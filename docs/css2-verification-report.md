@@ -56,11 +56,11 @@ and 17** using shared test snippets rendered in both engines.
 
 | Suite | Location | Tests | Provenance |
 |-------|----------|-------|------------|
-| Acid1CaptureTests | `Broiler.Cli.Tests/Acid1CaptureTests.cs` | ~30 | W3C Acid1 (CSS1 conformance) — capture verification |
-| Acid1ProgrammaticTests | `Broiler.Cli.Tests/Acid1ProgrammaticTests.cs` | ~25 | W3C Acid1 — programmatic layout assertions |
-| Acid1SplitTests | `Broiler.Cli.Tests/Acid1SplitTests.cs` | ~22 | Acid1 split into 10 isolated CSS1 feature sections |
-| Acid1DifferentialTests | `HtmlRenderer.Image.Tests/Acid1DifferentialTests.cs` | varies | Acid1 pixel-diff comparison vs Chromium |
-| Acid2NavigationTests | `Broiler.Cli.Tests/Acid2NavigationTests.cs` | 16 | W3C Acid2 — link navigation and basic rendering |
+| Acid1CaptureTests | `Broiler.Cli.Tests/Acid1CaptureTests.cs` | 34 | W3C Acid1 (CSS1 conformance) — capture verification |
+| Acid1ProgrammaticTests | `Broiler.Cli.Tests/Acid1ProgrammaticTests.cs` | 49 | W3C Acid1 — programmatic layout assertions |
+| Acid1SplitTests | `Broiler.Cli.Tests/Acid1SplitTests.cs` | 25 | Acid1 split into 10 isolated CSS1 feature sections |
+| Acid1DifferentialTests | `HtmlRenderer.Image.Tests/Acid1DifferentialTests.cs` | 24 | Acid1 pixel-diff comparison vs Chromium |
+| Acid2NavigationTests | `Broiler.Cli.Tests/Acid2NavigationTests.cs` | 13 | W3C Acid2 — link navigation and basic rendering |
 
 ### 2.4 CSS Unit Tests (Parsing / Logic)
 
@@ -153,8 +153,9 @@ The table below summarises verification status:
 
 ### 4.1 Chapter 9 — Unchecked Items (7)
 
-1. **`display: run-in`** (4 items) — Removed from CSS3; intentionally omitted.
-   This display type was deprecated and is not supported by modern browsers.
+1. **`display: run-in`** (4 items) — Removed from the CSS specification;
+   intentionally omitted. This display type was dropped and is not supported
+   by modern browsers.
 2. **`unicode-bidi`** (3 items: `normal`, `embed`, `bidi-override`) — Not
    implemented. Only basic `direction: ltr | rtl` is supported.
 
