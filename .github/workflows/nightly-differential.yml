@@ -43,4 +43,6 @@ jobs:
         path: |
           HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/TestData/DifferentialReports/
           HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/TestData/Acid1DifferentialReports/
+          HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/TestData/Acid2DifferentialReports/
+          HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/TestData/FontRegressionBaselines/
         if-no-files-found: ignore
