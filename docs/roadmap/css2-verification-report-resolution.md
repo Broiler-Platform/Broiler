@@ -81,7 +81,7 @@ and current status.
 
 | # | Issue | Report § | Suite | Status |
 |---|-------|----------|-------|--------|
-| E1 | W3C CSS2.1 Test Suite not integrated | §7.3, §8.3 | test.csswg.org (~9000 tests) | ⬜ Pending |
+| E1 | W3C CSS2.1 Test Suite not integrated | §7.3, §8.3 | [test.csswg.org](https://test.csswg.org/) (~9000 tests) | ⬜ Pending |
 | E2 | Web Platform Tests (WPT) not integrated | §7.3 | wpt.fyi CSS2 tests | ⬜ Pending |
 | E3 | Acid3 not tested | §7.3 | CSS2/3 + DOM features | ⬜ Pending |
 
@@ -429,7 +429,7 @@ coverage.
 #### 10a. W3C CSS2.1 Test Suite (E1)
 
 - [ ] Download and review the official W3C CSS2.1 test suite from
-  `test.csswg.org` (~9000+ tests).
+  [test.csswg.org](https://test.csswg.org/) (~9000+ tests).
 - [ ] Evaluate the test format (reference tests with reference images)
   and determine adaptation requirements.
 - [ ] Build an adapter to run W3C ref tests through the html-renderer
