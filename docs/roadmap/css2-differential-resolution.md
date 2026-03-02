@@ -398,11 +398,11 @@ additional chapter test classes.
 
 | Milestone | Priority | Target Outcome | Success Metric | Status |
 |-----------|----------|---------------|----------------|--------|
-| M1 | P1 | UA stylesheet aligned | Critical ≤ 6, pass rate ≥ 90 % | ✅ Code Complete |
-| M2 | P2 | Table backgrounds correct | Chapter 17: 0 Critical | ✅ Code Complete |
+| M1 | P1 | UA stylesheet aligned | Critical ≤ 6, pass rate ≥ 90 % | ✅ Complete |
+| M2 | P2 | Table backgrounds correct | Chapter 17: 0 Critical | ✅ Complete |
 | M3 | P3 | Float overlaps eliminated | 0 overlap warnings | 🔄 In Progress |
-| M4 | P4 | Table heights correct | 0 High-severity tests | ⬜ Pending |
-| M5 | P5 | Medium diffs resolved | 0 Medium-severity tests | ⬜ Pending |
+| M4 | P4 | Table heights correct | 0 High-severity tests | 🔄 In Progress |
+| M5 | P5 | Medium diffs resolved | 0 Medium-severity tests | 🔄 In Progress |
 | M6 | P6 | Regression gate active | CI monitors all Low tests | ⬜ Pending |
 | M7 | P7 | Full chapter coverage | Chapters 4, 5, 8 in diff suite | ⬜ Pending |
 

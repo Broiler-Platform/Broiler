@@ -3,8 +3,9 @@ namespace HtmlRenderer.Image.Tests;
 /// <summary>
 /// Provides all CSS2 chapter test HTML snippets for differential verification.
 /// Each entry is a (chapter, testName, html) tuple extracted from
-/// Css2Chapter6Tests, Css2Chapter9Tests, Css2Chapter10Tests, Css2Chapter12Tests,
-/// Css2Chapter13Tests, Css2Chapter15Tests, Css2Chapter16Tests, and Css2Chapter17Tests.
+/// Css2Chapter6Tests, Css2Chapter8Tests, Css2Chapter9Tests, Css2Chapter10Tests,
+/// Css2Chapter11Tests, Css2Chapter12Tests, Css2Chapter13Tests, Css2Chapter14Tests,
+/// Css2Chapter15Tests, Css2Chapter16Tests, Css2Chapter17Tests, and Css2Chapter18Tests.
 /// </summary>
 internal static class Css2TestSnippets
 {
@@ -1574,6 +1575,413 @@ newlines are preserved  </p>"),
               </div>"),
     ];
 
+    /// <summary>CSS 2.1 Chapter 8 test snippets — Box Model (25 tests).</summary>
+    internal static readonly (string Name, string Html)[] Chapter8 =
+    [
+        ("S8_1_ContentArea_BasicDimensions", @"<body style='margin:0;padding:0;'>
+              <div style='width:200px;height:100px;background-color:red;'></div>
+            </body>"),
+        ("S8_1_BoxModel_FullDiagram", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:60px;padding:10px;border:5px solid black;margin:20px;background-color:red;'></div>
+            </body>"),
+        ("S8_3_MarginShorthand_4Values", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;margin:5px 10px 15px 25px;background-color:red;'></div>
+            </body>"),
+        ("S8_3_AutoMargins_HorizontalCentering", @"<body style='margin:0;padding:0;'>
+              <div style='width:400px;'>
+                <div style='width:200px;height:50px;margin-left:auto;margin-right:auto;background-color:red;'></div>
+              </div>
+            </body>"),
+        ("S8_3_NegativeMargin_PullsUp", @"<body style='margin:0;padding:0;'>
+              <div style='width:200px;'>
+                <div style='height:50px;background-color:red;'></div>
+                <div style='height:50px;margin-top:-20px;background-color:blue;'></div>
+              </div>
+            </body>"),
+        ("S8_3_1_AdjacentVerticalMarginsCollapse", @"<body style='margin:0;padding:0;'>
+              <div style='width:200px;'>
+                <div style='height:30px;margin-bottom:25px;background-color:red;'></div>
+                <div style='height:30px;margin-top:15px;background-color:blue;'></div>
+              </div>
+            </body>"),
+        ("S8_3_1_FloatMarginsDoNotCollapse", @"<body style='margin:0;padding:0;'>
+              <div style='width:300px;'>
+                <div style='float:left;width:100px;height:50px;margin-bottom:20px;background-color:red;'></div>
+                <div style='clear:both;height:50px;margin-top:20px;background-color:blue;'></div>
+              </div>
+            </body>"),
+        ("S8_3_1_ParentFirstChildMarginCollapsing", @"<body style='margin:0;padding:0;'>
+              <div style='width:200px;margin-top:20px;'>
+                <div style='height:50px;margin-top:30px;background-color:red;'></div>
+              </div>
+            </body>"),
+        ("S8_3_1_NegativeMargins_DeductedFromPositive", @"<body style='margin:0;padding:0;'>
+              <div style='width:200px;'>
+                <div style='height:40px;margin-bottom:30px;background-color:red;'></div>
+                <div style='height:40px;margin-top:-10px;background-color:blue;'></div>
+              </div>
+            </body>"),
+        ("S8_4_PaddingShorthand_4Values", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;padding:5px 10px 15px 20px;background-color:green;'></div>
+            </body>"),
+        ("S8_4_PaddingUsesElementBackground", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:60px;padding:30px;background-color:#00ff00;'></div>
+            </body>"),
+        ("S8_5_1_BorderWidthShorthand_4Values", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;border-width:2px 4px 6px 8px;border-style:solid;border-color:red;'></div>
+            </body>"),
+        ("S8_5_3_Solid_RendersVisibleBorder", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:60px;border:8px solid red;background-color:white;'></div>
+            </body>"),
+        ("S8_5_3_Double_RendersWithWidth", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;border:6px double red;'></div>
+            </body>"),
+        ("S8_5_4_BorderShorthand_AllFourSides", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:60px;border:10px solid red;background-color:white;'></div>
+            </body>"),
+        ("S8_3_MarginShorthand_2Values", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;margin:10px 20px;background-color:red;'></div>
+            </body>"),
+        ("S8_3_MarginShorthand_1Value", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;margin:15px;background-color:red;'></div>
+            </body>"),
+        ("S8_4_PaddingShorthand_2Values", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;padding:10px 20px;background-color:green;'></div>
+            </body>"),
+        ("S8_5_3_Dashed_BorderStyle", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;border:3px dashed red;'></div>
+            </body>"),
+        ("S8_5_3_Dotted_BorderStyle", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;border:3px dotted blue;'></div>
+            </body>"),
+        ("S8_5_3_None_NoBorder", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;border:none;background-color:red;'></div>
+            </body>"),
+        ("S8_5_4_BorderColorShorthand", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;border:3px solid;border-color:red blue green orange;'></div>
+            </body>"),
+        ("S8_3_1_InlineFlowMarginsDoNotCollapse", @"<body style='margin:0;padding:0;'>
+              <div style='width:300px;'>
+                <span style='margin-right:20px;background-color:red;'>Inline A</span>
+                <span style='margin-left:20px;background-color:blue;'>Inline B</span>
+              </div>
+            </body>"),
+        ("S8_BoxSizing_ContentBox_Default", @"<body style='margin:0;padding:0;'>
+              <div style='width:200px;height:100px;padding:20px;border:5px solid black;background-color:red;'></div>
+            </body>"),
+        ("S8_Integration_NestedBoxModel", @"<body style='margin:0;padding:0;'>
+              <div style='width:300px;padding:10px;border:2px solid black;background-color:#eee;'>
+                <div style='width:100px;height:40px;margin:10px;padding:5px;border:1px solid red;background-color:#ccc;'></div>
+                <div style='width:100px;height:40px;margin:10px;padding:5px;border:1px solid blue;background-color:#aaa;'></div>
+              </div>
+            </body>"),
+    ];
+
+    /// <summary>CSS 2.1 Chapter 11 test snippets — Visual Effects (25 tests).</summary>
+    internal static readonly (string Name, string Html)[] Chapter11 =
+    [
+        ("S11_1_1_OverflowVisible_ContentNotClipped", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;overflow:visible;background-color:#eee;'>
+                <div style='width:200px;height:30px;background-color:red;'></div>
+              </div>
+            </body>"),
+        ("S11_1_1_OverflowHidden_ContentClipped", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;overflow:hidden;background-color:#eee;'>
+                <div style='width:200px;height:30px;background-color:red;'></div>
+              </div>
+            </body>"),
+        ("S11_1_1_OverflowScroll_ContentClipped", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;overflow:scroll;background-color:#eee;'>
+                <div style='width:200px;height:30px;background-color:blue;'></div>
+              </div>
+            </body>"),
+        ("S11_1_1_OverflowAuto_ContentClippedWhenOverflowing", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;overflow:auto;background-color:#eee;'>
+                <div style='width:200px;height:30px;background-color:#00ff00;'></div>
+              </div>
+            </body>"),
+        ("S11_1_1_OverflowCreatesNewBFC", @"<body style='margin:0;padding:0;'>
+              <div style='width:200px;overflow:hidden;background-color:#ddd;'>
+                <div style='float:left;width:80px;height:60px;background-color:red;'></div>
+                <div style='float:left;width:80px;height:60px;background-color:blue;'></div>
+              </div>
+            </body>"),
+        ("S11_1_1_OverflowPerpendicularDirection_VerticalOverflow", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;overflow:hidden;background-color:#eee;'>
+                <div style='width:80px;height:200px;background-color:red;'></div>
+              </div>
+            </body>"),
+        ("S11_1_1_OverflowClippingAtPaddingEdge", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:60px;padding:10px;overflow:hidden;background-color:#ddd;border:2px solid black;'>
+                <div style='width:200px;height:30px;background-color:red;'></div>
+              </div>
+            </body>"),
+        ("S11_1_1_AbsolutePositionedOutsideOverflowClip", @"<body style='margin:0;padding:0;position:relative;'>
+              <div style='width:100px;height:100px;overflow:hidden;background-color:#ddd;'>
+                <div style='position:absolute;top:0;left:150px;width:50px;height:50px;background-color:red;'></div>
+              </div>
+            </body>"),
+        ("S11_1_2_ClipRect_ClippingRectangle", @"<body style='margin:0;padding:0;'>
+              <div style='position:absolute;top:0;left:0;width:200px;height:200px;clip:rect(10px,100px,100px,10px);background-color:red;'></div>
+            </body>"),
+        ("S11_1_2_ClipAppliesOnlyToAbsolutelyPositioned", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:100px;clip:rect(0px,50px,50px,0px);background-color:#00ff00;'></div>
+            </body>"),
+        ("S11_1_2_ClipAutoEdge_UsesBorderEdge", @"<body style='margin:0;padding:0;'>
+              <div style='position:absolute;top:0;left:0;width:100px;height:100px;clip:rect(auto,auto,auto,auto);background-color:#00ff00;'></div>
+            </body>"),
+        ("S11_1_2_ClipNegativeValues_Allowed", @"<body style='margin:0;padding:0;'>
+              <div style='position:absolute;top:20px;left:20px;width:100px;height:100px;clip:rect(-10px,120px,120px,-10px);background-color:blue;'></div>
+            </body>"),
+        ("S11_2_VisibilityVisible_BoxIsVisible", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;visibility:visible;background-color:red;'></div>
+            </body>"),
+        ("S11_2_VisibilityHidden_InvisibleButAffectsLayout", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;visibility:hidden;background-color:red;'></div>
+              <div style='width:100px;height:50px;background-color:blue;'></div>
+            </body>"),
+        ("S11_2_HiddenDescendant_CanBeVisible", @"<body style='margin:0;padding:0;'>
+              <div style='visibility:hidden;width:200px;height:100px;'>
+                <div style='visibility:visible;width:80px;height:40px;background-color:red;'></div>
+              </div>
+            </body>"),
+        ("S11_1_1_OverflowHidden_VerticalAndHorizontal", @"<body style='margin:0;padding:0;'>
+              <div style='width:80px;height:80px;overflow:hidden;background-color:#eee;'>
+                <div style='width:150px;height:150px;background-color:red;'></div>
+              </div>
+            </body>"),
+        ("S11_1_1_OverflowHidden_WithPaddingAndBorder", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:60px;padding:5px;border:2px solid black;overflow:hidden;background-color:#ddd;'>
+                <div style='width:200px;height:100px;background-color:green;'></div>
+              </div>
+            </body>"),
+        ("S11_2_VisibilityHidden_PreservesSpace", @"<body style='margin:0;padding:0;'>
+              <div style='width:200px;'>
+                <div style='height:40px;background-color:red;'></div>
+                <div style='height:40px;visibility:hidden;background-color:green;'></div>
+                <div style='height:40px;background-color:blue;'></div>
+              </div>
+            </body>"),
+        ("S11_2_VisibilityCollapse_OnTableRow", @"<body style='margin:0;padding:0;'>
+              <table style='border-collapse:collapse;'>
+                <tr><td style='background-color:red;padding:5px;'>Row 1</td></tr>
+                <tr style='visibility:collapse;'><td style='background-color:green;padding:5px;'>Row 2</td></tr>
+                <tr><td style='background-color:blue;padding:5px;'>Row 3</td></tr>
+              </table>
+            </body>"),
+        ("S11_1_1_OverflowVisible_NoClipping", @"<body style='margin:0;padding:0;'>
+              <div style='width:60px;height:60px;overflow:visible;background-color:#ddd;border:1px solid black;'>
+                <div style='width:100px;height:100px;background-color:rgba(255,0,0,0.5);'></div>
+              </div>
+            </body>"),
+        ("S11_1_1_OverflowHidden_NestedContainers", @"<body style='margin:0;padding:0;'>
+              <div style='width:150px;height:100px;overflow:hidden;background-color:#eee;'>
+                <div style='width:120px;height:80px;overflow:hidden;background-color:#ccc;'>
+                  <div style='width:200px;height:200px;background-color:red;'></div>
+                </div>
+              </div>
+            </body>"),
+        ("S11_Integration_OverflowWithFloat", @"<body style='margin:0;padding:0;'>
+              <div style='width:200px;height:80px;overflow:hidden;background-color:#eee;'>
+                <div style='float:left;width:100px;height:120px;background-color:red;'></div>
+                <p>Text content that flows around the float within the overflow container.</p>
+              </div>
+            </body>"),
+        ("S11_Integration_VisibilityWithOverflow", @"<body style='margin:0;padding:0;'>
+              <div style='width:150px;height:80px;overflow:hidden;'>
+                <div style='visibility:hidden;width:100px;height:40px;background-color:red;'></div>
+                <div style='width:100px;height:60px;background-color:blue;'></div>
+              </div>
+            </body>"),
+        ("S11_1_2_ClipRect_PartialClip", @"<body style='margin:0;padding:0;'>
+              <div style='position:absolute;top:0;left:0;width:100px;height:100px;clip:rect(20px,80px,80px,20px);background-color:red;'></div>
+            </body>"),
+        ("S11_Integration_ClipWithOverflow", @"<body style='margin:0;padding:0;'>
+              <div style='position:absolute;top:0;left:0;width:150px;height:100px;clip:rect(0px,120px,80px,0px);overflow:hidden;background-color:green;'>
+                <div style='width:200px;height:200px;background-color:red;'></div>
+              </div>
+            </body>"),
+    ];
+
+    /// <summary>CSS 2.1 Chapter 14 test snippets — Colors and Backgrounds (25 tests).</summary>
+    internal static readonly (string Name, string Html)[] Chapter14 =
+    [
+        ("S14_1_ColorSetsTextForeground_Red", @"<body style='margin:0;padding:0;background:white;'>
+              <div style='font-size:40px;color:red;'>XXXX</div>
+            </body>"),
+        ("S14_1_ColorInheritedByDefault", @"<body style='margin:0;padding:0;background:white;'>
+              <div style='color:red;font-size:40px;'>
+                <span>XXXX</span>
+              </div>
+            </body>"),
+        ("S14_2_1_BackgroundColorRed", @"<body style='margin:0;padding:0;'>
+              <div style='background-color:red;width:100px;height:50px;'></div>
+            </body>"),
+        ("S14_2_1_BackgroundColorTransparent", @"<body style='margin:0;padding:0;background:white;'>
+              <div style='background-color:transparent;width:100px;height:50px;border:1px solid black;'></div>
+            </body>"),
+        ("S14_2_1_MultipleElementsDifferentBgColors", @"<body style='margin:0;padding:0;background:white;'>
+              <div style='background-color:red;width:100px;height:50px;'></div>
+              <div style='background-color:blue;width:100px;height:50px;'></div>
+            </body>"),
+        ("S14_2_1_BackgroundImageNone", @"<body style='margin:0;padding:0;background:white;'>
+              <div style='background-image:none;background-color:red;width:100px;height:50px;'></div>
+            </body>"),
+        ("S14_2_1_BackgroundRepeatDefault", @"<body style='margin:0;padding:0;'>
+              <div style='background-color:red;background-repeat:repeat;width:100px;height:50px;'></div>
+            </body>"),
+        ("S14_2_1_BackgroundRepeatX", @"<body style='margin:0;padding:0;'>
+              <div style='background-color:red;background-repeat:repeat-x;width:100px;height:50px;'>X</div>
+            </body>"),
+        ("S14_2_1_BackgroundRepeatNoRepeat", @"<body style='margin:0;padding:0;'>
+              <div style='background-color:red;background-repeat:no-repeat;width:100px;height:50px;'>NR</div>
+            </body>"),
+        ("S14_2_1_BackgroundPositionCenter", @"<body style='margin:0;padding:0;'>
+              <div style='background-color:red;background-position:center center;width:100px;height:50px;'>C</div>
+            </body>"),
+        ("S14_2_1_BackgroundPositionPercentage", @"<body style='margin:0;padding:0;'>
+              <div style='background-color:red;background-position:50% 50%;width:100px;height:50px;'></div>
+            </body>"),
+        ("S14_2_1_BackgroundAttachmentScroll", @"<body style='margin:0;padding:0;'>
+              <div style='background-color:red;background-attachment:scroll;width:100px;height:50px;'>Content</div>
+            </body>"),
+        ("S14_2_1_BackgroundShorthand", @"<body style='margin:0;padding:0;'>
+              <div style='background:red;width:100px;height:50px;'></div>
+            </body>"),
+        ("S14_1_ColorHexValue", @"<body style='margin:0;padding:0;background:white;'>
+              <div style='font-size:40px;color:#0000ff;'>XXXX</div>
+            </body>"),
+        ("S14_1_ColorRgbFunction", @"<body style='margin:0;padding:0;background:white;'>
+              <div style='font-size:40px;color:rgb(0,128,0);'>XXXX</div>
+            </body>"),
+        ("S14_2_1_BackgroundColorNamedColors", @"<body style='margin:0;padding:0;'>
+              <div style='background-color:navy;width:100px;height:30px;'></div>
+              <div style='background-color:olive;width:100px;height:30px;'></div>
+              <div style='background-color:teal;width:100px;height:30px;'></div>
+            </body>"),
+        ("S14_2_1_BackgroundColorHex", @"<body style='margin:0;padding:0;'>
+              <div style='background-color:#ff8800;width:100px;height:50px;'></div>
+            </body>"),
+        ("S14_2_1_BackgroundColorRgb", @"<body style='margin:0;padding:0;'>
+              <div style='background-color:rgb(128,0,255);width:100px;height:50px;'></div>
+            </body>"),
+        ("S14_2_BackgroundExtendsToPaddingEdge", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;padding:20px;background-color:red;border:2px solid black;'></div>
+            </body>"),
+        ("S14_1_ColorOnInlineElement", @"<body style='margin:0;padding:0;background:white;'>
+              <p style='font-size:20px;'>Normal <span style='color:red;'>red text</span> normal</p>
+            </body>"),
+        ("S14_2_1_BackgroundOnInlineElement", @"<body style='margin:0;padding:0;'>
+              <p style='font-size:20px;'>Normal <span style='background-color:yellow;'>highlighted</span> normal</p>
+            </body>"),
+        ("S14_2_PropagateBodyBgToCanvas", @"<body style='margin:0;padding:0;background-color:red;'>
+              <div style='width:100px;height:50px;'></div>
+            </body>"),
+        ("S14_Integration_ColorAndBackground", @"<body style='margin:0;padding:0;background:white;'>
+              <div style='width:200px;padding:10px;background-color:#eee;color:navy;font-size:16px;'>
+                <p>Navy text on grey background</p>
+              </div>
+            </body>"),
+        ("S14_Integration_NestedBackgrounds", @"<body style='margin:0;padding:0;'>
+              <div style='width:200px;height:100px;background-color:red;padding:10px;'>
+                <div style='width:100px;height:50px;background-color:blue;'></div>
+              </div>
+            </body>"),
+        ("S14_Integration_TransparentOverColored", @"<body style='margin:0;padding:0;'>
+              <div style='width:200px;height:80px;background-color:green;'>
+                <div style='width:100px;height:40px;background-color:transparent;border:1px solid white;'></div>
+              </div>
+            </body>"),
+    ];
+
+    /// <summary>CSS 2.1 Chapter 18 test snippets — User Interface (25 tests).</summary>
+    internal static readonly (string Name, string Html)[] Chapter18 =
+    [
+        ("S18_1_CursorPointer", @"<body style='margin:0;padding:0;'>
+              <a href='#' style='cursor:pointer;'>Pointer link</a>
+            </body>"),
+        ("S18_1_CursorCrosshair", @"<body style='margin:0;padding:0;'>
+              <div style='cursor:crosshair;width:100px;height:50px;background-color:blue;'>Crosshair</div>
+            </body>"),
+        ("S18_1_CursorText", @"<body style='margin:0;padding:0;'>
+              <p style='cursor:text;'>Selectable text cursor</p>
+            </body>"),
+        ("S18_1_CursorHelp", @"<body style='margin:0;padding:0;'>
+              <div style='cursor:help;width:100px;height:50px;background-color:pink;'>Help</div>
+            </body>"),
+        ("S18_1_CursorDefault", @"<body style='margin:0;padding:0;'>
+              <div style='cursor:default;width:100px;height:50px;background-color:#eee;'>Default</div>
+            </body>"),
+        ("S18_1_CursorWait", @"<body style='margin:0;padding:0;'>
+              <div style='cursor:wait;width:100px;height:50px;background-color:orange;'>Wait</div>
+            </body>"),
+        ("S18_2_SystemColorActiveBorder", @"<body style='margin:0;padding:0;'>
+              <div style='background-color:ActiveBorder;width:100px;height:50px;'>ActiveBorder</div>
+            </body>"),
+        ("S18_2_SystemColorHighlight", @"<body style='margin:0;padding:0;'>
+              <div style='background-color:Highlight;width:100px;height:50px;'>Highlight</div>
+            </body>"),
+        ("S18_2_SystemColorButtonFace", @"<body style='margin:0;padding:0;'>
+              <div style='background-color:ButtonFace;width:100px;height:50px;'>ButtonFace</div>
+            </body>"),
+        ("S18_2_SystemColorDeprecatedCSS3", @"<body style='margin:0;padding:0;'>
+              <div style='color:ButtonText;background-color:ButtonFace;border:1px solid ButtonShadow;width:120px;height:40px;padding:5px;'>Styled button</div>
+            </body>"),
+        ("S18_3_SystemFontCaption", @"<body style='margin:0;padding:0;'>
+              <p style='font:caption;'>Caption system font</p>
+            </body>"),
+        ("S18_3_SystemFontMenu", @"<body style='margin:0;padding:0;'>
+              <p style='font:menu;'>Menu system font</p>
+            </body>"),
+        ("S18_3_SystemFontWithOverride", @"<body style='margin:0;padding:0;'>
+              <p style='font:caption;font-size:20px;'>Caption with size override</p>
+            </body>"),
+        ("S18_4_OutlineStyleSolid", @"<body style='margin:0;padding:0;'>
+              <div style='outline:2px solid red;width:100px;height:50px;background-color:white;'>Solid</div>
+            </body>"),
+        ("S18_4_OutlineColorInvert", @"<body style='margin:0;padding:0;'>
+              <div style='outline-style:solid;outline-color:invert;width:100px;height:50px;background-color:green;'>Invert</div>
+            </body>"),
+        ("S18_4_OutlineWidthPixels", @"<body style='margin:0;padding:0;'>
+              <div style='outline:3px solid black;width:100px;height:50px;background-color:yellow;'>3px</div>
+            </body>"),
+        ("S18_4_OutlineShorthand", @"<body style='margin:0;padding:0;'>
+              <div style='outline:2px solid red;width:100px;height:50px;background-color:white;'>Shorthand</div>
+            </body>"),
+        ("S18_4_OutlineDoesNotAffectLayout", @"<body style='margin:0;padding:0;'>
+              <div style='width:200px;'>
+                <div style='outline:5px solid red;width:100px;height:30px;background-color:#eee;'>A</div>
+                <div style='width:100px;height:30px;background-color:#ccc;'>B</div>
+              </div>
+            </body>"),
+        ("S18_4_OutlineStyleDashed", @"<body style='margin:0;padding:0;'>
+              <div style='outline:2px dashed blue;width:100px;height:50px;background-color:white;'>Dashed</div>
+            </body>"),
+        ("S18_4_OutlineStyleDotted", @"<body style='margin:0;padding:0;'>
+              <div style='outline:2px dotted green;width:100px;height:50px;background-color:white;'>Dotted</div>
+            </body>"),
+        ("S18_4_OutlineWidthKeywords", @"<body style='margin:0;padding:0;'>
+              <div style='outline:thin solid red;width:100px;height:30px;'>Thin</div>
+              <div style='outline:medium solid red;width:100px;height:30px;'>Medium</div>
+              <div style='outline:thick solid red;width:100px;height:30px;'>Thick</div>
+            </body>"),
+        ("S18_1_CursorMove", @"<body style='margin:0;padding:0;'>
+              <div style='cursor:move;width:100px;height:50px;background-color:lightblue;'>Move</div>
+            </body>"),
+        ("S18_2_SystemColorWindowText", @"<body style='margin:0;padding:0;'>
+              <div style='color:WindowText;background-color:Window;width:150px;height:50px;padding:5px;'>Window text</div>
+            </body>"),
+        ("S18_Integration_OutlineAndBorder", @"<body style='margin:0;padding:0;'>
+              <div style='width:100px;height:50px;border:2px solid black;outline:3px solid red;background-color:white;'>Both</div>
+            </body>"),
+        ("S18_Integration_CursorAndSystemColors", @"<body style='margin:0;padding:0;'>
+              <div style='width:200px;padding:10px;'>
+                <div style='cursor:pointer;background-color:ButtonFace;color:ButtonText;padding:5px 10px;'>Click me</div>
+                <div style='cursor:text;background-color:Window;color:WindowText;padding:5px;margin-top:5px;'>Editable area</div>
+              </div>
+            </body>"),
+    ];
+
     /// <summary>All CSS2 test snippets across all chapters.</summary>
     /// <remarks>
     /// Each snippet is wrapped in <c>&lt;html&gt;&lt;body&gt;…&lt;/body&gt;&lt;/html&gt;</c>
@@ -1586,20 +1994,28 @@ newlines are preserved  </p>"),
     {
         foreach (var (name, html) in Chapter6)
             yield return ("Chapter 6", name, EnsureBodyWrapper(html));
+        foreach (var (name, html) in Chapter8)
+            yield return ("Chapter 8", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter9)
             yield return ("Chapter 9", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter10)
             yield return ("Chapter 10", name, EnsureBodyWrapper(html));
+        foreach (var (name, html) in Chapter11)
+            yield return ("Chapter 11", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter12)
             yield return ("Chapter 12", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter13)
             yield return ("Chapter 13", name, EnsureBodyWrapper(html));
+        foreach (var (name, html) in Chapter14)
+            yield return ("Chapter 14", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter15)
             yield return ("Chapter 15", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter16)
             yield return ("Chapter 16", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter17)
             yield return ("Chapter 17", name, EnsureBodyWrapper(html));
+        foreach (var (name, html) in Chapter18)
+            yield return ("Chapter 18", name, EnsureBodyWrapper(html));
     }
 
     /// <summary>
