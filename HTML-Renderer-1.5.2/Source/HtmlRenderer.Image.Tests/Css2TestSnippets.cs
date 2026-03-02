@@ -1575,23 +1575,44 @@ newlines are preserved  </p>"),
     ];
 
     /// <summary>All CSS2 test snippets across all chapters.</summary>
+    /// <remarks>
+    /// Each snippet is wrapped in <c>&lt;html&gt;&lt;body&gt;…&lt;/body&gt;&lt;/html&gt;</c>
+    /// when not already present. This aligns html-renderer's fragment parsing
+    /// with Chromium's implicit HTML5 wrapper injection so that the UA default
+    /// <c>body { margin: 8px }</c> applies consistently in both engines during
+    /// differential comparison (Phase 1 — P1 UA stylesheet alignment).
+    /// </remarks>
     internal static IEnumerable<(string Chapter, string Name, string Html)> All()
     {
         foreach (var (name, html) in Chapter6)
-            yield return ("Chapter 6", name, html);
+            yield return ("Chapter 6", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter9)
-            yield return ("Chapter 9", name, html);
+            yield return ("Chapter 9", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter10)
-            yield return ("Chapter 10", name, html);
+            yield return ("Chapter 10", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter12)
-            yield return ("Chapter 12", name, html);
+            yield return ("Chapter 12", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter13)
-            yield return ("Chapter 13", name, html);
+            yield return ("Chapter 13", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter15)
-            yield return ("Chapter 15", name, html);
+            yield return ("Chapter 15", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter16)
-            yield return ("Chapter 16", name, html);
+            yield return ("Chapter 16", name, EnsureBodyWrapper(html));
         foreach (var (name, html) in Chapter17)
-            yield return ("Chapter 17", name, html);
+            yield return ("Chapter 17", name, EnsureBodyWrapper(html));
+    }
+
+    /// <summary>
+    /// Wraps HTML in <c>&lt;html&gt;&lt;body&gt;…&lt;/body&gt;&lt;/html&gt;</c>
+    /// when neither <c>&lt;body</c> nor <c>&lt;html</c> tags are present.
+    /// Snippets that already contain explicit wrappers are returned unchanged.
+    /// </summary>
+    internal static string EnsureBodyWrapper(string html)
+    {
+        if (html.Contains("<body", StringComparison.OrdinalIgnoreCase) ||
+            html.Contains("<html", StringComparison.OrdinalIgnoreCase))
+            return html;
+
+        return $"<html><body>{html}</body></html>";
     }
 }
