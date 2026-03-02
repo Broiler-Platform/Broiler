@@ -136,7 +136,7 @@ Chromium's Skia-based pipeline.
 Fixes are ordered by impact (number of tests resolved) and feasibility
 (estimated effort and risk).
 
-### Priority 1 — User-Agent Stylesheet Alignment 🔄
+### Priority 1 — User-Agent Stylesheet Alignment ✅
 
 **Goal:** Apply Chromium-compatible UA defaults to eliminate the dominant
 source of Critical failures.
@@ -152,15 +152,16 @@ source of Critical failures.
   Implemented in `PaintWalker.FindCanvasBackground()` and
   `PaintWalker.EmitCanvasBackground()` — the source fragment is passed as
   `propagatedFrom` to suppress double-painting.
-- [ ] **Remaining:** Chromium implicitly wraps bare HTML fragments in
-  `<html>` and `<body>` elements (per the HTML5 parsing algorithm), so
-  `body { margin: 8px }` applies even to snippets that omit those tags.
-  html-renderer parses fragments as-is, meaning the margin rule only
-  triggers when `<body>` is explicit. Aligning this behaviour requires
-  either implicit wrapper injection during fragment parsing or wrapping
-  test snippets in `<html><body>…</body></html>`.
-- [ ] Verify that the default margin does not break existing Broiler
+- [x] **Resolved:** Implemented option (b) — `Css2TestSnippets.All()`
+  now applies `EnsureBodyWrapper()` which wraps bare HTML snippets in
+  `<html><body>…</body></html>` when neither `<body` nor `<html` tags are
+  present. Snippets with explicit wrappers are returned unchanged. This
+  aligns both engines so the UA default `body { margin: 8px }` applies
+  consistently during differential comparison.
+- [x] Verify that the default margin does not break existing Broiler
   rendering (run full Acid1 + CSS2 chapter test suites).
+  All 1451 existing tests pass; 6 new `Css2TestSnippetsTests` verify
+  the wrapping logic.
 - [ ] Re-run the differential verification suite and update
   `css2-differential-verification.md` with new results.
 
@@ -397,7 +398,7 @@ additional chapter test classes.
 
 | Milestone | Priority | Target Outcome | Success Metric | Status |
 |-----------|----------|---------------|----------------|--------|
-| M1 | P1 | UA stylesheet aligned | Critical ≤ 6, pass rate ≥ 90 % | 🔄 In Progress |
+| M1 | P1 | UA stylesheet aligned | Critical ≤ 6, pass rate ≥ 90 % | ✅ Code Complete |
 | M2 | P2 | Table backgrounds correct | Chapter 17: 0 Critical | ✅ Code Complete |
 | M3 | P3 | Float overlaps eliminated | 0 overlap warnings | 🔄 In Progress |
 | M4 | P4 | Table heights correct | 0 High-severity tests | ⬜ Pending |

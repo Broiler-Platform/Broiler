@@ -44,7 +44,7 @@ and current status.
 
 | # | Issue | Report § | Severity | Tests | Status |
 |---|-------|----------|----------|-------|--------|
-| A1 | UA stylesheet differences (body margin on fragments) | §5.2 | Critical | 119 | 🔄 In Progress |
+| A1 | UA stylesheet differences (body margin on fragments) | §5.2 | Critical | 119 | ✅ Code Complete |
 | A2 | Table layer background rendering | §5.3 | Critical | 3 | ✅ Code Complete |
 | A3 | Float/block overlap violations | §5.4 | Critical–Medium | 6+ | 🔄 In Progress |
 | A4 | Table height distribution algorithm | §5.5 | High | 2 | ⬜ Pending |
@@ -98,7 +98,7 @@ and current status.
 Issues are ordered by impact (severity × test count) and feasibility.
 Each priority maps to one or more issues from the inventory above.
 
-### Priority 1 — UA Stylesheet Alignment (A1) 🔄
+### Priority 1 — UA Stylesheet Alignment (A1) ✅
 
 **Goal:** Eliminate the dominant source of Critical failures by aligning
 fragment handling with Chromium's implicit `<html><body>` wrapping.
@@ -113,11 +113,13 @@ failures are likely dominated by the same UA stylesheet root cause).
 - [x] Add `body { margin: 8px }` to `CssDefaults.cs`.
 - [x] Implement CSS2.1 §14.2 background propagation in
   `PaintWalker.FindCanvasBackground()` / `EmitCanvasBackground()`.
-- [ ] Align fragment parsing to apply body margin when `<body>` is not
-  explicitly present. Options:
-  - (a) Inject implicit `<html><body>` wrappers during fragment parsing.
-  - (b) Wrap test snippets in `<html><body>…</body></html>`.
-- [ ] Verify no regressions in Acid1 + CSS2 chapter test suites.
+- [x] Align fragment parsing to apply body margin when `<body>` is not
+  explicitly present. Implemented option (b): `Css2TestSnippets.All()`
+  now applies `EnsureBodyWrapper()` which wraps bare snippets in
+  `<html><body>…</body></html>`. Snippets that already contain explicit
+  `<body>` or `<html>` tags are returned unchanged.
+- [x] Verify no regressions in Acid1 + CSS2 chapter test suites.
+  All 1451 existing tests pass; 6 new `Css2TestSnippetsTests` added.
 - [ ] Re-run differential verification and update
   `css2-differential-verification.md`.
 
@@ -492,7 +494,7 @@ The following issues from the verification report require no action:
 
 | Milestone | Priority | Target Outcome | Success Metric | Status |
 |-----------|----------|----------------|----------------|--------|
-| M1 | P1 | UA stylesheet aligned | Critical ≤ 6, pass rate ≥ 90% | 🔄 In Progress |
+| M1 | P1 | UA stylesheet aligned | Critical ≤ 6, pass rate ≥ 90% | ✅ Code Complete |
 | M2 | P2 | Table backgrounds verified | Chapter 17: 0 Critical | ✅ Code Complete |
 | M3 | P3 | Float overlaps eliminated | 0 overlap warnings | 🔄 In Progress |
 | M4 | P4 | Table heights correct | 0 High-severity tests | ⬜ Pending |
