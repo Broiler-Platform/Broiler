@@ -89,16 +89,16 @@ implementation targets:
 
 ## Chapter 6 — Cascading and Inheritance
 
-- [ ] Cascade order: user-agent → user → author
-- [ ] `!important` declarations override normal declarations
-- [ ] `!important` priority: user `!important` > author `!important`
-- [ ] Specificity-based ordering within same origin
-- [ ] Source order as final tie-breaker
-- [ ] Inline `style` attribute specificity
-- [ ] Inheritance of inherited properties
-- [ ] `inherit` keyword on any property
-- [ ] Specified, computed, used, and actual value stages
-- [ ] Initial values for non-inherited properties
+- [x] Cascade order: user-agent → user → author
+- [x] `!important` declarations override normal declarations
+- [x] `!important` priority: user `!important` > author `!important`
+- [x] Specificity-based ordering within same origin
+- [x] Source order as final tie-breaker
+- [x] Inline `style` attribute specificity
+- [x] Inheritance of inherited properties
+- [x] `inherit` keyword on any property
+- [x] Specified, computed, used, and actual value stages
+- [x] Initial values for non-inherited properties
 
 ## Chapter 7 — Media Types
 
@@ -287,14 +287,14 @@ implementation targets:
 
 ## Chapter 13 — Paged Media
 
-- [ ] `page-break-before: auto | always | avoid | left | right`
-- [ ] `page-break-after: auto | always | avoid | left | right`
-- [ ] `page-break-inside: auto | avoid`
-- [ ] `orphans` — minimum lines at bottom of page
-- [ ] `widows` — minimum lines at top of page
-- [ ] Page box model and `@page` rule
-- [ ] Allowed page breaks (between and inside block boxes)
-- [ ] Forced page breaks
+- [x] `page-break-before: auto | always | avoid | left | right`
+- [x] `page-break-after: auto | always | avoid | left | right`
+- [x] `page-break-inside: auto | avoid`
+- [x] `orphans` — minimum lines at bottom of page
+- [x] `widows` — minimum lines at top of page
+- [x] Page box model and `@page` rule
+- [x] Allowed page breaks (between and inside block boxes)
+- [x] Forced page breaks
 
 ## Chapter 14 — Colors and Backgrounds
 
