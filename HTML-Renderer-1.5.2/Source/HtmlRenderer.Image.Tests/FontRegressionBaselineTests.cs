@@ -47,9 +47,10 @@ public class FontRegressionBaselineTests
         BaselineDir, "css2-baselines.csv");
 
     /// <summary>
-    /// Maximum allowed increase in diff ratio (percentage points) before a
-    /// test is flagged as a regression.  A test whose baseline is 2.5 % will
-    /// fail if its current diff exceeds 4.5 %.
+    /// Maximum allowed increase in diff ratio before a test is flagged as a
+    /// regression.  Expressed as a fraction (0.02 = 2 percentage points).
+    /// Example: a test with a baseline ratio of 2.5 % (0.025) will fail if
+    /// its current diff ratio exceeds 4.5 % (0.045).
     /// </summary>
     private const double RegressionThreshold = 0.02;
 
@@ -196,14 +197,14 @@ public class FontRegressionBaselineTests
     }
 
     /// <summary>
-    /// Asserts that no Low-severity test exceeds the 5 % absolute ceiling.
-    /// This is a Broiler-only check (no Playwright needed) that validates
-    /// internal rendering consistency by comparing two renders of the same
-    /// snippet — if any single snippet produces different output across
-    /// renders, it indicates a determinism bug, not a font issue.
+    /// Validates that same-engine repeated renders of every CSS2 snippet
+    /// produce output within the 5 % absolute ceiling.  This is a looser
+    /// companion to <see cref="AllSnippets_RenderDeterministically"/> and
+    /// guards against subtle non-determinism that may only manifest as
+    /// small pixel-level variations (e.g. floating-point rounding).
     /// </summary>
     [Fact]
-    public void RegressionGate_NoTestExceeds5Percent()
+    public void DeterminismCeiling_NoSnippetExceeds5Percent()
     {
         // This test validates that every snippet renders identically when
         // rendered twice by the same engine (determinism).  Cross-engine
