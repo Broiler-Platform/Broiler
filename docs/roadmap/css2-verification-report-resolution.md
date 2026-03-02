@@ -328,7 +328,7 @@ comparison results in `css2-differential-verification.md`.
 
 ---
 
-### Priority 7 — Font Rasterisation Monitoring (A6) ⬜
+### Priority 7 — Font Rasterisation Monitoring (A6) 🔄
 
 **Goal:** Accept irreducible font differences and monitor for regressions.
 
@@ -338,9 +338,11 @@ comparison results in `css2-differential-verification.md`.
 
 **Tasks:**
 
-- [ ] Establish a baseline snapshot of all Low-severity diff ratios.
-- [ ] Add a CI check that flags any Low test whose diff increases by
+- [x] Establish a baseline snapshot of all Low-severity diff ratios.
+      Implemented in `FontRegressionBaselineTests.GenerateBaselineSnapshot()`.
+- [x] Add a CI check that flags any Low test whose diff increases by
   more than 2 percentage points (regression detection).
+      Implemented in `FontRegressionBaselineTests.CrossEngine_RegressionGate_NoDiffIncrease()`.
 - [ ] Document expected cross-environment variance (SkiaSharp/FreeType
   vs Chromium's HarfBuzz/Skia, font availability, hinting settings).
 
@@ -356,7 +358,7 @@ comparison results in `css2-differential-verification.md`.
 
 ---
 
-### Priority 8 — Acid2 Visual Comparison (F1) ⬜
+### Priority 8 — Acid2 Visual Comparison (F1) 🔄
 
 **Goal:** Complete a pixel-level comparison of Acid2 rendering against
 Chromium, beyond the current navigation-only tests.
@@ -367,11 +369,14 @@ Chromium, beyond the current navigation-only tests.
 
 **Tasks:**
 
-- [ ] Render the Acid2 test page using both html-renderer and Chromium.
-- [ ] Perform pixel-by-pixel comparison and measure diff ratio.
+- [x] Render the Acid2 test page using both html-renderer and Chromium.
+      Implemented in `Acid2DifferentialTests.Acid2Test_DifferentialBaseline()`.
+- [x] Perform pixel-by-pixel comparison and measure diff ratio.
+      Implemented via `DifferentialTestRunner.RunAsync()`.
 - [ ] Identify and document rendering differences.
-- [ ] Add differential test to `Acid2NavigationTests.cs` or a new
+- [x] Add differential test to `Acid2NavigationTests.cs` or a new
   `Acid2DifferentialTests.cs`.
+      Created `Acid2DifferentialTests.cs` with test and landing page comparisons.
 - [ ] Triage any Critical/High differences and add to the fix plan.
 
 **Dependencies:** `--follow-first-link` support in CLI (already
@@ -485,7 +490,7 @@ The following issues from the verification report require no action:
 |-------|----------|------------|------------------|--------|
 | 1 | Immediate | P1, P2 | UA stylesheet aligned; Critical ≤ 6; table backgrounds verified | ✅ Complete |
 | 2 | Short-term | P3, P4, P5, P6 | Float overlaps resolved; table heights fixed; medium diffs resolved; differential coverage expanded | 🔄 In Progress |
-| 3 | Medium-term | P6 (remaining), P7, P8 | All chapters diffed; font regression gate active; Acid2 visual comparison | ⬜ Pending |
+| 3 | Medium-term | P6 (remaining), P7, P8 | All chapters diffed; font regression gate active; Acid2 visual comparison | 🔄 In Progress |
 | 4 | Long-term | P9, P10 | `unicode-bidi` implemented; external test suites integrated | ⬜ Pending |
 
 ---
@@ -500,8 +505,8 @@ The following issues from the verification report require no action:
 | M4 | P4 | Table heights correct | 0 High-severity tests | 🔄 In Progress |
 | M5 | P5 | Medium diffs resolved | 0 Medium-severity tests | 🔄 In Progress |
 | M6 | P6 | Full chapter differential coverage | All chapters in diff suite | 🔄 In Progress |
-| M7 | P7 | Regression gate active | CI monitors all Low tests | ⬜ Pending |
-| M8 | P8 | Acid2 visual comparison | Pixel diff documented | ⬜ Pending |
+| M7 | P7 | Regression gate active | CI monitors all Low tests | 🔄 In Progress |
+| M8 | P8 | Acid2 visual comparison | Pixel diff documented | 🔄 In Progress |
 | M9 | P9 | `unicode-bidi` implemented | Chapter 9 at 100% | ⬜ Pending |
 | M10 | P10 | External suites integrated | ≥ 1 suite running | ⬜ Pending |
 

@@ -240,9 +240,18 @@ public class Css2DifferentialVerificationTests : IAsyncLifetime
         // Detailed results per chapter
         var chapterDescriptions = new Dictionary<string, string>
         {
-            ["Chapter 9"] = "Visual Formatting Model (49 CSS2 §9 tests — block/inline boxes, positioning, floats, clear, z-index)",
-            ["Chapter 10"] = "Visual Formatting Model Details (132 CSS2 §10 tests — widths, heights, min/max, line-height, vertical-align)",
+            ["Chapter 6"] = "Cascading and Inheritance (25 CSS2 §6 tests — cascade order, specificity, inheritance)",
+            ["Chapter 8"] = "Box Model (25 CSS2 §8 tests — margins, padding, borders, margin collapsing)",
+            ["Chapter 9"] = "Visual Formatting Model (50 CSS2 §9 tests — block/inline boxes, positioning, floats, clear, z-index)",
+            ["Chapter 10"] = "Visual Formatting Model Details (135 CSS2 §10 tests — widths, heights, min/max, line-height, vertical-align)",
+            ["Chapter 11"] = "Visual Effects (25 CSS2 §11 tests — overflow, clip, visibility)",
+            ["Chapter 12"] = "Generated Content and Lists (20 CSS2 §12 tests — content, counters, list styles)",
+            ["Chapter 13"] = "Paged Media (25 CSS2 §13 tests — page breaks, orphans, widows)",
+            ["Chapter 14"] = "Colors and Backgrounds (25 CSS2 §14 tests — foreground color, background color/image/position)",
+            ["Chapter 15"] = "Fonts (20 CSS2 §15 tests — font family, style, variant, weight, size)",
+            ["Chapter 16"] = "Text (23 CSS2 §16 tests — text-indent, text-align, text-decoration, letter/word-spacing, text-transform, white-space)",
             ["Chapter 17"] = "Tables (95 CSS2 §17 tests — table model, display values, column widths, border collapse)",
+            ["Chapter 18"] = "User Interface (25 CSS2 §18 tests — outlines, cursor, system colors)",
         };
 
         foreach (var chapter in chapters)
@@ -321,8 +330,8 @@ public class Css2DifferentialVerificationTests : IAsyncLifetime
 
         sb.AppendLine("## Methodology");
         sb.AppendLine();
-        sb.AppendLine("1. Each CSS2 chapter test's HTML snippet was extracted from");
-        sb.AppendLine("   `Css2Chapter9Tests.cs`, `Css2Chapter10Tests.cs`, and `Css2Chapter17Tests.cs`.");
+        sb.AppendLine("1. Each CSS2 chapter test's HTML snippet was extracted from `Css2TestSnippets.cs`,");
+        sb.AppendLine("   covering chapters 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, and 18.");
         sb.AppendLine("2. Each snippet was rendered at 800×600 viewport using both:");
         sb.AppendLine("   - **html-renderer** (Broiler engine via `PixelDiffRunner.RenderDeterministic`)");
         sb.AppendLine("   - **Chromium** (headless via Playwright `ChromiumRenderer.RenderAsync`)");
