@@ -47,18 +47,18 @@ and current status.
 | A1 | UA stylesheet differences (body margin on fragments) | §5.2 | Critical | 119 | ✅ Code Complete |
 | A2 | Table layer background rendering | §5.3 | Critical | 3 | ✅ Code Complete |
 | A3 | Float/block overlap violations | §5.4 | Critical–Medium | 6+ | 🔄 In Progress |
-| A4 | Table height distribution algorithm | §5.5 | High | 2 | ⬜ Pending |
-| A5 | Medium-severity rendering differences | §5.6 | Medium | 5 | ⬜ Pending |
+| A4 | Table height distribution algorithm | §5.5 | High | 2 | 🔄 In Progress |
+| A5 | Medium-severity rendering differences | §5.6 | Medium | 5 | 🔄 In Progress |
 | A6 | Font rasterisation differences | §5.7 | Low | 148 | ⬜ Monitor Only |
 
 ### Group B — Differential Coverage Gaps (§7.1)
 
 | # | Issue | Report § | Chapter | Priority | Status |
 |---|-------|----------|---------|----------|--------|
-| B1 | No differential snippets for Box Model | §7.1, §8.1 | 8 | P1 | ⬜ Pending |
-| B2 | No differential snippets for Visual Effects | §7.1, §8.1 | 11 | P2 | ⬜ Pending |
-| B3 | No differential snippets for Colors/Backgrounds | §7.1, §8.1 | 14 | P3 | ⬜ Pending |
-| B4 | No differential snippets for User Interface | §7.1 | 18 | P4 | ⬜ Pending |
+| B1 | No differential snippets for Box Model | §7.1, §8.1 | 8 | P1 | 🔄 Snippets Added |
+| B2 | No differential snippets for Visual Effects | §7.1, §8.1 | 11 | P2 | 🔄 Snippets Added |
+| B3 | No differential snippets for Colors/Backgrounds | §7.1, §8.1 | 14 | P3 | 🔄 Snippets Added |
+| B4 | No differential snippets for User Interface | §7.1 | 18 | P4 | 🔄 Snippets Added |
 
 ### Group C — Pending Differential Reports (§3.1)
 
@@ -202,7 +202,7 @@ the html-renderer layout pipeline (`CssBox.cs`, `CssLayoutEngine.cs`).
 
 ---
 
-### Priority 4 — Table Height Distribution (A4) ⬜
+### Priority 4 — Table Height Distribution (A4) 🔄
 
 **Goal:** Match Chromium's row-height distribution algorithm per
 CSS2.1 §17.5.3.
@@ -232,7 +232,7 @@ CSS2.1 §17.5.3.
 
 ---
 
-### Priority 5 — Medium-Severity Rendering Fixes (A5) ⬜
+### Priority 5 — Medium-Severity Rendering Fixes (A5) 🔄
 
 **Goal:** Resolve the 5 medium-severity tests (5–10% pixel diff).
 
@@ -267,7 +267,7 @@ height fixes may resolve `S17_5_3_MinimumRowHeight`).
 
 ---
 
-### Priority 6 — Expand Differential Coverage (B1–B4, C1–C2) ⬜
+### Priority 6 — Expand Differential Coverage (B1–B4, C1–C2) 🔄
 
 **Goal:** Add Chromium differential comparison for all chapters that
 currently have test suites but no cross-engine verification.
@@ -281,26 +281,26 @@ reports (C1–C2).
 
 #### 6a. Chapter 8 — Box Model (B1, P1 priority)
 
-- [ ] Add test snippets for margins, padding, borders, and margin
+- [x] Add test snippets for margins, padding, borders, and margin
   collapsing to `Css2TestSnippets.cs`.
 - [ ] Run differential verification and analyse results.
 - [ ] Triage any new Critical/High/Medium failures.
 
 #### 6b. Chapter 11 — Visual Effects (B2, P2 priority)
 
-- [ ] Add test snippets for overflow, clip, and visibility to
+- [x] Add test snippets for overflow, clip, and visibility to
   `Css2TestSnippets.cs`.
 - [ ] Run differential verification and analyse results.
 
 #### 6c. Chapter 14 — Colors and Backgrounds (B3, P3 priority)
 
-- [ ] Add test snippets for background colours, images, and positioning
+- [x] Add test snippets for background colours, images, and positioning
   to `Css2TestSnippets.cs`.
 - [ ] Run differential verification and analyse results.
 
 #### 6d. Chapter 18 — User Interface (B4, P4 priority)
 
-- [ ] Add test snippets for outlines, cursor, and system colours to
+- [x] Add test snippets for outlines, cursor, and system colours to
   `Css2TestSnippets.cs`.
 - [ ] Run differential verification and analyse results.
 
@@ -481,12 +481,12 @@ The following issues from the verification report require no action:
 
 ## Phased Timeline
 
-| Phase | Timeline | Priorities | Key Deliverables |
-|-------|----------|------------|------------------|
-| 1 | Immediate | P1, P2 | UA stylesheet aligned; Critical ≤ 6; table backgrounds verified |
-| 2 | Short-term | P3, P4, P5, P6 | Float overlaps resolved; table heights fixed; medium diffs resolved; differential coverage expanded |
-| 3 | Medium-term | P6 (remaining), P7, P8 | All chapters diffed; font regression gate active; Acid2 visual comparison |
-| 4 | Long-term | P9, P10 | `unicode-bidi` implemented; external test suites integrated |
+| Phase | Timeline | Priorities | Key Deliverables | Status |
+|-------|----------|------------|------------------|--------|
+| 1 | Immediate | P1, P2 | UA stylesheet aligned; Critical ≤ 6; table backgrounds verified | ✅ Complete |
+| 2 | Short-term | P3, P4, P5, P6 | Float overlaps resolved; table heights fixed; medium diffs resolved; differential coverage expanded | 🔄 In Progress |
+| 3 | Medium-term | P6 (remaining), P7, P8 | All chapters diffed; font regression gate active; Acid2 visual comparison | ⬜ Pending |
+| 4 | Long-term | P9, P10 | `unicode-bidi` implemented; external test suites integrated | ⬜ Pending |
 
 ---
 
@@ -494,12 +494,12 @@ The following issues from the verification report require no action:
 
 | Milestone | Priority | Target Outcome | Success Metric | Status |
 |-----------|----------|----------------|----------------|--------|
-| M1 | P1 | UA stylesheet aligned | Critical ≤ 6, pass rate ≥ 90% | ✅ Code Complete |
-| M2 | P2 | Table backgrounds verified | Chapter 17: 0 Critical | ✅ Code Complete |
+| M1 | P1 | UA stylesheet aligned | Critical ≤ 6, pass rate ≥ 90% | ✅ Complete |
+| M2 | P2 | Table backgrounds verified | Chapter 17: 0 Critical | ✅ Complete |
 | M3 | P3 | Float overlaps eliminated | 0 overlap warnings | 🔄 In Progress |
-| M4 | P4 | Table heights correct | 0 High-severity tests | ⬜ Pending |
-| M5 | P5 | Medium diffs resolved | 0 Medium-severity tests | ⬜ Pending |
-| M6 | P6 | Full chapter differential coverage | All chapters in diff suite | ⬜ Pending |
+| M4 | P4 | Table heights correct | 0 High-severity tests | 🔄 In Progress |
+| M5 | P5 | Medium diffs resolved | 0 Medium-severity tests | 🔄 In Progress |
+| M6 | P6 | Full chapter differential coverage | All chapters in diff suite | 🔄 In Progress |
 | M7 | P7 | Regression gate active | CI monitors all Low tests | ⬜ Pending |
 | M8 | P8 | Acid2 visual comparison | Pixel diff documented | ⬜ Pending |
 | M9 | P9 | `unicode-bidi` implemented | Chapter 9 at 100% | ⬜ Pending |
