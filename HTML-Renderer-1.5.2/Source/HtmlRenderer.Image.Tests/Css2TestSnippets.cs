@@ -3,8 +3,8 @@ namespace HtmlRenderer.Image.Tests;
 /// <summary>
 /// Provides all CSS2 chapter test HTML snippets for differential verification.
 /// Each entry is a (chapter, testName, html) tuple extracted from
-/// Css2Chapter9Tests, Css2Chapter10Tests, Css2Chapter12Tests,
-/// Css2Chapter15Tests, Css2Chapter16Tests, and Css2Chapter17Tests.
+/// Css2Chapter6Tests, Css2Chapter9Tests, Css2Chapter10Tests, Css2Chapter12Tests,
+/// Css2Chapter13Tests, Css2Chapter15Tests, Css2Chapter16Tests, and Css2Chapter17Tests.
 /// </summary>
 internal static class Css2TestSnippets
 {
@@ -1325,15 +1325,268 @@ newlines   kept  </p>"),
 newlines are preserved  </p>"),
     ];
 
+    /// <summary>CSS 2.1 Chapter 6 test snippets (25 tests).</summary>
+    internal static readonly (string Name, string Html)[] Chapter6 =
+    [
+        ("S6_1_1_CascadeYieldsValue_UsesIt", @"<style>div { background-color: red; }</style>
+              <body style='margin:0;padding:0;'>
+                <div style='width:100px;height:50px;'></div>
+              </body>"),
+        ("S6_1_1_InlineStyleOverridesStylesheet", @"<style>div { background-color: red; }</style>
+              <body style='margin:0;padding:0;'>
+                <div style='width:100px;height:50px;background-color:#00ff00;'></div>
+              </body>"),
+        ("S6_1_2_EmUnitsComputedToPx", @"<style>
+                body { margin:0; padding:0; font-size:16px; }
+                .box { width:2em; height:2em; background-color:red; }
+              </style>
+              <div class='box'></div>"),
+        ("S6_1_2_PercentageDependsOnLayout", @"<style>
+                body { margin:0; padding:0; }
+                .container { width:200px; height:50px; }
+                .half { width:50%; height:50px; background-color:red; }
+              </style>
+              <div class='container'>
+                <div class='half'></div>
+              </div>"),
+        ("S6_1_2_InheritResolvesToParentComputed", @"<style>
+                body { margin:0; padding:0; }
+                .parent { background-color: red; width:100px; height:50px; }
+                .child { background-color: inherit; width:50px; height:50px; }
+              </style>
+              <div class='parent'>
+                <div class='child'></div>
+              </div>"),
+        ("S6_1_2_FontSizePercentageComputed", @"<style>
+                body { margin:0; padding:0; font-size:20px; }
+                .child { font-size:150%; width:1em; height:1em; background-color:red; }
+              </style>
+              <div class='child'></div>"),
+        ("S6_1_2_EmCompoundsOnNesting", @"<style>
+                body { margin:0; padding:0; font-size:10px; }
+                .outer { font-size:2em; }
+                .inner { font-size:2em; width:1em; height:1em; background-color:red; }
+              </style>
+              <div class='outer'>
+                <div class='inner'></div>
+              </div>"),
+        ("S6_1_3_UsedValuesResolvePercentages", @"<style>
+                body { margin:0; padding:0; }
+                .container { width:400px; height:60px; }
+                .quarter { width:25%; height:50px; background-color:red; }
+              </style>
+              <div class='container'>
+                <div class='quarter'></div>
+              </div>"),
+        ("S6_1_3_PercentageMarginResolved", @"<style>
+                body { margin:0; padding:0; }
+                .container { width:400px; height:60px; }
+                .box { margin-left:10%; width:50px; height:30px; background-color:red; }
+              </style>
+              <div class='container'>
+                <div class='box'></div>
+              </div>"),
+        ("S6_1_4_IntegerRoundingForPixelValues", @"<style>
+                body { margin:0; padding:0; }
+                .box { width:33.3px; height:33.3px; background-color:red; }
+              </style>
+              <div class='box'></div>"),
+        ("S6_2_NonInheritedPropertyUsesInitialValue", @"<style>
+                body { margin:0; padding:0; }
+                .parent { border:5px solid blue; width:200px; height:60px; }
+                .child { width:100px; height:30px; background-color:red; margin:10px; }
+              </style>
+              <div class='parent'>
+                <div class='child'></div>
+              </div>"),
+        ("S6_2_NonInheritedBackgroundNotPassed", @"<style>
+                body { margin:0; padding:0; }
+                .parent { background-color:blue; width:200px; height:100px; }
+                .child { background-color:red; width:100px; height:50px; }
+              </style>
+              <div class='parent'>
+                <div class='child'></div>
+              </div>"),
+        ("S6_2_LineHeightInherited", @"<style>
+                body { margin:0; padding:0; line-height:40px; font-size:16px; }
+                .box { background-color:red; width:200px; }
+              </style>
+              <div class='box'><span>A</span></div>"),
+        ("S6_2_1_InheritKeywordForcesInheritance", @"<style>
+                body { margin:0; padding:0; }
+                .parent { background-color:red; width:200px; height:60px; }
+                .child { background-color:inherit; width:100px; height:30px; }
+              </style>
+              <div class='parent'>
+                <div class='child'></div>
+              </div>"),
+        ("S6_2_1_InheritApplesToInheritedAndNonInherited", @"<style>
+                body { margin:0; padding:0; }
+                .parent { color: red; background-color: blue; width:200px; height:80px; }
+                .child { color: inherit; background-color: inherit;
+                         width:100px; height:40px; }
+              </style>
+              <div class='parent'>
+                <div class='child'></div>
+              </div>"),
+        ("S6_2_1_InheritMarginNonInherited", @"<style>
+                body { margin:0; padding:0; }
+                .parent { margin-left:40px; width:200px; height:60px; background-color:#00ff00; }
+                .child { margin-left:inherit; width:50px; height:30px; background-color:red; }
+              </style>
+              <div class='parent'>
+                <div class='child'></div>
+              </div>"),
+        ("S6_4_1_LaterDeclarationWins_SourceOrder", @"<style>
+                div { background-color: red; }
+                div { background-color: blue; }
+              </style>
+              <body style='margin:0;padding:0;'>
+                <div style='width:100px;height:50px;'></div>
+              </body>"),
+        ("S6_4_1_HigherSpecificityWins", @"<style>
+                div { background-color: red; }
+                div.special { background-color: blue; }
+              </style>
+              <body style='margin:0;padding:0;'>
+                <div class='special' style='width:100px;height:50px;'></div>
+              </body>"),
+        ("S6_4_1_InlineStyleHighestSpecificity", @"<style>
+                #myid { background-color: red; }
+                div.special { background-color: yellow; }
+              </style>
+              <body style='margin:0;padding:0;'>
+                <div id='myid' class='special'
+                     style='width:100px;height:50px;background-color:blue;'></div>
+              </body>"),
+        ("S6_4_1_AuthorOverridesUADefaults", @"<style>
+                body { margin:0; padding:0; background-color:red; }
+              </style>
+              <body></body>"),
+        ("S6_4_3_IdSelectorSpecificity", @"<style>
+                .cls { background-color: red; }
+                #myid { background-color: blue; }
+              </style>
+              <body style='margin:0;padding:0;'>
+                <div id='myid' class='cls' style='width:100px;height:50px;'></div>
+              </body>"),
+        ("S6_4_3_ClassSelectorSpecificity", @"<style>
+                div { background-color: red; }
+                .highlight { background-color: blue; }
+              </style>
+              <body style='margin:0;padding:0;'>
+                <div class='highlight' style='width:100px;height:50px;'></div>
+              </body>"),
+        ("S6_4_3_UniversalSelectorSpecificityZero", @"<style>
+                * { background-color: red; }
+                div { background-color: blue; }
+              </style>
+              <body style='margin:0;padding:0;'>
+                <div style='width:100px;height:50px;'></div>
+              </body>"),
+        ("S6_4_3_CombinatorsDoNotAffectSpecificity", @"<style>
+                body { margin:0; padding:0; }
+                div p { background-color: red; }
+                div > p { background-color: blue; }
+              </style>
+              <div>
+                <p style='width:100px;height:50px;margin:0;'>text</p>
+              </div>"),
+        ("S6_4_4_PresentationalHintTreatedAsAuthorSpec0", @"<body style='margin:0;padding:0;'>
+                <table bgcolor='red' style='border-collapse:collapse;'>
+                  <tr><td style='width:100px;height:50px;'>X</td></tr>
+                </table>
+              </body>"),
+    ];
+
+    /// <summary>CSS 2.1 Chapter 13 test snippets (25 tests).</summary>
+    internal static readonly (string Name, string Html)[] Chapter13 =
+    [
+        ("S13_1_ContinuousMediaRendersNormally", @"<div style='width:200px;height:100px;background-color:red;'>Continuous</div>"),
+        ("S13_1_PageBoxConceptNotApplied", @"<div style='margin:10px;border:2px solid black;padding:5px;width:150px;height:80px;
+                          background-color:blue;'>Page-box concept</div>"),
+        ("S13_2_PageBoxModelIgnoredInContinuousMedia", @"<style>@page { margin: 1in; }</style>
+              <div style='width:100px;height:50px;background-color:red;'>Box model test</div>"),
+        ("S13_2_PageAreaContentRendersNormally", @"<style>@page { size: 210mm 297mm; margin: 25mm; }</style>
+              <div style='width:150px;height:50px;background-color:blue;'>Page area</div>"),
+        ("S13_2_1_PageMarginShorthand", @"<style>@page { margin: 1cm 2cm 3cm 4cm; }</style>
+              <div style='width:100px;height:50px;background-color:green;'>Shorthand</div>"),
+        ("S13_2_3_ContentOverflowPageArea", @"<style>@page { margin: 5cm; }</style>
+              <div style='width:800px;height:400px;background-color:red;'>
+                Large content that overflows
+              </div>"),
+        ("S13_2_3_ContentOutsidePageBoxNotClipped", @"<style>@page { margin: 10cm; }</style>
+              <div style='width:100px;height:50px;background-color:green;'>Visible</div>"),
+        ("S13_3_1_PageBreakBefore_Auto", @"<div style='page-break-before:auto;width:100px;height:50px;background-color:red;'></div>"),
+        ("S13_3_1_PageBreakBefore_Always", @"<div style='page-break-before:always;width:100px;height:50px;background-color:red;'></div>"),
+        ("S13_3_1_PageBreakBefore_Avoid", @"<div style='page-break-before:avoid;width:100px;height:50px;background-color:blue;'></div>"),
+        ("S13_3_1_PageBreakAfter_Always", @"<div style='page-break-after:always;width:100px;height:50px;background-color:red;'></div>"),
+        ("S13_3_1_PageBreakAfter_Avoid", @"<div style='page-break-after:avoid;width:100px;height:50px;background-color:blue;'></div>"),
+        ("S13_3_1_PageBreakInside_Avoid", @"<div style='page-break-inside:avoid;width:100px;height:50px;background-color:blue;'></div>"),
+        ("S13_3_1_MultiplePageBreakProperties", @"<div style='page-break-before:always;page-break-after:avoid;page-break-inside:avoid;
+                          width:150px;height:80px;background-color:red;'>All three</div>"),
+        ("S13_3_3_BreakBetweenAdjacentBlocks", @"<div style='width:200px;'>
+                <div style='height:50px;background-color:red;page-break-after:always;'></div>
+                <div style='height:50px;background-color:blue;'></div>
+              </div>"),
+        ("S13_3_3_NoBreakInsideTable", @"<table style='page-break-inside:avoid;border:1px solid black;'>
+                <tr><td>Cell 1</td><td>Cell 2</td></tr>
+                <tr><td>Cell 3</td><td>Cell 4</td></tr>
+              </table>"),
+        ("S13_3_3_NoBreakInsideAbsolutelyPositioned", @"<div style='position:relative;width:300px;height:200px;'>
+                <div style='position:absolute;top:10px;left:10px;width:100px;height:80px;
+                            background-color:red;page-break-inside:avoid;'>Abs</div>
+              </div>"),
+        ("S13_3_4_ForcedBreakAlways", @"<div style='width:200px;'>
+                <div style='height:40px;background-color:red;page-break-after:always;'>Before</div>
+                <div style='height:40px;background-color:blue;'>After</div>
+              </div>"),
+        ("S13_3_4_BlankPageNotInsertedInContinuousMedia", @"<div style='width:200px;'>
+                <div style='height:30px;background-color:red;page-break-after:left;'>A</div>
+                <div style='height:30px;background-color:green;page-break-after:right;'>B</div>
+                <div style='height:30px;background-color:blue;'>C</div>
+              </div>"),
+        ("S13_3_4_ForcedBreakBetweenSiblings", @"<div style='width:200px;'>
+                <p style='page-break-after:always;background-color:red;'>Sibling A</p>
+                <p style='background-color:blue;'>Sibling B</p>
+              </div>"),
+        ("S13_3_5_PreferBreakBetweenBlocks", @"<div style='width:200px;'>
+                <div style='height:60px;background-color:red;page-break-inside:avoid;'>Block A</div>
+                <div style='height:60px;background-color:blue;page-break-inside:avoid;'>Block B</div>
+              </div>"),
+        ("S13_4_PageContextCascadeOrder", @"<style>
+                @page { margin-top: 1cm; }
+                @page { margin-top: 5cm; }
+              </style>
+              <div style='width:100px;height:50px;background-color:green;'>Cascade order</div>"),
+        ("S13_3_1_PageBreakBefore_FirstChild", @"<div style='width:200px;'>
+                <p style='page-break-before:always;background-color:red;'>First child with break</p>
+                <p>Second child</p>
+              </div>"),
+        ("S13_3_1_PageBreakAfter_LastChild", @"<div style='width:200px;'>
+                <p>First child</p>
+                <p style='page-break-after:always;background-color:blue;'>Last child with break</p>
+              </div>"),
+        ("S13_Combined_AtPageWithPageBreakProperties", @"<style>@page { margin: 2cm; }</style>
+              <div style='page-break-before:always;width:200px;'>
+                <p style='page-break-after:avoid;'>First paragraph</p>
+                <p>Second paragraph</p>
+              </div>"),
+    ];
+
     /// <summary>All CSS2 test snippets across all chapters.</summary>
     internal static IEnumerable<(string Chapter, string Name, string Html)> All()
     {
+        foreach (var (name, html) in Chapter6)
+            yield return ("Chapter 6", name, html);
         foreach (var (name, html) in Chapter9)
             yield return ("Chapter 9", name, html);
         foreach (var (name, html) in Chapter10)
             yield return ("Chapter 10", name, html);
         foreach (var (name, html) in Chapter12)
             yield return ("Chapter 12", name, html);
+        foreach (var (name, html) in Chapter13)
+            yield return ("Chapter 13", name, html);
         foreach (var (name, html) in Chapter15)
             yield return ("Chapter 15", name, html);
         foreach (var (name, html) in Chapter16)
