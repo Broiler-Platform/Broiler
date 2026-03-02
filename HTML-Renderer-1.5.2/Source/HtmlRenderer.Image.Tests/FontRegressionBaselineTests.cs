@@ -23,7 +23,7 @@ namespace HtmlRenderer.Image.Tests;
 /// The baseline file is written to
 /// <c>TestData/FontRegressionBaselines/css2-baselines.csv</c> by
 /// <see cref="GenerateBaselineSnapshot"/> and committed to source control.
-/// The regression gate test (<see cref="RegressionGate_NoTestExceeds5Percent"/>)
+/// The regression gate test (<see cref="DeterminismCeiling_NoSnippetExceeds5Percent"/>)
 /// runs without Playwright — it only compares Broiler renders against
 /// themselves to detect determinism regressions.
 ///
