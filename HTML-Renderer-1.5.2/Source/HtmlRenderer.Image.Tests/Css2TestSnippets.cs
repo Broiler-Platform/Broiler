@@ -1604,15 +1604,35 @@ newlines are preserved  </p>"),
 
     /// <summary>
     /// Wraps HTML in <c>&lt;html&gt;&lt;body&gt;…&lt;/body&gt;&lt;/html&gt;</c>
-    /// when neither <c>&lt;body</c> nor <c>&lt;html</c> tags are present.
+    /// when no opening <c>&lt;body</c> or <c>&lt;html</c> element tag is present.
     /// Snippets that already contain explicit wrappers are returned unchanged.
+    /// The check looks for <c>&lt;body</c> or <c>&lt;html</c> followed by
+    /// whitespace or <c>&gt;</c> to avoid false positives from attribute values
+    /// or text content.
     /// </summary>
     internal static string EnsureBodyWrapper(string html)
     {
-        if (html.Contains("<body", StringComparison.OrdinalIgnoreCase) ||
-            html.Contains("<html", StringComparison.OrdinalIgnoreCase))
+        if (ContainsOpeningTag(html, "body") ||
+            ContainsOpeningTag(html, "html"))
             return html;
 
         return $"<html><body>{html}</body></html>";
+    }
+
+    private static bool ContainsOpeningTag(string html, string tagName)
+    {
+        int idx = 0;
+        while (idx < html.Length)
+        {
+            idx = html.IndexOf($"<{tagName}", idx, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0)
+                return false;
+            int after = idx + 1 + tagName.Length;
+            if (after >= html.Length || html[after] == '>' || html[after] == ' ' ||
+                html[after] == '\t' || html[after] == '\n' || html[after] == '\r')
+                return true;
+            idx = after;
+        }
+        return false;
     }
 }
