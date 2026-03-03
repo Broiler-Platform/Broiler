@@ -19,6 +19,8 @@ namespace HtmlRenderer.Image.Tests;
 /// is written automatically and the test is marked as inconclusive.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Rendering")]
+[Trait("Engine", "HtmlRenderer")]
 public class GoldenLayoutTests
 {
     private static readonly string GoldenDir = Path.Combine(

@@ -2,6 +2,8 @@ using Broiler.App.Rendering;
 
 namespace Broiler.App.Tests;
 
+[Trait("Category", "Unit")]
+[Trait("Engine", "Broiler")]
 public class HtmlTokenizerTests
 {
     private readonly HtmlTokenizer _tokenizer = new();

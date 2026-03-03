@@ -7,6 +7,8 @@ namespace HtmlRenderer.Image.Tests;
 /// Covers pixel, em, rem, percentage, and absolute units as well as
 /// error handling for malformed inputs.
 /// </summary>
+[Trait("Category", "Unit")]
+[Trait("Engine", "HtmlRenderer")]
 public class CssLengthTests
 {
     // -----------------------------------------------------------------

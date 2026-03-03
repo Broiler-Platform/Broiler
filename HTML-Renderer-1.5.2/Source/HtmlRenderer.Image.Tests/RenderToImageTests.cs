@@ -6,6 +6,8 @@ namespace HtmlRenderer.Image.Tests;
 /// Tests for rendering HTML to SKBitmap images with various HTML samples.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Rendering")]
+[Trait("Engine", "HtmlRenderer")]
 public class RenderToImageTests(RenderingFixture fixture)
 {
     [Fact]

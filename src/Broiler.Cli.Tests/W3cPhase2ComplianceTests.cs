@@ -9,6 +9,8 @@ namespace Broiler.Cli.Tests;
 /// box model properties, color values, text properties,
 /// display modes, table rendering, and CSS specificity.
 /// </summary>
+[Trait("Category", "Compliance")]
+[Trait("Engine", "Cli")]
 public class W3cPhase2ComplianceTests
 {
     // -----------------------------------------------------------------

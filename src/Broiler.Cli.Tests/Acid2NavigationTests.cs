@@ -11,6 +11,8 @@ namespace Broiler.Cli.Tests;
 /// html-renderer can detect and programmatically follow the first link,
 /// matching the Chromium/Playwright navigation pattern.
 /// </summary>
+[Trait("Category", "Integration")]
+[Trait("Engine", "Cli")]
 public class Acid2NavigationTests : IDisposable
 {
     private const int RenderWidth = 800;

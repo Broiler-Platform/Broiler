@@ -6,6 +6,8 @@ namespace Broiler.Cli.Tests;
 /// Exceptions are logged and the test is retried until it passes or the
 /// maximum number of attempts is exhausted.
 /// </summary>
+[Trait("Category", "Integration")]
+[Trait("Engine", "Cli")]
 public class HeiseCaptureTests : IDisposable
 {
     /// <summary>Maximum number of retry attempts for transient failures.</summary>

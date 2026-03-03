@@ -35,6 +35,7 @@ namespace HtmlRenderer.Image.Tests;
 /// </summary>
 [Collection("Rendering")]
 [Trait("Category", "DifferentialReport")]
+[Trait("Engine", "HtmlRenderer")]
 public class Acid1DifferentialReportGenerator
 {
     /// <summary>

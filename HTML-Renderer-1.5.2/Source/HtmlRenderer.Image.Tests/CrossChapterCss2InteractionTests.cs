@@ -14,6 +14,8 @@ namespace HtmlRenderer.Image.Tests;
 /// and element positions.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Compliance")]
+[Trait("Engine", "HtmlRenderer")]
 public class CrossChapterCss2InteractionTests
 {
     // ── Ch 9 (Positioning) + Ch 10 (Dimensions) ────────────────────

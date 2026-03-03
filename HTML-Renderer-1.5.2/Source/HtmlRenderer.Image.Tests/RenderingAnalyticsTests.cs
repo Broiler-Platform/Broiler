@@ -8,6 +8,8 @@ namespace HtmlRenderer.Image.Tests;
 /// These tests verify measurable rendering metrics such as timing,
 /// output dimensions, pixel coverage, and format-specific properties.
 /// </summary>
+[Trait("Category", "Rendering")]
+[Trait("Engine", "HtmlRenderer")]
 public class RenderingAnalyticsTests
 {
     // -----------------------------------------------------------------

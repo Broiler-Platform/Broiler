@@ -1,5 +1,7 @@
 namespace Broiler.Cli.Tests;
 
+[Trait("Category", "Unit")]
+[Trait("Engine", "Cli")]
 public class ProgramTests
 {
     [Fact]
@@ -202,6 +204,8 @@ public class ProgramTests
     }
 }
 
+[Trait("Category", "Unit")]
+[Trait("Engine", "Cli")]
 public class CaptureOptionsTests
 {
     [Fact]
@@ -240,6 +244,8 @@ public class CaptureOptionsTests
     }
 }
 
+[Trait("Category", "Unit")]
+[Trait("Engine", "Cli")]
 public class ImageCaptureOptionsTests
 {
     [Fact]

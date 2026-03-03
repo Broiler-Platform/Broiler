@@ -6,6 +6,8 @@ namespace HtmlRenderer.Image.Tests;
 /// Unit tests for <see cref="ReadOnlyMemory{T}"/>-based text handling
 /// that replaced the former SubString class.
 /// </summary>
+[Trait("Category", "Unit")]
+[Trait("Engine", "HtmlRenderer")]
 public class SubStringTests
 {
     [Fact]

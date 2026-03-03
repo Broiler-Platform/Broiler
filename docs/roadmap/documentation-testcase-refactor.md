@@ -188,24 +188,24 @@ internal data structures.
 
 **Goal:** Make test filtering reliable and test naming consistent.
 
-- [ ] Define standard trait categories
-  - [ ] `Category` — `Unit`, `Rendering`, `Integration`, `Differential`,
+- [x] Define standard trait categories
+  - [x] `Category` — `Unit`, `Rendering`, `Integration`, `Differential`,
         `Compliance`
-  - [ ] `Feature` — `BoxModel`, `Float`, `Position`, `Table`, `Text`,
+  - [x] `Feature` — `BoxModel`, `Float`, `Position`, `Table`, `Text`,
         `Color`, `Font`, `Selector`, `Media`, etc.
-  - [ ] `Engine` — `HtmlRenderer`, `Broiler`, `Cli`
-- [ ] Apply traits consistently across all test projects
-  - [ ] Audit existing `[Trait]` usage in all three test projects
-  - [ ] Add missing traits to existing tests
-  - [ ] Ensure new tests created in Phase 3 use the standardised traits
-- [ ] Standardise test naming conventions
-  - [ ] Pattern: `[Feature]_[Scenario]_[ExpectedResult]`
-  - [ ] Document the convention in `testing-guide.md`
-- [ ] Verify filtered test runs work correctly
-  - [ ] `dotnet test --filter "Category=Rendering"` returns only rendering
+  - [x] `Engine` — `HtmlRenderer`, `Broiler`, `Cli`
+- [x] Apply traits consistently across all test projects
+  - [x] Audit existing `[Trait]` usage in all three test projects
+  - [x] Add missing traits to existing tests
+  - [x] Ensure new tests created in Phase 3 use the standardised traits
+- [x] Standardise test naming conventions
+  - [x] Pattern: `[Feature]_[Scenario]_[ExpectedResult]`
+  - [x] Document the convention in `testing-guide.md`
+- [x] Verify filtered test runs work correctly
+  - [x] `dotnet test --filter "Category=Rendering"` returns only rendering
         tests
-  - [ ] `dotnet test --filter "Category=Unit"` returns only unit tests
-  - [ ] Document filter commands in `testing-guide.md`
+  - [x] `dotnet test --filter "Category=Unit"` returns only unit tests
+  - [x] Document filter commands in `testing-guide.md`
 
 **Acceptance criteria:**
 - Every test has at least a `Category` trait.

@@ -22,6 +22,7 @@ namespace HtmlRenderer.Image.Tests;
 /// </summary>
 [Collection("Rendering")]
 [Trait("Category", "DifferentialReport")]
+[Trait("Engine", "HtmlRenderer")]
 public class Css2DifferentialVerificationTests : IAsyncLifetime
 {
     private ChromiumRenderer _chromium = null!;

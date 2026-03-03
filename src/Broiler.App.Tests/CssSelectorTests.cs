@@ -2,6 +2,9 @@ using Broiler.App.Rendering;
 
 namespace Broiler.App.Tests;
 
+[Trait("Category", "Unit")]
+[Trait("Engine", "Broiler")]
+[Trait("Feature", "Selector")]
 public class CssSelectorTests
 {
     private readonly ScriptEngine _engine = new();

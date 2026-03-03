@@ -8,6 +8,8 @@ namespace Broiler.App.Tests;
 /// observable output properties: dimensions, non-blank content, element
 /// positions, and layer ordering.
 /// </summary>
+[Trait("Category", "Rendering")]
+[Trait("Engine", "Broiler")]
 public class RenderingOutputTests
 {
     // ── Dimension verification ──────────────────────────────────────

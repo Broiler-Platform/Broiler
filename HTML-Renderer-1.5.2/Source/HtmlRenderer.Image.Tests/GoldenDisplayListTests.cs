@@ -20,6 +20,8 @@ namespace HtmlRenderer.Image.Tests;
 /// is written automatically and the test is marked as failed (re-run to validate).
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Rendering")]
+[Trait("Engine", "HtmlRenderer")]
 public class GoldenDisplayListTests
 {
     private const int RenderSize = 500;

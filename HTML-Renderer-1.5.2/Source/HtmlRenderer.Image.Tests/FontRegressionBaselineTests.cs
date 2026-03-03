@@ -35,6 +35,8 @@ namespace HtmlRenderer.Image.Tests;
 ///   <c>pwsh bin/Debug/net8.0/playwright.ps1 install chromium</c>
 /// </summary>
 [Collection("Rendering")]
+[Trait("Engine", "HtmlRenderer")]
+[Trait("Feature", "Font")]
 public class FontRegressionBaselineTests
 {
     private static readonly DeterministicRenderConfig RenderConfig =
@@ -67,6 +69,7 @@ public class FontRegressionBaselineTests
     /// masquerade as font regressions.
     /// </summary>
     [Fact]
+    [Trait("Category", "Rendering")]
     public void AllSnippets_RenderDeterministically()
     {
         var failures = new List<string>();

@@ -1,5 +1,7 @@
 namespace Broiler.Cli.Tests;
 
+[Trait("Category", "Unit")]
+[Trait("Engine", "Cli")]
 public class EngineTestServiceTests
 {
     private readonly EngineTestService _service = new();
