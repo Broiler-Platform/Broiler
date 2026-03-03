@@ -252,6 +252,70 @@ Known layout engine bugs (e.g. negative widths from deeply nested
 elements) are logged and saved but do not fail the test. See
 `TestData/FuzzFailures/` for any saved violations.
 
+## Trait Standardisation (Phase 4)
+
+Every test class must carry at least a `Category` and an `Engine` trait.
+Add `Feature` traits where the test clearly exercises a single CSS/HTML
+feature area.
+
+### Standard Trait Categories
+
+| Trait | Values | Description |
+|-------|--------|-------------|
+| `Category` | `Unit` | Isolated function / type tests |
+| | `Rendering` | Tests that verify visual / rendered output |
+| | `Integration` | Multi-component pipeline tests |
+| | `Differential` | Cross-engine pixel comparison (requires Playwright) |
+| | `DifferentialReport` | Report-generation runs (manual / nightly) |
+| | `Compliance` | CSS2 / W3C specification conformance |
+| | `Fuzz` | Property-based / generative layout tests |
+| `Feature` | `BoxModel`, `Float`, `Position`, `Table`, `Text`, `Color`, `Font`, `Selector`, `Media` | CSS/HTML feature area |
+| `Engine` | `HtmlRenderer` | Tests in `HtmlRenderer.Image.Tests` |
+| | `Broiler` | Tests in `Broiler.App.Tests` |
+| | `Cli` | Tests in `Broiler.Cli.Tests` |
+
+### Filtered Test Runs
+
+```bash
+# Run only unit tests
+dotnet test Broiler.slnx --filter "Category=Unit"
+
+# Run only rendering tests
+dotnet test Broiler.slnx --filter "Category=Rendering"
+
+# Run only compliance tests
+dotnet test Broiler.slnx --filter "Category=Compliance"
+
+# Run only integration tests
+dotnet test Broiler.slnx --filter "Category=Integration"
+
+# Exclude slow differential & fuzz tests (default CI filter)
+dotnet test Broiler.slnx --filter "Category!=Differential&Category!=DifferentialReport&Category!=Fuzz"
+
+# Run tests for a specific feature
+dotnet test Broiler.slnx --filter "Feature=BoxModel"
+dotnet test Broiler.slnx --filter "Feature=Font"
+
+# Run tests for a specific engine
+dotnet test Broiler.slnx --filter "Engine=HtmlRenderer"
+dotnet test Broiler.slnx --filter "Engine=Cli"
+```
+
+### Test Naming Convention
+
+Use the pattern **`[Feature]_[Scenario]_[ExpectedResult]`** for new tests:
+
+```
+BoxModel_MarginCollapsing_LargerMarginWins
+Float_LeftFloatWithClear_RendersBelow
+Position_RelativeOffset_ShiftsElement
+```
+
+Existing tests are not required to be renamed, but new tests should follow
+this convention.
+
+---
+
 ## Adding New Tests
 
 1. Place unit tests for HTML-Renderer internals in
@@ -263,7 +327,9 @@ elements) are logged and saved but do not fail the test. See
    `IsRed/IsGreen/IsBlue`) for visual rendering assertions.
 5. Follow existing test conventions: xUnit `[Fact]` attributes, XML doc
    comments, descriptive assertion messages.
-6. Run `dotnet test` to verify before submitting.
+6. Add `[Trait("Category", "...")]` and `[Trait("Engine", "...")]` to every
+   new test class. Add `[Trait("Feature", "...")]` when applicable.
+7. Run `dotnet test` to verify before submitting.
 
 ## Pixel Regression Baselines
 
