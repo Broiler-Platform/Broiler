@@ -8,6 +8,8 @@ namespace Broiler.Cli.Tests;
 /// Integration tests for capturing sites as images using HtmlRenderer.Image.
 /// Verifies the rendering pipeline produces valid image output from HTML content.
 /// </summary>
+[Trait("Category", "Integration")]
+[Trait("Engine", "Cli")]
 public class ImageCaptureTests : IDisposable
 {
     private readonly HttpListener _listener;

@@ -26,6 +26,8 @@ namespace Broiler.Cli.Tests;
 /// not supported; all tests use <c>background-color</c> instead.
 /// </para>
 /// </remarks>
+[Trait("Category", "Compliance")]
+[Trait("Engine", "Cli")]
 public class Acid1ProgrammaticTests
 {
     // -----------------------------------------------------------------

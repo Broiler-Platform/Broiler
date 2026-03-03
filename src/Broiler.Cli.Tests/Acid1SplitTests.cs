@@ -30,6 +30,8 @@ namespace Broiler.Cli.Tests;
 /// float positioning within nested containers.
 /// </para>
 /// </remarks>
+[Trait("Category", "Compliance")]
+[Trait("Engine", "Cli")]
 public class Acid1SplitTests : IDisposable
 {
     private const int RenderWidth = 509;

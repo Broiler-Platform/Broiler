@@ -45,6 +45,8 @@ namespace Broiler.Cli.Tests;
 /// </list>
 /// </para>
 /// </remarks>
+[Trait("Category", "Integration")]
+[Trait("Engine", "Cli")]
 public class Acid1CaptureTests : IDisposable
 {
     /// <summary>Render width matching the reference image.</summary>

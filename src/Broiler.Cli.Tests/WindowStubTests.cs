@@ -7,6 +7,8 @@ namespace Broiler.Cli.Tests;
 /// <see cref="CaptureService.RegisterWindowStub"/> to prevent
 /// JSException when scripts access browser globals.
 /// </summary>
+[Trait("Category", "Unit")]
+[Trait("Engine", "Cli")]
 public class WindowStubTests
 {
     [Fact]

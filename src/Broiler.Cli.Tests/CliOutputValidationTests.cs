@@ -6,6 +6,8 @@ namespace Broiler.Cli.Tests;
 /// CLI output validation tests that verify the end-to-end capture pipeline
 /// produces correct output format, content, and metadata.
 /// </summary>
+[Trait("Category", "Integration")]
+[Trait("Engine", "Cli")]
 public class CliOutputValidationTests : IDisposable
 {
     private readonly HttpListener _listener;

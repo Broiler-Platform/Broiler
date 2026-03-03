@@ -7,6 +7,8 @@ namespace Broiler.Cli.Tests;
 /// Tests use the local rendering engines (HTML-Renderer and YantraJS)
 /// instead of Playwright/Chromium.
 /// </summary>
+[Trait("Category", "Integration")]
+[Trait("Engine", "Cli")]
 public class CaptureIntegrationTests : IDisposable
 {
     private readonly HttpListener _listener;
