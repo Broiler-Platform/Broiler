@@ -34,6 +34,13 @@ Use it as the starting point for navigating project documentation.
 | [Architecture Roadmap](architecture-roadmap.md) | Phased plan for Style/Layout/Paint/Raster module separation |
 | [Roadmap Index](roadmap/README.md) | Index of all development roadmaps with status and cross-references |
 
+## Guidelines
+
+| Document | Summary |
+|----------|---------|
+| [Contributing Documentation](CONTRIBUTING-DOCS.md) | Templates and rules for adding project documentation |
+| [Contributing Tests](CONTRIBUTING-TESTS.md) | Required traits, naming conventions, and rendering-test requirements |
+
 ## Decisions
 
 | Document | Summary |

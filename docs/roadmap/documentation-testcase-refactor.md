@@ -242,21 +242,21 @@ and vice versa.
 **Goal:** Establish conventions to prevent documentation and test chaos
 from recurring.
 
-- [ ] Create `docs/CONTRIBUTING-DOCS.md` with documentation guidelines
-  - [ ] Template for new roadmap documents
-  - [ ] Template for new ADRs (already exists in ADR format)
-  - [ ] Rules: every new document must be added to `docs/README.md`
-  - [ ] Rules: every document must include a "Related Documents" section
-- [ ] Create `docs/CONTRIBUTING-TESTS.md` with test guidelines
-  - [ ] Required traits for every new test
-  - [ ] Naming convention enforcement
-  - [ ] Requirement: rendering-affecting changes must include at least one
+- [x] Create `docs/CONTRIBUTING-DOCS.md` with documentation guidelines
+  - [x] Template for new roadmap documents
+  - [x] Template for new ADRs (already exists in ADR format)
+  - [x] Rules: every new document must be added to `docs/README.md`
+  - [x] Rules: every document must include a "Related Documents" section
+- [x] Create `docs/CONTRIBUTING-TESTS.md` with test guidelines
+  - [x] Required traits for every new test
+  - [x] Naming convention enforcement
+  - [x] Requirement: rendering-affecting changes must include at least one
         rendering-specific test
-  - [ ] Baseline image update process
-- [ ] Add a PR checklist item for documentation and test quality
-  - [ ] "New/modified docs added to `docs/README.md`"
-  - [ ] "Tests include appropriate `[Trait]` attributes"
-  - [ ] "Rendering changes include rendering-specific tests"
+  - [x] Baseline image update process
+- [x] Add a PR checklist item for documentation and test quality
+  - [x] "New/modified docs added to `docs/README.md`"
+  - [x] "Tests include appropriate `[Trait]` attributes"
+  - [x] "Rendering changes include rendering-specific tests"
 
 **Acceptance criteria:**
 - Guidelines documents exist and are linked from `docs/README.md`.
