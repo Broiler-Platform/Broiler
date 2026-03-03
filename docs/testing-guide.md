@@ -22,8 +22,9 @@ HTML-Renderer components. The suite is organized into four categories:
 
 | Project | Location | Focus |
 |---------|----------|-------|
-| `HtmlRenderer.Image.Tests` | `HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/` | Unit tests, rendering, analytics |
-| `Broiler.Cli.Tests` | `src/Broiler.Cli.Tests/` | W3C compliance, CLI validation, Acid1, integration |
+| `HtmlRenderer.Image.Tests` | `HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/` | Unit tests, CSS2 compliance, rendering, golden-file, analytics, differential |
+| `Broiler.Cli.Tests` | `src/Broiler.Cli.Tests/` | W3C compliance, CLI validation, Acid1/Acid2, integration |
+| `Broiler.App.Tests` | `src/Broiler.App.Tests/` | Unit tests, rendering output, cross-feature rendering (Windows only) |
 
 ## Running Tests
 
@@ -134,16 +135,16 @@ Covers Phase 2 CSS specifications:
 - **CSS Value Parsing** (1 test): rgb() in border-color shorthand
 - **Media Queries** (1 test): @media print vs @media screen coexistence
 
-### 3. Acid1 CSS1 Conformance Tests (77 tests)
+### 3. Acid1 CSS1 Conformance Tests (108 tests)
 
 Tests validating the rendering engine against the W3C CSS1 Acid1 test
 (`acid/acid1/acid1.html`). Organized into three test classes:
 
-- **Acid1CaptureTests** (30 tests): Visual regression, structural validation,
+- **Acid1CaptureTests** (34 tests): Visual regression, structural validation,
   image format checks, and similarity scoring against the reference image.
-- **Acid1ProgrammaticTests** (25 tests): Layout, float positioning, margin
+- **Acid1ProgrammaticTests** (49 tests): Layout, float positioning, margin
   collapsing, percentage widths, clear behaviour, and border-box computation.
-- **Acid1SplitTests** (22 tests): Isolated section tests (10 sections)
+- **Acid1SplitTests** (25 tests): Isolated section tests (10 sections)
   targeting individual CSS1 features for precise regression diagnostics.
 
 Run all Acid1 tests:
@@ -154,7 +155,7 @@ dotnet test src/Broiler.Cli.Tests/ --filter "FullyQualifiedName~Acid1"
 
 See [acid1-testing.md](acid1-testing.md) for full details.
 
-### 4. Rendering Analytics Tests (11 tests)
+### 4. Rendering Analytics Tests (10 tests)
 
 - **Performance**: Simple and large document render timing
 - **Dimensions**: Auto-sized rendering respects maxWidth, wider content
@@ -166,7 +167,7 @@ See [acid1-testing.md](acid1-testing.md) for full details.
 - **Consistency**: Same HTML produces identical output, different HTML
   produces different output
 
-### 5. CLI Output Validation Tests (6 tests)
+### 5. CLI Output Validation Tests (5 tests)
 
 - HTML capture preserves title and special characters
 - PNG capture produces valid PNG with correct magic bytes

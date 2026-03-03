@@ -254,3 +254,10 @@ right.
 - [ADR-020](020-acid1-differential-testing-errors.md) – Triggering error report
 - [Acid1 Error Resolution Roadmap](../roadmap/acid1-error-resolution.md) –
   Detailed fix plan
+
+## Related Tests
+
+| Test File | Project | Purpose |
+|-----------|---------|---------|
+| `Acid1ProgrammaticTests.cs` | `Broiler.Cli.Tests` | Regression test for the blockquote float fix (see above) |
+| `Acid1DifferentialTests.cs` | `HtmlRenderer.Image.Tests` | Per-section pixel comparison tracking investigation progress |

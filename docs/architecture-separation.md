@@ -2,6 +2,12 @@
 
 ## 1. Current Pipeline (As-Is)
 
+> **Note (2026-03-03):** The paint phase described below has been replaced.
+> `CssBox.Paint()` / `PaintImp()` have been removed (see
+> [Architecture Roadmap Phase 3](architecture-roadmap.md)). Paint now goes
+> through `PaintWalker` → `DisplayList` → `RGraphicsRasterBackend`. The
+> module map and data flow below are preserved for historical reference.
+
 ### Module Map
 
 | Phase | Module(s) | Key Files |
@@ -11,8 +17,8 @@
 | **Selector Matching** | `HtmlRenderer.Orchestration` | `DomParser.CascadeApplyStyles()` |
 | **Computed Styles** | `HtmlRenderer.Dom` | `CssBoxProperties.cs` (lazy-parsed CSS lengths) |
 | **Layout** | `HtmlRenderer.Dom` | `CssBox.PerformLayoutImp()`, `CssLayoutEngine.cs`, `CssLayoutEngineTable.cs` |
-| **Paint** | `HtmlRenderer.Dom` + `HtmlRenderer.Rendering` | `CssBox.Paint()`/`PaintImp()`, `BordersDrawHandler`, `BackgroundImageDrawHandler` |
-| **Raster** | `HtmlRenderer.Image` (Skia) / `HtmlRenderer.WPF` | `GraphicsAdapter`, platform `RGraphics` |
+| **Paint** | `HtmlRenderer.Orchestration` | `PaintWalker.cs` → `DisplayList` |
+| **Raster** | `HtmlRenderer.Orchestration` | `RGraphicsRasterBackend.cs` → `RGraphics` |
 | **Orchestration** | `HtmlRenderer.Orchestration` | `HtmlContainerInt.PerformLayout()`, `HtmlContainerInt.PerformPaint()` |
 
 ### Data Flow

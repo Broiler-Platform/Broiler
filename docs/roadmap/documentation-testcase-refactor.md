@@ -56,9 +56,9 @@ This roadmap defines concrete phases to address these issues.
 
 | Project | Test Count | Primary Focus |
 |---------|-----------|---------------|
-| `Broiler.App.Tests` | ~18 files | Structural: DOM, CSS parsing, pipeline wiring |
+| `Broiler.App.Tests` | ~20 files, ~298 tests | Structural: DOM, CSS parsing, pipeline wiring, rendering output |
 | `Broiler.Cli.Tests` | ~14 files, ~240 tests | CLI output validation, capture integration, W3C compliance |
-| `HtmlRenderer.Image.Tests` | ~51 files, ~1461 tests | Rendering: CSS2 chapters, pixel regression, analytics, differential |
+| `HtmlRenderer.Image.Tests` | ~50 files, ~1474 tests | Rendering: CSS2 chapters, pixel regression, analytics, differential |
 
 **Key problems:**
 
@@ -219,17 +219,17 @@ internal data structures.
 **Goal:** Ensure documentation examples are consistent with actual tests
 and vice versa.
 
-- [ ] Review all code examples in documentation
-  - [ ] Verify examples in `testing-guide.md` match real test commands
-  - [ ] Verify architecture descriptions match current code structure
-  - [ ] Update outdated references (file paths, class names, test counts)
-- [ ] Add "Related Tests" sections to roadmaps
-  - [ ] Each roadmap phase references the tests that validate it
-  - [ ] Each major test file references the documentation that explains its
+- [x] Review all code examples in documentation
+  - [x] Verify examples in `testing-guide.md` match real test commands
+  - [x] Verify architecture descriptions match current code structure
+  - [x] Update outdated references (file paths, class names, test counts)
+- [x] Add "Related Tests" sections to roadmaps
+  - [x] Each roadmap phase references the tests that validate it
+  - [x] Each major test file references the documentation that explains its
         purpose
-- [ ] Update `testing-current-state.md` with current test counts and
+- [x] Update `testing-current-state.md` with current test counts and
   categories
-- [ ] Ensure all ADRs reference related tests where applicable
+- [x] Ensure all ADRs reference related tests where applicable
 
 **Acceptance criteria:**
 - No documentation references a test, class, or file that does not exist.
@@ -305,3 +305,16 @@ final step.
       impact
 - [ ] Identify candidate cross-feature rendering scenarios for Phase 3
 - [ ] Audit existing trait usage to scope Phase 4 effort
+
+---
+
+## Related Tests
+
+| Test File | Project | Validates Phase |
+|-----------|---------|-----------------|
+| `RenderingOutputTests.cs` | `Broiler.App.Tests` | Phase 3 — rendering-specific tests |
+| `CrossFeatureRenderingTests.cs` | `Broiler.App.Tests` | Phase 3 — cross-feature interaction tests |
+| `PixelRegressionTests.cs` | `HtmlRenderer.Image.Tests` | Phase 3 — pixel regression baselines |
+| `CrossChapterCss2InteractionTests.cs` | `HtmlRenderer.Image.Tests` | Phase 3 — cross-chapter CSS2 interactions |
+| `RealWorldSnippetRenderingTests.cs` | `HtmlRenderer.Image.Tests` | Phase 3 — real-world snippet rendering |
+| All test files with `[Trait]` attributes | All projects | Phase 4 — trait standardisation |

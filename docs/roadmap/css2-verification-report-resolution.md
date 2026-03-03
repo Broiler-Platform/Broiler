@@ -556,3 +556,16 @@ This roadmap is complete when:
 - All changes are documented with ADRs where appropriate.
 - `css2-verification-report.md` and `css2-differential-verification.md`
   are updated with final results.
+
+---
+
+## Related Tests
+
+| Test File | Project | Validates |
+|-----------|---------|-----------|
+| `Css2Chapter1Tests.cs` – `Css2Chapter18Tests.cs` | `HtmlRenderer.Image.Tests` | Per-chapter CSS2 spec compliance (1161 tests) |
+| `Css2DifferentialVerificationTests.cs` | `HtmlRenderer.Image.Tests` | Cross-engine differential verification |
+| `Css2TestSnippetsTests.cs` | `HtmlRenderer.Image.Tests` | Differential test snippet validation |
+| `FontRegressionBaselineTests.cs` | `HtmlRenderer.Image.Tests` | Font determinism gate and cross-engine regression |
+| `Acid2DifferentialTests.cs` | `HtmlRenderer.Image.Tests` | Acid2 pixel-level comparison |
+| `CrossChapterCss2InteractionTests.cs` | `HtmlRenderer.Image.Tests` | Cross-chapter CSS2 feature interaction rendering |

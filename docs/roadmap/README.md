@@ -13,7 +13,7 @@ area of work.
 | [CSS2 Differential Resolution](css2-differential-resolution.md) | Active | Fix rendering differences between html-renderer and headless Chromium |
 | [CSS2 Verification Report Resolution](css2-verification-report-resolution.md) | Active | Address every issue identified in the CSS2 verification report |
 | [Documentation & Testcase Refactor](documentation-testcase-refactor.md) | Active | Restructure documentation and refactor tests for clarity and rendering focus |
-| [.NET Standard Type Replacement](dotnet-standard-type-replacement.md) | Proposed | Replace custom types in HTML-Renderer with .NET standard library equivalents |
+| [.NET Standard Type Replacement](dotnet-standard-type-replacement.md) | Complete | Replace custom types in HTML-Renderer with .NET standard library equivalents |
 | [HTML & JS Engine](html-js-engine.md) | Active | Evolve HTML-Renderer and YantraJS into a production-grade HTML/JS engine |
 | [W3C HTML Compliance](w3c-html-compliance.md) | Active | Advance HTML-Renderer to full W3C HTML compliance |
 

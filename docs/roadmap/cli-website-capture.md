@@ -93,3 +93,16 @@ broiler-capture --help
 4. The Copilot instruction file documents the post-issue capture workflow.
 5. CI automatically captures `https://www.heise.de/` after each successful
    build and test run.
+
+---
+
+## Related Tests
+
+| Test File | Project | Validates |
+|-----------|---------|-----------|
+| `ProgramTests.cs` | `Broiler.Cli.Tests` | CLI argument parsing, option handling |
+| `CaptureIntegrationTests.cs` | `Broiler.Cli.Tests` | End-to-end capture producing files on disk |
+| `CliOutputValidationTests.cs` | `Broiler.Cli.Tests` | HTML/PNG/JPEG output format validation |
+| `ImageCaptureTests.cs` | `Broiler.Cli.Tests` | Image capture format and dimension tests |
+| `HeiseCaptureTests.cs` | `Broiler.Cli.Tests` | Live-site capture with retry (heise.de) |
+| `EngineTestServiceTests.cs` | `Broiler.Cli.Tests` | `--test-engines` command smoke tests |

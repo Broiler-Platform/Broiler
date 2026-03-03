@@ -228,3 +228,12 @@ Playwright Chromium 145.0.7632.6. All pixel-diff ratios are measured at
   the tracking issue.
 - The 95 % threshold is intentionally permissive and should be lowered to
   50 %, then 25 %, then 5 % as the roadmap items are completed.
+
+## Related Tests
+
+| Test File | Project | Purpose |
+|-----------|---------|---------|
+| `Acid1DifferentialTests.cs` | `HtmlRenderer.Image.Tests` | Per-section pixel comparison against Chromium |
+| `Acid1CaptureTests.cs` | `Broiler.Cli.Tests` | Visual regression and structural validation |
+| `Acid1ProgrammaticTests.cs` | `Broiler.Cli.Tests` | Layout and float positioning assertions |
+| `Acid1SplitTests.cs` | `Broiler.Cli.Tests` | Per-section CSS1 feature isolation |

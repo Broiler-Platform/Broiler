@@ -445,3 +445,16 @@ The roadmap is complete when:
   (currently chapters 9, 10, 17; pending chapters 4, 5, 8).
 - All changes are documented with ADRs where appropriate.
 - `css2-differential-verification.md` is updated with final results.
+
+---
+
+## Related Tests
+
+| Test File | Project | Validates |
+|-----------|---------|-----------|
+| `Css2DifferentialVerificationTests.cs` | `HtmlRenderer.Image.Tests` | Chapter-level differential pixel comparison |
+| `DifferentialTests.cs` | `HtmlRenderer.Image.Tests` | Cross-engine structural and layout comparison |
+| `Css2Chapter9Tests.cs` | `HtmlRenderer.Image.Tests` | Visual formatting model (positioning, floats) |
+| `Css2Chapter10Tests.cs` | `HtmlRenderer.Image.Tests` | Visual formatting model details (dimensions) |
+| `Css2Chapter17Tests.cs` | `HtmlRenderer.Image.Tests` | Table layout |
+| `Css2TestSnippetsTests.cs` | `HtmlRenderer.Image.Tests` | Differential test snippet body wrapping |

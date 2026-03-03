@@ -490,6 +490,14 @@ X,Y,ActualR,ActualG,ActualB,ActualA,BaselineR,BaselineG,BaselineB,BaselineA
   Detailed fix plan with CSS references
 - **[Acid1 Testing Guide](../acid1-testing.md)** – Test suite documentation
 
+## Related Tests
+
+| Test File | Project | Purpose |
+|-----------|---------|---------|
+| `Acid1DifferentialTests.cs` | `HtmlRenderer.Image.Tests` | Pixel comparison reproducing the visual comparison above |
+| `Acid1CaptureTests.cs` | `Broiler.Cli.Tests` | Similarity scoring against reference image |
+| `Acid1SplitTests.cs` | `Broiler.Cli.Tests` | Per-section regression diagnostics |
+
 ## Consequences
 
 - All acid1.html rendering differences between Broiler and Chromium are
