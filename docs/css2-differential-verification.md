@@ -1,5 +1,13 @@
 # CSS2 Differential Verification: html-renderer vs Chromium
 
+> **Scope:** Raw pixel-comparison data — per-test diff percentages, severity
+> classifications, and per-chapter summaries. This is the **detail report**
+> produced by running `Css2DifferentialVerificationTests`. For root-cause
+> analysis and fix tracking see
+> [CSS2 Differential Resolution](css2-differential-resolution.md). For a
+> high-level compliance overview see
+> [CSS2 Verification Report](css2-verification-report.md).
+
 ## Overview
 
 This document records the results of comparing every CSS2 chapter test

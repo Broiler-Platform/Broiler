@@ -1,5 +1,13 @@
 # CSS2 Specification Verification Report
 
+> **Scope:** High-level CSS 2.1 compliance summary — test-suite inventory,
+> checklist coverage, observed issues, and recommendations. This is the
+> **top-level entry point** for CSS2 verification. For detailed
+> pixel-comparison data see
+> [CSS2 Differential Verification](css2-differential-verification.md). For
+> root-cause analysis and fix tracking see
+> [CSS2 Differential Resolution](css2-differential-resolution.md).
+
 ## 1. Overview
 
 This report documents the verification of the html-renderer engine against

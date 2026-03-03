@@ -1,6 +1,18 @@
 # Testing Current State – Audit
 
 > Phase 0 deliverable for the [Automated Multi-Layer Test Suite Roadmap](testing-roadmap.md).
+>
+> **Date:** 2026-02-15  
+> **Engine version:** html-renderer (Broiler) — pre-CSS2 differential resolution  
+> **Scope:** Point-in-time audit of test coverage and gaps. For the
+> practical "how to run tests" guide see [Testing Guide](testing-guide.md).
+> For the target architecture see
+> [Testing Architecture](testing-architecture.md). For the implementation
+> plan see [Testing Roadmap](testing-roadmap.md).
+>
+> ⚠️ Test counts and coverage gaps in this document reflect the state at the
+> date above and may be outdated. Consult the test projects directly for
+> current counts.
 
 ---
 

@@ -1,5 +1,11 @@
 # HTML-Renderer Testsuite Guide
 
+> **Scope:** Practical entry point for running, writing, and organising
+> tests across all Broiler test projects. For the target testing architecture
+> see [Testing Architecture](testing-architecture.md). For a point-in-time
+> coverage audit see [Testing Current State](testing-current-state.md). For
+> the implementation roadmap see [Testing Roadmap](testing-roadmap.md).
+
 ## Overview
 
 This document describes the comprehensive testsuite for Broiler's
