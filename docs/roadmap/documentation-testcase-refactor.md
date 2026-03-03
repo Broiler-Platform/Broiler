@@ -283,7 +283,7 @@ final step.
 
 ## Relationship to Other Roadmaps
 
-- **[testing-roadmap.md](../../docs/testing-roadmap.md)** — the existing
+- **[testing-roadmap.md](../testing-roadmap.md)** — the existing
   test-suite evolution plan. This roadmap complements it by addressing
   organisation and rendering focus rather than pipeline-layer coverage.
 - **[w3c-html-compliance.md](w3c-html-compliance.md)** — W3C compliance
@@ -292,7 +292,7 @@ final step.
 - **[css2-verification-report-resolution.md](css2-verification-report-resolution.md)** —
   CSS2 differential testing is a key input to Phase 3's rendering test
   design.
-- **[architecture-roadmap.md](../../docs/architecture-roadmap.md)** —
+- **[architecture-roadmap.md](../architecture-roadmap.md)** —
   engine separation directly affects which test boundaries are meaningful
   for rendering verification.
 
