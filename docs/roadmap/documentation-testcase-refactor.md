@@ -153,28 +153,28 @@ This roadmap defines concrete phases to address these issues.
 **Goal:** Introduce tests that verify rendered visual output, not just
 internal data structures.
 
-- [ ] Define rendering test categories
-  - [ ] **Pixel regression** — compare rendered output against baseline
+- [x] Define rendering test categories
+  - [x] **Pixel regression** — compare rendered output against baseline
         images (extend existing `PixelRegressionTests` patterns)
-  - [ ] **Layout verification** — assert bounding-box positions and
+  - [x] **Layout verification** — assert bounding-box positions and
         dimensions for key elements after layout
-  - [ ] **Cross-feature interaction** — test combinations (e.g. floats +
+  - [x] **Cross-feature interaction** — test combinations (e.g. floats +
         positioning, tables + overflow, inline-block + text-align)
-  - [ ] **Visual analytics** — measure coverage, blank-area ratio, and
+  - [x] **Visual analytics** — measure coverage, blank-area ratio, and
         timing metrics
-- [ ] Add rendering tests to `Broiler.App.Tests`
-  - [ ] Create `RenderingOutputTests.cs` — render HTML snippets through the
+- [x] Add rendering tests to `Broiler.App.Tests`
+  - [x] Create `RenderingOutputTests.cs` — render HTML snippets through the
         full pipeline and verify output properties (dimensions, non-blank,
         key element positions)
-  - [ ] Create `CrossFeatureRenderingTests.cs` — test interactions between
+  - [x] Create `CrossFeatureRenderingTests.cs` — test interactions between
         CSS features that are currently only tested in isolation
-- [ ] Extend `HtmlRenderer.Image.Tests` rendering coverage
-  - [ ] Add cross-chapter CSS2 interaction tests (e.g. Chapter 9 positioning
+- [x] Extend `HtmlRenderer.Image.Tests` rendering coverage
+  - [x] Add cross-chapter CSS2 interaction tests (e.g. Chapter 9 positioning
         + Chapter 10 dimensions + Chapter 11 overflow)
-  - [ ] Add real-world snippet tests — extract layout patterns from common
+  - [x] Add real-world snippet tests — extract layout patterns from common
         websites and verify rendering
-- [ ] Establish baseline images for new pixel regression tests
-  - [ ] Document the baseline-generation process in `testing-guide.md`
+- [x] Establish baseline images for new pixel regression tests
+  - [x] Document the baseline-generation process in `testing-guide.md`
 
 **Acceptance criteria:**
 - At least 20 new rendering-specific tests exist across the two test
