@@ -8,6 +8,8 @@ namespace HtmlRenderer.Image.Tests;
 /// Tests for the ImageComparer utility class.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Unit")]
+[Trait("Engine", "HtmlRenderer")]
 public class ImageComparerTests(RenderingFixture fixture)
 {
     [Fact]

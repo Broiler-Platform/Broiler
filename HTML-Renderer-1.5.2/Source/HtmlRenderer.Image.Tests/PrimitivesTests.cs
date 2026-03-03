@@ -7,6 +7,8 @@ namespace HtmlRenderer.Image.Tests;
 /// <see cref="Color"/>, <see cref="RectangleF"/>, <see cref="PointF"/>,
 /// and <see cref="SizeF"/>.
 /// </summary>
+[Trait("Category", "Unit")]
+[Trait("Engine", "HtmlRenderer")]
 public class PrimitivesTests
 {
     // =================================================================

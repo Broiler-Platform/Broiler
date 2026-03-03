@@ -25,6 +25,9 @@ namespace HtmlRenderer.Image.Tests;
 ///     translates into correct visual output.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Compliance")]
+[Trait("Engine", "HtmlRenderer")]
+[Trait("Feature", "BoxModel")]
 public class Css2Chapter10Tests
 {
     private static readonly string GoldenDir = Path.Combine(

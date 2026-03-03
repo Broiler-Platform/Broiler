@@ -5,6 +5,8 @@ namespace HtmlRenderer.Image.Tests;
 /// <summary>
 /// Tests for the CommonUtils utility class.
 /// </summary>
+[Trait("Category", "Unit")]
+[Trait("Engine", "HtmlRenderer")]
 public class CommonUtilsTests
 {
     [Theory]

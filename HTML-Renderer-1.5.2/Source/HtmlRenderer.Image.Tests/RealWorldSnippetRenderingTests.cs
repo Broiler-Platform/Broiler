@@ -13,6 +13,8 @@ namespace HtmlRenderer.Image.Tests;
 /// external dependencies.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Rendering")]
+[Trait("Engine", "HtmlRenderer")]
 public class RealWorldSnippetRenderingTests
 {
     private const int ViewportWidth = 600;

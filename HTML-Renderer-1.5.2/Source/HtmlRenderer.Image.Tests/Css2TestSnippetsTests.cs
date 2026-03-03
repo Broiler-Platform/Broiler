@@ -6,6 +6,8 @@ namespace HtmlRenderer.Image.Tests;
 /// to align differential test snippets with Chromium's implicit
 /// <c>&lt;html&gt;&lt;body&gt;</c> wrapper behaviour.
 /// </summary>
+[Trait("Category", "Unit")]
+[Trait("Engine", "HtmlRenderer")]
 public class Css2TestSnippetsTests
 {
     [Fact]

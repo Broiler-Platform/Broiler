@@ -27,6 +27,9 @@ namespace HtmlRenderer.Image.Tests;
 ///     colours appear at specific coordinates.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Compliance")]
+[Trait("Engine", "HtmlRenderer")]
+[Trait("Feature", "Media")]
 public class Css2Chapter13Tests
 {
     private static readonly string GoldenDir = Path.Combine(

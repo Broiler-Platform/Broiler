@@ -20,6 +20,7 @@ namespace HtmlRenderer.Image.Tests;
 /// </summary>
 [Collection("Rendering")]
 [Trait("Category", "Differential")]
+[Trait("Engine", "HtmlRenderer")]
 public class DifferentialTests : IAsyncLifetime
 {
     // Initialised by xUnit via IAsyncLifetime.InitializeAsync() before any test runs.

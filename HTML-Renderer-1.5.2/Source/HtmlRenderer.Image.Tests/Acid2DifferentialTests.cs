@@ -26,6 +26,7 @@ namespace HtmlRenderer.Image.Tests;
 /// </summary>
 [Collection("Rendering")]
 [Trait("Category", "Differential")]
+[Trait("Engine", "HtmlRenderer")]
 public class Acid2DifferentialTests : IAsyncLifetime
 {
     private ChromiumRenderer _chromium = null!;

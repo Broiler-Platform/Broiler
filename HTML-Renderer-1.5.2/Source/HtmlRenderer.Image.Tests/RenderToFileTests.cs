@@ -4,6 +4,8 @@ namespace HtmlRenderer.Image.Tests;
 /// Tests for rendering HTML to files.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Rendering")]
+[Trait("Engine", "HtmlRenderer")]
 public class RenderToFileTests(RenderingFixture fixture)
 {
     [Fact]

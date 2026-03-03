@@ -8,6 +8,8 @@ namespace HtmlRenderer.Image.Tests;
 /// Tests for the HtmlContainer class.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Rendering")]
+[Trait("Engine", "HtmlRenderer")]
 public class HtmlContainerTests(RenderingFixture fixture)
 {
     [Fact]
