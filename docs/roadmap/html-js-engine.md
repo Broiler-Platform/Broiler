@@ -258,3 +258,18 @@ Polish, optimise, and prepare for public consumption.
 - [ ] Review and refine with team input
 - [ ] Create tracking issues for each milestone
 - [ ] Integrate feedback from stakeholders and potential users
+
+---
+
+## Related Tests
+
+| Test File | Project | Validates |
+|-----------|---------|-----------|
+| `DomBridgeTests.cs` | `Broiler.App.Tests` | JavaScript ↔ DOM interop (createElement, appendChild, etc.) |
+| `Milestone3DomBridgeTests.cs` | `Broiler.App.Tests` | Extended DOM bridge methods |
+| `Milestone4RuntimeTests.cs` | `Broiler.App.Tests` | Runtime feature tests |
+| `ScriptEngineTests.cs` | `Broiler.App.Tests` | YantraJS evaluation |
+| `DomEventsTests.cs` | `Broiler.App.Tests` | DOM event propagation |
+| `FormElementTests.cs` | `Broiler.App.Tests` | Form input, select, textarea handling |
+| `CssAnimationsTests.cs` | `Broiler.App.Tests` | CSS transitions and keyframes |
+| `CssGridFlexTests.cs` | `Broiler.App.Tests` | Flexbox and grid layout |

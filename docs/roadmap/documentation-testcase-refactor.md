@@ -305,3 +305,16 @@ final step.
       impact
 - [ ] Identify candidate cross-feature rendering scenarios for Phase 3
 - [ ] Audit existing trait usage to scope Phase 4 effort
+
+---
+
+## Related Tests
+
+| Test File | Project | Validates Phase |
+|-----------|---------|-----------------|
+| `RenderingOutputTests.cs` | `Broiler.App.Tests` | Phase 3 — rendering-specific tests |
+| `CrossFeatureRenderingTests.cs` | `Broiler.App.Tests` | Phase 3 — cross-feature interaction tests |
+| `PixelRegressionTests.cs` | `HtmlRenderer.Image.Tests` | Phase 3 — pixel regression baselines |
+| `CrossChapterCss2InteractionTests.cs` | `HtmlRenderer.Image.Tests` | Phase 3 — cross-chapter CSS2 interactions |
+| `RealWorldSnippetRenderingTests.cs` | `HtmlRenderer.Image.Tests` | Phase 3 — real-world snippet rendering |
+| All test files with `[Trait]` attributes | All projects | Phase 4 — trait standardisation |

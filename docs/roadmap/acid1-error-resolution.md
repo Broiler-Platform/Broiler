@@ -449,3 +449,15 @@ rasterisation floor of ~4 %).
 See [ADR-021](../adr/021-acid1-rendering-bug-investigation.md) for the full
 investigation of the 11.26 % RenderEngineBug, including regression analysis,
 root cause breakdown, and per-category contribution to the full-page diff.
+
+---
+
+## Related Tests
+
+| Test File | Project | Validates |
+|-----------|---------|-----------|
+| `Acid1CaptureTests.cs` | `Broiler.Cli.Tests` | Acid1 visual regression, structural validation, similarity scoring |
+| `Acid1ProgrammaticTests.cs` | `Broiler.Cli.Tests` | Layout, float positioning, margin collapsing, clear behaviour |
+| `Acid1SplitTests.cs` | `Broiler.Cli.Tests` | Per-section CSS1 feature isolation and regression |
+| `Acid1DifferentialTests.cs` | `HtmlRenderer.Image.Tests` | html-renderer vs. Chromium pixel comparison per section |
+| `Acid1DifferentialReportGenerator.cs` | `HtmlRenderer.Image.Tests` | Side-by-side comparison report generation |

@@ -302,3 +302,17 @@ Results are published in CI via GitHub Actions after each PR.
 - [ ] Import initial WPT test subsets for selectors and box model
 - [ ] Establish baseline compliance metrics in CI
 - [ ] Review and refine with community feedback
+
+---
+
+## Related Tests
+
+| Test File | Project | Validates |
+|-----------|---------|-----------|
+| `W3cPhase1ComplianceTests.cs` | `Broiler.Cli.Tests` | HTML5 semantic elements, void elements, rem units, @media |
+| `W3cPhase2ComplianceTests.cs` | `Broiler.Cli.Tests` | Box model, colours, text, display, tables, specificity |
+| `Css2Chapter4Tests.cs` | `HtmlRenderer.Image.Tests` | CSS2 syntax and values |
+| `Css2Chapter5Tests.cs` | `HtmlRenderer.Image.Tests` | CSS2 selectors |
+| `Css2Chapter8Tests.cs` | `HtmlRenderer.Image.Tests` | CSS2 box model |
+| `Css2Chapter9Tests.cs` | `HtmlRenderer.Image.Tests` | CSS2 visual formatting model |
+| `Css2Chapter10Tests.cs` | `HtmlRenderer.Image.Tests` | CSS2 visual formatting model details |
