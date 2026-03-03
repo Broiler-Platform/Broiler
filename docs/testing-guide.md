@@ -257,11 +257,52 @@ elements) are logged and saved but do not fail the test. See
 1. Place unit tests for HTML-Renderer internals in
    `HtmlRenderer.Image.Tests` (has `InternalsVisibleTo` access).
 2. Place rendering/compliance tests in `Broiler.Cli.Tests`.
-3. Use the pixel-based helper methods (`CountPixels`, `GetColorBounds`,
+3. Place rendering-output and cross-feature tests in `Broiler.App.Tests`
+   or `HtmlRenderer.Image.Tests` depending on the rendering layer.
+4. Use the pixel-based helper methods (`CountPixels`, `GetColorBounds`,
    `IsRed/IsGreen/IsBlue`) for visual rendering assertions.
-4. Follow existing test conventions: xUnit `[Fact]` attributes, XML doc
+5. Follow existing test conventions: xUnit `[Fact]` attributes, XML doc
    comments, descriptive assertion messages.
-5. Run `dotnet test` to verify before submitting.
+6. Run `dotnet test` to verify before submitting.
+
+## Pixel Regression Baselines
+
+Pixel regression tests compare rendered output against committed baseline
+PNG images stored in `TestData/PixelBaseline/`.
+
+### Generating Baselines
+
+1. Write a test using `AssertPixelBaseline(html)` in
+   `PixelRegressionTests.cs`.
+2. Run the test — it will **fail** on the first run and write a new
+   baseline PNG to `TestData/PixelBaseline/{TestName}.png`.
+3. Inspect the generated PNG visually to confirm it is correct.
+4. Re-run the test — it should now **pass**, comparing future renders
+   against the committed baseline.
+
+### Updating Baselines
+
+1. Delete the existing baseline PNG for the test you want to re-baseline.
+2. Run the test — a new baseline is written and the test fails.
+3. Inspect the new baseline, then re-run to confirm it passes.
+
+### Failure Diagnosis
+
+When a pixel regression test fails, the runner:
+
+- Saves a **diff image** (`{TestName}_diff.png`) highlighting mismatched
+  pixels in magenta.
+- **Classifies** the failure as one of:
+  - `LayoutDiff` — the Fragment tree (layout structure) differs.
+  - `PaintDiff` — the DisplayList (paint instructions) differs.
+  - `RasterDiff` — layout and paint match but pixel rasterization differs.
+
+### CSS Property Notes
+
+When writing HTML snippets for rendering tests, use `background-color:`
+(the longhand property) rather than the `background:` shorthand. The
+HtmlRenderer CSS parser handles the longhand property more reliably for
+isolated test snippets.
 
 ---
 
