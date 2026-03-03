@@ -248,3 +248,14 @@ next-phase plan.
 | Flaky test in parallel run | Run the specific test in isolation (see Single Test above) |
 | Similarity below threshold | Run split tests to identify which section regressed |
 | Playwright not found | Install Chromium: `pwsh .../playwright.ps1 install chromium` |
+
+---
+
+## Related Documents
+
+- [Testing Guide](testing-guide.md) — how to run and write tests across all suites
+- [Testing Roadmap](testing-roadmap.md) — planned testing improvements
+- [CSS2 Verification Report](css2-verification-report.md) — CSS 2.1 spec compliance status
+- [Roadmap: Acid1 Error Resolution](roadmap/acid1-error-resolution.md) — fix tracker for Acid1 rendering discrepancies
+- [ADR-009: Acid1 Differential Testing](adr/009-acid1-differential-testing.md) — decision record for Acid1 differential testing approach
+- [ADR-018: Acid1 Visual Comparison](adr/018-acid1-visual-comparison.md) — visual comparison results

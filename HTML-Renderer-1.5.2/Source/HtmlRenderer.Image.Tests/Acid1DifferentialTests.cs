@@ -24,6 +24,7 @@ namespace HtmlRenderer.Image.Tests;
 /// </summary>
 [Collection("Rendering")]
 [Trait("Category", "Differential")]
+[Trait("Engine", "HtmlRenderer")]
 public class Acid1DifferentialTests : IAsyncLifetime
 {
     private ChromiumRenderer _chromium = null!;
@@ -202,6 +203,8 @@ public class Acid1DifferentialTests : IAsyncLifetime
 /// They run without Playwright (Broiler-only) and are included in every CI build.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Rendering")]
+[Trait("Engine", "HtmlRenderer")]
 public class Acid1FloatOverlapTests
 {
     private static readonly DeterministicRenderConfig RenderConfig = DeterministicRenderConfig.Default;
@@ -266,6 +269,7 @@ public class Acid1FloatOverlapTests
 /// </summary>
 [Collection("Rendering")]
 [Trait("Category", "Differential")]
+[Trait("Engine", "HtmlRenderer")]
 public class Acid1RepeatedRenderTests
 {
     private const int RepeatCount = 3;

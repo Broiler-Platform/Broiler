@@ -136,7 +136,7 @@ Chromium's Skia-based pipeline.
 Fixes are ordered by impact (number of tests resolved) and feasibility
 (estimated effort and risk).
 
-### Priority 1 — User-Agent Stylesheet Alignment 🔄
+### Priority 1 — User-Agent Stylesheet Alignment ✅
 
 **Goal:** Apply Chromium-compatible UA defaults to eliminate the dominant
 source of Critical failures.
@@ -152,15 +152,16 @@ source of Critical failures.
   Implemented in `PaintWalker.FindCanvasBackground()` and
   `PaintWalker.EmitCanvasBackground()` — the source fragment is passed as
   `propagatedFrom` to suppress double-painting.
-- [ ] **Remaining:** Chromium implicitly wraps bare HTML fragments in
-  `<html>` and `<body>` elements (per the HTML5 parsing algorithm), so
-  `body { margin: 8px }` applies even to snippets that omit those tags.
-  html-renderer parses fragments as-is, meaning the margin rule only
-  triggers when `<body>` is explicit. Aligning this behaviour requires
-  either implicit wrapper injection during fragment parsing or wrapping
-  test snippets in `<html><body>…</body></html>`.
-- [ ] Verify that the default margin does not break existing Broiler
+- [x] **Resolved:** Implemented option (b) — `Css2TestSnippets.All()`
+  now applies `EnsureBodyWrapper()` which wraps bare HTML snippets in
+  `<html><body>…</body></html>` when neither `<body` nor `<html` tags are
+  present. Snippets with explicit wrappers are returned unchanged. This
+  aligns both engines so the UA default `body { margin: 8px }` applies
+  consistently during differential comparison.
+- [x] Verify that the default margin does not break existing Broiler
   rendering (run full Acid1 + CSS2 chapter test suites).
+  All 1451 existing tests pass; 6 new `Css2TestSnippetsTests` verify
+  the wrapping logic.
 - [ ] Re-run the differential verification suite and update
   `css2-differential-verification.md` with new results.
 
@@ -397,11 +398,11 @@ additional chapter test classes.
 
 | Milestone | Priority | Target Outcome | Success Metric | Status |
 |-----------|----------|---------------|----------------|--------|
-| M1 | P1 | UA stylesheet aligned | Critical ≤ 6, pass rate ≥ 90 % | 🔄 In Progress |
-| M2 | P2 | Table backgrounds correct | Chapter 17: 0 Critical | ✅ Code Complete |
+| M1 | P1 | UA stylesheet aligned | Critical ≤ 6, pass rate ≥ 90 % | ✅ Complete |
+| M2 | P2 | Table backgrounds correct | Chapter 17: 0 Critical | ✅ Complete |
 | M3 | P3 | Float overlaps eliminated | 0 overlap warnings | 🔄 In Progress |
-| M4 | P4 | Table heights correct | 0 High-severity tests | ⬜ Pending |
-| M5 | P5 | Medium diffs resolved | 0 Medium-severity tests | ⬜ Pending |
+| M4 | P4 | Table heights correct | 0 High-severity tests | 🔄 In Progress |
+| M5 | P5 | Medium diffs resolved | 0 Medium-severity tests | 🔄 In Progress |
 | M6 | P6 | Regression gate active | CI monitors all Low tests | ⬜ Pending |
 | M7 | P7 | Full chapter coverage | Chapters 4, 5, 8 in diff suite | ⬜ Pending |
 
@@ -444,3 +445,16 @@ The roadmap is complete when:
   (currently chapters 9, 10, 17; pending chapters 4, 5, 8).
 - All changes are documented with ADRs where appropriate.
 - `css2-differential-verification.md` is updated with final results.
+
+---
+
+## Related Tests
+
+| Test File | Project | Validates |
+|-----------|---------|-----------|
+| `Css2DifferentialVerificationTests.cs` | `HtmlRenderer.Image.Tests` | Chapter-level differential pixel comparison |
+| `DifferentialTests.cs` | `HtmlRenderer.Image.Tests` | Cross-engine structural and layout comparison |
+| `Css2Chapter9Tests.cs` | `HtmlRenderer.Image.Tests` | Visual formatting model (positioning, floats) |
+| `Css2Chapter10Tests.cs` | `HtmlRenderer.Image.Tests` | Visual formatting model details (dimensions) |
+| `Css2Chapter17Tests.cs` | `HtmlRenderer.Image.Tests` | Table layout |
+| `Css2TestSnippetsTests.cs` | `HtmlRenderer.Image.Tests` | Differential test snippet body wrapping |

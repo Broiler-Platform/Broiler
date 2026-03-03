@@ -7,6 +7,8 @@ namespace Broiler.App.Tests;
 /// micro-task queue, module extraction, strict mode, CSP, profiling,
 /// error handling, and ES2023+ built-in polyfills.
 /// </summary>
+[Trait("Category", "Unit")]
+[Trait("Engine", "Broiler")]
 public class Milestone4RuntimeTests
 {
     // ── MicroTaskQueue ──────────────────────────────────────────────

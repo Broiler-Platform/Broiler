@@ -14,6 +14,8 @@ namespace HtmlRenderer.Image.Tests;
 /// Also tests shadow IR building via <see cref="HtmlContainerInt.LatestFragmentTree"/>.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Unit")]
+[Trait("Engine", "HtmlRenderer")]
 public class IRTypesTests
 {
     // =================================================================

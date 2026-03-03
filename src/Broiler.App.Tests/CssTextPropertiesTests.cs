@@ -2,6 +2,9 @@ using Broiler.App.Rendering;
 
 namespace Broiler.App.Tests;
 
+[Trait("Category", "Unit")]
+[Trait("Engine", "Broiler")]
+[Trait("Feature", "Text")]
 public class CssTextPropertiesTests
 {
     [Fact]

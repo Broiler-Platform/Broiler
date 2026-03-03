@@ -10,6 +10,8 @@ namespace HtmlRenderer.Image.Tests;
 /// and that the rendering pipeline works through the new assembly structure.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Unit")]
+[Trait("Engine", "HtmlRenderer")]
 public class OrchestrationModuleTests
 {
     [Fact]

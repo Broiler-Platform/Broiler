@@ -1,5 +1,11 @@
 # HTML-Renderer Testsuite Guide
 
+> **Scope:** Practical entry point for running, writing, and organising
+> tests across all Broiler test projects. For the target testing architecture
+> see [Testing Architecture](testing-architecture.md). For a point-in-time
+> coverage audit see [Testing Current State](testing-current-state.md). For
+> the implementation roadmap see [Testing Roadmap](testing-roadmap.md).
+
 ## Overview
 
 This document describes the comprehensive testsuite for Broiler's
@@ -16,8 +22,9 @@ HTML-Renderer components. The suite is organized into four categories:
 
 | Project | Location | Focus |
 |---------|----------|-------|
-| `HtmlRenderer.Image.Tests` | `HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/` | Unit tests, rendering, analytics |
-| `Broiler.Cli.Tests` | `src/Broiler.Cli.Tests/` | W3C compliance, CLI validation, Acid1, integration |
+| `HtmlRenderer.Image.Tests` | `HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/` | Unit tests, CSS2 compliance, rendering, golden-file, analytics, differential |
+| `Broiler.Cli.Tests` | `src/Broiler.Cli.Tests/` | W3C compliance, CLI validation, Acid1/Acid2, integration |
+| `Broiler.App.Tests` | `src/Broiler.App.Tests/` | Unit tests, rendering output, cross-feature rendering (Windows only) |
 
 ## Running Tests
 
@@ -128,16 +135,16 @@ Covers Phase 2 CSS specifications:
 - **CSS Value Parsing** (1 test): rgb() in border-color shorthand
 - **Media Queries** (1 test): @media print vs @media screen coexistence
 
-### 3. Acid1 CSS1 Conformance Tests (77 tests)
+### 3. Acid1 CSS1 Conformance Tests (108 tests)
 
 Tests validating the rendering engine against the W3C CSS1 Acid1 test
 (`acid/acid1/acid1.html`). Organized into three test classes:
 
-- **Acid1CaptureTests** (30 tests): Visual regression, structural validation,
+- **Acid1CaptureTests** (34 tests): Visual regression, structural validation,
   image format checks, and similarity scoring against the reference image.
-- **Acid1ProgrammaticTests** (25 tests): Layout, float positioning, margin
+- **Acid1ProgrammaticTests** (49 tests): Layout, float positioning, margin
   collapsing, percentage widths, clear behaviour, and border-box computation.
-- **Acid1SplitTests** (22 tests): Isolated section tests (10 sections)
+- **Acid1SplitTests** (25 tests): Isolated section tests (10 sections)
   targeting individual CSS1 features for precise regression diagnostics.
 
 Run all Acid1 tests:
@@ -148,7 +155,7 @@ dotnet test src/Broiler.Cli.Tests/ --filter "FullyQualifiedName~Acid1"
 
 See [acid1-testing.md](acid1-testing.md) for full details.
 
-### 4. Rendering Analytics Tests (11 tests)
+### 4. Rendering Analytics Tests (10 tests)
 
 - **Performance**: Simple and large document render timing
 - **Dimensions**: Auto-sized rendering respects maxWidth, wider content
@@ -160,7 +167,7 @@ See [acid1-testing.md](acid1-testing.md) for full details.
 - **Consistency**: Same HTML produces identical output, different HTML
   produces different output
 
-### 5. CLI Output Validation Tests (6 tests)
+### 5. CLI Output Validation Tests (5 tests)
 
 - HTML capture preserves title and special characters
 - PNG capture produces valid PNG with correct magic bytes
@@ -246,13 +253,129 @@ Known layout engine bugs (e.g. negative widths from deeply nested
 elements) are logged and saved but do not fail the test. See
 `TestData/FuzzFailures/` for any saved violations.
 
+## Trait Standardisation (Phase 4)
+
+Every test class must carry at least a `Category` and an `Engine` trait.
+Add `Feature` traits where the test clearly exercises a single CSS/HTML
+feature area.
+
+### Standard Trait Categories
+
+| Trait | Values | Description |
+|-------|--------|-------------|
+| `Category` | `Unit` | Isolated function / type tests |
+| | `Rendering` | Tests that verify visual / rendered output |
+| | `Integration` | Multi-component pipeline tests |
+| | `Differential` | Cross-engine pixel comparison (requires Playwright) |
+| | `DifferentialReport` | Report-generation runs (manual / nightly) |
+| | `Compliance` | CSS2 / W3C specification conformance |
+| | `Fuzz` | Property-based / generative layout tests |
+| `Feature` | `BoxModel`, `Float`, `Position`, `Table`, `Text`, `Color`, `Font`, `Selector`, `Media` | CSS/HTML feature area |
+| `Engine` | `HtmlRenderer` | Tests in `HtmlRenderer.Image.Tests` |
+| | `Broiler` | Tests in `Broiler.App.Tests` |
+| | `Cli` | Tests in `Broiler.Cli.Tests` |
+
+### Filtered Test Runs
+
+```bash
+# Run only unit tests
+dotnet test Broiler.slnx --filter "Category=Unit"
+
+# Run only rendering tests
+dotnet test Broiler.slnx --filter "Category=Rendering"
+
+# Run only compliance tests
+dotnet test Broiler.slnx --filter "Category=Compliance"
+
+# Run only integration tests
+dotnet test Broiler.slnx --filter "Category=Integration"
+
+# Exclude slow differential & fuzz tests (default CI filter)
+dotnet test Broiler.slnx --filter "Category!=Differential&Category!=DifferentialReport&Category!=Fuzz"
+
+# Run tests for a specific feature
+dotnet test Broiler.slnx --filter "Feature=BoxModel"
+dotnet test Broiler.slnx --filter "Feature=Font"
+
+# Run tests for a specific engine
+dotnet test Broiler.slnx --filter "Engine=HtmlRenderer"
+dotnet test Broiler.slnx --filter "Engine=Cli"
+```
+
+### Test Naming Convention
+
+Use the pattern **`[Feature]_[Scenario]_[ExpectedResult]`** for new tests:
+
+```
+BoxModel_MarginCollapsing_LargerMarginWins
+Float_LeftFloatWithClear_RendersBelow
+Position_RelativeOffset_ShiftsElement
+```
+
+Existing tests are not required to be renamed, but new tests should follow
+this convention.
+
+---
+
 ## Adding New Tests
 
 1. Place unit tests for HTML-Renderer internals in
    `HtmlRenderer.Image.Tests` (has `InternalsVisibleTo` access).
 2. Place rendering/compliance tests in `Broiler.Cli.Tests`.
-3. Use the pixel-based helper methods (`CountPixels`, `GetColorBounds`,
+3. Place rendering-output and cross-feature tests in `Broiler.App.Tests`
+   or `HtmlRenderer.Image.Tests` depending on the rendering layer.
+4. Use the pixel-based helper methods (`CountPixels`, `GetColorBounds`,
    `IsRed/IsGreen/IsBlue`) for visual rendering assertions.
-4. Follow existing test conventions: xUnit `[Fact]` attributes, XML doc
+5. Follow existing test conventions: xUnit `[Fact]` attributes, XML doc
    comments, descriptive assertion messages.
-5. Run `dotnet test` to verify before submitting.
+6. Add `[Trait("Category", "...")]` and `[Trait("Engine", "...")]` to every
+   new test class. Add `[Trait("Feature", "...")]` when applicable.
+7. Run `dotnet test` to verify before submitting.
+
+## Pixel Regression Baselines
+
+Pixel regression tests compare rendered output against committed baseline
+PNG images stored in `TestData/PixelBaseline/`.
+
+### Generating Baselines
+
+1. Write a test using `AssertPixelBaseline(html)` in
+   `PixelRegressionTests.cs`.
+2. Run the test — it will **fail** on the first run and write a new
+   baseline PNG to `TestData/PixelBaseline/{TestName}.png`.
+3. Inspect the generated PNG visually to confirm it is correct.
+4. Re-run the test — it should now **pass**, comparing future renders
+   against the committed baseline.
+
+### Updating Baselines
+
+1. Delete the existing baseline PNG for the test you want to re-baseline.
+2. Run the test — a new baseline is written and the test fails.
+3. Inspect the new baseline, then re-run to confirm it passes.
+
+### Failure Diagnosis
+
+When a pixel regression test fails, the runner:
+
+- Saves a **diff image** (`{TestName}_diff.png`) highlighting mismatched
+  pixels in magenta.
+- **Classifies** the failure as one of:
+  - `LayoutDiff` — the Fragment tree (layout structure) differs.
+  - `PaintDiff` — the DisplayList (paint instructions) differs.
+  - `RasterDiff` — layout and paint match but pixel rasterization differs.
+
+### CSS Property Notes
+
+When writing HTML snippets for rendering tests, use `background-color:`
+(the longhand property) rather than the `background:` shorthand. The
+HtmlRenderer CSS parser handles the longhand property more reliably for
+isolated test snippets.
+
+---
+
+## Related Documents
+
+- [Testing Architecture](testing-architecture.md) — testable IR boundaries and invariants
+- [Testing Current State](testing-current-state.md) — point-in-time audit of test coverage and gaps
+- [Testing Roadmap](testing-roadmap.md) — staged plan for multi-layer automated testing
+- [Acid1 Testing](acid1-testing.md) — W3C CSS1 conformance test workflow

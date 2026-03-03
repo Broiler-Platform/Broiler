@@ -360,3 +360,14 @@ Each phase is considered complete when:
 - [x] Phase 5 — Convert regex caching to `[GeneratedRegex]` source generation
 - [x] Phase 6 — Replace `SubString` with `ReadOnlyMemory<char>`
 - [x] Phase 7 — Replace `RRect`/`RSize`/`RPoint` with `System.Drawing.RectangleF`/`SizeF`/`PointF`
+
+---
+
+## Related Tests
+
+| Test File | Project | Validates |
+|-----------|---------|-----------|
+| `PrimitivesTests.cs` | `HtmlRenderer.Image.Tests` | RRect, RPoint, RSize, Color type correctness |
+| `CssLengthTests.cs` | `HtmlRenderer.Image.Tests` | CSS length value parsing and unit conversion |
+| `SubStringTests.cs` | `HtmlRenderer.Image.Tests` | SubString wrapper (Phase 6 replacement target) |
+| `CommonUtilsTests.cs` | `HtmlRenderer.Image.Tests` | URI handling utilities |

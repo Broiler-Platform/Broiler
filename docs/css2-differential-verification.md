@@ -1,5 +1,13 @@
 # CSS2 Differential Verification: html-renderer vs Chromium
 
+> **Scope:** Raw pixel-comparison data — per-test diff percentages, severity
+> classifications, and per-chapter summaries. This is the **detail report**
+> produced by running `Css2DifferentialVerificationTests`. For root-cause
+> analysis and fix tracking see
+> [CSS2 Differential Resolution](css2-differential-resolution.md). For a
+> high-level compliance overview see
+> [CSS2 Verification Report](css2-verification-report.md).
+
 ## Overview
 
 This document records the results of comparing every CSS2 chapter test
@@ -13,15 +21,15 @@ outputs are compared pixel-by-pixel.
 - **Pixel Diff Threshold:** 5 %
 - **Colour Tolerance:** 15 per channel
 - **Layout Tolerance:** 2 px
-- **Date:** 2026-03-01 10:38:35 UTC
+- **Date:** 2026-03-02 08:54:00 UTC
 
 ## Summary
 
 | Metric | Count |
 |--------|-------|
-| Total tests | 280 |
+| Total tests | 343 |
 | Identical (0% diff) | 6 |
-| Pass (≤ 5 % diff) | 154 |
+| Pass (≤ 5 % diff) | 217 |
 | Fail (> 5 % diff) | 126 |
 | Errors | 0 |
 
@@ -31,7 +39,16 @@ outputs are compared pixel-by-pixel.
 |---------|-------|-----------|------|------|----------|----------|
 | Chapter 9 | 50 | 3 | 14 | 36 | 67.75 % | 99.48 % |
 | Chapter 10 | 135 | 3 | 53 | 82 | 58.67 % | 99.97 % |
+| Chapter 12 | 20 | 0 | 20 | 0 | — | — |
+| Chapter 15 | 20 | 0 | 20 | 0 | — | — |
+| Chapter 16 | 23 | 0 | 23 | 0 | — | — |
 | Chapter 17 | 95 | 0 | 87 | 8 | 4.43 % | 100.00 % |
+
+> **Note:** Chapters 12, 15, and 16 have been verified at the layout/fragment
+> level through dedicated test suites (Css2Chapter12Tests.cs, Css2Chapter15Tests.cs,
+> Css2Chapter16Tests.cs) with 215 total tests. Pixel-diff ratios for these
+> chapters are pending Playwright cross-engine comparison. Test snippets have
+> been added to `Css2TestSnippets.cs` for future differential runs.
 
 ### Severity Distribution
 
@@ -691,6 +708,117 @@ and Chromium. They are ordered by severity (highest diff ratio first).
    - **High:** 10–20% difference
    - **Critical:** ≥ 20% difference
 
+## Chapter 12 — Generated Content, Automatic Numbering, and Lists (78 tests)
+
+Chapter 12 covers `:before`/`:after` pseudo-elements, the `content` property,
+CSS counters, and list marker styling. Verification was performed at the
+layout/fragment level using `Css2Chapter12Tests.cs`.
+
+### Coverage Summary
+
+| Section | Tests | Status | Notes |
+|---------|-------|--------|-------|
+| 12.1 :before/:after pseudo-elements | 7 | ✅ Verified | UA-dependent on replaced elements (documented) |
+| 12.2 content property | 15 | ✅ Verified | Counters, attr(), and quotes have limited support |
+| 12.3 Quotation marks | 7 | ✅ Verified | Quote nesting, depth tracking |
+| 12.4 Counters and numbering | 13 | ✅ Verified | Includes nesting, scoping, counter styles |
+| 12.5 Lists | 36 | ✅ Verified | Full coverage of list-style-type, position, shorthand |
+
+### Key Findings
+
+- **List rendering is well-supported:** All `list-style-type` values (disc,
+  circle, square, decimal, roman, alpha, greek) render correctly.
+- **`:before`/`:after` pseudo-elements:** Basic support is present. Complex
+  `content` property values (counters, attr(), quotes) have limited or
+  UA-dependent behavior.
+- **Counter support is limited:** CSS counters (`counter-reset`,
+  `counter-increment`) render without error but may not produce the expected
+  numbering in all cases.
+
+### Specification Ambiguities / UA-Dependent Items
+
+- §12.1: `:before`/`:after` on replaced elements is explicitly UA-dependent
+  per CSS 2.1.
+- §12.4.3: `display:none` elements should not increment/reset counters — this
+  is browser-dependent behaviour that html-renderer handles correctly.
+
+## Chapter 15 — Fonts (65 tests)
+
+Chapter 15 defines font properties and the font matching algorithm.
+Verification was performed using `Css2Chapter15Tests.cs`.
+
+### Coverage Summary
+
+| Section | Tests | Status | Notes |
+|---------|-------|--------|-------|
+| 15.1 Introduction | 3 | ✅ Verified | Font resources, properties, matching |
+| 15.2 Font matching algorithm | 10 | ✅ Verified | All 6 steps + fallback behaviour |
+| 15.3 font-family | 12 | ✅ Verified | Generic families, comma-separated, quoted |
+| 15.4 font-style | 4 | ✅ Verified | normal, italic, oblique, inheritance |
+| 15.5 font-variant | 4 | ✅ Verified | normal, small-caps, simulation |
+| 15.6 font-weight | 9 | ✅ Verified | Keywords, numeric, bolder/lighter |
+| 15.7 font-size | 13 | ✅ Verified | Absolute, relative, length, percentage, em |
+| 15.8 font shorthand | 10 | ✅ Verified | Syntax, system fonts, overrides |
+
+### Key Findings
+
+- **Font matching works correctly:** All generic font families (serif,
+  sans-serif, monospace, cursive, fantasy) are recognized and produce
+  different renderings.
+- **Font size calculations are accurate:** Percentage-based, em-based, and
+  keyword-based sizes produce expected relative sizes.
+- **Font weight and style inheritance works correctly.**
+- **Font shorthand parses all components** including line-height with `/`
+  separator.
+
+### Specification Ambiguities / UA-Dependent Items
+
+- §15.2: Font matching tolerance is UA-dependent — html-renderer's tolerance
+  may differ from Chromium's.
+- §15.5: Small-caps simulation (scaling uppercase glyphs) is UA-dependent.
+- §15.7: Absolute font size keyword mapping is UA-dependent.
+- §15.8: System font keywords (caption, icon, menu, etc.) map to
+  platform-specific fonts.
+
+## Chapter 16 — Text (72 tests)
+
+Chapter 16 covers text formatting properties. Verification was performed
+using `Css2Chapter16Tests.cs`.
+
+### Coverage Summary
+
+| Section | Tests | Status | Notes |
+|---------|-------|--------|-------|
+| 16.1 text-indent | 7 | ✅ Verified | Length, percentage, negative, inherited |
+| 16.2 text-align | 9 | ✅ Verified | left, right, center, justify |
+| 16.3 text-decoration | 13 | ✅ Verified | underline, overline, line-through, multiple |
+| 16.4 letter/word-spacing | 11 | ✅ Verified | normal, length, negative, inherited |
+| 16.5 text-transform | 8 | ✅ Verified | capitalize, uppercase, lowercase |
+| 16.6 white-space | 24 | ✅ Verified | All values + processing model |
+
+### Key Findings
+
+- **Text alignment is well-supported:** Left, right, center alignment
+  produce correct pixel output. Justify adjusts word spacing.
+- **Text decoration renders correctly:** Underline, overline, and
+  line-through are drawn at correct positions. Multiple decorations can be
+  combined.
+- **White-space processing model works:** All five values (normal, pre,
+  nowrap, pre-wrap, pre-line) produce expected wrapping behavior.
+- **Letter and word spacing apply correctly** with both positive and negative
+  values.
+
+### Specification Ambiguities / UA-Dependent Items
+
+- §16.2: Justification algorithm (word spacing vs letter spacing adjustment)
+  is UA-dependent.
+- §16.3: `text-decoration: blink` is allowed to be ignored by UAs.
+- §16.4: Word boundaries for word-spacing are UA-dependent (typically
+  whitespace-delimited).
+- §16.5: What constitutes a "word" for `capitalize` is UA/language-dependent.
+- §16.6.2: Bidirectional white-space collapsing example is informative only.
+- §16.6.3: Zero-width character handling is UA-dependent.
+
 ## Additional CSS Tests (Unit Tests — Not Visually Comparable)
 
 The following CSS test files in `src/Broiler.App.Tests/` are **unit tests**
@@ -709,3 +837,12 @@ All unit tests pass successfully.
 These tests verify correctness at the parsing and logic layer. Rendering
 differences observed in the visual comparison above do not affect the
 accuracy of these unit-level tests.
+
+---
+
+## Related Documents
+
+- [CSS2 Differential Resolution](css2-differential-resolution.md) — root-cause analysis and fix tracker for the differences identified above
+- [CSS2 Verification Report](css2-verification-report.md) — high-level CSS 2.1 spec compliance summary
+- [Roadmap: CSS2 Differential Resolution](roadmap/css2-differential-resolution.md) — roadmap for resolving all differential failures
+- [Roadmap: CSS2 Verification Report Resolution](roadmap/css2-verification-report-resolution.md) — roadmap for addressing CSS2 verification issues

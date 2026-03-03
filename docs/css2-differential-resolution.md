@@ -1,5 +1,12 @@
 # CSS2 Differential Resolution: html-renderer vs Chromium
 
+> **Scope:** Root-cause analysis, code pointers, and fix-tracking for
+> rendering differences identified in the differential verification. This is
+> the **resolution tracker**. For the raw pixel-comparison data see
+> [CSS2 Differential Verification](css2-differential-verification.md). For a
+> high-level compliance overview see
+> [CSS2 Verification Report](css2-verification-report.md).
+
 ## Overview
 
 This document tracks the resolution of rendering differences identified in
@@ -142,3 +149,12 @@ with browser behaviour.
 Applications using html-renderer for tooltips or rich text labels that
 provide bare HTML fragments will not be affected, because the margin only
 applies when a `<body>` element exists in the parsed document.
+
+---
+
+## Related Documents
+
+- [CSS2 Differential Verification](css2-differential-verification.md) — pixel-by-pixel comparison results that feed into this resolution tracker
+- [CSS2 Verification Report](css2-verification-report.md) — high-level CSS 2.1 spec compliance summary
+- [Roadmap: CSS2 Differential Resolution](roadmap/css2-differential-resolution.md) — roadmap for resolving all differential failures
+- [Roadmap: CSS2 Verification Report Resolution](roadmap/css2-verification-report-resolution.md) — roadmap for addressing CSS2 verification issues

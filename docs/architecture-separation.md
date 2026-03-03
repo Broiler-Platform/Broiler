@@ -2,6 +2,12 @@
 
 ## 1. Current Pipeline (As-Is)
 
+> **Note (2026-03-03):** The paint phase described below has been replaced.
+> `CssBox.Paint()` / `PaintImp()` have been removed (see
+> [Architecture Roadmap Phase 3](architecture-roadmap.md)). Paint now goes
+> through `PaintWalker` → `DisplayList` → `RGraphicsRasterBackend`. The
+> module map and data flow below are preserved for historical reference.
+
 ### Module Map
 
 | Phase | Module(s) | Key Files |
@@ -11,8 +17,8 @@
 | **Selector Matching** | `HtmlRenderer.Orchestration` | `DomParser.CascadeApplyStyles()` |
 | **Computed Styles** | `HtmlRenderer.Dom` | `CssBoxProperties.cs` (lazy-parsed CSS lengths) |
 | **Layout** | `HtmlRenderer.Dom` | `CssBox.PerformLayoutImp()`, `CssLayoutEngine.cs`, `CssLayoutEngineTable.cs` |
-| **Paint** | `HtmlRenderer.Dom` + `HtmlRenderer.Rendering` | `CssBox.Paint()`/`PaintImp()`, `BordersDrawHandler`, `BackgroundImageDrawHandler` |
-| **Raster** | `HtmlRenderer.Image` (Skia) / `HtmlRenderer.WPF` | `GraphicsAdapter`, platform `RGraphics` |
+| **Paint** | `HtmlRenderer.Orchestration` | `PaintWalker.cs` → `DisplayList` |
+| **Raster** | `HtmlRenderer.Orchestration` | `RGraphicsRasterBackend.cs` → `RGraphics` |
 | **Orchestration** | `HtmlRenderer.Orchestration` | `HtmlContainerInt.PerformLayout()`, `HtmlContainerInt.PerformPaint()` |
 
 ### Data Flow
@@ -406,3 +412,13 @@ established several clean boundaries:
 | DOM orchestration ↔ CssBox | `IHtmlContainerInt` interface | ✅ Clean |
 
 These existing interfaces are a strong foundation for the full separation.
+
+---
+
+## Related Documents
+
+- [Architecture Roadmap](architecture-roadmap.md) — phased plan for completing the Style/Layout/Paint/Raster separation
+- [ADR-006: Modular HtmlRenderer Split](adr/006-modular-htmlrenderer-split.md) — initial modularisation decision
+- [ADR-007: Advanced HtmlRenderer Modularization](adr/007-advanced-htmlrenderer-modularization.md) — advanced modularisation plan
+- [ADR-008: Further HtmlRenderer Modularization](adr/008-further-htmlrenderer-modularization.md) — further modularisation proposal
+- [Testing Architecture](testing-architecture.md) — testable IR boundaries in the rendering pipeline

@@ -1,6 +1,12 @@
 # Testing Architecture – Testable IR Boundaries
 
 > Phase 1 deliverable for the [Automated Multi-Layer Test Suite Roadmap](testing-roadmap.md).
+>
+> **Scope:** Defines the four testable IR boundaries (Style → Layout →
+> Paint → Raster) and their invariants. This describes the **target testing
+> architecture** — see the [Testing Roadmap](testing-roadmap.md) for
+> implementation status of each phase. For the practical "how to run tests"
+> guide see [Testing Guide](testing-guide.md).
 
 ---
 
@@ -279,5 +285,9 @@ subtle rendering regressions (anti-aliasing, sub-pixel shifts, border artefacts)
 
 ---
 
-*See [testing-current-state.md](testing-current-state.md) for the full audit and
-[testing-roadmap.md](testing-roadmap.md) for the staged implementation plan.*
+## Related Documents
+
+- [Testing Current State](testing-current-state.md) — full audit of test coverage and gaps
+- [Testing Roadmap](testing-roadmap.md) — staged implementation plan
+- [Testing Guide](testing-guide.md) — how to run, write, and organise tests
+- [Architecture Separation](architecture-separation.md) — current pipeline module map and data flow

@@ -16,6 +16,7 @@ namespace HtmlRenderer.Image.Tests;
 /// HTML + Fragment JSON + violation descriptions.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Engine", "HtmlRenderer")]
 public class LayoutFuzzRunner
 {
     private static readonly string FailureDir = Path.Combine(

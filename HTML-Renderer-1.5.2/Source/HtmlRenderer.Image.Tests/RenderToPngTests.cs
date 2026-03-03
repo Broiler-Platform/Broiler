@@ -6,6 +6,8 @@ namespace HtmlRenderer.Image.Tests;
 /// Tests for rendering HTML to PNG format.
 /// </summary>
 [Collection("Rendering")]
+[Trait("Category", "Rendering")]
+[Trait("Engine", "HtmlRenderer")]
 public class RenderToPngTests(RenderingFixture fixture)
 {
     [Fact]

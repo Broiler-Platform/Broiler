@@ -2,6 +2,8 @@ using Broiler.App.Rendering;
 
 namespace Broiler.Cli.Tests;
 
+[Trait("Category", "Unit")]
+[Trait("Engine", "Cli")]
 public class RenderLoggerTests : IDisposable
 {
     public RenderLoggerTests()

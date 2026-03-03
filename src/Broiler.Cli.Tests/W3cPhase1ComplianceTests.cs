@@ -18,6 +18,8 @@ namespace Broiler.Cli.Tests;
 ///   <item><c>@media screen</c> rules are applied when rendering.</item>
 /// </list>
 /// </remarks>
+[Trait("Category", "Compliance")]
+[Trait("Engine", "Cli")]
 public class W3cPhase1ComplianceTests
 {
     // -----------------------------------------------------------------
