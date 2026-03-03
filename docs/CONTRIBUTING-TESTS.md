@@ -29,7 +29,7 @@ CSS/HTML feature area.
 ```csharp
 [Trait("Category", "Unit")]
 [Trait("Engine", "HtmlRenderer")]
-public class MyNewTests
+public class CssParser_ShorthandExpansionTests
 {
     // ...
 }
