@@ -56,9 +56,9 @@ This roadmap defines concrete phases to address these issues.
 
 | Project | Test Count | Primary Focus |
 |---------|-----------|---------------|
-| `Broiler.App.Tests` | ~18 files | Structural: DOM, CSS parsing, pipeline wiring |
+| `Broiler.App.Tests` | ~20 files, ~298 tests | Structural: DOM, CSS parsing, pipeline wiring, rendering output |
 | `Broiler.Cli.Tests` | ~14 files, ~240 tests | CLI output validation, capture integration, W3C compliance |
-| `HtmlRenderer.Image.Tests` | ~51 files, ~1461 tests | Rendering: CSS2 chapters, pixel regression, analytics, differential |
+| `HtmlRenderer.Image.Tests` | ~50 files, ~1474 tests | Rendering: CSS2 chapters, pixel regression, analytics, differential |
 
 **Key problems:**
 
