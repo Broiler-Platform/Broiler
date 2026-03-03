@@ -8,6 +8,8 @@ namespace Broiler.App.Tests;
 /// positioning, tables with overflow, inline-block with text-align, and
 /// z-index with opacity.
 /// </summary>
+[Trait("Category", "Rendering")]
+[Trait("Engine", "Broiler")]
 public class CrossFeatureRenderingTests
 {
     // ── Float + Positioning ─────────────────────────────────────────
