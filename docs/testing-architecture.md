@@ -279,5 +279,9 @@ subtle rendering regressions (anti-aliasing, sub-pixel shifts, border artefacts)
 
 ---
 
-*See [testing-current-state.md](testing-current-state.md) for the full audit and
-[testing-roadmap.md](testing-roadmap.md) for the staged implementation plan.*
+## Related Documents
+
+- [Testing Current State](testing-current-state.md) — full audit of test coverage and gaps
+- [Testing Roadmap](testing-roadmap.md) — staged implementation plan
+- [Testing Guide](testing-guide.md) — how to run, write, and organise tests
+- [Architecture Separation](architecture-separation.md) — current pipeline module map and data flow

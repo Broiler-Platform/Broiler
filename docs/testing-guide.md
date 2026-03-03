@@ -256,3 +256,12 @@ elements) are logged and saved but do not fail the test. See
 4. Follow existing test conventions: xUnit `[Fact]` attributes, XML doc
    comments, descriptive assertion messages.
 5. Run `dotnet test` to verify before submitting.
+
+---
+
+## Related Documents
+
+- [Testing Architecture](testing-architecture.md) — testable IR boundaries and invariants
+- [Testing Current State](testing-current-state.md) — point-in-time audit of test coverage and gaps
+- [Testing Roadmap](testing-roadmap.md) — staged plan for multi-layer automated testing
+- [Acid1 Testing](acid1-testing.md) — W3C CSS1 conformance test workflow

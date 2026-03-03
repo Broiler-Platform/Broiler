@@ -9,6 +9,7 @@ adoption plan with clear incremental milestones.
 Related documents:
 - [Testing Current State (Phase 0 Audit)](testing-current-state.md)
 - [Testing Architecture (IR Boundaries)](testing-architecture.md)
+- [Testing Guide](testing-guide.md)
 - [Architecture Separation](architecture-separation.md)
 - [Architecture Roadmap](architecture-roadmap.md)
 

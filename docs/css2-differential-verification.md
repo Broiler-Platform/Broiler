@@ -829,3 +829,12 @@ All unit tests pass successfully.
 These tests verify correctness at the parsing and logic layer. Rendering
 differences observed in the visual comparison above do not affect the
 accuracy of these unit-level tests.
+
+---
+
+## Related Documents
+
+- [CSS2 Differential Resolution](css2-differential-resolution.md) — root-cause analysis and fix tracker for the differences identified above
+- [CSS2 Verification Report](css2-verification-report.md) — high-level CSS 2.1 spec compliance summary
+- [Roadmap: CSS2 Differential Resolution](roadmap/css2-differential-resolution.md) — roadmap for resolving all differential failures
+- [Roadmap: CSS2 Verification Report Resolution](roadmap/css2-verification-report-resolution.md) — roadmap for addressing CSS2 verification issues
