@@ -1,5 +1,12 @@
 # CSS2 Differential Resolution: html-renderer vs Chromium
 
+> **Scope:** Root-cause analysis, code pointers, and fix-tracking for
+> rendering differences identified in the differential verification. This is
+> the **resolution tracker**. For the raw pixel-comparison data see
+> [CSS2 Differential Verification](css2-differential-verification.md). For a
+> high-level compliance overview see
+> [CSS2 Verification Report](css2-verification-report.md).
+
 ## Overview
 
 This document tracks the resolution of rendering differences identified in

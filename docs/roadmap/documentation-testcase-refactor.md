@@ -122,24 +122,24 @@ This roadmap defines concrete phases to address these issues.
 
 **Goal:** Reduce overlap and clarify document boundaries.
 
-- [ ] Consolidate CSS2 verification documents
-  - [ ] Merge `css2-differential-resolution.md` and
+- [x] Consolidate CSS2 verification documents
+  - [x] Merge `css2-differential-resolution.md` and
         `css2-differential-verification.md` into a single resolution report,
         or clearly delineate scope with introductory paragraphs
-  - [ ] Ensure `css2-verification-report.md` serves as the high-level
+  - [x] Ensure `css2-verification-report.md` serves as the high-level
         summary and links to the detailed resolution document
-- [ ] Consolidate testing documents
-  - [ ] Ensure `testing-guide.md` is the practical "how to run tests" entry
+- [x] Consolidate testing documents
+  - [x] Ensure `testing-guide.md` is the practical "how to run tests" entry
         point
-  - [ ] Ensure `testing-current-state.md` is clearly marked as a
+  - [x] Ensure `testing-current-state.md` is clearly marked as a
         point-in-time audit (add date and version)
-  - [ ] Ensure `testing-architecture.md` describes the target architecture
+  - [x] Ensure `testing-architecture.md` describes the target architecture
         and links to the roadmap for implementation status
-  - [ ] Ensure `testing-roadmap.md` is the single source of truth for
+  - [x] Ensure `testing-roadmap.md` is the single source of truth for
         planned testing improvements
-- [ ] Review and update all ADR statuses in `docs/adr/README.md`
-  - [ ] Mark completed ADRs as `Accepted`
-  - [ ] Mark superseded ADRs and link to replacements
+- [x] Review and update all ADR statuses in `docs/adr/README.md`
+  - [x] Mark completed ADRs as `Accepted`
+  - [x] Mark superseded ADRs and link to replacements
 
 **Acceptance criteria:**
 - No two documents cover the same topic without clearly stated distinct

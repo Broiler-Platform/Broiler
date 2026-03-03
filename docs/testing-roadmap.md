@@ -1,10 +1,12 @@
 # Testing Roadmap – Automated Multi-Layer Test Suite
 
 > Style → Layout → Paint → Raster
-
-This roadmap describes how to evolve from the current test suite to a robust,
-multi-layer, partially auto-generated testing system. It is designed as a staged
-adoption plan with clear incremental milestones.
+>
+> **Scope:** Single source of truth for planned testing improvements. Tracks
+> phase status from Phase 0 (audit) through Phase 6 (differential testing).
+> For the target architecture definitions see
+> [Testing Architecture](testing-architecture.md). For the practical
+> "how to run tests" guide see [Testing Guide](testing-guide.md).
 
 Related documents:
 - [Testing Current State (Phase 0 Audit)](testing-current-state.md)
