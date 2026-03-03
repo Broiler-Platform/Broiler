@@ -406,3 +406,13 @@ established several clean boundaries:
 | DOM orchestration ↔ CssBox | `IHtmlContainerInt` interface | ✅ Clean |
 
 These existing interfaces are a strong foundation for the full separation.
+
+---
+
+## Related Documents
+
+- [Architecture Roadmap](architecture-roadmap.md) — phased plan for completing the Style/Layout/Paint/Raster separation
+- [ADR-006: Modular HtmlRenderer Split](adr/006-modular-htmlrenderer-split.md) — initial modularisation decision
+- [ADR-007: Advanced HtmlRenderer Modularization](adr/007-advanced-htmlrenderer-modularization.md) — advanced modularisation plan
+- [ADR-008: Further HtmlRenderer Modularization](adr/008-further-htmlrenderer-modularization.md) — further modularisation proposal
+- [Testing Architecture](testing-architecture.md) — testable IR boundaries in the rendering pipeline

@@ -303,3 +303,13 @@ pixel-identical output for all existing tests (no behavior regressions).
 | `HtmlRenderer.Image/SkiaRasterBackend.cs` | ✦ new | | ✎ | |
 
 ✦ = new file, ✎ = modified
+
+---
+
+## Related Documents
+
+- [Architecture Separation](architecture-separation.md) — current and target pipeline structure with module map and data flow
+- [ADR-006: Modular HtmlRenderer Split](adr/006-modular-htmlrenderer-split.md) — initial modularisation decision
+- [ADR-007: Advanced HtmlRenderer Modularization](adr/007-advanced-htmlrenderer-modularization.md) — advanced modularisation plan
+- [ADR-008: Further HtmlRenderer Modularization](adr/008-further-htmlrenderer-modularization.md) — further modularisation proposal
+- [Roadmap: .NET Standard Type Replacement](roadmap/dotnet-standard-type-replacement.md) — codebase modernisation roadmap

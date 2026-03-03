@@ -154,6 +154,9 @@ the biggest blind spots are.
 
 ---
 
-*See [testing-architecture.md](testing-architecture.md) for testable IR boundary
-definitions and [testing-roadmap.md](testing-roadmap.md) for the staged
-implementation plan.*
+## Related Documents
+
+- [Testing Architecture](testing-architecture.md) — testable IR boundary definitions
+- [Testing Roadmap](testing-roadmap.md) — staged implementation plan
+- [Testing Guide](testing-guide.md) — how to run, write, and organise tests
+- [Architecture Separation](architecture-separation.md) — current pipeline structure
