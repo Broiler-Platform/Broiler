@@ -219,17 +219,17 @@ internal data structures.
 **Goal:** Ensure documentation examples are consistent with actual tests
 and vice versa.
 
-- [ ] Review all code examples in documentation
-  - [ ] Verify examples in `testing-guide.md` match real test commands
-  - [ ] Verify architecture descriptions match current code structure
-  - [ ] Update outdated references (file paths, class names, test counts)
-- [ ] Add "Related Tests" sections to roadmaps
-  - [ ] Each roadmap phase references the tests that validate it
-  - [ ] Each major test file references the documentation that explains its
+- [x] Review all code examples in documentation
+  - [x] Verify examples in `testing-guide.md` match real test commands
+  - [x] Verify architecture descriptions match current code structure
+  - [x] Update outdated references (file paths, class names, test counts)
+- [x] Add "Related Tests" sections to roadmaps
+  - [x] Each roadmap phase references the tests that validate it
+  - [x] Each major test file references the documentation that explains its
         purpose
-- [ ] Update `testing-current-state.md` with current test counts and
+- [x] Update `testing-current-state.md` with current test counts and
   categories
-- [ ] Ensure all ADRs reference related tests where applicable
+- [x] Ensure all ADRs reference related tests where applicable
 
 **Acceptance criteria:**
 - No documentation references a test, class, or file that does not exist.
