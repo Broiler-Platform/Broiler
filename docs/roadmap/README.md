@@ -9,6 +9,7 @@ area of work.
 | Roadmap | Status | Summary |
 |---------|--------|---------|
 | [Acid1 Error Resolution](acid1-error-resolution.md) | Complete | Fix all rendering discrepancies between Broiler and Chromium for the Acid1 CSS1 test |
+| [Acid2 Compliance](acid2-compliance.md) | Active | Achieve full Acid2 CSS2 conformance test compliance in html-renderer |
 | [CLI Website Capture](cli-website-capture.md) | Complete | Deliver a cross-platform CLI tool that captures website content using local engines |
 | [CSS2 Differential Resolution](css2-differential-resolution.md) | Active | Fix rendering differences between html-renderer and headless Chromium |
 | [CSS2 Verification Report Resolution](css2-verification-report-resolution.md) | Active | Address every issue identified in the CSS2 verification report |
@@ -25,6 +26,10 @@ Several roadmaps are closely related:
   and [CSS2 Verification Report Resolution](css2-verification-report-resolution.md)
   both feed into the CSS2 compliance effort tracked in the
   [verification report](../css2-verification-report.md).
+- **Acid tests** — [Acid1 Error Resolution](acid1-error-resolution.md)
+  (complete) and [Acid2 Compliance](acid2-compliance.md) (active) target the
+  W3C CSS conformance tests.  Acid2 exercises CSS2.1 features covered by the
+  CSS2 cluster roadmaps.
 - **Testing & documentation** — [Documentation & Testcase Refactor](documentation-testcase-refactor.md)
   complements the [testing roadmap](../testing-roadmap.md) by addressing
   organisation and rendering focus rather than pipeline-layer coverage.

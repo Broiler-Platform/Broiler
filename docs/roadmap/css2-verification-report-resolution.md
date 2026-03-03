@@ -14,6 +14,8 @@
 >   pixel-by-pixel comparison results.
 > - [Acid1 Error Resolution](acid1-error-resolution.md) — completed Acid1
 >   fixes (all four priorities done).
+> - [Acid2 Compliance](acid2-compliance.md) — roadmap for Acid2 CSS2
+>   conformance (Priority 8 detail).
 
 ---
 
