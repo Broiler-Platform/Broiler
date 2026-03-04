@@ -388,7 +388,7 @@ passes at ≤ 5 % threshold in CI.
 | Phase | Timeline | Milestones | Key Deliverables | Status |
 |-------|----------|------------|------------------|--------|
 | 1 | Immediate | M1 | Stylesheet resolution, object fallback, data URI | ✅ Complete |
-| 2 | Short-term | M2, M3, M4 | Paint order, table display, min/max dims | ⬜ Pending |
+| 2 | Short-term | M2, M3, M4 | Paint order, table display, min/max dims | ✅ Complete |
 | 3 | Medium-term | M5, M6, M7 | Margin collapsing, float inheritance, gen content | ⬜ Pending |
 | 4 | Long-term | M8, M9, M10 | Parser hardening, bg:fixed, CI gate at ≤ 5 % | ⬜ Pending |
 
