@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using TheArtOfDev.HtmlRenderer.Core.Parse;
 using TheArtOfDev.HtmlRenderer.Core.Utils;
 using System.Drawing;
 
@@ -145,10 +146,31 @@ internal static class CssBoxHelper
         double? oldSum = null;
 
         // not inline (block) boxes start a new line so we need to reset the max sum
-        if (box.Display != CssConstants.Inline && box.Display != CssConstants.TableCell && box.WhiteSpace != CssConstants.NoWrap)
+        // CSS2.1 §10.3.7: Floated children contribute to the same "line" for
+        // shrink-to-fit width calculation, so they do not reset maxSum.
+        if (box.Display != CssConstants.Inline && box.Display != CssConstants.TableCell && box.WhiteSpace != CssConstants.NoWrap && box.Float == CssConstants.None)
         {
             oldSum = maxSum;
             maxSum = marginSum;
+        }
+
+        // CSS2.1 §10.3.5/§10.3.7: When a floated child has an explicit width,
+        // use the declared width directly for shrink-to-fit calculation
+        // instead of measuring content words.
+        if (box.Float != CssConstants.None
+            && box.Width != CssConstants.Auto
+            && !string.IsNullOrEmpty(box.Width))
+        {
+            double explicitWidth = CssValueParser.ParseLength(
+                box.Width, box.ContainingBlock?.Size.Width ?? 0, box.GetEmHeight());
+            paddingSum += box.ActualBorderLeftWidth + box.ActualBorderRightWidth
+                        + box.ActualPaddingRight + box.ActualPaddingLeft;
+            maxSum += explicitWidth;
+            min = Math.Max(min, explicitWidth);
+
+            if (oldSum.HasValue)
+                maxSum = Math.Max(maxSum, oldSum.Value);
+            return;
         }
 
         // add the padding 

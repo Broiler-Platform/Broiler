@@ -216,6 +216,12 @@ internal static class CssUtils
             case "top":
                 cssBox.Top = value;
                 break;
+            case "right":
+                cssBox.Right = value;
+                break;
+            case "bottom":
+                cssBox.Bottom = value;
+                break;
             case "width":
                 cssBox.Width = value;
                 break;
