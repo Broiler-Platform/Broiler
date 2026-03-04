@@ -444,8 +444,12 @@ internal class CssBox : CssBoxProperties, IDisposable
                         }
                     }
 
-                    // Handle clear property
-                    if (Clear != CssConstants.None && prevSibling != null)
+                    // CSS2.1 §9.5.2: Handle clear property.  Clearance is
+                    // introduced above the margin of the cleared element to
+                    // push it below all relevant floats.  The prevSibling
+                    // check is removed because floats may originate from
+                    // ancestors' preceding siblings within the same BFC.
+                    if (Clear != CssConstants.None)
                     {
                         double maxFloatBottom = CssBoxHelper.GetMaxFloatBottom(this);
                         if (maxFloatBottom > top)
@@ -496,8 +500,18 @@ internal class CssBox : CssBoxProperties, IDisposable
         // padding and border are additive (CSS2.1 §10.6.3).
         if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
         {
-            double borderBoxHeight = ActualHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
-            ActualBottom = Math.Max(ActualBottom, Location.Y + borderBoxHeight);
+            // CSS2.1 §10.5: If height is a percentage and the containing
+            // block's height is not explicitly specified (auto), the
+            // percentage resolves to auto and this constraint is skipped.
+            bool resolveToAuto = Height.Contains('%')
+                && (ContainingBlock.Height == CssConstants.Auto
+                    || string.IsNullOrEmpty(ContainingBlock.Height));
+
+            if (!resolveToAuto)
+            {
+                double borderBoxHeight = ActualHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+                ActualBottom = Math.Max(ActualBottom, Location.Y + borderBoxHeight);
+            }
         }
 
         // CSS2.1 §10.7: Apply min-height / max-height constraints.

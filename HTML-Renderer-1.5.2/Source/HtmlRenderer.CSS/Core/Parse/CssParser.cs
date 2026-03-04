@@ -251,20 +251,42 @@ internal sealed class CssParser
         className = className.ToLower();
 
         string psedoClass = null;
+        string pseudoElement = null;
         var colonIdx = className.IndexOf(":", StringComparison.Ordinal);
 
         if (colonIdx > -1 && !className.StartsWith("::"))
         {
-            psedoClass = colonIdx < className.Length - 1 ? className.Substring(colonIdx + 1).Trim() : null;
+            var suffix = colonIdx < className.Length - 1 ? className.Substring(colonIdx + 1).Trim() : null;
             className = className.Substring(0, colonIdx).Trim();
+
+            // CSS2.1 §12.1 / CSS3: Normalise :before/:after and ::before/::after
+            // to pseudo-element references so they can be stored and applied.
+            if (suffix != null)
+            {
+                var normalised = suffix.TrimStart(':');
+                if (normalised == "before" || normalised == "after")
+                    pseudoElement = "::" + normalised;
+                else
+                    psedoClass = suffix;
+            }
         }
 
-        if (!string.IsNullOrEmpty(className) && (psedoClass == null || psedoClass == "link" || psedoClass == "hover"))
+        if (!string.IsNullOrEmpty(className))
         {
-            var selectors = ParseCssBlockSelector(className, out string firstClass);
-            var properties = ParseCssBlockProperties(blockSource);
+            if (pseudoElement != null)
+            {
+                var selectors = ParseCssBlockSelector(className, out string firstClass);
+                var properties = ParseCssBlockProperties(blockSource);
+                return new CssBlock(firstClass + pseudoElement, properties, selectors);
+            }
 
-            return new CssBlock(firstClass, properties, selectors, psedoClass == "hover");
+            if (psedoClass == null || psedoClass == "link" || psedoClass == "hover")
+            {
+                var selectors = ParseCssBlockSelector(className, out string firstClass);
+                var properties = ParseCssBlockProperties(blockSource);
+
+                return new CssBlock(firstClass, properties, selectors, psedoClass == "hover");
+            }
         }
 
         return null;
