@@ -169,6 +169,107 @@ public class Css2Chapter5Tests
         LayoutInvariantChecker.AssertValid(fragment);
     }
 
+    /// <summary>
+    /// §5.2 – T8.1 (Phase 4): Chained adjacent sibling combinator
+    /// <c>p + table + p</c> must be accepted by the parser.  Acid2 uses
+    /// this pattern to hide a paragraph after a table.
+    /// </summary>
+    [Fact]
+    public void S5_2_Combinator_ChainedAdjacentSibling_Acid2()
+    {
+        const string html =
+            @"<style>
+                body { margin:0; padding:0; }
+                p + table + p { background-color: red; width:60px; height:30px; }
+              </style>
+              <p>First</p>
+              <table><tr><td>Cell</td></tr></table>
+              <p>Third</p>";
+        var fragment = BuildFragmentTree(html);
+        Assert.NotNull(fragment);
+        LayoutInvariantChecker.AssertValid(fragment);
+    }
+
+    /// <summary>
+    /// §5.2 / §4.1.7 – T8.2 (Phase 4): The CSS parser must ignore
+    /// invalid property values (e.g. <c>width: 200</c> without a unit)
+    /// and continue processing subsequent valid declarations.
+    /// </summary>
+    [Fact]
+    public void S5_InvalidPropertyValue_Ignored_Acid2()
+    {
+        const string html =
+            @"<style>
+                body { margin:0; padding:0; }
+                div { width: 200; height: 50px; background-color: red; }
+              </style>
+              <div></div>";
+        var fragment = BuildFragmentTree(html);
+        Assert.NotNull(fragment);
+        LayoutInvariantChecker.AssertValid(fragment);
+        // width: 200 (no unit) should be ignored; the valid
+        // background-color: red must still apply.
+        using var bitmap = RenderHtml(html, 300, 100);
+        var pixel = bitmap.GetPixel(10, 10);
+        Assert.True(pixel.Red > HighChannel && pixel.Green < LowChannel,
+            $"Valid declarations after invalid one should still apply, got ({pixel.Red},{pixel.Green},{pixel.Blue})");
+    }
+
+    /// <summary>
+    /// §4.1.7 – T8.2 (Phase 4): CSS parser ignores declarations with
+    /// <c>! error</c> (not <c>!important</c>).  Valid rules that follow
+    /// the invalid declaration must still apply.
+    /// </summary>
+    [Fact]
+    public void S5_InvalidImportantSyntax_Ignored_Acid2()
+    {
+        const string html =
+            @"<style>
+                body { margin:0; padding:0; }
+                div { border: 1px solid red ! error; background-color: blue; width:100px; height:50px; }
+              </style>
+              <div></div>";
+        var fragment = BuildFragmentTree(html);
+        Assert.NotNull(fragment);
+        LayoutInvariantChecker.AssertValid(fragment);
+    }
+
+    /// <summary>
+    /// §4.1.3 – T8.3 (Phase 4): Escaped (backslash) identifiers in CSS
+    /// values must be accepted by the parser without crashing.
+    /// </summary>
+    [Fact]
+    public void S5_EscapedIdentifiers_Accepted_Acid2()
+    {
+        const string html =
+            @"<style>
+                body { margin:0; padding:0; }
+                .t\65 st { background-color: red; width:100px; height:50px; }
+              </style>
+              <div class='test'></div>";
+        var fragment = BuildFragmentTree(html);
+        Assert.NotNull(fragment);
+        LayoutInvariantChecker.AssertValid(fragment);
+    }
+
+    /// <summary>
+    /// §4.1.3 – T8.3 (Phase 4): Backslash-escaped characters within
+    /// property values must not crash the CSS parser.
+    /// </summary>
+    [Fact]
+    public void S5_BackslashInPropertyValue_Accepted_Acid2()
+    {
+        const string html =
+            @"<style>
+                body { margin:0; padding:0; }
+                div { font-family: 'he\6Cvetica'; width:100px; height:50px; background-color:green; }
+              </style>
+              <div>Text</div>";
+        var fragment = BuildFragmentTree(html);
+        Assert.NotNull(fragment);
+        LayoutInvariantChecker.AssertValid(fragment);
+    }
+
     // ───────────────────────────────────────────────────────────────
     // 5.2.1 Grouping
     // ───────────────────────────────────────────────────────────────
