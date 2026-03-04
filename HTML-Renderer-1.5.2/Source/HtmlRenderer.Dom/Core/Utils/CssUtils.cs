@@ -62,7 +62,10 @@ internal static class CssUtils
             "top" => cssBox.Top,
             "width" => cssBox.Width,
             "max-width" => cssBox.MaxWidth,
+            "min-width" => cssBox.MinWidth,
             "height" => cssBox.Height,
+            "max-height" => cssBox.MaxHeight,
+            "min-height" => cssBox.MinHeight,
             "background-color" => cssBox.BackgroundColor,
             "background-image" => cssBox.BackgroundImage,
             "background-position" => cssBox.BackgroundPosition,
@@ -219,8 +222,17 @@ internal static class CssUtils
             case "max-width":
                 cssBox.MaxWidth = value;
                 break;
+            case "min-width":
+                cssBox.MinWidth = value;
+                break;
             case "height":
                 cssBox.Height = value;
+                break;
+            case "max-height":
+                cssBox.MaxHeight = value;
+                break;
+            case "min-height":
+                cssBox.MinHeight = value;
                 break;
             case "background-color":
                 cssBox.BackgroundColor = value;

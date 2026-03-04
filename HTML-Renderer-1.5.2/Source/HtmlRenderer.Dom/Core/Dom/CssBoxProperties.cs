@@ -296,7 +296,10 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
     public string Width { get; set; } = "auto";
     public string MaxWidth { get; set; } = "none";
+    public string MinWidth { get; set; } = "0";
     public string Height { get; set; } = "auto";
+    public string MaxHeight { get; set; } = "none";
+    public string MinHeight { get; set; } = "0";
     public string BackgroundColor { get; set; } = "transparent";
     public string BackgroundImage { get; set; } = "none";
     public string BackgroundPosition { get; set; } = "0% 0%";
@@ -1059,6 +1062,9 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         VerticalAlign = p.VerticalAlign;
         Width = p.Width;
         MaxWidth = p.MaxWidth;
+        MinWidth = p.MinWidth;
+        MinHeight = p.MinHeight;
+        MaxHeight = p.MaxHeight;
         _wordSpacing = p._wordSpacing;
         Opacity = p.Opacity;
         BoxShadow = p.BoxShadow;

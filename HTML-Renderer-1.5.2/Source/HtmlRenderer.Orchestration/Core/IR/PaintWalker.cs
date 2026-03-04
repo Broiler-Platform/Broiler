@@ -458,10 +458,17 @@ internal static class PaintWalker
             return;
         }
 
-        // Separate children into non-positioned and positioned
-        // Paint order: non-positioned (tree order), then positioned (sorted by StackLevel)
+        // CSS2.1 Appendix E: Within a stacking context, non-positioned
+        // children are painted in three phases:
+        //   Step 3: In-flow, non-inline-level, non-positioned descendants (blocks)
+        //   Step 4: Non-positioned floats
+        //   Step 5: In-flow, inline-level, non-positioned descendants
+        // Positioned children (stacking contexts) are painted last, sorted by StackLevel.
         List<Fragment>? positioned = null;
+        List<Fragment>? floats = null;
+        List<Fragment>? inlineLevel = null;
 
+        // Step 3: Paint block-level, non-float, non-positioned children
         foreach (var child in fragment.Children)
         {
             if (child.CreatesStackingContext)
@@ -469,12 +476,37 @@ internal static class PaintWalker
                 positioned ??= new List<Fragment>();
                 positioned.Add(child);
             }
+            else if (child.Style.Float is "left" or "right")
+            {
+                floats ??= new List<Fragment>();
+                floats.Add(child);
+            }
+            else if (child.Style.Display is "inline" or "inline-block" or "inline-table")
+            {
+                inlineLevel ??= new List<Fragment>();
+                inlineLevel.Add(child);
+            }
             else
             {
                 PaintFragment(child, items, propagatedFrom);
             }
         }
 
+        // Step 4: Paint non-positioned floats
+        if (floats != null)
+        {
+            foreach (var child in floats)
+                PaintFragment(child, items, propagatedFrom);
+        }
+
+        // Step 5: Paint inline-level, non-positioned descendants
+        if (inlineLevel != null)
+        {
+            foreach (var child in inlineLevel)
+                PaintFragment(child, items, propagatedFrom);
+        }
+
+        // Steps 6–7: Positioned children sorted by StackLevel
         if (positioned != null)
         {
             positioned.Sort((a, b) => a.StackLevel.CompareTo(b.StackLevel));
