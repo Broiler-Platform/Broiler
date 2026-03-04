@@ -4,15 +4,17 @@ namespace TheArtOfDev.HtmlRenderer.Core.Entities;
 
 public readonly struct CssBlockSelectorItem
 {
-    public CssBlockSelectorItem(string @class, bool directParent)
+    public CssBlockSelectorItem(string @class, bool directParent, bool adjacentSibling = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(@class);
 
         Class = @class;
         DirectParent = directParent;
+        AdjacentSibling = adjacentSibling;
     }
 
     public readonly string Class { get; }
     public readonly bool DirectParent { get; }
-    public override readonly string ToString() => Class + (DirectParent ? " > " : string.Empty);
+    public readonly bool AdjacentSibling { get; }
+    public override readonly string ToString() => Class + (DirectParent ? " > " : AdjacentSibling ? " + " : string.Empty);
 }

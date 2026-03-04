@@ -14,7 +14,7 @@ internal sealed class CssParser
     private static readonly char[] _cssBlockSplitters = ['}', ';'];
     private readonly IColorResolver _colorResolver;
     private readonly CssValueParser _valueParser;
-    private static readonly char[] _cssClassTrimChars = ['\r', '\n', '\t', ' ', '-', '!', '<', '>'];
+    private static readonly char[] _cssClassTrimChars = ['\r', '\n', '\t', ' ', '-', '!', '<', '>', ';'];
 
     public CssParser(IColorResolver colorResolver)
     {
@@ -49,6 +49,34 @@ internal sealed class CssParser
     public string ParseFontFamily(string value) => ParseFontFamilyProperty(value);
     public Color ParseColor(string colorStr) => _valueParser.GetActualColor(colorStr);
 
+
+    /// <summary>
+    /// Returns the index of the first unescaped occurrence of <paramref name="ch"/>
+    /// starting from <paramref name="startIdx"/>, or -1 if not found.
+    /// A character preceded by an odd number of backslashes is considered
+    /// escaped and skipped (e.g. <c>\}</c> is escaped but <c>\\}</c> is not).
+    /// </summary>
+    private static int FindUnescapedChar(string text, char ch, int startIdx)
+    {
+        for (int i = startIdx; i < text.Length; i++)
+        {
+            if (text[i] == ch && !IsEscaped(text, i))
+                return i;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when the character at <paramref name="index"/>
+    /// is preceded by an odd number of backslashes (i.e. it is escaped).
+    /// </summary>
+    private static bool IsEscaped(string text, int index)
+    {
+        int backslashes = 0;
+        for (int i = index - 1; i >= 0 && text[i] == '\\'; i--)
+            backslashes++;
+        return (backslashes & 1) != 0;
+    }
 
     private static string RemoveStylesheetComments(string stylesheet)
     {
@@ -136,9 +164,9 @@ internal sealed class CssParser
             while (endIdx + 1 < stylesheet.Length)
             {
                 endIdx++;
-                if (stylesheet[endIdx] == '}')
+                if (!IsEscaped(stylesheet, endIdx) && stylesheet[endIdx] == '}')
                     startIdx = endIdx + 1;
-                if (stylesheet[endIdx] == '{')
+                if (!IsEscaped(stylesheet, endIdx) && stylesheet[endIdx] == '{')
                     break;
             }
 
@@ -151,10 +179,10 @@ internal sealed class CssParser
             
             while (endIdx < stylesheet.Length)
             {
-                if (stylesheet[endIdx] == '{')
+                if (!IsEscaped(stylesheet, endIdx) && stylesheet[endIdx] == '{')
                     startIdx = midIdx + 1;
 
-                if (stylesheet[endIdx] == '}')
+                if (!IsEscaped(stylesheet, endIdx) && stylesheet[endIdx] == '}')
                     break;
 
                 endIdx++;
@@ -162,11 +190,14 @@ internal sealed class CssParser
 
             if (endIdx < stylesheet.Length)
             {
-                while (Char.IsWhiteSpace(stylesheet[startIdx]))
+                while (startIdx < stylesheet.Length && Char.IsWhiteSpace(stylesheet[startIdx]))
                     startIdx++;
 
-                var substring = stylesheet.Substring(startIdx, endIdx - startIdx + 1);
-                FeedStyleBlock(cssData, substring);
+                if (startIdx < endIdx)
+                {
+                    var substring = stylesheet.Substring(startIdx, endIdx - startIdx + 1);
+                    FeedStyleBlock(cssData, substring);
+                }
             }
 
             startIdx = endIdx + 1;
@@ -225,7 +256,7 @@ internal sealed class CssParser
     private void FeedStyleBlock(CssData cssData, string block, string media = "all")
     {
         int startIdx = block.IndexOf("{", StringComparison.Ordinal);
-        int endIdx = startIdx > -1 ? block.IndexOf("}", startIdx) : -1;
+        int endIdx = startIdx > -1 ? FindUnescapedChar(block, '}', startIdx + 1) : -1;
 
         if (startIdx <= -1 || endIdx <= -1)
             return;
@@ -302,16 +333,21 @@ internal sealed class CssParser
         while (endIdx > -1)
         {
             bool directParent = false;
+            bool adjacentSibling = false;
 
-            while (char.IsWhiteSpace(className[endIdx]) || className[endIdx] == '>')
+            while (endIdx > -1 && (char.IsWhiteSpace(className[endIdx]) || className[endIdx] == '>' || className[endIdx] == '+'))
             {
                 directParent = directParent || className[endIdx] == '>';
+                adjacentSibling = adjacentSibling || className[endIdx] == '+';
                 endIdx--;
             }
 
+            if (endIdx < 0)
+                break;
+
             var startIdx = endIdx;
 
-            while (startIdx > -1 && !char.IsWhiteSpace(className[startIdx]) && className[startIdx] != '>')
+            while (startIdx > -1 && !char.IsWhiteSpace(className[startIdx]) && className[startIdx] != '>' && className[startIdx] != '+')
                 startIdx--;
 
             if (startIdx > -1)
@@ -326,15 +362,15 @@ internal sealed class CssParser
                 }
                 else
                 {
-                    while (char.IsWhiteSpace(className[startIdx]) || className[startIdx] == '>')
+                    while (startIdx > -1 && char.IsWhiteSpace(className[startIdx]))
                         startIdx--;
 
-                    selectors.Add(new CssBlockSelectorItem(subclass, directParent));
+                    selectors.Add(new CssBlockSelectorItem(subclass, directParent, adjacentSibling));
                 }
             }
             else if (firstClass != null)
             {
-                selectors.Add(new CssBlockSelectorItem(className.Substring(0, endIdx + 1), directParent));
+                selectors.Add(new CssBlockSelectorItem(className.Substring(0, endIdx + 1), directParent, adjacentSibling));
             }
 
             endIdx = startIdx;
@@ -390,8 +426,18 @@ internal sealed class CssParser
 
     private void AddProperty(string propName, string propValue, Dictionary<string, string> properties)
     {
-        // remove !important css crap
-        propValue = propValue.Replace("!important", string.Empty).Trim();
+        // CSS2.1 §1.3.2: handle !important declarations.
+        // If '!' is present but not followed by 'important', the
+        // declaration is malformed and must be discarded (§4.1.7).
+        int bangIdx = propValue.IndexOf('!');
+        if (bangIdx >= 0)
+        {
+            var afterBang = propValue.Substring(bangIdx + 1).Trim();
+            if (afterBang.Equals("important", StringComparison.OrdinalIgnoreCase))
+                propValue = propValue.Substring(0, bangIdx).Trim();
+            else
+                return; // malformed !important — discard the entire declaration
+        }
 
         switch (propName)
         {
