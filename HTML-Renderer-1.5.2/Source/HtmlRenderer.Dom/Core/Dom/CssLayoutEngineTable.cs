@@ -111,6 +111,11 @@ internal sealed class CssLayoutEngineTable
 
     private void AssignBoxKinds()
     {
+        // CSS2.1 §17.2.1: Generate anonymous table-row boxes for table-cell
+        // children that are direct children of the table without an
+        // intermediate table-row wrapper.
+        GenerateAnonymousTableRows();
+
         foreach (var box in _tableBox.Boxes)
         {
             switch (box.Display)
@@ -173,6 +178,73 @@ internal sealed class CssLayoutEngineTable
 
         if (_footerBox != null)
             _allRows.AddRange(_footerBox.Boxes);
+    }
+
+    /// <summary>
+    /// CSS2.1 §17.2.1: If a child of a table element is not a proper table
+    /// sub-element (table-row, table-row-group, etc.), generate an anonymous
+    /// table-row box to wrap consecutive table-cell children.
+    /// </summary>
+    private void GenerateAnonymousTableRows()
+    {
+        bool hasDirectCells = false;
+        foreach (var box in _tableBox.Boxes)
+        {
+            if (box.Display == CssConstants.TableCell)
+            {
+                hasDirectCells = true;
+                break;
+            }
+        }
+
+        if (!hasDirectCells)
+            return;
+
+        // Collect children and group consecutive table-cell boxes into
+        // anonymous table-row wrappers.
+        var children = new List<CssBox>(_tableBox.Boxes);
+        _tableBox.Boxes.Clear();
+
+        List<CssBox>? pendingCells = null;
+
+        foreach (var child in children)
+        {
+            if (child.Display == CssConstants.TableCell)
+            {
+                pendingCells ??= new List<CssBox>();
+                pendingCells.Add(child);
+            }
+            else
+            {
+                if (pendingCells != null)
+                {
+                    FlushAnonymousRow(pendingCells);
+                    pendingCells = null;
+                }
+
+                _tableBox.Boxes.Add(child);
+            }
+        }
+
+        if (pendingCells != null)
+            FlushAnonymousRow(pendingCells);
+    }
+
+    /// <summary>
+    /// Creates an anonymous table-row box, re-parents the given cells into it,
+    /// and appends the row to the table.
+    /// </summary>
+    private void FlushAnonymousRow(List<CssBox> cells)
+    {
+        // Create the anonymous row. The CssBox(parent, tag) constructor
+        // automatically adds the new box to parent.Boxes.
+        var anonRow = new CssBox(_tableBox, null) { Display = CssConstants.TableRow };
+        foreach (var cell in cells)
+        {
+            // Use Boxes list directly to avoid triggering removal from
+            // _tableBox.Boxes (children were already removed above).
+            anonRow.Boxes.Add(cell);
+        }
     }
 
     private void InsertEmptyBoxes()

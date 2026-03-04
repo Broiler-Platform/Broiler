@@ -281,11 +281,18 @@ internal class CssBox : CssBoxProperties, IDisposable
                     double containingWidth = width;
                     width = CssValueParser.ParseLength(Width, containingWidth, GetEmHeight());
 
-                    // Apply max-width constraint before adding padding/border
+                    // CSS2.1 §10.4: Apply max-width constraint
                     if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
                     {
                         double maxW = CssValueParser.ParseLength(MaxWidth, containingWidth, GetEmHeight());
                         if (width > maxW) width = maxW;
+                    }
+
+                    // CSS2.1 §10.4: Apply min-width constraint (min wins over max per §10.4)
+                    if (MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
+                    {
+                        double minW = CssValueParser.ParseLength(MinWidth, containingWidth, GetEmHeight());
+                        if (width < minW) width = minW;
                     }
 
                     width += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
@@ -491,6 +498,38 @@ internal class CssBox : CssBoxProperties, IDisposable
         {
             double borderBoxHeight = ActualHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
             ActualBottom = Math.Max(ActualBottom, Location.Y + borderBoxHeight);
+        }
+
+        // CSS2.1 §10.7: Apply min-height / max-height constraints.
+        // When min-height > max-height, min-height wins.
+        {
+            double contentHeight = ActualBottom - Location.Y - ActualPaddingTop - ActualPaddingBottom - ActualBorderTopWidth - ActualBorderBottomWidth;
+            bool constrained = false;
+
+            if (MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight))
+            {
+                double maxH = CssValueParser.ParseLength(MaxHeight, ContainingBlock.Size.Height, GetEmHeight());
+                if (contentHeight > maxH)
+                {
+                    contentHeight = maxH;
+                    constrained = true;
+                }
+            }
+
+            if (MinHeight != "0" && !string.IsNullOrEmpty(MinHeight))
+            {
+                double minH = CssValueParser.ParseLength(MinHeight, ContainingBlock.Size.Height, GetEmHeight());
+                if (contentHeight < minH)
+                {
+                    contentHeight = minH;
+                    constrained = true;
+                }
+            }
+
+            if (constrained)
+            {
+                ActualBottom = Location.Y + contentHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+            }
         }
 
         // Floats with an explicit CSS height establish a new BFC.
