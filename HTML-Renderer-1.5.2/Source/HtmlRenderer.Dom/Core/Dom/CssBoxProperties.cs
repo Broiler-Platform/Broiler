@@ -21,7 +21,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     private string _borderRightColor = "black";
     private string _borderBottomColor = "black";
     private string _borderLeftColor = "black";
-    private string _bottom;
+    private string _bottom = "auto";
     private string _color = "black";
     private string _cornerRadius = "0";
     private string _fontSize = "medium";
@@ -31,7 +31,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     private string _paddingBottom = "0";
     private string _paddingRight = "0";
     private string _paddingTop = "0";
-    private string _right;
+    private string _right = "auto";
     private string _textIndent = "0";
     private string _top = "auto";
     private string _wordSpacing = "normal";
@@ -292,6 +292,18 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
             if (Position == CssConstants.Fixed)
                 _location = GetActualLocation(Left, Top);
         }
+    }
+
+    public string Right
+    {
+        get { return _right; }
+        set { _right = value; }
+    }
+
+    public string Bottom
+    {
+        get { return _bottom; }
+        set { _bottom = value; }
     }
 
     public string Width { get; set; } = "auto";

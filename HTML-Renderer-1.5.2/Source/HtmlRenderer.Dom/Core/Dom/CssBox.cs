@@ -444,16 +444,45 @@ internal class CssBox : CssBoxProperties, IDisposable
                         }
                     }
 
-                    // CSS2.1 §9.5.2: Handle clear property.  Clearance is
-                    // introduced above the margin of the cleared element to
-                    // push it below all relevant floats.  The prevSibling
-                    // check is removed because floats may originate from
-                    // ancestors' preceding siblings within the same BFC.
+                    // CSS2.1 §8.3.1/§9.5.2: Handle clear property.  Clearance
+                    // inhibits margin collapsing and pushes the border edge of the
+                    // cleared element below the bottom outer edge of the relevant
+                    // floats.  Clearance can be negative when the uncollapsed
+                    // position is already past the float.
                     if (Clear != CssConstants.None)
                     {
                         double maxFloatBottom = CssBoxHelper.GetMaxFloatBottom(this);
-                        if (maxFloatBottom > top)
-                            top = maxFloatBottom;
+                        if (maxFloatBottom > 0)
+                        {
+                            double hypotheticalTop = top;
+
+                            // Compute uncollapsed position: margins are NOT
+                            // collapsed when clearance is present (§8.3.1).
+                            double uncollapsedTop;
+                            if (flowPrev != null)
+                            {
+                                uncollapsedTop = flowPrev.ActualBottom
+                                    + flowPrev.ActualBorderBottomWidth
+                                    + flowPrev.ActualMarginBottom
+                                    + ActualMarginTop;
+                            }
+                            else if (ParentBox != null)
+                            {
+                                uncollapsedTop = ParentBox.ClientTop + ActualMarginTop;
+                            }
+                            else
+                            {
+                                uncollapsedTop = hypotheticalTop;
+                            }
+
+                            // clearance = max(amount to clear float, amount to
+                            // reach hypothetical position).  This can be negative.
+                            double clearance = Math.Max(
+                                maxFloatBottom - uncollapsedTop,
+                                hypotheticalTop - uncollapsedTop);
+
+                            top = uncollapsedTop + clearance;
+                        }
                     }
 
                     Location = new PointF((float)left, (float)top);
@@ -556,13 +585,28 @@ internal class CssBox : CssBoxProperties, IDisposable
         }
 
         // Apply position:relative offset after layout (visual only, does not affect flow)
+        // CSS2.1 §9.4.3: For relative positioning, 'left'/'right' and
+        // 'top'/'bottom' form constraint pairs.  When 'top' is auto and
+        // 'bottom' is not, dy = -bottom.  When both are non-auto, 'bottom'
+        // is ignored (in LTR).  Same logic applies to left/right.
         if (Position == CssConstants.Relative)
         {
             double dx = 0, dy = 0;
-            if (Left != null && Left != CssConstants.Auto)
+
+            bool hasLeft = Left != null && Left != CssConstants.Auto;
+            bool hasRight = Right != null && Right != CssConstants.Auto;
+            bool hasTop = Top != null && Top != CssConstants.Auto;
+            bool hasBottom = Bottom != null && Bottom != CssConstants.Auto;
+
+            if (hasLeft)
                 dx = CssValueParser.ParseLength(Left, Size.Width, GetEmHeight());
-            if (Top != null && Top != CssConstants.Auto)
+            else if (hasRight)
+                dx = -CssValueParser.ParseLength(Right, Size.Width, GetEmHeight());
+
+            if (hasTop)
                 dy = CssValueParser.ParseLength(Top, Size.Height, GetEmHeight());
+            else if (hasBottom)
+                dy = -CssValueParser.ParseLength(Bottom, Size.Height, GetEmHeight());
 
             if (dx != 0)
                 OffsetLeft(dx);

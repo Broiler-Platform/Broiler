@@ -181,69 +181,99 @@ internal sealed class CssLayoutEngineTable
     }
 
     /// <summary>
-    /// CSS2.1 §17.2.1: If a child of a table element is not a proper table
-    /// sub-element (table-row, table-row-group, etc.), generate an anonymous
-    /// table-row box to wrap consecutive table-cell children.
+    /// CSS2.1 §17.2.1: Generate anonymous table-row boxes for children of a
+    /// table element that are not proper table sub-elements (table-row,
+    /// table-row-group, table-header-group, table-footer-group, table-caption,
+    /// table-column, or table-column-group).  All consecutive non-row children
+    /// are wrapped together in a single anonymous table-row.  Within each
+    /// anonymous row, children that are not table-cell are additionally wrapped
+    /// in anonymous table-cell boxes.
     /// </summary>
     private void GenerateAnonymousTableRows()
     {
-        bool hasDirectCells = false;
+        bool needsWrapping = false;
         foreach (var box in _tableBox.Boxes)
         {
-            if (box.Display == CssConstants.TableCell)
+            if (!IsProperTableChild(box.Display))
             {
-                hasDirectCells = true;
+                needsWrapping = true;
                 break;
             }
         }
 
-        if (!hasDirectCells)
+        if (!needsWrapping)
             return;
 
-        // Collect children and group consecutive table-cell boxes into
+        // Collect children and group consecutive non-row children into
         // anonymous table-row wrappers.
         var children = new List<CssBox>(_tableBox.Boxes);
         _tableBox.Boxes.Clear();
 
-        List<CssBox>? pendingCells = null;
+        List<CssBox>? pendingNonRow = null;
 
         foreach (var child in children)
         {
-            if (child.Display == CssConstants.TableCell)
+            if (IsProperTableChild(child.Display))
             {
-                pendingCells ??= new List<CssBox>();
-                pendingCells.Add(child);
-            }
-            else
-            {
-                if (pendingCells != null)
+                if (pendingNonRow != null)
                 {
-                    FlushAnonymousRow(pendingCells);
-                    pendingCells = null;
+                    FlushAnonymousRow(pendingNonRow);
+                    pendingNonRow = null;
                 }
 
                 _tableBox.Boxes.Add(child);
             }
+            else
+            {
+                pendingNonRow ??= new List<CssBox>();
+                pendingNonRow.Add(child);
+            }
         }
 
-        if (pendingCells != null)
-            FlushAnonymousRow(pendingCells);
+        if (pendingNonRow != null)
+            FlushAnonymousRow(pendingNonRow);
     }
 
     /// <summary>
-    /// Creates an anonymous table-row box, re-parents the given cells into it,
-    /// and appends the row to the table.
+    /// Returns true if the display value is a proper direct child of a table
+    /// element per CSS2.1 §17.2.1 (table-row, row-group, caption, column, etc.).
     /// </summary>
-    private void FlushAnonymousRow(List<CssBox> cells)
+    private static bool IsProperTableChild(string display)
+    {
+        return display == CssConstants.TableRow
+            || display == CssConstants.TableRowGroup
+            || display == CssConstants.TableHeaderGroup
+            || display == CssConstants.TableFooterGroup
+            || display == CssConstants.TableCaption
+            || display == CssConstants.TableColumn
+            || display == CssConstants.TableColumnGroup;
+    }
+
+    /// <summary>
+    /// Creates an anonymous table-row box, re-parents the given children into
+    /// it, and appends the row to the table.  Children that are not table-cell
+    /// are additionally wrapped in anonymous table-cell boxes (CSS2.1 §17.2.1).
+    /// </summary>
+    private void FlushAnonymousRow(List<CssBox> children)
     {
         // Create the anonymous row. The CssBox(parent, tag) constructor
         // automatically adds the new box to parent.Boxes.
         var anonRow = new CssBox(_tableBox, null) { Display = CssConstants.TableRow };
-        foreach (var cell in cells)
+        foreach (var child in children)
         {
-            // Use Boxes list directly to avoid triggering removal from
-            // _tableBox.Boxes (children were already removed above).
-            anonRow.Boxes.Add(cell);
+            if (child.Display == CssConstants.TableCell)
+            {
+                // Already a table-cell — add directly to the anonymous row.
+                anonRow.Boxes.Add(child);
+            }
+            else
+            {
+                // CSS2.1 §17.2.1: Wrap non-cell children in an anonymous
+                // table-cell box.  The CssBox constructor automatically adds
+                // the anonymous cell to anonRow.Boxes.
+                var anonCell = new CssBox(anonRow, null) { Display = CssConstants.TableCell };
+                anonCell.Boxes.Add(child);
+            }
         }
     }
 
