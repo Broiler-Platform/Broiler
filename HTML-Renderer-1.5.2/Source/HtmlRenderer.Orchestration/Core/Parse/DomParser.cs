@@ -208,39 +208,88 @@ internal sealed class DomParser
     {
         foreach (var selector in block.Selectors)
         {
-            bool matched = false;
-            while (!matched)
+            if (selector.AdjacentSibling)
             {
-                box = box.ParentBox;
-                while (box != null && box.HtmlTag == null)
-                    box = box.ParentBox;
-
+                // Adjacent sibling combinator: the immediately preceding element
+                // sibling of the current box must match the selector.
+                box = GetPreviousElementSibling(box);
                 if (box == null)
                     return false;
 
-                if (box.HtmlTag.Name.Equals(selector.Class, StringComparison.InvariantCultureIgnoreCase))
-                    matched = true;
-
-                if (!matched && box.HtmlTag.HasAttribute("class"))
-                {
-                    var className = box.HtmlTag.TryGetAttribute("class");
-                    if (selector.Class.Equals("." + className, StringComparison.InvariantCultureIgnoreCase) || selector.Class.Equals(box.HtmlTag.Name + "." + className, StringComparison.InvariantCultureIgnoreCase))
-                        matched = true;
-                }
-
-                if (!matched && box.HtmlTag.HasAttribute("id"))
-                {
-                    var id = box.HtmlTag.TryGetAttribute("id");
-                    if (selector.Class.Equals("#" + id, StringComparison.InvariantCultureIgnoreCase))
-                        matched = true;
-                }
-
-                if (!matched && selector.DirectParent)
+                if (!MatchesSelectorItem(box, selector.Class))
                     return false;
+            }
+            else
+            {
+                bool matched = false;
+                while (!matched)
+                {
+                    box = box.ParentBox;
+                    while (box != null && box.HtmlTag == null)
+                        box = box.ParentBox;
+
+                    if (box == null)
+                        return false;
+
+                    matched = MatchesSelectorItem(box, selector.Class);
+
+                    if (!matched && selector.DirectParent)
+                        return false;
+                }
             }
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when <paramref name="box"/> matches
+    /// the given CSS selector item (tag name, .class, or #id).
+    /// </summary>
+    private static bool MatchesSelectorItem(CssBox box, string selectorClass)
+    {
+        if (box.HtmlTag == null)
+            return false;
+
+        if (box.HtmlTag.Name.Equals(selectorClass, StringComparison.InvariantCultureIgnoreCase))
+            return true;
+
+        if (box.HtmlTag.HasAttribute("class"))
+        {
+            var className = box.HtmlTag.TryGetAttribute("class");
+            if (selectorClass.Equals("." + className, StringComparison.InvariantCultureIgnoreCase) || selectorClass.Equals(box.HtmlTag.Name + "." + className, StringComparison.InvariantCultureIgnoreCase))
+                return true;
+        }
+
+        if (box.HtmlTag.HasAttribute("id"))
+        {
+            var id = box.HtmlTag.TryGetAttribute("id");
+            if (selectorClass.Equals("#" + id, StringComparison.InvariantCultureIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Returns the immediately preceding element sibling (a box with a
+    /// non-null <see cref="CssBox.HtmlTag"/>) in the document tree,
+    /// or <c>null</c> if there is none. Text-only and anonymous boxes
+    /// are skipped.
+    /// </summary>
+    private static CssBox GetPreviousElementSibling(CssBox box)
+    {
+        if (box.ParentBox == null)
+            return null;
+
+        int index = box.ParentBox.Boxes.IndexOf(box);
+        for (int i = index - 1; i >= 0; i--)
+        {
+            var sib = box.ParentBox.Boxes[i];
+            if (sib.HtmlTag != null)
+                return sib;
+        }
+        return null;
     }
 
     private static void AssignCssBlock(CssBox box, CssBlock block)

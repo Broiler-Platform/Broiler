@@ -7,6 +7,19 @@ namespace TheArtOfDev.HtmlRenderer.Core.Parse;
 
 internal static class HtmlParser
 {
+    /// <summary>
+    /// Elements that implicitly close an open <c>&lt;p&gt;</c> element
+    /// per HTML 4 DTD / HTML5 §12.2.6.4.7.
+    /// </summary>
+    private static readonly HashSet<string> _pClosingTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "address", "article", "aside", "blockquote", "details", "div", "dl",
+        "fieldset", "figcaption", "figure", "footer", "form",
+        "h1", "h2", "h3", "h4", "h5", "h6",
+        "header", "hgroup", "hr", "li", "main", "nav", "ol",
+        "p", "pre", "section", "summary", "table", "ul"
+    };
+
     public static CssBox ParseDocument(string source)
     {
         var root = CssBoxHelper.CreateBlock();
@@ -100,6 +113,16 @@ internal static class HtmlParser
             //new SubString(source, lastEnd + 1, tagmatch.Index - lastEnd - 1)
             var isSingle = HtmlUtils.IsSingleTag(tagName) || source[endIdx - 1] == '/';
             var tag = new HtmlTag(tagName, isSingle, tagAttributes);
+
+            // HTML 4 DTD / HTML5 §12.2.6.4.7: implicitly close an open <p>
+            // when a block-level element that cannot be a child of <p> is encountered.
+            if (!isSingle && curBox.HtmlTag != null
+                && curBox.HtmlTag.Name.Equals("p", StringComparison.OrdinalIgnoreCase)
+                && _pClosingTags.Contains(tagName)
+                && curBox.ParentBox != null)
+            {
+                curBox = curBox.ParentBox;
+            }
 
             if (isSingle)
             {

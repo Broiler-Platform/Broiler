@@ -90,6 +90,9 @@ public sealed class CssBlock
 
                 if (!Equals(other.Selectors[i].DirectParent, Selectors[i].DirectParent))
                     return false;
+
+                if (!Equals(other.Selectors[i].AdjacentSibling, Selectors[i].AdjacentSibling))
+                    return false;
             }
         }
 
