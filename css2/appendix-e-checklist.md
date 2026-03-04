@@ -17,7 +17,7 @@ rules for stacking context creation and painting order.
 - [x] Stacking context: an atomically painted group of elements *(implemented — `Fragment.CreatesStackingContext` flag isolates subtrees)*
 - [x] Stack level: z-position of a box within a stacking context *(partial — `Fragment.StackLevel` property exists but is currently hardcoded to 0; z-index values not captured from CSS)*
 - [x] Root element creates the root stacking context *(implicit — `PaintWalker.Paint()` treats the root fragment as the initial stacking context)*
-- [x] Elements with `position` not `static` and `z-index` not `auto` create stacking contexts *(deviation: `IsStackingContext()` triggers on `position: absolute`/`fixed` regardless of z-index; `position: relative` with explicit z-index does not currently trigger a stacking context)*
+- [x] Elements with `position` not `static` and `z-index` not `auto` create stacking contexts *(deviation: `IsStackingContext()` unconditionally returns true for `position: absolute`/`fixed` regardless of z-index value — even `z-index: auto` creates a stacking context, contrary to spec. Conversely, `position: relative` with an explicit z-index does not trigger a stacking context, also contrary to spec.)*
 - [x] Stacking contexts can be nested *(implemented — recursive `PaintFragment` calls handle nesting)*
 - [x] Each stacking context is self-contained (child stacking contexts are atomic) *(implemented — positioned children are collected and sorted separately from normal flow)*
 - [x] Boxes within a stacking context have the same stack level by default (0) *(implemented — `StackLevel` defaults to 0)*
@@ -39,7 +39,7 @@ Within each stacking context, the following layers are painted in order
 
 - [x] Within each step, elements are painted in document tree order *(implemented — children are iterated in document order; positioned list preserves insertion order before sort)*
 - [x] For step 2 and step 7: stacking contexts sorted by z-index, then document order as tie-breaker *(partial — `positioned.Sort((a, b) => a.StackLevel.CompareTo(b.StackLevel))` exists; stable sort preserves document order as tie-breaker, but StackLevel is always 0)*
-- [x] Positioned elements with `z-index: auto` do not create new stacking contexts *(deviation: `IsStackingContext()` unconditionally returns true for `position: absolute`/`fixed` regardless of z-index value)*
+- [x] Positioned elements with `z-index: auto` do not create new stacking contexts *(deviation: see E.1 item 4 above — `IsStackingContext()` does not distinguish `z-index: auto` from explicit z-index values)*
 - [x] `opacity < 1` creates a stacking context (CSS3, but commonly implemented) *(implemented — `IsStackingContext()` checks `opacity < 1.0`)*
 - [x] `transform` not `none` creates a stacking context (CSS3, but commonly implemented) *(not implemented — no `transform` property handling in `IsStackingContext()`)*
 

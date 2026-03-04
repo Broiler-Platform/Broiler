@@ -59,7 +59,7 @@ informative default (user-agent) style sheet for HTML 4 elements.
 ## Default Table Styles
 
 - [x] `table` → `border-spacing: 2px; border-collapse: separate` (UA-typical) *(note: `border-collapse` defaults to `separate` via `CssBoxProperties`; not explicitly in stylesheet)*
-- [x] `td`, `th` → `padding: 1px` *(deviation: UA does not explicitly set `padding: 1px`; cells rely on engine default)*
+- [x] `td`, `th` → `padding: 1px` *(deviation: UA stylesheet does not explicitly set `padding: 1px`; `CssBoxProperties` defaults padding to `0`, so cells get `0` padding rather than the spec-recommended `1px`)*
 - [x] `th` → `font-weight: bolder; text-align: center`
 - [x] `caption` → `text-align: center`
 
@@ -77,7 +77,7 @@ informative default (user-agent) style sheet for HTML 4 elements.
 - [x] `:focus` → `outline: thin dotted invert` (typical UA)
 - [x] `abbr`, `acronym` → no special default styles *(correct — no rules defined)*
 - [x] `img` → `border: none` (for linked images, UA may add border) *(note: no explicit `img` rule; engine default applies)*
-- [x] `br:before` → `content: "\A"; white-space: pre-line` *(deviation: `br:before` sets `content: "\A"` but `white-space: pre-line` applied globally via `:before, :after` rule)*
+- [x] `br:before` → `content: "\A"; white-space: pre-line` *(deviation: `br:before` sets `content: "\A"` but `white-space: pre-line` is applied globally to all `:before, :after` pseudo-elements instead of only to `br:before`. This produces equivalent behavior for `br` but also applies `pre-line` to all other generated content, which may preserve unexpected whitespace in non-`br` pseudo-elements.)*
 - [x] `noframes` in frameset: `display: none` *(note: `noframes` is in the `display: block` group; no special frameset-context rule)*
 - [x] `head` and head children: `display: none` *(head → `display: none`; children like `style`, `title`, `script`, `link`, `meta` also `display: none`)*
 
