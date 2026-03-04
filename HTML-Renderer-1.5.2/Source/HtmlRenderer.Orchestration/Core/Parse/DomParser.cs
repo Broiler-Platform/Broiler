@@ -35,6 +35,7 @@ internal sealed class DomParser
         SetTextSelectionStyle(htmlContainer, cssData);
         CorrectTextBoxes(root);
         CorrectImgBoxes(root);
+        CorrectObjectBoxes(root);
 
         bool followingBlock = true;
         CorrectLineBreaksBlocks(root, ref followingBlock);
@@ -50,8 +51,10 @@ internal sealed class DomParser
         if (box.HtmlTag != null)
         {
             // Check for the <link rel=stylesheet> tag
+            // Per CSS2.1 §6.4.1, the rel attribute is a space-separated list;
+            // match if any token equals "stylesheet" (e.g. rel="appendix stylesheet").
             if (box.HtmlTag.Name.Equals("link", StringComparison.CurrentCultureIgnoreCase) &&
-                box.GetAttribute("rel", string.Empty).Equals("stylesheet", StringComparison.CurrentCultureIgnoreCase))
+                ContainsStylesheetRel(box.GetAttribute("rel", string.Empty)))
             {
                 CloneCssData(ref cssData, ref cssDataChanged);
                 _stylesheetLoader.LoadStylesheet(box.GetAttribute("href", string.Empty), box.HtmlTag.Attributes, out string stylesheet, out CssData stylesheetData);
@@ -278,6 +281,26 @@ internal sealed class DomParser
     }
 
     /// <summary>
+    /// Returns <c>true</c> when the space-separated <c>rel</c> attribute value
+    /// contains the token <c>stylesheet</c> (case-insensitive).
+    /// This allows <c>&lt;link rel="appendix stylesheet"&gt;</c> to be recognised
+    /// as a stylesheet link, as required by CSS2.1 §6.4.1 and the Acid2 test.
+    /// </summary>
+    private static bool ContainsStylesheetRel(string relValue)
+    {
+        if (string.IsNullOrEmpty(relValue))
+            return false;
+
+        foreach (var token in relValue.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (token.Equals("stylesheet", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Phase 2: Sets <see cref="CssBoxProperties.Kind"/>, list attributes
     /// (<see cref="CssBoxProperties.ListStart"/>, <see cref="CssBoxProperties.ListReversed"/>),
     /// and <see cref="CssBoxProperties.ImageSource"/> based on the HTML tag.
@@ -306,6 +329,7 @@ internal sealed class DomParser
             HtmlConstants.Font => BoxKind.Font,
             HtmlConstants.Input => BoxKind.Input,
             "h1" or "h2" or "h3" or "h4" or "h5" or "h6" => BoxKind.Heading,
+            "object" when box is CssBoxImage => BoxKind.ReplacedImage,
             _ => BoxKind.Anonymous,
         };
 
@@ -317,9 +341,9 @@ internal sealed class DomParser
                 box.ListStart = start;
         }
 
-        // Populate image source for <img> elements
+        // Populate image source for <img> and <object> image elements
         if (box.Kind == BoxKind.ReplacedImage)
-            box.ImageSource = tag.TryGetAttribute("src");
+            box.ImageSource = tag.TryGetAttribute("src") ?? tag.TryGetAttribute("data");
     }
 
     private void TranslateAttributes(HtmlTag tag, CssBox box)
@@ -506,6 +530,34 @@ internal sealed class DomParser
                 // recursive
                 CorrectImgBoxes(childBox);
             }
+        }
+    }
+
+    /// <summary>
+    /// Implements the <c>&lt;object&gt;</c> fallback chain (HTML4 §13.3):
+    /// when an <c>&lt;object&gt;</c> element's <c>data</c> attribute points to a
+    /// supported image (<c>data:image/…</c>), it is rendered as a replaced image
+    /// and its children (fallback content) are removed.  Otherwise, children
+    /// are kept as fallback content.
+    /// </summary>
+    private static void CorrectObjectBoxes(CssBox box)
+    {
+        for (int i = box.Boxes.Count - 1; i >= 0; i--)
+        {
+            var childBox = box.Boxes[i];
+
+            if (childBox is CssBoxImage &&
+                childBox.HtmlTag != null &&
+                childBox.HtmlTag.Name.Equals("object", StringComparison.OrdinalIgnoreCase))
+            {
+                // This <object> was promoted to CssBoxImage because its data
+                // attribute contains a data:image URI.  Remove fallback children
+                // so only the image renders.
+                childBox.Boxes.Clear();
+            }
+
+            // Recurse into all children (including non-object boxes)
+            CorrectObjectBoxes(childBox);
         }
     }
 

@@ -30,7 +30,13 @@ internal sealed class CssBoxImage : CssBox
                 if (Content != null && Content != CssConstants.Normal)
                     _imageLoadHandler.LoadImage(Content, HtmlTag?.Attributes);
                 else
-                    _imageLoadHandler.LoadImage(GetAttribute("src"), HtmlTag?.Attributes);
+                {
+                    var src = GetAttribute("src");
+                    // <object data="..."> fallback: use 'data' attribute when 'src' is absent
+                    if (string.IsNullOrEmpty(src))
+                        src = GetAttribute("data");
+                    _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes);
+                }
             }
 
             MeasureWordSpacing(g);
