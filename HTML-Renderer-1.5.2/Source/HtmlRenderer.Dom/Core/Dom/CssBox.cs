@@ -593,9 +593,9 @@ internal class CssBox : CssBoxProperties, IDisposable
         {
             double dx = 0, dy = 0;
 
-            bool hasLeft  = Left  != null && Left  != CssConstants.Auto;
+            bool hasLeft = Left != null && Left != CssConstants.Auto;
             bool hasRight = Right != null && Right != CssConstants.Auto;
-            bool hasTop   = Top   != null && Top   != CssConstants.Auto;
+            bool hasTop = Top != null && Top != CssConstants.Auto;
             bool hasBottom = Bottom != null && Bottom != CssConstants.Auto;
 
             if (hasLeft)
