@@ -254,20 +254,24 @@ table layout algorithm does not handle mixed `display:table-cell` /
 ## 4  How to Reproduce
 
 ```bash
-# 1. Render with Broiler CLI
+# All commands must be run from the repository root.
+
+# 1. Render with Broiler CLI (accepts relative or absolute paths)
 dotnet run --project src/Broiler.Cli -- \
   --capture-image acid/acid2/acid2.html \
   --output /tmp/acid2-broiler.png \
   --width 1024 --height 768
 
-# 2. Render with Chromium (requires Playwright + Chromium)
+# 2. Render with Chromium (requires: npm install playwright && npx playwright install chromium)
 node -e "
 const { chromium } = require('playwright');
+const path = require('path');
 (async () => {
   const b = await chromium.launch({ headless: true });
   const p = await b.newPage();
   await p.setViewportSize({ width: 1024, height: 768 });
-  await p.goto('file://$(pwd)/acid/acid2/acid2.html', { waitUntil: 'networkidle' });
+  const acid2 = 'file://' + path.resolve('acid/acid2/acid2.html');
+  await p.goto(acid2, { waitUntil: 'networkidle' });
   await p.screenshot({ path: '/tmp/acid2-chromium.png' });
   await b.close();
 })();
