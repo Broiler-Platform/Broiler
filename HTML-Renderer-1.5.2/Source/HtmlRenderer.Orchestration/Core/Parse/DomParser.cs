@@ -120,6 +120,12 @@ internal sealed class DomParser
 
         foreach (var childBox in box.Boxes)
             CascadeApplyStyles(childBox, cssData);
+
+        // CSS2.1 §12.1: Generate ::before and ::after pseudo-element boxes
+        // after child style cascading to avoid modifying the child list
+        // during iteration.
+        if (box.HtmlTag != null)
+            ApplyPseudoElementBoxes(box, cssData);
     }
 
     private void SetTextSelectionStyle(HtmlContainerInt htmlContainer, CssData cssData)
@@ -249,6 +255,127 @@ internal sealed class DomParser
             if (IsStyleOnElementAllowed(box, prop.Key, value))
                 CssUtils.SetPropertyValue(box, prop.Key, value);
         }
+    }
+
+    // ── CSS2.1 §12.1: ::before / ::after pseudo-element generation ──
+
+    /// <summary>
+    /// Creates <c>::before</c> and <c>::after</c> pseudo-element child
+    /// boxes when the CSS data contains matching pseudo-element blocks.
+    /// </summary>
+    private static void ApplyPseudoElementBoxes(CssBox box, CssData cssData)
+    {
+        var beforeBlock = FindPseudoElementBlock(box, cssData, "::before");
+        if (beforeBlock != null)
+            CreatePseudoElementBox(box, beforeBlock, isBefore: true);
+
+        var afterBlock = FindPseudoElementBlock(box, cssData, "::after");
+        if (afterBlock != null)
+            CreatePseudoElementBox(box, afterBlock, isBefore: false);
+    }
+
+    /// <summary>
+    /// Searches <paramref name="cssData"/> for a pseudo-element block
+    /// matching <paramref name="box"/> and <paramref name="pseudoElement"/>
+    /// (e.g. <c>"::before"</c>).
+    /// </summary>
+    private static CssBlock FindPseudoElementBlock(CssBox box, CssData cssData, string pseudoElement)
+    {
+        // Element-level: e.g. "p::before"
+        var found = MatchPseudoBlock(box, cssData, box.HtmlTag.Name + pseudoElement);
+        if (found != null) return found;
+
+        // Class-level: e.g. ".nose::before", "p.nose::before"
+        if (box.HtmlTag.HasAttribute("class"))
+        {
+            var classes = box.HtmlTag.TryGetAttribute("class");
+            var startIdx = 0;
+
+            while (startIdx < classes.Length)
+            {
+                while (startIdx < classes.Length && classes[startIdx] == ' ')
+                    startIdx++;
+                if (startIdx >= classes.Length) break;
+
+                var endIdx = classes.IndexOf(' ', startIdx);
+                if (endIdx < 0) endIdx = classes.Length;
+
+                var cls = classes.Substring(startIdx, endIdx - startIdx);
+
+                found = MatchPseudoBlock(box, cssData, "." + cls + pseudoElement);
+                if (found != null) return found;
+
+                found = MatchPseudoBlock(box, cssData, box.HtmlTag.Name + "." + cls + pseudoElement);
+                if (found != null) return found;
+
+                startIdx = endIdx + 1;
+            }
+        }
+
+        // ID-level: e.g. "#myid::before"
+        if (box.HtmlTag.HasAttribute("id"))
+        {
+            var id = box.HtmlTag.TryGetAttribute("id");
+            found = MatchPseudoBlock(box, cssData, "#" + id + pseudoElement);
+            if (found != null) return found;
+        }
+
+        // Universal: "*::before"
+        found = MatchPseudoBlock(box, cssData, "*" + pseudoElement);
+        return found;
+    }
+
+    private static CssBlock MatchPseudoBlock(CssBox box, CssData cssData, string key)
+    {
+        foreach (var block in cssData.GetCssBlock(key))
+        {
+            if (block.Selectors == null || IsBlockAssignableToBoxWithSelector(box, block))
+                return block;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Creates a pseudo-element <see cref="CssBox"/> as a child of
+    /// <paramref name="parentBox"/> with styles from <paramref name="block"/>.
+    /// For <c>::before</c>, the box is inserted as the first child;
+    /// for <c>::after</c>, it is appended as the last child.
+    /// </summary>
+    private static void CreatePseudoElementBox(CssBox parentBox, CssBlock block, bool isBefore)
+    {
+        // Determine content value — skip generation for "none" and "normal".
+        string contentValue = null;
+        if (block.Properties.TryGetValue("content", out string cv))
+            contentValue = cv;
+
+        if (contentValue == null || contentValue == "none" || contentValue == "normal")
+            return;
+
+        // Create the pseudo-element box and inherit from parent.
+        CssBox pseudoBox;
+        if (isBefore && parentBox.Boxes.Count > 0)
+        {
+            var firstChild = parentBox.Boxes[0];
+            pseudoBox = CssBoxHelper.CreateBox(parentBox, before: firstChild);
+        }
+        else
+        {
+            pseudoBox = CssBoxHelper.CreateBox(parentBox);
+        }
+
+        // Apply pseudo-element CSS declarations.
+        foreach (var prop in block.Properties)
+        {
+            var value = prop.Value;
+            if (value == CssConstants.Inherit)
+                value = CssUtils.GetPropertyValue(parentBox, prop.Key);
+            CssUtils.SetPropertyValue(pseudoBox, prop.Key, value);
+        }
+
+        // Set text content (strip surrounding quotes from CSS content value).
+        var text = contentValue.Trim('\'', '"');
+        if (text.Length > 0)
+            pseudoBox.Text = text.AsMemory();
     }
 
     private static bool IsStyleOnElementAllowed(CssBox box, string key, string value)
