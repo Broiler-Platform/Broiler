@@ -5,101 +5,107 @@ for aural presentation of documents by speech synthesizers.
 
 > **Spec file:** [`aural.html`](aural.html)
 
+> **Verification note:** The html-renderer is a visual rendering engine. Aural
+> style sheet properties (`aural`/`speech` media) are intentionally not
+> implemented. The CSS parser recognises `@media` blocks and stores rules keyed
+> by media type, but only `screen` (mapped to `all`) is actively consumed.
+> All items below are marked as verified (reviewed); none apply to visual output.
+
 ---
 
 ## A.1 The Media Types 'aural' and 'speech'
 
-- [ ] `aural` media type (CSS 2.0 — deprecated)
-- [ ] `speech` media type (replaces `aural`)
-- [ ] Properties apply to `aural`/`speech` media groups
+- [x] `aural` media type (CSS 2.0 — deprecated) *(not applicable — visual renderer)*
+- [x] `speech` media type (replaces `aural`) *(not applicable — visual renderer)*
+- [x] Properties apply to `aural`/`speech` media groups *(not applicable — visual renderer)*
 
 ## Volume Properties
 
-- [ ] `volume: <number>` — volume level (0–100)
-- [ ] `volume: <percentage>` — relative to inherited volume
-- [ ] `volume: silent` — no sound
-- [ ] `volume: x-soft` — equivalent to 0
-- [ ] `volume: soft` — equivalent to 25
-- [ ] `volume: medium` — equivalent to 50 (default)
-- [ ] `volume: loud` — equivalent to 75
-- [ ] `volume: x-loud` — equivalent to 100
-- [ ] Inherited: yes
+- [x] `volume: <number>` — volume level (0–100) *(not applicable — visual renderer)*
+- [x] `volume: <percentage>` — relative to inherited volume *(not applicable — visual renderer)*
+- [x] `volume: silent` — no sound *(not applicable — visual renderer)*
+- [x] `volume: x-soft` — equivalent to 0 *(not applicable — visual renderer)*
+- [x] `volume: soft` — equivalent to 25 *(not applicable — visual renderer)*
+- [x] `volume: medium` — equivalent to 50 (default) *(not applicable — visual renderer)*
+- [x] `volume: loud` — equivalent to 75 *(not applicable — visual renderer)*
+- [x] `volume: x-loud` — equivalent to 100 *(not applicable — visual renderer)*
+- [x] Inherited: yes *(not applicable — visual renderer)*
 
 ## Speaking Properties
 
-- [ ] `speak: normal` — normal spoken rendering (default)
-- [ ] `speak: none` — element not spoken (but may be rendered visually)
-- [ ] `speak: spell-out` — spelled letter by letter
-- [ ] Inherited: yes
+- [x] `speak: normal` — normal spoken rendering (default) *(not applicable — visual renderer)*
+- [x] `speak: none` — element not spoken (but may be rendered visually) *(not applicable — visual renderer)*
+- [x] `speak: spell-out` — spelled letter by letter *(not applicable — visual renderer)*
+- [x] Inherited: yes *(not applicable — visual renderer)*
 
 ## Pause Properties
 
-- [ ] `pause-before: <time> | <percentage>` — pause before speaking element
-- [ ] `pause-after: <time> | <percentage>` — pause after speaking element
-- [ ] `pause` shorthand — before and after values
-- [ ] Percentage values relative to `speech-rate`
-- [ ] Inherited: no
+- [x] `pause-before: <time> | <percentage>` — pause before speaking element *(not applicable — visual renderer)*
+- [x] `pause-after: <time> | <percentage>` — pause after speaking element *(not applicable — visual renderer)*
+- [x] `pause` shorthand — before and after values *(not applicable — visual renderer)*
+- [x] Percentage values relative to `speech-rate` *(not applicable — visual renderer)*
+- [x] Inherited: no *(not applicable — visual renderer)*
 
 ## Cue Properties
 
-- [ ] `cue-before: <uri> | none` — auditory icon before element
-- [ ] `cue-after: <uri> | none` — auditory icon after element
-- [ ] `cue` shorthand — before and after cue URIs
-- [ ] Inherited: no
+- [x] `cue-before: <uri> | none` — auditory icon before element *(not applicable — visual renderer)*
+- [x] `cue-after: <uri> | none` — auditory icon after element *(not applicable — visual renderer)*
+- [x] `cue` shorthand — before and after cue URIs *(not applicable — visual renderer)*
+- [x] Inherited: no *(not applicable — visual renderer)*
 
 ## Mixing Properties
 
-- [ ] `play-during: <uri> [mix || repeat]? | auto | none` — background sound during speech
-- [ ] `mix` — mix with inherited play-during sound
-- [ ] `repeat` — repeat sound if shorter than element duration
-- [ ] `auto` — continue parent's background sound
-- [ ] `none` — silence the background
-- [ ] Inherited: no
+- [x] `play-during: <uri> [mix || repeat]? | auto | none` — background sound during speech *(not applicable — visual renderer)*
+- [x] `mix` — mix with inherited play-during sound *(not applicable — visual renderer)*
+- [x] `repeat` — repeat sound if shorter than element duration *(not applicable — visual renderer)*
+- [x] `auto` — continue parent's background sound *(not applicable — visual renderer)*
+- [x] `none` — silence the background *(not applicable — visual renderer)*
+- [x] Inherited: no *(not applicable — visual renderer)*
 
 ## Spatial Properties
 
-- [ ] `azimuth: <angle> | keywords | behind | leftwards | rightwards`
-- [ ] `azimuth` keywords: `left-side`, `far-left`, `left`, `center-left`, `center`, `center-right`, `right`, `far-right`, `right-side`
-- [ ] `behind` modifier — mirror azimuth behind the listener
-- [ ] `leftwards` / `rightwards` — relative shift
-- [ ] `elevation: <angle> | below | level | above | higher | lower`
-- [ ] Inherited: yes
+- [x] `azimuth: <angle> | keywords | behind | leftwards | rightwards` *(not applicable — visual renderer)*
+- [x] `azimuth` keywords: `left-side`, `far-left`, `left`, `center-left`, `center`, `center-right`, `right`, `far-right`, `right-side` *(not applicable — visual renderer)*
+- [x] `behind` modifier — mirror azimuth behind the listener *(not applicable — visual renderer)*
+- [x] `leftwards` / `rightwards` — relative shift *(not applicable — visual renderer)*
+- [x] `elevation: <angle> | below | level | above | higher | lower` *(not applicable — visual renderer)*
+- [x] Inherited: yes *(not applicable — visual renderer)*
 
 ## Voice Characteristic Properties
 
-- [ ] `speech-rate: <number> | x-slow | slow | medium | fast | x-fast | faster | slower`
-- [ ] Inherited: yes
-- [ ] `voice-family: [[<specific-voice> | <generic-voice>],]* [<specific-voice> | <generic-voice>]`
-- [ ] Generic voices: `male`, `female`, `child`
-- [ ] Inherited: yes
-- [ ] `pitch: <frequency> | x-low | low | medium | high | x-high`
-- [ ] Inherited: yes
-- [ ] `pitch-range: <number>` — variation in pitch (0–100)
-- [ ] Inherited: yes
-- [ ] `stress: <number>` — stress marking height (0–100)
-- [ ] Inherited: yes
-- [ ] `richness: <number>` — voice richness / brightness (0–100)
-- [ ] Inherited: yes
+- [x] `speech-rate: <number> | x-slow | slow | medium | fast | x-fast | faster | slower` *(not applicable — visual renderer)*
+- [x] Inherited: yes *(not applicable — visual renderer)*
+- [x] `voice-family: [[<specific-voice> | <generic-voice>],]* [<specific-voice> | <generic-voice>]` *(not applicable — visual renderer)*
+- [x] Generic voices: `male`, `female`, `child` *(not applicable — visual renderer)*
+- [x] Inherited: yes *(not applicable — visual renderer)*
+- [x] `pitch: <frequency> | x-low | low | medium | high | x-high` *(not applicable — visual renderer)*
+- [x] Inherited: yes *(not applicable — visual renderer)*
+- [x] `pitch-range: <number>` — variation in pitch (0–100) *(not applicable — visual renderer)*
+- [x] Inherited: yes *(not applicable — visual renderer)*
+- [x] `stress: <number>` — stress marking height (0–100) *(not applicable — visual renderer)*
+- [x] Inherited: yes *(not applicable — visual renderer)*
+- [x] `richness: <number>` — voice richness / brightness (0–100) *(not applicable — visual renderer)*
+- [x] Inherited: yes *(not applicable — visual renderer)*
 
 ## Speech Properties
 
-- [ ] `speak-punctuation: code | none`
-  - [ ] `code` — punctuation spoken literally
-  - [ ] `none` — punctuation rendered naturally (default)
-  - [ ] Inherited: yes
-- [ ] `speak-numeral: digits | continuous`
-  - [ ] `digits` — spoken as individual digits ("1", "2", "0", "0")
-  - [ ] `continuous` — spoken as number ("one thousand two hundred")
-  - [ ] Inherited: yes
+- [x] `speak-punctuation: code | none` *(not applicable — visual renderer)*
+  - [x] `code` — punctuation spoken literally *(not applicable — visual renderer)*
+  - [x] `none` — punctuation rendered naturally (default) *(not applicable — visual renderer)*
+  - [x] Inherited: yes *(not applicable — visual renderer)*
+- [x] `speak-numeral: digits | continuous` *(not applicable — visual renderer)*
+  - [x] `digits` — spoken as individual digits ("1", "2", "0", "0") *(not applicable — visual renderer)*
+  - [x] `continuous` — spoken as number ("one thousand two hundred") *(not applicable — visual renderer)*
+  - [x] Inherited: yes *(not applicable — visual renderer)*
 
 ## Table Speaking
 
 ### A.11.1 Speaking Headers
 
-- [ ] `speak-header: once | always`
-  - [ ] `once` — speak header once before associated cells
-  - [ ] `always` — speak header before every associated cell
-  - [ ] Inherited: yes
+- [x] `speak-header: once | always` *(not applicable — visual renderer)*
+  - [x] `once` — speak header once before associated cells *(not applicable — visual renderer)*
+  - [x] `always` — speak header before every associated cell *(not applicable — visual renderer)*
+  - [x] Inherited: yes *(not applicable — visual renderer)*
 
 ---
 
