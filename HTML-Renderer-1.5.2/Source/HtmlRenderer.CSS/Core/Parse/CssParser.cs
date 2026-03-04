@@ -53,16 +53,29 @@ internal sealed class CssParser
     /// <summary>
     /// Returns the index of the first unescaped occurrence of <paramref name="ch"/>
     /// starting from <paramref name="startIdx"/>, or -1 if not found.
-    /// A character preceded by <c>\</c> is considered escaped and skipped.
+    /// A character preceded by an odd number of backslashes is considered
+    /// escaped and skipped (e.g. <c>\}</c> is escaped but <c>\\}</c> is not).
     /// </summary>
     private static int FindUnescapedChar(string text, char ch, int startIdx)
     {
         for (int i = startIdx; i < text.Length; i++)
         {
-            if (text[i] == ch && (i == 0 || text[i - 1] != '\\'))
+            if (text[i] == ch && !IsEscaped(text, i))
                 return i;
         }
         return -1;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when the character at <paramref name="index"/>
+    /// is preceded by an odd number of backslashes (i.e. it is escaped).
+    /// </summary>
+    private static bool IsEscaped(string text, int index)
+    {
+        int backslashes = 0;
+        for (int i = index - 1; i >= 0 && text[i] == '\\'; i--)
+            backslashes++;
+        return (backslashes & 1) != 0;
     }
 
     private static string RemoveStylesheetComments(string stylesheet)
@@ -151,10 +164,9 @@ internal sealed class CssParser
             while (endIdx + 1 < stylesheet.Length)
             {
                 endIdx++;
-                bool escaped = endIdx > 0 && stylesheet[endIdx - 1] == '\\';
-                if (!escaped && stylesheet[endIdx] == '}')
+                if (!IsEscaped(stylesheet, endIdx) && stylesheet[endIdx] == '}')
                     startIdx = endIdx + 1;
-                if (!escaped && stylesheet[endIdx] == '{')
+                if (!IsEscaped(stylesheet, endIdx) && stylesheet[endIdx] == '{')
                     break;
             }
 
@@ -167,12 +179,10 @@ internal sealed class CssParser
             
             while (endIdx < stylesheet.Length)
             {
-                bool escaped = endIdx > 0 && stylesheet[endIdx - 1] == '\\';
-
-                if (!escaped && stylesheet[endIdx] == '{')
+                if (!IsEscaped(stylesheet, endIdx) && stylesheet[endIdx] == '{')
                     startIdx = midIdx + 1;
 
-                if (!escaped && stylesheet[endIdx] == '}')
+                if (!IsEscaped(stylesheet, endIdx) && stylesheet[endIdx] == '}')
                     break;
 
                 endIdx++;
