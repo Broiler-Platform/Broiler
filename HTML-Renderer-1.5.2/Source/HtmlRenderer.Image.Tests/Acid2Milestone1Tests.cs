@@ -70,8 +70,8 @@ public class Acid2Milestone1Tests
 
         // The preferred stylesheet overrides .picture background to none,
         // so the white page background shows through (no red).
-        Assert.True(pixel.Red < 200 || (pixel.Red > 200 && pixel.Green > 200 && pixel.Blue > 200),
-            $"Expected no red background after preferred stylesheet, got ({pixel.Red},{pixel.Green},{pixel.Blue})");
+        Assert.True(pixel.Red < 100 || (pixel.Red > 200 && pixel.Green > 200 && pixel.Blue > 200),
+            $"Expected white background (no red) after preferred stylesheet, got ({pixel.Red},{pixel.Green},{pixel.Blue})");
     }
 
     /// <summary>
@@ -133,7 +133,7 @@ public class Acid2Milestone1Tests
         var pixel = bitmap.GetPixel(50, 25);
 
         // rel="icon" should not be treated as stylesheet, so red stays
-        Assert.True(pixel.Red > 200,
+        Assert.True(pixel.Red > 200 && pixel.Green < 100 && pixel.Blue < 100,
             $"Expected red background (icon link not a stylesheet), got ({pixel.Red},{pixel.Green},{pixel.Blue})");
     }
 
