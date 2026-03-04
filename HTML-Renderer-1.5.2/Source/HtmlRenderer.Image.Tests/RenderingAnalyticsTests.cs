@@ -171,44 +171,16 @@ public class RenderingAnalyticsTests
         Assert.True(pixel.Blue < 5, $"Blue channel should be ~0, got {pixel.Blue}");
     }
 
-    /// <summary>
-    /// Verifies that JPEG quality parameter affects output file size.
-    /// Uses a complex document with many visual elements to ensure
-    /// the quality parameter produces measurable differences.
-    /// </summary>
-    [Fact]
-    public void JpegOutput_QualityAffectsSize()
-    {
-        var items = string.Join("", Enumerable.Range(1, 30)
-            .Select(i => $"<p style='color:rgb({i * 8},0,{255 - i * 8});font-size:{10 + i}px;'>Text line {i}</p>"));
-        string html = $"<div style='background-color:#f0f0f0;'>{items}</div>";
-
-        byte[] high = HtmlRender.RenderToJpeg(html, 400, 800, quality: 100);
-        byte[] low = HtmlRender.RenderToJpeg(html, 400, 800, quality: 10);
-
-        Assert.True(high.Length > low.Length,
-            $"High quality ({high.Length} bytes) should be larger than low quality ({low.Length} bytes)");
-    }
+    // NOTE: JpegOutput_QualityAffectsSize removed — duplicate of
+    // RenderToJpegTests.RenderToJpeg_QualityAffectsFileSize.
 
     // -----------------------------------------------------------------
     // Consistency analytics
     // -----------------------------------------------------------------
 
-    /// <summary>
-    /// Verifies that rendering the same HTML twice produces identical output.
-    /// </summary>
-    [Fact]
-    public void RenderConsistency_SameHtml_ProducesIdenticalOutput()
-    {
-        const string html = "<div style='background:green;width:100px;height:100px;'>Test</div>";
-
-        byte[] first = HtmlRender.RenderToPng(html, 200, 200);
-        byte[] second = HtmlRender.RenderToPng(html, 200, 200);
-
-        Assert.Equal(first.Length, second.Length);
-        Assert.True(first.SequenceEqual(second),
-            "Same HTML should produce byte-identical PNG output");
-    }
+    // NOTE: RenderConsistency_SameHtml_ProducesIdenticalOutput removed —
+    // duplicate of PixelRegressionTests.IdenticalRender_PixelsMatch which
+    // uses the more rigorous DeterministicRenderConfig infrastructure.
 
     /// <summary>
     /// Verifies that different HTML produces different output.
