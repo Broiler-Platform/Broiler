@@ -37,6 +37,13 @@ jobs:
       # These tests also run as part of the main Test step above.
       run: dotnet test src/Broiler.Cli.Tests/ --no-build --configuration Release --verbosity normal --filter "FullyQualifiedName~Acid1"
 
+    - name: Acid2 Compliance Gate
+      # Phase 4 M10.2 — Acid2 deterministic rendering gate.
+      # Runs the non-Playwright Acid2 test to verify deterministic
+      # rendering in CI.  The full differential test (vs Chromium) runs
+      # in the nightly-differential workflow which has Playwright.
+      run: dotnet test HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/ --no-build --configuration Release --verbosity normal --filter "FullyQualifiedName~Acid2Test_RepeatedRender_IsDeterministic"
+
     - name: Image Capture Test
       run: dotnet run --project src/Broiler.Cli --no-build --configuration Release -- --capture-image https://www.heise.de/ --output capture.png --timeout 60
 

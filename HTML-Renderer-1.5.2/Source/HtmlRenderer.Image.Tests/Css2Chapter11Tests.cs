@@ -92,6 +92,34 @@ public class Css2Chapter11Tests
     }
 
     /// <summary>
+    /// §11.1.1 – T9.2 (Phase 4): overflow:hidden must clip a child that is
+    /// wider than its parent container.  Acid2 uses this pattern for the
+    /// forehead and chin elements.  Verifies that pixels beyond the parent
+    /// boundary are white (clipped).
+    /// </summary>
+    [Fact]
+    public void S11_1_1_OverflowHidden_ChildWiderThanParent_Clipped_Acid2()
+    {
+        const string html =
+            @"<body style='margin:0;padding:0;'>
+                <div style='width:80px;height:40px;overflow:hidden;background-color:yellow;'>
+                    <div style='width:300px;height:20px;background-color:lime;'></div>
+                </div>
+              </body>";
+        using var bitmap = RenderHtml(html, 400, 100);
+        // Inside the parent bounds – lime child visible.
+        var inside = bitmap.GetPixel(10, 5);
+        Assert.True(inside.Green > HighChannel,
+            $"Child should be visible inside parent at (10,5), got ({inside.Red},{inside.Green},{inside.Blue})");
+        // Beyond the parent's 80px width – the lime child (300px wide) must
+        // be clipped by overflow:hidden.  At x=200 we expect white (body bg)
+        // or at minimum NOT lime.
+        var far = bitmap.GetPixel(200, 5);
+        Assert.False(far.Green > HighChannel && far.Red < LowChannel && far.Blue < LowChannel,
+            $"overflow:hidden should clip lime child at parent edge; got ({far.Red},{far.Green},{far.Blue}) at (200,5)");
+    }
+
+    /// <summary>
     /// §11.1.1 – overflow:scroll. Content is clipped; UA provides a
     /// scrolling mechanism (always visible scrollbars). The html-renderer
     /// parses overflow:scroll without error. Clipping behaviour may vary

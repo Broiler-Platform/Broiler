@@ -33,18 +33,17 @@ public class Acid2DifferentialTests : IAsyncLifetime
     private DifferentialTestRunner _runner = null!;
 
     /// <summary>
-    /// Uses a 30 % pixel-diff threshold.  Acid2 exercises advanced CSS2
-    /// features (generated content via <c>::before</c>/<c>::after</c>,
-    /// complex table/positioning combos, <c>overflow: hidden</c> clipping)
-    /// that html-renderer partially supports.  The Acid1 differential tests
-    /// (ADR-010) show actual diffs of ≤ 11.3 % for the simpler CSS1 test;
-    /// Acid2 is expected to diverge more due to wider feature coverage.
-    /// The 30 % threshold captures major layout regressions while allowing
-    /// known gaps to be documented and triaged separately.
+    /// Uses a 5 % pixel-diff threshold (Phase 4 — Milestone 10).
+    /// Acid2 exercises advanced CSS2 features (generated content via
+    /// <c>::before</c>/<c>::after</c>, complex table/positioning combos,
+    /// <c>overflow: hidden</c> clipping) that html-renderer partially
+    /// supports.  Phase 4 lowers the threshold from 30 % to 5 % to act
+    /// as a CI gate for full Acid2 visual compliance, allowing only
+    /// font-rasterisation differences.
     /// </summary>
     private static readonly DifferentialTestConfig Config = new()
     {
-        DiffThreshold = 0.30,
+        DiffThreshold = 0.05,
         ColorTolerance = 30,
         LayoutTolerancePx = 3.0
     };
