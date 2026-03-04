@@ -53,6 +53,12 @@ internal sealed class StylesheetLoadHandler : IStylesheetLoader
 
     private string LoadStylesheet(string src)
     {
+        // Handle data: URIs (e.g. data:text/css,.picture%20%7B...%7D)
+        if (src.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            return LoadStylesheetFromDataUri(src);
+        }
+
         var uri = CommonUtils.TryGetUri(src);
 
         if (uri == null || !uri.IsAbsoluteUri || uri.Scheme == "file")
@@ -63,6 +69,30 @@ internal sealed class StylesheetLoadHandler : IStylesheetLoader
         {
             return LoadStylesheetFromUri(uri);
         }
+    }
+
+    /// <summary>
+    /// Extracts CSS content from a <c>data:</c> URI.
+    /// Supports both percent-encoded (<c>data:text/css,.picture%20%7B...%7D</c>)
+    /// and base64-encoded (<c>data:text/css;base64,...</c>) payloads.
+    /// </summary>
+    private static string LoadStylesheetFromDataUri(string src)
+    {
+        // Format: data:[<mediatype>][;base64],<data>
+        var commaIdx = src.IndexOf(',');
+        if (commaIdx < 0)
+            return string.Empty;
+
+        var meta = src.Substring(5, commaIdx - 5); // between "data:" and ","
+        var payload = src.Substring(commaIdx + 1);
+
+        if (meta.Contains("base64", StringComparison.OrdinalIgnoreCase))
+        {
+            var bytes = Convert.FromBase64String(payload);
+            return System.Text.Encoding.UTF8.GetString(bytes);
+        }
+
+        return Uri.UnescapeDataString(payload);
     }
 
     private string LoadStylesheetFromFile(string path)

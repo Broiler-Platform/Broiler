@@ -128,7 +128,9 @@ internal sealed class ImageLoadHandler : IImageLoadHandler
         if (imagePartsCount <= 0)
             return null;
 
-        byte[] imageData = base64PartsCount > 0 ? Convert.FromBase64String(s[1].Trim()) : new UTF8Encoding().GetBytes(Uri.UnescapeDataString(s[1].Trim()));
+        byte[] imageData = base64PartsCount > 0
+            ? Convert.FromBase64String(Uri.UnescapeDataString(s[1].Trim()))
+            : new UTF8Encoding().GetBytes(Uri.UnescapeDataString(s[1].Trim()));
         return _htmlContainer.ImageFromStream(new MemoryStream(imageData));
     }
 

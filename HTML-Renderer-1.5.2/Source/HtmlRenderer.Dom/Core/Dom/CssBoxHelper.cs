@@ -17,6 +17,14 @@ internal static class CssBoxHelper
         {
             return new CssBoxImage(parent, tag);
         }
+        else if (tag.Name.Equals("object", StringComparison.OrdinalIgnoreCase) &&
+                 tag.TryGetAttribute("data") is { } data &&
+                 data.StartsWith("data:image", StringComparison.OrdinalIgnoreCase))
+        {
+            // <object data="data:image/..."> — treat as a replaced image element.
+            // Any nested fallback content will be removed by CorrectObjectBoxes.
+            return new CssBoxImage(parent, tag);
+        }
         else if (tag.Name == HtmlConstants.Iframe)
         {
             return new CssBox(parent, tag);
