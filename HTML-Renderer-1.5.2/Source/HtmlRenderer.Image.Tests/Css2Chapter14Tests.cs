@@ -982,6 +982,50 @@ public class Css2Chapter14Tests
         LayoutInvariantChecker.AssertValid(fragment);
     }
 
+    /// <summary>
+    /// §14.2.1 – T9.1 (Phase 4): background-attachment: fixed with pixel
+    /// offset.  Acid2 uses fixed-attachment backgrounds to tile a 1×1 yellow
+    /// pixel at a specific viewport offset.  The parser must accept the
+    /// compound declaration and rendering must not crash.
+    /// </summary>
+    [Fact]
+    public void S14_2_1_BackgroundAttachmentFixed_WithPixelOffset_Acid2()
+    {
+        const string html =
+            @"<body style='margin:0;padding:0;'>
+                <div style='background-color:yellow;background-attachment:fixed;background-position:10px 20px;width:120px;height:60px;'>Offset</div>
+              </body>";
+        var fragment = BuildFragmentTree(html);
+        Assert.NotNull(fragment);
+        LayoutInvariantChecker.AssertValid(fragment);
+        using var bitmap = RenderHtml(html, 200, 100);
+        // Should render without crashing; bg-color should be visible
+        Assert.True(bitmap.Width > 0 && bitmap.Height > 0,
+            "Rendering with background-attachment:fixed + pixel offset should not crash");
+        var pixel = bitmap.GetPixel(60, 30);
+        Assert.True(pixel.Green > HighChannel,
+            $"Background-color yellow should still apply with fixed+offset, got ({pixel.Red},{pixel.Green},{pixel.Blue})");
+    }
+
+    /// <summary>
+    /// §14.2.1 – T9.1 (Phase 4): background-attachment: fixed on a float.
+    /// Acid2 exercises this pattern for the eyes section (§5.3).
+    /// </summary>
+    [Fact]
+    public void S14_2_1_BackgroundAttachmentFixed_OnFloat_Acid2()
+    {
+        const string html =
+            @"<body style='margin:0;padding:0;'>
+                <div style='float:left;background-color:green;background-attachment:fixed;width:80px;height:40px;'>Float</div>
+              </body>";
+        var fragment = BuildFragmentTree(html);
+        Assert.NotNull(fragment);
+        LayoutInvariantChecker.AssertValid(fragment);
+        using var bitmap = RenderHtml(html, 200, 100);
+        Assert.True(bitmap.Width > 0 && bitmap.Height > 0,
+            "Rendering with background-attachment:fixed on float should not crash");
+    }
+
     // ───────────────────────────────────────────────────────────────
     // background-position
     // ───────────────────────────────────────────────────────────────

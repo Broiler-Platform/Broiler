@@ -2092,6 +2092,50 @@ public class Css2Chapter10Tests
         AssertGoldenLayout(html);
     }
 
+    /// <summary>
+    /// §10.8.1 – T9.3 (Phase 4): font shorthand with fractional px
+    /// line-height (e.g. <c>font: 2px/4px serif</c>).  Acid2 uses this
+    /// pattern for the chin element.  The parser must correctly extract
+    /// the fractional line-height from the shorthand.
+    /// </summary>
+    [Fact]
+    public void S10_8_1_FontShorthand_FractionalPx_LineHeight_Acid2()
+    {
+        const string html =
+            @"<div style='width:400px;font:2px/4px serif;'>
+                <span>Fractional line-height test</span>
+              </div>";
+        var fragment = BuildFragmentTree(html);
+        Assert.NotNull(fragment);
+        LayoutInvariantChecker.AssertValid(fragment);
+    }
+
+    /// <summary>
+    /// §10.8.1 – T9.3 (Phase 4): line-height with em units that produce
+    /// fractional pixel values (e.g. <c>line-height: 1.5em</c> at
+    /// <c>font-size: 11px</c> = 16.5px).  The parser must not truncate
+    /// or reject these values.
+    /// </summary>
+    [Fact]
+    public void S10_8_1_LineHeight_FractionalEm_Acid2()
+    {
+        const string htmlWhole =
+            @"<div style='width:400px;font-size:11px;line-height:1em;'>
+                <span>1em</span>
+              </div>";
+        const string htmlFractional =
+            @"<div style='width:400px;font-size:11px;line-height:1.5em;'>
+                <span>1.5em</span>
+              </div>";
+        var fragWhole = BuildFragmentTree(htmlWhole);
+        var fragFractional = BuildFragmentTree(htmlFractional);
+        Assert.NotNull(fragWhole);
+        Assert.NotNull(fragFractional);
+        LayoutInvariantChecker.AssertValid(fragFractional);
+        Assert.True(fragFractional.Children[0].Size.Height > fragWhole.Children[0].Size.Height,
+            $"line-height:1.5em ({fragFractional.Children[0].Size.Height}) should be taller than 1em ({fragWhole.Children[0].Size.Height})");
+    }
+
     // ───────────────────────────────────────────────────────────────
     // 10.8.2  vertical-align
     // ───────────────────────────────────────────────────────────────
