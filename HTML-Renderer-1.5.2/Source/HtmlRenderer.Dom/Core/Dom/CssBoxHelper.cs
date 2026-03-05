@@ -173,6 +173,30 @@ internal static class CssBoxHelper
             return;
         }
 
+        // CSS2.1 §17.5.2: Non-floated block-level children (e.g. display:table
+        // or display:list-item inside an anonymous table-cell) with explicit
+        // width contribute that width to the intrinsic minimum/maximum.
+        if (box.Display != CssConstants.Inline
+            && box.Display != CssConstants.TableCell
+            && box.Float == CssConstants.None
+            && box.Width != CssConstants.Auto
+            && !string.IsNullOrEmpty(box.Width))
+        {
+            double explicitWidth = CssValueParser.ParseLength(
+                box.Width, box.ContainingBlock?.Size.Width ?? 0, box.GetEmHeight());
+            if (explicitWidth > 0)
+            {
+                paddingSum += box.ActualBorderLeftWidth + box.ActualBorderRightWidth
+                            + box.ActualPaddingRight + box.ActualPaddingLeft;
+                maxSum += explicitWidth;
+                min = Math.Max(min, explicitWidth);
+
+                if (oldSum.HasValue)
+                    maxSum = Math.Max(maxSum, oldSum.Value);
+                return;
+            }
+        }
+
         // add the padding 
         paddingSum += box.ActualBorderLeftWidth + box.ActualBorderRightWidth + box.ActualPaddingRight + box.ActualPaddingLeft;
 

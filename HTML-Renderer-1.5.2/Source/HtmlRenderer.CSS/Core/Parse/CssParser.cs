@@ -411,7 +411,11 @@ internal sealed class CssParser
                 {
                     string propValue = blockSource.Substring(splitIdx, adjEndIdx - splitIdx + 1).Trim();
 
-                    if (!propValue.StartsWith("url", StringComparison.InvariantCultureIgnoreCase))
+                    // CSS property values are case-insensitive for keywords,
+                    // but URLs (including data: URIs with base64) are case-
+                    // sensitive.  Only lowercase when the value contains no URL.
+                    if (!propValue.StartsWith("url", StringComparison.InvariantCultureIgnoreCase)
+                        && propValue.IndexOf("url(", StringComparison.InvariantCultureIgnoreCase) < 0)
                         propValue = propValue.ToLower();
 
                     AddProperty(propName, propValue, properties);
@@ -529,6 +533,7 @@ internal sealed class CssParser
         string? repeat = null;
         string? attachment = null;
         var positionParts = new List<string>();
+        bool hasUnrecognizedToken = false;
 
         // Extract url(...) first, then tokenise the remainder.
         string remaining = propValue;
@@ -616,7 +621,14 @@ internal sealed class CssParser
                 color = t;
                 continue;
             }
+
+            // CSS2.1 §4.1.7: Unrecognized or duplicate token makes the
+            // entire declaration invalid — discard it.
+            hasUnrecognizedToken = true;
         }
+
+        if (hasUnrecognizedToken)
+            return;
 
         // CSS2.1 §14.2.1: The 'background' shorthand resets ALL longhand
         // properties to their initial values, then overrides with any
