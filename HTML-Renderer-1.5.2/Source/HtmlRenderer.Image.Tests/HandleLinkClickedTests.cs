@@ -101,4 +101,26 @@ public class HandleLinkClickedTests
         Assert.True(intercepted);
         Assert.False(scrollFired); // Should not scroll because event was handled
     }
+
+    [Fact]
+    public void LinkClicked_FragmentHref_ResolvesAgainstBaseUrl()
+    {
+        var container = CreateContainer();
+        container.BaseUrl = "https://example.com/acid2.html";
+        container.SetHtml("<html><body><a href=\"#top\">Top</a></body></html>");
+
+        string? receivedLink = null;
+        container.LinkClicked += (_, args) =>
+        {
+            receivedLink = args.Link;
+            args.Handled = true;
+        };
+
+        var tag = new HtmlTag("a", false, new Dictionary<string, string> { { "href", "#top" } });
+        var box = new CssBox(null, tag);
+
+        container.HandleLinkClicked(this, PointF.Empty, box);
+
+        Assert.Equal("https://example.com/acid2.html#top", receivedLink);
+    }
 }
