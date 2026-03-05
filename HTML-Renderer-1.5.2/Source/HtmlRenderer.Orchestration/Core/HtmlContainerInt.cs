@@ -78,6 +78,13 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
 
     public SizeF MaxSize { get; set; }
 
+    /// <summary>
+    /// Optional base URL used to resolve relative <c>href</c> values in links.
+    /// When set, relative paths (e.g. <c>./page.html</c>, <c>../section/index.html</c>)
+    /// are resolved against this URL before navigation.
+    /// </summary>
+    public string BaseUrl { get; set; }
+
     public SizeF ActualSize { get; set; }
 
     public SizeF PageSize { get; set; }
@@ -474,7 +481,16 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
         if (string.IsNullOrEmpty(link.HrefLink))
             return;
 
-        if (link.HrefLink.StartsWith("#") && link.HrefLink.Length > 1)
+        if (link.HrefLink == "#")
+        {
+            EventHandler<HtmlScrollEventArgs> scrollHandler = ScrollChange;
+            if (scrollHandler != null)
+            {
+                scrollHandler(this, new HtmlScrollEventArgs(PointF.Empty));
+                HandleMouseMove(parent, location);
+            }
+        }
+        else if (link.HrefLink.StartsWith("#") && link.HrefLink.Length > 1)
         {
             EventHandler<HtmlScrollEventArgs> scrollHandler = ScrollChange;
             if (scrollHandler != null)
@@ -489,7 +505,8 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
         }
         else
         {
-            var nfo = new ProcessStartInfo(link.HrefLink) { UseShellExecute = true };
+            var href = ResolveHref(link.HrefLink);
+            var nfo = new ProcessStartInfo(href) { UseShellExecute = true };
             Process.Start(nfo);
         }
     }
@@ -501,6 +518,28 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
 
         _hoverBoxes ??= [];
         _hoverBoxes.Add(new HoverBoxBlock(box, block));
+    }
+
+    /// <summary>
+    /// Resolves an href value against <see cref="BaseUrl"/> when the href is a
+    /// relative path. If <see cref="BaseUrl"/> is not set or the href is already
+    /// absolute, the original href is returned unchanged.
+    /// </summary>
+    internal string ResolveHref(string href)
+    {
+        if (string.IsNullOrEmpty(BaseUrl))
+            return href;
+
+        if (Uri.TryCreate(href, UriKind.Absolute, out _))
+            return href;
+
+        if (Uri.TryCreate(BaseUrl, UriKind.Absolute, out var baseUri))
+        {
+            var resolved = new Uri(baseUri, href);
+            return resolved.AbsoluteUri;
+        }
+
+        return href;
     }
 
     internal ImageDownloader GetImageDownloader() => _imageDownloader;
