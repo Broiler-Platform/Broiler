@@ -103,6 +103,7 @@ internal static class ComputedStyleBuilder
             BackgroundImage = box.BackgroundImage,
             BackgroundPosition = box.BackgroundPosition,
             BackgroundRepeat = box.BackgroundRepeat,
+            BackgroundAttachment = box.BackgroundAttachment,
             BackgroundSize = box.BackgroundSize,
 
             // List

@@ -316,6 +316,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string BackgroundImage { get; set; } = "none";
     public string BackgroundPosition { get; set; } = "0% 0%";
     public string BackgroundRepeat { get; set; } = "repeat";
+    public string BackgroundAttachment { get; set; } = "scroll";
     public string BackgroundSize { get; set; } = "auto";
     public string BackgroundGradient { get; set; } = "none";
     public string BackgroundGradientAngle { get; set; } = "90";
@@ -341,7 +342,38 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string LineHeight
     {
         get { return _lineHeight; }
-        set { _lineHeight = $"{CssValueParser.ParseLength(value, Size.Height, GetEmHeight(), CssConstants.Em)}px"; }
+        set
+        {
+            // CSS2.1 §10.8: Preserve "normal" and "inherit" keywords as-is
+            if (string.IsNullOrEmpty(value) || value == "normal" || value == "inherit")
+            {
+                _lineHeight = value ?? "normal";
+                return;
+            }
+
+            // Unitless numbers (line-height: <number>) should be treated as a
+            // multiplier of the element's font-size. Store as "Nem" so
+            // ActualLineHeight resolves with the correct em factor at layout time,
+            // avoiding precision loss from premature conversion at parse time
+            // (CSS2.1 §10.8.1).
+            if (!value.EndsWith("px", StringComparison.OrdinalIgnoreCase) &&
+                !value.EndsWith("pt", StringComparison.OrdinalIgnoreCase) &&
+                !value.EndsWith("em", StringComparison.OrdinalIgnoreCase) &&
+                !value.EndsWith("ex", StringComparison.OrdinalIgnoreCase) &&
+                !value.EndsWith("rem", StringComparison.OrdinalIgnoreCase) &&
+                !value.EndsWith("cm", StringComparison.OrdinalIgnoreCase) &&
+                !value.EndsWith("mm", StringComparison.OrdinalIgnoreCase) &&
+                !value.EndsWith("in", StringComparison.OrdinalIgnoreCase) &&
+                !value.EndsWith("pc", StringComparison.OrdinalIgnoreCase) &&
+                !value.EndsWith("%") &&
+                double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+            {
+                _lineHeight = value + "em";
+                return;
+            }
+
+            _lineHeight = $"{CssValueParser.ParseLength(value, Size.Height, GetEmHeight(), CssConstants.Em)}px";
+        }
     }
 
     public string VerticalAlign { get; set; } = "baseline";
@@ -894,7 +926,14 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualLineHeight))
-                _actualLineHeight = CssValueParser.ParseLength(LineHeight, Size.Height, GetEmHeight());
+            {
+                // CSS2.1 §10.8: "normal" line-height uses a UA-chosen value,
+                // typically 1.0–1.2 × font-size. We use 1.2× for spec compliance.
+                if (LineHeight == "normal" || string.IsNullOrEmpty(LineHeight))
+                    _actualLineHeight = 0; // 0 = let font metrics determine line height
+                else
+                    _actualLineHeight = CssValueParser.ParseLength(LineHeight, Size.Height, GetEmHeight());
+            }
 
             return _actualLineHeight;
         }
@@ -1034,6 +1073,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         BackgroundImage = p.BackgroundImage;
         BackgroundPosition = p.BackgroundPosition;
         BackgroundRepeat = p.BackgroundRepeat;
+        BackgroundAttachment = p.BackgroundAttachment;
         BackgroundSize = p.BackgroundSize;
         _borderTopWidth = p._borderTopWidth;
         _borderRightWidth = p._borderRightWidth;

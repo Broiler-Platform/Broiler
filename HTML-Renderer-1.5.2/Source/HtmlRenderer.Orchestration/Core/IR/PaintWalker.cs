@@ -47,7 +47,7 @@ internal static class PaintWalker
         if (viewport.Width > 0 && viewport.Height > 0)
             propagatedFrom = EmitCanvasBackground(root, viewport, items);
 
-        PaintFragment(root, items, propagatedFrom);
+        PaintFragment(root, items, propagatedFrom, viewport);
         return new DisplayList { Items = items };
     }
 
@@ -118,7 +118,7 @@ internal static class PaintWalker
         return null;
     }
 
-    private static void PaintFragment(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null)
+    private static void PaintFragment(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default)
     {
         var style = fragment.Style;
 
@@ -128,7 +128,7 @@ internal static class PaintWalker
         if (style.Visibility != "visible")
         {
             // Even if not visible, children may be visible (CSS spec)
-            PaintChildren(fragment, items, propagatedFrom);
+            PaintChildren(fragment, items, propagatedFrom, viewport);
             return;
         }
 
@@ -142,11 +142,17 @@ internal static class PaintWalker
                 return;
         }
 
-        // Overflow clipping
+        // Overflow clipping — CSS2.1 §11.1.1: clip at the padding edge of the box
         bool clipped = false;
         if (style.Overflow == "hidden")
         {
-            items.Add(new ClipItem { Bounds = bounds, ClipRect = bounds });
+            var border = fragment.Border;
+            var clipRect = new RectangleF(
+                bounds.X + (float)border.Left,
+                bounds.Y + (float)border.Top,
+                bounds.Width - (float)(border.Left + border.Right),
+                bounds.Height - (float)(border.Top + border.Bottom));
+            items.Add(new ClipItem { Bounds = bounds, ClipRect = clipRect });
             clipped = true;
         }
 
@@ -156,7 +162,7 @@ internal static class PaintWalker
             EmitBackground(fragment, items);
 
         // Background image
-        EmitBackgroundImage(fragment, items);
+        EmitBackgroundImage(fragment, items, viewport);
 
         // Borders
         EmitBorders(fragment, items);
@@ -174,7 +180,7 @@ internal static class PaintWalker
         EmitTextDecoration(fragment, items);
 
         // Child fragments (stacking-context sorted)
-        PaintChildren(fragment, items, propagatedFrom);
+        PaintChildren(fragment, items, propagatedFrom, viewport);
 
         // Restore clip
         if (clipped)
@@ -208,7 +214,7 @@ internal static class PaintWalker
         }
     }
 
-    private static void EmitBackgroundImage(Fragment fragment, List<DisplayItem> items)
+    private static void EmitBackgroundImage(Fragment fragment, List<DisplayItem> items, RectangleF viewport = default)
     {
         if (fragment.BackgroundImageHandle == null)
             return;
@@ -225,16 +231,25 @@ internal static class PaintWalker
             bounds.Width - (float)(border.Left + border.Right),
             bounds.Height - (float)(border.Top + border.Bottom));
 
-        if (imgRect.Width > 0 && imgRect.Height > 0)
+        if (imgRect.Width <= 0 || imgRect.Height <= 0)
+            return;
+
+        // CSS2.1 §14.2.1: When background-attachment is "fixed", the image
+        // is positioned relative to the viewport, not the element's padding box.
+        // The image is still only visible within the element's padding area.
+        var destRect = imgRect;
+        if (fragment.Style.BackgroundAttachment == "fixed" && viewport.Width > 0 && viewport.Height > 0)
         {
-            items.Add(new DrawImageItem
-            {
-                Bounds = imgRect,
-                ImageHandle = fragment.BackgroundImageHandle,
-                SourceRect = RectangleF.Empty,
-                DestRect = imgRect,
-            });
+            destRect = viewport;
         }
+
+        items.Add(new DrawImageItem
+        {
+            Bounds = imgRect,
+            ImageHandle = fragment.BackgroundImageHandle,
+            SourceRect = RectangleF.Empty,
+            DestRect = destRect,
+        });
     }
 
     private static void EmitReplacedImage(Fragment fragment, List<DisplayItem> items)
@@ -442,7 +457,7 @@ internal static class PaintWalker
         }
     }
 
-    private static void PaintChildren(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null)
+    private static void PaintChildren(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default)
     {
         if (fragment.Children.Count == 0)
             return;
@@ -454,7 +469,7 @@ internal static class PaintWalker
         // through transparent areas.
         if (fragment.Style.Display is "table" or "inline-table")
         {
-            PaintTableChildren(fragment, items, propagatedFrom);
+            PaintTableChildren(fragment, items, propagatedFrom, viewport);
             return;
         }
 
@@ -463,7 +478,8 @@ internal static class PaintWalker
         //   Step 3: In-flow, non-inline-level, non-positioned descendants (blocks)
         //   Step 4: Non-positioned floats
         //   Step 5: In-flow, inline-level, non-positioned descendants
-        // Positioned children (stacking contexts) are painted last, sorted by StackLevel.
+        // Positioned children (stacking contexts + position:relative) are painted
+        // in steps 6–7, sorted by StackLevel.
         List<Fragment>? positioned = null;
         List<Fragment>? floats = null;
         List<Fragment>? inlineLevel = null;
@@ -471,8 +487,9 @@ internal static class PaintWalker
         // Step 3: Paint block-level, non-float, non-positioned children
         foreach (var child in fragment.Children)
         {
-            if (child.CreatesStackingContext)
+            if (child.CreatesStackingContext || child.Style.Position == "relative")
             {
+                // Steps 6–7: positioned descendants (CSS2.1 App. E)
                 positioned ??= new List<Fragment>();
                 positioned.Add(child);
             }
@@ -488,7 +505,7 @@ internal static class PaintWalker
             }
             else
             {
-                PaintFragment(child, items, propagatedFrom);
+                PaintFragment(child, items, propagatedFrom, viewport);
             }
         }
 
@@ -496,14 +513,14 @@ internal static class PaintWalker
         if (floats != null)
         {
             foreach (var child in floats)
-                PaintFragment(child, items, propagatedFrom);
+                PaintFragment(child, items, propagatedFrom, viewport);
         }
 
         // Step 5: Paint inline-level, non-positioned descendants
         if (inlineLevel != null)
         {
             foreach (var child in inlineLevel)
-                PaintFragment(child, items, propagatedFrom);
+                PaintFragment(child, items, propagatedFrom, viewport);
         }
 
         // Steps 6–7: Positioned children sorted by StackLevel
@@ -512,7 +529,7 @@ internal static class PaintWalker
             positioned.Sort((a, b) => a.StackLevel.CompareTo(b.StackLevel));
             foreach (var child in positioned)
             {
-                PaintFragment(child, items, propagatedFrom);
+                PaintFragment(child, items, propagatedFrom, viewport);
             }
         }
     }
@@ -524,7 +541,7 @@ internal static class PaintWalker
     /// Layers 2–3: column-group and column backgrounds.
     /// Layers 4–6: row-group, row, and cell backgrounds (tree order).
     /// </summary>
-    private static void PaintTableChildren(Fragment table, List<DisplayItem> items, Fragment? propagatedFrom)
+    private static void PaintTableChildren(Fragment table, List<DisplayItem> items, Fragment? propagatedFrom, RectangleF viewport = default)
     {
         // Collect column/column-group fragments whose backgrounds will be
         // emitted early (layers 2–3) so PaintFragment can skip them later.
@@ -569,7 +586,7 @@ internal static class PaintWalker
             else
             {
                 var skipBg = propagatedFrom ?? (earlyBgFragments != null && earlyBgFragments.Contains(child) ? child : null);
-                PaintFragment(child, items, skipBg);
+                PaintFragment(child, items, skipBg, viewport);
             }
         }
 
@@ -579,7 +596,7 @@ internal static class PaintWalker
             foreach (var child in positioned)
             {
                 var skipBg = propagatedFrom ?? (earlyBgFragments != null && earlyBgFragments.Contains(child) ? child : null);
-                PaintFragment(child, items, skipBg);
+                PaintFragment(child, items, skipBg, viewport);
             }
         }
     }
