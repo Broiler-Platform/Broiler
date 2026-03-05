@@ -409,6 +409,14 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get { return _fontSize; }
         set
         {
+            // CSS2.1 §6.2.1: 'inherit' resolves to the parent's computed value.
+            if (value != null && value.Equals("inherit", StringComparison.OrdinalIgnoreCase) && GetParent() != null)
+            {
+                _fontSize = GetParent().FontSize;
+                InvalidateFontDependentValues();
+                return;
+            }
+
             string length = RegexParserUtils.Search(RegexParserUtils.CssLengthRegex(), value);
 
             if (length != null)
