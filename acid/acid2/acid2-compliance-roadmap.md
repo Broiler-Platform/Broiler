@@ -4,15 +4,19 @@
 
 | Metric | Value |
 |---|---|
-| Overall pixel match | **94.15%** |
-| Different pixels | 45,996 / 786,432 |
-| Red-pixel leak (CSS failure indicator) | 288 in Broiler, 0 in Chromium |
+| Overall pixel match (at `#top`) | **12.38%** |
+| Different pixels | 689,080 / 786,432 |
+| Red-pixel leak (CSS failure indicator) | 635,036 in Broiler, 0 in Chromium |
 | Test dimensions | 1024 × 768 |
+| Render target | `acid2.html#top` (face test area) |
 
-Broiler's html-renderer produces a recognisable Acid2 face but diverges from
-the Chromium reference in several CSS 2.1 feature areas.  The sections below
-catalogue every significant discrepancy, give a root-cause analysis, and
-propose a prioritised fix roadmap.
+Broiler's html-renderer produces a partially recognisable Acid2 face when
+rendered at the `#top` anchor, but diverges significantly from the Chromium
+reference in several CSS 2.1 feature areas.  The dominant issue is the
+`.picture` red background not being overridden by the external
+`<link rel="appendix stylesheet">` CSS.  The sections below catalogue every
+significant discrepancy, give a root-cause analysis, and propose a prioritised
+fix roadmap.
 
 ---
 
@@ -20,7 +24,7 @@ propose a prioritised fix roadmap.
 
 | Image | Description |
 |---|---|
-| `acid2-reference.png` | Chromium (Playwright) reference screenshot |
+| `acid2-reference.png` | Chromium (Playwright) reference screenshot at `acid2.html#top` |
 | `acid2-diff.png`       | Pixel-diff heatmap (red = different, green = matching) |
 
 ### Region-Level Diff Summary
@@ -43,7 +47,25 @@ propose a prioritised fix roadmap.
 
 ## 2  Root-Cause Analysis
 
-### 2.1  Red-Pixel Leak (288 pixels)
+### 2.0  External Stylesheet Not Loaded — `.picture` Red Background (635,036 pixels)
+
+**Location:** Entire `.picture` region (the face container).
+
+**What Acid2 tests:** The `<link rel="appendix stylesheet" href="data:text/css,...>`
+tag provides `.picture { background: none; }` which should override the inline
+`.picture { background: red; }` rule.  Without this override, the face
+container fills with solid red.
+
+**Root cause:** Broiler's HTML parser/renderer does not fetch and apply CSS from
+`<link>` elements.  The `data:text/css,...` URI is never loaded, so the
+`background: red` declaration is never overridden.
+
+**Priority:** P0 — this single issue accounts for ~80% of all pixel differences
+and produces the vast majority of red-pixel leak.
+
+---
+
+### 2.1  Red-Pixel Leak (288 pixels — in addition to the stylesheet issue)
 
 **Location:** 2nd line of the face (y 120–150, x 50–280).
 
@@ -205,6 +227,14 @@ table layout algorithm does not handle mixed `display:table-cell` /
 
 ## 3  Fix Roadmap
 
+### Phase 0 — P0: Load External `<link>` Stylesheets (Target: eliminate red background)
+
+| # | Task | Ref | Effort |
+|---|---|---|---|
+| 0.1 | Parse `<link rel="... stylesheet" href="...">` elements during HTML parsing | HTML 4.01 §14.3.2 | M |
+| 0.2 | Support `data:text/css,...` URIs in `<link>` href attributes | RFC 2397 | S |
+| 0.3 | Apply fetched CSS to the document cascade | CSS 2.1 §6.4 | M |
+
 ### Phase 1 — P1: Eliminate Red Pixels (Target: 0 red pixels)
 
 | # | Task | CSS 2.1 Ref | Effort |
@@ -235,19 +265,20 @@ table layout algorithm does not handle mixed `display:table-cell` /
 | 3.4 | Fix `line-height` at sub-pixel font sizes | §10.8 | S | ✅ Done |
 | 3.5 | Handle `<object>` fallback chain for data-URI objects | HTML 4.01 §13.3 | M | ✅ Done |
 
-### Phase 4 — Validation  ✅ Done
+### Phase 4 — Validation
 
 | # | Task | Status |
 |---|---|---|
-| 4.1 | Re-render Acid2 with Broiler CLI and regenerate diff | ✅ |
-| 4.2 | Achieve 0 red pixels and < 2% overall pixel diff | ⚠️ 96 red px / 1.88% diff |
-| 4.3 | Update `acid2-reference.png` and `acid2-diff.png` | ✅ |
+| 4.1 | Re-render Acid2 at `#top` with Broiler CLI and regenerate diff | ✅ |
+| 4.2 | Achieve 0 red pixels and < 2% overall pixel diff | ❌ 635k red px / 87.6% diff |
+| 4.3 | Update `acid2-reference.png` and `acid2-diff.png` for `#top` | ✅ |
 
-**Validation Results (latest render):**
-- Match: 98.12% (diff: 1.88%) — meets < 2% target ✅
-- Red leak: 96 px — reduced from 288 (93% reduction), remaining pixels
-  are from p.bad border visible below the .intro box due to font-metric
-  differences between Broiler and Chromium.
+**Validation Results (latest render at `#top`):**
+- Match: 12.38% (diff: 87.62%) — does NOT meet < 2% target ❌
+- Red leak: 635,036 px — primarily from `.picture { background: red }`
+  not being overridden by external `<link>` stylesheet.
+- The previous 98.12% match was measured on the intro landing page
+  (`acid2.html` without `#top`), not the actual face test.
 
 **Fixes applied in this phase:**
 - Position:fixed margin handling (CSS2.1 §10.6.4)
@@ -270,13 +301,13 @@ table layout algorithm does not handle mixed `display:table-cell` /
 ```bash
 # All commands must be run from the repository root.
 
-# 1. Render with Broiler CLI (accepts relative or absolute paths)
+# 1. Render with Broiler CLI (note: renders the intro page at acid2.html)
 dotnet run --project src/Broiler.Cli -- \
   --capture-image acid/acid2/acid2.html \
   --output /tmp/acid2-broiler.png \
   --width 1024 --height 768
 
-# 2. Render with Chromium (requires: npm install playwright && npx playwright install chromium)
+# 2. Render with Chromium at #top (requires: npm install playwright && npx playwright install chromium)
 node -e "
 const { chromium } = require('playwright');
 const path = require('path');
@@ -284,8 +315,9 @@ const path = require('path');
   const b = await chromium.launch({ headless: true });
   const p = await b.newPage();
   await p.setViewportSize({ width: 1024, height: 768 });
-  const acid2 = 'file://' + path.resolve('acid/acid2/acid2.html');
+  const acid2 = 'file://' + path.resolve('acid/acid2/acid2.html') + '#top';
   await p.goto(acid2, { waitUntil: 'networkidle' });
+  await p.waitForTimeout(500);
   await p.screenshot({ path: '/tmp/acid2-chromium.png' });
   await b.close();
 })();
@@ -300,7 +332,62 @@ d = np.sqrt(np.sum((b.astype(float) - c.astype(float))**2, axis=2))
 print(f'Match: {np.sum(d==0)/d.size*100:.2f}%')
 print(f'Red leak: {np.sum((b[:,:,0]>200)&(b[:,:,1]<50)&(b[:,:,2]<50))} px')
 "
+
+# 4. Run automated differential tests (renders at #top via scroll)
+dotnet test HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests \
+  --filter "Category=Differential" --verbosity normal
 ```
+
+---
+
+## 5  Compliance Checklist
+
+Progress checklist tracking the path to full Acid2 compliance.
+
+### Identification & Analysis
+
+- [x] Render Acid2 test page at `#top` with Broiler CLI as full-page image
+- [x] Render Acid2 test page at `#top` with Chromium (Playwright) for reference
+- [x] Compare both images programmatically (pixel-diff with `PixelDiffRunner`)
+- [x] Compare both images visually (diff heatmap in `acid2-diff.png`)
+- [x] Document all rendering differences by region (§1 Image Comparison)
+- [x] Categorize discrepancies by CSS/HTML feature (§2 Root-Cause Analysis)
+- [x] Analyze root causes for each mismatch category
+
+### Missing/Incorrect Features Identified
+
+- [ ] **External `<link>` stylesheet loading** — `data:text/css` URI in `<link>` not applied (P0)
+- [x] CSS `+` (adjacent sibling) combinator across implicit `<p>` closure
+- [x] CSS parser error recovery (escaped braces, malformed `!important`, bare `;`)
+- [ ] `min-height` > `max-height` override rule (CSS 2.1 §10.7)
+- [ ] Shrink-to-fit width for abs-pos blocks containing only floats (§10.3.7)
+- [ ] Negative clearance for `clear:both` after floats (§8.3.1, §9.5.1)
+- [ ] `position:relative` with negative `bottom` offset (§9.4.3)
+- [ ] Complete anonymous table-cell box generation (§17.2.1)
+- [ ] `display:table` on non-table elements with mixed children (§17.2)
+- [x] `background-attachment:fixed` offset for tiled images (§14.2.1)
+- [x] Paint order: blocks → floats → inlines (Appendix E)
+- [x] `overflow` clipping with children wider than container (§11.1.1)
+- [x] `line-height` at sub-pixel font sizes (§10.8)
+- [x] `<object>` fallback chain for data-URI objects (HTML 4.01 §13.3)
+
+### Prioritised Fix Targets
+
+- [ ] **P0 — Load external stylesheets**: Parse `<link>` elements, support `data:` URIs, apply to cascade
+- [x] **P1 — Eliminate red pixels**: HTML parser implicit closure, sibling combinator, CSS error recovery
+- [ ] **P2 — Layout correctness**: min/max height, shrink-to-fit, negative clearance, anonymous tables
+- [x] **P3 — Visual polish**: fixed backgrounds, paint order, overflow clipping, line-height, object fallback
+
+### Validation & Iteration
+
+- [x] Re-render Acid2 at `#top` after Phase 3/4 fixes and regenerate diff
+- [ ] Achieve < 2% overall pixel diff (current at `#top`: 87.62%)
+- [ ] Achieve 0 red-pixel leak (current at `#top`: 635,036 px)
+- [x] Update reference and diff images for `#top` rendering
+- [x] Add automated `Acid2DifferentialTests` in test suite (renders at `#top`)
+- [ ] Implement Phase 0 (external stylesheet loading) and re-validate
+- [ ] Complete Phase 2 (P2) layout fixes and re-validate
+- [ ] Final compliance review — 0 red pixels and < 0.5% diff target
 
 ---
 
