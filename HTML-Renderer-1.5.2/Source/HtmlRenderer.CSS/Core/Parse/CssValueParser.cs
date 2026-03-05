@@ -57,6 +57,10 @@ internal sealed class CssValueParser
 
     public static bool IsValidLength(string value)
     {
+        // CSS2.1 §4.3.2: "0" is a valid length (unit identifier optional after zero).
+        if (value == "0")
+            return true;
+
         if (value.Length <= 1)
             return false;
 
