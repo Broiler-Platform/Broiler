@@ -325,7 +325,7 @@ references for anonymous table-cells are now correctly maintained.
 | # | Task | Status |
 |---|---|---|
 | 4.1 | Re-render Acid2 at `#top` with Broiler CLI and regenerate diff | ✅ |
-| 4.2 | Achieve < 10% overall pixel diff | ✅ 90.16% match (9.84% diff) |
+| 4.2 | Achieve 0 red pixels and < 2% overall pixel diff | ⚠️ 90.16% match, 4,848 red px (see notes) |
 | 4.3 | Update `acid2-reference.png` and `acid2-diff.png` for `#top` | ✅ |
 | 4.4 | All 5 automated differential tests passing | ✅ |
 
@@ -335,6 +335,9 @@ references for anonymous table-cells are now correctly maintained.
   reset (CSS2.1 §14.2.1) and abs-pos shrink-to-fit width (§10.3.7).
 - Remaining diff from: sub-pixel rendering precision, font metric differences,
   and minor layout rounding in edge-case areas.
+- The original target of 0 red pixels and < 2% diff remains as a stretch goal;
+  all identified CSS 2.1 features have been implemented and the remaining gap
+  is due to rendering precision rather than missing feature support.
 
 **Fixes applied across all phases:**
 - Phase 0: `<link>` element parsing, `data:text/css` URI support, cascade application
@@ -480,7 +483,8 @@ Progress checklist tracking the path to full Acid2 compliance.
 - [x] Complete Phase 2 (P2) layout fixes and re-validate
 - [x] Complete Phase 3 (P3) visual polish fixes and re-validate
 - [x] All 5 automated differential tests passing
-- [ ] Stretch goal: Achieve 0 red-pixel leak and ≥ 98% pixel match
+- [ ] Stretch goal: Achieve 0 red-pixel leak (currently 4,848 px)
+- [ ] Stretch goal: Achieve ≥ 98% pixel match / < 2% diff (currently 90.16%)
 
 ---
 
