@@ -304,6 +304,54 @@ print(f'Red leak: {np.sum((b[:,:,0]>200)&(b[:,:,1]<50)&(b[:,:,2]<50))} px')
 
 ---
 
+## 5  Compliance Checklist
+
+Progress checklist tracking the path to full Acid2 compliance.
+
+### Identification & Analysis
+
+- [x] Render Acid2 test page with Broiler CLI as full-page image
+- [x] Render Acid2 test page with Chromium (Playwright) for reference
+- [x] Compare both images programmatically (pixel-diff with `PixelDiffRunner`)
+- [x] Compare both images visually (diff heatmap in `acid2-diff.png`)
+- [x] Document all rendering differences by region (§1 Image Comparison)
+- [x] Categorize discrepancies by CSS/HTML feature (§2 Root-Cause Analysis)
+- [x] Analyze root causes for each mismatch category
+
+### Missing/Incorrect Features Identified
+
+- [x] CSS `+` (adjacent sibling) combinator across implicit `<p>` closure
+- [x] CSS parser error recovery (escaped braces, malformed `!important`, bare `;`)
+- [ ] `min-height` > `max-height` override rule (CSS 2.1 §10.7)
+- [ ] Shrink-to-fit width for abs-pos blocks containing only floats (§10.3.7)
+- [ ] Negative clearance for `clear:both` after floats (§8.3.1, §9.5.1)
+- [ ] `position:relative` with negative `bottom` offset (§9.4.3)
+- [ ] Complete anonymous table-cell box generation (§17.2.1)
+- [ ] `display:table` on non-table elements with mixed children (§17.2)
+- [x] `background-attachment:fixed` offset for tiled images (§14.2.1)
+- [x] Paint order: blocks → floats → inlines (Appendix E)
+- [x] `overflow` clipping with children wider than container (§11.1.1)
+- [x] `line-height` at sub-pixel font sizes (§10.8)
+- [x] `<object>` fallback chain for data-URI objects (HTML 4.01 §13.3)
+
+### Prioritised Fix Targets
+
+- [x] **P1 — Eliminate red pixels**: HTML parser implicit closure, sibling combinator, CSS error recovery
+- [ ] **P2 — Layout correctness**: min/max height, shrink-to-fit, negative clearance, anonymous tables
+- [x] **P3 — Visual polish**: fixed backgrounds, paint order, overflow clipping, line-height, object fallback
+
+### Validation & Iteration
+
+- [x] Re-render Acid2 after Phase 3/4 fixes and regenerate diff
+- [x] Achieve < 2% overall pixel diff (current: 1.88% ✅)
+- [ ] Achieve 0 red-pixel leak (current: 96 px — reduced from 288)
+- [x] Update reference and diff images
+- [x] Add automated `Acid2DifferentialTests` in test suite (regression guard)
+- [ ] Complete Phase 2 (P2) layout fixes and re-validate
+- [ ] Final compliance review — 0 red pixels and < 0.5% diff target
+
+---
+
 ## References
 
 - [Acid2 Test](https://webstandards.org/acid2/test/)
