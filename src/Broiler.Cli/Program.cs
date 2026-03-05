@@ -114,9 +114,17 @@ public class Program
             }
 
             // Support bare file paths by converting to file:// URIs.
-            if (File.Exists(captureImageUrl))
+            // Separate any fragment (e.g. "#top") before checking the filesystem.
+            string? captureFragment = null;
+            var hashIdx = captureImageUrl.IndexOf('#');
+            var captureFilePath = hashIdx >= 0 ? captureImageUrl[..hashIdx] : captureImageUrl;
+            if (hashIdx >= 0)
+                captureFragment = captureImageUrl[hashIdx..]; // includes '#'
+
+            if (File.Exists(captureFilePath))
             {
-                captureImageUrl = new Uri(Path.GetFullPath(captureImageUrl)).AbsoluteUri;
+                captureImageUrl = new Uri(Path.GetFullPath(captureFilePath)).AbsoluteUri
+                                  + (captureFragment ?? string.Empty);
             }
 
             if (!Uri.TryCreate(captureImageUrl, UriKind.Absolute, out var imgUri)
