@@ -98,6 +98,14 @@ public sealed class HtmlContainer : IDisposable
     }
 
     /// <summary>
+    /// Returns the bounding rectangle of the element with the specified <paramref name="elementId"/>,
+    /// or <c>null</c> if no such element exists.  Useful for scrolling to an anchor target
+    /// (e.g.&nbsp;<c>#top</c>).
+    /// Requires <see cref="SetHtml"/> and <see cref="PerformLayout"/> to have been called first.
+    /// </summary>
+    public RectangleF? GetElementRectangle(string elementId) => HtmlContainerInt.GetElementRectangle(elementId);
+
+    /// <summary>
     /// Returns all links found in the parsed HTML document.
     /// Requires <see cref="SetHtml"/> to have been called first.
     /// Each link includes its <c>id</c>, <c>href</c>, and bounding rectangle.
