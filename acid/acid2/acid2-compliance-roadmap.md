@@ -4,21 +4,22 @@
 
 | Metric | Value |
 |---|---|
-| Overall pixel match (at `#top`) | **90.16%** |
-| Different pixels | 77,413 / 786,432 |
-| Red-pixel leak (CSS failure indicator) | 4,848 in Broiler, 0 in Chromium |
+| Overall pixel match (at `#top`) | **90.91%** |
+| Different pixels | 71,456 / 786,432 |
+| Red-pixel leak (CSS failure indicator) | 3,744 in Broiler, 0 in Chromium |
 | Test dimensions | 1024 × 768 |
 | Render target | `acid2.html#top` (face test area) |
 | Automated test status | **All 5 differential tests passing** |
 | Last verified | 2026-03-05 (Chromium reference pixel-identical to fresh Playwright render) |
 
 Broiler's html-renderer produces a recognisable Acid2 face when rendered at
-the `#top` anchor, matching the Chromium reference at 90.16%.  All four fix
-phases (P0–P3) have been completed, addressing external stylesheet loading,
-red-pixel elimination, layout correctness, and visual polish.  The remaining
-9.84% pixel difference (77,413 pixels) comes from layout positioning errors,
-missing CSS features, and rendering precision gaps described in the
-root-cause analysis and remaining-gap analysis below.
+the `#top` anchor, matching the Chromium reference at 90.91%.  All four fix
+phases (P0–P3) and Phase 5 item 5.1 have been completed, addressing external
+stylesheet loading, red-pixel elimination, layout correctness, visual polish,
+and CSS `height:0` / `ActualBottom` consistency.  The remaining 9.09% pixel
+difference (71,456 pixels) comes from layout positioning errors, missing CSS
+features, and rendering precision gaps described in the root-cause analysis
+and remaining-gap analysis below.
 
 The sections below catalogue every significant discrepancy identified during
 the initial analysis, note the fix status for each, document remaining gaps,
@@ -362,35 +363,34 @@ references for anonymous table-cells are now correctly maintained.
 
 ### Phase 5 — Remaining Gap Analysis (Target: ≥ 98% match, 0 red pixels)
 
-The 9.84% remaining pixel difference comes from several categories of
-rendering gaps.  These are ordered by estimated pixel impact.
+The remaining pixel difference comes from several categories of rendering
+gaps.  These are ordered by estimated pixel impact.
 
 | # | Issue | Pixel Impact | CSS 2.1 Ref | Effort | Status |
 |---|---|---|---|---|---|
-| 5.1 | **Nose region positioning** — `::before`/`::after` pseudo-elements with `float` and auto margins produce 2,316 red pixels and 57.9% region mismatch | ~15,000 px | §12.1, §9.5 | L | 🔴 Blocker |
-| 5.2 | **Eyes paint-order / stacking** — 540 red pixels remain; `background-attachment:fixed` tiling offset or z-index paint ordering gap | ~8,000 px | App. E, §14.2.1 | M | 🔴 Blocker |
-| 5.3 | **Second-line ears** — 1,152 red pixels from sibling-combinator or abs-pos stacking not fully hiding `p.bad` border | ~6,000 px | §5.7, §9.9 | M | 🔴 Blocker |
+| 5.1 | **Nose region positioning** — `::before`/`::after` pseudo-elements with `height:0` and border-based CSS triangles. Fixed: `IsValidLength("0")` now accepted (§4.3.2) and `ActualBottom` border-bottom double-counting eliminated across sibling positioning, float collision, clearance, and `MarginBottomCollapse`. | ~15,000 px | §4.3.2, §12.1, §9.5 | L | ✅ Done |
+| 5.2 | **Eyes paint-order / stacking** — 2,592 red pixels remain; `background` shorthand stores `url()` wrapper preventing data-URI loading, and `RenderDrawImage` crashes (`ArgumentNullException`) when background images load via `SKBitmap.Decode` returning null | ~8,000 px | App. E, §14.2.1 | M | 🔴 Blocker |
+| 5.3 | **Second-line ears** — 1,152 red pixels from `position:fixed` `p.bad` element with `border-bottom:red` painting above nose/forehead in stacking order | ~6,000 px | §5.7, §9.9 | M | 🔴 Blocker |
 | 5.4 | **Smile margin collapsing** — 46.6% region mismatch; `clear:both` with negative clearance interaction not producing correct vertical offset | ~7,000 px | §8.3.1, §9.5.1 | L | ⚠️ Open |
 | 5.5 | **Forehead overflow clipping** — 45.9% region mismatch; data-URI `background-image` extent or `overflow:hidden` clip rect incorrect | ~6,000 px | §11.1.1, §14.2 | M | ⚠️ Open |
 | 5.6 | **Scalp `position:fixed` positioning** — 26.2% region mismatch; fixed-position element not anchoring to viewport correctly when scrolled | ~5,000 px | §9.6.1 | M | ⚠️ Open |
 | 5.7 | **Chin line-height / inline sizing** — 25.9% region mismatch at tiny font sizes; `display:inline` with `font:2px/4px serif` line-height | ~4,000 px | §10.8 | S | ⚠️ Open |
-| 5.8 | **Table bottom** — 576 red pixels and 11.9% mismatch; anonymous table-cell height/width or `display:table` table-row wrapping | ~2,000 px | §17.2.1 | M | ⚠️ Open |
+| 5.8 | **Table bottom** — anonymous table-cell height/width or `display:table` table-row wrapping | ~2,000 px | §17.2.1 | M | ⚠️ Open |
 | 5.9 | **Right-half background clipping** — 3.6% mismatch; border or overflow clipping off by small offset | ~14,000 px | §11.1.1 | S | ⚠️ Open |
 
 #### Blockers
 
-Three areas produce the remaining 4,848 red pixels.  Red is the canonical
+Two areas produce the remaining 3,744 red pixels.  Red is the canonical
 Acid2 failure signal — eliminating all red is the primary gate to passing:
 
-1. **5.1 Nose pseudo-elements** (2,316 red px): `::before`/`::after` content
-   with `float` positioning or `content` property generation is not correctly
-   stacking over the red background in this region.
-2. **5.2 Eyes stacking** (540 red px): Paint-order or `z-index` within the
-   eyes region allows red to show through where it should be occluded.
-3. **5.3 Second-line ears** (1,152 red px): The `p.bad` element with
-   `border-bottom:red` is not fully hidden by the absolutely-positioned table.
-4. **5.8 Table bottom** (576 red px): Red from table cell border/background
-   bleeding through anonymous cell gaps.
+1. **5.2 Eyes stacking** (2,592 red px): The `background` shorthand stores
+   `url(data:image/...)` with the `url()` wrapper, preventing
+   `ImageLoadHandler.LoadImage` from detecting data-URIs.  Additionally,
+   `RenderDrawImage` crashes with `ArgumentNullException` when `SKBitmap.Decode`
+   returns null for certain data-URI images — a null guard is needed.
+2. **5.3 Second-line ears** (1,152 red px): The `p.bad` element with
+   `border-bottom:red` is `position:fixed` and paints in the positioned
+   layer (Appendix E step 7), above the nose/forehead float/block content.
 
 #### Open Specification Questions
 
