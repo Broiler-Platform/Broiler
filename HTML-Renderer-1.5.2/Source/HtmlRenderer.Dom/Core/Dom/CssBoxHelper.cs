@@ -284,7 +284,7 @@ internal static class CssBoxHelper
                     + box.ActualBorderTopWidth + box.ActualBorderBottomWidth
                     + box.ActualMarginBottom;
             else
-                bottom = box.ActualBottom + box.ActualBorderBottomWidth
+                bottom = box.ActualBottom
                     + box.ActualMarginBottom;
             maxBottom = Math.Max(maxBottom, bottom);
             considered ??= new List<(string, double)>();

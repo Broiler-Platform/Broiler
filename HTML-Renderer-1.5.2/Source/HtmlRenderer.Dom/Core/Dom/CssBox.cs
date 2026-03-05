@@ -353,7 +353,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                         flowPrev = DomUtils.GetPreviousInFlowSibling(flowPrev);
                     }
 
-                    double top = (flowPrev == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + MarginTopCollapse(flowPrev) + (flowPrev != null ? flowPrev.ActualBottom + flowPrev.ActualBorderBottomWidth : 0);
+                    double top = (flowPrev == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + MarginTopCollapse(flowPrev) + (flowPrev != null ? flowPrev.ActualBottom : 0);
 
                     // --- Float positioning ---
                     if (Float != CssConstants.None)
@@ -388,7 +388,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                                 {
                                     if (floatBox.Float == CssConstants.Left)
                                     {
-                                        double fBottom = floatBox.ActualBottom + floatBox.ActualBorderBottomWidth;
+                                        double fBottom = floatBox.ActualBottom;
                                         if (top < fBottom && top + floatHeight > floatBox.Location.Y)
                                             left = Math.Max(left, floatBox.Location.X + floatBox.Size.Width + floatBox.ActualMarginRight + ActualMarginLeft);
                                     }
@@ -400,7 +400,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                                 {
                                     if (floatBox.Float == CssConstants.Right)
                                     {
-                                        double fBottom = floatBox.ActualBottom + floatBox.ActualBorderBottomWidth;
+                                        double fBottom = floatBox.ActualBottom;
                                         if (top < fBottom && top + floatHeight > floatBox.Location.Y)
                                             effectiveRight = Math.Min(effectiveRight, floatBox.Location.X - floatBox.ActualMarginLeft);
                                     }
@@ -413,7 +413,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                                 double maxBottom = top;
                                 foreach (var floatBox in precedingFloats)
                                 {
-                                    double fBottom = floatBox.ActualBottom + floatBox.ActualBorderBottomWidth;
+                                    double fBottom = floatBox.ActualBottom;
                                     if (top < fBottom && top + floatHeight > floatBox.Location.Y)
                                         maxBottom = Math.Max(maxBottom, fBottom);
                                 }
@@ -434,7 +434,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                                 {
                                     if (floatBox.Float == CssConstants.Right)
                                     {
-                                        double fBottom = floatBox.ActualBottom + floatBox.ActualBorderBottomWidth;
+                                        double fBottom = floatBox.ActualBottom;
                                         if (top < fBottom && top + floatHeight > floatBox.Location.Y)
                                             left = Math.Min(left, floatBox.Location.X - floatBox.ActualMarginLeft - Size.Width - ActualMarginRight);
                                     }
@@ -446,7 +446,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                                 {
                                     if (floatBox.Float == CssConstants.Left)
                                     {
-                                        double fBottom = floatBox.ActualBottom + floatBox.ActualBorderBottomWidth;
+                                        double fBottom = floatBox.ActualBottom;
                                         if (top < fBottom && top + floatHeight > floatBox.Location.Y)
                                             leftFloatEdge = Math.Max(leftFloatEdge, floatBox.Location.X + floatBox.Size.Width + floatBox.ActualMarginRight);
                                     }
@@ -459,7 +459,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                                 double maxBottom = top;
                                 foreach (var floatBox in precedingFloats)
                                 {
-                                    double fBottom = floatBox.ActualBottom + floatBox.ActualBorderBottomWidth;
+                                    double fBottom = floatBox.ActualBottom;
                                     if (top < fBottom && top + floatHeight > floatBox.Location.Y)
                                         maxBottom = Math.Max(maxBottom, fBottom);
                                 }
@@ -488,7 +488,6 @@ internal class CssBox : CssBoxProperties, IDisposable
                             if (flowPrev != null)
                             {
                                 uncollapsedTop = flowPrev.ActualBottom
-                                    + flowPrev.ActualBorderBottomWidth
                                     + flowPrev.ActualMarginBottom
                                     + ActualMarginTop;
                             }
@@ -905,7 +904,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                 continue;
             }
 
-            maxChildBottom = Math.Max(maxChildBottom, child.ActualBottom + child.ActualBorderBottomWidth);
+            maxChildBottom = Math.Max(maxChildBottom, child.ActualBottom);
         }
 
         return Math.Max(ActualBottom, maxChildBottom + margin + ActualPaddingBottom + ActualBorderBottomWidth);
