@@ -14,6 +14,7 @@ internal interface IBackgroundRenderData
 {
     string BackgroundPosition { get; }
     string BackgroundRepeat { get; }
+    string BackgroundAttachment { get; }
 }
 
 /// <summary>

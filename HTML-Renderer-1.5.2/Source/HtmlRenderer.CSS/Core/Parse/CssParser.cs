@@ -490,6 +490,9 @@ internal sealed class CssParser
             case "background-image":
                 properties["background-image"] = ParseImageProperty(propValue);
                 break;
+            case "background":
+                ParseBackgroundShorthand(propValue, properties);
+                break;
             case "content":
                 properties["content"] = ParseImageProperty(propValue);
                 break;
@@ -509,6 +512,122 @@ internal sealed class CssParser
     {
         if (CssValueParser.IsValidLength(propValue) || propValue.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase))
             properties[propName] = propValue;
+    }
+
+    /// <summary>
+    /// Parses the CSS <c>background</c> shorthand into its individual longhand properties.
+    /// CSS2.1 §14.2.1: <c>background: [color] [image] [repeat] [attachment] [position]</c>.
+    /// Tokens can appear in any order (except position values, which are taken as a pair).
+    /// </summary>
+    private void ParseBackgroundShorthand(string propValue, Dictionary<string, string> properties)
+    {
+        if (string.IsNullOrEmpty(propValue))
+            return;
+
+        string? color = null;
+        string? image = null;
+        string? repeat = null;
+        string? attachment = null;
+        var positionParts = new List<string>();
+
+        // Extract url(...) first, then tokenise the remainder.
+        string remaining = propValue;
+        int urlStart = remaining.IndexOf("url(", StringComparison.OrdinalIgnoreCase);
+        if (urlStart >= 0)
+        {
+            int depth = 0;
+            int urlEnd = urlStart + 4;
+            bool closed = false;
+            for (; urlEnd < remaining.Length; urlEnd++)
+            {
+                if (remaining[urlEnd] == '(') depth++;
+                else if (remaining[urlEnd] == ')')
+                {
+                    if (depth == 0) { urlEnd++; closed = true; break; }
+                    depth--;
+                }
+            }
+            if (closed)
+            {
+                image = remaining.Substring(urlStart, urlEnd - urlStart);
+                remaining = remaining.Substring(0, urlStart) + remaining.Substring(urlEnd);
+            }
+        }
+
+        // Tokenise the rest.
+        string[] tokens = remaining.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var token in tokens)
+        {
+            string t = token.Trim();
+            if (string.IsNullOrEmpty(t))
+                continue;
+
+            // attachment
+            if (t.Equals("scroll", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("fixed", StringComparison.OrdinalIgnoreCase))
+            {
+                attachment = t.ToLowerInvariant();
+                continue;
+            }
+
+            // repeat
+            if (t.Equals("repeat", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("repeat-x", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("repeat-y", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("no-repeat", StringComparison.OrdinalIgnoreCase))
+            {
+                repeat = t.ToLowerInvariant();
+                continue;
+            }
+
+            // position keywords
+            if (t.Equals("left", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("right", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("top", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("bottom", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("center", StringComparison.OrdinalIgnoreCase))
+            {
+                positionParts.Add(t.ToLowerInvariant());
+                continue;
+            }
+
+            // Length or percentage (position value)
+            if (CssValueParser.IsValidLength(t) || t.EndsWith("%"))
+            {
+                positionParts.Add(t);
+                continue;
+            }
+
+            // none keyword (background-image: none)
+            if (t.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                image = "none";
+                continue;
+            }
+
+            // inherit
+            if (t.Equals("inherit", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            // Try as color
+            if (color == null && _valueParser.IsColorValid(t))
+            {
+                color = t;
+                continue;
+            }
+        }
+
+        if (color != null)
+            properties["background-color"] = color;
+        if (image != null)
+            properties["background-image"] = image;
+        if (repeat != null)
+            properties["background-repeat"] = repeat;
+        if (attachment != null)
+            properties["background-attachment"] = attachment;
+        if (positionParts.Count > 0)
+            properties["background-position"] = string.Join(" ", positionParts);
     }
 
     private void ParseColorProperty(string propName, string propValue, Dictionary<string, string> properties)
