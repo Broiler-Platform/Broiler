@@ -84,8 +84,13 @@ internal sealed class DomParser
 
         if (box.HtmlTag != null)
         {
-            AssignCssBlocks(box, cssData, "*");
+            // CSS2.1 §6.4.3 specificity: Apply rules in increasing specificity.
+            // Bare '*' = (0,0,0), tag = (0,0,1), '.class *' = (0,1,0), etc.
+            // Universal rules with ancestor/sibling selectors (e.g. '.intro *')
+            // have higher specificity than bare tag rules, so apply them after.
+            AssignCssBlocks(box, cssData, "*", qualifiedOnly: false);
             AssignCssBlocks(box, cssData, box.HtmlTag.Name);
+            AssignCssBlocks(box, cssData, "*", qualifiedOnly: true);
 
             if (box.HtmlTag.HasAttribute("class"))
                 AssignClassCssBlocks(box, cssData);
@@ -173,11 +178,20 @@ internal sealed class DomParser
         }
     }
 
-    private static void AssignCssBlocks(CssBox box, CssData cssData, string className)
+    private static void AssignCssBlocks(CssBox box, CssData cssData, string className, bool? qualifiedOnly = null)
     {
         var blocks = cssData.GetCssBlock(className);
         foreach (var block in blocks)
         {
+            // When qualifiedOnly is specified, filter by whether the block has
+            // ancestor/sibling selectors (which increase specificity).
+            if (qualifiedOnly.HasValue)
+            {
+                bool hasSelectors = block.Selectors != null;
+                if (qualifiedOnly.Value != hasSelectors)
+                    continue;
+            }
+
             if (IsBlockAssignableToBox(box, block))
                 AssignCssBlock(box, block);
         }

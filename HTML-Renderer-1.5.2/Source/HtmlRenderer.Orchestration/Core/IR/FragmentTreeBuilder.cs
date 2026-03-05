@@ -77,7 +77,7 @@ internal static class FragmentTreeBuilder
             Children = children,
             Style = style,
             CreatesStackingContext = IsStackingContext(box),
-            StackLevel = 0,
+            StackLevel = GetStackLevel(box),
             BackgroundImageHandle = bgImage,
             ImageHandle = imgHandle,
             ImageSourceRect = imgSourceRect,
@@ -142,10 +142,29 @@ internal static class FragmentTreeBuilder
         if (box.Position == CssConstants.Absolute || box.Position == CssConstants.Fixed)
             return true;
 
+        // CSS2.1 §9.9.1: A positioned element with a computed z-index
+        // other than 'auto' establishes a new stacking context.
+        if (box.Position == CssConstants.Relative
+            && box.ZIndex != null && box.ZIndex != CssConstants.Auto
+            && int.TryParse(box.ZIndex, out _))
+            return true;
+
         if (double.TryParse(box.Opacity, System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var opacity) && opacity < 1.0)
             return true;
 
         return false;
+    }
+
+    /// <summary>
+    /// Returns the computed stack level (z-index) for a box.
+    /// CSS2.1 §9.9.1: 'auto' computes to 0 for painting order.
+    /// </summary>
+    private static int GetStackLevel(CssBox box)
+    {
+        if (box.ZIndex != null && box.ZIndex != CssConstants.Auto
+            && int.TryParse(box.ZIndex, out int z))
+            return z;
+        return 0;
     }
 }

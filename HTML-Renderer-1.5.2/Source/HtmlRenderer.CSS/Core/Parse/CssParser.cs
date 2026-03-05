@@ -638,6 +638,18 @@ internal sealed class CssParser
 
     private void ParseFontProperty(string propValue, Dictionary<string, string> properties)
     {
+        // CSS2.1 §15.8: 'font: inherit' sets all font sub-properties to inherit.
+        if (propValue.Trim().Equals("inherit", StringComparison.OrdinalIgnoreCase))
+        {
+            properties["font-style"] = "inherit";
+            properties["font-variant"] = "inherit";
+            properties["font-weight"] = "inherit";
+            properties["font-size"] = "inherit";
+            properties["line-height"] = "inherit";
+            properties["font-family"] = "inherit";
+            return;
+        }
+
         string mustBe = RegexParserUtils.Search(RegexParserUtils.CssFontSizeAndLineHeightRegex(), propValue, out int mustBePos);
 
         if (!string.IsNullOrEmpty(mustBe))
@@ -750,14 +762,11 @@ internal sealed class CssParser
 
         if (direction != null)
         {
-            if (borderWidth != null)
-                properties["border" + direction + "-width"] = borderWidth;
-
-            if (borderStyle != null)
-                properties["border" + direction + "-style"] = borderStyle;
-
-            if (borderColor != null)
-                properties["border" + direction + "-color"] = borderColor;
+            // CSS2.1 §8.5.1: The border shorthand resets ALL sub-properties.
+            // When a component is omitted, reset to its initial value.
+            properties["border" + direction + "-width"] = borderWidth ?? "medium";
+            properties["border" + direction + "-style"] = borderStyle ?? "none";
+            properties["border" + direction + "-color"] = borderColor ?? "black";
         }
         else
         {
