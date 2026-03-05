@@ -5,23 +5,24 @@
 | Metric | Value |
 |---|---|
 | Overall pixel match (at `#top`) | **90.16%** |
-| Different pixels | 77,352 / 786,432 |
+| Different pixels | 77,413 / 786,432 |
 | Red-pixel leak (CSS failure indicator) | 4,848 in Broiler, 0 in Chromium |
 | Test dimensions | 1024 × 768 |
 | Render target | `acid2.html#top` (face test area) |
 | Automated test status | **All 5 differential tests passing** |
+| Last verified | 2026-03-05 (Chromium reference pixel-identical to fresh Playwright render) |
 
 Broiler's html-renderer produces a recognisable Acid2 face when rendered at
 the `#top` anchor, matching the Chromium reference at 90.16%.  All four fix
 phases (P0–P3) have been completed, addressing external stylesheet loading,
 red-pixel elimination, layout correctness, and visual polish.  The remaining
-9.84% pixel difference comes from sub-pixel rendering precision, minor
-layout rounding, and edge-case areas described in the root-cause analysis
-below.
+9.84% pixel difference (77,413 pixels) comes from layout positioning errors,
+missing CSS features, and rendering precision gaps described in the
+root-cause analysis and remaining-gap analysis below.
 
 The sections below catalogue every significant discrepancy identified during
-the initial analysis, note the fix status for each, and provide instructions
-for verification and testing.
+the initial analysis, note the fix status for each, document remaining gaps,
+and provide instructions for verification and testing.
 
 ---
 
@@ -29,24 +30,37 @@ for verification and testing.
 
 | Image | Description |
 |---|---|
-| `acid2-reference.png` | Chromium (Playwright) reference screenshot at `acid2.html#top` |
-| `acid2-diff.png`       | Pixel-diff heatmap (red = different, green = matching) |
+| `acid2.png`              | Broiler CLI render at `acid2.html#top` (generated via `--capture-image acid2.html#top`) |
+| `acid2-reference.png`    | Chromium (Playwright) reference screenshot at `acid2.html#top` |
+| `acid2-diff.png`         | Pixel-diff heatmap (red = different, green = matching) |
 
-### Region-Level Diff Summary
+### Region-Level Diff Summary (face content area x=20–400)
 
-| Region | Mismatch | CSS Features Tested |
+| Region | Mismatch | Red Leak | CSS Features Tested |
+|---|---|---|---|
+| Hello World! text (y 0–50) | **0.0%** | 0 px | font, margin, color |
+| Scalp (y 50–120) | 26.2% | 0 px | `position:fixed`, `min-height`/`max-height` |
+| 2nd line / ears (y 120–160) | 35.4% | 1,152 px | attribute selectors, `float`, shrink-wrap |
+| Forehead (y 160–195) | 45.9% | 0 px | `width`, `overflow`, `background-image` data-URI |
+| Eyes (y 195–235) | 51.1% | 540 px | paint order (Appendix E), `background:fixed`, `<object>` fallback |
+| Nose (y 200–310) | 57.9% | 2,316 px | `float`, auto margins, `::before`/`::after` |
+| Smile (y 310–360) | 46.6% | 0 px | margin collapsing, `clear`, negative clearance, `position:relative` |
+| Chin (y 360–395) | 25.9% | 0 px | `line-height`, `display:inline`, data-URI background |
+| Parser area (y 395–430) | 3.2% | 0 px | CSS comment parsing, error recovery, cascade |
+| Table bottom (y 430–470) | 11.9% | 576 px | `display:table`, anonymous table cells |
+| Background (right half) | 3.6% | 0 px | overflow clipping |
+
+### Diff Pixel Color Distribution (Broiler-side)
+
+| Color | Pixel Count | Likely Cause |
 |---|---|---|
-| Hello World! text (y 0–80) | **0.0%** | font, margin, color |
-| Scalp (y 80–120) | 32.9% | `position:fixed`, `min-height`/`max-height` |
-| 2nd line (y 120–150) | 33.4% | attribute selectors, `float`, shrink-wrap |
-| Forehead (y 140–180) | 34.6% | `width`, `overflow`, `background-image` data-URI |
-| Eyes (y 170–210) | 6.3% | paint order (Appendix E), `background:fixed`, `<object>` fallback |
-| Nose (y 200–280) | 2.2% | `float`, auto margins, `::before`/`::after` |
-| Smile (y 250–310) | 16.7% | margin collapsing, `clear`, negative clearance, `position:relative` |
-| Chin (y 300–340) | 32.3% | `line-height`, `display:inline`, data-URI background |
-| Parser area (y 330–360) | 47.1% | CSS comment parsing, error recovery, cascade |
-| Table bottom (y 350–390) | 35.9% | `display:table`, anonymous table cells |
-| Background (right half) | 1.1% | overflow clipping |
+| Black | 38,367 | Border/outline/text misposition — layout offsets |
+| White | 17,809 | Missing content or over-clipping |
+| Red | 4,848 | CSS failure indicator — sibling-combinator or stacking gaps |
+| Yellow | 13,845 | Background fill misposition or sizing |
+| Blue | 507 | Text positioning (Hello World blue text bleeds) |
+| Other | 2,037 | Anti-aliasing or blended colours |
+| **Total** | **77,413** | |
 
 ---
 
@@ -329,15 +343,15 @@ references for anonymous table-cells are now correctly maintained.
 | 4.3 | Update `acid2-reference.png` and `acid2-diff.png` for `#top` | ✅ |
 | 4.4 | All 5 automated differential tests passing | ✅ |
 
-**Validation Results (latest render at `#top`):**
-- Match: 90.16% (diff: 9.84%) — significant improvement from 12.38% ⬆️
+**Validation Results (latest render at `#top`, verified 2026-03-05):**
+- Match: 90.16% (diff: 9.84%, 77,413 pixels) — significant improvement from 12.38% ⬆️
 - Red leak: 4,848 px — reduced from 635,036 by fixing `background` shorthand
   reset (CSS2.1 §14.2.1) and abs-pos shrink-to-fit width (§10.3.7).
-- Remaining diff from: sub-pixel rendering precision, font metric differences,
-  and minor layout rounding in edge-case areas.
-- The original target of 0 red pixels and < 2% diff remains as a stretch goal;
-  all identified CSS 2.1 features have been implemented and the remaining gap
-  is due to rendering precision rather than missing feature support.
+- Chromium reference verified pixel-identical to fresh Playwright render.
+- `acid2.png` (Broiler render at `#top`) now committed as artifact.
+- Remaining diff breakdown: 38,367 black (layout misposition), 17,809 white
+  (missing content), 13,845 yellow (background misposition), 4,848 red
+  (CSS failure), 507 blue (text bleed), 2,037 other (anti-aliasing).
 
 **Fixes applied across all phases:**
 - Phase 0: `<link>` element parsing, `data:text/css` URI support, cascade application
@@ -345,6 +359,50 @@ references for anonymous table-cells are now correctly maintained.
 - Phase 2: min/max height override, shrink-to-fit width, negative clearance, relative positioning, anonymous table-cells
 - Phase 3: Fixed backgrounds, paint order, overflow clipping, line-height, object fallback
 - Additional: `font: inherit` shorthand, `font-size: inherit`, border shorthand reset, z-index support
+
+### Phase 5 — Remaining Gap Analysis (Target: ≥ 98% match, 0 red pixels)
+
+The 9.84% remaining pixel difference comes from several categories of
+rendering gaps.  These are ordered by estimated pixel impact.
+
+| # | Issue | Pixel Impact | CSS 2.1 Ref | Effort | Status |
+|---|---|---|---|---|---|
+| 5.1 | **Nose region positioning** — `::before`/`::after` pseudo-elements with `float` and auto margins produce 2,316 red pixels and 57.9% region mismatch | ~15,000 px | §12.1, §9.5 | L | 🔴 Blocker |
+| 5.2 | **Eyes paint-order / stacking** — 540 red pixels remain; `background-attachment:fixed` tiling offset or z-index paint ordering gap | ~8,000 px | App. E, §14.2.1 | M | 🔴 Blocker |
+| 5.3 | **Second-line ears** — 1,152 red pixels from sibling-combinator or abs-pos stacking not fully hiding `p.bad` border | ~6,000 px | §5.7, §9.9 | M | 🔴 Blocker |
+| 5.4 | **Smile margin collapsing** — 46.6% region mismatch; `clear:both` with negative clearance interaction not producing correct vertical offset | ~7,000 px | §8.3.1, §9.5.1 | L | ⚠️ Open |
+| 5.5 | **Forehead overflow clipping** — 45.9% region mismatch; data-URI `background-image` extent or `overflow:hidden` clip rect incorrect | ~6,000 px | §11.1.1, §14.2 | M | ⚠️ Open |
+| 5.6 | **Scalp `position:fixed` positioning** — 26.2% region mismatch; fixed-position element not anchoring to viewport correctly when scrolled | ~5,000 px | §9.6.1 | M | ⚠️ Open |
+| 5.7 | **Chin line-height / inline sizing** — 25.9% region mismatch at tiny font sizes; `display:inline` with `font:2px/4px serif` line-height | ~4,000 px | §10.8 | S | ⚠️ Open |
+| 5.8 | **Table bottom** — 576 red pixels and 11.9% mismatch; anonymous table-cell height/width or `display:table` table-row wrapping | ~2,000 px | §17.2.1 | M | ⚠️ Open |
+| 5.9 | **Right-half background clipping** — 3.6% mismatch; border or overflow clipping off by small offset | ~14,000 px | §11.1.1 | S | ⚠️ Open |
+
+#### Blockers
+
+Three areas produce the remaining 4,848 red pixels.  Red is the canonical
+Acid2 failure signal — eliminating all red is the primary gate to passing:
+
+1. **5.1 Nose pseudo-elements** (2,316 red px): `::before`/`::after` content
+   with `float` positioning or `content` property generation is not correctly
+   stacking over the red background in this region.
+2. **5.2 Eyes stacking** (540 red px): Paint-order or `z-index` within the
+   eyes region allows red to show through where it should be occluded.
+3. **5.3 Second-line ears** (1,152 red px): The `p.bad` element with
+   `border-bottom:red` is not fully hidden by the absolutely-positioned table.
+4. **5.8 Table bottom** (576 red px): Red from table cell border/background
+   bleeding through anonymous cell gaps.
+
+#### Open Specification Questions
+
+- **Negative clearance interaction with margin collapsing (§8.3.1):** When
+  `clear:both` produces negative clearance, should the clearance participate
+  in margin collapsing with the preceding float's margin?  This affects the
+  smile region positioning.
+- **`position:fixed` within scrolled content:** CSS 2.1 §9.6.1 says
+  fixed-position elements are positioned relative to the viewport, but when
+  rendering a "scrolled" region (as Broiler does for `#top` anchor), the
+  viewport reference frame is ambiguous — should the scalp render at the
+  viewport top or at the document-flow position?
 
 ### Effort Key
 
@@ -379,9 +437,9 @@ dotnet test HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests \
 ```bash
 # All commands must be run from the repository root.
 
-# 1. Render with Broiler CLI (note: renders the intro page at acid2.html)
+# 1. Render with Broiler CLI at #top (fragment support renders at anchor position)
 dotnet run --project src/Broiler.Cli -- \
-  --capture-image acid/acid2/acid2.html \
+  --capture-image "acid/acid2/acid2.html#top" \
   --output /tmp/acid2-broiler.png \
   --width 1024 --height 768
 
@@ -483,8 +541,17 @@ Progress checklist tracking the path to full Acid2 compliance.
 - [x] Complete Phase 2 (P2) layout fixes and re-validate
 - [x] Complete Phase 3 (P3) visual polish fixes and re-validate
 - [x] All 5 automated differential tests passing
-- [ ] Stretch goal: Achieve 0 red-pixel leak (currently 4,848 px)
-- [ ] Stretch goal: Achieve ≥ 98% pixel match / < 2% diff (currently 90.16%)
+- [x] Generate `acid2.png` (Broiler render) and commit to repo
+- [x] Verify Chromium reference matches fresh Playwright render (2026-03-05: 100%)
+- [x] Document diff pixel colour distribution (black/white/red/yellow/blue)
+- [x] Add CLI fragment support (`--capture-image file.html#anchor`)
+- [ ] Phase 5: Eliminate remaining 4,848 red pixels (blockers 5.1–5.3, 5.8)
+- [ ] Phase 5: Fix nose pseudo-element positioning (2,316 red px)
+- [ ] Phase 5: Fix eyes stacking/paint order (540 red px)
+- [ ] Phase 5: Fix second-line ear stacking (1,152 red px)
+- [ ] Phase 5: Fix table bottom cell gaps (576 red px)
+- [ ] Stretch goal: Achieve 0 red-pixel leak
+- [ ] Stretch goal: Achieve ≥ 98% pixel match / < 2% diff
 
 ---
 

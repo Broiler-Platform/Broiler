@@ -297,7 +297,14 @@ public class CaptureService
             ? SKEncodedImageFormat.Jpeg
             : SKEncodedImageFormat.Png;
 
-        if (options.FullPage)
+        // Extract fragment identifier (e.g. "#top") for anchor-based rendering.
+        string? fragment = uri.Fragment;
+        if (!string.IsNullOrEmpty(fragment) && fragment.StartsWith('#') && fragment.Length > 1)
+        {
+            string elementId = fragment[1..]; // strip leading '#'
+            RenderAtAnchor(html, elementId, options, format);
+        }
+        else if (options.FullPage)
         {
             using var bitmap = HtmlRender.RenderToImageAutoSized(html, maxWidth: options.Width);
             using var data = bitmap.Encode(format, 90);
@@ -308,6 +315,59 @@ public class CaptureService
         {
             HtmlRender.RenderToFile(html, options.Width, options.Height, options.OutputPath, format);
         }
+    }
+
+    /// <summary>
+    /// Renders the HTML scrolled to the element with the given <paramref name="elementId"/>,
+    /// producing a viewport-sized image of the content visible at that anchor.
+    /// This mirrors the approach used by the Acid2 differential test suite:
+    /// layout with a tall viewport, locate the anchor via
+    /// <see cref="HtmlContainer.GetElementRectangle"/>, then render the
+    /// viewport-sized region starting at the anchor's Y position.
+    /// </summary>
+    private static void RenderAtAnchor(string html, string elementId, ImageCaptureOptions options,
+        SKEncodedImageFormat format)
+    {
+        // Maximum layout height used for initial full-page measurement.
+        const int LayoutMaxHeight = 99999;
+        // Bitmap height for the initial layout pass (must be large enough to
+        // contain the visible content but does not need to match LayoutMaxHeight).
+        const int LayoutBitmapHeight = 2000;
+
+        int w = options.Width, h = options.Height;
+
+        // 1. Layout with a tall viewport so the full page is measured.
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.MaxSize = new System.Drawing.SizeF(w, LayoutMaxHeight);
+        container.SetHtml(html);
+
+        using var layoutBmp = new SKBitmap(w, LayoutBitmapHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var layoutCanvas = new SKCanvas(layoutBmp);
+        layoutCanvas.Clear(SKColors.White);
+        container.PerformLayout(layoutCanvas, new System.Drawing.RectangleF(0, 0, w, LayoutMaxHeight));
+
+        // 2. Find the anchor element position.
+        var anchorRect = container.GetElementRectangle(elementId);
+        float scrollY = anchorRect?.Y ?? 0;
+
+        // 3. Constrain viewport and set Location to scroll position.
+        container.Location = new System.Drawing.PointF(0, scrollY);
+        container.MaxSize = new System.Drawing.SizeF(w, h);
+
+        // 4. Render with canvas translation to map scroll region to bitmap.
+        using var bitmap = new SKBitmap(w, h, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.White);
+        canvas.Save();
+        canvas.Translate(0, -scrollY);
+        container.PerformPaint(canvas, new System.Drawing.RectangleF(0, scrollY, w, h));
+        canvas.Restore();
+
+        using var data = bitmap.Encode(format, 90);
+        using var stream = File.OpenWrite(options.OutputPath);
+        data.SaveTo(stream);
     }
 
     /// <summary>
