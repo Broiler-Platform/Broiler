@@ -300,10 +300,36 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                 Size = new SizeF((float)width, Size.Height);
 
-                // Margins reduce the box width only for auto-width elements.
-                // For explicit widths, margins affect position only (CSS1 box model).
-                if (Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
+                // CSS2.1 §10.3.7: Absolutely positioned non-replaced elements
+                // with auto width use shrink-to-fit when at least one of
+                // left/right is auto.  Shrink-to-fit =
+                //   min(max(preferred_minimum, available), preferred)
+                if ((Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
+                    && (Position == CssConstants.Absolute || Position == CssConstants.Fixed)
+                    && (Left == null || Left == CssConstants.Auto
+                     || Right == null || Right == CssConstants.Auto))
                 {
+                    GetMinMaxWidth(out double prefMin, out double preferred);
+                    double available = width - ActualMarginLeft - ActualMarginRight;
+                    double stfWidth = Math.Min(Math.Max(prefMin, available), preferred);
+
+                    if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
+                    {
+                        double maxW = CssValueParser.ParseLength(MaxWidth, width, GetEmHeight());
+                        if (stfWidth > maxW) stfWidth = maxW;
+                    }
+                    if (MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
+                    {
+                        double minW = CssValueParser.ParseLength(MinWidth, width, GetEmHeight());
+                        if (stfWidth < minW) stfWidth = minW;
+                    }
+
+                    Size = new SizeF((float)stfWidth, Size.Height);
+                }
+                else if (Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
+                {
+                    // Margins reduce the box width only for auto-width elements.
+                    // For explicit widths, margins affect position only (CSS1 box model).
                     Size = new SizeF((float)(width - ActualMarginLeft - ActualMarginRight), Size.Height);
                 }
             }
