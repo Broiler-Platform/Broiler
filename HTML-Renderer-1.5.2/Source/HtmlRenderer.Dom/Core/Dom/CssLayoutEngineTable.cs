@@ -263,8 +263,10 @@ internal sealed class CssLayoutEngineTable
         {
             if (child.Display == CssConstants.TableCell)
             {
-                // Already a table-cell — add directly to the anonymous row.
-                anonRow.Boxes.Add(child);
+                // Already a table-cell — re-parent into the anonymous row.
+                // Using the ParentBox setter updates _parentBox and adds
+                // the child to anonRow.Boxes.
+                child.ParentBox = anonRow;
             }
             else
             {
@@ -272,7 +274,7 @@ internal sealed class CssLayoutEngineTable
                 // table-cell box.  The CssBox constructor automatically adds
                 // the anonymous cell to anonRow.Boxes.
                 var anonCell = new CssBox(anonRow, null) { Display = CssConstants.TableCell };
-                anonCell.Boxes.Add(child);
+                child.ParentBox = anonCell;
             }
         }
     }

@@ -23,15 +23,15 @@ public class Acid2DifferentialTests : IDisposable
     /// The renderer must stay at or above this level.
     /// As rendering fixes land, raise this threshold.
     /// </summary>
-    private const double MinMatchRatio = 0.10;
+    private const double MinMatchRatio = 0.88;
 
     /// <summary>
     /// Maximum allowed red-pixel leak count.
     /// Red pixels are the canonical Acid2 failure signal.
-    /// The high count is primarily from the <c>.picture</c> red background
-    /// not being overridden by the <c>&lt;link rel="appendix stylesheet"&gt;</c>.
+    /// Remaining red pixels are from border/background areas not yet
+    /// fully covered by layout (nose pseudo-elements, table cell gaps).
     /// </summary>
-    private const int MaxRedPixelLeak = 700_000;
+    private const int MaxRedPixelLeak = 6_000;
 
     private static readonly DeterministicRenderConfig Config = new()
     {
