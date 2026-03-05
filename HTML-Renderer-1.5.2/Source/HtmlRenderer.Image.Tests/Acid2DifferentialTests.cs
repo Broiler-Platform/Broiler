@@ -64,6 +64,7 @@ public class Acid2DifferentialTests : IDisposable
     /// <summary>
     /// Renders <c>acid2.html</c> scrolled to the <c>#top</c> anchor, returning
     /// a 1024×768 bitmap of the face test area.
+    /// The caller owns the returned <see cref="SKBitmap"/> and must dispose it.
     /// </summary>
     private static SKBitmap RenderAtAnchorTop(string html)
     {
@@ -83,7 +84,8 @@ public class Acid2DifferentialTests : IDisposable
 
         // 2. Find the #top element position.
         var topRect = container.GetElementRectangle("top");
-        float scrollY = topRect?.Y ?? 0;
+        Assert.NotNull(topRect); // anchor must exist in acid2.html
+        float scrollY = topRect.Value.Y;
 
         // 3. Constrain viewport and set Location to scroll position.
         container.Location = new PointF(0, scrollY);
