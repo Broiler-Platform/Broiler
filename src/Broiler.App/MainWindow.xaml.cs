@@ -72,7 +72,20 @@ public partial class MainWindow : Window
     private void HtmlPanel_LinkClicked(object sender, RoutedEventArgs<HtmlLinkClickedEventArgs> e)
     {
         e.Handled = true;
-        NavigateTo(e.Data.Link);
+        var link = e.Data.Link;
+
+        // Resolve fragment-only hrefs (e.g. "#top") against the current page
+        // URL so the address bar shows "acid2.html#top" instead of just "#top".
+        if (link.StartsWith("#") && _historyIndex >= 0 && _historyIndex < _history.Count)
+        {
+            var currentUrl = _history[_historyIndex];
+            var hashIndex = currentUrl.IndexOf('#');
+            if (hashIndex >= 0)
+                currentUrl = currentUrl.Substring(0, hashIndex);
+            link = currentUrl + link;
+        }
+
+        NavigateTo(link);
     }
 
     /// <summary>

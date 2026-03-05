@@ -465,7 +465,7 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
         EventHandler<HtmlLinkClickedEventArgs> clickHandler = LinkClicked;
         if (clickHandler != null)
         {
-            var args = new HtmlLinkClickedEventArgs(link.HrefLink, link.HtmlTag.Attributes);
+            var args = new HtmlLinkClickedEventArgs(ResolveHref(link.HrefLink), link.HtmlTag.Attributes);
             try
             {
                 clickHandler(this, args);

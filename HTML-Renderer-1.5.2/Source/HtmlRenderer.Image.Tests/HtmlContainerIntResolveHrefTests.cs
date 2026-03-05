@@ -66,4 +66,27 @@ public class HtmlContainerIntResolveHrefTests
         var container = CreateContainer("");
         Assert.Equal("./page.html", container.ResolveHref("./page.html"));
     }
+
+    [Fact]
+    public void ResolveHref_FragmentOnly_ResolvesAgainstBaseUrl()
+    {
+        var container = CreateContainer("https://example.com/acid2.html");
+        var result = container.ResolveHref("#top");
+        Assert.Equal("https://example.com/acid2.html#top", result);
+    }
+
+    [Fact]
+    public void ResolveHref_EmptyFragment_ResolvesAgainstBaseUrl()
+    {
+        var container = CreateContainer("https://example.com/acid2.html");
+        var result = container.ResolveHref("#");
+        Assert.Equal("https://example.com/acid2.html#", result);
+    }
+
+    [Fact]
+    public void ResolveHref_FragmentOnly_NoBaseUrl_ReturnsOriginal()
+    {
+        var container = CreateContainer();
+        Assert.Equal("#top", container.ResolveHref("#top"));
+    }
 }
