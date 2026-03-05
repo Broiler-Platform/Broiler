@@ -537,17 +537,21 @@ internal sealed class CssParser
         {
             int depth = 0;
             int urlEnd = urlStart + 4;
+            bool closed = false;
             for (; urlEnd < remaining.Length; urlEnd++)
             {
                 if (remaining[urlEnd] == '(') depth++;
                 else if (remaining[urlEnd] == ')')
                 {
-                    if (depth == 0) { urlEnd++; break; }
+                    if (depth == 0) { urlEnd++; closed = true; break; }
                     depth--;
                 }
             }
-            image = remaining.Substring(urlStart, urlEnd - urlStart);
-            remaining = remaining.Substring(0, urlStart) + remaining.Substring(urlEnd);
+            if (closed)
+            {
+                image = remaining.Substring(urlStart, urlEnd - urlStart);
+                remaining = remaining.Substring(0, urlStart) + remaining.Substring(urlEnd);
+            }
         }
 
         // Tokenise the rest.

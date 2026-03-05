@@ -227,13 +227,13 @@ table layout algorithm does not handle mixed `display:table-cell` /
 
 ### Phase 3 — P3: Visual Polish
 
-| # | Task | CSS 2.1 Ref | Effort |
-|---|---|---|---|
-| 3.1 | Fix `background-attachment:fixed` offset for tiled images | §14.2.1 | M |
-| 3.2 | Fix paint order: blocks → floats → inlines (Appendix E) | App. E | M |
-| 3.3 | Fix `overflow` clipping with children wider than container | §11.1.1 | S |
-| 3.4 | Fix `line-height` at sub-pixel font sizes | §10.8 | S |
-| 3.5 | Handle `<object>` fallback chain for data-URI objects | HTML 4.01 §13.3 | M |
+| # | Task | CSS 2.1 Ref | Effort | Status |
+|---|---|---|---|---|
+| 3.1 | Fix `background-attachment:fixed` offset for tiled images | §14.2.1 | M | ✅ Done |
+| 3.2 | Fix paint order: blocks → floats → inlines (Appendix E) | App. E | M | ✅ Done |
+| 3.3 | Fix `overflow` clipping with children wider than container | §11.1.1 | S | ✅ Done |
+| 3.4 | Fix `line-height` at sub-pixel font sizes | §10.8 | S | ✅ Done |
+| 3.5 | Handle `<object>` fallback chain for data-URI objects | HTML 4.01 §13.3 | M | ✅ Done |
 
 ### Phase 4 — Validation
 
