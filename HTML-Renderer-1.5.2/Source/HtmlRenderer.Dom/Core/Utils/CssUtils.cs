@@ -346,6 +346,9 @@ internal static class CssUtils
             case "overflow":
                 cssBox.Overflow = value;
                 break;
+            case "z-index":
+                cssBox.ZIndex = value;
+                break;
         }
     }
 }

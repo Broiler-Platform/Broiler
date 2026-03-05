@@ -397,6 +397,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
     public string WordBreak { get; set; } = "normal";
     public string Opacity { get; set; } = "1";
+    public string ZIndex { get; set; } = CssConstants.Auto;
     public string BoxShadow { get; set; } = "none";
     public string FlexDirection { get; set; } = "row";
     public string JustifyContent { get; set; } = "flex-start";

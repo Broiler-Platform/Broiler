@@ -488,6 +488,19 @@ internal class CssBox : CssBoxProperties, IDisposable
                     Location = new PointF((float)left, (float)top);
                     ActualBottom = top;
                 }
+                else
+                {
+                    // CSS2.1 §10.6.4: For fixed-position elements, 'top'/'left'
+                    // specify the offset of the top/left margin edge from the
+                    // viewport.  Location represents the border edge, so add
+                    // the final computed margins (which may have been updated by
+                    // later CSS rules such as the Acid2 'p + table + p' rule).
+                    var basePos = GetActualLocation(Left, Top);
+                    Location = new PointF(
+                        basePos.X + (float)ActualMarginLeft,
+                        basePos.Y + (float)ActualMarginTop);
+                    ActualBottom = Location.Y;
+                }
             }
 
             //If we're talking about a table here..
