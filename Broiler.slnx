@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/HTML-Renderer-1.5.2/" />
   <Folder Name="/HTML-Renderer-1.5.2/Source/">
+    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/HtmlRenderer.Image.Tests.csproj" />
     <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Image/HtmlRenderer.Image.csproj" />
     <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.WPF/HtmlRenderer.WPF.csproj" />
     <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer/HtmlRenderer.csproj" />
