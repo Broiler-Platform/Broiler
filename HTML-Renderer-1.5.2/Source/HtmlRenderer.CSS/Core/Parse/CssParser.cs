@@ -618,16 +618,17 @@ internal sealed class CssParser
             }
         }
 
-        if (color != null)
-            properties["background-color"] = color;
-        if (image != null)
-            properties["background-image"] = image;
-        if (repeat != null)
-            properties["background-repeat"] = repeat;
-        if (attachment != null)
-            properties["background-attachment"] = attachment;
-        if (positionParts.Count > 0)
-            properties["background-position"] = string.Join(" ", positionParts);
+        // CSS2.1 §14.2.1: The 'background' shorthand resets ALL longhand
+        // properties to their initial values, then overrides with any
+        // values explicitly provided.  Without this reset, a later
+        // 'background: none' would not clear an earlier 'background: red'.
+        properties["background-color"] = color ?? "transparent";
+        properties["background-image"] = image ?? "none";
+        properties["background-repeat"] = repeat ?? "repeat";
+        properties["background-attachment"] = attachment ?? "scroll";
+        properties["background-position"] = positionParts.Count > 0
+            ? string.Join(" ", positionParts)
+            : "0% 0%";
     }
 
     private void ParseColorProperty(string propName, string propValue, Dictionary<string, string> properties)
