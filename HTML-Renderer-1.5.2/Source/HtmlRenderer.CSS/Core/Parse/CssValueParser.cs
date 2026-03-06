@@ -357,6 +357,15 @@ internal sealed class CssValueParser
 
     private bool GetColorByName(string str, int idx, int length, out Color color)
     {
+        // CSS2.1 §4.3.6: 'transparent' is a valid color keyword that computes
+        // to rgba(0,0,0,0).  Handle it before the general alpha check to avoid
+        // rejecting it due to A == 0.
+        if (length == 11 && string.Compare(str, idx, "transparent", 0, 11, StringComparison.OrdinalIgnoreCase) == 0)
+        {
+            color = Color.FromArgb(0, 0, 0, 0);
+            return true;
+        }
+
         color = _colorResolver.GetColor(str.Substring(idx, length));
         return color.A > 0;
     }
