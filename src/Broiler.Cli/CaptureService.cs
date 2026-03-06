@@ -356,14 +356,11 @@ public class CaptureService
         container.Location = new System.Drawing.PointF(0, scrollY);
         container.MaxSize = new System.Drawing.SizeF(w, h);
 
-        // 4. Render with canvas translation to map scroll region to bitmap.
+        // 4. Render the viewport region at the anchor position.
         using var bitmap = new SKBitmap(w, h, SKColorType.Rgba8888, SKAlphaType.Premul);
         using var canvas = new SKCanvas(bitmap);
         canvas.Clear(SKColors.White);
-        canvas.Save();
-        canvas.Translate(0, -scrollY);
         container.PerformPaint(canvas, new System.Drawing.RectangleF(0, scrollY, w, h));
-        canvas.Restore();
 
         using var data = bitmap.Encode(format, 90);
         using var stream = File.OpenWrite(options.OutputPath);
