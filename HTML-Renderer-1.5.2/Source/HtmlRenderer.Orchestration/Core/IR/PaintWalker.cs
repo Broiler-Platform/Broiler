@@ -540,14 +540,26 @@ internal static class PaintWalker
         //   Step 5: In-flow, inline-level, non-positioned descendants
         // Positioned children (stacking contexts + position:relative) are painted
         // in steps 6–7, sorted by StackLevel.
+        //
+        // position:fixed with z-index:auto are painted BEFORE step-3 blocks
+        // so that in-flow content covers them (CSS2.1 §9.9, §9.6.1).
         List<Fragment>? positioned = null;
+        List<Fragment>? fixedNoZIndex = null;
+        List<Fragment>? blocks = null;
         List<Fragment>? floats = null;
         List<Fragment>? inlineLevel = null;
 
-        // Step 3: Paint block-level, non-float, non-positioned children
+        // Categorize children
         foreach (var child in fragment.Children)
         {
-            if (child.CreatesStackingContext || child.Style.Position == "relative")
+            // position:fixed with z-index:auto: paint before step-3 blocks
+            // so that in-flow face content covers them.
+            if (child.Style.Position == "fixed" && child.StackLevel == 0)
+            {
+                fixedNoZIndex ??= new List<Fragment>();
+                fixedNoZIndex.Add(child);
+            }
+            else if (child.CreatesStackingContext || child.Style.Position == "relative")
             {
                 // Steps 6–7: positioned descendants (CSS2.1 App. E)
                 positioned ??= new List<Fragment>();
@@ -565,8 +577,34 @@ internal static class PaintWalker
             }
             else
             {
-                PaintFragment(child, items, propagatedFrom, viewport);
+                blocks ??= new List<Fragment>();
+                blocks.Add(child);
             }
+        }
+
+        // Paint position:fixed (z-index:auto) first, beneath all other content
+        if (fixedNoZIndex != null)
+        {
+            foreach (var child in fixedNoZIndex)
+            {
+                if (viewport.Width > 0 && viewport.Height > 0)
+                {
+                    int startIdx = items.Count;
+                    PaintFragment(child, items, propagatedFrom, viewport);
+                    OffsetDisplayItems(items, startIdx, viewport.X, viewport.Y);
+                }
+                else
+                {
+                    PaintFragment(child, items, propagatedFrom, viewport);
+                }
+            }
+        }
+
+        // Step 3: Paint block-level, non-float, non-positioned children
+        if (blocks != null)
+        {
+            foreach (var child in blocks)
+                PaintFragment(child, items, propagatedFrom, viewport);
         }
 
         // Step 4: Paint non-positioned floats
