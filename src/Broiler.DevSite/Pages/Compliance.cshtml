@@ -1,0 +1,100 @@
+@page
+@model Broiler.DevSite.Pages.ComplianceModel
+@{
+    ViewData["Title"] = "Compliance Dashboard";
+}
+
+<h2>CSS 2.1 Compliance Dashboard</h2>
+<p>Aggregate completion status parsed from the <code>css2/</code> chapter checklists.</p>
+
+@if (Model.Checklists.Count == 0)
+{
+    <div class="alert alert-warning">No checklists found. Ensure the <code>css2/</code> directory contains <code>*-checklist.md</code> files.</div>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Overall Progress</h5>
+            <div class="progress" style="height: 30px;">
+                <div class="progress-bar @(Model.OverallPercent >= 80 ? "bg-success" : Model.OverallPercent >= 50 ? "bg-warning" : "bg-danger")"
+                     role="progressbar"
+                     style="width: @Model.OverallPercent%"
+                     aria-valuenow="@Model.OverallPercent"
+                     aria-valuemin="0"
+                     aria-valuemax="100">
+                    @Model.OverallPercent.ToString("F1")%
+                </div>
+            </div>
+            <p class="mt-2 text-muted">
+                @Model.TotalCompleted of @Model.TotalItems items completed across @Model.Checklists.Count checklists
+            </p>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Chapter</th>
+                    <th>Completed</th>
+                    <th>Total</th>
+                    <th>Progress</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var chapter in Model.Checklists)
+                {
+                    <tr>
+                        <td>
+                            <a data-bs-toggle="collapse" href="#sections-@chapter.FileName.Replace(".", "-")" role="button"
+                               aria-expanded="false">
+                                @chapter.Title
+                            </a>
+                        </td>
+                        <td>@chapter.CompletedItems</td>
+                        <td>@chapter.TotalItems</td>
+                        <td>
+                            <div class="progress" style="min-width: 120px;">
+                                <div class="progress-bar @(chapter.CompletionPercent >= 80 ? "bg-success" : chapter.CompletionPercent >= 50 ? "bg-warning" : "bg-danger")"
+                                     role="progressbar"
+                                     style="width: @chapter.CompletionPercent%">
+                                    @chapter.CompletionPercent.ToString("F1")%
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr class="collapse" id="sections-@chapter.FileName.Replace(".", "-")">
+                        <td colspan="4">
+                            <div class="ps-4">
+                                @foreach (var sec in chapter.Sections)
+                                {
+                                    @if (!string.IsNullOrEmpty(sec.Heading))
+                                    {
+                                        <h6 class="mt-2">@sec.Heading</h6>
+                                    }
+                                    <ul class="list-unstyled small">
+                                        @foreach (var item in sec.Items)
+                                        {
+                                            <li>
+                                                @if (item.IsChecked)
+                                                {
+                                                    <span class="text-success">&#10003;</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-danger">&#10007;</span>
+                                                }
+                                                @item.Text
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

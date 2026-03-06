@@ -1,0 +1,60 @@
+@page
+@model Broiler.DevSite.Pages.ApiDocsModel
+@{
+    ViewData["Title"] = "API Documentation";
+}
+
+<h2>DomBridge API Reference</h2>
+<p>Auto-generated API reference from XML doc comments in <code>DomBridge.cs</code>.</p>
+
+@if (Model.Types.Count == 0)
+{
+    <div class="alert alert-warning">
+        No API documentation found. Ensure <code>DomBridge.cs</code> is present in the expected location.
+    </div>
+}
+else
+{
+    @foreach (var type in Model.Types)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="mb-0">@type.TypeName</h4>
+                @if (type.Summary != null)
+                {
+                    <small class="text-muted">@type.Summary</small>
+                }
+            </div>
+            <div class="card-body">
+                @if (type.Members.Count == 0)
+                {
+                    <p class="text-muted">No public members documented.</p>
+                }
+                else
+                {
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Kind</th>
+                                <th>Name</th>
+                                <th>Signature</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var member in type.Members)
+                            {
+                                <tr>
+                                    <td><span class="badge bg-secondary">@member.MemberKind</span></td>
+                                    <td><strong>@member.Name</strong></td>
+                                    <td><code>@member.Signature</code></td>
+                                    <td>@(member.Summary ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    }
+}
