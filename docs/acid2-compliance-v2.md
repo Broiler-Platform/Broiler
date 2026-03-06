@@ -286,29 +286,53 @@ The following issues produce the remaining 39,204 mismatched content pixels
 (91% of all content) and 1,680 red pixels.  The renderer is far from
 compliant — nearly every facial feature is broken.
 
-#### 3.2.1  Eyes Region — Background Image Loading (1,254 red px)
+#### 3.2.1  Eyes Region — Background Image & Stacking (1,584 red px)
 
-**Location:** Eyes region (y 195–235).
+**Location:** Eyes region (y 216–239 in viewport).
 
-**Root cause:** The `background` shorthand stores `url(data:image/...)` with
-the `url()` wrapper.  `ImageLoadHandler.LoadImage` checks
-`src.StartsWith("data:image")` which fails because of the `url()` prefix.
-Additionally, `RenderDrawImage` lacks a null guard when `SKBitmap.Decode`
-returns null.
+**Root cause (updated 2026-03-06):** Investigation reveals the 1,584 red
+pixels previously attributed to the nose pseudo-elements actually originate
+from the eyes stacking context:
 
-**Impact:** ~8,000 diff pixels, 1,254 red pixels.
+- **#eyes-c** (`display:block; background:red`): 1,296 red px.  Painted in
+  CSS2.1 Appendix E Step 3 (block-level).  Should be covered by #eyes-a and
+  #eyes-b (Step 4, floats) but their `background: fixed url(data:...)` images
+  do not render opaquely in the full Acid2 context, so the red leaks through.
+- **#eyes-b** (`float:left; border-right: solid 1em red`): 288 red px.
+  The red right border is intended to be hidden by #eyes-a painting above it,
+  but both are floats and paint in DOM order (a before b); nothing covers b.
 
-**CSS 2.1 reference:** Appendix E (paint order), §14.2.1 (background images).
+The `url()` wrapper stripping (Phase 5.2) is confirmed working — background
+images from `data:` URIs load correctly in isolation (including with
+`background-attachment: fixed`).  The issue is specific to the full Acid2
+layout where the eyes `<span>` elements with `float:left` and `background:
+fixed url(...)` fail to fully cover the block-level red background.  Further
+investigation needed on whether CSS2.1 §9.7 display-computation for floated
+inline elements is correctly implemented.
 
-#### 3.2.2  Nose Region — Pseudo-Element Positioning (1,584 red px)
+The original Phase 5.2 diagnosis (url() wrapper stripping) is confirmed
+**complete** — it was fixed in a prior commit and no red pixels remain from
+that specific cause.
 
-**Location:** Nose region (y 200–310).
+**Impact:** ~15,000 diff pixels, 1,584 red pixels (1,296 from #eyes-c + 288
+from #eyes-b).
 
-**Root cause:** `::before`/`::after` pseudo-elements with border-based CSS
-triangles are not fully positioned.  Remaining layout offsets cause red
-background to bleed through.
+**CSS 2.1 reference:** Appendix E (paint order), §14.2.1 (background images),
+§9.7 (display/float/position relationships).
 
-**Impact:** ~15,000 diff pixels, 1,584 red pixels.
+#### 3.2.2  Nose Region — Pseudo-Elements (0 red px) ✅
+
+**Location:** Nose region.
+
+**Status (updated 2026-03-06):** Investigation confirms that the nose
+pseudo-elements (`::before`/`::after` with border-based CSS triangles) render
+**correctly** in isolation.  The 1,584 red pixels previously attributed to the
+nose are actually from the eyes stacking context (see §3.2.1).  The nose
+pseudo-element selectors (`.nose div div:before`, `.nose div :after`) match
+correctly, border-style/color/width shorthand parsing is correct, and the
+border trapezoid rendering covers the inner div's red background as intended.
+
+**Impact:** 0 red pixels from this source.
 
 **CSS 2.1 reference:** §12.1 (generated content), §9.5 (floats).
 
@@ -325,11 +349,15 @@ rect is slightly off, producing 15.9% mismatch despite no red leak.
 
 #### 3.2.4  2nd-Line Ears — position:fixed Stacking (96 red px)
 
-**Location:** 2nd line (y 120–160).
+**Location:** 2nd line (y 156–157 in viewport).
 
-**Root cause:** The `p.bad` element with `border-bottom:red` is
-`position:fixed` and should be hidden behind the face content in stacking
-order.  96 red pixels leak through.
+**Root cause:** The `p.bad` element (`position:fixed; border-bottom: red
+solid`) is painted first by PaintWalker (beneath in-flow content per Appendix
+E).  The `p + table + p` adjacent-sibling selector correctly matches and
+applies `margin-top: 3em`, positioning the element at viewport y ≈ 144 with
+height 12px (min-height overrides max-height) and a medium-width red
+bottom-border at y 156–157.  However, no opaque face content covers that
+precise location, so 96 red pixels (48 wide × 2 rows) remain visible.
 
 **Impact:** ~2,900 diff pixels, 96 red pixels.
 
@@ -386,9 +414,9 @@ is the primary gate to passing.
 
 | # | Task | Pixel Impact | CSS 2.1 Ref | Effort | Priority |
 |---|---|---|---|---|---|
-| 5.2 | **Fix background-image `url()` wrapper stripping** — Strip `url()` prefix before passing to `ImageLoadHandler.LoadImage` so `data:image/...` URIs are detected.  Add null guard in `RenderDrawImage` for `SKBitmap.Decode` returning null. | ~1,254 red px | §14.2.1 | S | 🔴 P0 |
-| 5.3 | **Fix nose pseudo-element positioning** — Correct `::before`/`::after` border-triangle layout for floated elements with `height:0` borders. | ~1,584 red px | §12.1, §9.5 | L | 🔴 P0 |
-| 5.4 | **Fix position:fixed stacking for p.bad** — Ensure `position:fixed` elements with `border-bottom:red` are covered by subsequently-positioned content per Appendix E stacking order. | ~96 red px | §9.9, App. E | M | 🔴 P0 |
+| 5.2 | **Fix background-image `url()` wrapper stripping** — Strip `url()` prefix before passing to `ImageLoadHandler.LoadImage` so `data:image/...` URIs are detected.  Add null guard in `RenderDrawImage` for `SKBitmap.Decode` returning null. | ~~1,254~~ 0 red px | §14.2.1 | S | ✅ Done |
+| 5.3 | **Fix eyes stacking / background rendering** — (Root cause updated: red pixels originate from `#eyes-c` block background and `#eyes-b` right border not being fully covered by float backgrounds with `background-attachment:fixed` in the full Acid2 context.  Nose pseudo-elements confirmed working.) | ~1,584 red px | §9.7, App. E | L | 🔴 P0 |
+| 5.4 | **Fix position:fixed stacking for p.bad** — The `p.bad` element's red bottom-border at viewport y 156–157 is not covered by any opaque face content.  PaintWalker correctly paints fixed elements first; the gap is in face layout coverage. | ~96 red px | §9.9, App. E | M | 🔴 P0 |
 
 **Measurable outcome:** `Acid2Top_RedPixelLeak_BelowMaximum` passes with
 `MaxRedPixelLeak = 0`.
