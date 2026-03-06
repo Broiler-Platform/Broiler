@@ -2,12 +2,16 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:htmlRenderer="clr-namespace:TheArtOfDev.HtmlRenderer.WPF;assembly=HtmlRenderer.WPF"
+        xmlns:devConsole="clr-namespace:Broiler.App.DevConsole"
         Title="Broiler" Height="720" Width="1280"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        KeyDown="Window_KeyDown">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition x:Name="ConsoleRow" Height="0"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -33,8 +37,17 @@
         <htmlRenderer:HtmlPanel x:Name="HtmlPanel" Grid.Row="1"
                                 LinkClicked="HtmlPanel_LinkClicked"/>
 
+        <!-- Console Splitter (only visible when console is open) -->
+        <GridSplitter x:Name="ConsoleSplitter" Grid.Row="2" Height="4" Background="#3E3E3E"
+                      HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                      Visibility="Collapsed"/>
+
+        <!-- Developer Console Panel -->
+        <devConsole:DevConsolePanel x:Name="DevConsole" Grid.Row="3"
+                                    Visibility="Collapsed"/>
+
         <!-- Status Bar -->
-        <StatusBar Grid.Row="2">
+        <StatusBar Grid.Row="4">
             <StatusBarItem>
                 <TextBlock x:Name="StatusText" Text="Ready"/>
             </StatusBarItem>

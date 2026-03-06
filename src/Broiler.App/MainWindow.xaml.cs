@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private readonly List<string> _history = [];
     private int _historyIndex = -1;
     private readonly RenderingPipeline _pipeline;
+    private bool _consoleVisible;
 
     public MainWindow()
     {
@@ -29,7 +30,14 @@ public partial class MainWindow : Window
             new ScriptExtractor(),
             new ScriptEngine());
 
-        Closed += (_, _) => _pipeline.Dispose();
+        DevConsole.CloseRequested += ToggleConsole;
+
+        Closed += (_, _) =>
+        {
+            _pipeline.Dispose();
+            DevConsole.Dispose();
+        };
+
         NavigateTo("about:blank");
     }
 
@@ -140,6 +148,33 @@ public partial class MainWindow : Window
     {
         BackButton.IsEnabled = _historyIndex > 0;
         ForwardButton.IsEnabled = _historyIndex < _history.Count - 1;
+    }
+
+    private void Window_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F12)
+        {
+            ToggleConsole();
+            e.Handled = true;
+        }
+    }
+
+    private void ToggleConsole()
+    {
+        _consoleVisible = !_consoleVisible;
+
+        if (_consoleVisible)
+        {
+            ConsoleRow.Height = new GridLength(250);
+            DevConsole.Visibility = Visibility.Visible;
+            ConsoleSplitter.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            ConsoleRow.Height = new GridLength(0);
+            DevConsole.Visibility = Visibility.Collapsed;
+            ConsoleSplitter.Visibility = Visibility.Collapsed;
+        }
     }
 
     private static string GetWelcomePage() => @"
