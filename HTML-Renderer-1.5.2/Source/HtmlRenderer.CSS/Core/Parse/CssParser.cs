@@ -688,12 +688,28 @@ internal sealed class CssParser
                     if (!string.IsNullOrEmpty(val) && addedClasses.Add(val))
                         sb.Append('.').Append(val);
                 }
-                // [class=value] with unquoted spaces → invalid selector
+                // [class=value] — exact match
                 else if (inner.StartsWith("class=", StringComparison.OrdinalIgnoreCase))
                 {
-                    var val = inner.Substring(6).Trim('"', '\'', ' ');
-                    if (val.Contains(' ') && !inner.Contains('"') && !inner.Contains('\''))
+                    var raw = inner.Substring(6);
+                    // CSS2.1 §4.1.3: backslash-escaped characters like "second\ two"
+                    // are valid IDENTs. Normalize by removing backslashes before spaces.
+                    var val = raw.Replace("\\ ", " ").Trim('"', '\'', ' ');
+                    bool hasBackslashEscape = raw.Contains('\\');
+                    bool isQuoted = raw.Contains('"') || raw.Contains('\'');
+                    // Bare unquoted/unescaped space → invalid selector per CSS2.1 grammar
+                    if (val.Contains(' ') && !isQuoted && !hasBackslashEscape)
                         return null;
+                    // Convert to class selectors: "second two" → .second.two
+                    if (!string.IsNullOrEmpty(val))
+                    {
+                        var words = val.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var w in words)
+                        {
+                            if (addedClasses.Add(w))
+                                sb.Append('.').Append(w);
+                        }
+                    }
                 }
                 // Other attribute selectors: skip
             }
