@@ -1132,10 +1132,28 @@ internal sealed class CssParser
             int idx = 0;
             while ((idx = CommonUtils.GetNextSubString(value, idx, out int length)) > -1)
             {
-                width ??= ParseBorderWidth(value, idx, length);
-                style ??= ParseBorderStyle(value, idx, length);
-                color ??= ParseBorderColor(value, idx, length);
-                
+                // CSS2.1 §8.5.1: Each token must match exactly one of width,
+                // style, or color.  Use exclusive matching (width > style > color)
+                // so that tokens like "1em" are not consumed as both a width
+                // and a color (the fallback color resolver treats unknown names
+                // as black, which would otherwise match every token).
+                if (width == null)
+                {
+                    var w = ParseBorderWidth(value, idx, length);
+                    if (w != null) { width = w; goto next; }
+                }
+                if (style == null)
+                {
+                    var s = ParseBorderStyle(value, idx, length);
+                    if (s != null) { style = s; goto next; }
+                }
+                if (color == null)
+                {
+                    var c = ParseBorderColor(value, idx, length);
+                    if (c != null) { color = c; goto next; }
+                }
+
+                next:
                 idx = idx + length + 1;
             }
         }
