@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.DevConsole.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="..\Broiler.App\Rendering\RenderLogger.cs" Link="RenderLogger.cs" />
   </ItemGroup>
 
