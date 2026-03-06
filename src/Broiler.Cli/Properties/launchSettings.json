@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Broiler.Cli": {
+      "commandName": "Project",
+      "commandLineArgs": "--capture-image http://acid2.acidtests.org#top --output cpature.png --full-page"
+    }
+  }
+}
