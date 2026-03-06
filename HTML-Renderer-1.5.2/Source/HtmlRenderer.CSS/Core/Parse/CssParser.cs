@@ -1140,19 +1140,20 @@ internal sealed class CssParser
                 if (width == null)
                 {
                     var w = ParseBorderWidth(value, idx, length);
-                    if (w != null) { width = w; idx = idx + length + 1; continue; }
+                    if (w != null) { width = w; goto next; }
                 }
                 if (style == null)
                 {
                     var s = ParseBorderStyle(value, idx, length);
-                    if (s != null) { style = s; idx = idx + length + 1; continue; }
+                    if (s != null) { style = s; goto next; }
                 }
                 if (color == null)
                 {
                     var c = ParseBorderColor(value, idx, length);
-                    if (c != null) { color = c; idx = idx + length + 1; continue; }
+                    if (c != null) { color = c; goto next; }
                 }
 
+                next:
                 idx = idx + length + 1;
             }
         }
