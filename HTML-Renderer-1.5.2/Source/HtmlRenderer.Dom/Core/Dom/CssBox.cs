@@ -833,6 +833,9 @@ internal class CssBox : CssBoxProperties, IDisposable
                 double maxNeg = Math.Min(ActualMarginTop, 0);
                 CollectEmptyBoxMargins(prevBox, ref maxPos, ref maxNeg);
                 double collapsed = maxPos + maxNeg; // maxNeg <= 0
+                // Subtract the portion of the collapsed margin already
+                // consumed when positioning the empty box itself (its
+                // CollapsedMarginTop was recorded during its own layout).
                 value = collapsed - prevBox.CollapsedMarginTop;
             }
             else
@@ -1095,6 +1098,7 @@ internal class CssBox : CssBoxProperties, IDisposable
         }
 
         // Zero content height — ActualBottom should equal Location.Y
+        // (tolerance 0.5 accounts for sub-pixel rounding in layout)
         if (Math.Abs(box.ActualBottom - box.Location.Y) > 0.5)
             return false;
 
