@@ -272,9 +272,33 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
 
         if (LatestFragmentTree != null)
         {
+            // When scrolling, compute the viewport in layout-space coordinates so that
+            // PaintWalker generates a canvas background that covers the visible area
+            // after the scroll offset is applied.
+            var paintViewport = viewport;
+            bool hasScroll = ScrollOffset.X != 0 || ScrollOffset.Y != 0;
+            if (hasScroll)
+            {
+                paintViewport = new RectangleF(
+                    viewport.X - ScrollOffset.X,
+                    viewport.Y - ScrollOffset.Y,
+                    viewport.Width,
+                    viewport.Height);
+            }
+
             // Paint path: Fragment tree → DisplayList → RGraphics
             // Pass viewport for CSS2.1 §14.2 canvas background propagation.
-            var displayList = PaintWalker.Paint(LatestFragmentTree, viewport);
+            var displayList = PaintWalker.Paint(LatestFragmentTree, paintViewport);
+
+            // Apply scroll offset: shift all display items so that content scrolls
+            // within the fixed viewport clip.
+            if (hasScroll)
+            {
+                var offsetItems = new List<DisplayItem>(displayList.Items);
+                PaintWalker.OffsetDisplayItems(offsetItems, 0, ScrollOffset.X, ScrollOffset.Y);
+                displayList = new DisplayList { Items = offsetItems };
+            }
+
             LatestDisplayList = displayList;
             RGraphicsRasterBackend.Instance.Render(displayList, g);
         }

@@ -729,9 +729,10 @@ internal static class PaintWalker
     /// <summary>
     /// Offsets all display items starting at <paramref name="startIndex"/> by
     /// (<paramref name="dx"/>, <paramref name="dy"/>).  Used to reposition
-    /// <c>position:fixed</c> fragments to viewport-relative coordinates.
+    /// <c>position:fixed</c> fragments to viewport-relative coordinates and
+    /// to apply scroll offsets during painting.
     /// </summary>
-    private static void OffsetDisplayItems(List<DisplayItem> items, int startIndex, float dx, float dy)
+    internal static void OffsetDisplayItems(List<DisplayItem> items, int startIndex, float dx, float dy)
     {
         if (dx == 0 && dy == 0)
             return;
@@ -742,7 +743,7 @@ internal static class PaintWalker
         }
     }
 
-    private static DisplayItem OffsetItem(DisplayItem item, float dx, float dy)
+    internal static DisplayItem OffsetItem(DisplayItem item, float dx, float dy)
     {
         var ob = OffsetRect(item.Bounds, dx, dy);
         switch (item)
@@ -801,6 +802,6 @@ internal static class PaintWalker
         }
     }
 
-    private static RectangleF OffsetRect(RectangleF r, float dx, float dy)
+    internal static RectangleF OffsetRect(RectangleF r, float dx, float dy)
         => new(r.X + dx, r.Y + dy, r.Width, r.Height);
 }
