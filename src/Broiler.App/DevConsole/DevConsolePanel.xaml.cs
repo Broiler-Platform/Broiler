@@ -18,6 +18,9 @@ namespace Broiler.App.DevConsole;
 /// </summary>
 public partial class DevConsolePanel : UserControl, IDisposable
 {
+    private const double DefaultCanvasWidth = 280;
+    private const double DefaultCanvasHeight = 120;
+
     private readonly List<RenderLogEntry> _logEntries = [];
     private readonly ErrorOverlayService _errorOverlay = new();
     private int _errorCount;
@@ -216,8 +219,8 @@ public partial class DevConsolePanel : UserControl, IDisposable
         BoxModelCanvas.Children.Clear();
         var model = ConsoleService.GetBoxModel(box);
 
-        var canvasWidth = BoxModelCanvas.ActualWidth > 0 ? BoxModelCanvas.ActualWidth : 280;
-        var canvasHeight = BoxModelCanvas.ActualHeight > 0 ? BoxModelCanvas.ActualHeight : 120;
+        var canvasWidth = BoxModelCanvas.ActualWidth > 0 ? BoxModelCanvas.ActualWidth : DefaultCanvasWidth;
+        var canvasHeight = BoxModelCanvas.ActualHeight > 0 ? BoxModelCanvas.ActualHeight : DefaultCanvasHeight;
 
         // Draw nested rectangles: margin > border > padding > content
         DrawBoxModelRect(0, 0, canvasWidth, canvasHeight,
@@ -242,8 +245,8 @@ public partial class DevConsolePanel : UserControl, IDisposable
 
     private void DrawBoxModelRect(double x, double y, double w, double h, Color fill, string label)
     {
-        if (w < 0) w = 0;
-        if (h < 0) h = 0;
+        w = Math.Max(0, w);
+        h = Math.Max(0, h);
 
         var rect = new Rectangle
         {
