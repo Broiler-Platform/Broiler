@@ -17,13 +17,17 @@ public class Acid2DifferentialTests : IDisposable
 {
     private const int ViewportWidth = 1024;
     private const int ViewportHeight = 768;
+    private const int SmileRegionX = 20;
+    private const int SmileRegionY = 310;
+    private const int SmileRegionWidth = 380;
+    private const int SmileRegionHeight = 50;
 
     /// <summary>
     /// Current pixel-match floor when rendering at <c>#top</c>.
     /// The renderer must stay at or above this level.
     /// As rendering fixes land, raise this threshold.
     /// </summary>
-    private const double MinMatchRatio = 0.95;
+    private const double MinMatchRatio = 1.0;
 
     /// <summary>
     /// Maximum allowed red-pixel leak count.
@@ -38,7 +42,7 @@ public class Acid2DifferentialTests : IDisposable
         ViewportWidth = ViewportWidth,
         ViewportHeight = ViewportHeight,
         PixelDiffThreshold = 1.0, // we assert manually
-        ColorTolerance = 5
+        ColorTolerance = 0
     };
 
     private readonly string _acid2Html;
@@ -109,7 +113,7 @@ public class Acid2DifferentialTests : IDisposable
     /// Asserts the pixel match ratio is at or above the current floor.
     /// </summary>
     [Fact]
-    public void Acid2Top_PixelMatch_MeetsMinimumThreshold()
+    public void Acid2Top_PixelMatch_MatchesReferenceExactly()
     {
         using var actual = RenderAtAnchorTop(_acid2Html);
         using var baseline = SKBitmap.Decode(_referencePath);
@@ -123,6 +127,27 @@ public class Acid2DifferentialTests : IDisposable
             matchRatio >= MinMatchRatio,
             $"Acid2 #top pixel match {matchRatio:P2} is below the minimum threshold {MinMatchRatio:P2}. " +
             $"Diff pixels: {result.DiffPixelCount}/{result.TotalPixelCount}");
+    }
+
+    /// <summary>
+    /// Verifies the smile region of the Acid2 face is pixel-identical to the
+    /// reference image.
+    /// </summary>
+    [Fact]
+    public void Acid2Top_SmileRegion_MatchesReferenceExactly()
+    {
+        using var actual = RenderAtAnchorTop(_acid2Html);
+        using var baseline = SKBitmap.Decode(_referencePath);
+        Assert.NotNull(baseline);
+
+        double smileMatch = ImageComparer.CompareRegion(
+            actual, baseline,
+            SmileRegionX, SmileRegionY, SmileRegionWidth, SmileRegionHeight,
+            colorTolerance: 0);
+
+        Assert.True(
+            smileMatch == 1.0,
+            $"Acid2 smile region mismatch detected. Match ratio: {smileMatch:P2}");
     }
 
     /// <summary>
