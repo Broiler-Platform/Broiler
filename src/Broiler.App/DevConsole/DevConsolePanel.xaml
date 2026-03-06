@@ -13,11 +13,11 @@
         <!-- Tab header bar -->
         <Border Grid.Row="0" Background="#2D2D2D" BorderBrush="#3E3E3E" BorderThickness="0,0,0,1">
             <StackPanel Orientation="Horizontal">
-                <RadioButton x:Name="LogTab" Content="Log Viewer" Style="{StaticResource ConsoleTabStyle}"
+                <RadioButton x:Name="LogTab" Content="Log Viewer" 
                              IsChecked="True" Checked="Tab_Checked" Tag="Log"/>
-                <RadioButton x:Name="DomTab" Content="DOM Inspector" Style="{StaticResource ConsoleTabStyle}"
+                <RadioButton x:Name="DomTab" Content="DOM Inspector" 
                              Checked="Tab_Checked" Tag="Dom"/>
-                <RadioButton x:Name="JsTab" Content="JS Console" Style="{StaticResource ConsoleTabStyle}"
+                <RadioButton x:Name="JsTab" Content="JS Console" 
                              Checked="Tab_Checked" Tag="Js"/>
                 <!-- Error indicator badge -->
                 <Border x:Name="ErrorBadge" Background="#E74C3C" CornerRadius="8" Padding="6,2"

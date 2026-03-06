@@ -108,14 +108,14 @@ public partial class DevConsolePanel : UserControl, IDisposable
             _ => null,
         };
 
-        LogCategory? category = LogCategoryFilter.SelectedIndex switch
+        LogCategory? category = LogCategoryFilter?.SelectedIndex switch
         {
             1 => LogCategory.HtmlRenderer,
             2 => LogCategory.JavaScript,
             _ => null,
         };
 
-        var search = string.IsNullOrWhiteSpace(LogSearchBox.Text) ? null : LogSearchBox.Text;
+        var search = string.IsNullOrWhiteSpace(LogSearchBox?.Text) ? null : LogSearchBox.Text;
 
         IEnumerable<RenderLogEntry> entries;
         lock (_logEntries)
@@ -132,7 +132,7 @@ public partial class DevConsolePanel : UserControl, IDisposable
                 e.Message.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                 e.Context.Contains(search, StringComparison.OrdinalIgnoreCase));
 
-        LogList.Items.Clear();
+        LogList?.Items.Clear();
         foreach (var entry in entries)
             LogList.Items.Add(FormatLogEntry(entry));
     }
