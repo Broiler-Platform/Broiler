@@ -31,6 +31,7 @@ public sealed class DisplayList
 [JsonDerivedType(typeof(DrawBorderItem), "DrawBorder")]
 [JsonDerivedType(typeof(DrawTextItem), "DrawText")]
 [JsonDerivedType(typeof(DrawImageItem), "DrawImage")]
+[JsonDerivedType(typeof(DrawTiledImageItem), "DrawTiledImage")]
 [JsonDerivedType(typeof(ClipItem), "Clip")]
 [JsonDerivedType(typeof(RestoreItem), "Restore")]
 [JsonDerivedType(typeof(OpacityItem), "Opacity")]
@@ -92,6 +93,20 @@ public sealed class DrawImageItem : DisplayItem
     public object? ImageHandle { get; init; }
     public RectangleF SourceRect { get; init; }
     public RectangleF DestRect { get; init; }
+}
+
+/// <summary>Draws a tiled (repeated) background image within a clip region.</summary>
+public sealed class DrawTiledImageItem : DisplayItem
+{
+    public object? ImageHandle { get; init; }
+    /// <summary>Source rectangle within the image (Empty = full image).</summary>
+    public RectangleF SourceRect { get; init; }
+    /// <summary>Rectangle to fill with the tiled pattern.</summary>
+    public RectangleF FillRect { get; init; }
+    /// <summary>Tile origin (top-left of first tile).</summary>
+    public PointF TileOrigin { get; init; }
+    /// <summary>CSS background-repeat value.</summary>
+    public string Repeat { get; init; } = "repeat";
 }
 
 /// <summary>Pushes a clip rectangle onto the clip stack.</summary>

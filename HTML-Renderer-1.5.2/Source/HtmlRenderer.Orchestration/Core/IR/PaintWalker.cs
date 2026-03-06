@@ -234,22 +234,76 @@ internal static class PaintWalker
         if (imgRect.Width <= 0 || imgRect.Height <= 0)
             return;
 
-        // CSS2.1 §14.2.1: When background-attachment is "fixed", the image
-        // is positioned relative to the viewport, not the element's padding box.
-        // The image is still only visible within the element's padding area.
-        var destRect = imgRect;
-        if (fragment.Style.BackgroundAttachment == "fixed" && viewport.Width > 0 && viewport.Height > 0)
-        {
-            destRect = viewport;
-        }
+        var repeat = fragment.Style.BackgroundRepeat;
+        var isFixed = fragment.Style.BackgroundAttachment == "fixed" && viewport.Width > 0 && viewport.Height > 0;
 
-        items.Add(new DrawImageItem
+        if (repeat == "no-repeat" && !isFixed)
         {
-            Bounds = imgRect,
-            ImageHandle = fragment.BackgroundImageHandle,
-            SourceRect = RectangleF.Empty,
-            DestRect = destRect,
-        });
+            // Simple case: single image at natural position within the padding box
+            items.Add(new DrawImageItem
+            {
+                Bounds = imgRect,
+                ImageHandle = fragment.BackgroundImageHandle,
+                SourceRect = RectangleF.Empty,
+                DestRect = imgRect,
+            });
+        }
+        else
+        {
+            // CSS2.1 §14.2.1: For fixed attachment, the tiling origin is
+            // the viewport origin; the image is visible only within the
+            // element's padding area.  For scroll attachment, the origin
+            // is the padding-box origin.
+            var tileOrigin = isFixed
+                ? new PointF(viewport.X, viewport.Y)
+                : new PointF(imgRect.X, imgRect.Y);
+
+            // Apply background-position offset to tile origin
+            var posStr = fragment.Style.BackgroundPosition;
+            if (!string.IsNullOrEmpty(posStr))
+            {
+                var parts = posStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 1)
+                {
+                    float xOff = ParsePositionValue(parts[0], imgRect.Width);
+                    tileOrigin.X += xOff;
+                }
+                if (parts.Length >= 2)
+                {
+                    float yOff = ParsePositionValue(parts[1], imgRect.Height);
+                    tileOrigin.Y += yOff;
+                }
+            }
+
+            items.Add(new DrawTiledImageItem
+            {
+                Bounds = imgRect,
+                ImageHandle = fragment.BackgroundImageHandle,
+                SourceRect = RectangleF.Empty,
+                FillRect = imgRect,
+                TileOrigin = tileOrigin,
+                Repeat = repeat,
+            });
+        }
+    }
+
+    /// <summary>Parses a single CSS background-position value (keyword, px, or %).</summary>
+    private static float ParsePositionValue(string val, float containerSize)
+    {
+        if (string.IsNullOrEmpty(val)) return 0;
+        if (val.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+        {
+            if (float.TryParse(val.AsSpan(0, val.Length - 2), out float px)) return px;
+        }
+        else if (val.EndsWith("%"))
+        {
+            if (float.TryParse(val.AsSpan(0, val.Length - 1), out float pct)) return containerSize * pct / 100f;
+        }
+        else if (float.TryParse(val, out float raw))
+        {
+            return raw;
+        }
+        return 0;
     }
 
     private static void EmitReplacedImage(Fragment fragment, List<DisplayItem> items)

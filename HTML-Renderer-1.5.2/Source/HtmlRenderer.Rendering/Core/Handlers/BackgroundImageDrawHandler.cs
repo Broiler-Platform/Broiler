@@ -10,6 +10,9 @@ internal sealed class BackgroundImageDrawHandler : IBackgroundImageDrawHandler
 
     public static void DrawBackgroundImage(RGraphics g, IBackgroundRenderData box, IImageLoadHandler imageLoadHandler, RectangleF rectangle)
     {
+        if (imageLoadHandler.Image == null)
+            return;
+
         // image size depends if specific rectangle given in image loader
         var imgSize = new SizeF((float)(imageLoadHandler.Rectangle == RectangleF.Empty ? imageLoadHandler.Image.Width : imageLoadHandler.Rectangle.Width),
             (float)(imageLoadHandler.Rectangle == RectangleF.Empty ? imageLoadHandler.Image.Height : imageLoadHandler.Rectangle.Height));

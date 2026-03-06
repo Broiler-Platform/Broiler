@@ -106,7 +106,11 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     protected override RImage ConvertImageInt(object image) => image != null ? new ImageAdapter((SKBitmap)image) : null;
 
-    protected override RImage ImageFromStreamInt(Stream memoryStream) => new ImageAdapter(SKBitmap.Decode(memoryStream));
+    protected override RImage ImageFromStreamInt(Stream memoryStream)
+    {
+        var bitmap = SKBitmap.Decode(memoryStream);
+        return bitmap != null ? new ImageAdapter(bitmap) : null;
+    }
 
     protected override RFont CreateFontInt(string family, double size, FontStyle style)
     {

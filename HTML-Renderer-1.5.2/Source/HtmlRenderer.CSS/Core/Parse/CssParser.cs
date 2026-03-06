@@ -635,7 +635,7 @@ internal sealed class CssParser
         // values explicitly provided.  Without this reset, a later
         // 'background: none' would not clear an earlier 'background: red'.
         properties["background-color"] = color ?? "transparent";
-        properties["background-image"] = image ?? "none";
+        properties["background-image"] = image != null ? ParseImageProperty(image) : "none";
         properties["background-repeat"] = repeat ?? "repeat";
         properties["background-attachment"] = attachment ?? "scroll";
         properties["background-position"] = positionParts.Count > 0
