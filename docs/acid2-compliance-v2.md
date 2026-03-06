@@ -93,10 +93,12 @@ Both images are compared using two complementary approaches:
   "95% match" number, but **this metric is misleading** because the vast
   majority of both images is white background.  The automated test suite
   (`PixelDiffRunner`) uses this method as a regression guard.
-- **Content-area pixel diff:** Isolates pixels that are non-white (< 250 in
-  any channel) in *either* image, then compares only those.  This produces
-  the **8.97% content match** — the honest measure of how well the Acid2
-  face is rendered.
+- **Content-area pixel diff:** Isolates pixels where at least one RGB channel
+  is below 250 (i.e., not near-white) in *either* image, then compares only
+  those.  Near-white is defined as all channels > 250, a threshold chosen to
+  exclude the plain white background while tolerating minor anti-aliasing.
+  This produces the **8.97% content match** — the honest measure of how well
+  the Acid2 face is rendered.
 - **Content bounding-box diff:** Crops both images to the Chromium
   reference's content bounding box (x: 72–240, y: 51–276, 168 × 225 px) and
   compares pixel-by-pixel.  This gives **42.24% match** within the face
@@ -466,7 +468,7 @@ c = np.array(Image.open('/tmp/acid2-chromium.png').convert('RGBA'))[:,:,:3]
 diff = np.abs(b.astype(int) - c.astype(int))
 total = b.shape[0] * b.shape[1]
 full_match = np.sum(np.all(diff == 0, axis=2))
-# Content-area: pixels non-white in either image
+# Content-area: pixels where at least one channel <= 250 in either image (not near-white)
 content_mask = ~(np.all(b > 250, axis=2) & np.all(c > 250, axis=2))
 content_total = np.sum(content_mask)
 content_match = np.sum(content_mask & np.all(diff == 0, axis=2))
