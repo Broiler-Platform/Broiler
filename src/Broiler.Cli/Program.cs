@@ -1,3 +1,6 @@
+using System.Text.Json;
+using Broiler.App.Rendering;
+
 namespace Broiler.Cli;
 
 /// <summary>
@@ -15,6 +18,7 @@ public class Program
         bool testEngines = false;
         bool fuzzLayout = false;
         bool followFirstLink = false;
+        bool diagnostics = false;
         int fuzzCount = 1000;
         int timeoutSeconds = 30;
         int width = 1024;
@@ -66,6 +70,9 @@ public class Program
                 case "--fuzz-layout":
                     fuzzLayout = true;
                     break;
+                case "--diagnostics":
+                    diagnostics = true;
+                    break;
                 case "--count" when i + 1 < args.Length:
                     if (!int.TryParse(args[++i], out fuzzCount) || fuzzCount <= 0)
                     {
@@ -104,124 +111,148 @@ public class Program
             return fuzzService.Run(fuzzCount, outputDir: output);
         }
 
+        // When --diagnostics is active, subscribe to the render logger and
+        // collect entries to emit as structured JSON on stdout after the
+        // main operation completes.
+        List<RenderLogEntry>? diagnosticEntries = null;
+        Action<RenderLogEntry>? diagHandler = null;
+        if (diagnostics)
+        {
+            diagnosticEntries = [];
+            diagHandler = entry => { lock (diagnosticEntries) diagnosticEntries.Add(entry); };
+            RenderLogger.EntryLogged += diagHandler;
+        }
+
+        int exitCode;
+
         if (captureImageUrl is not null)
         {
             if (output is null)
             {
                 Console.Error.WriteLine("Error: '--output' is required when using '--capture-image'.");
                 PrintUsage();
-                return 1;
+                exitCode = 1;
             }
+            else
+            {
+                // Support bare file paths by converting to file:// URIs.
+                // Separate any fragment (e.g. "#top") before checking the filesystem.
+                string? captureFragment = null;
+                var hashIdx = captureImageUrl.IndexOf('#');
+                var captureFilePath = hashIdx >= 0 ? captureImageUrl[..hashIdx] : captureImageUrl;
+                if (hashIdx >= 0)
+                    captureFragment = captureImageUrl[hashIdx..]; // includes '#'
 
-            // Support bare file paths by converting to file:// URIs.
-            // Separate any fragment (e.g. "#top") before checking the filesystem.
-            string? captureFragment = null;
-            var hashIdx = captureImageUrl.IndexOf('#');
-            var captureFilePath = hashIdx >= 0 ? captureImageUrl[..hashIdx] : captureImageUrl;
-            if (hashIdx >= 0)
-                captureFragment = captureImageUrl[hashIdx..]; // includes '#'
+                if (File.Exists(captureFilePath))
+                {
+                    captureImageUrl = new Uri(Path.GetFullPath(captureFilePath)).AbsoluteUri
+                                      + (captureFragment ?? string.Empty);
+                }
 
-            if (File.Exists(captureFilePath))
-            {
-                captureImageUrl = new Uri(Path.GetFullPath(captureFilePath)).AbsoluteUri
-                                  + (captureFragment ?? string.Empty);
-            }
+                if (!Uri.TryCreate(captureImageUrl, UriKind.Absolute, out var imgUri)
+                    || (imgUri.Scheme != "http" && imgUri.Scheme != "https" && imgUri.Scheme != "file"))
+                {
+                    Console.Error.WriteLine($"Error: '{captureImageUrl}' is not a valid HTTP, HTTPS, or file URL.");
+                    exitCode = 1;
+                }
+                else
+                {
+                    var imageOptions = new ImageCaptureOptions
+                    {
+                        Url = captureImageUrl,
+                        OutputPath = output,
+                        Width = width,
+                        Height = height,
+                        FullPage = fullPage,
+                        FollowFirstLink = followFirstLink,
+                        TimeoutSeconds = timeoutSeconds,
+                    };
 
-            if (!Uri.TryCreate(captureImageUrl, UriKind.Absolute, out var imgUri)
-                || (imgUri.Scheme != "http" && imgUri.Scheme != "https" && imgUri.Scheme != "file"))
-            {
-                Console.Error.WriteLine($"Error: '{captureImageUrl}' is not a valid HTTP, HTTPS, or file URL.");
-                return 1;
-            }
+                    try
+                    {
+                        var service = new CaptureService();
+                        await service.CaptureImageAsync(imageOptions);
 
-            var imageOptions = new ImageCaptureOptions
-            {
-                Url = captureImageUrl,
-                OutputPath = output,
-                Width = width,
-                Height = height,
-                FullPage = fullPage,
-                FollowFirstLink = followFirstLink,
-                TimeoutSeconds = timeoutSeconds,
-            };
-
-            try
-            {
-                var service = new CaptureService();
-                await service.CaptureImageAsync(imageOptions);
-
-                Console.WriteLine($"Image capture saved to {output}");
-                return 0;
-            }
-            catch (HttpRequestException ex)
-            {
-                Console.Error.WriteLine($"Capture failed: {ex.Message}");
-                return 1;
-            }
-            catch (IOException ex)
-            {
-                Console.Error.WriteLine($"File I/O error: {ex.Message}");
-                return 1;
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Unexpected error: {ex.Message}");
-                return 1;
+                        Console.WriteLine($"Image capture saved to {output}");
+                        exitCode = 0;
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        Console.Error.WriteLine($"Capture failed: {ex.Message}");
+                        exitCode = 1;
+                    }
+                    catch (IOException ex)
+                    {
+                        Console.Error.WriteLine($"File I/O error: {ex.Message}");
+                        exitCode = 1;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"Unexpected error: {ex.Message}");
+                        exitCode = 1;
+                    }
+                }
             }
         }
-
-        if (url is null || output is null)
+        else if (url is null || output is null)
         {
             Console.Error.WriteLine("Error: Both --url and --output arguments are required.");
             PrintUsage();
-            return 1;
+            exitCode = 1;
+        }
+        else
+        {
+            // Support bare file paths by converting to file:// URIs.
+            if (File.Exists(url))
+            {
+                url = new Uri(Path.GetFullPath(url)).AbsoluteUri;
+            }
+
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
+                || (uri.Scheme != "http" && uri.Scheme != "https" && uri.Scheme != "file"))
+            {
+                Console.Error.WriteLine($"Error: '{url}' is not a valid HTTP, HTTPS, or file URL.");
+                exitCode = 1;
+            }
+            else
+            {
+                var captureOptions = new CaptureOptions
+                {
+                    Url = url,
+                    OutputPath = output,
+                    FullPage = fullPage,
+                    FollowFirstLink = followFirstLink,
+                    TimeoutSeconds = timeoutSeconds,
+                };
+
+                try
+                {
+                    var service = new CaptureService();
+                    await service.CaptureAsync(captureOptions);
+
+                    Console.WriteLine($"Capture saved to {output}");
+                    exitCode = 0;
+                }
+                catch (HttpRequestException ex)
+                {
+                    Console.Error.WriteLine($"Capture failed: {ex.Message}");
+                    exitCode = 1;
+                }
+                catch (IOException ex)
+                {
+                    Console.Error.WriteLine($"File I/O error: {ex.Message}");
+                    exitCode = 1;
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Unexpected error: {ex.Message}");
+                    exitCode = 1;
+                }
+            }
         }
 
-        // Support bare file paths by converting to file:// URIs.
-        if (File.Exists(url))
-        {
-            url = new Uri(Path.GetFullPath(url)).AbsoluteUri;
-        }
-
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
-            || (uri.Scheme != "http" && uri.Scheme != "https" && uri.Scheme != "file"))
-        {
-            Console.Error.WriteLine($"Error: '{url}' is not a valid HTTP, HTTPS, or file URL.");
-            return 1;
-        }
-
-        var captureOptions = new CaptureOptions
-        {
-            Url = url,
-            OutputPath = output,
-            FullPage = fullPage,
-            FollowFirstLink = followFirstLink,
-            TimeoutSeconds = timeoutSeconds,
-        };
-
-        try
-        {
-            var service = new CaptureService();
-            await service.CaptureAsync(captureOptions);
-
-            Console.WriteLine($"Capture saved to {output}");
-            return 0;
-        }
-        catch (HttpRequestException ex)
-        {
-            Console.Error.WriteLine($"Capture failed: {ex.Message}");
-            return 1;
-        }
-        catch (IOException ex)
-        {
-            Console.Error.WriteLine($"File I/O error: {ex.Message}");
-            return 1;
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Unexpected error: {ex.Message}");
-            return 1;
-        }
+        EmitDiagnostics(diagHandler, diagnosticEntries);
+        return exitCode;
     }
 
     private static void PrintUsage()
@@ -243,6 +274,7 @@ public class Program
         Console.WriteLine("  --test-engines         Run smoke tests for the embedded rendering engines");
         Console.WriteLine("  --fuzz-layout          Run layout fuzz testing with random HTML/CSS");
         Console.WriteLine("  --count <N>            Number of fuzz cases to generate (default: 1000)");
+        Console.WriteLine("  --diagnostics          Emit structured JSON log output on stdout after the operation");
         Console.WriteLine("  --help                 Show this help message");
     }
 
@@ -273,5 +305,39 @@ public class Program
         Console.WriteLine(allPassed ? "All engine tests passed." : "Some engine tests failed.");
 
         return allPassed ? 0 : 1;
+    }
+
+    /// <summary>
+    /// If <c>--diagnostics</c> was active, unsubscribes the handler and
+    /// writes collected log entries to stdout as a JSON array.
+    /// </summary>
+    private static void EmitDiagnostics(
+        Action<RenderLogEntry>? diagHandler,
+        List<RenderLogEntry>? diagnosticEntries)
+    {
+        if (diagHandler is not null)
+            RenderLogger.EntryLogged -= diagHandler;
+
+        if (diagnosticEntries is null)
+            return;
+
+        RenderLogEntry[] snapshot;
+        lock (diagnosticEntries) snapshot = diagnosticEntries.ToArray();
+
+        if (snapshot.Length == 0)
+            return;
+
+        var jsonEntries = snapshot.Select(e => new
+        {
+            timestamp = e.Timestamp.ToString("o"),
+            category = e.Category.ToString(),
+            level = e.Level.ToString(),
+            context = e.Context,
+            message = e.Message,
+            exception = e.Exception?.ToString(),
+        });
+
+        var json = JsonSerializer.Serialize(jsonEntries, new JsonSerializerOptions { WriteIndented = true });
+        Console.WriteLine(json);
     }
 }

@@ -17,6 +17,8 @@
   <Folder Name="/src/">
     <Project Path="src/Broiler.App/Broiler.App.csproj" />
     <Project Path="src/Broiler.Cli/Broiler.Cli.csproj" />
+    <Project Path="src/Broiler.DevConsole/Broiler.DevConsole.csproj" />
+    <Project Path="src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj" />
   </Folder>
   <Folder Name="/yantra-1.2.295/">
     <Project Path="yantra-1.2.295/YantraJS.Core/YantraJS.Core.csproj" />

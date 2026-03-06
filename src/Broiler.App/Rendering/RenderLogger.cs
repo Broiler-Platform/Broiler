@@ -79,6 +79,13 @@ public static class RenderLogger
     private static LogLevel _minimumLevel = LogLevel.Debug;
 
     /// <summary>
+    /// Raised whenever a new log entry is recorded.  Subscribers receive the
+    /// entry synchronously on the logging thread – handlers should return
+    /// quickly to avoid blocking the rendering pipeline.
+    /// </summary>
+    public static event Action<RenderLogEntry>? EntryLogged;
+
+    /// <summary>
     /// Gets or sets the minimum severity level. Entries below this level
     /// are discarded. Default is <see cref="LogLevel.Debug"/> (capture
     /// everything).
@@ -125,6 +132,7 @@ public static class RenderLogger
 
         lock (_lock) _entries.Add(entry);
         Debug.WriteLine(entry.ToString());
+        EntryLogged?.Invoke(entry);
     }
 
     /// <summary>
