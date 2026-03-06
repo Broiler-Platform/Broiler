@@ -133,6 +133,13 @@ internal static class CssLayoutEngine
             linebox.AssignRectanglesToBoxes();
         }
 
+        // CSS2.1 §10.8: The "strut" — each line box starts with an
+        // imaginary zero-width inline box with the block container's font
+        // and line-height properties.  This establishes the minimum line
+        // box height for inline formatting contexts.
+        if (blockBox.ActualLineHeight > 0)
+            maxBottom = Math.Max(maxBottom, starty + blockBox.ActualLineHeight);
+
         blockBox.ActualBottom = maxBottom + blockBox.ActualPaddingBottom + blockBox.ActualBorderBottomWidth;
 
         // handle limiting block height when overflow is hidden

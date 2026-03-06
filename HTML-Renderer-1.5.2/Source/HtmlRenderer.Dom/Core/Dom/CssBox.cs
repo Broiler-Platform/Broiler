@@ -484,11 +484,16 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                             // Compute uncollapsed position: margins are NOT
                             // collapsed when clearance is present (§8.3.1).
+                            // Use the effective margin for empty collapsible
+                            // boxes (§8.3.1 margin-through-collapse).
                             double uncollapsedTop;
                             if (flowPrev != null)
                             {
+                                double prevMarginBottom = (flowPrev is CssBox fpb)
+                                    ? GetEffectiveMarginBottom(fpb)
+                                    : flowPrev.ActualMarginBottom;
                                 uncollapsedTop = flowPrev.ActualBottom
-                                    + flowPrev.ActualMarginBottom
+                                    + prevMarginBottom
                                     + ActualMarginTop;
                             }
                             else if (ParentBox != null)
@@ -817,7 +822,26 @@ internal class CssBox : CssBoxProperties, IDisposable
 
         if (prevSibling != null)
         {
-            value = Math.Max(prevSibling.ActualMarginBottom, ActualMarginTop);
+            // CSS2.1 §8.3.1: When the previous sibling is an "empty" box
+            // (zero content height, no borders/padding, height auto/0), its
+            // own top and bottom margins — and its children's margins —
+            // collapse through.  The resulting collapsed margin participates
+            // in collapsing with this element's top margin.
+            if (prevSibling is CssBox prevBox && IsEmptyCollapsible(prevBox))
+            {
+                double maxPos = Math.Max(ActualMarginTop, 0);
+                double maxNeg = Math.Min(ActualMarginTop, 0);
+                CollectEmptyBoxMargins(prevBox, ref maxPos, ref maxNeg);
+                double collapsed = maxPos + maxNeg; // maxNeg <= 0
+                // Subtract the portion of the collapsed margin already
+                // consumed when positioning the empty box itself (its
+                // CollapsedMarginTop was recorded during its own layout).
+                value = collapsed - prevBox.CollapsedMarginTop;
+            }
+            else
+            {
+                value = Math.Max(prevSibling.ActualMarginBottom, ActualMarginTop);
+            }
             CollapsedMarginTop = value;
         }
         else if (_parentBox != null && ActualPaddingTop < 0.1 && ActualPaddingBottom < 0.1 && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1)
@@ -1043,6 +1067,91 @@ internal class CssBox : CssBoxProperties, IDisposable
         var top = CssValueParser.ParseLength(Y, ContainerInt.PageSize.Height, GetEmHeight(), null);
 
         return new PointF((float)left, (float)top);
+    }
+
+    /// <summary>
+    /// CSS2.1 §8.3.1: Returns <c>true</c> if a box is "empty" — its own
+    /// top and bottom margins are adjoining and collapse through.
+    /// Conditions: min-height is zero, no top/bottom borders or padding,
+    /// height is 0 or auto (or percentage that resolves to auto), no line
+    /// boxes, and all in-flow children's margins also collapse.
+    /// </summary>
+    private static bool IsEmptyCollapsible(CssBox box)
+    {
+        if (box.ActualBorderTopWidth > 0.1 || box.ActualBorderBottomWidth > 0.1)
+            return false;
+        if (box.ActualPaddingTop > 0.1 || box.ActualPaddingBottom > 0.1)
+            return false;
+
+        // Check if height resolves to zero/auto
+        if (box.Height != CssConstants.Auto && !string.IsNullOrEmpty(box.Height))
+        {
+            bool resolvedToAuto = box.Height.Contains('%')
+                && (box.ContainingBlock.Height == CssConstants.Auto
+                    || string.IsNullOrEmpty(box.ContainingBlock.Height));
+            if (!resolvedToAuto)
+            {
+                double h = CssValueParser.ParseLength(box.Height, box.Size.Height, box.GetEmHeight());
+                if (h > 0.1)
+                    return false;
+            }
+        }
+
+        // Zero content height — ActualBottom should equal Location.Y
+        // (tolerance 0.5 accounts for sub-pixel rounding in layout)
+        if (Math.Abs(box.ActualBottom - box.Location.Y) > 0.5)
+            return false;
+
+        // Must not contain any line boxes (inline content)
+        if (box.LineBoxes.Count > 0)
+            return false;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Collects the maximum positive and minimum negative margins from an
+    /// empty collapsible box and all its in-flow children (recursively for
+    /// children that are also empty and collapsible).
+    /// </summary>
+    private static void CollectEmptyBoxMargins(CssBox box, ref double maxPos, ref double maxNeg)
+    {
+        maxPos = Math.Max(maxPos, Math.Max(box.ActualMarginTop, 0));
+        maxPos = Math.Max(maxPos, Math.Max(box.ActualMarginBottom, 0));
+        maxNeg = Math.Min(maxNeg, Math.Min(box.ActualMarginTop, 0));
+        maxNeg = Math.Min(maxNeg, Math.Min(box.ActualMarginBottom, 0));
+
+        foreach (var child in box.Boxes)
+        {
+            if (child.Float != CssConstants.None
+                || child.Position == CssConstants.Absolute
+                || child.Position == CssConstants.Fixed)
+                continue;
+
+            maxPos = Math.Max(maxPos, Math.Max(child.ActualMarginTop, 0));
+            maxPos = Math.Max(maxPos, Math.Max(child.ActualMarginBottom, 0));
+            maxNeg = Math.Min(maxNeg, Math.Min(child.ActualMarginTop, 0));
+            maxNeg = Math.Min(maxNeg, Math.Min(child.ActualMarginBottom, 0));
+
+            if (IsEmptyCollapsible(child))
+                CollectEmptyBoxMargins(child, ref maxPos, ref maxNeg);
+        }
+    }
+
+    /// <summary>
+    /// Returns the effective bottom margin for a box, accounting for margins
+    /// that collapse through the box when it is "empty" per CSS2.1 §8.3.1.
+    /// For non-empty boxes returns <see cref="CssBoxProperties.ActualMarginBottom"/>.
+    /// </summary>
+    private static double GetEffectiveMarginBottom(CssBox box)
+    {
+        if (!IsEmptyCollapsible(box))
+            return box.ActualMarginBottom;
+
+        double maxPos = 0, maxNeg = 0;
+        CollectEmptyBoxMargins(box, ref maxPos, ref maxNeg);
+        double collapsed = maxPos + maxNeg;
+        return collapsed - box.CollapsedMarginTop;
     }
 
     public override string ToString()

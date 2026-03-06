@@ -688,11 +688,16 @@ internal sealed class CssLayoutEngineTable
                 if (spacer == null && GetRowSpan(cell) == 1)
                 {
                     cell.ActualBottom = maxBottom;
+                    // CSS2.1 §17.5.3: Update Size.Height to match the
+                    // stretched cell so background painting uses the full
+                    // cell height.
+                    cell.Size = new SizeF(cell.Size.Width, (float)(maxBottom - cell.Location.Y));
                     CssLayoutEngine.ApplyCellVerticalAlignment(g, cell);
                 }
                 else if (spacer != null && spacer.EndRow == currentrow)
                 {
                     spacer.ExtendedBox.ActualBottom = maxBottom;
+                    spacer.ExtendedBox.Size = new SizeF(spacer.ExtendedBox.Size.Width, (float)(maxBottom - spacer.ExtendedBox.Location.Y));
                     CssLayoutEngine.ApplyCellVerticalAlignment(g, spacer.ExtendedBox);
                 }
 
@@ -727,6 +732,14 @@ internal sealed class CssLayoutEngineTable
         maxRight = Math.Max(maxRight, _tableBox.Location.X + _tableBox.ActualWidth);
         _tableBox.ActualRight = maxRight + GetHorizontalSpacing() + _tableBox.ActualBorderRightWidth;
         _tableBox.ActualBottom = Math.Max(maxBottom, starty) + GetVerticalSpacing() + _tableBox.ActualBorderBottomWidth;
+
+        // CSS2.1 §17.5.2: Update the table box's Size to match the
+        // computed layout dimensions so background painting, overflow
+        // clipping, and child containing-block queries use the correct
+        // table bounds.
+        _tableBox.Size = new SizeF(
+            (float)(_tableBox.ActualRight - _tableBox.Location.X),
+            (float)(_tableBox.ActualBottom - _tableBox.Location.Y));
     }
 
     private double GetSpannedMinWidth(CssBox row, CssBox cell, int realcolindex, int colspan)
