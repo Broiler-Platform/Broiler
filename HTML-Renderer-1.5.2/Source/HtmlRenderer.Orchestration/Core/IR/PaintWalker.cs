@@ -583,7 +583,20 @@ internal static class PaintWalker
             positioned.Sort((a, b) => a.StackLevel.CompareTo(b.StackLevel));
             foreach (var child in positioned)
             {
-                PaintFragment(child, items, propagatedFrom, viewport);
+                // CSS2.1 §9.6.1: Fixed-position elements are positioned relative
+                // to the viewport.  When rendering a scrolled region, offset the
+                // fragment's coordinates so it paints at the viewport-relative
+                // position instead of its document-origin layout position.
+                if (child.Style.Position == "fixed" && viewport.Width > 0 && viewport.Height > 0)
+                {
+                    int startIdx = items.Count;
+                    PaintFragment(child, items, propagatedFrom, viewport);
+                    OffsetDisplayItems(items, startIdx, viewport.X, viewport.Y);
+                }
+                else
+                {
+                    PaintFragment(child, items, propagatedFrom, viewport);
+                }
             }
         }
     }
@@ -712,4 +725,82 @@ internal static class PaintWalker
             return fragment.InlineRects;
         return [fragment.Bounds];
     }
+
+    /// <summary>
+    /// Offsets all display items starting at <paramref name="startIndex"/> by
+    /// (<paramref name="dx"/>, <paramref name="dy"/>).  Used to reposition
+    /// <c>position:fixed</c> fragments to viewport-relative coordinates.
+    /// </summary>
+    private static void OffsetDisplayItems(List<DisplayItem> items, int startIndex, float dx, float dy)
+    {
+        if (dx == 0 && dy == 0)
+            return;
+
+        for (int i = startIndex; i < items.Count; i++)
+        {
+            items[i] = OffsetItem(items[i], dx, dy);
+        }
+    }
+
+    private static DisplayItem OffsetItem(DisplayItem item, float dx, float dy)
+    {
+        var ob = OffsetRect(item.Bounds, dx, dy);
+        switch (item)
+        {
+            case FillRectItem f:
+                return new FillRectItem { Bounds = ob, Color = f.Color };
+            case DrawBorderItem b:
+                return new DrawBorderItem
+                {
+                    Bounds = ob, Widths = b.Widths,
+                    TopColor = b.TopColor, RightColor = b.RightColor,
+                    BottomColor = b.BottomColor, LeftColor = b.LeftColor,
+                    Style = b.Style, TopStyle = b.TopStyle, RightStyle = b.RightStyle,
+                    BottomStyle = b.BottomStyle, LeftStyle = b.LeftStyle,
+                    CornerNw = b.CornerNw, CornerNe = b.CornerNe,
+                    CornerSe = b.CornerSe, CornerSw = b.CornerSw,
+                };
+            case DrawTextItem t:
+                return new DrawTextItem
+                {
+                    Bounds = ob, Text = t.Text, FontFamily = t.FontFamily,
+                    FontSize = t.FontSize, FontWeight = t.FontWeight,
+                    Color = t.Color, Origin = new PointF(t.Origin.X + dx, t.Origin.Y + dy),
+                    FontHandle = t.FontHandle, IsRtl = t.IsRtl,
+                };
+            case DrawImageItem img:
+                return new DrawImageItem
+                {
+                    Bounds = ob, ImageHandle = img.ImageHandle,
+                    SourceRect = img.SourceRect,
+                    DestRect = OffsetRect(img.DestRect, dx, dy),
+                };
+            case DrawTiledImageItem ti:
+                return new DrawTiledImageItem
+                {
+                    Bounds = ob, ImageHandle = ti.ImageHandle,
+                    SourceRect = ti.SourceRect,
+                    FillRect = OffsetRect(ti.FillRect, dx, dy),
+                    TileOrigin = new PointF(ti.TileOrigin.X + dx, ti.TileOrigin.Y + dy),
+                    Repeat = ti.Repeat,
+                };
+            case ClipItem c:
+                return new ClipItem { Bounds = ob, ClipRect = OffsetRect(c.ClipRect, dx, dy) };
+            case RestoreItem:
+                return new RestoreItem { Bounds = ob };
+            case DrawLineItem l:
+                return new DrawLineItem
+                {
+                    Bounds = ob,
+                    Start = new PointF(l.Start.X + dx, l.Start.Y + dy),
+                    End = new PointF(l.End.X + dx, l.End.Y + dy),
+                    Color = l.Color, Width = l.Width, DashStyle = l.DashStyle,
+                };
+            default:
+                return item;
+        }
+    }
+
+    private static RectangleF OffsetRect(RectangleF r, float dx, float dy)
+        => new(r.X + dx, r.Y + dy, r.Width, r.Height);
 }

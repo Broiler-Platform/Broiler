@@ -281,6 +281,13 @@ internal sealed class CssParser
     {
         className = className.ToLower();
 
+        // Strip attribute selectors: convert [class~=value] to .value,
+        // and remove other attribute selectors.  This enables CSS2.1 §5.8.1
+        // attribute selectors used in the Acid2 test.
+        className = StripAttributeSelectors(className);
+        if (string.IsNullOrEmpty(className))
+            return null;
+
         string psedoClass = null;
         string pseudoElement = null;
         var colonIdx = className.IndexOf(":", StringComparison.Ordinal);
@@ -647,6 +654,112 @@ internal sealed class CssParser
     {
         if (_valueParser.IsColorValid(propValue))
             properties[propName] = propValue;
+    }
+
+    /// <summary>
+    /// Converts CSS2.1 attribute selectors to simpler equivalents:
+    /// <c>[class~=value]</c> → <c>.value</c> (word-match on class attribute).
+    /// Other attribute selectors are removed.  Returns <c>null</c> if the
+    /// result is an invalid/empty selector (e.g. bare <c>[class=a b]</c>
+    /// per CSS2.1 grammar).
+    /// </summary>
+    private static string StripAttributeSelectors(string selector)
+    {
+        if (selector.IndexOf('[') < 0)
+            return selector;
+
+        var sb = new System.Text.StringBuilder(selector.Length);
+        var addedClasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int i = 0;
+        while (i < selector.Length)
+        {
+            if (selector[i] == '[')
+            {
+                int close = selector.IndexOf(']', i);
+                if (close < 0) break;
+
+                var inner = selector.Substring(i + 1, close - i - 1);
+                i = close + 1;
+
+                // [class~=value] → .value (if not already present)
+                if (inner.StartsWith("class~=", StringComparison.OrdinalIgnoreCase))
+                {
+                    var val = inner.Substring(7).Trim('"', '\'', ' ');
+                    if (!string.IsNullOrEmpty(val) && addedClasses.Add(val))
+                        sb.Append('.').Append(val);
+                }
+                // [class=value] with unquoted spaces → invalid selector
+                else if (inner.StartsWith("class=", StringComparison.OrdinalIgnoreCase))
+                {
+                    var val = inner.Substring(6).Trim('"', '\'', ' ');
+                    if (val.Contains(' ') && !inner.Contains('"') && !inner.Contains('\''))
+                        return null;
+                }
+                // Other attribute selectors: skip
+            }
+            else
+            {
+                sb.Append(selector[i]);
+                i++;
+            }
+        }
+
+        // Remove duplicate class parts: e.g. ".one.first.one" → ".first.one"
+        var result = sb.ToString().Trim();
+        if (string.IsNullOrEmpty(result))
+            return null;
+
+        // Deduplicate class parts within each compound selector segment
+        if (result.IndexOf('.') >= 0)
+            result = DeduplicateClassParts(result);
+
+        return string.IsNullOrEmpty(result) ? null : result;
+    }
+
+    /// <summary>
+    /// Removes duplicate class parts from compound selectors.
+    /// E.g. ".one.first.one" → ".first.one".
+    /// Preserves ordering and non-class content (spaces, combinators, tag names).
+    /// </summary>
+    private static string DeduplicateClassParts(string selector)
+    {
+        // Split by whitespace/combinators to handle multi-part selectors
+        var sb = new System.Text.StringBuilder(selector.Length);
+        int i = 0;
+        while (i < selector.Length)
+        {
+            if (selector[i] == ' ' || selector[i] == '>' || selector[i] == '+')
+            {
+                sb.Append(selector[i]);
+                i++;
+                continue;
+            }
+
+            // Find the end of this compound selector
+            int start = i;
+            while (i < selector.Length && selector[i] != ' ' && selector[i] != '>' && selector[i] != '+')
+                i++;
+            var compound = selector.Substring(start, i - start);
+
+            // Deduplicate dot-separated parts
+            var parts = compound.Split('.');
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var deduped = new System.Text.StringBuilder();
+            for (int p = 0; p < parts.Length; p++)
+            {
+                if (p == 0 && string.IsNullOrEmpty(parts[p]))
+                {
+                    // Leading dot produces empty first part
+                    continue;
+                }
+                if (seen.Add(parts[p]))
+                {
+                    deduped.Append('.').Append(parts[p]);
+                }
+            }
+            sb.Append(deduped);
+        }
+        return sb.ToString();
     }
 
     private void ParseFontProperty(string propValue, Dictionary<string, string> properties)
