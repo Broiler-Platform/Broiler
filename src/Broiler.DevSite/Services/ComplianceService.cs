@@ -22,7 +22,7 @@ public sealed partial class ComplianceService
 
     public ComplianceService(string contentRootPath)
     {
-        _css2Directory = Path.GetFullPath(Path.Combine(contentRootPath, "..", "css2"));
+        _css2Directory = Path.GetFullPath(Path.Combine(contentRootPath, "..", "..", "css2"));
         _checklists = new Lazy<List<ChapterChecklist>>(ParseAllChecklists);
     }
 

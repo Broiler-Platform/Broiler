@@ -23,8 +23,22 @@ public class CompareModel : PageModel
 
     public async Task<IActionResult> OnPostAsync(IFormFile htmlFile, IFormFile? referenceImage, int width = 1024, int height = 768)
     {
+        const long maxFileSize = 5 * 1024 * 1024; // 5 MB
+
         if (htmlFile == null || htmlFile.Length == 0)
             return Page();
+
+        if (htmlFile.Length > maxFileSize)
+        {
+            ModelState.AddModelError("htmlFile", "HTML file must be under 5 MB.");
+            return Page();
+        }
+
+        if (referenceImage != null && referenceImage.Length > maxFileSize)
+        {
+            ModelState.AddModelError("referenceImage", "Reference image must be under 5 MB.");
+            return Page();
+        }
 
         width = Math.Clamp(width, 100, 4096);
         height = Math.Clamp(height, 100, 4096);

@@ -43,15 +43,25 @@
 
                 if (!response.ok) {
                     const text = await response.text();
-                    container.innerHTML = '<div class="alert alert-danger">' + text + '</div>';
+                    const errDiv = document.createElement('div');
+                    errDiv.className = 'alert alert-danger';
+                    errDiv.textContent = text;
+                    container.replaceChildren(errDiv);
                     return;
                 }
 
                 const blob = await response.blob();
                 const url = URL.createObjectURL(blob);
-                container.innerHTML = '<img src="' + url + '" class="img-fluid" alt="Rendered output" />';
+                const img = document.createElement('img');
+                img.src = url;
+                img.className = 'img-fluid';
+                img.alt = 'Rendered output';
+                container.replaceChildren(img);
             } catch (err) {
-                container.innerHTML = '<div class="alert alert-danger">Error: ' + err.message + '</div>';
+                const errDiv = document.createElement('div');
+                errDiv.className = 'alert alert-danger';
+                errDiv.textContent = 'Error: ' + err.message;
+                container.replaceChildren(errDiv);
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Render';

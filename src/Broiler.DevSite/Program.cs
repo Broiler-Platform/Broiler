@@ -26,10 +26,17 @@ app.MapRazorPages();
 // API endpoint for snippet playground live rendering
 app.MapPost("/api/render", async (HttpContext context, RenderingService renderer) =>
 {
+    // Limit request body to 1 MB to prevent denial-of-service
+    if (context.Request.ContentLength > 1_048_576)
+        return Results.BadRequest("Request body too large (max 1 MB).");
+
     using var reader = new StreamReader(context.Request.Body);
-    string html = await reader.ReadToEndAsync();
-    if (string.IsNullOrWhiteSpace(html))
+    char[] buffer = new char[1_048_576];
+    int charsRead = await reader.ReadAsync(buffer, 0, buffer.Length);
+    if (charsRead == 0)
         return Results.BadRequest("No HTML content provided.");
+
+    string html = new string(buffer, 0, charsRead);
 
     int width = 1024;
     int height = 768;
