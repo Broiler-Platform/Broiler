@@ -76,7 +76,23 @@ internal sealed class CssValueParser
         }
         else if (value.Length > 2)
         {
-            number = value.Substring(0, value.Length - 2);
+            // CSS2.1 §4.3.2: Non-zero lengths require a valid unit identifier.
+            var unit = value.Substring(value.Length - 2, 2);
+            switch (unit)
+            {
+                case CssConstants.Em:
+                case CssConstants.Ex:
+                case CssConstants.Px:
+                case CssConstants.Mm:
+                case CssConstants.Cm:
+                case CssConstants.In:
+                case CssConstants.Pt:
+                case CssConstants.Pc:
+                    number = value.Substring(0, value.Length - 2);
+                    break;
+                default:
+                    return false; // unrecognized unit
+            }
         }
 
         return double.TryParse(number, out _);
