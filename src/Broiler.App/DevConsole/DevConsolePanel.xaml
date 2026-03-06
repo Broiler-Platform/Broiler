@@ -19,6 +19,12 @@
                              Checked="Tab_Checked" Tag="Dom"/>
                 <RadioButton x:Name="JsTab" Content="JS Console" Style="{StaticResource ConsoleTabStyle}"
                              Checked="Tab_Checked" Tag="Js"/>
+                <!-- Error indicator badge -->
+                <Border x:Name="ErrorBadge" Background="#E74C3C" CornerRadius="8" Padding="6,2"
+                        Margin="8,4" VerticalAlignment="Center" Visibility="Collapsed">
+                    <TextBlock x:Name="ErrorCount" Text="0 errors" Foreground="White"
+                               FontSize="11" FontFamily="Segoe UI"/>
+                </Border>
                 <Button Content="✕" Width="24" Height="24" Margin="8,2" Background="Transparent"
                         Foreground="#999" BorderThickness="0" Click="CloseButton_Click"
                         ToolTip="Close (F12)" HorizontalAlignment="Right"

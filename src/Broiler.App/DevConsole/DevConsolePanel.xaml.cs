@@ -19,6 +19,8 @@ namespace Broiler.App.DevConsole;
 public partial class DevConsolePanel : UserControl, IDisposable
 {
     private readonly List<RenderLogEntry> _logEntries = [];
+    private readonly ErrorOverlayService _errorOverlay = new();
+    private int _errorCount;
 
     /// <summary>Raised when the user clicks the close button.</summary>
     public event Action? CloseRequested;
@@ -33,6 +35,34 @@ public partial class DevConsolePanel : UserControl, IDisposable
     {
         InitializeComponent();
         RenderLogger.EntryLogged += OnLogEntry;
+        _errorOverlay.ErrorCaptured += OnErrorCaptured;
+    }
+
+    // ─── Error Overlay ─────────────────────────────────────────────────
+
+    private void OnErrorCaptured(RenderErrorInfo error)
+    {
+        _errorCount++;
+        Dispatcher.BeginInvoke(() =>
+        {
+            ErrorBadge.Visibility = Visibility.Visible;
+            ErrorCount.Text = _errorCount == 1 ? "1 error" : $"{_errorCount} errors";
+        });
+    }
+
+    /// <summary>
+    /// Returns all captured rendering errors for overlay visualisation.
+    /// </summary>
+    public IReadOnlyList<RenderErrorInfo> GetErrors() => _errorOverlay.GetErrors();
+
+    /// <summary>
+    /// Clears the error overlay and resets the badge count.
+    /// </summary>
+    public void ClearErrors()
+    {
+        _errorOverlay.Clear();
+        _errorCount = 0;
+        ErrorBadge.Visibility = Visibility.Collapsed;
     }
 
     // ─── Log Viewer ────────────────────────────────────────────────────
@@ -306,5 +336,6 @@ public partial class DevConsolePanel : UserControl, IDisposable
     public void Dispose()
     {
         RenderLogger.EntryLogged -= OnLogEntry;
+        _errorOverlay.Dispose();
     }
 }
