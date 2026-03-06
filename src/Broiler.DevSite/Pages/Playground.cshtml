@@ -1,0 +1,61 @@
+@page
+@model Broiler.DevSite.Pages.PlaygroundModel
+@{
+    ViewData["Title"] = "Snippet Playground";
+}
+
+<h2>Snippet Playground</h2>
+<p>Edit HTML/CSS below and click <strong>Render</strong> to see the Broiler rendering preview.</p>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="mb-2">
+            <label for="htmlInput" class="form-label">HTML / CSS</label>
+            <textarea id="htmlInput" class="form-control font-monospace" rows="20" spellcheck="false">@Model.DefaultSnippet</textarea>
+        </div>
+        <button id="renderBtn" class="btn btn-primary" onclick="renderSnippet()">Render</button>
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Preview</label>
+        <div id="previewContainer" class="border bg-light" style="min-height: 400px; display: flex; align-items: center; justify-content: center;">
+            <span class="text-muted">Click Render to see the output</span>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        async function renderSnippet() {
+            const html = document.getElementById('htmlInput').value;
+            const container = document.getElementById('previewContainer');
+            const btn = document.getElementById('renderBtn');
+
+            btn.disabled = true;
+            btn.textContent = 'Rendering...';
+            container.innerHTML = '<span class="text-muted">Rendering...</span>';
+
+            try {
+                const response = await fetch('/api/render', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: html
+                });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    container.innerHTML = '<div class="alert alert-danger">' + text + '</div>';
+                    return;
+                }
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                container.innerHTML = '<img src="' + url + '" class="img-fluid" alt="Rendered output" />';
+            } catch (err) {
+                container.innerHTML = '<div class="alert alert-danger">Error: ' + err.message + '</div>';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Render';
+            }
+        }
+    </script>
+}

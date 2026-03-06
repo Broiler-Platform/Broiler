@@ -1,10 +1,60 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Home";
 }
 
 <div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <h1 class="display-4">Broiler Development Site</h1>
+    <p class="lead">A browser-accessible test and demo environment for the Broiler HTML rendering engine.</p>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Test Case Runner</h5>
+                <p class="card-text">Execute Acid1 and Acid2 tests headlessly and view pixel-diff results inline.</p>
+                <a asp-page="/TestRunner" class="btn btn-primary">Run Tests</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Side-by-Side Comparison</h5>
+                <p class="card-text">Upload or select an HTML file, render via Broiler, and compare with a reference image.</p>
+                <a asp-page="/Compare" class="btn btn-primary">Compare</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Snippet Playground</h5>
+                <p class="card-text">Edit HTML/CSS in an editable pane with a live Broiler rendering preview.</p>
+                <a asp-page="/Playground" class="btn btn-primary">Playground</a>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Compliance Dashboard</h5>
+                <p class="card-text">View CSS 2.1 chapter checklist status with aggregate completion percentages.</p>
+                <a asp-page="/Compliance" class="btn btn-primary">Dashboard</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">API Documentation</h5>
+                <p class="card-text">Auto-generated DomBridge API reference from XML doc comments.</p>
+                <a asp-page="/ApiDocs" class="btn btn-primary">API Docs</a>
+            </div>
+        </div>
+    </div>
 </div>

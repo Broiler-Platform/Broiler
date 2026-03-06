@@ -1,0 +1,69 @@
+@page
+@model Broiler.DevSite.Pages.CompareModel
+@{
+    ViewData["Title"] = "Side-by-Side Comparison";
+}
+
+<h2>Side-by-Side Comparison</h2>
+<p>Upload an HTML file and an optional reference image to render via Broiler and compare the results.</p>
+
+<form method="post" enctype="multipart/form-data">
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label for="htmlFile" class="form-label">HTML File</label>
+            <input type="file" class="form-control" id="htmlFile" name="htmlFile" accept=".html,.htm" required />
+        </div>
+        <div class="col-md-6">
+            <label for="referenceImage" class="form-label">Reference Image (optional)</label>
+            <input type="file" class="form-control" id="referenceImage" name="referenceImage" accept="image/png,image/jpeg" />
+        </div>
+    </div>
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <label for="width" class="form-label">Viewport Width</label>
+            <input type="number" class="form-control" id="width" name="width" value="1024" min="100" max="4096" />
+        </div>
+        <div class="col-md-3">
+            <label for="height" class="form-label">Viewport Height</label>
+            <input type="number" class="form-control" id="height" name="height" value="768" min="100" max="4096" />
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Render &amp; Compare</button>
+</form>
+
+@if (Model.RenderedImageBase64 != null)
+{
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <h5>Broiler Render</h5>
+            <img src="data:image/png;base64,@Model.RenderedImageBase64" class="img-fluid border" alt="Broiler render" />
+        </div>
+        @if (Model.ReferenceImageBase64 != null)
+        {
+            <div class="col-md-6">
+                <h5>Reference Image</h5>
+                <img src="data:image/png;base64,@Model.ReferenceImageBase64" class="img-fluid border" alt="Reference" />
+            </div>
+        }
+    </div>
+
+    @if (Model.DiffImageBase64 != null)
+    {
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <h5>Pixel Diff</h5>
+                <img src="data:image/png;base64,@Model.DiffImageBase64" class="img-fluid border" alt="Pixel diff" />
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h6>Comparison Results</h6>
+                        <p>Match: <strong>@Model.MatchPercent.ToString("F2")%</strong></p>
+                        <p>Diff Pixels: <strong>@Model.DiffPixelCount.ToString("N0")</strong></p>
+                        <p>Total Pixels: <strong>@Model.TotalPixelCount.ToString("N0")</strong></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}

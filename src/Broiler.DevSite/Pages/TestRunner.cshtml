@@ -1,0 +1,82 @@
+@page
+@model Broiler.DevSite.Pages.TestRunnerModel
+@{
+    ViewData["Title"] = "Test Case Runner";
+}
+
+<h2>Test Case Runner</h2>
+<p>Execute Acid1 and Acid2 rendering tests headlessly and view pixel-diff results.</p>
+
+<div class="mb-3">
+    <form method="post">
+        <div class="btn-group" role="group">
+            <button type="submit" asp-page-handler="Acid1" class="btn btn-outline-primary">Run Acid1 Test</button>
+            <button type="submit" asp-page-handler="Acid2" class="btn btn-outline-primary">Run Acid2 Test</button>
+        </div>
+    </form>
+</div>
+
+@if (Model.TestName != null)
+{
+    <div class="card mt-3">
+        <div class="card-header">
+            <h5>@Model.TestName Results</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Match Ratio</h6>
+                            <h3 class="@(Model.MatchPercent >= 90 ? "text-success" : "text-warning")">
+                                @Model.MatchPercent.ToString("F2")%
+                            </h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Diff Pixels</h6>
+                            <h3>@Model.DiffPixelCount.ToString("N0")</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Total Pixels</h6>
+                            <h3>@Model.TotalPixelCount.ToString("N0")</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">Dimensions</h6>
+                            <h3>@Model.RenderWidth x @Model.RenderHeight</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-4">
+                    <h6>Broiler Render</h6>
+                    <img src="data:image/png;base64,@Model.RenderedImageBase64" class="img-fluid border" alt="Broiler render" />
+                </div>
+                <div class="col-md-4">
+                    <h6>Reference</h6>
+                    <img src="data:image/png;base64,@Model.ReferenceImageBase64" class="img-fluid border" alt="Reference" />
+                </div>
+                @if (Model.DiffImageBase64 != null)
+                {
+                    <div class="col-md-4">
+                        <h6>Pixel Diff</h6>
+                        <img src="data:image/png;base64,@Model.DiffImageBase64" class="img-fluid border" alt="Pixel diff" />
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
