@@ -17,9 +17,18 @@ internal static class RenderUtils
             if (containingBlock.Overflow == CssConstants.Hidden)
             {
                 var prevClip = g.GetClip();
-                var rect = box.ContainingBlock.ClientRectangle;
-                rect.X -= 2; // TODO:a find better way to fix it
-                rect.Width += 2;
+
+                // CSS2.1 §11.1.1: Content is clipped to the padding edge
+                // (inside borders, but including the padding area).
+                var cb = box.ContainingBlock;
+                var rect = new RectangleF(
+                    (float)(cb.Location.X + cb.ActualBorderLeftWidth),
+                    (float)(cb.Location.Y + cb.ActualBorderTopWidth),
+                    (float)(cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth),
+                    (float)(cb.Size.Height - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth));
+
+                if (rect.Width < 0) rect.Width = 0;
+                if (rect.Height < 0) rect.Height = 0;
 
                 if (!box.IsFixed)
                     rect.Offset(box.ContainerInt.ScrollOffset);
