@@ -677,7 +677,25 @@ internal class CssBox : CssBoxProperties, IDisposable
         if (BackgroundImage != CssConstants.None && _imageLoadHandler == null)
         {
             _imageLoadHandler = ContainerInt.CreateImageLoadHandler(OnImageLoadComplete);
-            _imageLoadHandler.LoadImage(BackgroundImage, HtmlTag != null ? HtmlTag.Attributes : null);
+
+            // CSS background-image stores the value with a url() wrapper
+            // (e.g. "url(data:image/png;base64,...)").  Strip the wrapper
+            // so ImageLoadHandler.LoadImage can detect data: URIs via its
+            // src.StartsWith("data:image") check (§14.2.1).
+            var src = BackgroundImage;
+            if (src.StartsWith("url(", StringComparison.OrdinalIgnoreCase) && src.EndsWith(")"))
+            {
+                src = src.Substring(4, src.Length - 5).Trim();
+                // Remove optional quotes around the URL
+                if (src.Length >= 2 &&
+                    ((src[0] == '\'' && src[^1] == '\'') ||
+                     (src[0] == '"' && src[^1] == '"')))
+                {
+                    src = src[1..^1];
+                }
+            }
+
+            _imageLoadHandler.LoadImage(src, HtmlTag != null ? HtmlTag.Attributes : null);
         }
     }
 

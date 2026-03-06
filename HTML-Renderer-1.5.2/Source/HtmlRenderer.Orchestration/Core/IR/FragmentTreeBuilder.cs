@@ -66,10 +66,19 @@ internal static class FragmentTreeBuilder
             inlineRects = new List<RectangleF>(box.Rectangles.Values);
         }
 
+        // CssBox.Size.Height is never set for block-level boxes during layout;
+        // the actual rendered height is tracked via ActualBottom instead.
+        // Compute the correct border-box height so that PaintWalker can
+        // draw backgrounds and borders (which skip Height <= 0 rects).
+        var size = box.Size;
+        float layoutHeight = (float)(box.ActualBottom - box.Location.Y);
+        if (layoutHeight > size.Height)
+            size = new SizeF(size.Width, layoutHeight);
+
         return new Fragment
         {
             Location = box.Location,
-            Size = box.Size,
+            Size = size,
             Margin = style.Margin,
             Border = style.Border,
             Padding = style.Padding,
