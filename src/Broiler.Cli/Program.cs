@@ -318,11 +318,14 @@ public class Program
         if (diagHandler is not null)
             RenderLogger.EntryLogged -= diagHandler;
 
-        if (diagnosticEntries is null || diagnosticEntries.Count == 0)
+        if (diagnosticEntries is null)
             return;
 
         RenderLogEntry[] snapshot;
         lock (diagnosticEntries) snapshot = diagnosticEntries.ToArray();
+
+        if (snapshot.Length == 0)
+            return;
 
         var jsonEntries = snapshot.Select(e => new
         {
