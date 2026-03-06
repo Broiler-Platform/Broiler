@@ -281,6 +281,13 @@ internal sealed class CssParser
     {
         className = className.ToLower();
 
+        // Strip attribute selectors: convert [class~=value] to .value,
+        // and remove other attribute selectors.  This enables CSS2.1 §5.8.1
+        // attribute selectors used in the Acid2 test.
+        className = StripAttributeSelectors(className);
+        if (string.IsNullOrEmpty(className))
+            return null;
+
         string psedoClass = null;
         string pseudoElement = null;
         var colonIdx = className.IndexOf(":", StringComparison.Ordinal);
@@ -635,7 +642,7 @@ internal sealed class CssParser
         // values explicitly provided.  Without this reset, a later
         // 'background: none' would not clear an earlier 'background: red'.
         properties["background-color"] = color ?? "transparent";
-        properties["background-image"] = image ?? "none";
+        properties["background-image"] = image != null ? ParseImageProperty(image) : "none";
         properties["background-repeat"] = repeat ?? "repeat";
         properties["background-attachment"] = attachment ?? "scroll";
         properties["background-position"] = positionParts.Count > 0
@@ -647,6 +654,128 @@ internal sealed class CssParser
     {
         if (_valueParser.IsColorValid(propValue))
             properties[propName] = propValue;
+    }
+
+    /// <summary>
+    /// Converts CSS2.1 attribute selectors to simpler equivalents:
+    /// <c>[class~=value]</c> → <c>.value</c> (word-match on class attribute).
+    /// Other attribute selectors are removed.  Returns <c>null</c> if the
+    /// result is an invalid/empty selector (e.g. bare <c>[class=a b]</c>
+    /// per CSS2.1 grammar).
+    /// </summary>
+    private static string StripAttributeSelectors(string selector)
+    {
+        if (selector.IndexOf('[') < 0)
+            return selector;
+
+        var sb = new System.Text.StringBuilder(selector.Length);
+        var addedClasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int i = 0;
+        while (i < selector.Length)
+        {
+            if (selector[i] == '[')
+            {
+                int close = selector.IndexOf(']', i);
+                if (close < 0) break;
+
+                var inner = selector.Substring(i + 1, close - i - 1);
+                i = close + 1;
+
+                // [class~=value] → .value (if not already present)
+                if (inner.StartsWith("class~=", StringComparison.OrdinalIgnoreCase))
+                {
+                    var val = inner.Substring(7).Trim('"', '\'', ' ');
+                    if (!string.IsNullOrEmpty(val) && addedClasses.Add(val))
+                        sb.Append('.').Append(val);
+                }
+                // [class=value] — exact match
+                else if (inner.StartsWith("class=", StringComparison.OrdinalIgnoreCase))
+                {
+                    var raw = inner.Substring(6);
+                    // CSS2.1 §4.1.3: backslash-escaped characters like "second\ two"
+                    // are valid IDENTs. Normalize by removing backslashes before spaces.
+                    var val = raw.Replace("\\ ", " ").Trim('"', '\'', ' ');
+                    bool hasBackslashEscape = raw.Contains('\\');
+                    bool isQuoted = raw.Contains('"') || raw.Contains('\'');
+                    // Bare unquoted/unescaped space → invalid selector per CSS2.1 grammar
+                    if (val.Contains(' ') && !isQuoted && !hasBackslashEscape)
+                        return null;
+                    // Convert to class selectors: "second two" → .second.two
+                    if (!string.IsNullOrEmpty(val))
+                    {
+                        var words = val.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var w in words)
+                        {
+                            if (addedClasses.Add(w))
+                                sb.Append('.').Append(w);
+                        }
+                    }
+                }
+                // Other attribute selectors: skip
+            }
+            else
+            {
+                sb.Append(selector[i]);
+                i++;
+            }
+        }
+
+        // Remove duplicate class parts: e.g. ".one.first.one" → ".first.one"
+        var result = sb.ToString().Trim();
+        if (string.IsNullOrEmpty(result))
+            return null;
+
+        // Deduplicate class parts within each compound selector segment
+        if (result.IndexOf('.') >= 0)
+            result = DeduplicateClassParts(result);
+
+        return string.IsNullOrEmpty(result) ? null : result;
+    }
+
+    /// <summary>
+    /// Removes duplicate class parts from compound selectors.
+    /// E.g. ".one.first.one" → ".first.one".
+    /// Preserves ordering and non-class content (spaces, combinators, tag names).
+    /// </summary>
+    private static string DeduplicateClassParts(string selector)
+    {
+        // Split by whitespace/combinators to handle multi-part selectors
+        var sb = new System.Text.StringBuilder(selector.Length);
+        int i = 0;
+        while (i < selector.Length)
+        {
+            if (selector[i] == ' ' || selector[i] == '>' || selector[i] == '+')
+            {
+                sb.Append(selector[i]);
+                i++;
+                continue;
+            }
+
+            // Find the end of this compound selector
+            int start = i;
+            while (i < selector.Length && selector[i] != ' ' && selector[i] != '>' && selector[i] != '+')
+                i++;
+            var compound = selector.Substring(start, i - start);
+
+            // Deduplicate dot-separated parts
+            var parts = compound.Split('.');
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var deduped = new System.Text.StringBuilder();
+            for (int p = 0; p < parts.Length; p++)
+            {
+                if (p == 0 && string.IsNullOrEmpty(parts[p]))
+                {
+                    // Leading dot produces empty first part
+                    continue;
+                }
+                if (seen.Add(parts[p]))
+                {
+                    deduped.Append('.').Append(parts[p]);
+                }
+            }
+            sb.Append(deduped);
+        }
+        return sb.ToString();
     }
 
     private void ParseFontProperty(string propValue, Dictionary<string, string> properties)

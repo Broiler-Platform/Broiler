@@ -1,5 +1,6 @@
 using System.Drawing;
 using System;
+using System.Collections.Generic;
 using TheArtOfDev.HtmlRenderer.Core.Dom;
 using TheArtOfDev.HtmlRenderer.Core.Entities;
 using TheArtOfDev.HtmlRenderer.Core.IR;
@@ -155,6 +156,7 @@ internal sealed class DomParser
     private static void AssignClassCssBlocks(CssBox box, CssData cssData)
     {
         var classes = box.HtmlTag.TryGetAttribute("class");
+        var classList = new List<string>();
         var startIdx = 0;
 
         while (startIdx < classes.Length)
@@ -171,10 +173,29 @@ internal sealed class DomParser
                 endIdx = classes.Length;
 
             var cls = "." + classes.Substring(startIdx, endIdx - startIdx);
+            classList.Add(cls);
             AssignCssBlocks(box, cssData, cls);
             AssignCssBlocks(box, cssData, box.HtmlTag.Name + cls);
 
             startIdx = endIdx + 1;
+        }
+
+        // CSS2.1 §5.8.3: compound class selectors like .first.one must
+        // match elements that have ALL specified classes.  Generate lookup
+        // keys for all 2-class combinations so that rules stored under
+        // compound keys are found.
+        if (classList.Count >= 2)
+        {
+            for (int i = 0; i < classList.Count; i++)
+            {
+                for (int j = 0; j < classList.Count; j++)
+                {
+                    if (i == j) continue;
+                    var compound = classList[i] + classList[j];
+                    AssignCssBlocks(box, cssData, compound);
+                    AssignCssBlocks(box, cssData, box.HtmlTag.Name + compound);
+                }
+            }
         }
     }
 
@@ -258,7 +279,7 @@ internal sealed class DomParser
 
     /// <summary>
     /// Returns <c>true</c> when <paramref name="box"/> matches
-    /// the given CSS selector item (tag name, .class, or #id).
+    /// the given CSS selector item (tag name, .class, #id, or compound .c1.c2).
     /// </summary>
     private static bool MatchesSelectorItem(CssBox box, string selectorClass)
     {
@@ -271,8 +292,29 @@ internal sealed class DomParser
         if (box.HtmlTag.HasAttribute("class"))
         {
             var className = box.HtmlTag.TryGetAttribute("class");
-            if (selectorClass.Equals("." + className, StringComparison.InvariantCultureIgnoreCase) || selectorClass.Equals(box.HtmlTag.Name + "." + className, StringComparison.InvariantCultureIgnoreCase))
+
+            // Single class match: ".foo" matches class="foo"
+            if (selectorClass.Equals("." + className, StringComparison.InvariantCultureIgnoreCase)
+                || selectorClass.Equals(box.HtmlTag.Name + "." + className, StringComparison.InvariantCultureIgnoreCase))
                 return true;
+
+            // Compound class match: ".foo.bar" matches class="foo bar" or "bar foo"
+            if (selectorClass.StartsWith(".") && selectorClass.IndexOf('.', 1) > 0)
+            {
+                var parts = selectorClass.Split('.');
+                var classWords = (" " + className + " ").ToLower();
+                bool allMatch = true;
+                for (int i = 1; i < parts.Length; i++) // skip first empty part from leading "."
+                {
+                    if (string.IsNullOrEmpty(parts[i])) continue;
+                    if (!classWords.Contains(" " + parts[i] + " "))
+                    {
+                        allMatch = false;
+                        break;
+                    }
+                }
+                if (allMatch) return true;
+            }
         }
 
         if (box.HtmlTag.HasAttribute("id"))

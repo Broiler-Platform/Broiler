@@ -42,6 +42,9 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                 case DrawImageItem image:
                     RenderDrawImage(g, image);
                     break;
+                case DrawTiledImageItem tiled:
+                    RenderDrawTiledImage(g, tiled);
+                    break;
                 case DrawLineItem line:
                     RenderDrawLine(g, line);
                     break;
@@ -217,6 +220,61 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
             else
                 g.DrawImage(image, item.DestRect);
         }
+    }
+
+    private static void RenderDrawTiledImage(RGraphics g, DrawTiledImageItem item)
+    {
+        if (item.ImageHandle is not RImage image)
+            return;
+
+        var srcRect = item.SourceRect == RectangleF.Empty
+            ? new RectangleF(0, 0, (float)image.Width, (float)image.Height)
+            : item.SourceRect;
+
+        var fill = item.FillRect;
+        var origin = item.TileOrigin;
+
+        // Clip to the element's padding box
+        var clip = fill;
+        clip.Intersect(g.GetClip());
+        g.PushClip(clip);
+
+        switch (item.Repeat)
+        {
+            case "no-repeat":
+                g.DrawImage(image,
+                    new RectangleF(origin.X, origin.Y, srcRect.Width, srcRect.Height), srcRect);
+                break;
+            case "repeat-x":
+            {
+                // Shift origin left to cover the fill area
+                float ox = origin.X;
+                while (ox > fill.X) ox -= srcRect.Width;
+                using var brush = g.GetTextureBrush(image, srcRect, new PointF(ox, origin.Y));
+                g.DrawRectangle(brush, fill.X, origin.Y, fill.Width, srcRect.Height);
+                break;
+            }
+            case "repeat-y":
+            {
+                float oy = origin.Y;
+                while (oy > fill.Y) oy -= srcRect.Height;
+                using var brush = g.GetTextureBrush(image, srcRect, new PointF(origin.X, oy));
+                g.DrawRectangle(brush, origin.X, fill.Y, srcRect.Width, fill.Height);
+                break;
+            }
+            default: // "repeat"
+            {
+                float ox = origin.X;
+                while (ox > fill.X) ox -= srcRect.Width;
+                float oy = origin.Y;
+                while (oy > fill.Y) oy -= srcRect.Height;
+                using var brush = g.GetTextureBrush(image, srcRect, new PointF(ox, oy));
+                g.DrawRectangle(brush, fill.X, fill.Y, fill.Width, fill.Height);
+                break;
+            }
+        }
+
+        g.PopClip();
     }
 
     private static void RenderDrawLine(RGraphics g, DrawLineItem item)
