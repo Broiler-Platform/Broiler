@@ -288,20 +288,19 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
 
             // Paint path: Fragment tree → DisplayList → RGraphics
             // Pass viewport for CSS2.1 §14.2 canvas background propagation.
-            var items = new List<DisplayItem>();
             var displayList = PaintWalker.Paint(LatestFragmentTree, paintViewport);
-            items.AddRange(displayList.Items);
 
             // Apply scroll offset: shift all display items so that content scrolls
             // within the fixed viewport clip.
             if (hasScroll)
             {
-                PaintWalker.OffsetDisplayItems(items, 0, ScrollOffset.X, ScrollOffset.Y);
+                var offsetItems = new List<DisplayItem>(displayList.Items);
+                PaintWalker.OffsetDisplayItems(offsetItems, 0, ScrollOffset.X, ScrollOffset.Y);
+                displayList = new DisplayList { Items = offsetItems };
             }
 
-            var finalList = new DisplayList { Items = items };
-            LatestDisplayList = finalList;
-            RGraphicsRasterBackend.Instance.Render(finalList, g);
+            LatestDisplayList = displayList;
+            RGraphicsRasterBackend.Instance.Render(displayList, g);
         }
 
         g.PopClip();
