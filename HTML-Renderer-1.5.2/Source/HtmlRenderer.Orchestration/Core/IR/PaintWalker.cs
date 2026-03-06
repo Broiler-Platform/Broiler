@@ -219,71 +219,77 @@ internal static class PaintWalker
         if (fragment.BackgroundImageHandle == null)
             return;
 
-        var bounds = fragment.Bounds;
-        if (bounds.Width <= 0 || bounds.Height <= 0)
-            return;
+        // Use GetPaintRects to handle inline elements (which may have zero
+        // Size but non-empty InlineRects from per-line-box layout).
+        var rects = GetPaintRects(fragment);
 
-        // Background image covers the padding box (inside borders)
-        var border = fragment.Border;
-        var imgRect = new RectangleF(
-            bounds.X + (float)border.Left,
-            bounds.Y + (float)border.Top,
-            bounds.Width - (float)(border.Left + border.Right),
-            bounds.Height - (float)(border.Top + border.Bottom));
-
-        if (imgRect.Width <= 0 || imgRect.Height <= 0)
-            return;
-
-        var repeat = fragment.Style.BackgroundRepeat;
-        var isFixed = fragment.Style.BackgroundAttachment == "fixed" && viewport.Width > 0 && viewport.Height > 0;
-
-        if (repeat == "no-repeat" && !isFixed)
+        foreach (var bounds in rects)
         {
-            // Simple case: single image at natural position within the padding box
-            items.Add(new DrawImageItem
-            {
-                Bounds = imgRect,
-                ImageHandle = fragment.BackgroundImageHandle,
-                SourceRect = RectangleF.Empty,
-                DestRect = imgRect,
-            });
-        }
-        else
-        {
-            // CSS2.1 §14.2.1: For fixed attachment, the tiling origin is
-            // the viewport origin; the image is visible only within the
-            // element's padding area.  For scroll attachment, the origin
-            // is the padding-box origin.
-            var tileOrigin = isFixed
-                ? new PointF(viewport.X, viewport.Y)
-                : new PointF(imgRect.X, imgRect.Y);
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+                continue;
 
-            // Apply background-position offset to tile origin
-            var posStr = fragment.Style.BackgroundPosition;
-            if (!string.IsNullOrEmpty(posStr))
+            // Background image covers the padding box (inside borders)
+            var border = fragment.Border;
+            var imgRect = new RectangleF(
+                bounds.X + (float)border.Left,
+                bounds.Y + (float)border.Top,
+                bounds.Width - (float)(border.Left + border.Right),
+                bounds.Height - (float)(border.Top + border.Bottom));
+
+            if (imgRect.Width <= 0 || imgRect.Height <= 0)
+                continue;
+
+            var repeat = fragment.Style.BackgroundRepeat;
+            var isFixed = fragment.Style.BackgroundAttachment == "fixed" && viewport.Width > 0 && viewport.Height > 0;
+
+            if (repeat == "no-repeat" && !isFixed)
             {
-                var parts = posStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length >= 1)
+                // Simple case: single image at natural position within the padding box
+                items.Add(new DrawImageItem
                 {
-                    float xOff = ParsePositionValue(parts[0], imgRect.Width);
-                    tileOrigin.X += xOff;
-                }
-                if (parts.Length >= 2)
-                {
-                    float yOff = ParsePositionValue(parts[1], imgRect.Height);
-                    tileOrigin.Y += yOff;
-                }
+                    Bounds = imgRect,
+                    ImageHandle = fragment.BackgroundImageHandle,
+                    SourceRect = RectangleF.Empty,
+                    DestRect = imgRect,
+                });
             }
-
-            items.Add(new DrawTiledImageItem
+            else
             {
-                Bounds = imgRect,
-                ImageHandle = fragment.BackgroundImageHandle,
-                SourceRect = RectangleF.Empty,
-                FillRect = imgRect,
-                TileOrigin = tileOrigin,
-                Repeat = repeat,
-            });
+                // CSS2.1 §14.2.1: For fixed attachment, the tiling origin is
+                // the viewport origin; the image is visible only within the
+                // element's padding area.  For scroll attachment, the origin
+                // is the padding-box origin.
+                var tileOrigin = isFixed
+                    ? new PointF(viewport.X, viewport.Y)
+                    : new PointF(imgRect.X, imgRect.Y);
+
+                // Apply background-position offset to tile origin
+                var posStr = fragment.Style.BackgroundPosition;
+                if (!string.IsNullOrEmpty(posStr))
+                {
+                    var parts = posStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 1)
+                    {
+                        float xOff = ParsePositionValue(parts[0], imgRect.Width);
+                        tileOrigin.X += xOff;
+                    }
+                    if (parts.Length >= 2)
+                    {
+                        float yOff = ParsePositionValue(parts[1], imgRect.Height);
+                        tileOrigin.Y += yOff;
+                    }
+                }
+
+                items.Add(new DrawTiledImageItem
+                {
+                    Bounds = imgRect,
+                    ImageHandle = fragment.BackgroundImageHandle,
+                    SourceRect = RectangleF.Empty,
+                    FillRect = imgRect,
+                    TileOrigin = tileOrigin,
+                    Repeat = repeat,
+                });
+            }
         }
     }
 

@@ -23,6 +23,11 @@ internal sealed class CssBoxImage : CssBox
     {
         if (!_wordsSizeMeasured)
         {
+            // Load the CSS background image (if any) via the base class.
+            // CssBoxImage overrides MeasureWordsSize entirely, so the base
+            // class's background-image loading code would otherwise be skipped.
+            LoadBackgroundImageIfNeeded();
+
             if (_imageLoadHandler == null && (ContainerInt.AvoidAsyncImagesLoading || ContainerInt.AvoidImagesLateLoading))
             {
                 _imageLoadHandler = ContainerInt.CreateImageLoadHandler(OnLoadImageComplete);

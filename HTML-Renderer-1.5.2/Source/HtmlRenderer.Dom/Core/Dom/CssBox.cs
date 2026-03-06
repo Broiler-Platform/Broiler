@@ -666,16 +666,27 @@ internal class CssBox : CssBoxProperties, IDisposable
         }
     }
 
-    internal virtual void MeasureWordsSize(RGraphics g)
+    /// <summary>
+    /// Loads the CSS background image if one is specified and not yet loaded.
+    /// Called from <see cref="MeasureWordsSize"/> and overridden versions in
+    /// subclasses (e.g. <see cref="CssBoxImage"/>) that replace the base
+    /// measurement logic.
+    /// </summary>
+    protected void LoadBackgroundImageIfNeeded()
     {
-        if (_wordsSizeMeasured)
-            return;
-
         if (BackgroundImage != CssConstants.None && _imageLoadHandler == null)
         {
             _imageLoadHandler = ContainerInt.CreateImageLoadHandler(OnImageLoadComplete);
             _imageLoadHandler.LoadImage(BackgroundImage, HtmlTag != null ? HtmlTag.Attributes : null);
         }
+    }
+
+    internal virtual void MeasureWordsSize(RGraphics g)
+    {
+        if (_wordsSizeMeasured)
+            return;
+
+        LoadBackgroundImageIfNeeded();
 
         MeasureWordSpacing(g);
 
