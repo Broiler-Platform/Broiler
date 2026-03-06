@@ -10,26 +10,33 @@
 
 | Metric | Value |
 |---|---|
-| Overall pixel match (at `#top`) | **95.01%** |
-| Different pixels | 39,271 / 786,432 |
+| **Content-area pixel match** | **8.97%** (3,861 / 43,065 content pixels) |
+| Content bounding-box pixel match | 42.24% (15,965 / 37,800 pixels in face region) |
+| Full-image pixel match (incl. background) | 95.01% — **misleading**: 94.5% of the image is white background that matches trivially |
 | Red-pixel leak (CSS failure indicator) | 1,680 in Broiler, 0 in Chromium |
 | Test dimensions | 1024 × 768 |
+| Content bounding box (Chromium) | x: [72, 240], y: [51, 276] — 168 × 225 px |
 | Render target | `acid2.html#top` (face test area) |
 | Automated test status | **All 5 differential tests passing** |
-| Test thresholds | MinMatchRatio = 0.95, MaxRedPixelLeak = 2,000 |
 | Chromium version | 145.0.7632.6 (Playwright v1.58.2) |
-| Last verified | 2026-03-06 (Chromium reference pixel-identical to fresh Playwright render) |
+| Last verified | 2026-03-06 |
 
-Broiler's html-renderer produces a recognisable Acid2 face when rendered at
-the `#top` anchor, matching the Chromium reference at **95.01%**.  Prior fix
-phases (P0–P3) and Phase 5 item 5.1 addressed external stylesheet loading,
-red-pixel elimination, layout correctness, visual polish, and CSS `height:0`
-/ `ActualBottom` consistency.
+### Current State: Far From Compliant
 
-The remaining **4.99%** pixel difference (39,271 pixels) and **1,680 red
-pixels** come from layout positioning errors, missing CSS features, and
-rendering precision gaps described in the root-cause analysis and roadmap
-below.
+Broiler's html-renderer produces a **severely broken** Acid2 face.  While
+the full-image pixel match is 95%, this is entirely misleading — 94.5% of
+both images is plain white background.  When comparing only the content
+pixels (any pixel that is non-white in either render), **only 8.97% match**.
+
+Visual inspection confirms: the eyes are missing, the nose is malformed,
+there are large red areas (CSS failure indicators), the smile is broken,
+and the overall face structure is wrong.  The renderer is **not close** to
+Acid2 compliance.
+
+The 1,680 red pixels are the canonical Acid2 failure signal and must be
+eliminated as the first priority.  Beyond that, nearly every facial feature
+(eyes, nose, smile, forehead, ears, chin) needs significant layout and
+rendering fixes.
 
 ---
 
@@ -79,13 +86,23 @@ Output: `acid/acid2/acid2-reference.png`
 
 ### 1.3  Comparison
 
-Both images are compared:
+Both images are compared using two complementary approaches:
 
-- **Programmatically** via the `PixelDiffRunner` (SkiaSharp-based) in the
-  automated test suite, and independently with NumPy/Pillow for validation.
-- **Visually** via a diff heatmap (`acid/acid2/acid2-diff.png`) where
-  red = different pixels, green = matching pixels, blended 50/50 with the
-  Broiler render for spatial context.
+- **Full-image pixel diff:** Compares every pixel at position (x,y) in the
+  Broiler render against (x,y) in the Chromium reference.  This produces the
+  "95% match" number, but **this metric is misleading** because the vast
+  majority of both images is white background.  The automated test suite
+  (`PixelDiffRunner`) uses this method as a regression guard.
+- **Content-area pixel diff:** Isolates pixels that are non-white (< 250 in
+  any channel) in *either* image, then compares only those.  This produces
+  the **8.97% content match** — the honest measure of how well the Acid2
+  face is rendered.
+- **Content bounding-box diff:** Crops both images to the Chromium
+  reference's content bounding box (x: 72–240, y: 51–276, 168 × 225 px) and
+  compares pixel-by-pixel.  This gives **42.24% match** within the face
+  region (including internal white areas like the face background).
+- **Visual diff heatmap:** `acid/acid2/acid2-diff.png` shows red = different
+  pixels, green = matching pixels, blended 50/50 with the Broiler render.
 
 ### 1.4  Automated Tests
 
@@ -99,11 +116,15 @@ dotnet test HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests \
 
 | Test | What It Checks |
 |---|---|
-| `Acid2Top_PixelMatch_MeetsMinimumThreshold` | Pixel match ≥ 95% |
+| `Acid2Top_PixelMatch_MeetsMinimumThreshold` | Full-image pixel match ≥ 95% (inflated by background) |
 | `Acid2Top_RedPixelLeak_BelowMaximum` | Red pixels ≤ 2,000 |
 | `Acid2Top_RenderDimensions_MatchViewport` | Output is 1024 × 768 |
 | `Acid2Top_Render_IsDeterministic` | Two renders produce identical output |
 | `Acid2Top_AnchorElement_IsFoundDuringLayout` | `#top` anchor found with Y > 100 |
+
+**Note:** These tests use full-image pixel comparison, which is dominated by
+white background.  They serve as regression guards but do not measure true
+content-area compliance.
 
 ---
 
@@ -117,11 +138,32 @@ dotnet test HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests \
 
 All images are located in `acid/acid2/`.
 
-### 2.1  Region-Level Diff Summary
+### 2.1  Overall Comparison
 
-| Region | Y Range | Mismatch | Red Leak | CSS Features Tested |
+| Metric | Value |
+|---|---|
+| Full-image pixel match | 95.01% (747,161 / 786,432) — **inflated by 94.5% white background** |
+| Content-pixel match | **8.97%** (3,861 / 43,065 non-white pixels) |
+| Content bounding-box match | **42.24%** (15,965 / 37,800 pixels in face region) |
+| Different content pixels | 39,204 |
+| Red-pixel leak | 1,680 (Broiler), 0 (Chromium) |
+
+**Visual assessment:** The Broiler render is severely broken.  The overall
+face outline is vaguely recognisable but nearly every facial feature differs
+from the reference: eyes are missing, the nose is malformed with red
+bleed-through, the forehead shape is wrong, the smile is broken, and there
+are large areas of incorrect color.
+
+### 2.3  Region-Level Diff Summary
+
+Region-level mismatch percentages below are computed over the full image
+width (1024 px) at each Y range, so they are diluted by white background
+on the right side of each row.  The actual content-area mismatch within each
+region is much higher.
+
+| Region | Y Range | Row Mismatch | Red Leak | CSS Features Tested |
 |---|---|---|---|---|
-| Hello World! text | 0–50 | **0.0%** | 0 px | font, margin, color |
+| Hello World! text | 0–50 | 0.0% | 0 px | font, margin, color |
 | Scalp | 50–120 | 2.3% | 0 px | `position:fixed`, `min-height`/`max-height` |
 | 2nd line / ears | 120–160 | 7.0% | 96 px | attribute selectors, `float`, shrink-wrap |
 | Forehead | 160–195 | 15.9% | 0 px | `width`, `overflow`, `background-image` data-URI |
@@ -133,7 +175,7 @@ All images are located in `acid/acid2/`.
 | Table bottom | 430–470 | 0.0% | 0 px | `display:table`, anonymous table cells |
 | Background (right) | 470+ | 0.0% | 0 px | overflow clipping |
 
-### 2.2  Diff Pixel Color Distribution (Broiler-side)
+### 2.4  Diff Pixel Color Distribution (Broiler-side)
 
 | Color | Pixel Count | Likely Cause |
 |---|---|---|
@@ -144,16 +186,18 @@ All images are located in `acid/acid2/`.
 | Other | 909 | Anti-aliasing or blended colours |
 | **Total** | **39,271** | |
 
-### 2.3  Improvement Since v1
+### 2.5  Improvement Since v1
+
+These numbers use the full-image metric for comparability with v1, but
+remember: both are inflated by white-background matching.
 
 | Metric | v1 (2026-03-05) | v2 (2026-03-06) | Change |
 |---|---|---|---|
-| Pixel match | 90.91% | 95.01% | **+4.10 pp** |
-| Different pixels | 71,456 | 39,271 | **−32,185** |
-| Red-pixel leak | 3,744 | 1,680 | **−2,064** |
-| Black diff pixels | 38,367 | 5,546 | **−32,821** |
-| White diff pixels | 17,809 | 14,744 | **−3,065** |
-| Yellow diff pixels | 13,845 | 16,392 | +2,547 |
+| Full-image pixel match | 90.91% | 95.01% | +4.10 pp |
+| Different pixels | 71,456 | 39,271 | −32,185 |
+| Red-pixel leak | 3,744 | 1,680 | −2,064 |
+| Content-area match | not measured | **8.97%** | — |
+| Content bbox match | not measured | **42.24%** | — |
 
 ---
 
@@ -236,8 +280,9 @@ double-counting.
 
 ### 3.2  Remaining Issues
 
-The following issues produce the remaining 39,271 diff pixels and 1,680 red
-pixels.
+The following issues produce the remaining 39,204 mismatched content pixels
+(91% of all content) and 1,680 red pixels.  The renderer is far from
+compliant — nearly every facial feature is broken.
 
 #### 3.2.1  Eyes Region — Background Image Loading (1,254 red px)
 
@@ -326,6 +371,12 @@ scrolled region.
 
 ## 4  Roadmap to Full Acid2 Compliance
 
+### Current Compliance Level
+
+- **Content-area pixel match: 8.97%** — the renderer fails 91% of content pixels.
+- **Red-pixel leak: 1,680** — canonical Acid2 failure indicator.
+- **Visual assessment: far from compliant** — eyes missing, nose wrong, smile broken.
+
 ### Phase 5 — Eliminate Red Pixels (Target: 0 red pixels)
 
 Red pixels are the canonical Acid2 failure signal.  Eliminating all 1,680
@@ -340,7 +391,7 @@ is the primary gate to passing.
 **Measurable outcome:** `Acid2Top_RedPixelLeak_BelowMaximum` passes with
 `MaxRedPixelLeak = 0`.
 
-### Phase 6 — Layout Precision (Target: ≥ 98% match)
+### Phase 6 — Layout Precision (Target: ≥ 70% content-area match)
 
 | # | Task | Pixel Impact | CSS 2.1 Ref | Effort | Priority |
 |---|---|---|---|---|---|
@@ -350,10 +401,10 @@ is the primary gate to passing.
 | 6.4 | **Fix chin inline line-height** — Correct `display:inline` line-height calculation at tiny font sizes (`font:2px/4px serif`). | ~1,800 px | §10.8 | S | P2 |
 | 6.5 | **Fix scalp position:fixed viewport anchor** — Fixed-position elements should anchor to viewport top regardless of scroll position. | ~1,600 px | §9.6.1 | M | P2 |
 
-**Measurable outcome:** `Acid2Top_PixelMatch_MeetsMinimumThreshold` passes
-with `MinMatchRatio = 0.98`.
+**Measurable outcome:** Content-area pixel match ≥ 70%.  Content bounding-box
+match ≥ 85%.
 
-### Phase 7 — Visual Perfection (Target: ≥ 99.5% match)
+### Phase 7 — Visual Perfection (Target: ≥ 95% content-area match)
 
 | # | Task | Pixel Impact | CSS 2.1 Ref | Effort |
 |---|---|---|---|---|
@@ -361,7 +412,8 @@ with `MinMatchRatio = 0.98`.
 | 7.2 | **Remaining background-image tiling** — Verify all 2×2 fixed-position background tiles match exactly. | ~500 px | §14.2.1 | S |
 | 7.3 | **Final pixel-perfect audit** — Manual pixel-by-pixel comparison of any remaining differences. | remaining | — | M |
 
-**Measurable outcome:** `MinMatchRatio = 0.995` and `MaxRedPixelLeak = 0`.
+**Measurable outcome:** Content-area pixel match ≥ 95%.  Content bounding-box
+match ≥ 99%.  `MaxRedPixelLeak = 0`.
 
 ### Effort Key
 
@@ -411,27 +463,36 @@ python3 -c "
 from PIL import Image; import numpy as np
 b = np.array(Image.open('/tmp/acid2-broiler.png').convert('RGBA'))[:,:,:3]
 c = np.array(Image.open('/tmp/acid2-chromium.png').convert('RGBA'))[:,:,:3]
-d = np.sqrt(np.sum((b.astype(float) - c.astype(float))**2, axis=2))
-total = d.size
-match = np.sum(d == 0)
+diff = np.abs(b.astype(int) - c.astype(int))
+total = b.shape[0] * b.shape[1]
+full_match = np.sum(np.all(diff == 0, axis=2))
+# Content-area: pixels non-white in either image
+content_mask = ~(np.all(b > 250, axis=2) & np.all(c > 250, axis=2))
+content_total = np.sum(content_mask)
+content_match = np.sum(content_mask & np.all(diff == 0, axis=2))
 red = np.sum((b[:,:,0]>200)&(b[:,:,1]<50)&(b[:,:,2]<50))
-print(f'Match: {match/total*100:.2f}% ({match}/{total})')
-print(f'Diff: {total-match} pixels')
+print(f'Full-image match: {full_match/total*100:.2f}% (inflated by background)')
+print(f'Content-area match: {content_match/content_total*100:.2f}% ({content_match}/{content_total})')
 print(f'Red leak: {red} px')
 "
 ```
 
 ### Test Thresholds
 
+The automated tests use full-image pixel comparison, which is **inflated by
+white background matching**.  These thresholds are regression guards only —
+they do not measure actual compliance.
+
 | Threshold | Value | Purpose |
 |---|---|---|
-| `MinMatchRatio` | 0.95 (95%) | Minimum pixel match floor |
+| `MinMatchRatio` | 0.95 (95%) | Full-image regression floor (inflated by background) |
 | `MaxRedPixelLeak` | 2,000 | Maximum allowed red pixels |
 | Viewport | 1024 × 768 | Standard Acid2 test dimensions |
 | `ColorTolerance` | 5 | Per-channel tolerance for pixel comparison |
 
-These thresholds are regression guards.  As rendering improves, raise
-`MinMatchRatio` and lower `MaxRedPixelLeak` accordingly.
+**Important:** A 95% full-image match does not mean the renderer is 95%
+compliant.  Only 8.97% of content pixels actually match.  Future test
+improvements should add content-area-specific assertions.
 
 ---
 
@@ -468,8 +529,9 @@ These thresholds are regression guards.  As rendering improves, raise
 - [ ] **Phase 6.5** — Fix scalp `position:fixed` viewport anchor (~1,600 px)
 - [ ] **Phase 7** — Sub-pixel perfection and final audit
 - [ ] Achieve 0 red-pixel leak
-- [ ] Achieve ≥ 98% pixel match
-- [ ] Achieve ≥ 99.5% pixel match (stretch goal)
+- [ ] Achieve ≥ 70% content-area pixel match (Phase 6 target)
+- [ ] Achieve ≥ 95% content-area pixel match (Phase 7 target)
+- [ ] Add content-area-specific assertions to automated tests
 
 ---
 
