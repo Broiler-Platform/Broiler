@@ -87,6 +87,13 @@ A comprehensive plan covering milestones from Enhanced MVP through to a
 production-grade, standards-compliant HTML and JavaScript engine.
 See the [HTML & JS Engine Roadmap](docs/roadmap/html-js-engine.md) for details.
 
+### Development Console & Development Site
+
+A roadmap for integrating an in-app developer console and a dedicated
+development site to aid rendering investigation, debugging, and testing.
+See the [Dev Console & Site Roadmap](docs/roadmap/dev-console-and-site.md)
+for details.
+
 ### CLI Website Capture Tool
 
 A cross-platform command-line tool for capturing website screenshots.
