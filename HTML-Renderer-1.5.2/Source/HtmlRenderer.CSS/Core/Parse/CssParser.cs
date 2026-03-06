@@ -711,7 +711,15 @@ internal sealed class CssParser
                         }
                     }
                 }
-                // Other attribute selectors: skip
+                // Other attribute selectors (e.g. [dir="rtl"], [hidden]):
+                // we cannot match by attribute, so discard the entire rule
+                // to avoid the stripped selector matching too broadly.
+                // Without this, *[DIR="rtl"] would become * and apply
+                // direction:rtl to every element.
+                else
+                {
+                    return null;
+                }
             }
             else
             {

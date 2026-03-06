@@ -1,10 +1,8 @@
-using System;
 using System.Drawing;
 using System.Linq;
 using SkiaSharp;
 using TheArtOfDev.HtmlRenderer.Core.IR;
 using TheArtOfDev.HtmlRenderer.Image;
-using TheArtOfDev.HtmlRenderer.Image.Adapters;
 using Xunit;
 
 namespace HtmlRenderer.Tests;
@@ -12,7 +10,7 @@ namespace HtmlRenderer.Tests;
 public class TextRenderTest
 {
     [Fact]
-    public void WelcomeToBroiler_TextNotReversed()
+    public void LtrText_IsNotMarkedRtl()
     {
         string html = "<html><body><h1>Welcome to Broiler</h1></body></html>";
 
@@ -36,20 +34,16 @@ public class TextRenderTest
         var textItems = displayList.Items.OfType<DrawTextItem>().ToList();
         Assert.True(textItems.Count > 0, "Expected at least one text item");
 
-        // Collect all text from display list
+        // The combined text must contain the original words in their correct order
         var allText = string.Join("", textItems.Select(t => t.Text));
-        Console.WriteLine($"All text from display list: '{allText}'");
-        
-        foreach (var item in textItems)
-        {
-            Console.WriteLine($"  Text: '{item.Text}' IsRtl={item.IsRtl}");
-            // Check that no word is reversed
-            Assert.DoesNotContain("emocleW", item.Text);
-            Assert.DoesNotContain("reliorB", item.Text);
-        }
-
-        // The full text should contain "Welcome" and "Broiler" (not reversed)
         Assert.Contains("Welcome", allText);
         Assert.Contains("Broiler", allText);
+
+        // No text item should be marked RTL for a plain LTR page
+        foreach (var item in textItems)
+        {
+            Assert.False(item.IsRtl,
+                $"Text '{item.Text}' should not be marked RTL on a LTR page");
+        }
     }
 }
