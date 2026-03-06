@@ -715,7 +715,7 @@ internal sealed class CssParser
                 // we cannot match by attribute, so discard the entire rule
                 // to avoid the stripped selector matching too broadly.
                 // Without this, *[DIR="rtl"] would become * and apply
-                // direction:rtl to every element.
+                // direction: rtl to every element.
                 else
                 {
                     return null;
