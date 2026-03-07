@@ -309,9 +309,16 @@ internal class CssBox : CssBoxProperties, IDisposable
                     && (Left == null || Left == CssConstants.Auto
                      || Right == null || Right == CssConstants.Auto))
                 {
+                    // DEBUG TRACE
+                    string tag = HtmlTag?.Name ?? "anon";
+                    string cls = HtmlTag?.TryGetAttribute("class") ?? "";
+                    System.IO.File.AppendAllText("/tmp/stf_trace.log", $"[STF] tag={tag} class={cls} Position={Position} Width={Width} Left={Left} Right={Right} CBWidth={ContainingBlock.Size.Width}\n");
+                    
                     GetMinMaxWidth(out double prefMin, out double preferred);
                     double available = width - ActualMarginLeft - ActualMarginRight;
                     double stfWidth = Math.Min(Math.Max(prefMin, available), preferred);
+                    
+                    System.IO.File.AppendAllText("/tmp/stf_trace.log", $"[STF]   prefMin={prefMin} preferred={preferred} available={available} stfWidth={stfWidth}\n");
 
                     if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
                     {
@@ -324,7 +331,9 @@ internal class CssBox : CssBoxProperties, IDisposable
                         if (stfWidth < minW) stfWidth = minW;
                     }
 
+                    System.IO.File.AppendAllText("/tmp/stf_trace.log", $"[STF]   final stfWidth={stfWidth} Size.Width before={Size.Width}\n");
                     Size = new SizeF((float)stfWidth, Size.Height);
+                    System.IO.File.AppendAllText("/tmp/stf_trace.log", $"[STF]   Size.Width after={Size.Width}\n");
                 }
                 else if (Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
                 {
