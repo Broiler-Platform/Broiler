@@ -1,6 +1,6 @@
 # Acid2 Compliance Report — Version 2
 
-> **Version:** 2.2
+> **Version:** 2.3
 > **Date:** 2026-03-07
 > **Supersedes:** All previous Acid2 compliance documentation (including `acid/acid2/acid2-compliance-roadmap.md`)
 
@@ -10,9 +10,9 @@
 
 | Metric | Value |
 |---|---|
-| **Content-area pixel match** | **8.97%** (3,861 / 43,065 content pixels) |
-| Content bounding-box pixel match | 42.24% (15,965 / 37,800 pixels in face region) |
-| **Full-image pixel match (incl. background)** | **98.39%** — misleading: 94.5% of the image is white background that matches trivially |
+| **Content-area pixel match** | **55.20%** (13,981 / 25,329 content pixels) |
+| Content bounding-box pixel match | TBD — re-measure after Phase 6.2/6.3 fixes |
+| **Full-image pixel match (incl. background)** | **98.56%** — misleading: 94.5% of the image is white background that matches trivially |
 | Red-pixel leak (CSS failure indicator) | **0** in Broiler, 0 in Chromium |
 | Test dimensions | 1024 × 768 |
 | Content bounding box (Chromium) | x: [72, 240], y: [51, 276] — 168 × 225 px |
@@ -21,16 +21,20 @@
 | Chromium version | 145.0.7632.6 (Playwright v1.58.2) |
 | Last verified | 2026-03-07 |
 
-### Current State: Far From Compliant
+### Current State: Progressing — Phase 6 In Progress
 
-Broiler's html-renderer produces a **severely broken** Acid2 face.  While
-the full-image pixel match is 97.70%, this is entirely misleading — 94.5% of
-both images is plain white background.  When comparing only the content
-pixels (any pixel that is non-white in either render), **only 8.97% match**.
+Broiler's html-renderer produces a **recognisable but imperfect** Acid2 face.
+The content-area pixel match has improved from 8.97% to **55.20%** after
+Phase 6.2 and 6.3 fixes.  The face outline, forehead, eyes, nose, smile bar,
+and chin borders are all visible in approximately correct positions.
 
-Visual inspection confirms: the nose is malformed, the smile is broken, and
-the overall face structure is wrong.  The renderer is **not close** to Acid2
-compliance.
+Phase 6.2 fixed the float height override for percentage heights resolving
+to auto (CSS 2.1 §10.5), correcting the `.nose` float's border-box height
+from 12px to 48px and improving the `.smile` clearance computation.
+
+Phase 6.3 (partial) fixed the shrink-to-fit width for absolutely positioned
+elements to include the element's own borders and padding (CSS 2.1 §10.3.7),
+correcting the `.first.one` blockquote width from 48px to 96px.
 
 As of Phase 5.4, all red pixel leaks have been eliminated (0 remaining).
 The eyes region renders with correct layout (Phase 5.3) and absolutely
@@ -95,8 +99,8 @@ Both images are compared using two complementary approaches:
   is below 250 (i.e., not near-white) in *either* image, then compares only
   those.  Near-white is defined as all channels > 250, a threshold chosen to
   exclude the plain white background while tolerating minor anti-aliasing.
-  This produces the **8.97% content match** — the honest measure of how well
-  the Acid2 face is rendered.
+  This produces the **55.20% content match** (up from 8.97% before Phase 6)
+  — the honest measure of how well the Acid2 face is rendered.
 - **Content bounding-box diff:** Crops both images to the Chromium
   reference's content bounding box (x: 72–240, y: 51–276, 168 × 225 px) and
   compares pixel-by-pixel.  This gives **42.24% match** within the face
@@ -142,17 +146,17 @@ All images are located in `acid/acid2/`.
 
 | Metric | Value |
 |---|---|
-| Full-image pixel match | 95.01% (747,161 / 786,432) — **inflated by 94.5% white background** |
-| Content-pixel match | **8.97%** (3,861 / 43,065 non-white pixels) |
-| Content bounding-box match | **42.24%** (15,965 / 37,800 pixels in face region) |
-| Different content pixels | 39,204 |
-| Red-pixel leak | 1,680 (Broiler), 0 (Chromium) |
+| Full-image pixel match | 98.56% (775,084 / 786,432) — **inflated by 94.5% white background** |
+| Content-pixel match | **55.20%** (13,981 / 25,329 non-white pixels) |
+| Content bounding-box match | TBD — re-measure after Phase 6 fixes |
+| Different pixels | 11,348 |
+| Red-pixel leak | **0** (Broiler), 0 (Chromium) |
 
-**Visual assessment:** The Broiler render is severely broken.  The overall
-face outline is vaguely recognisable but nearly every facial feature differs
-from the reference: eyes are missing, the nose is malformed with red
-bleed-through, the forehead shape is wrong, the smile is broken, and there
-are large areas of incorrect color.
+**Visual assessment:** The Broiler render produces a **recognisable** Acid2
+face.  The scalp, forehead, eyes region, nose, smile bar, and chin borders
+are all visible in approximately correct positions.  Remaining differences
+are primarily vertical offset issues, font metric differences, and some
+elements appearing below the face that should be hidden.
 
 ### 2.3  Region-Level Diff Summary
 
@@ -186,18 +190,18 @@ region is much higher.
 | Other | 909 | Anti-aliasing or blended colours |
 | **Total** | **39,271** | |
 
-### 2.5  Improvement Since v1
+### 2.5  Improvement History
 
 These numbers use the full-image metric for comparability with v1, but
 remember: both are inflated by white-background matching.
 
-| Metric | v1 (2026-03-05) | v2 (2026-03-06) | Change |
-|---|---|---|---|
-| Full-image pixel match | 90.91% | 95.01% | +4.10 pp |
-| Different pixels | 71,456 | 39,271 | −32,185 |
-| Red-pixel leak | 3,744 | 1,680 | −2,064 |
-| Content-area match | not measured | **8.97%** | — |
-| Content bbox match | not measured | **42.24%** | — |
+| Metric | v1 (2026-03-05) | v2 (2026-03-06) | v2.3 (2026-03-07) | Change (v2→v2.3) |
+|---|---|---|---|---|
+| Full-image pixel match | 90.91% | 95.01% | **98.56%** | +3.55 pp |
+| Different pixels | 71,456 | 39,271 | **11,348** | −27,923 |
+| Red-pixel leak | 3,744 | 1,680 | **0** | −1,680 |
+| Content-area match | not measured | **8.97%** | **55.20%** | +46.23 pp |
+| Content bbox match | not measured | **42.24%** | TBD | — |
 
 ---
 
@@ -280,9 +284,9 @@ double-counting.
 
 ### 3.2  Remaining Issues
 
-The following issues produce the remaining 39,204 mismatched content pixels
-(91% of all content) and 1,680 red pixels.  The renderer is far from
-compliant — nearly every facial feature is broken.
+The following issues produced the majority of mismatched content pixels.
+After Phase 6.2/6.3, diff pixels reduced from 39,204 to 11,348 and
+content-area match improved from 8.97% to 55.20%.  Red-pixel leak is 0.
 
 #### 3.2.1  Eyes Region — Background Image & Stacking (~~1,584~~ 0 red px) ✅
 
@@ -441,16 +445,44 @@ different line-height calculation at tiny font sizes.
 
 **CSS 2.1 reference:** §10.8 (line-height).
 
-#### 3.2.6  Smile — Margin Collapsing Precision (0 red px)
+#### 3.2.6  Smile — Margin Collapsing Precision (0 red px) ✅
 
 **Location:** Smile region (y 310–360).
 
-**Root cause:** `clear:both` with negative clearance interaction produces
-slightly incorrect vertical offset.  4.2% mismatch, no red.
+**Root cause (resolved in Phase 6.2):** The float height override in
+`CssBox.PerformLayoutImp` did not check whether a percentage `height` value
+resolved to `auto` (CSS 2.1 §10.5).  For the `.nose` float with
+`height:60%`, the containing block (`.picture`) has auto height, so
+`height:60%` resolves to auto.  However, the override treated it as an
+explicit height, computing `ActualHeight = 60% × 0 = 0` and setting
+`ActualBottom = Location.Y + 0 + border = Location.Y + 12`.  This
+collapsed the nose's border-box from 48px (correct: 36px content from
+`max-height:3em` + 12px border-bottom) to just 12px.
 
-**Impact:** ~2,200 diff pixels.
+The incorrect float height cascaded to `CollectMaxFloatBottom` in
+`CssBoxHelper.cs`, which also used the same flawed `ActualHeight` for
+floats with non-auto `Height`.  The smile's `clear:both` clearance was
+computed against a float bottom that was 36px too high, misplacing the
+smile and all subsequent elements.
 
-**CSS 2.1 reference:** §8.3.1 (margin collapsing), §9.5.1 (clearance).
+**Fix:** Added `resolveToAuto` check (matching the explicit height
+constraint at §10.6.3) to both:
+1. The float height override in `PerformLayoutImp` — skip override when
+   percentage height resolves to auto
+2. `CollectMaxFloatBottom` in `CssBoxHelper.cs` — use `ActualBottom`
+   (layout-computed) instead of `ActualHeight` (CSS-specified) for
+   percentage-auto heights
+
+**Results (Phase 6.2):**
+- `.nose` border-box height: 12px → 48px ✓
+- `.smile` vertical position: corrected by 36px ✓
+- Content-area pixel match: 8.97% → 50.52% (Phase 6.2 alone)
+- Full-image pixel match: 98.39% → 98.39% (shifted content)
+
+**Impact:** ~2,200 diff pixels corrected.
+
+**CSS 2.1 reference:** §8.3.1 (margin collapsing), §9.5.1 (clearance),
+§10.5 (percentage heights), §10.6.1 (float height).
 
 #### 3.2.7  Scalp — position:fixed Viewport Anchor (0 red px)
 
@@ -470,10 +502,10 @@ scrolled region.
 
 ### Current Compliance Level
 
-- **Content-area pixel match: 8.97%** — the renderer fails 91% of content pixels.
+- **Content-area pixel match: 55.20%** — up from 8.97% after Phase 6.2/6.3 fixes.
 - **Red-pixel leak: 0** — all red pixels eliminated by Phase 5.4.
-- **Full-image pixel match: 97.70%** — up from 96.31%.
-- **Visual assessment: far from compliant** — nose wrong, smile broken, but eyes now render and no red leak.
+- **Full-image pixel match: 98.56%** — up from 98.39%.
+- **Visual assessment: recognisable face** — scalp, forehead, eyes, nose, smile, chin borders visible. Remaining issues are vertical offsets and font metrics.
 
 ### Phase 5 — Eliminate Red Pixels (Target: 0 red pixels) ✅ Complete
 
@@ -493,10 +525,10 @@ Red pixels are the canonical Acid2 failure signal.  **0 remain after Phase 5.4.*
 | # | Task | Pixel Impact | CSS 2.1 Ref | Effort | Priority |
 |---|---|---|---|---|---|
 | 6.1 | **Fix forehead overflow clip rect** — Fixed negative-margin collapsing in `MarginTopCollapse` (CSS 2.1 §8.3.1): replaced `Math.Max(prev, cur)` with the general formula `max(positives,0) + min(negatives,0)`.  This correctly handles the `.nose` float's `margin-top: -2em` against the `.forehead`'s `margin-bottom: 4em`, moving the nose up 24 px and filling the gap in the face.  Pixel match improved from 97.70% → 98.39%.  Diff pixels reduced from ~18,056 → 12,675 (~5,381 px). | ~~5,700~~ 5,381 px | §8.3.1 | M | ✅ Done |
-| 6.2 | **Fix smile margin-collapsing precision** — Correct the clearance value for `clear:both` after floats with negative margins. | ~2,200 px | §8.3.1, §9.5.1 | L | P1 |
-| 6.3 | **Fix ears/2nd-line layout** — Correct float shrink-wrap and attribute-selector matching for compound selectors in the 2nd-line ear region. | ~2,900 px | §10.3.7, §5.8 | M | P2 |
-| 6.4 | **Fix chin inline line-height** — Correct `display:inline` line-height calculation at tiny font sizes (`font:2px/4px serif`). | ~1,800 px | §10.8 | S | P2 |
-| 6.5 | **Fix scalp position:fixed viewport anchor** — Fixed-position elements should anchor to viewport top regardless of scroll position. | ~1,600 px | §9.6.1 | M | P2 |
+| 6.2 | **Fix smile margin-collapsing precision** — Float height override for percentage heights resolving to auto incorrectly collapsed the `.nose` border-box from 48px to 12px.  Fixed by adding `resolveToAuto` check to both the float height override in `PerformLayoutImp` and `CollectMaxFloatBottom` in `CssBoxHelper.cs`.  Smile vertical position corrected by 36px.  Content-area match improved from 8.97% → 50.52%. | ~~2,200~~ fixed | §8.3.1, §9.5.1, §10.5 | L | ✅ Done |
+| 6.3 | **Fix ears/2nd-line layout** — Shrink-to-fit width for abs-pos elements now adds the element's own borders/padding (§10.3.7).  Blockquote width corrected from 48px to 96px.  Content-area match improved from 50.52% → 55.20%.  Remaining: attribute-selector matching and float interactions need further investigation. | ~~2,900~~ partially fixed | §10.3.7, §5.8 | M | ✅ Partial |
+| 6.4 | **Fix chin inline line-height** — Investigation shows `display:inline` with `font:2px/4px serif` parses correctly (font-size=2px, line-height=4px).  The chin height (12px from parent strut) is correct per CSS 2.1 §10.8.1.  Remaining difference is primarily vertical positioning (dependent on smile/nose fixes above) and font-metric rendering at tiny sizes. | ~1,800 px | §10.8 | S | P2 — follow-up |
+| 6.5 | **Fix scalp position:fixed viewport anchor** — Investigation confirms position:fixed elements are correctly placed at viewport-relative positions (p at y=108, p.bad at y=144).  PaintWalker correctly offsets fixed elements by viewport coordinates during paint.  Remaining ~1,600 px difference is from font metrics and overall vertical offset of the face structure. | ~1,600 px | §9.6.1 | M | P2 — follow-up |
 
 **Measurable outcome:** Content-area pixel match ≥ 70%.  Content bounding-box
 match ≥ 85%.
@@ -582,14 +614,14 @@ they do not measure actual compliance.
 
 | Threshold | Value | Purpose |
 |---|---|---|
-| `MinMatchRatio` | 0.96 (96%) | Full-image regression floor (inflated by background) |
-| `MaxRedPixelLeak` | 200 | Maximum allowed red pixels |
+| `MinMatchRatio` | 0.98 (98%) | Full-image regression floor (inflated by background) |
+| `MaxRedPixelLeak` | 0 | Maximum allowed red pixels |
 | Viewport | 1024 × 768 | Standard Acid2 test dimensions |
 | `ColorTolerance` | 5 | Per-channel tolerance for pixel comparison |
 
-**Important:** A 96% full-image match does not mean the renderer is 96%
-compliant.  Only 8.97% of content pixels actually match.  Future test
-improvements should add content-area-specific assertions.
+**Important:** A 98% full-image match does not mean the renderer is 98%
+compliant.  55.20% of content pixels actually match (up from 8.97%).
+Future test improvements should add content-area-specific assertions.
 
 ---
 
@@ -606,7 +638,7 @@ improvements should add content-area-specific assertions.
 - [x] Analyze root causes for each mismatch category
 - [x] Verify Chromium reference matches fresh Playwright render (2026-03-06: identical)
 
-### Completed Fixes (Phases 0–3, 5.1, 5.2, 5.3)
+### Completed Fixes (Phases 0–3, 5.1–5.4, 6.1–6.3)
 
 - [x] **Phase 0** — Load external `<link>` stylesheets (`data:text/css` URI, cascade)
 - [x] **Phase 1** — Eliminate bulk red pixels (HTML parser, sibling combinator, CSS error recovery)
@@ -619,21 +651,23 @@ improvements should add content-area-specific assertions.
   - [x] Fix NaN `ActualWordSpacing` in shrink-to-fit: `EnsureDescendantWordsMeasured`
   - [x] Fix additive block-float width accumulation: `ComputeShrinkToFitWidth`
   - [x] Fix CSS2.1 §10.6.3 explicit height override: direct `ActualBottom` assignment
-
-### In Progress
-
-- [ ] **Phase 5.4** — Fix `position:fixed` stacking for `p.bad` (96 red px)
+- [x] **Phase 5.4** — Fix `position:absolute` top/left and BFC auto-height (96 red px → 0)
+- [x] **Phase 6.1** — Fix forehead negative-margin collapsing (98.39% match)
+- [x] **Phase 6.2** — Fix smile margin-collapsing precision (content match 8.97% → 50.52%)
+  - [x] Add `resolveToAuto` check to float height override in `PerformLayoutImp`
+  - [x] Add `resolveToAuto` check to `CollectMaxFloatBottom` in `CssBoxHelper.cs`
+  - [x] `.nose` border-box height corrected: 12px → 48px
+- [x] **Phase 6.3** (partial) — Fix ears shrink-to-fit border-box width (content match → 55.20%)
+  - [x] Add borders/padding to shrink-to-fit width for abs-pos elements
 
 ### Remaining Work
 
-- [ ] **Phase 6.1** — Fix forehead overflow clip rect (~5,700 px)
-- [ ] **Phase 6.2** — Fix smile margin-collapsing precision (~2,200 px)
-- [ ] **Phase 6.3** — Fix ears/2nd-line layout (~2,900 px)
-- [ ] **Phase 6.4** — Fix chin inline line-height (~1,800 px)
-- [ ] **Phase 6.5** — Fix scalp `position:fixed` viewport anchor (~1,600 px)
+- [ ] **Phase 6.3** (remaining) — Attribute-selector matching and float interactions for ears
+- [ ] **Phase 6.4** — Fix chin inline line-height (~1,800 px) — font metrics at tiny sizes
+- [ ] **Phase 6.5** — Fix scalp `position:fixed` viewport anchor (~1,600 px) — vertical offset
 - [ ] **Phase 7** — Sub-pixel perfection and final audit
-- [ ] Achieve 0 red-pixel leak
-- [ ] Achieve ≥ 70% content-area pixel match (Phase 6 target)
+- [x] Achieve 0 red-pixel leak ✓
+- [ ] Achieve ≥ 70% content-area pixel match (Phase 6 target — currently 55.20%)
 - [ ] Achieve ≥ 95% content-area pixel match (Phase 7 target)
 - [ ] Add content-area-specific assertions to automated tests
 

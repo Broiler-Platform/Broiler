@@ -142,6 +142,20 @@ internal class CssBox : CssBoxProperties, IDisposable
         return ContainingBlock;
     }
 
+    /// <summary>
+    /// Returns true when <see cref="Height"/> is a percentage that resolves
+    /// to auto because the containing block's height is not explicitly
+    /// specified (CSS 2.1 §10.5).  Callers must still verify that Height is
+    /// not auto/empty before using this — the check only tests whether a
+    /// non-auto percentage value should be treated as auto.
+    /// </summary>
+    internal bool HeightPercentageResolvesToAuto()
+    {
+        return Height.Contains('%')
+            && (ContainingBlock.Height == CssConstants.Auto
+                || string.IsNullOrEmpty(ContainingBlock.Height));
+    }
+
     public HtmlTag HtmlTag { get; }
 
     public bool IsImage => Words.Count == 1 && Words[0].IsImage;
@@ -361,6 +375,12 @@ internal class CssBox : CssBoxProperties, IDisposable
                         double minW = CssValueParser.ParseLength(MinWidth, width, GetEmHeight());
                         if (stfWidth < minW) stfWidth = minW;
                     }
+
+                    // CSS2.1 §10.3.7: Shrink-to-fit gives the content
+                    // width; add own borders and padding for the border-box
+                    // width that Size.Width represents.
+                    stfWidth += ActualBorderLeftWidth + ActualBorderRightWidth
+                              + ActualPaddingLeft + ActualPaddingRight;
 
                     Size = new SizeF((float)stfWidth, Size.Height);
                 }
@@ -641,11 +661,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             // CSS2.1 §10.5: If height is a percentage and the containing
             // block's height is not explicitly specified (auto), the
             // percentage resolves to auto and this constraint is skipped.
-            bool resolveToAuto = Height.Contains('%')
-                && (ContainingBlock.Height == CssConstants.Auto
-                    || string.IsNullOrEmpty(ContainingBlock.Height));
-
-            if (!resolveToAuto)
+            if (!HeightPercentageResolvesToAuto())
             {
                 double borderBoxHeight = ActualHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
 
@@ -694,10 +710,15 @@ internal class CssBox : CssBoxProperties, IDisposable
         // Floats with an explicit CSS height establish a new BFC.
         // Their ActualBottom should reflect the stated height, not
         // content overflow from child floats (CSS2.1 §10.6.1).
+        // CSS2.1 §10.5: Percentage heights resolve to auto when
+        // the containing block's height is not explicitly specified.
         if (Float != CssConstants.None && Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
         {
-            double borderBoxHeight = ActualHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
-            ActualBottom = Location.Y + borderBoxHeight;
+            if (!HeightPercentageResolvesToAuto())
+            {
+                double borderBoxHeight = ActualHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+                ActualBottom = Location.Y + borderBoxHeight;
+            }
         }
 
         // Apply position:relative offset after layout (visual only, does not affect flow)
