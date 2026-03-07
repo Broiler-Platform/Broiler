@@ -282,11 +282,8 @@ internal static class CssBoxHelper
             // use ActualBottom (layout-computed) in that case.
             double bottom;
             bool hasExplicitHeight = box.Height != CssConstants.Auto && !string.IsNullOrEmpty(box.Height);
-            bool resolveToAuto = hasExplicitHeight && box.Height.Contains('%')
-                && (box.ContainingBlock.Height == CssConstants.Auto
-                    || string.IsNullOrEmpty(box.ContainingBlock.Height));
 
-            if (hasExplicitHeight && !resolveToAuto)
+            if (hasExplicitHeight && !box.HeightPercentageResolvesToAuto())
                 bottom = box.Location.Y + box.ActualHeight
                     + box.ActualPaddingTop + box.ActualPaddingBottom
                     + box.ActualBorderTopWidth + box.ActualBorderBottomWidth

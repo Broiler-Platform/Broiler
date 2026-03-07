@@ -142,6 +142,20 @@ internal class CssBox : CssBoxProperties, IDisposable
         return ContainingBlock;
     }
 
+    /// <summary>
+    /// Returns true when <see cref="Height"/> is a percentage that resolves
+    /// to auto because the containing block's height is not explicitly
+    /// specified (CSS 2.1 §10.5).  Callers must still verify that Height is
+    /// not auto/empty before using this — the check only tests whether a
+    /// non-auto percentage value should be treated as auto.
+    /// </summary>
+    internal bool HeightPercentageResolvesToAuto()
+    {
+        return Height.Contains('%')
+            && (ContainingBlock.Height == CssConstants.Auto
+                || string.IsNullOrEmpty(ContainingBlock.Height));
+    }
+
     public HtmlTag HtmlTag { get; }
 
     public bool IsImage => Words.Count == 1 && Words[0].IsImage;
@@ -647,11 +661,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             // CSS2.1 §10.5: If height is a percentage and the containing
             // block's height is not explicitly specified (auto), the
             // percentage resolves to auto and this constraint is skipped.
-            bool resolveToAuto = Height.Contains('%')
-                && (ContainingBlock.Height == CssConstants.Auto
-                    || string.IsNullOrEmpty(ContainingBlock.Height));
-
-            if (!resolveToAuto)
+            if (!HeightPercentageResolvesToAuto())
             {
                 double borderBoxHeight = ActualHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
 
@@ -704,11 +714,7 @@ internal class CssBox : CssBoxProperties, IDisposable
         // the containing block's height is not explicitly specified.
         if (Float != CssConstants.None && Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
         {
-            bool floatHeightResolvesToAuto = Height.Contains('%')
-                && (ContainingBlock.Height == CssConstants.Auto
-                    || string.IsNullOrEmpty(ContainingBlock.Height));
-
-            if (!floatHeightResolvesToAuto)
+            if (!HeightPercentageResolvesToAuto())
             {
                 double borderBoxHeight = ActualHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
                 ActualBottom = Location.Y + borderBoxHeight;
