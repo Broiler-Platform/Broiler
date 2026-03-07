@@ -1,6 +1,6 @@
 # Acid2 Compliance Report — Version 2
 
-> **Version:** 2.4
+> **Version:** 2.5
 > **Date:** 2026-03-07
 > **Supersedes:** All previous Acid2 compliance documentation (including `acid/acid2/acid2-compliance-roadmap.md`)
 
@@ -10,23 +10,35 @@
 
 | Metric | Value |
 |---|---|
-| **Content-area pixel match** | **55.20%** (13,969 / 25,317 content pixels) |
-| Content bounding-box pixel match | TBD — re-measure after Phase 6.4+ fixes |
-| **Full-image pixel match (incl. background)** | **98.56%** — misleading: 94.5% of the image is white background that matches trivially |
+| **Content-area pixel match** | **62.95%** (15,349 / 24,381 content pixels) |
+| Content bounding-box pixel match | TBD — re-measure after Phase 7+ fixes |
+| **Full-image pixel match (incl. background)** | **98.85%** — misleading: 94.5% of the image is white background that matches trivially |
 | Red-pixel leak (CSS failure indicator) | **0** in Broiler, 0 in Chromium |
 | Test dimensions | 1024 × 768 |
 | Content bounding box (Chromium) | x: [72, 240], y: [51, 276] — 168 × 225 px |
 | Render target | `acid2.html#top` (face test area) |
-| Automated test status | **All 6 differential tests passing** |
+| Automated test status | **All 10 tests passing** (6 differential + 4 regression) |
 | Chromium version | 145.0.7632.6 (Playwright v1.58.2) |
 | Last verified | 2026-03-07 |
 
-### Current State: Progressing — Phase 6 In Progress
+### Current State: Progressing — Phase 6 Complete
 
 Broiler's html-renderer produces a **recognisable but imperfect** Acid2 face.
-The content-area pixel match has improved from 8.97% to **55.20%** after
-Phase 6.2 and 6.3 fixes.  The face outline, forehead, eyes, nose, smile bar,
-and chin borders are all visible in approximately correct positions.
+The content-area pixel match has improved from 8.97% to **62.95%** after
+Phase 6.2–6.4 fixes.  The face outline, forehead, eyes, nose, smile bar,
+and chin borders are all visible in approximately correct positions.  The
+face height is 242px (reference: 225px), a 17px difference primarily from
+parser/list-item rendering in the bottom face area.
+
+Phase 6.4 fixed three CSS 2.1 compliance issues:
+1. **MarginTopCollapse parent-child border check** (§8.3.1): parent-child
+   margins no longer collapse when the parent has non-zero border-top or
+   border-bottom, matching the `.picture` transparent border in Acid2.
+2. **MarginBottomCollapse relative positioning** (§9.4.3): `position:relative`
+   offsets no longer leak into parent auto-height calculation.  The
+   `.smile div` (bottom:-1em) was adding 12px to the smile's height.
+3. **Sibling positioning relative offset** (§9.4.3): siblings of relatively
+   positioned elements now use the flow-position bottom (before visual offset).
 
 Phase 6.2 fixed the float height override for percentage heights resolving
 to auto (CSS 2.1 §10.5), correcting the `.nose` float's border-box height
@@ -536,7 +548,7 @@ Red pixels are the canonical Acid2 failure signal.  **0 remain after Phase 5.4.*
 | 6.1 | **Fix forehead overflow clip rect** — Fixed negative-margin collapsing in `MarginTopCollapse` (CSS 2.1 §8.3.1): replaced `Math.Max(prev, cur)` with the general formula `max(positives,0) + min(negatives,0)`.  This correctly handles the `.nose` float's `margin-top: -2em` against the `.forehead`'s `margin-bottom: 4em`, moving the nose up 24 px and filling the gap in the face.  Pixel match improved from 97.70% → 98.39%.  Diff pixels reduced from ~18,056 → 12,675 (~5,381 px). | ~~5,700~~ 5,381 px | §8.3.1 | M | ✅ Done |
 | 6.2 | **Fix smile margin-collapsing precision** — Float height override for percentage heights resolving to auto incorrectly collapsed the `.nose` border-box from 48px to 12px.  Fixed by adding `resolveToAuto` check to both the float height override in `PerformLayoutImp` and `CollectMaxFloatBottom` in `CssBoxHelper.cs`.  Smile vertical position corrected by 36px.  Content-area match improved from 8.97% → 50.52%. | ~~2,200~~ fixed | §8.3.1, §9.5.1, §10.5 | L | ✅ Done |
 | 6.3 | **Fix ears/2nd-line layout** — Shrink-to-fit width for abs-pos elements now adds the element's own borders/padding (§10.3.7).  Blockquote width corrected from 48px to 96px.  Content-area match improved from 50.52% → 55.20%.  Phase 6.3 completion: validated attribute-selector matching (`[class~=one].first.one`, `[class=second\ two]`) and float interactions for the ears region; confirmed shrink-to-fit border-box width is correct; added NaN guards in `ComputeShrinkToFitWidth` and `FragmentTreeBuilder`; added content-area match test assertion. | ~~2,900~~ partially fixed | §10.3.7, §5.8 | M | ✅ Done |
-| 6.4 | **Fix chin inline line-height** — Investigation shows `display:inline` with `font:2px/4px serif` parses correctly (font-size=2px, line-height=4px).  The chin height (12px from parent strut) is correct per CSS 2.1 §10.8.1.  Remaining difference is primarily vertical positioning (dependent on smile/nose fixes above) and font-metric rendering at tiny sizes. | ~1,800 px | §10.8 | S | P2 — follow-up |
+| 6.4 | **Fix margin collapsing and relative positioning** — Three CSS 2.1 compliance fixes: (1) Parent-child margins no longer collapse when parent has non-zero border (§8.3.1); (2) `position:relative` offset excluded from parent auto-height in `MarginBottomCollapse` (§9.4.3); (3) siblings use flow-position bottom for layout.  Content-area match improved from 55.20% → 62.95%.  Face height reduced from 254px → 242px (reference: 225px).  Added 4 regression tests. | ~~1,800~~ fixed | §8.3.1, §9.4.3 | M | ✅ Done |
 | 6.5 | **Fix scalp position:fixed viewport anchor** — Investigation confirms position:fixed elements are correctly placed at viewport-relative positions (p at y=108, p.bad at y=144).  PaintWalker correctly offsets fixed elements by viewport coordinates during paint.  Remaining ~1,600 px difference is from font metrics and overall vertical offset of the face structure. | ~1,600 px | §9.6.1 | M | P2 — follow-up |
 
 **Measurable outcome:** Content-area pixel match ≥ 70%.  Content bounding-box

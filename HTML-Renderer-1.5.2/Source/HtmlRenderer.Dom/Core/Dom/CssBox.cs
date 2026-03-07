@@ -414,7 +414,14 @@ internal class CssBox : CssBoxProperties, IDisposable
                         flowPrev = DomUtils.GetPreviousInFlowSibling(flowPrev);
                     }
 
-                    double top = (flowPrev == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + MarginTopCollapse(flowPrev) + (flowPrev != null ? flowPrev.ActualBottom : 0);
+                    // CSS2.1 §9.4.3: Relative positioning is visual-only.
+                    // Use the flow-position bottom (before relative offset)
+                    // when computing the next sibling's position.
+                    double flowPrevBottom = flowPrev?.ActualBottom ?? 0;
+                    if (flowPrev is CssBox flowPrevBox && flowPrevBox.Position == CssConstants.Relative)
+                        flowPrevBottom -= GetRelativeOffsetY(flowPrevBox);
+
+                    double top = (flowPrev == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + MarginTopCollapse(flowPrev) + flowPrevBottom;
 
                     // --- Float positioning ---
                     if (Float != CssConstants.None)
@@ -553,7 +560,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                                 double prevMarginBottom = (flowPrev is CssBox fpb)
                                     ? GetEffectiveMarginBottom(fpb)
                                     : flowPrev.ActualMarginBottom;
-                                uncollapsedTop = flowPrev.ActualBottom
+                                uncollapsedTop = flowPrevBottom
                                     + prevMarginBottom
                                     + ActualMarginTop;
                             }
@@ -1047,7 +1054,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
             CollapsedMarginTop = value;
         }
-        else if (_parentBox != null && ActualPaddingTop < 0.1 && ActualPaddingBottom < 0.1 && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1)
+        else if (_parentBox != null && ActualPaddingTop < 0.1 && ActualPaddingBottom < 0.1 && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1 && _parentBox.ActualBorderTopWidth < 0.1 && _parentBox.ActualBorderBottomWidth < 0.1)
         {
             value = Math.Max(0, ActualMarginTop - Math.Max(_parentBox.ActualMarginTop, _parentBox.CollapsedMarginTop));
         }
@@ -1133,10 +1140,35 @@ internal class CssBox : CssBoxProperties, IDisposable
                 continue;
             }
 
-            maxChildBottom = Math.Max(maxChildBottom, child.ActualBottom);
+            // CSS2.1 §9.4.3: Relative positioning is visual-only and
+            // does not affect the flow position used for auto-height
+            // calculation.  Undo the relative offset so the parent
+            // measures the child's normal-flow bottom.
+            double childBottom = child.ActualBottom;
+            if (child.Position == CssConstants.Relative)
+                childBottom -= GetRelativeOffsetY(child);
+
+            maxChildBottom = Math.Max(maxChildBottom, childBottom);
         }
 
         return Math.Max(ActualBottom, maxChildBottom + margin + ActualPaddingBottom + ActualBorderBottomWidth);
+    }
+
+    /// <summary>
+    /// Computes the vertical offset applied by <c>position: relative</c>.
+    /// CSS2.1 §9.4.3: <c>top</c> takes precedence over <c>bottom</c>.
+    /// Returns 0 if the element is not relatively positioned or has no offset.
+    /// </summary>
+    private static double GetRelativeOffsetY(CssBoxProperties box)
+    {
+        bool hasTop = box.Top != null && box.Top != CssConstants.Auto;
+        bool hasBottom = box.Bottom != null && box.Bottom != CssConstants.Auto;
+
+        if (hasTop)
+            return CssValueParser.ParseLength(box.Top, box.Size.Height, box.GetEmHeight());
+        if (hasBottom)
+            return -CssValueParser.ParseLength(box.Bottom, box.Size.Height, box.GetEmHeight());
+        return 0;
     }
 
     /// <summary>
