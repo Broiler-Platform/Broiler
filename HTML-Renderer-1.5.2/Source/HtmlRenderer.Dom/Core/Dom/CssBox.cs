@@ -119,6 +119,29 @@ internal class CssBox : CssBoxProperties, IDisposable
         }
     }
 
+    /// <summary>
+    /// CSS2.1 §10.1: For absolutely positioned elements, the containing
+    /// block is the padding-box of the nearest ancestor with a computed
+    /// position of <c>absolute</c>, <c>relative</c>, or <c>fixed</c>.
+    /// Falls back to <see cref="ContainingBlock"/> if none is found.
+    /// </summary>
+    private CssBox FindPositionedContainingBlock()
+    {
+        var box = ParentBox;
+        while (box != null)
+        {
+            if (box.Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed
+                || box.ParentBox == null)
+            {
+                return box;
+            }
+
+            box = box.ParentBox;
+        }
+
+        return ContainingBlock;
+    }
+
     public HtmlTag HtmlTag { get; }
 
     public bool IsImage => Words.Count == 1 && Words[0].IsImage;
@@ -532,6 +555,34 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                     Location = new PointF((float)left, (float)top);
                     ActualBottom = top;
+
+                    // CSS2.1 §10.3.7 / §10.6.4: For absolutely positioned
+                    // elements with explicit 'top'/'left', override the static
+                    // position with the CSS-specified offset from the containing
+                    // block's padding edge.
+                    if (Position == CssConstants.Absolute)
+                    {
+                        var cb = FindPositionedContainingBlock();
+                        double cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
+                        double cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
+
+                        float newX = Location.X, newY = Location.Y;
+
+                        if (Left != null && Left != CssConstants.Auto)
+                        {
+                            double cssLeft = CssValueParser.ParseLength(Left, cb.Size.Width, GetEmHeight());
+                            newX = (float)(cbPadLeft + cssLeft + ActualMarginLeft);
+                        }
+
+                        if (Top != null && Top != CssConstants.Auto)
+                        {
+                            double cssTop = CssValueParser.ParseLength(Top, cb.Size.Height, GetEmHeight());
+                            newY = (float)(cbPadTop + cssTop + ActualMarginTop);
+                        }
+
+                        Location = new PointF(newX, newY);
+                        ActualBottom = newY;
+                    }
                 }
                 else
                 {
@@ -1026,7 +1077,9 @@ internal class CssBox : CssBoxProperties, IDisposable
         bool isBfc = Float != CssConstants.None
             || Display == CssConstants.InlineBlock
             || Display == CssConstants.TableCell
-            || (Overflow != null && Overflow != CssConstants.Visible);
+            || (Overflow != null && Overflow != CssConstants.Visible)
+            || Position == CssConstants.Absolute
+            || Position == CssConstants.Fixed;
 
         // Use the maximum ActualBottom across all children to handle
         // floated children that may not be the last in source order.

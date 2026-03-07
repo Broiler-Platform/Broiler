@@ -1,6 +1,6 @@
 # Acid2 Compliance Report — Version 2
 
-> **Version:** 2.1
+> **Version:** 2.2
 > **Date:** 2026-03-07
 > **Supersedes:** All previous Acid2 compliance documentation (including `acid/acid2/acid2-compliance-roadmap.md`)
 
@@ -12,8 +12,8 @@
 |---|---|
 | **Content-area pixel match** | **8.97%** (3,861 / 43,065 content pixels) |
 | Content bounding-box pixel match | 42.24% (15,965 / 37,800 pixels in face region) |
-| Full-image pixel match (incl. background) | 96.31% — **misleading**: 94.5% of the image is white background that matches trivially |
-| Red-pixel leak (CSS failure indicator) | 96 in Broiler, 0 in Chromium |
+| Full-image pixel match (incl. background) | 97.70% — **misleading**: 94.5% of the image is white background that matches trivially |
+| Red-pixel leak (CSS failure indicator) | **0** in Broiler, 0 in Chromium |
 | Test dimensions | 1024 × 768 |
 | Content bounding box (Chromium) | x: [72, 240], y: [51, 276] — 168 × 225 px |
 | Render target | `acid2.html#top` (face test area) |
@@ -24,18 +24,17 @@
 ### Current State: Far From Compliant
 
 Broiler's html-renderer produces a **severely broken** Acid2 face.  While
-the full-image pixel match is 96.31%, this is entirely misleading — 94.5% of
+the full-image pixel match is 97.70%, this is entirely misleading — 94.5% of
 both images is plain white background.  When comparing only the content
 pixels (any pixel that is non-white in either render), **only 8.97% match**.
 
-Visual inspection confirms: the nose is malformed, there are residual red
-areas (CSS failure indicators), the smile is broken, and the overall face
-structure is wrong.  The renderer is **not close** to Acid2 compliance.
+Visual inspection confirms: the nose is malformed, the smile is broken, and
+the overall face structure is wrong.  The renderer is **not close** to Acid2
+compliance.
 
-As of Phase 5.3, the eyes region now renders with correct layout (NaN width
-blocker resolved).  Red pixel leak is reduced from 1,680 to 96 (94%
-reduction).  The remaining 96 red pixels come from the `p.bad`
-`position:fixed` stacking issue (Phase 5.4).
+As of Phase 5.4, all red pixel leaks have been eliminated (0 remaining).
+The eyes region renders with correct layout (Phase 5.3) and absolutely
+positioned elements now use CSS `top`/`left` properties correctly (Phase 5.4).
 
 ---
 
@@ -363,8 +362,8 @@ that specific cause.
 - Full-image pixel match: 95.01% → 96.31% ✓
 - Test thresholds tightened: `MinMatchRatio` 0.95→0.96, `MaxRedPixelLeak` 2000→200
 
-**Impact:** ~1,584 red pixels eliminated.  Remaining 96 red pixels are from
-`p.bad` `position:fixed` stacking (Phase 5.4).
+**Impact:** ~1,584 red pixels eliminated.  Remaining 96 red pixels were
+resolved by Phase 5.4 (absolute positioning fix).
 
 **CSS 2.1 reference:** Appendix E (paint order), §10.3.7 (shrink-to-fit
 width), §10.6.3 (explicit height), §14.2.1 (background images).
@@ -400,17 +399,36 @@ rect is slightly off, producing 15.9% mismatch despite no red leak.
 
 **Location:** 2nd line (y 156–157 in viewport).
 
-**Root cause:** The `p.bad` element (`position:fixed; border-bottom: red
-solid`) is painted first by PaintWalker (beneath in-flow content per Appendix
-E).  The `p + table + p` adjacent-sibling selector correctly matches and
-applies `margin-top: 3em`, positioning the element at viewport y ≈ 144 with
-height 12px (min-height overrides max-height) and a medium-width red
-bottom-border at y 156–157.  However, no opaque face content covers that
-precise location, so 96 red pixels (48 wide × 2 rows) remain visible.
+**Root cause (resolved in Phase 5.4):** The `.eyes` div (`position:absolute;
+top:5em; left:3em`) was placed at its static position (viewport y ≈ 192)
+instead of the CSS-specified offset from the containing block (viewport y =
+144).  The layout code only applied CSS `top`/`left` properties for
+`position:fixed` elements, not for `position:absolute`.  Additionally, the
+`blockquote.first.one` (`position:absolute`) had auto-height 0 instead of
+12px because the BFC check in `MarginBottomCollapse` did not include
+`position:absolute`, causing float children to be excluded from the height
+calculation.
 
-**Impact:** ~2,900 diff pixels, 96 red pixels.
+**Fix:** (1) After computing the static position for non-fixed elements,
+override with CSS `top`/`left` values when `position:absolute` and the
+values are not `auto`.  Added `FindPositionedContainingBlock()` to locate
+the nearest positioned ancestor per CSS 2.1 §10.1.  (2) Added
+`Position == Absolute` and `Position == Fixed` to the `isBfc` check in
+`MarginBottomCollapse` so absolutely positioned elements correctly include
+float children in their auto-height (CSS 2.1 §10.6.7).
 
-**CSS 2.1 reference:** §9.9 (stacking), §9.6.1 (fixed positioning).
+**Results (Phase 5.4):**
+- `.eyes` position: viewport (48, 192) → (84, 144) ✓
+- `blockquote.first.one` height: 0 → 12px ✓
+- Red pixel leak: 96 → **0** (100% reduction) ✓
+- Full-image pixel match: 96.31% → 97.70% ✓
+- Test thresholds tightened: `MinMatchRatio` 0.96→0.97, `MaxRedPixelLeak` 200→0
+
+**Impact:** 96 red pixels eliminated.  **All red pixels now eliminated.**
+
+**CSS 2.1 reference:** §9.9 (stacking), §9.6.1 (fixed positioning), §10.1
+(containing block for absolute), §10.3.7 (absolute positioning), §10.6.7
+(auto-height with floats).
 
 #### 3.2.5  Chin — Inline Line-Height (0 red px)
 
@@ -453,22 +471,22 @@ scrolled region.
 ### Current Compliance Level
 
 - **Content-area pixel match: 8.97%** — the renderer fails 91% of content pixels.
-- **Red-pixel leak: 96** — reduced from 1,680 by Phase 5.3 fixes.
-- **Full-image pixel match: 96.31%** — up from 95.01%.
-- **Visual assessment: far from compliant** — nose wrong, smile broken, but eyes now render.
+- **Red-pixel leak: 0** — all red pixels eliminated by Phase 5.4.
+- **Full-image pixel match: 97.70%** — up from 96.31%.
+- **Visual assessment: far from compliant** — nose wrong, smile broken, but eyes now render and no red leak.
 
-### Phase 5 — Eliminate Red Pixels (Target: 0 red pixels)
+### Phase 5 — Eliminate Red Pixels (Target: 0 red pixels) ✅ Complete
 
-Red pixels are the canonical Acid2 failure signal.  96 remain after Phase 5.3.
+Red pixels are the canonical Acid2 failure signal.  **0 remain after Phase 5.4.**
 
 | # | Task | Pixel Impact | CSS 2.1 Ref | Effort | Priority |
 |---|---|---|---|---|---|
 | 5.2 | **Fix background-image `url()` wrapper stripping** — Strip `url()` prefix before passing to `ImageLoadHandler.LoadImage` so `data:image/...` URIs are detected.  Add null guard in `RenderDrawImage` for `SKBitmap.Decode` returning null. | ~~1,254~~ 0 red px | §14.2.1 | S | ✅ Done |
 | 5.3 | **Fix eyes stacking / background rendering** — Resolved NaN width for `.eyes` div by: (1) recursively measuring descendant word sizes before shrink-to-fit computation, (2) computing per-child max width instead of additive accumulation, (3) fixing explicit `height:0` override via direct `ActualBottom` assignment.  Red pixels from eyes region eliminated.  **Remaining red:** 96px from `p.bad` fixed stacking (Phase 5.4). | ~~1,584~~ 0 red px | §9.7, §10.3.7, §10.6.3, App. E | L | ✅ Done |
-| 5.4 | **Fix position:fixed stacking for p.bad** — The `p.bad` element's red bottom-border at viewport y 156–157 is not covered by any opaque face content.  PaintWalker correctly paints fixed elements first; the gap is in face layout coverage.  **Hint:** The `p + table + p` adjacent-sibling selector correctly matches and applies `margin-top: 3em`.  The element lands at viewport y ≈ 144 with height 12 px and a medium-width red bottom-border at y 156–157.  The Phase 5.3 height:0 fix may shift face content closer to covering this region. | ~96 red px | §9.9, App. E | M | 🔴 P0 |
+| 5.4 | **Fix absolute positioning and BFC auto-height** — (1) Applied CSS `top`/`left` for `position:absolute` elements by overriding static position with the CSS-specified offset from the positioned containing block (`FindPositionedContainingBlock`).  (2) Added `position:absolute`/`fixed` to the BFC check in `MarginBottomCollapse` so float children contribute to auto-height per §10.6.7.  Eyes position corrected from viewport (48,192) to (84,144); blockquote height from 0→12px.  All 96 remaining red pixels eliminated. | ~~96~~ 0 red px | §9.9, §10.1, §10.3.7, §10.6.7 | M | ✅ Done |
 
 **Measurable outcome:** `Acid2Top_RedPixelLeak_BelowMaximum` passes with
-`MaxRedPixelLeak = 0`.
+`MaxRedPixelLeak = 0`.  ✅ Achieved.
 
 ### Phase 6 — Layout Precision (Target: ≥ 70% content-area match)
 
