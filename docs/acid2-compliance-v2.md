@@ -1,7 +1,7 @@
 # Acid2 Compliance Report — Version 2
 
-> **Version:** 2.0
-> **Date:** 2026-03-06
+> **Version:** 2.1
+> **Date:** 2026-03-07
 > **Supersedes:** All previous Acid2 compliance documentation (including `acid/acid2/acid2-compliance-roadmap.md`)
 
 ---
@@ -12,31 +12,30 @@
 |---|---|
 | **Content-area pixel match** | **8.97%** (3,861 / 43,065 content pixels) |
 | Content bounding-box pixel match | 42.24% (15,965 / 37,800 pixels in face region) |
-| Full-image pixel match (incl. background) | 95.01% — **misleading**: 94.5% of the image is white background that matches trivially |
-| Red-pixel leak (CSS failure indicator) | 1,680 in Broiler, 0 in Chromium |
+| Full-image pixel match (incl. background) | 96.31% — **misleading**: 94.5% of the image is white background that matches trivially |
+| Red-pixel leak (CSS failure indicator) | 96 in Broiler, 0 in Chromium |
 | Test dimensions | 1024 × 768 |
 | Content bounding box (Chromium) | x: [72, 240], y: [51, 276] — 168 × 225 px |
 | Render target | `acid2.html#top` (face test area) |
 | Automated test status | **All 5 differential tests passing** |
 | Chromium version | 145.0.7632.6 (Playwright v1.58.2) |
-| Last verified | 2026-03-06 |
+| Last verified | 2026-03-07 |
 
 ### Current State: Far From Compliant
 
 Broiler's html-renderer produces a **severely broken** Acid2 face.  While
-the full-image pixel match is 95%, this is entirely misleading — 94.5% of
+the full-image pixel match is 96.31%, this is entirely misleading — 94.5% of
 both images is plain white background.  When comparing only the content
 pixels (any pixel that is non-white in either render), **only 8.97% match**.
 
-Visual inspection confirms: the eyes are missing, the nose is malformed,
-there are large red areas (CSS failure indicators), the smile is broken,
-and the overall face structure is wrong.  The renderer is **not close** to
-Acid2 compliance.
+Visual inspection confirms: the nose is malformed, there are residual red
+areas (CSS failure indicators), the smile is broken, and the overall face
+structure is wrong.  The renderer is **not close** to Acid2 compliance.
 
-The 1,680 red pixels are the canonical Acid2 failure signal and must be
-eliminated as the first priority.  Beyond that, nearly every facial feature
-(eyes, nose, smile, forehead, ears, chin) needs significant layout and
-rendering fixes.
+As of Phase 5.3, the eyes region now renders with correct layout (NaN width
+blocker resolved).  Red pixel leak is reduced from 1,680 to 96 (94%
+reduction).  The remaining 96 red pixels come from the `p.bad`
+`position:fixed` stacking issue (Phase 5.4).
 
 ---
 
@@ -169,7 +168,7 @@ region is much higher.
 | Scalp | 50–120 | 2.3% | 0 px | `position:fixed`, `min-height`/`max-height` |
 | 2nd line / ears | 120–160 | 7.0% | 96 px | attribute selectors, `float`, shrink-wrap |
 | Forehead | 160–195 | 15.9% | 0 px | `width`, `overflow`, `background-image` data-URI |
-| Eyes | 195–235 | 22.4% | 1,254 px | paint order (Appendix E), `background:fixed`, `<object>` fallback |
+| Eyes | 195–235 | TBD | ~~1,254~~ 0 px | paint order (Appendix E), `background:fixed`, `<object>` fallback — **Phase 5.3 complete** |
 | Nose | 200–310 | 21.3% | 1,584 px | `float`, auto margins, `::before`/`::after` |
 | Smile | 310–360 | 4.2% | 0 px | margin collapsing, `clear`, negative clearance, `position:relative` |
 | Chin | 360–395 | 5.1% | 0 px | `line-height`, `display:inline`, data-URI background |
@@ -286,7 +285,7 @@ The following issues produce the remaining 39,204 mismatched content pixels
 (91% of all content) and 1,680 red pixels.  The renderer is far from
 compliant — nearly every facial feature is broken.
 
-#### 3.2.1  Eyes Region — Background Image & Stacking (1,584 red px)
+#### 3.2.1  Eyes Region — Background Image & Stacking (~~1,584~~ 0 red px) ✅
 
 **Location:** Eyes region (y 216–239 in viewport).
 
@@ -320,32 +319,55 @@ that specific cause.
    `PaintFragmentBackgroundPhase` / `PaintFragmentForegroundPhase`.  This
    ensures inline content from blocks paints above sibling floats.
 
-2. **Layout blocker identified:** The `.eyes` div has `position:absolute` with
-   no explicit width.  The layout engine does not compute shrink-to-fit width
-   for auto-width absolutely positioned elements (CSS 2.1 §10.3.7), resulting
-   in `NaN` for `Size.Width`.  This `NaN` cascades:
-   - `.eyes` → `NaN` width
-   - `#eyes-a` → `NaN` width (child of `.eyes`)
-   - Inline `<object>` elements inside `#eyes-a` → `Rectangles` have
-     `{X=NaN, Width=NaN}`
-   - The innermost `<object>` (matched by `#eyes-a object object object`)
-     has `BackgroundImage` correctly set to the data-URI, `BackgroundAttachment`
-     = `"fixed"`, and `LoadedBackgroundImage` is non-null — but the `NaN`
-     rectangle dimensions prevent `EmitBackgroundImage` from producing
-     renderable drawing commands.
+2. **Layout blocker resolved:** The `.eyes` div had `position:absolute` with
+   no explicit width.  Two root causes were identified and fixed:
 
-3. **Next step:** Implement shrink-to-fit width computation in
-   `CssBox.PerformLayoutImp` for absolutely positioned boxes with `width:auto`.
-   The layout engine already has a partial shrink-to-fit path
-   (`ActualRight >= 90999` check in `CssLayoutEngine`) but it does not cover
-   this case.  The fix should compute the preferred width from children and
-   clamp to the containing block per §10.3.7.
+   **Root cause A — NaN `ActualWordSpacing`:**
+   `CssBoxProperties.ActualWordSpacing` defaults to `double.NaN` and is only
+   computed when `MeasureWordSpacing` runs (called from `MeasureWordsSize`).
+   `GetMinMaxWidth` was called during shrink-to-fit *before* children's
+   `MeasureWordsSize` had run, so `word.FullWidth` (which includes
+   `ActualWordSpacing`) was `NaN`.  This propagated through
+   `maxSum → preferred → stfWidth`, making the entire shrink-to-fit result
+   `NaN`.  **Fix:** Added `EnsureDescendantWordsMeasured(g)` which
+   recursively calls `MeasureWordsSize` on all descendant boxes before
+   computing intrinsic min/max widths.
 
-**Impact:** ~15,000 diff pixels, 1,584 red pixels (1,296 from #eyes-c + 288
-from #eyes-b).
+   **Root cause B — Additive block-float width accumulation:**
+   `CssBoxHelper.GetMinMaxSumWords` accumulated float explicit widths
+   additively with preceding block content widths.  For the `.eyes` div,
+   `#eyes-a`'s inline content width (96px) was summed with `#eyes-b`'s
+   explicit width (120px), producing a preferred width of 299px instead of
+   the correct 144px.  **Fix:** Added `ComputeShrinkToFitWidth()` method
+   which independently measures each direct child's total width (explicit
+   width + borders + padding, or intrinsic width for auto-width children)
+   and returns the maximum.  This correctly treats each block/float child
+   as its own "line."
 
-**CSS 2.1 reference:** Appendix E (paint order), §14.2.1 (background images),
-§9.7 (display/float/position relationships), §10.3.7 (shrink-to-fit width).
+3. **Explicit height override fixed (CSS2.1 §10.6.3):**
+   `CssBox.PerformLayoutImp` used `Math.Max(ActualBottom, Location.Y +
+   borderBoxHeight)` for explicit heights, meaning `height:0` could never
+   override the height computed by `CreateLineBoxes` from `line-height`.
+   This caused `#eyes-b` and `#eyes-c` to be positioned 24px below `#eyes-a`
+   instead of overlapping as intended.  **Fix:** Changed to direct assignment
+   `ActualBottom = Location.Y + borderBoxHeight` so explicit height always
+   takes precedence.  Content overflow remains visible per default
+   `overflow:visible`.
+
+**Results (Phase 5.3):**
+- `.eyes` width: `NaN` → 144px ✓
+- `#eyes-a` width: `NaN` → 144px ✓
+- `#eyes-a` height: 24px → 0px (correct per CSS `height:0`) ✓
+- `#eyes-b`, `#eyes-c` Y position: overlapping with `#eyes-a` ✓
+- Red pixel leak: 1,680 → 96 (94% reduction) ✓
+- Full-image pixel match: 95.01% → 96.31% ✓
+- Test thresholds tightened: `MinMatchRatio` 0.95→0.96, `MaxRedPixelLeak` 2000→200
+
+**Impact:** ~1,584 red pixels eliminated.  Remaining 96 red pixels are from
+`p.bad` `position:fixed` stacking (Phase 5.4).
+
+**CSS 2.1 reference:** Appendix E (paint order), §10.3.7 (shrink-to-fit
+width), §10.6.3 (explicit height), §14.2.1 (background images).
 
 #### 3.2.2  Nose Region — Pseudo-Elements (0 red px) ✅
 
@@ -431,19 +453,19 @@ scrolled region.
 ### Current Compliance Level
 
 - **Content-area pixel match: 8.97%** — the renderer fails 91% of content pixels.
-- **Red-pixel leak: 1,680** — canonical Acid2 failure indicator.
-- **Visual assessment: far from compliant** — eyes missing, nose wrong, smile broken.
+- **Red-pixel leak: 96** — reduced from 1,680 by Phase 5.3 fixes.
+- **Full-image pixel match: 96.31%** — up from 95.01%.
+- **Visual assessment: far from compliant** — nose wrong, smile broken, but eyes now render.
 
 ### Phase 5 — Eliminate Red Pixels (Target: 0 red pixels)
 
-Red pixels are the canonical Acid2 failure signal.  Eliminating all 1,680
-is the primary gate to passing.
+Red pixels are the canonical Acid2 failure signal.  96 remain after Phase 5.3.
 
 | # | Task | Pixel Impact | CSS 2.1 Ref | Effort | Priority |
 |---|---|---|---|---|---|
 | 5.2 | **Fix background-image `url()` wrapper stripping** — Strip `url()` prefix before passing to `ImageLoadHandler.LoadImage` so `data:image/...` URIs are detected.  Add null guard in `RenderDrawImage` for `SKBitmap.Decode` returning null. | ~~1,254~~ 0 red px | §14.2.1 | S | ✅ Done |
-| 5.3 | **Fix eyes stacking / background rendering** — (Root cause updated: red pixels originate from `#eyes-c` block background and `#eyes-b` right border not being fully covered by float backgrounds with `background-attachment:fixed` in the full Acid2 context.  Nose pseudo-elements confirmed working.)  **Progress:** CSS2.1 Appendix E three-phase painting implemented in `PaintWalker.PaintChildren` (Step 3 bg → Step 4 floats → Step 5 fg).  **Blocker:** `.eyes` div (`position:absolute`, no explicit width) gets `NaN` `Size.Width` because the layout engine does not compute shrink-to-fit width for auto-width absolutely positioned elements.  This `NaN` cascades to `#eyes-a` and its inline `<object>` children, making their `Rectangles` have `NaN` X/Width.  The objects' CSS rules match correctly and background images load (`LoadedBackgroundImage` is set), but `NaN` dimensions prevent rendering.  **Next step:** compute shrink-to-fit width in `CssBox.PerformLayoutImp` for absolutely positioned boxes with `width:auto` (CSS 2.1 §10.3.7). | ~1,584 red px | §9.7, §10.3.7, App. E | L | 🟡 In Progress |
-| 5.4 | **Fix position:fixed stacking for p.bad** — The `p.bad` element's red bottom-border at viewport y 156–157 is not covered by any opaque face content.  PaintWalker correctly paints fixed elements first; the gap is in face layout coverage.  **Hint:** The `p + table + p` adjacent-sibling selector correctly matches and applies `margin-top: 3em`.  The element lands at viewport y ≈ 144 with height 12 px and a medium-width red bottom-border at y 156–157.  Fixing Phase 5.3 (eyes layout) may shift face content to cover this region, or an explicit layout adjustment to the 2nd-line ear region may be needed. | ~96 red px | §9.9, App. E | M | 🔴 P0 |
+| 5.3 | **Fix eyes stacking / background rendering** — Resolved NaN width for `.eyes` div by: (1) recursively measuring descendant word sizes before shrink-to-fit computation, (2) computing per-child max width instead of additive accumulation, (3) fixing explicit `height:0` override via direct `ActualBottom` assignment.  Red pixels from eyes region eliminated.  **Remaining red:** 96px from `p.bad` fixed stacking (Phase 5.4). | ~~1,584~~ 0 red px | §9.7, §10.3.7, §10.6.3, App. E | L | ✅ Done |
+| 5.4 | **Fix position:fixed stacking for p.bad** — The `p.bad` element's red bottom-border at viewport y 156–157 is not covered by any opaque face content.  PaintWalker correctly paints fixed elements first; the gap is in face layout coverage.  **Hint:** The `p + table + p` adjacent-sibling selector correctly matches and applies `margin-top: 3em`.  The element lands at viewport y ≈ 144 with height 12 px and a medium-width red bottom-border at y 156–157.  The Phase 5.3 height:0 fix may shift face content closer to covering this region. | ~96 red px | §9.9, App. E | M | 🔴 P0 |
 
 **Measurable outcome:** `Acid2Top_RedPixelLeak_BelowMaximum` passes with
 `MaxRedPixelLeak = 0`.
@@ -542,12 +564,12 @@ they do not measure actual compliance.
 
 | Threshold | Value | Purpose |
 |---|---|---|
-| `MinMatchRatio` | 0.95 (95%) | Full-image regression floor (inflated by background) |
-| `MaxRedPixelLeak` | 2,000 | Maximum allowed red pixels |
+| `MinMatchRatio` | 0.96 (96%) | Full-image regression floor (inflated by background) |
+| `MaxRedPixelLeak` | 200 | Maximum allowed red pixels |
 | Viewport | 1024 × 768 | Standard Acid2 test dimensions |
 | `ColorTolerance` | 5 | Per-channel tolerance for pixel comparison |
 
-**Important:** A 95% full-image match does not mean the renderer is 95%
+**Important:** A 96% full-image match does not mean the renderer is 96%
 compliant.  Only 8.97% of content pixels actually match.  Future test
 improvements should add content-area-specific assertions.
 
@@ -566,7 +588,7 @@ improvements should add content-area-specific assertions.
 - [x] Analyze root causes for each mismatch category
 - [x] Verify Chromium reference matches fresh Playwright render (2026-03-06: identical)
 
-### Completed Fixes (Phases 0–3, 5.1, 5.2)
+### Completed Fixes (Phases 0–3, 5.1, 5.2, 5.3)
 
 - [x] **Phase 0** — Load external `<link>` stylesheets (`data:text/css` URI, cascade)
 - [x] **Phase 1** — Eliminate bulk red pixels (HTML parser, sibling combinator, CSS error recovery)
@@ -574,12 +596,14 @@ improvements should add content-area-specific assertions.
 - [x] **Phase 3** — Visual polish (fixed backgrounds, paint order, overflow clipping, line-height)
 - [x] **Phase 5.1** — `height:0` / `ActualBottom` consistency fix
 - [x] **Phase 5.2** — Fix `background-image` `url()` wrapper stripping
+- [x] **Phase 5.3** — Fix eyes stacking / background rendering (1,584 red px → 0)
+  - [x] Implement CSS2.1 Appendix E three-phase block painting in `PaintWalker`
+  - [x] Fix NaN `ActualWordSpacing` in shrink-to-fit: `EnsureDescendantWordsMeasured`
+  - [x] Fix additive block-float width accumulation: `ComputeShrinkToFitWidth`
+  - [x] Fix CSS2.1 §10.6.3 explicit height override: direct `ActualBottom` assignment
 
 ### In Progress
 
-- [ ] **Phase 5.3** — Fix eyes stacking / background rendering (1,584 red px)
-  - [x] Implement CSS2.1 Appendix E three-phase block painting in `PaintWalker`
-  - [ ] **Blocker:** Compute shrink-to-fit width for auto-width absolutely positioned elements (`.eyes` div has `NaN` width → cascades to `#eyes-a` → objects get `NaN` rect dims)
 - [ ] **Phase 5.4** — Fix `position:fixed` stacking for `p.bad` (96 red px)
 
 ### Remaining Work

@@ -8,22 +8,20 @@
 
 | Metric | Value |
 |---|---|
-| Overall pixel match (at `#top`) | **90.91%** |
-| Different pixels | 71,456 / 786,432 |
-| Red-pixel leak (CSS failure indicator) | 3,744 in Broiler, 0 in Chromium |
+| Overall pixel match (at `#top`) | **96.31%** |
+| Different pixels | 28,990 / 786,432 |
+| Red-pixel leak (CSS failure indicator) | 96 in Broiler, 0 in Chromium |
 | Test dimensions | 1024 × 768 |
 | Render target | `acid2.html#top` (face test area) |
 | Automated test status | **All 5 differential tests passing** |
-| Last verified | 2026-03-05 (Chromium reference pixel-identical to fresh Playwright render) |
+| Last verified | 2026-03-07 |
 
 Broiler's html-renderer produces a recognisable Acid2 face when rendered at
-the `#top` anchor, matching the Chromium reference at 90.91%.  All four fix
-phases (P0–P3) and Phase 5 item 5.1 have been completed, addressing external
-stylesheet loading, red-pixel elimination, layout correctness, visual polish,
-and CSS `height:0` / `ActualBottom` consistency.  The remaining 9.09% pixel
-difference (71,456 pixels) comes from layout positioning errors, missing CSS
-features, and rendering precision gaps described in the root-cause analysis
-and remaining-gap analysis below.
+the `#top` anchor, matching the Chromium reference at 96.31%.  All four fix
+phases (P0–P3) and Phase 5 items 5.1–5.3 have been completed, addressing
+external stylesheet loading, red-pixel elimination, layout correctness,
+visual polish, CSS `height:0` / `ActualBottom` consistency, background-image
+URL stripping, and eyes stacking / shrink-to-fit width computation.
 
 The sections below catalogue every significant discrepancy identified during
 the initial analysis, note the fix status for each, document remaining gaps,
