@@ -23,7 +23,7 @@ public class Acid2DifferentialTests : IDisposable
     /// The renderer must stay at or above this level.
     /// As rendering fixes land, raise this threshold.
     /// </summary>
-    private const double MinMatchRatio = 0.97;
+    private const double MinMatchRatio = 0.98;
 
     /// <summary>
     /// Maximum allowed red-pixel leak count.

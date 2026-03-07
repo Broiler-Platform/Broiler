@@ -1005,7 +1005,18 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
             else
             {
-                value = Math.Max(prevSibling.ActualMarginBottom, ActualMarginTop);
+                // CSS2.1 §8.3.1: Adjoining vertical margins collapse.
+                // When both are positive → max(m1, m2).
+                // When one is negative  → max(positives,0) + min(negatives,0).
+                // When both are negative → 0 + min(m1,m2) = most-negative.
+                // The general formula covers all three cases:
+                double maxPos = Math.Max(
+                    Math.Max(prevSibling.ActualMarginBottom, 0),
+                    Math.Max(ActualMarginTop, 0));
+                double minNeg = Math.Min(
+                    Math.Min(prevSibling.ActualMarginBottom, 0),
+                    Math.Min(ActualMarginTop, 0));
+                value = maxPos + minNeg;
             }
             CollapsedMarginTop = value;
         }

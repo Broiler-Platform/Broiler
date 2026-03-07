@@ -12,7 +12,7 @@
 |---|---|
 | **Content-area pixel match** | **8.97%** (3,861 / 43,065 content pixels) |
 | Content bounding-box pixel match | 42.24% (15,965 / 37,800 pixels in face region) |
-| Full-image pixel match (incl. background) | 97.70% — **misleading**: 94.5% of the image is white background that matches trivially |
+| **Full-image pixel match (incl. background)** | **98.39%** — misleading: 94.5% of the image is white background that matches trivially |
 | Red-pixel leak (CSS failure indicator) | **0** in Broiler, 0 in Chromium |
 | Test dimensions | 1024 × 768 |
 | Content bounding box (Chromium) | x: [72, 240], y: [51, 276] — 168 × 225 px |
@@ -492,7 +492,7 @@ Red pixels are the canonical Acid2 failure signal.  **0 remain after Phase 5.4.*
 
 | # | Task | Pixel Impact | CSS 2.1 Ref | Effort | Priority |
 |---|---|---|---|---|---|
-| 6.1 | **Fix forehead overflow clip rect** — Ensure `overflow:hidden` clip matches the padding-edge extent exactly when combined with data-URI `background-image`. | ~5,700 px | §11.1.1 | M | P1 |
+| 6.1 | **Fix forehead overflow clip rect** — Fixed negative-margin collapsing in `MarginTopCollapse` (CSS 2.1 §8.3.1): replaced `Math.Max(prev, cur)` with the general formula `max(positives,0) + min(negatives,0)`.  This correctly handles the `.nose` float's `margin-top: -2em` against the `.forehead`'s `margin-bottom: 4em`, moving the nose up 24 px and filling the gap in the face.  Pixel match improved from 97.70% → 98.39%.  Diff pixels reduced from ~18,056 → 12,675 (~5,381 px). | ~~5,700~~ 5,381 px | §8.3.1 | M | ✅ Done |
 | 6.2 | **Fix smile margin-collapsing precision** — Correct the clearance value for `clear:both` after floats with negative margins. | ~2,200 px | §8.3.1, §9.5.1 | L | P1 |
 | 6.3 | **Fix ears/2nd-line layout** — Correct float shrink-wrap and attribute-selector matching for compound selectors in the 2nd-line ear region. | ~2,900 px | §10.3.7, §5.8 | M | P2 |
 | 6.4 | **Fix chin inline line-height** — Correct `display:inline` line-height calculation at tiny font sizes (`font:2px/4px serif`). | ~1,800 px | §10.8 | S | P2 |
