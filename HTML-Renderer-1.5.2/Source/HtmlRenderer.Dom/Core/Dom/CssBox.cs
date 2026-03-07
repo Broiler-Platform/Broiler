@@ -414,7 +414,14 @@ internal class CssBox : CssBoxProperties, IDisposable
                         flowPrev = DomUtils.GetPreviousInFlowSibling(flowPrev);
                     }
 
-                    double top = (flowPrev == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + MarginTopCollapse(flowPrev) + (flowPrev != null ? flowPrev.ActualBottom : 0);
+                    // CSS2.1 §9.4.3: Relative positioning is visual-only.
+                    // Use the flow-position bottom (before relative offset)
+                    // when computing the next sibling's position.
+                    double flowPrevBottom = flowPrev?.ActualBottom ?? 0;
+                    if (flowPrev is CssBox flowPrevBox && flowPrevBox.Position == CssConstants.Relative)
+                        flowPrevBottom -= GetRelativeOffsetY(flowPrevBox);
+
+                    double top = (flowPrev == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + MarginTopCollapse(flowPrev) + flowPrevBottom;
 
                     // --- Float positioning ---
                     if (Float != CssConstants.None)
@@ -553,7 +560,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                                 double prevMarginBottom = (flowPrev is CssBox fpb)
                                     ? GetEffectiveMarginBottom(fpb)
                                     : flowPrev.ActualMarginBottom;
-                                uncollapsedTop = flowPrev.ActualBottom
+                                uncollapsedTop = flowPrevBottom
                                     + prevMarginBottom
                                     + ActualMarginTop;
                             }
