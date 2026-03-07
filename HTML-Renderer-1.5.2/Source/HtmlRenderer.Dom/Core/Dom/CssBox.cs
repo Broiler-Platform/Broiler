@@ -362,6 +362,12 @@ internal class CssBox : CssBoxProperties, IDisposable
                         if (stfWidth < minW) stfWidth = minW;
                     }
 
+                    // CSS2.1 §10.3.7: Shrink-to-fit gives the content
+                    // width; add own borders and padding for the border-box
+                    // width that Size.Width represents.
+                    stfWidth += ActualBorderLeftWidth + ActualBorderRightWidth
+                              + ActualPaddingLeft + ActualPaddingRight;
+
                     Size = new SizeF((float)stfWidth, Size.Height);
                 }
                 else if (Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
@@ -694,10 +700,19 @@ internal class CssBox : CssBoxProperties, IDisposable
         // Floats with an explicit CSS height establish a new BFC.
         // Their ActualBottom should reflect the stated height, not
         // content overflow from child floats (CSS2.1 §10.6.1).
+        // CSS2.1 §10.5: Percentage heights resolve to auto when
+        // the containing block's height is not explicitly specified.
         if (Float != CssConstants.None && Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
         {
-            double borderBoxHeight = ActualHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
-            ActualBottom = Location.Y + borderBoxHeight;
+            bool floatHeightResolvesToAuto = Height.Contains('%')
+                && (ContainingBlock.Height == CssConstants.Auto
+                    || string.IsNullOrEmpty(ContainingBlock.Height));
+
+            if (!floatHeightResolvesToAuto)
+            {
+                double borderBoxHeight = ActualHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+                ActualBottom = Location.Y + borderBoxHeight;
+            }
         }
 
         // Apply position:relative offset after layout (visual only, does not affect flow)

@@ -277,8 +277,16 @@ internal static class CssBoxHelper
             // Compute the float's margin-box bottom ("bottom outer edge"
             // per CSS2.1 §9.5.2) so that clearance positions the cleared
             // element below the float's full margin box.
+            // CSS2.1 §10.5: Percentage heights resolve to auto when the
+            // containing block's height is not explicitly specified —
+            // use ActualBottom (layout-computed) in that case.
             double bottom;
-            if (box.Height != CssConstants.Auto && !string.IsNullOrEmpty(box.Height))
+            bool hasExplicitHeight = box.Height != CssConstants.Auto && !string.IsNullOrEmpty(box.Height);
+            bool resolveToAuto = hasExplicitHeight && box.Height.Contains('%')
+                && (box.ContainingBlock.Height == CssConstants.Auto
+                    || string.IsNullOrEmpty(box.ContainingBlock.Height));
+
+            if (hasExplicitHeight && !resolveToAuto)
                 bottom = box.Location.Y + box.ActualHeight
                     + box.ActualPaddingTop + box.ActualPaddingBottom
                     + box.ActualBorderTopWidth + box.ActualBorderBottomWidth
