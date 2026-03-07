@@ -71,6 +71,17 @@ internal static class FragmentTreeBuilder
         // Compute the correct border-box height so that PaintWalker can
         // draw backgrounds and borders (which skip Height <= 0 rects).
         var size = box.Size;
+
+        // Sanitise NaN width: auto-width absolutely positioned elements
+        // may still have NaN if ComputeShrinkToFitWidth could not resolve
+        // a finite value (e.g. deeply nested inline objects).  Fall back
+        // to ActualRight - Location.X which is layout-computed.
+        if (float.IsNaN(size.Width))
+        {
+            float layoutWidth = (float)(box.ActualRight - box.Location.X);
+            size = new SizeF(layoutWidth > 0 ? layoutWidth : 0, size.Height);
+        }
+
         float layoutHeight = (float)(box.ActualBottom - box.Location.Y);
         if (layoutHeight > size.Height)
             size = new SizeF(size.Width, layoutHeight);

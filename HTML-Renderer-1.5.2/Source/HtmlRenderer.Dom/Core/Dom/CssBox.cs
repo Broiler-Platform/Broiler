@@ -363,6 +363,9 @@ internal class CssBox : CssBoxProperties, IDisposable
                     double available = width - ActualMarginLeft - ActualMarginRight;
 
                     GetMinMaxWidth(out double prefMin, out _);
+                    // Guard against NaN from unmeasured descendants
+                    if (double.IsNaN(prefMin)) prefMin = 0;
+                    if (double.IsNaN(preferred)) preferred = 0;
                     double stfWidth = Math.Min(Math.Max(prefMin, available), preferred);
 
                     if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
@@ -986,13 +989,16 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
             else
             {
-                // Auto-width child: compute its intrinsic preferred width
+                // Auto-width child: compute its intrinsic preferred width.
+                // Guard against NaN from unmeasured words in deeply nested
+                // inline elements (e.g. Acid2 .eyes → #eyes-a → <object>).
                 child.GetMinMaxWidth(out _, out double childMax);
-                childWidth = childMax;
+                childWidth = double.IsNaN(childMax) ? 0 : childMax;
             }
 
             childWidth += child.ActualMarginLeft + child.ActualMarginRight;
-            maxLineWidth = Math.Max(maxLineWidth, childWidth);
+            if (!double.IsNaN(childWidth))
+                maxLineWidth = Math.Max(maxLineWidth, childWidth);
         }
 
         return maxLineWidth;
