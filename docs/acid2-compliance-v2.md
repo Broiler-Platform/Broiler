@@ -306,19 +306,46 @@ The `url()` wrapper stripping (Phase 5.2) is confirmed working — background
 images from `data:` URIs load correctly in isolation (including with
 `background-attachment: fixed`).  The issue is specific to the full Acid2
 layout where the eyes `<span>` elements with `float:left` and `background:
-fixed url(...)` fail to fully cover the block-level red background.  Further
-investigation needed on whether CSS2.1 §9.7 display-computation for floated
-inline elements is correctly implemented.
+fixed url(...)` fail to fully cover the block-level red background.
 
 The original Phase 5.2 diagnosis (url() wrapper stripping) is confirmed
 **complete** — it was fixed in a prior commit and no red pixels remain from
 that specific cause.
 
+**Phase 5.3 investigation (2026-03-07):**
+
+1. **Three-phase painting implemented:** `PaintWalker.PaintChildren` now
+   correctly splits block painting into background phase (Appendix E Step 3),
+   float phase (Step 4), and foreground phase (Step 5) via
+   `PaintFragmentBackgroundPhase` / `PaintFragmentForegroundPhase`.  This
+   ensures inline content from blocks paints above sibling floats.
+
+2. **Layout blocker identified:** The `.eyes` div has `position:absolute` with
+   no explicit width.  The layout engine does not compute shrink-to-fit width
+   for auto-width absolutely positioned elements (CSS 2.1 §10.3.7), resulting
+   in `NaN` for `Size.Width`.  This `NaN` cascades:
+   - `.eyes` → `NaN` width
+   - `#eyes-a` → `NaN` width (child of `.eyes`)
+   - Inline `<object>` elements inside `#eyes-a` → `Rectangles` have
+     `{X=NaN, Width=NaN}`
+   - The innermost `<object>` (matched by `#eyes-a object object object`)
+     has `BackgroundImage` correctly set to the data-URI, `BackgroundAttachment`
+     = `"fixed"`, and `LoadedBackgroundImage` is non-null — but the `NaN`
+     rectangle dimensions prevent `EmitBackgroundImage` from producing
+     renderable drawing commands.
+
+3. **Next step:** Implement shrink-to-fit width computation in
+   `CssBox.PerformLayoutImp` for absolutely positioned boxes with `width:auto`.
+   The layout engine already has a partial shrink-to-fit path
+   (`ActualRight >= 90999` check in `CssLayoutEngine`) but it does not cover
+   this case.  The fix should compute the preferred width from children and
+   clamp to the containing block per §10.3.7.
+
 **Impact:** ~15,000 diff pixels, 1,584 red pixels (1,296 from #eyes-c + 288
 from #eyes-b).
 
 **CSS 2.1 reference:** Appendix E (paint order), §14.2.1 (background images),
-§9.7 (display/float/position relationships).
+§9.7 (display/float/position relationships), §10.3.7 (shrink-to-fit width).
 
 #### 3.2.2  Nose Region — Pseudo-Elements (0 red px) ✅
 
@@ -415,8 +442,8 @@ is the primary gate to passing.
 | # | Task | Pixel Impact | CSS 2.1 Ref | Effort | Priority |
 |---|---|---|---|---|---|
 | 5.2 | **Fix background-image `url()` wrapper stripping** — Strip `url()` prefix before passing to `ImageLoadHandler.LoadImage` so `data:image/...` URIs are detected.  Add null guard in `RenderDrawImage` for `SKBitmap.Decode` returning null. | ~~1,254~~ 0 red px | §14.2.1 | S | ✅ Done |
-| 5.3 | **Fix eyes stacking / background rendering** — (Root cause updated: red pixels originate from `#eyes-c` block background and `#eyes-b` right border not being fully covered by float backgrounds with `background-attachment:fixed` in the full Acid2 context.  Nose pseudo-elements confirmed working.) | ~1,584 red px | §9.7, App. E | L | 🔴 P0 |
-| 5.4 | **Fix position:fixed stacking for p.bad** — The `p.bad` element's red bottom-border at viewport y 156–157 is not covered by any opaque face content.  PaintWalker correctly paints fixed elements first; the gap is in face layout coverage. | ~96 red px | §9.9, App. E | M | 🔴 P0 |
+| 5.3 | **Fix eyes stacking / background rendering** — (Root cause updated: red pixels originate from `#eyes-c` block background and `#eyes-b` right border not being fully covered by float backgrounds with `background-attachment:fixed` in the full Acid2 context.  Nose pseudo-elements confirmed working.)  **Progress:** CSS2.1 Appendix E three-phase painting implemented in `PaintWalker.PaintChildren` (Step 3 bg → Step 4 floats → Step 5 fg).  **Blocker:** `.eyes` div (`position:absolute`, no explicit width) gets `NaN` `Size.Width` because the layout engine does not compute shrink-to-fit width for auto-width absolutely positioned elements.  This `NaN` cascades to `#eyes-a` and its inline `<object>` children, making their `Rectangles` have `NaN` X/Width.  The objects' CSS rules match correctly and background images load (`LoadedBackgroundImage` is set), but `NaN` dimensions prevent rendering.  **Next step:** compute shrink-to-fit width in `CssBox.PerformLayoutImp` for absolutely positioned boxes with `width:auto` (CSS 2.1 §10.3.7). | ~1,584 red px | §9.7, §10.3.7, App. E | L | 🟡 In Progress |
+| 5.4 | **Fix position:fixed stacking for p.bad** — The `p.bad` element's red bottom-border at viewport y 156–157 is not covered by any opaque face content.  PaintWalker correctly paints fixed elements first; the gap is in face layout coverage.  **Hint:** The `p + table + p` adjacent-sibling selector correctly matches and applies `margin-top: 3em`.  The element lands at viewport y ≈ 144 with height 12 px and a medium-width red bottom-border at y 156–157.  Fixing Phase 5.3 (eyes layout) may shift face content to cover this region, or an explicit layout adjustment to the 2nd-line ear region may be needed. | ~96 red px | §9.9, App. E | M | 🔴 P0 |
 
 **Measurable outcome:** `Acid2Top_RedPixelLeak_BelowMaximum` passes with
 `MaxRedPixelLeak = 0`.
@@ -539,19 +566,24 @@ improvements should add content-area-specific assertions.
 - [x] Analyze root causes for each mismatch category
 - [x] Verify Chromium reference matches fresh Playwright render (2026-03-06: identical)
 
-### Completed Fixes (Phases 0–3, 5.1)
+### Completed Fixes (Phases 0–3, 5.1, 5.2)
 
 - [x] **Phase 0** — Load external `<link>` stylesheets (`data:text/css` URI, cascade)
 - [x] **Phase 1** — Eliminate bulk red pixels (HTML parser, sibling combinator, CSS error recovery)
 - [x] **Phase 2** — Layout correctness (min/max height, shrink-to-fit, negative clearance, tables)
 - [x] **Phase 3** — Visual polish (fixed backgrounds, paint order, overflow clipping, line-height)
 - [x] **Phase 5.1** — `height:0` / `ActualBottom` consistency fix
+- [x] **Phase 5.2** — Fix `background-image` `url()` wrapper stripping
+
+### In Progress
+
+- [ ] **Phase 5.3** — Fix eyes stacking / background rendering (1,584 red px)
+  - [x] Implement CSS2.1 Appendix E three-phase block painting in `PaintWalker`
+  - [ ] **Blocker:** Compute shrink-to-fit width for auto-width absolutely positioned elements (`.eyes` div has `NaN` width → cascades to `#eyes-a` → objects get `NaN` rect dims)
+- [ ] **Phase 5.4** — Fix `position:fixed` stacking for `p.bad` (96 red px)
 
 ### Remaining Work
 
-- [ ] **Phase 5.2** — Fix `background-image` `url()` wrapper stripping (1,254 red px)
-- [ ] **Phase 5.3** — Fix nose pseudo-element positioning (1,584 red px)
-- [ ] **Phase 5.4** — Fix `position:fixed` stacking for `p.bad` (96 red px)
 - [ ] **Phase 6.1** — Fix forehead overflow clip rect (~5,700 px)
 - [ ] **Phase 6.2** — Fix smile margin-collapsing precision (~2,200 px)
 - [ ] **Phase 6.3** — Fix ears/2nd-line layout (~2,900 px)
@@ -586,6 +618,8 @@ improvements should add content-area-specific assertions.
 | `HTML-Renderer-1.5.2/Source/HtmlRenderer.CSS/Core/Parse/CssValueParser.cs` | CSS value parsing (colors, lengths) |
 | `HTML-Renderer-1.5.2/Source/HtmlRenderer.Dom/Core/Dom/CssBox.cs` | Box model, layout, margin collapsing |
 | `HTML-Renderer-1.5.2/Source/HtmlRenderer.Dom/Core/Dom/CssLayoutEngine.cs` | Layout engine, line boxes |
+| `HTML-Renderer-1.5.2/Source/HtmlRenderer.Orchestration/Core/IR/PaintWalker.cs` | CSS2.1 Appendix E paint walker, three-phase block painting |
+| `HTML-Renderer-1.5.2/Source/HtmlRenderer.Orchestration/Core/IR/FragmentTreeBuilder.cs` | Fragment tree builder from CssBox layout tree |
 | `HTML-Renderer-1.5.2/Source/HtmlRenderer.Dom/Core/Utils/RenderUtils.cs` | Overflow clipping |
 | `HTML-Renderer-1.5.2/Source/HtmlRenderer.Rendering/Core/Handlers/ImageLoadHandler.cs` | Image loading (data-URI) |
 
@@ -600,6 +634,15 @@ improvements should add content-area-specific assertions.
 - **`position:fixed` in scrolled renders:** CSS 2.1 §9.6.1 defines fixed
   positioning relative to the viewport, but when rendering a scrolled region,
   the viewport reference frame is ambiguous.
+- **`NaN` width for auto-width absolutely positioned elements:** The layout
+  engine (`CssBox.PerformLayoutImp`) does not compute shrink-to-fit width for
+  absolutely positioned elements with `width:auto`.  `CssLayoutEngine` has a
+  partial shrink-to-fit path (`ActualRight >= 90999` check) but it does not
+  cover this case.  This causes `Size.Width = NaN` which cascades to child
+  `Rectangles`, preventing background image and border rendering.  Affected
+  in Acid2: `.eyes` div → `#eyes-a` → inline `<object>` children.  Fix
+  requires implementing §10.3.7 shrink-to-fit in `PerformLayoutImp` or
+  sanitising `NaN` in `FragmentTreeBuilder`.
 
 ---
 

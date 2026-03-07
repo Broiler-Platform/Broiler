@@ -373,8 +373,8 @@ gaps.  These are ordered by estimated pixel impact.
 | # | Issue | Pixel Impact | CSS 2.1 Ref | Effort | Status |
 |---|---|---|---|---|---|
 | 5.1 | **Nose region positioning** — `::before`/`::after` pseudo-elements with `height:0` and border-based CSS triangles. Fixed: `IsValidLength("0")` now accepted (§4.3.2) and `ActualBottom` border-bottom double-counting eliminated across sibling positioning, float collision, clearance, and `MarginBottomCollapse`. | ~15,000 px | §4.3.2, §12.1, §9.5 | L | ✅ Done |
-| 5.2 | **Eyes paint-order / stacking** — 2,592 red pixels remain; `background` shorthand stores `url()` wrapper preventing data-URI loading, and `RenderDrawImage` crashes (`ArgumentNullException`) when background images load via `SKBitmap.Decode` returning null | ~8,000 px | App. E, §14.2.1 | M | 🔴 Blocker |
-| 5.3 | **Second-line ears** — 1,152 red pixels from `position:fixed` `p.bad` element with `border-bottom:red` painting above nose/forehead in stacking order | ~6,000 px | §5.7, §9.9 | M | 🔴 Blocker |
+| 5.2 | **Eyes paint-order / stacking** — 2,592 red pixels remain; `background` shorthand stores `url()` wrapper preventing data-URI loading, and `RenderDrawImage` crashes (`ArgumentNullException`) when background images load via `SKBitmap.Decode` returning null.  **Fixed:** `url()` stripping implemented; null guard added.  **Paint order fixed:** three-phase painting (Step 3 bg → Step 4 floats → Step 5 fg) implemented in `PaintWalker`.  **Layout blocker:** `.eyes` div (`position:absolute`, auto width) gets `NaN` `Size.Width` — layout does not compute shrink-to-fit for auto-width abspos elements (§10.3.7).  NaN cascades to `#eyes-a` → `<object>` children → prevents background rendering despite images loading correctly. | ~8,000 px | App. E, §14.2.1, §10.3.7 | M | 🟡 Partial |
+| 5.3 | **Second-line ears** — 1,152 red pixels from `position:fixed` `p.bad` element with `border-bottom:red` painting above nose/forehead in stacking order.  **V2 reclassification:** Now tracked as Phase 5.4 in v2 docs; 96 red pixels remain at y 156–157.  PaintWalker correctly paints fixed elements first; the gap is in face layout coverage.  Fixing Phase 5.3 (eyes layout) may shift content to cover this region. | ~6,000 px | §5.7, §9.9 | M | 🟡 Partial |
 | 5.4 | **Smile margin collapsing** — 46.6% region mismatch; `clear:both` with negative clearance interaction not producing correct vertical offset | ~7,000 px | §8.3.1, §9.5.1 | L | ⚠️ Open |
 | 5.5 | **Forehead overflow clipping** — 45.9% region mismatch; data-URI `background-image` extent or `overflow:hidden` clip rect incorrect | ~6,000 px | §11.1.1, §14.2 | M | ⚠️ Open |
 | 5.6 | **Scalp `position:fixed` positioning** — 26.2% region mismatch; fixed-position element not anchoring to viewport correctly when scrolled | ~5,000 px | §9.6.1 | M | ⚠️ Open |
@@ -384,17 +384,23 @@ gaps.  These are ordered by estimated pixel impact.
 
 #### Blockers
 
-Two areas produce the remaining 3,744 red pixels.  Red is the canonical
-Acid2 failure signal — eliminating all red is the primary gate to passing:
+~~Two areas produce the remaining 3,744 red pixels.~~  Updated 2026-03-07:
+`url()` stripping and three-phase painting are fixed; remaining blocker is
+a layout issue.
 
-1. **5.2 Eyes stacking** (2,592 red px): The `background` shorthand stores
-   `url(data:image/...)` with the `url()` wrapper, preventing
-   `ImageLoadHandler.LoadImage` from detecting data-URIs.  Additionally,
-   `RenderDrawImage` crashes with `ArgumentNullException` when `SKBitmap.Decode`
-   returns null for certain data-URI images — a null guard is needed.
-2. **5.3 Second-line ears** (1,152 red px): The `p.bad` element with
-   `border-bottom:red` is `position:fixed` and paints in the positioned
-   layer (Appendix E step 7), above the nose/forehead float/block content.
+1. **5.2 Eyes stacking** (1,584 red px): ~~The `background` shorthand stores
+   `url(data:image/...)` with the `url()` wrapper~~ **Fixed.**  Three-phase
+   Appendix E painting also implemented.  **Remaining blocker:** `.eyes` div
+   (`position:absolute`, auto width) gets `NaN` `Size.Width` because the
+   layout engine does not compute shrink-to-fit width for auto-width absolutely
+   positioned elements (§10.3.7).  This NaN cascades to inline `<object>`
+   children, preventing background rendering.
+2. **5.3 Second-line ears** (96 red px): ~~The `p.bad` element paints in the
+   positioned layer above content.~~  PaintWalker correctly paints fixed
+   elements first (beneath in-flow content).  The remaining 96 red pixels are
+   at y 156–157 where no opaque face content covers the red bottom-border.
+   Fixing the eyes layout (shrink-to-fit width) may shift content to cover
+   this region.
 
 #### Open Specification Questions
 
