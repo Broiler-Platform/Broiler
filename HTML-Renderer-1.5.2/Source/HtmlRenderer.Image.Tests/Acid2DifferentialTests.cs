@@ -33,6 +33,14 @@ public class Acid2DifferentialTests : IDisposable
     /// </summary>
     private const int MaxRedPixelLeak = 0;
 
+    /// <summary>
+    /// Minimum content-area pixel match ratio.  Content pixels are those
+    /// where at least one of the actual or reference images has a non-white
+    /// pixel (R/G/B &lt; 250).  The full-image match is inflated by the
+    /// large white background so this metric focuses on the rendered face.
+    /// </summary>
+    private const double MinContentMatchRatio = 0.55;
+
     private static readonly DeterministicRenderConfig Config = new()
     {
         ViewportWidth = ViewportWidth,
@@ -150,6 +158,51 @@ public class Acid2DifferentialTests : IDisposable
             redCount <= MaxRedPixelLeak,
             $"Acid2 #top red-pixel leak ({redCount}) exceeds maximum ({MaxRedPixelLeak}). " +
             "Red pixels indicate CSS 2.1 compliance failures.");
+    }
+
+    /// <summary>
+    /// Measures the content-area pixel match.  Content pixels are identified
+    /// by either the actual or reference image having a non-white pixel
+    /// (any RGB channel &lt; 250).  This isolates the rendered face area
+    /// from the large white background that inflates the full-image metric.
+    /// </summary>
+    [Fact]
+    public void Acid2Top_ContentAreaMatch_MeetsMinimumThreshold()
+    {
+        using var actual = RenderAtAnchorTop(_acid2Html);
+        using var baseline = SKBitmap.Decode(_referencePath);
+        Assert.NotNull(baseline);
+
+        int tolerance = Config.ColorTolerance;
+        int totalContent = 0, matchContent = 0;
+
+        for (int y = 0; y < Math.Min(actual.Height, baseline.Height); y++)
+        {
+            for (int x = 0; x < Math.Min(actual.Width, baseline.Width); x++)
+            {
+                var a = actual.GetPixel(x, y);
+                var r = baseline.GetPixel(x, y);
+
+                bool isContent = a.Red < 250 || a.Green < 250 || a.Blue < 250
+                              || r.Red < 250 || r.Green < 250 || r.Blue < 250;
+
+                if (isContent)
+                {
+                    totalContent++;
+                    if (Math.Abs(a.Red - r.Red) <= tolerance
+                     && Math.Abs(a.Green - r.Green) <= tolerance
+                     && Math.Abs(a.Blue - r.Blue) <= tolerance)
+                        matchContent++;
+                }
+            }
+        }
+
+        double contentMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
+
+        Assert.True(
+            contentMatch >= MinContentMatchRatio,
+            $"Acid2 #top content-area match {contentMatch:P2} is below minimum {MinContentMatchRatio:P2}. " +
+            $"Matching content pixels: {matchContent}/{totalContent}");
     }
 
     /// <summary>
