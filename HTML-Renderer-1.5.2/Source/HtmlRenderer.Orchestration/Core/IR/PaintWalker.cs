@@ -600,11 +600,16 @@ internal static class PaintWalker
             }
         }
 
-        // Step 3: Paint block-level, non-float, non-positioned children
+        // CSS2.1 Appendix E three-phase painting:
+        // Blocks are split across Steps 3 and 5 so that their inline content
+        // (Step 5) paints above non-positioned floats (Step 4).
+
+        // Step 3: Block backgrounds, background images, borders, and replaced
+        //         content only — inline content (text, children) is deferred.
         if (blocks != null)
         {
             foreach (var child in blocks)
-                PaintFragment(child, items, propagatedFrom, viewport);
+                PaintFragmentBackgroundPhase(child, items, propagatedFrom, viewport);
         }
 
         // Step 4: Paint non-positioned floats
@@ -614,7 +619,13 @@ internal static class PaintWalker
                 PaintFragment(child, items, propagatedFrom, viewport);
         }
 
-        // Step 5: Paint inline-level, non-positioned descendants
+        // Step 5: Inline content from blocks (text, inline children) plus
+        //         direct inline-level children.
+        if (blocks != null)
+        {
+            foreach (var child in blocks)
+                PaintFragmentForegroundPhase(child, items, propagatedFrom, viewport);
+        }
         if (inlineLevel != null)
         {
             foreach (var child in inlineLevel)
@@ -643,6 +654,136 @@ internal static class PaintWalker
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// CSS2.1 Appendix E Step 3 — Background phase: paints only the
+    /// background colour, background image, borders, and replaced-image of
+    /// a block-level fragment. Text, selection, text-decoration, and child
+    /// processing are deferred to <see cref="PaintFragmentForegroundPhase"/>.
+    /// Block children are visited recursively so their backgrounds also
+    /// appear before floats (Step 4).
+    /// </summary>
+    private static void PaintFragmentBackgroundPhase(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom, RectangleF viewport)
+    {
+        var style = fragment.Style;
+
+        if (style.Display == "none")
+            return;
+        if (style.Visibility != "visible")
+        {
+            // Walk block children even when not visible (their visibility is independent)
+            PaintChildrenBackgroundPhase(fragment, items, propagatedFrom, viewport);
+            return;
+        }
+
+        var bounds = fragment.Bounds;
+
+        // empty-cells check (table-cell)
+        if (style.Display == "table-cell" && style.EmptyCells == "hide")
+        {
+            bool hasContent = fragment.Lines != null && fragment.Lines.Count > 0;
+            if (!hasContent && fragment.Children.Count == 0)
+                return;
+        }
+
+        // Overflow clipping — paired with RestoreItem at the end
+        bool clipped = false;
+        if (style.Overflow == "hidden")
+        {
+            var border = fragment.Border;
+            var clipRect = new RectangleF(
+                bounds.X + (float)border.Left,
+                bounds.Y + (float)border.Top,
+                bounds.Width - (float)(border.Left + border.Right),
+                bounds.Height - (float)(border.Top + border.Bottom));
+            items.Add(new ClipItem { Bounds = bounds, ClipRect = clipRect });
+            clipped = true;
+        }
+
+        // Background, background image, borders, replaced image
+        if (!ReferenceEquals(fragment, propagatedFrom))
+            EmitBackground(fragment, items);
+        EmitBackgroundImage(fragment, items, viewport);
+        EmitBorders(fragment, items);
+        EmitReplacedImage(fragment, items);
+
+        // Recursively visit block children for their backgrounds
+        PaintChildrenBackgroundPhase(fragment, items, propagatedFrom, viewport);
+
+        if (clipped)
+            items.Add(new RestoreItem { Bounds = bounds });
+    }
+
+    /// <summary>
+    /// Walks only the block-level, non-float, non-positioned children of
+    /// <paramref name="fragment"/> and paints their backgrounds via
+    /// <see cref="PaintFragmentBackgroundPhase"/>.  Float, inline-level,
+    /// positioned, and table children are skipped (handled in later steps).
+    /// </summary>
+    private static void PaintChildrenBackgroundPhase(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom, RectangleF viewport)
+    {
+        foreach (var child in fragment.Children)
+        {
+            // Skip fixed / positioned / stacking-context — handled in Steps 0, 6–7
+            if (child.Style.Position is "fixed" or "absolute" || child.CreatesStackingContext || child.Style.Position == "relative")
+                continue;
+            // Skip floats — handled in Step 4
+            if (child.Style.Float is "left" or "right")
+                continue;
+            // Skip inline-level — handled in Step 5
+            if (child.Style.Display is "inline" or "inline-block" or "inline-table")
+                continue;
+            // Skip tables — they use their own six-layer model
+            if (child.Style.Display is "table" or "inline-table")
+                continue;
+
+            PaintFragmentBackgroundPhase(child, items, propagatedFrom, viewport);
+        }
+    }
+
+    /// <summary>
+    /// CSS2.1 Appendix E Step 5 — Foreground phase: paints the text,
+    /// selection, and text-decoration of a block-level fragment, then
+    /// processes its children via <see cref="PaintChildren"/> which applies
+    /// the three-phase split recursively.
+    /// </summary>
+    private static void PaintFragmentForegroundPhase(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom, RectangleF viewport)
+    {
+        var style = fragment.Style;
+
+        if (style.Display == "none")
+            return;
+        if (style.Visibility != "visible")
+            return;
+
+        var bounds = fragment.Bounds;
+
+        // Overflow clipping — paired with RestoreItem at the end
+        bool clipped = false;
+        if (style.Overflow == "hidden")
+        {
+            var border = fragment.Border;
+            var clipRect = new RectangleF(
+                bounds.X + (float)border.Left,
+                bounds.Y + (float)border.Top,
+                bounds.Width - (float)(border.Left + border.Right),
+                bounds.Height - (float)(border.Top + border.Bottom));
+            items.Add(new ClipItem { Bounds = bounds, ClipRect = clipRect });
+            clipped = true;
+        }
+
+        // Foreground content: selection, text, text-decoration
+        EmitSelection(fragment, items);
+        EmitText(fragment, items);
+        EmitTextDecoration(fragment, items);
+
+        // Process children using the standard Appendix E ordering
+        // (this applies the three-phase split recursively)
+        PaintChildren(fragment, items, propagatedFrom, viewport);
+
+        if (clipped)
+            items.Add(new RestoreItem { Bounds = bounds });
     }
 
     /// <summary>
