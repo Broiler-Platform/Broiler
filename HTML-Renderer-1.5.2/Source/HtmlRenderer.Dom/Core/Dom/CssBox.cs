@@ -309,16 +309,24 @@ internal class CssBox : CssBoxProperties, IDisposable
                     && (Left == null || Left == CssConstants.Auto
                      || Right == null || Right == CssConstants.Auto))
                 {
-                    // DEBUG TRACE
-                    string tag = HtmlTag?.Name ?? "anon";
-                    string cls = HtmlTag?.TryGetAttribute("class") ?? "";
-                    System.IO.File.AppendAllText("/tmp/stf_trace.log", $"[STF] tag={tag} class={cls} Position={Position} Width={Width} Left={Left} Right={Right} CBWidth={ContainingBlock.Size.Width}\n");
-                    
-                    GetMinMaxWidth(out double prefMin, out double preferred);
+                    // Ensure descendant word sizes (and ActualWordSpacing) are
+                    // measured before computing intrinsic min/max widths.
+                    // Without this, word.FullWidth may be NaN because
+                    // ActualWordSpacing defaults to NaN until MeasureWordSpacing
+                    // runs, causing the entire shrink-to-fit result to be NaN.
+                    EnsureDescendantWordsMeasured(g);
+
+                    // Compute preferred width by independently measuring each
+                    // direct child and taking the maximum.  This correctly
+                    // treats each block/float child as its own "line" and avoids
+                    // the additive accumulation in GetMinMaxSumWords where a
+                    // float's width would incorrectly sum with a preceding
+                    // block child's width.
+                    double preferred = ComputeShrinkToFitWidth();
                     double available = width - ActualMarginLeft - ActualMarginRight;
+
+                    GetMinMaxWidth(out double prefMin, out _);
                     double stfWidth = Math.Min(Math.Max(prefMin, available), preferred);
-                    
-                    System.IO.File.AppendAllText("/tmp/stf_trace.log", $"[STF]   prefMin={prefMin} preferred={preferred} available={available} stfWidth={stfWidth}\n");
 
                     if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
                     {
@@ -331,9 +339,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                         if (stfWidth < minW) stfWidth = minW;
                     }
 
-                    System.IO.File.AppendAllText("/tmp/stf_trace.log", $"[STF]   final stfWidth={stfWidth} Size.Width before={Size.Width}\n");
                     Size = new SizeF((float)stfWidth, Size.Height);
-                    System.IO.File.AppendAllText("/tmp/stf_trace.log", $"[STF]   Size.Width after={Size.Width}\n");
                 }
                 else if (Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
                 {
@@ -591,7 +597,14 @@ internal class CssBox : CssBoxProperties, IDisposable
             if (!resolveToAuto)
             {
                 double borderBoxHeight = ActualHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
-                ActualBottom = Math.Max(ActualBottom, Location.Y + borderBoxHeight);
+
+                // CSS2.1 §10.6.3: An explicit height sets the content box
+                // height.  Content that exceeds this height overflows
+                // (visible by default) but does not affect sibling
+                // positioning.  Use direct assignment so that explicit
+                // height (e.g. height:0) can override the height computed
+                // by CreateLineBoxes (e.g. from line-height).
+                ActualBottom = Location.Y + borderBoxHeight;
             }
         }
 
@@ -729,6 +742,27 @@ internal class CssBox : CssBoxProperties, IDisposable
         _wordsSizeMeasured = true;
     }
 
+    /// <summary>
+    /// Recursively calls <see cref="MeasureWordsSize"/> on this box and all
+    /// descendants so that <c>ActualWordSpacing</c> and word dimensions are
+    /// computed before <see cref="GetMinMaxWidth"/> is invoked for
+    /// shrink-to-fit width (CSS2.1 §10.3.7).
+    /// </summary>
+    private void EnsureDescendantWordsMeasured(RGraphics g)
+    {
+        var stack = new Stack<CssBox>();
+        foreach (var child in Boxes)
+            stack.Push(child);
+
+        while (stack.Count > 0)
+        {
+            var box = stack.Pop();
+            box.MeasureWordsSize(g);
+            foreach (var child in box.Boxes)
+                stack.Push(child);
+        }
+    }
+
     protected override sealed CssBoxProperties GetParent() => _parentBox;
 
     private int GetIndexForList()
@@ -848,6 +882,45 @@ internal class CssBox : CssBoxProperties, IDisposable
 
         maxWidth = paddingSum + maxSum;
         minWidth = paddingSum + (min < 90999 ? min : 0);
+    }
+
+    /// <summary>
+    /// CSS2.1 §10.3.7: Computes the shrink-to-fit width for an auto-width
+    /// absolutely positioned element by independently measuring each direct
+    /// child's total width and returning the maximum.
+    /// Each block or float child is its own "line"; the preferred width is
+    /// the widest line.  This avoids the incorrect accumulation that occurs
+    /// when <see cref="CssBoxHelper.GetMinMaxSumWords"/> sums float widths
+    /// with preceding block widths.
+    /// </summary>
+    private double ComputeShrinkToFitWidth()
+    {
+        double maxLineWidth = 0;
+
+        foreach (var child in Boxes)
+        {
+            double childWidth;
+
+            if (child.Width != CssConstants.Auto && !string.IsNullOrEmpty(child.Width))
+            {
+                // Explicit width: use declared width + borders/padding
+                double cbWidth = Size.Width > 0 && !double.IsNaN(Size.Width) ? Size.Width : 0;
+                childWidth = CssValueParser.ParseLength(child.Width, cbWidth, child.GetEmHeight())
+                           + child.ActualBorderLeftWidth + child.ActualBorderRightWidth
+                           + child.ActualPaddingLeft + child.ActualPaddingRight;
+            }
+            else
+            {
+                // Auto-width child: compute its intrinsic preferred width
+                child.GetMinMaxWidth(out _, out double childMax);
+                childWidth = childMax;
+            }
+
+            childWidth += child.ActualMarginLeft + child.ActualMarginRight;
+            maxLineWidth = Math.Max(maxLineWidth, childWidth);
+        }
+
+        return maxLineWidth;
     }
 
     internal bool HasJustInlineSiblings() => ParentBox != null && DomUtils.ContainsInlinesOnly(ParentBox);

@@ -199,12 +199,6 @@ internal static class CssBoxHelper
 
         // add the padding 
         paddingSum += box.ActualBorderLeftWidth + box.ActualBorderRightWidth + box.ActualPaddingRight + box.ActualPaddingLeft;
-        if (double.IsNaN(paddingSum))
-        {
-            string tag2 = box.HtmlTag?.Name ?? "anon";
-            System.IO.File.AppendAllText("/tmp/stf_trace.log",
-                $"[GMMW] NaN padding! tag={tag2} BL={box.ActualBorderLeftWidth} BR={box.ActualBorderRightWidth} PL={box.ActualPaddingLeft} PR={box.ActualPaddingRight}\n");
-        }
 
 
         // for tables the padding also contains the spacing between cells
@@ -216,14 +210,7 @@ internal static class CssBoxHelper
             // calculate the min and max sum for all the words in the box
             foreach (CssRect word in box.Words)
             {
-                double addVal = word.FullWidth + (word.HasSpaceBefore ? word.OwnerBox.ActualWordSpacing : 0);
-                if (double.IsNaN(addVal))
-                {
-                    string tag2 = box.HtmlTag?.Name ?? "anon";
-                    System.IO.File.AppendAllText("/tmp/stf_trace.log",
-                        $"[GMMW] NaN word! tag={tag2} word.Width={word.Width} word.FullWidth={word.FullWidth} word.IsImage={word.IsImage} word.Text='{word.Text}' ActualWordSpacing={word.OwnerBox.ActualWordSpacing}\n");
-                }
-                maxSum += addVal;
+                maxSum += word.FullWidth + (word.HasSpaceBefore ? word.OwnerBox.ActualWordSpacing : 0);
                 min = Math.Max(min, word.Width);
             }
 
