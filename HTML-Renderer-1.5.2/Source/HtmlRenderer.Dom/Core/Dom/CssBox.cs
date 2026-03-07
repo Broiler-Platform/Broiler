@@ -743,10 +743,13 @@ internal class CssBox : CssBoxProperties, IDisposable
     }
 
     /// <summary>
-    /// Recursively calls <see cref="MeasureWordsSize"/> on this box and all
-    /// descendants so that <c>ActualWordSpacing</c> and word dimensions are
+    /// Recursively calls <see cref="MeasureWordsSize"/> on all descendant
+    /// boxes so that <c>ActualWordSpacing</c> and word dimensions are
     /// computed before <see cref="GetMinMaxWidth"/> is invoked for
     /// shrink-to-fit width (CSS2.1 §10.3.7).
+    /// Note: the current box (<c>this</c>) is already measured by the
+    /// <see cref="MeasureWordsSize"/> call at the start of
+    /// <see cref="PerformLayoutImp"/>; only descendants need measuring.
     /// </summary>
     private void EnsureDescendantWordsMeasured(RGraphics g)
     {
@@ -904,8 +907,8 @@ internal class CssBox : CssBoxProperties, IDisposable
             if (child.Width != CssConstants.Auto && !string.IsNullOrEmpty(child.Width))
             {
                 // Explicit width: use declared width + borders/padding
-                double cbWidth = Size.Width > 0 && !double.IsNaN(Size.Width) ? Size.Width : 0;
-                childWidth = CssValueParser.ParseLength(child.Width, cbWidth, child.GetEmHeight())
+                double containingBlockWidth = Size.Width > 0 && !double.IsNaN(Size.Width) ? Size.Width : 0;
+                childWidth = CssValueParser.ParseLength(child.Width, containingBlockWidth, child.GetEmHeight())
                            + child.ActualBorderLeftWidth + child.ActualBorderRightWidth
                            + child.ActualPaddingLeft + child.ActualPaddingRight;
             }
