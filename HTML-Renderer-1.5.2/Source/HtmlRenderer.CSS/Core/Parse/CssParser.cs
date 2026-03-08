@@ -14,7 +14,7 @@ internal sealed class CssParser
     private static readonly char[] _cssBlockSplitters = ['}', ';'];
     private readonly IColorResolver _colorResolver;
     private readonly CssValueParser _valueParser;
-    private static readonly char[] _cssClassTrimChars = ['\r', '\n', '\t', ' ', '-', '!', '<', '>', ';'];
+    private static readonly char[] _cssClassTrimChars = ['\r', '\n', '\t', ' ', '-', '!', '<', '>'];
 
     public CssParser(IColorResolver colorResolver)
     {

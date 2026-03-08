@@ -23,7 +23,7 @@ public class Acid2DifferentialTests : IDisposable
     /// The renderer must stay at or above this level.
     /// As rendering fixes land, raise this threshold.
     /// </summary>
-    private const double MinMatchRatio = 0.992;
+    private const double MinMatchRatio = 0.995;
 
     /// <summary>
     /// Maximum allowed red-pixel leak count.
@@ -39,7 +39,7 @@ public class Acid2DifferentialTests : IDisposable
     /// pixel (R/G/B &lt; 250).  The full-image match is inflated by the
     /// large white background so this metric focuses on the rendered face.
     /// </summary>
-    private const double MinContentMatchRatio = 0.75;
+    private const double MinContentMatchRatio = 0.84;
 
     private static readonly DeterministicRenderConfig Config = new()
     {
