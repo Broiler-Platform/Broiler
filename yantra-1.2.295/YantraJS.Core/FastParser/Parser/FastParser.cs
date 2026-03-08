@@ -3,7 +3,7 @@
 namespace YantraJS.Core.FastParser;
 
 
-public partial class FastParser(FastTokenStream stream)
+public partial class FastParser(FastTokenStream stream) : IParser
 {
     private readonly FastTokenStream stream = stream;
 
