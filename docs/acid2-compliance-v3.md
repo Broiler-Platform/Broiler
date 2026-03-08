@@ -10,14 +10,14 @@
 
 | Metric | Value |
 |---|---|
-| **Content-area pixel match** | **68.66%** (16,741 / 24,381 content pixels) |
-| **Full-image pixel match (incl. background)** | **99.03%** (778,792 / 786,432 pixels) |
+| **Content-area pixel match** | **73.93%** (18,025 / 24,381 content pixels) |
+| **Full-image pixel match (incl. background)** | **99.19%** (780,076 / 786,432 pixels) |
 | Red-pixel leak (CSS failure indicator) | **0** |
 | Test dimensions | 1024 × 768 |
 | Content bounding box (Chromium) | x: [87, 211], y: [51, 275] — 125 × 225 px |
 | Content bounding box (Broiler) | x: [86, 205], y: [51, 292] — 120 × 242 px |
 | Render target | `acid2.html#top` (face test area) |
-| Automated test status | **All 6 differential tests passing** |
+| Automated test status | **All 8 differential tests passing** |
 | Chromium version | 145.0.7632.6 (Playwright v1.58.2) |
 | Last verified | 2026-03-08 |
 
@@ -33,10 +33,10 @@ Key achievements:
 - **Face structure visible** — forehead, eyes, nose, smile, and chin are rendered.
 - **Deterministic output** — re-renders produce identical pixel output.
 - **Phase 7.1 complete** — float display adjustment (§9.7), float shrink-to-fit (§10.3.5), abs-pos right positioning (§10.3.7).
+- **Phase 7.2 complete** — CSS pseudo-element descendant combinator fix (§5.12), removing erroneous `::after` on `.nose > div`.
 
-Key remaining gaps (7,640 diff pixels across 24,381 content pixels):
+Key remaining gaps (6,356 diff pixels across 24,381 content pixels):
 - Face height 242px vs. reference 225px (17px too tall).
-- Smile region renders extra black pixels (incorrect smile bar layout).
 - Chin/parser area extends 17px below reference.
 - Forehead text ("Hello World!") has minor anti-aliasing/font differences.
 - Nose diamond pseudo-elements missing anti-aliased rendering.
@@ -262,7 +262,7 @@ downward by 12px.
 | # | Task | Pixel Impact | CSS 2.1 Ref | Effort | Priority |
 |---|---|---|---|---|---|
 | 7.1 | Fix `float: inherit` resolution for nested floats | ~2,000 px | §9.5.1 | M | P0 |
-| 7.2 | Fix relative positioning offset on smile div siblings | ~500 px | §9.4.3 | S | P0 |
+| 7.2 | Fix pseudo-element descendant combinator parsing | ~2,676 px | §5.12 | S | P0 — **done** |
 | 7.3 | Correct smile bar height from nested float/clear interaction | ~1,000 px | §8.3.1, §9.5.2 | M | P0 |
 
 **Measurable outcome:** Smile region content match ≥ 90%.  Content-area
@@ -381,7 +381,7 @@ dotnet test HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests \
     - [x] CSS 2.1 §9.7: Display adjustment for floated inline elements ✓
     - [x] CSS 2.1 §10.3.5: Shrink-to-fit width for floated elements ✓
     - [x] CSS 2.1 §10.3.7: Abs-pos `right` property positioning ✓
-  - [ ] Correct relative positioning on smile div siblings
+  - [x] Correct pseudo-element descendant combinator parsing (§5.12) ✓
   - [ ] Fix smile bar height from nested float/clear interaction
 - [ ] **Phase 8** — Chin/parser height fix (target: ≥ 85% content match)
   - [ ] Fix parser container border-width rendering

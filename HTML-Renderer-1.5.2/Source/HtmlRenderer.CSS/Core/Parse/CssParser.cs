@@ -290,12 +290,22 @@ internal sealed class CssParser
 
         string psedoClass = null;
         string pseudoElement = null;
+        bool descendantCombinatorBeforePseudo = false;
         var colonIdx = className.IndexOf(":", StringComparison.Ordinal);
 
         if (colonIdx > -1 && !className.StartsWith("::"))
         {
             var suffix = colonIdx < className.Length - 1 ? className.Substring(colonIdx + 1).Trim() : null;
-            className = className.Substring(0, colonIdx).Trim();
+
+            // CSS2.1 §5.12: Detect whether a descendant combinator (whitespace)
+            // precedes the pseudo-element.  ".nose div :after" (with space) means
+            // "the ::after pseudo of *descendants* of .nose div", whereas
+            // ".nose div:after" (no space) means "::after on .nose div elements
+            // themselves".
+            var rawSelector = className.Substring(0, colonIdx);
+            descendantCombinatorBeforePseudo = rawSelector.Length > 0 &&
+                char.IsWhiteSpace(rawSelector[rawSelector.Length - 1]);
+            className = rawSelector.Trim();
 
             // CSS2.1 §12.1 / CSS3: Normalise :before/:after and ::before/::after
             // to pseudo-element references so they can be stored and applied.
@@ -314,6 +324,18 @@ internal sealed class CssParser
             if (pseudoElement != null)
             {
                 var selectors = ParseCssBlockSelector(className, out string firstClass);
+
+                // CSS2.1 §5.12: When a descendant combinator precedes the
+                // pseudo-element (e.g. ".nose div :after" vs ".nose div:after"),
+                // the pseudo applies to descendants of the matched element, not
+                // the element itself.  Model this by requiring firstClass as an
+                // additional ancestor in the selector chain.
+                if (descendantCombinatorBeforePseudo)
+                {
+                    selectors ??= [];
+                    selectors.Insert(0, new CssBlockSelectorItem(firstClass, false));
+                }
+
                 var properties = ParseCssBlockProperties(blockSource);
                 return new CssBlock(firstClass + pseudoElement, properties, selectors);
             }
