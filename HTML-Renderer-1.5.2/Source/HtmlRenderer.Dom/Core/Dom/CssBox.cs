@@ -1082,12 +1082,19 @@ internal class CssBox : CssBoxProperties, IDisposable
                 // When both are positive → max(m1, m2).
                 // When one is negative  → max(positives,0) + min(negatives,0).
                 // When both are negative → 0 + min(m1,m2) = most-negative.
-                // The general formula covers all three cases:
+                // The general formula covers all three cases.
+                // Use GetPropagatedMarginBottom so that a last-child's
+                // bottom margin propagates through its parent when the
+                // parent has no bottom border/padding and auto height
+                // (CSS 2.1 §8.3.1 parent-child bottom-margin collapse).
+                double prevMb = (prevSibling is CssBox prevSibBox)
+                    ? GetPropagatedMarginBottom(prevSibBox)
+                    : prevSibling.ActualMarginBottom;
                 double maxPos = Math.Max(
-                    Math.Max(prevSibling.ActualMarginBottom, 0),
+                    Math.Max(prevMb, 0),
                     Math.Max(ActualMarginTop, 0));
                 double minNeg = Math.Min(
-                    Math.Min(prevSibling.ActualMarginBottom, 0),
+                    Math.Min(prevMb, 0),
                     Math.Min(ActualMarginTop, 0));
                 value = maxPos + minNeg;
             }
@@ -1439,6 +1446,54 @@ internal class CssBox : CssBoxProperties, IDisposable
         CollectEmptyBoxMargins(box, ref maxPos, ref maxNeg);
         double collapsed = maxPos + maxNeg;
         return collapsed - box.CollapsedMarginTop;
+    }
+
+    /// <summary>
+    /// Returns the effective bottom margin for a box, accounting for
+    /// parent-child bottom-margin collapse (CSS 2.1 §8.3.1).
+    /// When a box has no bottom border, no bottom padding, and auto height,
+    /// the last in-flow block-level child's bottom margin collapses with
+    /// the box's own bottom margin.  This is applied recursively.
+    /// </summary>
+    private static double GetPropagatedMarginBottom(CssBox box)
+    {
+        double mb = box.ActualMarginBottom;
+
+        if (box.ActualBorderBottomWidth > 0.1 || box.ActualPaddingBottom > 0.1)
+            return mb;
+
+        if (box.Height != CssConstants.Auto && !string.IsNullOrEmpty(box.Height))
+        {
+            bool resolvedToAuto = box.Height.Contains('%')
+                && (box.ContainingBlock.Height == CssConstants.Auto
+                    || string.IsNullOrEmpty(box.ContainingBlock.Height));
+            if (!resolvedToAuto)
+                return mb;
+        }
+
+        // Find last in-flow block-level child (CSS 2.1 §8.3.1).
+        CssBox? lastInFlow = null;
+        foreach (var child in box.Boxes)
+        {
+            if (child.Float != CssConstants.None
+                || child.Position == CssConstants.Absolute
+                || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.Inline
+                || child.Display == CssConstants.InlineBlock)
+                continue;
+            lastInFlow = child;
+        }
+
+        if (lastInFlow == null)
+            return mb;
+
+        double childMb = GetPropagatedMarginBottom(lastInFlow);
+
+        // Collapse: max(positives,0) + min(negatives,0)
+        double maxPos = Math.Max(Math.Max(mb, 0), Math.Max(childMb, 0));
+        double minNeg = Math.Min(Math.Min(mb, 0), Math.Min(childMb, 0));
+        return maxPos + minNeg;
     }
 
     public override string ToString()
