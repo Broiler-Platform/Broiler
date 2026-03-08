@@ -116,6 +116,17 @@ internal sealed class DomParser
             AssignBoxKindAndAttributes(box);
         }
 
+        // CSS2.1 §9.7: Relationships between 'display', 'position', and 'float'.
+        // When 'float' is not 'none', the computed value of 'display' is adjusted
+        // so that inline-level elements become block-level.  This must happen
+        // after all CSS properties are resolved (including 'inherit') and before
+        // child style cascading so children see the correct parent display value.
+        if (box.Display != CssConstants.None && box.Float != CssConstants.None)
+        {
+            if (box.Display == CssConstants.Inline || box.Display == CssConstants.InlineBlock)
+                box.Display = CssConstants.Block;
+        }
+
         if (box.TextDecoration != String.Empty && box.Text.IsEmpty)
         {
             foreach (var childBox in box.Boxes)

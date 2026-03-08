@@ -387,6 +387,37 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                     Size = new SizeF((float)stfWidth, Size.Height);
                 }
+                else if ((Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
+                    && Float != CssConstants.None)
+                {
+                    // CSS2.1 §10.3.5: Floating non-replaced elements with
+                    // 'width: auto' use shrink-to-fit width.
+                    EnsureDescendantWordsMeasured(g);
+
+                    double preferred = ComputeShrinkToFitWidth();
+                    double available = width - ActualMarginLeft - ActualMarginRight;
+
+                    GetMinMaxWidth(out double prefMin, out _);
+                    if (double.IsNaN(prefMin)) prefMin = 0;
+                    if (double.IsNaN(preferred)) preferred = 0;
+                    double stfWidth = Math.Min(Math.Max(prefMin, available), preferred);
+
+                    if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
+                    {
+                        double maxW = CssValueParser.ParseLength(MaxWidth, width, GetEmHeight());
+                        if (stfWidth > maxW) stfWidth = maxW;
+                    }
+                    if (MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
+                    {
+                        double minW = CssValueParser.ParseLength(MinWidth, width, GetEmHeight());
+                        if (stfWidth < minW) stfWidth = minW;
+                    }
+
+                    stfWidth += ActualBorderLeftWidth + ActualBorderRightWidth
+                              + ActualPaddingLeft + ActualPaddingRight;
+
+                    Size = new SizeF((float)stfWidth, Size.Height);
+                }
                 else if (Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
                 {
                     // Margins reduce the box width only for auto-width elements.
@@ -595,6 +626,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                         var cb = FindPositionedContainingBlock();
                         double cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
                         double cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
+                        double cbContentWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
 
                         float newX = Location.X, newY = Location.Y;
 
@@ -602,6 +634,13 @@ internal class CssBox : CssBoxProperties, IDisposable
                         {
                             double cssLeft = CssValueParser.ParseLength(Left, cb.Size.Width, GetEmHeight());
                             newX = (float)(cbPadLeft + cssLeft + ActualMarginLeft);
+                        }
+                        else if (Right != null && Right != CssConstants.Auto)
+                        {
+                            // CSS2.1 §10.3.7: When left is auto and right is
+                            // specified, position from the right padding edge.
+                            double cssRight = CssValueParser.ParseLength(Right, cb.Size.Width, GetEmHeight());
+                            newX = (float)(cbPadLeft + cbContentWidth - cssRight - ActualMarginRight - Size.Width);
                         }
 
                         if (Top != null && Top != CssConstants.Auto)
