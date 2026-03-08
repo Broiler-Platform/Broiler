@@ -1,5 +1,9 @@
 # Acid2 Compliance Report — Version 2
 
+> **⚠️ SUPERSEDED:** This document (v2) has been superseded by
+> [Acid2 Compliance Report — Version 3](acid2-compliance-v3.md).
+> Refer to the v3 document for current metrics, analysis, and roadmap.
+
 > **Version:** 2.6
 > **Date:** 2026-03-08
 > **Supersedes:** All previous Acid2 compliance documentation (including `acid/acid2/acid2-compliance-roadmap.md`)
