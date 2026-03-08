@@ -25,5 +25,6 @@
     <Project Path="yantra-1.2.295/YantraJS.Core/YantraJS.Core.csproj" />
     <Project Path="yantra-1.2.295/YantraJS.ExpressionCompiler/YantraJS.ExpressionCompiler.csproj" />
     <Project Path="yantra-1.2.295/YantraJS.JSClassGenerator/YantraJS.JSClassGenerator.csproj" />
+    <Project Path="yantra-1.2.295/YantraJS.Core.Tests/YantraJS.Core.Tests.csproj" />
   </Folder>
 </Solution>
