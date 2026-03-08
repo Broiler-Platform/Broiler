@@ -1,8 +1,8 @@
 # Acid2 Compliance Roadmap
 
 > **⚠️ SUPERSEDED:** This document (v1) has been superseded by
-> [Acid2 Compliance Report — Version 2](../../docs/acid2-compliance-v2.md).
-> Refer to the v2 document for current metrics, analysis, and roadmap.
+> [Acid2 Compliance Report — Version 3](../../docs/acid2-compliance-v3.md).
+> Refer to the v3 document for current metrics, analysis, and roadmap.
 
 ## Summary
 
