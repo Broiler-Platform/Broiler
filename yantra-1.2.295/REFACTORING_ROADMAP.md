@@ -76,12 +76,12 @@ CLR execution with JSValue interop
 
 ### 2. Plan Code Migration into Modules
 
-- [ ] Evaluate whether to split `YantraJS.Core` into multiple assemblies or use namespace-based separation within the existing project
+- [ ] Split `YantraJS.Core` into **separate assemblies** per module (decided: assembly-level separation)
 - [ ] Prioritize extraction order based on coupling analysis (least coupled first):
   1. **Parser** (`FastParser/`) — self-contained, produces AST
   2. **Expression compiler** (`LinqExpressions/`) — depends on AST, produces expressions
   3. **Built-in objects** (`Core/{Array,String,...}/`) — depend on runtime but not on each other
-  4. **Debugger** (`Debugger/`) — largely independent, V8-protocol specific
+  4. **Debugger** (`Debugger/`) — largely independent; evaluate lighter alternatives to the V8 inspector protocol
   5. **CLR interop** (`Core/Clr/`) — depends on runtime, can be isolated
   6. **Module system** (`Core/Module/`) — depends on parser and runtime
 - [ ] Create internal interfaces to decouple the monolithic `JSContext` from individual built-in object implementations
@@ -144,6 +144,7 @@ CLR execution with JSValue interop
 - Add per-object test suites (Array, String, Number, Date, Promise, etc.)
 
 ### Milestone 4 — Debugger and CLR Interop
+- Evaluate lighter debugger protocol alternatives (e.g., DAP) and replace V8 inspector if a suitable option exists
 - Isolate debugger behind interface
 - Isolate CLR interop behind interface
 - Add corresponding tests
@@ -156,12 +157,14 @@ CLR execution with JSValue interop
 
 ---
 
-## Open Questions
+## Architectural Decisions
 
-- Should module extraction use separate assemblies or namespace-only separation?
-- What ECMAScript conformance level should be targeted (ES2020, ES2023, latest)?
-- Should the V8 debugger protocol support be kept or replaced with a lighter alternative?
-- How should the `modules/inbuilt/` Node.js polyfills (`.csx` files) be maintained?
+| Decision | Resolution |
+|----------|------------|
+| **Module separation strategy** | Separate assemblies (not namespace-only) |
+| **ECMAScript conformance target** | Latest spec, adopted incrementally (step by step) |
+| **Debugger protocol** | Replace V8 inspector with a lighter alternative if one exists (e.g., Debug Adapter Protocol) |
+| **Node.js polyfills (`modules/inbuilt/*.csx`)** | Consolidate into `YantraJS.NodePollyfill`; keep only actively used polyfills, remove dead `.csx` files, and convert remaining `.csx` scripts to compiled C# where feasible for better type safety and testability |
 
 ---
 
