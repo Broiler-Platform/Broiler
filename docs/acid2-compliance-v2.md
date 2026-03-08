@@ -1,7 +1,7 @@
 # Acid2 Compliance Report — Version 2
 
-> **Version:** 2.5
-> **Date:** 2026-03-07
+> **Version:** 2.6
+> **Date:** 2026-03-08
 > **Supersedes:** All previous Acid2 compliance documentation (including `acid/acid2/acid2-compliance-roadmap.md`)
 
 ---
@@ -17,11 +17,11 @@
 | Test dimensions | 1024 × 768 |
 | Content bounding box (Chromium) | x: [72, 240], y: [51, 276] — 168 × 225 px |
 | Render target | `acid2.html#top` (face test area) |
-| Automated test status | **All 10 tests passing** (6 differential + 4 regression) |
+| Automated test status | **All 15 tests passing** (6 differential + 4 margin/relpos + 5 fixed-position) |
 | Chromium version | 145.0.7632.6 (Playwright v1.58.2) |
-| Last verified | 2026-03-07 |
+| Last verified | 2026-03-08 |
 
-### Current State: Progressing — Phase 6 Complete
+### Current State: Progressing — Phase 6.5 Complete
 
 Broiler's html-renderer produces a **recognisable but imperfect** Acid2 face.
 The content-area pixel match has improved from 8.97% to **62.95%** after
@@ -29,6 +29,18 @@ Phase 6.2–6.4 fixes.  The face outline, forehead, eyes, nose, smile bar,
 and chin borders are all visible in approximately correct positions.  The
 face height is 242px (reference: 225px), a 17px difference primarily from
 parser/list-item rendering in the bottom face area.
+
+Phase 6.5 investigated and resolved the `position:fixed` viewport anchor
+ambiguity (CSS 2.1 §9.6.1):
+1. **OffsetTop/OffsetLeft fix**: `position:fixed` children are no longer
+   shifted by ancestor `position:relative` offsets.  The recursive
+   `OffsetTop`/`OffsetLeft` methods now skip `Position == Fixed` children.
+2. **PaintWalker validation**: confirmed that `OffsetDisplayItems` correctly
+   repositions fixed elements to viewport-relative coordinates during paint.
+3. **Containing block audit**: fixed elements use `GetActualLocation()` with
+   viewport dimensions, not `FindPositionedContainingBlock()`.
+4. **Regression tests**: 5 new tests validate viewport anchoring, ancestor
+   independence, scroll stability, and BFC auto-height for fixed elements.
 
 Phase 6.4 fixed three CSS 2.1 compliance issues:
 1. **MarginTopCollapse parent-child border check** (§8.3.1): parent-child
@@ -508,13 +520,26 @@ constraint at §10.6.3) to both:
 
 **Location:** Scalp region (y 50–120).
 
-**Root cause:** Fixed-position element not anchoring to viewport top correctly
-when scrolled to `#top` — ambiguity in how "viewport" maps when rendering a
-scrolled region.
+**Root cause:** Two issues identified:
+1. **OffsetTop/OffsetLeft bug (fixed):** The recursive `OffsetTop()` and
+   `OffsetLeft()` methods in `CssBox.cs` shifted ALL child elements —
+   including `position:fixed` children — when a parent applied a
+   `position:relative` visual offset.  Per CSS 2.1 §9.6.1, fixed-position
+   elements are positioned relative to the viewport and must not be affected
+   by ancestor positioning.  **Fix:** Skip children with `Position == Fixed`
+   in the recursive offset methods.
+2. **Remaining Acid2 difference (unresolved):** The ~1,600 diff pixels in the
+   scalp region are primarily from font metrics and the 17px overall face
+   height difference (Broiler 242px vs reference 225px), not from
+   `position:fixed` placement.  The Acid2 `p` and `p.bad` fixed elements are
+   direct children of the root, so the OffsetTop fix does not change
+   their positions.
 
-**Impact:** ~1,600 diff pixels.
+**Impact:** General CSS compliance fix.  ~1,600 Acid2 diff pixels remain
+(attributable to font metrics / vertical offset, tracked in Phase 7).
 
-**CSS 2.1 reference:** §9.6.1 (fixed positioning).
+**CSS 2.1 reference:** §9.6.1 (fixed positioning), §9.4.3 (relative
+positioning visual-only offset).
 
 ---
 
@@ -522,10 +547,10 @@ scrolled region.
 
 ### Current Compliance Level
 
-- **Content-area pixel match: 55.20%** — up from 8.97% after Phase 6.2/6.3 fixes.
+- **Content-area pixel match: 62.95%** — up from 8.97% after Phase 6.2/6.3/6.4 fixes.
 - **Red-pixel leak: 0** — all red pixels eliminated by Phase 5.4.
-- **Full-image pixel match: 98.56%** — up from 98.39%.
-- **Automated tests: 6 passing** — including content-area match assertion.
+- **Full-image pixel match: 98.85%** — up from 98.39%.
+- **Automated tests: 15 passing** — 6 differential + 4 margin/relpos + 5 fixed-position.
 - **Visual assessment: recognisable face** — scalp, forehead, eyes, nose, smile, chin borders visible. Remaining issues are vertical offsets and font metrics.
 
 ### Phase 5 — Eliminate Red Pixels (Target: 0 red pixels) ✅ Complete
@@ -549,7 +574,7 @@ Red pixels are the canonical Acid2 failure signal.  **0 remain after Phase 5.4.*
 | 6.2 | **Fix smile margin-collapsing precision** — Float height override for percentage heights resolving to auto incorrectly collapsed the `.nose` border-box from 48px to 12px.  Fixed by adding `resolveToAuto` check to both the float height override in `PerformLayoutImp` and `CollectMaxFloatBottom` in `CssBoxHelper.cs`.  Smile vertical position corrected by 36px.  Content-area match improved from 8.97% → 50.52%. | ~~2,200~~ fixed | §8.3.1, §9.5.1, §10.5 | L | ✅ Done |
 | 6.3 | **Fix ears/2nd-line layout** — Shrink-to-fit width for abs-pos elements now adds the element's own borders/padding (§10.3.7).  Blockquote width corrected from 48px to 96px.  Content-area match improved from 50.52% → 55.20%.  Phase 6.3 completion: validated attribute-selector matching (`[class~=one].first.one`, `[class=second\ two]`) and float interactions for the ears region; confirmed shrink-to-fit border-box width is correct; added NaN guards in `ComputeShrinkToFitWidth` and `FragmentTreeBuilder`; added content-area match test assertion. | ~~2,900~~ partially fixed | §10.3.7, §5.8 | M | ✅ Done |
 | 6.4 | **Fix margin collapsing and relative positioning** — Three CSS 2.1 compliance fixes: (1) Parent-child margins no longer collapse when parent has non-zero border (§8.3.1); (2) `position:relative` offset excluded from parent auto-height in `MarginBottomCollapse` (§9.4.3); (3) siblings use flow-position bottom for layout.  Content-area match improved from 55.20% → 62.95%.  Face height reduced from 254px → 242px (reference: 225px).  Added 4 regression tests. | ~~1,800~~ fixed | §8.3.1, §9.4.3 | M | ✅ Done |
-| 6.5 | **Fix scalp position:fixed viewport anchor** — Investigation confirms position:fixed elements are correctly placed at viewport-relative positions (p at y=108, p.bad at y=144).  PaintWalker correctly offsets fixed elements by viewport coordinates during paint.  Remaining ~1,600 px difference is from font metrics and overall vertical offset of the face structure. | ~1,600 px | §9.6.1 | M | P2 — follow-up |
+| 6.5 | **Fix scalp position:fixed viewport anchor** — (1) Fixed `OffsetTop`/`OffsetLeft` in `CssBox.cs` to skip `position:fixed` children, preventing ancestor `position:relative` offsets from incorrectly shifting fixed elements (CSS 2.1 §9.6.1).  (2) Validated PaintWalker correctly offsets fixed elements by viewport coordinates during paint.  (3) Audited containing block determination: fixed elements use `GetActualLocation()` with viewport dimensions, not `FindPositionedContainingBlock()`.  (4) Reviewed prior phases for missed dependencies — none found.  Remaining ~1,600 px Acid2 difference is from font metrics and overall vertical offset of the face structure, not from position:fixed placement.  Added 5 regression tests. | ~1,600 px (general fix, Acid2 pixels unchanged) | §9.6.1 | M | ✅ Done |
 
 **Measurable outcome:** Content-area pixel match ≥ 70%.  Content bounding-box
 match ≥ 85%.
@@ -635,14 +660,14 @@ they do not measure actual compliance.
 
 | Threshold | Value | Purpose |
 |---|---|---|
-| `MinMatchRatio` | 0.98 (98%) | Full-image regression floor (inflated by background) |
+| `MinMatchRatio` | 0.988 (98.8%) | Full-image regression floor (inflated by background) |
 | `MaxRedPixelLeak` | 0 | Maximum allowed red pixels |
-| `MinContentMatchRatio` | 0.55 (55%) | Content-area pixel match floor |
+| `MinContentMatchRatio` | 0.62 (62%) | Content-area pixel match floor |
 | Viewport | 1024 × 768 | Standard Acid2 test dimensions |
 | `ColorTolerance` | 5 | Per-channel tolerance for pixel comparison |
 
-**Important:** A 98% full-image match does not mean the renderer is 98%
-compliant.  55.20% of content pixels actually match (up from 8.97%).
+**Important:** A 98.8% full-image match does not mean the renderer is 98.8%
+compliant.  62.95% of content pixels actually match (up from 8.97%).
 The content-area assertion (`MinContentMatchRatio`) was added in Phase 6.3 to
 provide a more honest compliance metric.
 
@@ -661,7 +686,7 @@ provide a more honest compliance metric.
 - [x] Analyze root causes for each mismatch category
 - [x] Verify Chromium reference matches fresh Playwright render (2026-03-06: identical)
 
-### Completed Fixes (Phases 0–3, 5.1–5.4, 6.1–6.3)
+### Completed Fixes (Phases 0–3, 5.1–5.4, 6.1–6.5)
 
 - [x] **Phase 0** — Load external `<link>` stylesheets (`data:text/css` URI, cascade)
 - [x] **Phase 1** — Eliminate bulk red pixels (HTML parser, sibling combinator, CSS error recovery)
@@ -686,14 +711,24 @@ provide a more honest compliance metric.
   - [x] Validate float interactions within shrink-to-fit ears region
   - [x] Add NaN guards in `ComputeShrinkToFitWidth` and `FragmentTreeBuilder`
   - [x] Add content-area match assertion to automated test suite
+- [x] **Phase 6.4** — Fix margin collapsing and relative positioning (content match 55.20% → 62.95%)
+  - [x] Parent-child margin collapsing blocked by non-zero parent border (§8.3.1)
+  - [x] `position:relative` offset excluded from parent auto-height (§9.4.3)
+  - [x] Siblings use flow-position bottom for layout (§9.4.3)
+  - [x] Added 4 margin-collapsing / relative-positioning regression tests
+- [x] **Phase 6.5** — Fix scalp `position:fixed` viewport anchor (§9.6.1)
+  - [x] Investigate ambiguity in fixed positioning mapped in scrolled renders (`#top` anchor)
+  - [x] Validate PaintWalker places `position:fixed` elements at correct viewport-relative Y
+  - [x] Fix `OffsetTop`/`OffsetLeft` to skip `position:fixed` children
+  - [x] Audit containing block determination: fixed uses viewport, not positioned ancestor
+  - [x] Review prior phases (6.1–6.4) for missed dependencies — none found
+  - [x] Added 5 fixed-position regression tests
 
 ### Remaining Work
 
-- [ ] **Phase 6.4** — Fix chin inline line-height (~1,800 px) — font metrics at tiny sizes
-- [ ] **Phase 6.5** — Fix scalp `position:fixed` viewport anchor (~1,600 px) — vertical offset
 - [ ] **Phase 7** — Sub-pixel perfection and final audit
 - [x] Achieve 0 red-pixel leak ✓
-- [ ] Achieve ≥ 70% content-area pixel match (Phase 6 target — currently 55.20%)
+- [ ] Achieve ≥ 70% content-area pixel match (Phase 6 target — currently 62.95%)
 - [ ] Achieve ≥ 95% content-area pixel match (Phase 7 target)
 - [x] Add content-area-specific assertions to automated tests ✓
 
@@ -716,6 +751,8 @@ provide a more honest compliance metric.
 | `src/Broiler.Cli/CaptureService.cs` | CLI image capture, anchor/fragment support |
 | `HTML-Renderer-1.5.2/Source/HtmlRenderer.Image/PixelDiffRunner.cs` | Deterministic pixel comparison |
 | `HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/Acid2DifferentialTests.cs` | Automated regression tests |
+| `HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/FixedPositionTests.cs` | Position:fixed viewport anchor regression tests |
+| `HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/MarginCollapsingTests.cs` | Margin collapsing / relative positioning regression tests |
 | `HTML-Renderer-1.5.2/Source/HtmlRenderer.CSS/Core/Parse/CssParser.cs` | CSS parsing and error recovery |
 | `HTML-Renderer-1.5.2/Source/HtmlRenderer.CSS/Core/Parse/CssValueParser.cs` | CSS value parsing (colors, lengths) |
 | `HTML-Renderer-1.5.2/Source/HtmlRenderer.Dom/Core/Dom/CssBox.cs` | Box model, layout, margin collapsing |
@@ -734,8 +771,14 @@ provide a more honest compliance metric.
   `border-bottom` depending on the code path (inline vs block containers).
   Coordinated changes needed across all `ActualBottom`-setting paths.
 - **`position:fixed` in scrolled renders:** CSS 2.1 §9.6.1 defines fixed
-  positioning relative to the viewport, but when rendering a scrolled region,
-  the viewport reference frame is ambiguous.
+  positioning relative to the viewport.  ~~When rendering a scrolled region,
+  the viewport reference frame is ambiguous.~~  **Resolved in Phase 6.5.**
+  Fixed elements use `GetActualLocation()` with viewport dimensions for
+  layout positioning, and PaintWalker's `OffsetDisplayItems()` repositions
+  them to viewport-relative coordinates during paint.  The
+  `OffsetTop`/`OffsetLeft` methods skip `position:fixed` children to prevent
+  ancestor `position:relative` offsets from incorrectly shifting fixed
+  elements.
 - **`NaN` width for auto-width absolutely positioned elements:** ~~The layout
   engine (`CssBox.PerformLayoutImp`) does not compute shrink-to-fit width for
   absolutely positioned elements with `width:auto`.~~  **Resolved in Phase 5.3

@@ -1252,7 +1252,13 @@ internal class CssBox : CssBoxProperties, IDisposable
             word.Top += amount;
 
         foreach (CssBox b in Boxes)
-            b.OffsetTop(amount);
+        {
+            // CSS2.1 §9.6.1: position:fixed elements are positioned relative
+            // to the viewport and must not be shifted by ancestor offsets
+            // (e.g. a parent's position:relative visual offset).
+            if (b.Position != CssConstants.Fixed)
+                b.OffsetTop(amount);
+        }
 
         _listItemBox?.OffsetTop(amount);
 
@@ -1273,7 +1279,12 @@ internal class CssBox : CssBoxProperties, IDisposable
             word.Left += amount;
 
         foreach (CssBox b in Boxes)
-            b.OffsetLeft(amount);
+        {
+            // CSS2.1 §9.6.1: position:fixed elements are positioned relative
+            // to the viewport and must not be shifted by ancestor offsets.
+            if (b.Position != CssConstants.Fixed)
+                b.OffsetLeft(amount);
+        }
 
         _listItemBox?.OffsetLeft(amount);
 
