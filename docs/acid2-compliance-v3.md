@@ -10,8 +10,8 @@
 
 | Metric | Value |
 |---|---|
-| **Content-area pixel match** | **62.95%** (15,349 / 24,381 content pixels) |
-| **Full-image pixel match (incl. background)** | **98.85%** (777,400 / 786,432 pixels) |
+| **Content-area pixel match** | **68.66%** (16,741 / 24,381 content pixels) |
+| **Full-image pixel match (incl. background)** | **99.03%** (778,792 / 786,432 pixels) |
 | Red-pixel leak (CSS failure indicator) | **0** |
 | Test dimensions | 1024 × 768 |
 | Content bounding box (Chromium) | x: [87, 211], y: [51, 275] — 125 × 225 px |
@@ -24,16 +24,17 @@
 ### Current State
 
 Broiler's html-renderer produces a **recognisable but imperfect** Acid2 face.
-The full-image match of 98.85% is misleading because ~94% of the image is white
-background that matches trivially.  The content-area match of 62.95% isolates
+The full-image match of 99.03% is misleading because ~94% of the image is white
+background that matches trivially.  The content-area match of 68.66% isolates
 the rendered face and is the true compliance metric.
 
 Key achievements:
 - **Zero red-pixel leak** — all CSS failure indicators eliminated.
 - **Face structure visible** — forehead, eyes, nose, smile, and chin are rendered.
 - **Deterministic output** — re-renders produce identical pixel output.
+- **Phase 7.1 complete** — float display adjustment (§9.7), float shrink-to-fit (§10.3.5), abs-pos right positioning (§10.3.7).
 
-Key remaining gaps (9,032 diff pixels across 24,381 content pixels):
+Key remaining gaps (7,640 diff pixels across 24,381 content pixels):
 - Face height 242px vs. reference 225px (17px too tall).
 - Smile region renders extra black pixels (incorrect smile bar layout).
 - Chin/parser area extends 17px below reference.
@@ -253,7 +254,7 @@ downward by 12px.
 |---|---|---|
 | Red-pixel elimination | 0 red pixels | ✅ Complete |
 | Face structure | All features visible | ✅ Complete |
-| Content-area match | 62.95% | 🔶 In progress |
+| Content-area match | 68.66% | 🔶 In progress |
 | Full compliance | 100% content-area match | ❌ Not yet |
 
 ### Phase 7 — Smile Layout Fix (Target: ≥ 75% content-area match)
@@ -376,7 +377,10 @@ dotnet test HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests \
 ### Remaining Work
 
 - [ ] **Phase 7** — Smile layout fix (target: ≥ 75% content match)
-  - [ ] Fix `float: inherit` for nested floats
+  - [x] Fix `float: inherit` for nested floats ✓
+    - [x] CSS 2.1 §9.7: Display adjustment for floated inline elements ✓
+    - [x] CSS 2.1 §10.3.5: Shrink-to-fit width for floated elements ✓
+    - [x] CSS 2.1 §10.3.7: Abs-pos `right` property positioning ✓
   - [ ] Correct relative positioning on smile div siblings
   - [ ] Fix smile bar height from nested float/clear interaction
 - [ ] **Phase 8** — Chin/parser height fix (target: ≥ 85% content match)
