@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.Scripting;
 
 /// <summary>
 /// Abstraction over a JavaScript execution engine.
@@ -16,7 +16,8 @@ public interface IScriptEngine
     /// <summary>
     /// Execute the supplied <paramref name="scripts"/> in a fresh context
     /// with a <c>document</c> object derived from <paramref name="html"/>,
-    /// enabling basic DOM interaction via the <see cref="DomBridge"/>.
+    /// enabling basic DOM interaction when a <see cref="ScriptEngine.ContextSetup"/>
+    /// callback has been configured.
     /// Returns <c>true</c> when all scripts executed without error.
     /// </summary>
     bool Execute(IReadOnlyList<string> scripts, string html);

@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Broiler.App.Rendering;
 using YantraJS.Core;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.Scripting;
 
 /// <summary>
 /// Executes JavaScript using the YantraJS engine.
@@ -23,6 +24,15 @@ public sealed class ScriptEngine : IScriptEngine
 
     /// <inheritdoc />
     public MicroTaskQueue MicroTasks { get; } = new();
+
+    /// <summary>
+    /// Optional callback invoked to configure the <see cref="JSContext"/>
+    /// with additional capabilities (e.g. a DOM bridge) before scripts are
+    /// executed.  The first parameter is the <see cref="JSContext"/> and the
+    /// second is the HTML string passed to
+    /// <see cref="Execute(IReadOnlyList{string}, string)"/>.
+    /// </summary>
+    public Action<JSContext, string>? ContextSetup { get; set; }
 
     /// <inheritdoc />
     public bool Execute(IReadOnlyList<string> scripts)
@@ -65,8 +75,7 @@ public sealed class ScriptEngine : IScriptEngine
 
         using var context = new JSContext();
         RegisterRuntimeExtensions(context);
-        var bridge = new DomBridge();
-        bridge.Attach(context, html);
+        ContextSetup?.Invoke(context, html);
 
         var allSucceeded = true;
         for (var i = 0; i < scripts.Count; i++)
@@ -143,11 +152,11 @@ public sealed class ScriptEngine : IScriptEngine
     private string PrepareSource(string script) => StrictModeEnabled ? "\"use strict\";\n" + script : script;
 
     /// <summary>
-    /// Register Milestone 4 runtime extensions on the JS context:
+    /// Register runtime extensions on the JS context:
     /// <c>queueMicrotask</c>, CSP-gated <c>eval</c>, and polyfills for
     /// ES2023+ built-ins not natively provided by YantraJS.
     /// </summary>
-    private void RegisterRuntimeExtensions(JSContext context)
+    internal void RegisterRuntimeExtensions(JSContext context)
     {
         // queueMicrotask(fn)
         context["queueMicrotask"] = new JSFunction((in Arguments a) =>

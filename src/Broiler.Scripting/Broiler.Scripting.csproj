@@ -1,27 +1,22 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
-    <RootNamespace>Broiler.Cli</RootNamespace>
+    <RootNamespace>Broiler.Scripting</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Broiler.Cli.Tests" />
+    <InternalsVisibleTo Include="Broiler.Scripting.Tests" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="..\Broiler.App\Rendering\RenderLogger.cs" Link="RenderLogger.cs" />
   </ItemGroup>
 
-
   <ItemGroup>
-    <ProjectReference Include="..\..\HTML-Renderer-1.5.2\Source\HtmlRenderer\HtmlRenderer.csproj" />
-    <ProjectReference Include="..\..\HTML-Renderer-1.5.2\Source\HtmlRenderer.Image\HtmlRenderer.Image.csproj" />
     <ProjectReference Include="..\..\yantra-1.2.295\YantraJS.Core\YantraJS.Core.csproj" />
-    <ProjectReference Include="..\Broiler.Scripting\Broiler.Scripting.csproj" />
   </ItemGroup>
 
 </Project>

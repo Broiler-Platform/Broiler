@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.Scripting;
 
 /// <summary>
 /// Detailed result of a JavaScript execution batch, including per-script

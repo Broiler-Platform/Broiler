@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.Scripting;
 
 /// <summary>
 /// A simple micro-task queue that collects callbacks and drains them in
@@ -54,7 +54,7 @@ public sealed class MicroTaskQueue
                 }
                 catch (Exception ex)
                 {
-                    RenderLogger.LogError(LogCategory.JavaScript, "MicroTaskQueue.Drain", $"Microtask failed: {ex.Message}", ex);
+                    Broiler.App.Rendering.RenderLogger.LogError(Broiler.App.Rendering.LogCategory.JavaScript, "MicroTaskQueue.Drain", $"Microtask failed: {ex.Message}", ex);
                     errors.Add(ex);
                 }
             }
