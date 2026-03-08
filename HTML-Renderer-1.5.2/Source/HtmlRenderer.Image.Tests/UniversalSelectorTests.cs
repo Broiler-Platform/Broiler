@@ -12,7 +12,7 @@ namespace HtmlRenderer.Image.Tests;
 /// <c>* div.target { ... }</c> correctly match elements with the
 /// universal selector as an ancestor requirement.
 /// </summary>
-public class UniversalSelectorTests : IDisposable
+public class UniversalSelectorTests
 {
     /// <summary>
     /// CSS 2.1 §5.3: The universal selector '*' in a descendant combinator
@@ -151,10 +151,5 @@ html, body { margin: 0; padding: 0; font: 12px sans-serif; }
             if (result != null) return result;
         }
         return null;
-    }
-
-    public void Dispose()
-    {
-        // No persistent resources to clean up
     }
 }
