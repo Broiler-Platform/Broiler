@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Broiler.App.Rendering;
 using YantraJS.Core;
 
 namespace Broiler.Scripting;

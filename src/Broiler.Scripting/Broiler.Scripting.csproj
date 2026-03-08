@@ -12,10 +12,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\Broiler.App\Rendering\RenderLogger.cs" Link="RenderLogger.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\yantra-1.2.295\YantraJS.Core\YantraJS.Core.csproj" />
   </ItemGroup>
 

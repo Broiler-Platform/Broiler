@@ -1,5 +1,5 @@
 using System.Text.RegularExpressions;
-using Broiler.App.Rendering;
+using Broiler.Scripting;
 using SkiaSharp;
 using TheArtOfDev.HtmlRenderer.Core.Entities;
 using TheArtOfDev.HtmlRenderer.Image;

@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\Broiler.App\Rendering\RenderLogger.cs" Link="RenderLogger.cs" />
+    <Compile Include="..\Broiler.Scripting\RenderLogger.cs" Link="RenderLogger.cs" />
   </ItemGroup>
 
   <ItemGroup>

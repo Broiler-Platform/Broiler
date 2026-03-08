@@ -54,7 +54,7 @@ public sealed class MicroTaskQueue
                 }
                 catch (Exception ex)
                 {
-                    Broiler.App.Rendering.RenderLogger.LogError(Broiler.App.Rendering.LogCategory.JavaScript, "MicroTaskQueue.Drain", $"Microtask failed: {ex.Message}", ex);
+                    RenderLogger.LogError(LogCategory.JavaScript, "MicroTaskQueue.Drain", $"Microtask failed: {ex.Message}", ex);
                     errors.Add(ex);
                 }
             }
