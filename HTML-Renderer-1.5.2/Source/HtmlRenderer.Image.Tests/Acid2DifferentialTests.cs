@@ -23,7 +23,7 @@ public class Acid2DifferentialTests : IDisposable
     /// The renderer must stay at or above this level.
     /// As rendering fixes land, raise this threshold.
     /// </summary>
-    private const double MinMatchRatio = 0.988;
+    private const double MinMatchRatio = 0.991;
 
     /// <summary>
     /// Maximum allowed red-pixel leak count.
@@ -39,7 +39,7 @@ public class Acid2DifferentialTests : IDisposable
     /// pixel (R/G/B &lt; 250).  The full-image match is inflated by the
     /// large white background so this metric focuses on the rendered face.
     /// </summary>
-    private const double MinContentMatchRatio = 0.62;
+    private const double MinContentMatchRatio = 0.73;
 
     private static readonly DeterministicRenderConfig Config = new()
     {
@@ -256,6 +256,99 @@ public class Acid2DifferentialTests : IDisposable
         Assert.NotNull(topRect);
         Assert.True(topRect.Value.Y > 100,
             $"Expected #top element below intro (Y > 100), but Y = {topRect.Value.Y}");
+    }
+
+    /// <summary>
+    /// Validates the smile region (rows 196–260) meets a minimum content-area
+    /// match threshold.  This guards against regressions in relative positioning,
+    /// float/clear interaction, and margin collapsing in the smile/chin area.
+    /// </summary>
+    [Fact]
+    public void Acid2Top_SmileRegion_MeetsMinimumThreshold()
+    {
+        using var actual = RenderAtAnchorTop(_acid2Html);
+        using var baseline = SKBitmap.Decode(_referencePath);
+        Assert.NotNull(baseline);
+
+        int tolerance = Config.ColorTolerance;
+        int totalContent = 0, matchContent = 0;
+
+        for (int y = 196; y <= 260; y++)
+        {
+            for (int x = 0; x < Math.Min(actual.Width, baseline.Width); x++)
+            {
+                var a = actual.GetPixel(x, y);
+                var r = baseline.GetPixel(x, y);
+
+                bool isContent = a.Red < 250 || a.Green < 250 || a.Blue < 250
+                              || r.Red < 250 || r.Green < 250 || r.Blue < 250;
+
+                if (isContent)
+                {
+                    totalContent++;
+                    if (Math.Abs(a.Red - r.Red) <= tolerance
+                     && Math.Abs(a.Green - r.Green) <= tolerance
+                     && Math.Abs(a.Blue - r.Blue) <= tolerance)
+                        matchContent++;
+                }
+            }
+        }
+
+        double smileMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
+
+        Assert.True(
+            smileMatch >= 0.88,
+            $"Acid2 #top smile-region match {smileMatch:P2} is below minimum 88.00%. " +
+            $"Matching content pixels: {matchContent}/{totalContent}");
+    }
+
+    /// <summary>
+    /// Verifies the nose pseudo-element selector ".nose div :after" (with
+    /// descendant combinator before the pseudo-element) does not generate an
+    /// extra ::after box on .nose > div itself—only on descendants of
+    /// .nose div.  Regression guard for CSS 2.1 §5.12 pseudo-element parsing.
+    /// </summary>
+    [Fact]
+    public void Acid2Top_NosePseudoElement_NoExtraAfterOnNoseDiv()
+    {
+        int w = ViewportWidth;
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.MaxSize = new SizeF(w, 99999);
+        container.SetHtml(_acid2Html);
+
+        using var bmp = new SKBitmap(w, 2000, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(bmp);
+        canvas.Clear(SKColors.White);
+        container.PerformLayout(canvas, new RectangleF(0, 0, w, 99999));
+
+        var root = container.HtmlContainerInt.Root;
+        var nose = FindBoxByClass(root, "nose");
+        Assert.NotNull(nose);
+
+        // .nose > div should have exactly one child: .nose > div > div (the diamond).
+        // Before the fix it had two children (diamond + erroneous ::after).
+        var noseDiv = nose.Boxes.FirstOrDefault();
+        Assert.NotNull(noseDiv);
+
+        int childCount = noseDiv.Boxes.Count();
+        Assert.True(childCount == 1,
+            $"Expected .nose > div to have 1 child (diamond div), but found {childCount}. " +
+            "An erroneous ::after pseudo-element may have been generated.");
+    }
+
+    private static TheArtOfDev.HtmlRenderer.Core.Dom.CssBox? FindBoxByClass(
+        TheArtOfDev.HtmlRenderer.Core.Dom.CssBox root, string className)
+    {
+        if (root.HtmlTag?.TryGetAttribute("class") == className)
+            return root;
+        foreach (var child in root.Boxes)
+        {
+            var result = FindBoxByClass(child, className);
+            if (result != null) return result;
+        }
+        return null;
     }
 
     public void Dispose()
