@@ -4,7 +4,6 @@ using System.Net.Http;
 using System.Windows;
 using System.Windows.Input;
 using Broiler.App.Rendering;
-using Broiler.Scripting;
 using TheArtOfDev.HtmlRenderer.Core.Entities;
 using TheArtOfDev.HtmlRenderer.WPF;
 
@@ -29,10 +28,7 @@ public partial class MainWindow : Window
         _pipeline = new RenderingPipeline(
             new PageLoader(new HttpClient()),
             new ScriptExtractor(),
-            new ScriptEngine
-            {
-                ContextSetup = (ctx, html) => new DomBridge().Attach(ctx, html)
-            });
+            new ScriptEngine());
 
         DevConsole.CloseRequested += ToggleConsole;
 

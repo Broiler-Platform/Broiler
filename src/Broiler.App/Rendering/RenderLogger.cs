@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace Broiler.Scripting;
+namespace Broiler.App.Rendering;
 
 /// <summary>
 /// Identifies the subsystem that produced a log entry.

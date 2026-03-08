@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Broiler.Scripting;
+namespace Broiler.App.Rendering;
 
 /// <summary>
 /// A simple micro-task queue that collects callbacks and drains them in

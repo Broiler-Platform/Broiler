@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace Broiler.Scripting;
+namespace Broiler.App.Rendering;
 
 /// <summary>
 /// Records the execution time of individual JavaScript scripts to support

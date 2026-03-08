@@ -9,14 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\Broiler.Scripting\RenderLogger.cs" Link="RenderLogger.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\HTML-Renderer-1.5.2\Source\HtmlRenderer.WPF\HtmlRenderer.WPF.csproj" />
     <ProjectReference Include="..\..\yantra-1.2.295\YantraJS.Core\YantraJS.Core.csproj" />
     <ProjectReference Include="..\Broiler.DevConsole\Broiler.DevConsole.csproj" />
-    <ProjectReference Include="..\Broiler.Scripting\Broiler.Scripting.csproj" />
   </ItemGroup>
 
 </Project>
