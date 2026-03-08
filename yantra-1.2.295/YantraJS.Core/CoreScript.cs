@@ -3,6 +3,7 @@ using Microsoft.Threading;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using YantraJS.Core;
+using YantraJS.Core.FastParser.Compiler;
 using YantraJS.Emit;
 using Exp = YantraJS.Expressions.YExpression;
 namespace YantraJS;
@@ -10,16 +11,28 @@ namespace YantraJS;
 
 public class CoreScript
 {
+    private static IJSCompiler _compiler = new DefaultJSCompiler();
+
+    /// <summary>
+    /// Gets or sets the compiler used by <see cref="Compile"/>.
+    /// Defaults to <see cref="DefaultJSCompiler"/>.
+    /// </summary>
+    public static IJSCompiler Compiler
+    {
+        get => _compiler;
+        set => _compiler = value ?? throw new System.ArgumentNullException(nameof(value));
+    }
+
     internal static JSFunctionDelegate Compile(in StringSpan code, string location = null, IList<string> args = null, ICodeCache codeCache = null)
     {
         try
         {
             codeCache = codeCache ?? DictionaryCodeCache.Current;
             var script = code;
+            var compiler = _compiler;
             var jsc = new JSCode(location, code, args, () =>
             {
-                var cc = new Core.FastParser.Compiler.FastCompiler(script, location, args, codeCache);
-                return cc.Method;
+                return compiler.Compile(script, location, args, codeCache);
             });
             return codeCache.GetOrCreate(in jsc);
         }
