@@ -1,0 +1,28 @@
+Build started 03/08/2026 11:58:32.
+Test run for /home/runner/work/Broiler/Broiler/HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/bin/Debug/net8.0/HtmlRenderer.Image.Tests.dll (.NETCoreApp,Version=v8.0)
+VSTest version 18.0.1 (x64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.3.1+6b60a9e56a (64-bit .NET 8.0.24)
+[xUnit.net 00:00:00.07]   Discovering: HtmlRenderer.Image.Tests
+[xUnit.net 00:00:00.13]   Discovered:  HtmlRenderer.Image.Tests
+[xUnit.net 00:00:00.13]   Starting:    HtmlRenderer.Image.Tests
+  Passed HtmlRenderer.Image.Tests.Acid2DifferentialTests.Acid2Top_RedPixelLeak_BelowMaximum [285 ms]
+  Passed HtmlRenderer.Image.Tests.Acid2DifferentialTests.Acid2Top_ContentAreaMatch_MeetsMinimumThreshold [308 ms]
+  Passed HtmlRenderer.Image.Tests.Acid2DifferentialTests.Acid2Top_RenderDimensions_MatchViewport [11 ms]
+  Passed HtmlRenderer.Image.Tests.Acid2DifferentialTests.Acid2Top_PixelMatch_MeetsMinimumThreshold [1 s]
+  Passed HtmlRenderer.Image.Tests.Acid2DifferentialTests.Acid2Top_AnchorElement_IsFoundDuringLayout [7 ms]
+[xUnit.net 00:00:04.03]   Finished:    HtmlRenderer.Image.Tests
+  Passed HtmlRenderer.Image.Tests.Acid2DifferentialTests.Acid2Top_Render_IsDeterministic [1 s]
+
+Test Run Successful.
+Total tests: 6
+     Passed: 6
+ Total time: 4.5064 Seconds
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:05.04
