@@ -233,10 +233,23 @@ Broiler renders the same area as solid yellow.
 .nose div    :after  { border-style: solid solid none; border-color: black yellow red yellow; }
 ```
 Chromium applies sub-pixel anti-aliasing to the diagonal border edges.
-Broiler's SkiaSharp border rendering does not anti-alias border intersections,
-producing sharp edges instead of smooth gradients.  The `border-color: red`
-parts should be hidden by `margin: auto` on the `.nose div div` element,
-leaving only the black diamond outline visible.
+
+**Key finding (Phase 9 analysis):**  Solid borders in `BordersDrawHandler.cs`
+are rendered via the `DrawLine` code path (lines 71–86), which draws each
+border as a centred line at the border width.  This approach does NOT create
+diagonal polygon edges — the corner intersections are simply where two
+perpendicular lines overlap.  The `SetInOutsetRectanglePoints`/`DrawPolygon`
+path (line 66) is only used for `inset`/`outset` border styles.
+
+To produce anti-aliased diagonal intersections, the `BordersDrawHandler` must
+switch solid borders to trapezoid polygon rendering (like `inset`/`outset`) at
+corners where two adjacent borders have different colours.  This is the same
+approach already implemented in `RGraphicsRasterBackend.RenderDrawBorder` for
+the IR rendering path, which uses `DrawPolygon` with trapezoid vertices for
+all solid borders.
+
+The `border-color: red` parts should be hidden by `margin: auto` on the
+`.nose div div` element, leaving only the black diamond outline visible.
 
 ### 3.5  Chin Border Position (Fixed)
 
@@ -295,11 +308,25 @@ Content-area pixel match 84.14% (target ≥ 85%, within range).
 
 ### Phase 9 — Nose & Forehead Polish (Target: ≥ 95% content-area match)
 
-| # | Task | Pixel Impact | CSS 2.1 Ref | Effort | Priority |
-|---|---|---|---|---|---|
-| 9.1 | Anti-alias border triangle intersections (nose diamond) | ~800 px | §8.5 | M | P2 |
-| 9.2 | Improve sans-serif font mapping for cross-platform consistency | ~500 px | §15.3 | S | P2 |
-| 9.3 | Fine-tune text baseline and line-height calculation | ~300 px | §10.8 | S | P2 |
+| # | Task | Pixel Impact | CSS 2.1 Ref | Effort | Priority | Status |
+|---|---|---|---|---|---|---|
+| 9.1 | Anti-alias border triangle intersections (nose diamond) | ~800 px | §8.5 | M | P2 | **Blocked** — requires `BordersDrawHandler` solid-border trapezoid rendering |
+| 9.2 | Improve sans-serif font mapping for cross-platform consistency | ~500 px | §15.3 | S | P2 | Open |
+| 9.3 | Fine-tune text baseline and line-height calculation | ~300 px | §10.8 | S | P2 | Open |
+
+**9.1 Analysis (completed):**  Solid borders use the `DrawLine` code path in
+`BordersDrawHandler.cs` (lines 71–86), which renders each border as a centred
+pen stroke.  This means corner intersections are NOT rendered as diagonal
+polygon edges — they are just overlapping perpendicular lines.  The fix requires
+switching `BordersDrawHandler` to use `SetInOutsetRectanglePoints`/`DrawPolygon`
+(trapezoid rendering) for solid borders at corners where the two adjacent
+borders have different colours.  The `RGraphicsRasterBackend.RenderDrawBorder`
+IR path already uses trapezoid polygons for all solid borders and includes
+`FillBorderCorners` for same-colour corner seam prevention.
+
+**Dependencies:** Task 9.1 is a prerequisite for meaningful improvement on
+tasks 9.2 and 9.3 — the nose diamond accounts for the largest contiguous
+block of differing pixels in the content area.
 
 **Measurable outcome:** Content-area pixel match ≥ 95%.
 
@@ -402,7 +429,11 @@ dotnet test HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests \
   - [x] Fix display:table/table-cell list item positioning ✓
   - [x] Chin border vertical position resolved ✓
 - [ ] **Phase 9** — Nose & forehead polish (target: ≥ 95% content match)
-  - [ ] Anti-alias border triangle intersections
+  - [ ] Anti-alias border triangle intersections — **analysis complete, blocked**
+    - Solid borders use `DrawLine` path in `BordersDrawHandler.cs` (line-centered rendering)
+    - Diagonal intersections require trapezoid polygon rendering for solid borders at different-colour corners
+    - `RGraphicsRasterBackend.RenderDrawBorder` (IR path) already has trapezoid rendering but is not used for the main rendering pipeline
+    - Fix requires switching `BordersDrawHandler` solid-border rendering from `DrawLine` to `DrawPolygon` at corners with different border colours
   - [ ] Improve font mapping consistency
   - [ ] Fine-tune text baseline calculation
 - [ ] **Phase 10** — Sub-pixel perfection (target: 100%)
