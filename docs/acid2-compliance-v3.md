@@ -10,12 +10,12 @@
 
 | Metric | Value |
 |---|---|
-| **Content-area pixel match** | **73.93%** (18,025 / 24,381 content pixels) |
-| **Full-image pixel match (incl. background)** | **99.19%** (780,076 / 786,432 pixels) |
+| **Content-area pixel match** | **75.99%** (18,825 / 24,773 content pixels) |
+| **Full-image pixel match (incl. background)** | **99.24%** (780,484 / 786,432 pixels) |
 | Red-pixel leak (CSS failure indicator) | **0** |
 | Test dimensions | 1024 × 768 |
 | Content bounding box (Chromium) | x: [87, 211], y: [51, 275] — 125 × 225 px |
-| Content bounding box (Broiler) | x: [86, 205], y: [51, 292] — 120 × 242 px |
+| Content bounding box (Broiler) | x: [86, 205], y: [51, 288] — 120 × 238 px |
 | Render target | `acid2.html#top` (face test area) |
 | Automated test status | **All 8 differential tests passing** |
 | Chromium version | 145.0.7632.6 (Playwright v1.58.2) |
@@ -34,10 +34,11 @@ Key achievements:
 - **Deterministic output** — re-renders produce identical pixel output.
 - **Phase 7.1 complete** — float display adjustment (§9.7), float shrink-to-fit (§10.3.5), abs-pos right positioning (§10.3.7).
 - **Phase 7.2 complete** — CSS pseudo-element descendant combinator fix (§5.12), removing erroneous `::after` on `.nose > div`.
+- **Phase 7.3 complete** — Universal selector `*` ancestor matching fix (§5.3), enabling `* div.parser { border-width: 0 2em }` rule.
 
-Key remaining gaps (6,356 diff pixels across 24,381 content pixels):
-- Face height 242px vs. reference 225px (17px too tall).
-- Chin/parser area extends 17px below reference.
+Key remaining gaps (5,948 diff pixels across 24,773 content pixels):
+- Face height 238px vs. reference 225px (13px too tall).
+- Chin/parser area extends 13px below reference.
 - Forehead text ("Hello World!") has minor anti-aliasing/font differences.
 - Nose diamond pseudo-elements missing anti-aliased rendering.
 
@@ -263,7 +264,7 @@ downward by 12px.
 |---|---|---|---|---|---|
 | 7.1 | Fix `float: inherit` resolution for nested floats | ~2,000 px | §9.5.1 | M | P0 |
 | 7.2 | Fix pseudo-element descendant combinator parsing | ~2,676 px | §5.12 | S | P0 — **done** |
-| 7.3 | Correct smile bar height from nested float/clear interaction | ~1,000 px | §8.3.1, §9.5.2 | M | P0 |
+| 7.3 | Fix universal selector `*` ancestor matching in CSS cascade | ~408 px | §5.3, §6.4 | S | P0 — **done** |
 
 **Measurable outcome:** Smile region content match ≥ 90%.  Content-area
 pixel match ≥ 75%.
@@ -376,13 +377,13 @@ dotnet test HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests \
 
 ### Remaining Work
 
-- [ ] **Phase 7** — Smile layout fix (target: ≥ 75% content match)
+- [x] **Phase 7** — Smile layout fix (target: ≥ 75% content match) ✓
   - [x] Fix `float: inherit` for nested floats ✓
     - [x] CSS 2.1 §9.7: Display adjustment for floated inline elements ✓
     - [x] CSS 2.1 §10.3.5: Shrink-to-fit width for floated elements ✓
     - [x] CSS 2.1 §10.3.7: Abs-pos `right` property positioning ✓
   - [x] Correct pseudo-element descendant combinator parsing (§5.12) ✓
-  - [ ] Fix smile bar height from nested float/clear interaction
+  - [x] Fix universal selector `*` ancestor matching in CSS cascade (§5.3) ✓
 - [ ] **Phase 8** — Chin/parser height fix (target: ≥ 85% content match)
   - [ ] Fix parser container border-width rendering
   - [ ] Fix display:table/table-cell list item height

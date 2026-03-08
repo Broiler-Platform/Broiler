@@ -297,6 +297,10 @@ internal sealed class DomParser
         if (box.HtmlTag == null)
             return false;
 
+        // CSS2.1 §5.3: The universal selector '*' matches any element type.
+        if (selectorClass == "*")
+            return true;
+
         if (box.HtmlTag.Name.Equals(selectorClass, StringComparison.InvariantCultureIgnoreCase))
             return true;
 
