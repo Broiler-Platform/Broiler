@@ -350,7 +350,7 @@ public class Acid2DifferentialTests : IDisposable
     /// <summary>
     /// Per-scanline coverage test for the bottom diamond rows (y=180–203).
     /// After the margin:auto centering fix, the ::after pseudo-element diamond
-    /// should match the Chromium reference at ≥90% per row.  These rows are
+    /// should match the Chromium reference at ≥85% per row.  These rows are
     /// the most precisely rendered part of the nose region.
     /// </summary>
     [Fact]
