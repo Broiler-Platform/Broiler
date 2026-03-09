@@ -125,13 +125,41 @@ internal static class JSDateMath
 
     /// <summary>
     /// UTC adjustment: convert local time to UTC.
+    /// Uses the timezone offset for the date represented by <paramref name="t"/>
+    /// when within .NET DateTimeOffset range; otherwise falls back to current offset.
     /// </summary>
-    internal static double UTC(double t) => t - TimeZoneInfo.Local.GetUtcOffset(DateTimeOffset.UtcNow).TotalMilliseconds;
+    internal static double UTC(double t)
+    {
+        return t - GetLocalOffsetMs(t);
+    }
 
     /// <summary>
     /// LocalTime adjustment: convert UTC to local time.
+    /// Uses the timezone offset for the date represented by <paramref name="t"/>
+    /// when within .NET DateTimeOffset range; otherwise falls back to current offset.
     /// </summary>
-    internal static double LocalTime(double t) => t + TimeZoneInfo.Local.GetUtcOffset(DateTimeOffset.UtcNow).TotalMilliseconds;
+    internal static double LocalTime(double t)
+    {
+        return t + GetLocalOffsetMs(t);
+    }
+
+    /// <summary>
+    /// Returns the local timezone offset in milliseconds for the given UTC timestamp.
+    /// For dates outside .NET's supported range, falls back to the current offset.
+    /// </summary>
+    private static double GetLocalOffsetMs(double t)
+    {
+        long ms = (long)t;
+        long minMs = DateTimeOffset.MinValue.ToUnixTimeMilliseconds();
+        long maxMs = DateTimeOffset.MaxValue.ToUnixTimeMilliseconds();
+        if (ms >= minMs && ms <= maxMs)
+        {
+            var dto = DateTimeOffset.FromUnixTimeMilliseconds(ms);
+            return TimeZoneInfo.Local.GetUtcOffset(dto).TotalMilliseconds;
+        }
+        // Fallback for dates outside .NET range (e.g., year 0 or negative years)
+        return TimeZoneInfo.Local.GetUtcOffset(DateTimeOffset.UtcNow).TotalMilliseconds;
+    }
 
     /// <summary>
     /// TimeClip per ECMA-262 § 21.4.1.15.
