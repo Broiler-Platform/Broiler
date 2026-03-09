@@ -150,10 +150,10 @@ CLR execution with JSValue interop
 - [x] Add corresponding tests (`DebuggerTests.cs`, `ClrInteropTests.cs`)
 
 ### Milestone 5 — Optimization and Polish
-- Implement improvements from `Improvements.md`
-- Performance profiling and optimization
-- Documentation and code style cleanup
-- CI with cross-platform matrix
+- [x] Implement improvements from `Improvements.md` (inverse switch and native type comparison done; LinkedStack partially migrated)
+- [ ] Performance profiling and optimization
+- [x] Documentation and code style cleanup (XML doc comments added to public APIs: `CoreScript`, `JSValue`, `Arguments`, interfaces)
+- [x] CI with cross-platform matrix (`.github/workflows/ci.yml` — Linux, macOS, Windows)
 
 ---
 

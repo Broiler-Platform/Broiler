@@ -11,14 +11,21 @@ using YantraJS.Extensions;
 
 namespace YantraJS.Core; 
 
+/// <summary>
+/// Base class for all JavaScript values.  Every JS type (number, string,
+/// boolean, object, function, symbol, null, undefined) derives from this
+/// class and overrides the relevant virtual members.
+/// </summary>
 public abstract partial class JSValue : IDynamicMetaObjectProvider {
 
+    /// <summary>Gets whether this value is the <c>undefined</c> singleton.</summary>
     public bool IsUndefined
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => this == JSUndefined.Value;
     }
 
+    /// <summary>Gets whether this value is the <c>null</c> singleton.</summary>
     public bool IsNull
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -31,18 +38,25 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
         get => this == JSNull.Value || this == JSUndefined.Value;
     }
 
+    /// <summary>Gets whether this value is a JavaScript number.</summary>
     public virtual bool IsNumber => false;
 
+    /// <summary>Gets whether this value is a JavaScript object (including arrays and functions).</summary>
     public virtual bool IsObject => false;
 
+    /// <summary>Gets whether this value is a JavaScript <c>Symbol</c>.</summary>
     public virtual bool IsSymbol => false;
 
+    /// <summary>Gets whether this value is a JavaScript <c>Array</c>.</summary>
     public virtual bool IsArray => false;
 
+    /// <summary>Gets whether this value is a JavaScript string.</summary>
     public virtual bool IsString => false;
 
+    /// <summary>Gets whether this value is a JavaScript boolean.</summary>
     public virtual bool IsBoolean => false;
 
+    /// <summary>Gets whether this value is a JavaScript function.</summary>
     public virtual bool IsFunction => false;
 
     internal virtual bool IsSpread => false;
