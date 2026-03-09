@@ -3,7 +3,7 @@ namespace YantraJS.Core;
 /// <summary>
 /// Default implementation of <see cref="IBuiltInRegistry"/> that delegates
 /// to the source-generated <c>Names.RegisterGeneratedClasses</c> method.
-/// This preserves the existing registration behaviour where every built-in
+/// This preserves the existing registration behavior where every built-in
 /// object decorated with <c>[JSFunctionGenerator]</c> /
 /// <c>[JSClassGenerator]</c> is registered automatically.
 /// </summary>
