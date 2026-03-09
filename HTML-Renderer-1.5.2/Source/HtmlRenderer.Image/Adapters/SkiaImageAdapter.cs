@@ -78,7 +78,9 @@ internal sealed class SkiaImageAdapter : RAdapter
         if (!string.IsNullOrEmpty(mapFromName))
             AddFontFamilyMapping(mapFromName!, familyName);
 
-        typeface.Dispose();
+        // Do not dispose the typeface — SkiaSharp's font manager retains
+        // a reference so that subsequent SKTypeface.FromFamilyName lookups
+        // can resolve the loaded family.  Disposing would invalidate it.
         return familyName;
     }
 
