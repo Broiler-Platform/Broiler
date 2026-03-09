@@ -137,13 +137,17 @@ internal static class CssLayoutEngine
         // imaginary zero-width inline box with the block container's font
         // and line-height properties.  This establishes the minimum line
         // box height for inline formatting contexts.
-        if (blockBox.ActualLineHeight > 0)
+        // The strut only affects content height when height is 'auto';
+        // an explicit height (CSS2.1 §10.6.3) overrides the content height.
+        bool hasExplicitHeight = blockBox.Height != null && blockBox.Height != CssConstants.Auto;
+        if (blockBox.ActualLineHeight > 0 && !hasExplicitHeight)
             maxBottom = Math.Max(maxBottom, starty + blockBox.ActualLineHeight);
 
         blockBox.ActualBottom = maxBottom + blockBox.ActualPaddingBottom + blockBox.ActualBorderBottomWidth;
 
-        // handle limiting block height when overflow is hidden
-        if (blockBox.Height != null && blockBox.Height != CssConstants.Auto && blockBox.Overflow == CssConstants.Hidden && blockBox.ActualBottom - blockBox.Location.Y > blockBox.ActualHeight)
+        // CSS2.1 §10.6.3: When height is not 'auto', the used value is the
+        // specified value.  Content may overflow (controlled by 'overflow').
+        if (hasExplicitHeight && blockBox.Overflow == CssConstants.Hidden && blockBox.ActualBottom - blockBox.Location.Y > blockBox.ActualHeight)
             blockBox.ActualBottom = blockBox.Location.Y + blockBox.ActualHeight;
     }
 

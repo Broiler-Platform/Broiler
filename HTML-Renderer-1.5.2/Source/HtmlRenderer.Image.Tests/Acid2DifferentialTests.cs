@@ -28,12 +28,11 @@ public class Acid2DifferentialTests : IDisposable
     /// <summary>
     /// Maximum allowed red-pixel leak count.
     /// Red pixels are the canonical Acid2 failure signal.
-    /// Remaining red pixels are from border anti-aliasing at nose
-    /// pseudo-element boundaries where the correct sans-serif font
-    /// mapping (CSS 2.1 §15.3) produces slightly different sub-pixel
-    /// coverage compared to the previous fallback font.
+    /// Phase 9.4 eliminated all red pixels by fixing the background fill
+    /// coordinate rounding in RGraphicsRasterBackend (Math.Ceiling → Math.Round),
+    /// which prevented sub-pixel gaps where parent backgrounds leaked through.
     /// </summary>
-    private const int MaxRedPixelLeak = 168;
+    private const int MaxRedPixelLeak = 0;
 
     /// <summary>
     /// Minimum content-area pixel match ratio.  Content pixels are those
@@ -299,8 +298,8 @@ public class Acid2DifferentialTests : IDisposable
         double smileMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
 
         Assert.True(
-            smileMatch >= 0.88,
-            $"Acid2 #top smile-region match {smileMatch:P2} is below minimum 88.00%. " +
+            smileMatch >= 0.95,
+            $"Acid2 #top smile-region match {smileMatch:P2} is below minimum 95.00%. " +
             $"Matching content pixels: {matchContent}/{totalContent}");
     }
 
