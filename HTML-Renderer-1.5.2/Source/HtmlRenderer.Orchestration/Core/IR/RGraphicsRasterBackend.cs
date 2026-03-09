@@ -87,7 +87,7 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         // with direct SKPath polygon construction.  Rows y=146–165 of the Acid2
         // nose diamond show 62–86% per-scanline match because the ::before
         // pseudo-element diamond shape differs at the layout level (element
-        // position/dimension), not the rasterisation level.  Pixel-snapping
+        // position/dimensions), not the rasterisation level.  Pixel-snapping
         // outer bounds was tested and regressed adjacent regions; width-only
         // snapping had no measurable effect (widths are already at integer px).
         // The existing rendering is aligned with CSS 2.1 Appendix E paint order.
