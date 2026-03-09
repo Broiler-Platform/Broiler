@@ -82,6 +82,16 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         if (bounds.Width <= 0 || bounds.Height <= 0)
             return;
 
+        // P2.1/P2.2 audit: The border trapezoid AA kernel uses
+        // SKPaint.IsAntialias = true (set in SkiaImageAdapter.CreateSolidBrush)
+        // with direct SKPath polygon construction.  Rows y=146–165 of the Acid2
+        // nose diamond show 62–86% per-scanline match because the ::before
+        // pseudo-element diamond shape differs at the layout level (element
+        // position/dimensions), not the rasterisation level.  Pixel-snapping
+        // outer bounds was tested and regressed adjacent regions; width-only
+        // snapping had no measurable effect (widths are already at integer px).
+        // The existing rendering is aligned with CSS 2.1 Appendix E paint order.
+
         // Fill corner rectangles to prevent anti-aliased seams along
         // the diagonal edges where two same-color border trapezoids meet.
         FillBorderCorners(g, item);
