@@ -17,7 +17,12 @@ internal sealed class FontAdapter : RFont
         Typeface = typeface;
         _size = size;
         _style = style;
-        Font = new SKFont(typeface, (float)size) { Edging = SKFontEdging.SubpixelAntialias };
+        // Phase 10.2: Use grayscale anti-aliasing (Antialias) instead of
+        // SubpixelAntialias.  The Chromium reference screenshot is a bitmap
+        // where sub-pixel colour fringes have been composited away, so
+        // grayscale AA produces glyph shapes that match the reference more
+        // closely and eliminates per-sub-pixel colour differences.
+        Font = new SKFont(typeface, (float)size) { Edging = SKFontEdging.Antialias };
 
         // Calculate metrics
         var metrics = Font.Metrics;
