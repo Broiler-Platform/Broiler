@@ -144,8 +144,6 @@ public partial class JSPromise : JSObject
     {
         // to improve speed of promise, we will add then/catch here...
         sc = JSContext.Current.synchronizationContext;
-        if (sc == null)
-            throw JSContext.Current.NewTypeError($"Cannot use promise without Synchronization Context");
 
         RegisterPromise();
 
@@ -362,5 +360,11 @@ public partial class JSPromise : JSObject
     });
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void Post(Action action) => sc.Post(action, (x) => x());//AsyncPump.Run(() => {//    action();//    return Task.CompletedTask;//});
+    private void Post(Action action)
+    {
+        if (sc != null)
+            sc.Post(action, (x) => x());
+        else
+            action();
+    }
 }

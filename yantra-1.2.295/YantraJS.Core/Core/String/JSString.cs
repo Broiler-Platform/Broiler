@@ -43,9 +43,10 @@ public partial class JSString : JSPrimitive
 
     public override JSValue AddValue(double value)
     {
+        var numStr = JSNumber.ToECMAString(value);
         if (this.value.IsEmpty())
-            return new JSString(value.ToString());
-        return new JSString( string.Concat(this.value, value.ToString()) );
+            return new JSString(numStr);
+        return new JSString( string.Concat(this.value, numStr) );
     }
 
     public override JSValue AddValue(string value)

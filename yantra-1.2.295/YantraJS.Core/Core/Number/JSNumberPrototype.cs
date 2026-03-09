@@ -103,26 +103,7 @@ partial class JSNumber
             return new JSString(result);
 
         }
-        if (double.IsPositiveInfinity(value))
-            return JSConstants.Infinity;
-        if (double.IsNegativeInfinity(value))
-            return JSConstants.NegativeInfinity;
-
-        if (value > 999999999999999.0)
-            return new JSString(value.ToString("g21", culture));
-        if (value > 5e-7 && value < 1)
-            return new JSString(value.ToString("f6", culture)); //Assert.AreEqual("0.000005", Evaluate("5e-6.toString()"));
-        var txt = value.ToString("g", culture);
-        var eIndex = txt.IndexOf('e'); // remove extra zero, after e if any. 
-        if (eIndex != -1)
-        {
-            if (txt[eIndex + 2] == '0')
-            {
-                txt = txt.Remove(eIndex + 2, 1);
-            }
-        }
-        
-        return new JSString(txt);
+        return new JSString(JSNumber.ToECMAString(value));
 
     }
 
