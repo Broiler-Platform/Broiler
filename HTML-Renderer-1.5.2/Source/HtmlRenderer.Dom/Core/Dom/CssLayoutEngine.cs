@@ -8,6 +8,13 @@ namespace TheArtOfDev.HtmlRenderer.Core.Dom;
 
 internal static class CssLayoutEngine
 {
+    /// <summary>
+    /// Approximate ratio of font ascent to total font height for typical
+    /// Latin fonts.  Used to compute baseline position when full font
+    /// metrics are not directly available (CSS2.1 §10.8 strut).
+    /// </summary>
+    private const double TypicalAscentRatio = 0.8;
+
     public static void MeasureImageSize(CssRectImage imageWord)
     {
         ArgumentNullException.ThrowIfNull(imageWord);
@@ -287,14 +294,8 @@ internal static class CssLayoutEngine
                     if (word.IsImage && strutHeight > word.Height)
                     {
                         double fontHeight = blockbox.ActualFont.Height;
-                        // Approximate ascent ≈ 80% of font height (typical for
-                        // Latin fonts). The image bottom sits on the baseline.
-                        double baseline = fontHeight * 0.8;
-                        double imageTop = cury + baseline - word.Height;
-                        if (imageTop > cury)
-                            word.Top = imageTop;
-                        else
-                            word.Top = cury;
+                        double baseline = fontHeight * TypicalAscentRatio;
+                        word.Top = Math.Max(cury, cury + baseline - word.Height);
                     }
                     else
                     {
