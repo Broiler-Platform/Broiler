@@ -328,11 +328,11 @@ public class Acid2DifferentialTests : IDisposable
     /// Validates the nose region (rows 130–210) meets a minimum content-area
     /// match threshold.  This guards against regressions in margin:auto centering,
     /// pseudo-element border rendering, and the diamond rasterisation.
-    /// P2.4: Threshold raised from 88% → 90% after P2.1 AA audit confirmed
-    /// that the existing SkiaSharp rendering with <c>IsAntialias = true</c>
-    /// and correct trapezoid construction achieves ≥90% overall nose match.
-    /// v6: Raised from 90% → 93% to lock in margin:auto and pseudo-element fixes
-    /// (current ≥93%).
+    /// v6: Raised from 90% → 93% to lock in margin:auto and pseudo-element fixes.
+    /// v6.1 audit: Pixel-level analysis confirmed the diamond layout is correct
+    /// (black pixel positions match exactly).  The 93% threshold is at the
+    /// practical maximum — the remaining ~7% gap is inherent anti-aliasing
+    /// differences between SkiaSharp and Chromium at border edges.
     /// </summary>
     [Fact]
     public void Acid2Top_NoseRegion_MeetsMinimumThreshold()
@@ -376,12 +376,13 @@ public class Acid2DifferentialTests : IDisposable
     /// <summary>
     /// Per-scanline coverage test for the full nose diamond (y=140–210).
     /// P2.3: Extended from y=180–203 to cover the entire diamond region.
-    /// Rows y=146–165 have 62–86% match due to anti-aliasing differences
-    /// between SkiaSharp and Chromium on the diamond's angled edges (layout-
-    /// level shape differences identified in P2.1 audit).  Row y=168 has
-    /// only ~14% match due to a vertical offset at the diamond junction.
-    /// Threshold set to ≥60% per row, allowing at most 1 row below this
-    /// floor (accommodating the y=168 offset row).
+    /// P1 audit (v6.1): Pixel-level analysis confirmed the diamond layout
+    /// is correct — black pixel positions match exactly.  The per-row
+    /// mismatch at y=145–165 (63–94%) is caused by anti-aliasing
+    /// differences at the nose outer borders and diamond angled edges,
+    /// not by layout errors.  All rows are now above 60%; the junction
+    /// offset at y=168 was fixed in v4–v5.
+    /// Threshold tightened: 0 rows allowed below 60% (was 1).
     /// </summary>
     [Fact]
     public void Acid2Top_NoseBottomDiamond_PerScanlineMatch()
@@ -424,9 +425,9 @@ public class Acid2DifferentialTests : IDisposable
         }
 
         Assert.True(
-            failedRows <= 1,
+            failedRows <= 0,
             $"Acid2 #top nose diamond: {failedRows} row(s) at y=140–210 fell below 60% match. " +
-            "At most 1 row (y=168 offset) is expected below this threshold. " +
+            "After v6.1 audit, all rows should be above 60% (junction offset was fixed in v4–v5). " +
             "The diamond border rendering may have regressed.");
     }
 
