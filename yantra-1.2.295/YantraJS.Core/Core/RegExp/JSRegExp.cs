@@ -16,7 +16,7 @@ public partial class JSRegExp: JSObject
     {
         var input = a.Get1();
         if (input.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError("RegExp.escape requires a string argument");
+            throw JSContext.Current.NewTypeError("RegExp.escape called on null or undefined");
         var str = input.ToString();
         var sb = new StringBuilder(str.Length + 4);
         for (int i = 0; i < str.Length; i++)
