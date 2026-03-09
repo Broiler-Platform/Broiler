@@ -43,6 +43,18 @@ public readonly struct TypedArrayParameters
         this.prototype = prototype;
     }
 
+    public TypedArrayParameters(byte[] data, int bytesPerElements)
+    {
+        buffer = new JSArrayBuffer(data);
+        length = data.Length / bytesPerElements;
+        bytesPerElement = bytesPerElements;
+        byteOffset = 0;
+        copyFrom = null;
+        map = null;
+        thisArg = null;
+        prototype = JSContext.NewTargetPrototype;
+    }
+
     public TypedArrayParameters(
         in Arguments a, int bytesPerElements)
     {

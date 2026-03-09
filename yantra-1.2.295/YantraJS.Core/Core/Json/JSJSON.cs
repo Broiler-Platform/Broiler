@@ -10,6 +10,11 @@ namespace YantraJS.Core;
 
 public delegate JSValue JsonParserReceiver((string key, JSValue value) property);
 
+/// <summary>
+/// Delegate for reviver with source text access (ES2026 §4.7).
+/// </summary>
+public delegate JSValue JsonParserReceiverWithSource((string key, JSValue value, string source) property);
+
 [JSClassGenerator("JSON"), JSInternalObject]
 public partial class JSJSON: JSObject
 {
@@ -17,13 +22,37 @@ public partial class JSJSON: JSObject
     public static JSValue Parse(in Arguments a)
     {
         var (text, receiver) = a.Get2();
-        JsonParserReceiver r = null;
-        var t = a.This;
+
         if (receiver is JSFunction function)
         {
-            r = (p) => function.f( new Arguments(t, new JSString(p.key), p.value));
+            var t = a.This;
+            // ES2026 §4.7 — reviver receives (key, value, context) where
+            // context = { source: rawSourceText } for primitive values.
+            JsonParserReceiverWithSource rws = (p) =>
+            {
+                var context = new JSObject();
+                if (p.source != null)
+                    context["source"] = new JSString(p.source);
+                return function.f(new Arguments(t, new JSString(p.key), p.value, context));
+            };
+            var parsed = JSJsonParser.ParseWithSource(text.ToString(), rws) ?? JSNull.Value;
+
+            // Apply reviver to root value (key = "").
+            // For bare primitives, the source is the entire text.
+            string rootSource = null;
+            if (parsed is JSNumber || parsed is JSString || parsed == JSBoolean.True
+                || parsed == JSBoolean.False || parsed == JSNull.Value)
+            {
+                rootSource = text.ToString();
+            }
+            var rootCtx = new JSObject();
+            if (rootSource != null)
+                rootCtx["source"] = new JSString(rootSource);
+            parsed = function.f(new Arguments(t, new JSString(""), parsed, rootCtx));
+            return parsed ?? JSNull.Value;
         }
-        return JSJsonParser.Parse(text.ToString(), r) ?? JSNull.Value;
+
+        return JSJsonParser.Parse(text.ToString(), null) ?? JSNull.Value;
 
     }
 

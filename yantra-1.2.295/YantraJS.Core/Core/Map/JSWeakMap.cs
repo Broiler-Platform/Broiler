@@ -107,4 +107,59 @@ public partial class JSWeakMap: JSObject
 
         return JSUndefined.Value;
     }
+
+    /// <summary>
+    /// ES2026 §4.9.3 — WeakMap.prototype.getOrInsert(key, defaultValue)
+    /// Returns the value for key if present, otherwise inserts defaultValue
+    /// and returns it.
+    /// </summary>
+    [JSExport("getOrInsert")]
+    public JSValue GetOrInsert(in Arguments a)
+    {
+        var (keyVal, defaultValue) = a.Get2();
+        if (!(keyVal is JSObject key))
+            throw JSContext.Current.NewTypeError("WeakMap key must be an object");
+        var uk = key.ToUniqueID();
+        lock (this)
+        {
+            if (index.TryGetValue(uk, out var v))
+            {
+                if (v.TryGetTarget(out var target))
+                {
+                    return target.value;
+                }
+            }
+            index.Put(uk) = new WeakReference<WeakValue>(new WeakValue(uk, defaultValue, Unregister));
+        }
+        return defaultValue;
+    }
+
+    /// <summary>
+    /// ES2026 §4.9.3 — WeakMap.prototype.getOrInsertComputed(key, callback)
+    /// Returns the value for key if present, otherwise calls callback(key),
+    /// inserts the result, and returns it.
+    /// </summary>
+    [JSExport("getOrInsertComputed")]
+    public JSValue GetOrInsertComputed(in Arguments a)
+    {
+        var (keyVal, callbackfn) = a.Get2();
+        if (!(keyVal is JSObject key))
+            throw JSContext.Current.NewTypeError("WeakMap key must be an object");
+        if (!callbackfn.IsFunction)
+            throw JSContext.Current.NewTypeError("getOrInsertComputed requires a callback function");
+        var uk = key.ToUniqueID();
+        lock (this)
+        {
+            if (index.TryGetValue(uk, out var v))
+            {
+                if (v.TryGetTarget(out var target))
+                {
+                    return target.value;
+                }
+            }
+            var value = callbackfn.Call(JSUndefined.Value, key);
+            index.Put(uk) = new WeakReference<WeakValue>(new WeakValue(uk, value, Unregister));
+            return value;
+        }
+    }
 }
