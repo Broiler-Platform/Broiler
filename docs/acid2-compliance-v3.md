@@ -315,7 +315,7 @@ font mapping subsequently adjusted this to 83.82% — see Phase 9.*
 | 9.1 | Anti-alias border triangle intersections (nose diamond) | ~800 px | §8.5 | M | P2 | **Done** — `BordersDrawHandler` now uses trapezoid polygon rendering for solid borders |
 | 9.2 | Improve sans-serif font mapping for cross-platform consistency | ~500 px | §15.3 | S | P2 | **Done** — platform-aware generic family resolution in `SkiaImageAdapter` and `WpfAdapter` |
 | 9.3 | Fine-tune text baseline and line-height calculation | ~300 px | §10.8 | S | P2 | Open |
-| 9.4 | Eliminate nose red-pixel leak from font-metric sub-pixel shift | ~168 px | §8.5.3 | M | P2 | Open — see 9.2 notes |
+| 9.4 | Eliminate nose red-pixel leak from font-metric sub-pixel shift | ~168 px | §8.5, §15.3 | M | P2 | Open — see 9.2 notes |
 
 **9.1 Implementation (completed):**  `BordersDrawHandler.DrawBorder` now uses
 `SetInOutsetRectanglePoints`/`DrawPolygon` (trapezoid rendering) for solid

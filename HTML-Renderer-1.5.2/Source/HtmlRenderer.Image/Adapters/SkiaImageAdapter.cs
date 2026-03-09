@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
-using System.Linq;
 using SkiaSharp;
 using TheArtOfDev.HtmlRenderer.Adapters;
 
@@ -50,7 +49,7 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     private static string? FirstAvailable(HashSet<string> systemFonts, params string[] candidates)
     {
-        return candidates.FirstOrDefault(c => systemFonts.Contains(c));
+        return Array.Find(candidates, c => systemFonts.Contains(c));
     }
 
     public static SkiaImageAdapter Instance { get; } = new();
