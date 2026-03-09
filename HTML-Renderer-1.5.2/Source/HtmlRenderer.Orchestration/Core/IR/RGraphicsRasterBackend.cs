@@ -64,13 +64,14 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
     private static void RenderFillRect(RGraphics g, FillRectItem item)
     {
         using var brush = g.GetSolidBrush(item.Color);
-        // CSS2.1 §14.2: backgrounds extend to the padding edge.  Use Round
-        // (not Ceiling) so the fill covers the element's top-left pixel even
-        // when the layout position has a fractional component.  Ceiling was
-        // incorrect because it shifts the fill up to 1 px right/down, creating
-        // a gap where parent backgrounds (e.g. 'background: red') leak through
-        // (see Acid2 nose §8.5 / Phase 9.4).
-        g.DrawRectangle(brush, Math.Round(item.Bounds.X), Math.Round(item.Bounds.Y),
+        // CSS2.1 §14.2: backgrounds extend to the padding edge.
+        // P3.2: Do NOT round absolute coordinates — the canvas
+        // transform already contains a fractional scroll offset that
+        // aligns integer *layout* positions to exact pixel boundaries.
+        // Rounding absolute coords shifts the fill by ~0.09 px in
+        // viewport space, causing partial-coverage AA artifacts at
+        // element edges (e.g. (231,231,231) vs (255,255,255)).
+        g.DrawRectangle(brush, item.Bounds.X, item.Bounds.Y,
             item.Bounds.Width, item.Bounds.Height);
     }
 
@@ -82,15 +83,15 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         if (bounds.Width <= 0 || bounds.Height <= 0)
             return;
 
-        // P2.1/P2.2 audit: The border trapezoid AA kernel uses
-        // SKPaint.IsAntialias = true (set in SkiaImageAdapter.CreateSolidBrush)
-        // with direct SKPath polygon construction.  Rows y=146–165 of the Acid2
-        // nose diamond show 62–86% per-scanline match because the ::before
-        // pseudo-element diamond shape differs at the layout level (element
-        // position/dimensions), not the rasterisation level.  Pixel-snapping
-        // outer bounds was tested and regressed adjacent regions; width-only
-        // snapping had no measurable effect (widths are already at integer px).
-        // The existing rendering is aligned with CSS 2.1 Appendix E paint order.
+        // P3.1/P3.2 audit: Use raw layout coordinates for border edges.
+        // The canvas transform contains the fractional scroll offset
+        // that maps integer layout positions to exact pixel boundaries.
+        // Rounding absolute coords was tested (Round, Floor, Ceiling
+        // on origin, inner edges, or all edges) and always regressed
+        // because it shifted borders by ~0.09 px in viewport space,
+        // creating new partial-coverage artefacts.  The existing
+        // rendering with SKPaint.IsAntialias = true produces the
+        // correct CSS 2.1 Appendix E paint order.
 
         // Fill corner rectangles to prevent anti-aliased seams along
         // the diagonal edges where two same-color border trapezoids meet.
