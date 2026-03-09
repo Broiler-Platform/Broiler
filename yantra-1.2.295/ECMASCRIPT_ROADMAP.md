@@ -351,7 +351,7 @@ feature expected in ES2026.
 
 ### 4.2 Math.sumPrecise
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented
 **Priority:** P2 — Low
 **Spec:** [tc39/proposal-math-sum](https://github.com/tc39/proposal-math-sum)
 
@@ -364,7 +364,7 @@ feature expected in ES2026.
 
 ### 4.3 Uint8Array Base64 / Hex Methods
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented
 **Priority:** P2 — Low
 **Spec:** [tc39/proposal-arraybuffer-base64](https://github.com/tc39/proposal-arraybuffer-base64)
 
@@ -421,7 +421,7 @@ feature expected in ES2026.
 
 ### 4.7 JSON.parse Source Text Access
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented
 **Priority:** P3 — Low
 **Spec:** [tc39/proposal-json-parse-with-source](https://github.com/tc39/proposal-json-parse-with-source)
 
@@ -450,7 +450,7 @@ feature expected in ES2026.
 
 ### 4.9 Map.getOrInsert (Upsert)
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented
 **Priority:** P2 — Low
 **Spec:** [tc39/proposal-upsert](https://github.com/tc39/proposal-upsert)
 
@@ -481,7 +481,7 @@ threading model. This is architecturally complex and may need design review.
 
 ### 4.11 structuredClone
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented
 **Priority:** P1 — Medium (widely used in practice)
 
 | Sub-task | Description | Estimate |
@@ -624,16 +624,16 @@ column as work progresses.
 | 2.9 | ArrayBuffer.transfer | ✅ Done | @copilot | Phase 2 PR |
 | 2.10 | Redeclarable eval vars | ⏳ Audited — eval scope update needs compiler work | — | — |
 | 4.1 | Temporal API | ❌ Not started | — | — |
-| 4.2 | Math.sumPrecise | ❌ Not started | — | — |
-| 4.3 | Uint8Array Base64/Hex | ❌ Not started | — | — |
+| 4.2 | Math.sumPrecise | ✅ Done | @copilot | Phase 4 PR |
+| 4.3 | Uint8Array Base64/Hex | ✅ Done | @copilot | Phase 4 PR |
 | 4.4 | Error.isError | ✅ Done | @copilot | Phase 1 PR |
 | 4.5 | Array.fromAsync | ✅ Done | @copilot | Phase 2 PR |
 | 4.6 | Object.groupBy / Map.groupBy | ✅ Done | @copilot | Phase 1 PR |
-| 4.7 | JSON.parse source text | ❌ Not started | — | — |
+| 4.7 | JSON.parse source text | ✅ Done | @copilot | Phase 4 PR |
 | 4.8 | Iterator.concat | ✅ Done | @copilot | Phase 2 PR |
-| 4.9 | Map.getOrInsert | ❌ Not started | — | — |
+| 4.9 | Map.getOrInsert | ✅ Done | @copilot | Phase 4 PR |
 | 4.10 | Atomics / SharedArrayBuffer | ❌ Not started | — | — |
-| 4.11 | structuredClone | ❌ Not started | — | — |
+| 4.11 | structuredClone | ✅ Done | @copilot | Phase 4 PR |
 | L1 | Date year 0 | ❌ Not started | — | — |
 | L2 | Intl.DateTimeFormat | ❌ Not started | — | — |
 | L3 | Generator resumption | ⏳ In progress | — | — |

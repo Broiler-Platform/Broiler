@@ -12,91 +12,20 @@ internal class JSJsonParser(JsonParserReceiver r) : System.Text.Json.Serializati
                 new JSJsonParser(r)
             }
     });
-    //static JSValue ReadObject(JsonTextReader reader, JsonParserReceiver r)
-    //{
-    //    var j = new JSObject();
-    //    // read properties...
-    //    while(reader.Read())
-    //    {
-    //        switch(reader.TokenType)
-    //        {
-    //            case JsonToken.EndObject:
-    //                return j;
-    //            case JsonToken.PropertyName:
-    //                var name = (string)reader.Value;
 
-    //                reader.Next();
+    /// <summary>
+    /// Parse with source text tracking for the reviver context (ES2026 §4.7).
+    /// </summary>
+    public static JSValue ParseWithSource(string str, JsonParserReceiverWithSource r)
+    {
+        var parser = new JSJsonParser(null) { reviverWithSource = r };
+        return System.Text.Json.JsonSerializer.Deserialize<JSValue>(str, new System.Text.Json.JsonSerializerOptions
+        {
+            Converters = { parser }
+        });
+    }
 
-    //                var value = Read(reader, r);
-
-    //                value = r?.Invoke((name, value)) ?? value;
-    //                if (value.IsUndefined)
-    //                {
-    //                    continue;
-    //                }
-    //                j[name] = value;
-    //                break;
-    //            default:
-    //                throw new InvalidOperationException($"Invalid token {reader.Value} at {reader.LineNumber},{reader.LinePosition}");
-    //        }
-    //    }
-    //    return j;
-    // }
-    //static JSValue ReadArray(JsonTextReader reader, JsonParserReceiver r)
-    //{
-    //    var j = new JSArray();
-    //    // read properties...
-    //    while (reader.Read() && reader.TokenType != JsonToken.EndArray)
-    //    {
-    //        j.Add(Read(reader, r));
-    //    }
-    //    return j;
-    //}
-    //static JSValue Read(
-    //    JsonTextReader reader,
-    //    JsonParserReceiver r)
-    //{
-    //    switch (reader.TokenType)
-    //    {
-    //        case JsonToken.None:
-    //            break;
-    //        case JsonToken.StartObject:
-    //            return ReadObject(reader, r);
-    //        case JsonToken.StartArray:
-    //            return ReadArray(reader, r);
-    //        case JsonToken.StartConstructor:
-    //            break;
-    //        case JsonToken.PropertyName:
-    //            break;
-    //        case JsonToken.Comment:
-    //            break;
-    //        case JsonToken.Raw:
-    //            break;
-    //        case JsonToken.Integer:
-    //            return new JSNumber((long)reader.Value);
-    //        case JsonToken.Float:
-    //            return new JSNumber((double)reader.Value);
-    //        case JsonToken.String:
-    //            return new JSString((string)reader.Value);
-    //        case JsonToken.Boolean:
-    //            return ((bool)reader.Value) ? JSBoolean.True : JSBoolean.False;
-    //        case JsonToken.Null:
-    //            return JSNull.Value;
-    //        case JsonToken.Undefined:
-    //            return JSUndefined.Value;
-    //        case JsonToken.EndObject:
-    //            break;
-    //        case JsonToken.EndArray:
-    //            break;
-    //        case JsonToken.EndConstructor:
-    //            break;
-    //        case JsonToken.Date:
-    //            break;
-    //        case JsonToken.Bytes:
-    //            break;
-    //    }
-    //    throw new NotSupportedException($"Unexpected token {reader.Value}({reader.TokenType}) at {reader.LineNumber},{reader.LinePosition}");
-    //}
+    private JsonParserReceiverWithSource reviverWithSource;
 
     public override JSValue Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
@@ -122,13 +51,66 @@ internal class JSJsonParser(JsonParserReceiver r) : System.Text.Json.Serializati
         throw new NotSupportedException($"Unexpected JSON {reader.TokenType} at {reader.TokenStartIndex}");
     }
 
+    /// <summary>
+    /// Extracts the raw source text for a primitive token from the reader.
+    /// </summary>
+    private static string GetSourceText(ref Utf8JsonReader reader)
+    {
+        if (reader.HasValueSequence)
+        {
+            var sequence = reader.ValueSequence;
+            return System.Text.Encoding.UTF8.GetString(sequence.FirstSpan);
+        }
+        return System.Text.Encoding.UTF8.GetString(reader.ValueSpan);
+    }
+
+    /// <summary>
+    /// Reads a value and returns both the value and its source text for
+    /// the reviver context.
+    /// </summary>
+    private (JSValue value, string source) ReadWithSource(ref Utf8JsonReader reader, JsonSerializerOptions options)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.StartObject:
+                return (ReadObject(ref reader, options), null);
+            case JsonTokenType.StartArray:
+                return (ReadArray(ref reader, options), null);
+            case JsonTokenType.String:
+                // Source includes the surrounding quotes
+                var strSource = "\"" + GetSourceText(ref reader) + "\"";
+                return (new JSString(reader.GetString()), strSource);
+            case JsonTokenType.Number:
+                var numSource = GetSourceText(ref reader);
+                return (new JSNumber(reader.GetDouble()), numSource);
+            case JsonTokenType.True:
+                return (JSBoolean.True, "true");
+            case JsonTokenType.False:
+                return (JSBoolean.False, "false");
+            case JsonTokenType.Null:
+                return (JSNull.Value, "null");
+            default:
+                throw new NotSupportedException($"Unexpected JSON {reader.TokenType} at {reader.TokenStartIndex}");
+        }
+    }
+
     private JSValue ReadArray(ref Utf8JsonReader reader, JsonSerializerOptions options)
     {
         var j = new JSArray();
         // read properties...
         while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
         {
-            j.Add(Read(ref reader, typeof(JSValue), options));
+            if (reviverWithSource != null)
+            {
+                var (value, source) = ReadWithSource(ref reader, options);
+                value = reviverWithSource((j.Length.ToString(), value, source));
+                if (!value.IsUndefined)
+                    j.Add(value);
+            }
+            else
+            {
+                j.Add(Read(ref reader, typeof(JSValue), options));
+            }
         }
         return j;
     }
@@ -148,14 +130,24 @@ internal class JSJsonParser(JsonParserReceiver r) : System.Text.Json.Serializati
                     if (!reader.Read())
                         throw new InvalidOperationException($"Unable to read JSON");
 
-                    var value = Read(ref reader, typeof(JSValue), options);
-
-                    value = r?.Invoke((name, value)) ?? value;
-                    if (value.IsUndefined)
+                    if (reviverWithSource != null)
                     {
-                        continue;
+                        var (value, source) = ReadWithSource(ref reader, options);
+                        value = reviverWithSource((name, value, source));
+                        if (value.IsUndefined)
+                            continue;
+                        j[name] = value;
                     }
-                    j[name] = value;
+                    else
+                    {
+                        var value = Read(ref reader, typeof(JSValue), options);
+                        value = r?.Invoke((name, value)) ?? value;
+                        if (value.IsUndefined)
+                        {
+                            continue;
+                        }
+                        j[name] = value;
+                    }
                     break;
                 default:
                     throw new InvalidOperationException($"Invalid token {reader.TokenType} at {reader.TokenStartIndex}");

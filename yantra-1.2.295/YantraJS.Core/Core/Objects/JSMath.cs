@@ -639,4 +639,62 @@ public partial class JSMath: JSObject
         var r = new JSNumber(Math.Truncate(d));
         return r;
     }
+
+    /// <summary>
+    /// ES2026 §4.2 — Math.sumPrecise(iterable)
+    /// Returns the sum of values from an iterable using Neumaier compensated
+    /// summation for improved floating-point precision.
+    /// </summary>
+    [JSExport("sumPrecise")]
+    public static JSValue SumPrecise(in Arguments args)
+    {
+        var iterable = args.Get1();
+        if (iterable.IsNullOrUndefined)
+            throw JSContext.Current.NewTypeError("Math.sumPrecise requires an iterable argument");
+
+        double sum = 0.0;
+        double compensation = 0.0;
+        bool hasPositiveInfinity = false;
+        bool hasNegativeInfinity = false;
+
+        var en = iterable.GetElementEnumerator();
+        while (en.MoveNext(out var hasValue, out var item, out var _))
+        {
+            if (!hasValue)
+                continue;
+            var d = item.DoubleValue;
+
+            if (double.IsNaN(d))
+                return JSNumber.NaN;
+            if (double.IsPositiveInfinity(d))
+            {
+                if (hasNegativeInfinity)
+                    return JSNumber.NaN;
+                hasPositiveInfinity = true;
+                continue;
+            }
+            if (double.IsNegativeInfinity(d))
+            {
+                if (hasPositiveInfinity)
+                    return JSNumber.NaN;
+                hasNegativeInfinity = true;
+                continue;
+            }
+
+            // Neumaier compensated summation
+            var t = sum + d;
+            if (Math.Abs(sum) >= Math.Abs(d))
+                compensation += (sum - t) + d;
+            else
+                compensation += (d - t) + sum;
+            sum = t;
+        }
+
+        if (hasPositiveInfinity)
+            return JSNumber.PositiveInfinity;
+        if (hasNegativeInfinity)
+            return JSNumber.NegativeInfinity;
+
+        return new JSNumber(sum + compensation);
+    }
 }

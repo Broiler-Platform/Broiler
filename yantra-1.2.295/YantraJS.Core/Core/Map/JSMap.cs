@@ -179,5 +179,46 @@ public partial class JSMap: JSObject
         }
     }
 
+    /// <summary>
+    /// ES2026 §4.9.1 — Map.prototype.getOrInsert(key, defaultValue)
+    /// Returns the value for key if present, otherwise inserts defaultValue
+    /// and returns it.
+    /// </summary>
+    [JSExport("getOrInsert")]
+    public JSValue GetOrInsert(in Arguments a)
+    {
+        var (key, defaultValue) = a.Get2();
+        HashedString uk = key.ToUniqueID();
+        if (index.TryGetValue(in uk, out var i))
+        {
+            return i.Value.value;
+        }
+        var node = store.AddLast((key, defaultValue));
+        index.Put(in uk) = node;
+        return defaultValue;
+    }
+
+    /// <summary>
+    /// ES2026 §4.9.2 — Map.prototype.getOrInsertComputed(key, callback)
+    /// Returns the value for key if present, otherwise calls callback(key),
+    /// inserts the result, and returns it.
+    /// </summary>
+    [JSExport("getOrInsertComputed")]
+    public JSValue GetOrInsertComputed(in Arguments a)
+    {
+        var (key, callbackfn) = a.Get2();
+        if (!callbackfn.IsFunction)
+            throw JSContext.Current.NewTypeError("getOrInsertComputed requires a callback function");
+        HashedString uk = key.ToUniqueID();
+        if (index.TryGetValue(in uk, out var i))
+        {
+            return i.Value.value;
+        }
+        var value = callbackfn.Call(JSUndefined.Value, key);
+        var node = store.AddLast((key, value));
+        index.Put(in uk) = node;
+        return value;
+    }
+
 
 }

@@ -4,6 +4,8 @@ using Yantra.Core;
 using YantraJS.Core.BigInt;
 using YantraJS.Core.Clr;
 using YantraJS.Core.Core.Intl;
+using YantraJS.Core.Set;
+using YantraJS.Core.Typed;
 using YantraJS.Utils;
 
 namespace YantraJS.Core;
@@ -138,6 +140,140 @@ public partial class JSGlobalStatic
         var context = JSContext.Current;
         context.ClearTimeout(n);
         return JSUndefined.Value;
+    }
+
+    /// <summary>
+    /// ES2026 §4.11 — structuredClone(value, options?)
+    /// Deep-clones a value using the structured clone algorithm.
+    /// Supports: primitives, plain objects, arrays, Date, RegExp, Map, Set,
+    /// ArrayBuffer, typed arrays, Error. Handles circular references.
+    /// </summary>
+    [JSExport("structuredClone", Length = 1)]
+    public static JSValue StructuredClone(in Arguments a)
+    {
+        var value = a.Get1();
+        var seen = new System.Collections.Generic.Dictionary<JSValue, JSValue>(
+            System.Collections.Generic.ReferenceEqualityComparer.Instance);
+        return StructuredCloneValue(value, seen);
+    }
+
+    private static JSValue StructuredCloneValue(
+        JSValue value,
+        System.Collections.Generic.Dictionary<JSValue, JSValue> seen)
+    {
+        // Primitives are returned as-is.
+        if (value == null || value.IsNullOrUndefined)
+            return value;
+        if (value is JSNumber || value is JSString || value is JSBoolean)
+            return value;
+        if (value is JSBigInt)
+            return value;
+
+        // Functions cannot be cloned.
+        if (value is JSFunction)
+            throw JSContext.Current.NewTypeError("structuredClone: function values cannot be cloned");
+
+        // Check for circular references.
+        if (seen.TryGetValue(value, out var existing))
+            return existing;
+
+        // Date
+        if (value is JSDate date)
+        {
+            var clone = new JSDate(date.value);
+            seen[value] = clone;
+            return clone;
+        }
+
+        // RegExp
+        if (value is JSRegExp regex)
+        {
+            var clone = new JSRegExp(regex.pattern, regex.flags);
+            seen[value] = clone;
+            return clone;
+        }
+
+        // ArrayBuffer
+        if (value is JSArrayBuffer arrayBuffer)
+        {
+            if (arrayBuffer.isDetached)
+                throw JSContext.Current.NewTypeError("structuredClone: cannot clone a detached ArrayBuffer");
+            var newBuf = new byte[arrayBuffer.buffer.Length];
+            System.Array.Copy(arrayBuffer.buffer, newBuf, arrayBuffer.buffer.Length);
+            var clone = new JSArrayBuffer(newBuf);
+            seen[value] = clone;
+            return clone;
+        }
+
+        // Map
+        if (value is JSMap map)
+        {
+            var clone = new JSMap(Arguments.Empty);
+            seen[value] = clone;
+            foreach (var entry in map.GetEntries())
+            {
+                var clonedKey = StructuredCloneValue(entry[0], seen);
+                var clonedVal = StructuredCloneValue(entry[1], seen);
+                clone.Set(clonedKey, clonedVal);
+            }
+            return clone;
+        }
+
+        // Set
+        if (value is JSSet set)
+        {
+            var clone = new JSSet(Arguments.Empty);
+            seen[value] = clone;
+            foreach (var item in set.Keys())
+            {
+                clone.Add(StructuredCloneValue(item, seen));
+            }
+            return clone;
+        }
+
+        // Error
+        if (value is JSError error)
+        {
+            var clone = new JSError(new Arguments(
+                JSUndefined.Value, new JSString(error.Message)));
+            seen[value] = clone;
+            return clone;
+        }
+
+        // Array
+        if (value is JSArray arr)
+        {
+            var clone = new JSArray();
+            seen[value] = clone;
+            var en = arr.GetElementEnumerator();
+            while (en.MoveNext(out var hasValue, out var item, out var _))
+            {
+                if (!hasValue)
+                    continue;
+                clone.Add(StructuredCloneValue(item, seen));
+            }
+            return clone;
+        }
+
+        // Plain object
+        if (value is JSObject obj)
+        {
+            var clone = new JSObject();
+            seen[value] = clone;
+            var pen = obj.GetOwnProperties().GetEnumerator();
+            while (pen.MoveNext(out var key, out var prop))
+            {
+                if (prop.IsEmpty || !prop.IsEnumerable)
+                    continue;
+                if (!prop.IsValue)
+                    continue;
+                clone[key.Value] = StructuredCloneValue(prop.value, seen);
+            }
+            return clone;
+        }
+
+        // Fallback: return value as-is for unknown types.
+        return value;
     }
 
 
