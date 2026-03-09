@@ -39,7 +39,7 @@ public partial class JSPromise
     [JSExport("resolve")]
     public static JSValue Resolve(in Arguments a) => new JSPromise(a.Get1(), JSPromise.PromiseState.Resolved);
 
-    [JSExport("resolve")]
+    [JSExport("reject")]
     public static JSValue Reject(in Arguments a)
     {
         var reason = a.Get1();
@@ -51,7 +51,7 @@ public partial class JSPromise
     }
 
 
-    [JSExport("resolve")]
+    [JSExport("all")]
     public static JSValue All(in Arguments a)
     {
         var f = a.Get1();

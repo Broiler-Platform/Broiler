@@ -49,6 +49,14 @@ public partial class JSContext: JSObject, IDisposable
     public JSDebugger Debugger;
 
     /// <summary>
+    /// Gets or sets the built-in object registry used to populate new contexts.
+    /// When set before constructing a <see cref="JSContext"/>, the custom
+    /// registry will be used instead of the default source-generated one.
+    /// Defaults to <see cref="DefaultBuiltInRegistry.Instance"/>.
+    /// </summary>
+    public static IBuiltInRegistry BuiltInRegistry { get; set; } = DefaultBuiltInRegistry.Instance;
+
+    /// <summary>
     /// Available only when Enable Clr Integration is true in JSModuleContext
     /// </summary>
     public ClrMemberNamingConvention ClrMemberNamingConvention { get; set; }
@@ -377,7 +385,7 @@ public partial class JSContext: JSObject, IDisposable
         // Math = CreateInternalObject<JSMath>(KeyStrings.Math);
         // Reflect = CreateInternalObject<JSReflect>(KeyStrings.Reflect);
 
-        this.RegisterGeneratedClasses();
+        BuiltInRegistry.Register(this);
         // this.Fill<JSGlobalStatic>();
 
         //var c = new JSObject
