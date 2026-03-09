@@ -497,6 +497,95 @@ public class Acid2DifferentialTests : IDisposable
     }
 
     /// <summary>
+    /// Validates the eyes region (rows 69–129) meets a minimum content-area
+    /// match threshold.  This region contains the eye outlines rendered with
+    /// CSS borders.  Guards against regressions in border rasterisation and
+    /// sub-pixel rounding at element boundaries.
+    /// </summary>
+    [Fact]
+    public void Acid2Top_EyesRegion_MeetsMinimumThreshold()
+    {
+        using var actual = RenderAtAnchorTop(_acid2Html);
+        using var baseline = SKBitmap.Decode(_referencePath);
+        Assert.NotNull(baseline);
+
+        int tolerance = Config.ColorTolerance;
+        int totalContent = 0, matchContent = 0;
+
+        for (int y = 69; y <= 129; y++)
+        {
+            for (int x = 0; x < Math.Min(actual.Width, baseline.Width); x++)
+            {
+                var a = actual.GetPixel(x, y);
+                var r = baseline.GetPixel(x, y);
+
+                bool isContent = a.Red < 250 || a.Green < 250 || a.Blue < 250
+                              || r.Red < 250 || r.Green < 250 || r.Blue < 250;
+
+                if (isContent)
+                {
+                    totalContent++;
+                    if (Math.Abs(a.Red - r.Red) <= tolerance
+                     && Math.Abs(a.Green - r.Green) <= tolerance
+                     && Math.Abs(a.Blue - r.Blue) <= tolerance)
+                        matchContent++;
+                }
+            }
+        }
+
+        double eyesMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
+
+        Assert.True(
+            eyesMatch >= 0.90,
+            $"Acid2 #top eyes-region match {eyesMatch:P2} is below minimum 90.00%. " +
+            $"Matching content pixels: {matchContent}/{totalContent}");
+    }
+
+    /// <summary>
+    /// Validates the chin region (rows 261–275) meets a minimum content-area
+    /// match threshold.  This region tests CSS 2.1 §8.3.1 margin collapsing
+    /// and border corner anti-aliasing at the bottom of the face.
+    /// </summary>
+    [Fact]
+    public void Acid2Top_ChinRegion_MeetsMinimumThreshold()
+    {
+        using var actual = RenderAtAnchorTop(_acid2Html);
+        using var baseline = SKBitmap.Decode(_referencePath);
+        Assert.NotNull(baseline);
+
+        int tolerance = Config.ColorTolerance;
+        int totalContent = 0, matchContent = 0;
+
+        for (int y = 261; y <= 275; y++)
+        {
+            for (int x = 0; x < Math.Min(actual.Width, baseline.Width); x++)
+            {
+                var a = actual.GetPixel(x, y);
+                var r = baseline.GetPixel(x, y);
+
+                bool isContent = a.Red < 250 || a.Green < 250 || a.Blue < 250
+                              || r.Red < 250 || r.Green < 250 || r.Blue < 250;
+
+                if (isContent)
+                {
+                    totalContent++;
+                    if (Math.Abs(a.Red - r.Red) <= tolerance
+                     && Math.Abs(a.Green - r.Green) <= tolerance
+                     && Math.Abs(a.Blue - r.Blue) <= tolerance)
+                        matchContent++;
+                }
+            }
+        }
+
+        double chinMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
+
+        Assert.True(
+            chinMatch >= 0.88,
+            $"Acid2 #top chin-region match {chinMatch:P2} is below minimum 88.00%. " +
+            $"Matching content pixels: {matchContent}/{totalContent}");
+    }
+
+    /// <summary>
     /// Verifies the nose pseudo-element selector ".nose div :after" (with
     /// descendant combinator before the pseudo-element) does not generate an
     /// extra ::after box on .nose > div itself—only on descendants of
