@@ -634,14 +634,14 @@ column as work progresses.
 | 4.9 | Map.getOrInsert | ✅ Done | @copilot | Phase 4 PR |
 | 4.10 | Atomics / SharedArrayBuffer | ❌ Not started | — | — |
 | 4.11 | structuredClone | ✅ Done | @copilot | Phase 4 PR |
-| L1 | Date year 0 | ❌ Not started | — | — |
+| L1 | Date year 0 | ✅ Done | @copilot | Phase 5 PR |
 | L2 | Intl.DateTimeFormat | ❌ Not started | — | — |
 | L3 | Generator resumption | ⏳ In progress | — | — |
-| L4 | Number precision | ❌ Not started | — | — |
+| L4 | Number precision | ✅ Done | @copilot | Phase 5 PR |
 | L5 | Finally return | ❌ Not started | — | — |
 | L6 | Destructuring elision | ✅ Done | @copilot | Phase 1 PR |
 | L7 | Date day default | ✅ Done | @copilot | Phase 1 PR |
-| L8 | Promise SyncContext | ❌ Not started | — | — |
+| L8 | Promise SyncContext | ✅ Done | @copilot | Phase 5 PR |
 
 ### Status Legend
 

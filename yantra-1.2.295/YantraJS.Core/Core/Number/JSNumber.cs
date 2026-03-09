@@ -281,15 +281,15 @@ public sealed partial class JSNumber : JSPrimitive
         if (value is JSPrimitiveObject po)
             value = po.value;
         if (value is JSString @string)
-            return new JSString(this.value + @string.ToString());
+            return new JSString(ToECMAString(this.value) + @string.ToString());
         if(value is JSObject @object)
-            return new JSString(this.value + @object.StringValue);
+            return new JSString(ToECMAString(this.value) + @object.StringValue);
         return new JSNumber(this.value + value.DoubleValue);
     }
 
     public override JSValue AddValue(double value) => new JSNumber(this.value + value);
 
-    public override JSValue AddValue(string value) => new JSString(this.value.ToString() + value);
+    public override JSValue AddValue(string value) => new JSString(ToECMAString(this.value) + value);
 
 
     //public override JSValue AddValue(JSValue value)

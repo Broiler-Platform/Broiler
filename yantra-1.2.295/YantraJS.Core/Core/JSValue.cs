@@ -230,7 +230,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
         }
         //if (value.ToString().Length == 0)
         //    return self.IsString ? self : new JSString(self.StringValue);
-        return new JSString(self.StringValue + value);
+        return new JSString(self.StringValue + JSNumber.ToECMAString(value));
     }
     /// <summary>
     /// Speed improvements for string contact operations
