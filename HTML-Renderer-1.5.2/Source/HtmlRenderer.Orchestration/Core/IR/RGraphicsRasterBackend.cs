@@ -89,7 +89,7 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         // Rounding absolute coords was tested (Round, Floor, Ceiling
         // on origin, inner edges, or all edges) and always regressed
         // because it shifted borders by ~0.09 px in viewport space,
-        // creating new partial-coverage artefacts.  The existing
+        // creating new partial-coverage artifacts.  The existing
         // rendering with SKPaint.IsAntialias = true produces the
         // correct CSS 2.1 Appendix E paint order.
 

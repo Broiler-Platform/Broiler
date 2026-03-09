@@ -382,7 +382,7 @@ Target: content-area match ≥ **95%** (from current 86.17%)
     All diffs were ~24/255 magnitude, caused by `Math.Round` on
     absolute fill coordinates introducing a ~0.09 px shift in
     viewport space (scrollY = 2551.906 has a fractional component;
-    rounding absolute coords shifts the fill by 1 − 0.906 = 0.094 px).
+    rounding absolute coords shifts the fill by 1 - 0.906 = 0.094 px).
 
 - [x] **P3.2 — Align sub-pixel rounding.**
   Review all `Math.Round` calls in `RGraphicsRasterBackend` and `CssBox`
@@ -391,7 +391,7 @@ Target: content-area match ≥ **95%** (from current 86.17%)
     positions are already integers in viewport space (the canvas
     transform contains the fractional scroll offset).  Rounding
     absolute coordinates was counter-productive — it shifted fills
-    by ~0.09 px and caused partial-coverage AA artefacts.
+    by ~0.09 px and caused partial-coverage AA artifacts.
   - Content-area match: 86.32% → 88.58%.
   - Eyes: 93.12% → 96.12%.  Smile: 97.21% → 99.82%.
     Chin: 93.42% → 100.00%.
