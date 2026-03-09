@@ -170,12 +170,16 @@ public class CaptureService
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex SrcAttrPattern = new(
-        @"\ssrc\s*=\s*(?:""(?<uri>data:[^""]+)""|'(?<uri2>data:[^']+)'|(?<uri3>data:[^\s>]+))",
+        @"\ssrc\s*=\s*(?:""(?<uri>data:[^""]+)""|'(?<uri>data:[^']+)'|(?<uri>data:[^\s>]+))",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex StylePattern = new(
         @"<style[^>]*>(?<content>[\s\S]*?)</style>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex WhitespacePattern = new(
+        @"\s+",
+        RegexOptions.Compiled);
 
     /// <summary>
     /// Captures website content from the specified URL, processes it using
@@ -443,11 +447,8 @@ public class CaptureService
             var srcMatch = SrcAttrPattern.Match(attrs);
             if (srcMatch.Success)
             {
-                // data: URI script — pick whichever named group matched
-                var dataUri = srcMatch.Groups["uri"].Value;
-                if (string.IsNullOrEmpty(dataUri)) dataUri = srcMatch.Groups["uri2"].Value;
-                if (string.IsNullOrEmpty(dataUri)) dataUri = srcMatch.Groups["uri3"].Value;
-                var decoded = DecodeDataUri(dataUri);
+                // data: URI script
+                var decoded = DecodeDataUri(srcMatch.Groups["uri"].Value);
                 if (!string.IsNullOrEmpty(decoded))
                     scripts.Add(decoded);
             }
@@ -508,7 +509,7 @@ public class CaptureService
             // Percent-decode first (some Acid3 data URIs percent-encode the base64)
             var decoded = Uri.UnescapeDataString(payload);
             // Strip whitespace (RFC 2045 allows folding)
-            decoded = Regex.Replace(decoded, @"\s+", string.Empty);
+            decoded = WhitespacePattern.Replace(decoded, string.Empty);
             try
             {
                 var bytes = Convert.FromBase64String(decoded);

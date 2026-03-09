@@ -1011,13 +1011,13 @@ public sealed class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.writeln(html) — same as write, with trailing newline
+        var writeFn = (JSFunction)document[(KeyString)"write"];
         document.FastAddValue(
             (KeyString)"writeln",
             new JSFunction((in Arguments a) =>
             {
                 var text = a.Length > 0 ? a[0].ToString() + "\n" : "\n";
-                var writeArgs = new JSValue[] { new JSString(text) };
-                return document[(KeyString)"write"];
+                return writeFn.InvokeFunction(new Arguments(writeFn, new JSString(text)));
             }, "writeln", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
