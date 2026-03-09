@@ -18,6 +18,10 @@ internal sealed class BordersDrawHandler : IBordersDrawHandler
         if (rect.Width <= 0 || rect.Height <= 0)
             return;
 
+        // Fill corner rectangles to prevent anti-aliased seams along
+        // the diagonal edges where two same-color border trapezoids meet.
+        FillBorderCorners(g, box, rect, isFirst, isLast);
+
         if (!(string.IsNullOrEmpty(box.BorderTopStyle) || box.BorderTopStyle == CssConstants.None || box.BorderTopStyle == CssConstants.Hidden) && box.ActualBorderTopWidth > 0)
             DrawBorder(Border.Top, box, g, rect, isFirst, isLast);
 
@@ -65,9 +69,16 @@ internal sealed class BordersDrawHandler : IBordersDrawHandler
                 SetInOutsetRectanglePoints(border, box, rect, isLineStart, isLineEnd);
                 g.DrawPolygon(g.GetSolidBrush(color), _borderPts);
             }
+            else if (style == CssConstants.Solid)
+            {
+                // Trapezoid polygon rendering for correct corner joins
+                // with asymmetric widths and anti-aliased diagonal edges.
+                SetInOutsetRectanglePoints(border, box, rect, isLineStart, isLineEnd);
+                g.DrawPolygon(g.GetSolidBrush(color), _borderPts);
+            }
             else
             {
-                // solid/dotted/dashed border draw as simple line
+                // dotted/dashed border draw as simple line
                 var pen = GetPen(g, style, color, GetWidth(border, box));
                 switch (border)
                 {
@@ -207,6 +218,50 @@ internal sealed class BordersDrawHandler : IBordersDrawHandler
 
         return path;
     }
+
+    /// <summary>
+    /// Fills corner rectangles where two adjacent solid borders share the same color.
+    /// This prevents visible anti-aliased seams along the diagonal edge where the
+    /// two border trapezoids meet, which would otherwise let the background bleed through.
+    /// </summary>
+    private static void FillBorderCorners(RGraphics g, IBorderRenderData box, RectangleF rect, bool isFirst, bool isLast)
+    {
+        bool hasTop = IsBorderVisible(box.BorderTopStyle) && box.ActualBorderTopWidth > 0
+                      && box.BorderTopStyle == CssConstants.Solid;
+        bool hasRight = isLast && IsBorderVisible(box.BorderRightStyle) && box.ActualBorderRightWidth > 0
+                        && box.BorderRightStyle == CssConstants.Solid;
+        bool hasBottom = IsBorderVisible(box.BorderBottomStyle) && box.ActualBorderBottomWidth > 0
+                         && box.BorderBottomStyle == CssConstants.Solid;
+        bool hasLeft = isFirst && IsBorderVisible(box.BorderLeftStyle) && box.ActualBorderLeftWidth > 0
+                       && box.BorderLeftStyle == CssConstants.Solid;
+
+        // Top-left corner
+        if (hasTop && hasLeft && box.ActualBorderTopColor == box.ActualBorderLeftColor)
+            g.DrawRectangle(g.GetSolidBrush(box.ActualBorderTopColor),
+                rect.Left, rect.Top,
+                (float)box.ActualBorderLeftWidth, (float)box.ActualBorderTopWidth);
+
+        // Top-right corner
+        if (hasTop && hasRight && box.ActualBorderTopColor == box.ActualBorderRightColor)
+            g.DrawRectangle(g.GetSolidBrush(box.ActualBorderTopColor),
+                (float)(rect.Right - box.ActualBorderRightWidth), rect.Top,
+                (float)box.ActualBorderRightWidth, (float)box.ActualBorderTopWidth);
+
+        // Bottom-left corner
+        if (hasBottom && hasLeft && box.ActualBorderBottomColor == box.ActualBorderLeftColor)
+            g.DrawRectangle(g.GetSolidBrush(box.ActualBorderBottomColor),
+                rect.Left, (float)(rect.Bottom - box.ActualBorderBottomWidth),
+                (float)box.ActualBorderLeftWidth, (float)box.ActualBorderBottomWidth);
+
+        // Bottom-right corner
+        if (hasBottom && hasRight && box.ActualBorderBottomColor == box.ActualBorderRightColor)
+            g.DrawRectangle(g.GetSolidBrush(box.ActualBorderBottomColor),
+                (float)(rect.Right - box.ActualBorderRightWidth), (float)(rect.Bottom - box.ActualBorderBottomWidth),
+                (float)box.ActualBorderRightWidth, (float)box.ActualBorderBottomWidth);
+    }
+
+    private static bool IsBorderVisible(string style)
+        => !string.IsNullOrEmpty(style) && style != CssConstants.None && style != CssConstants.Hidden;
 
     private static RPen GetPen(RGraphics g, string style, Color color, double width)
     {

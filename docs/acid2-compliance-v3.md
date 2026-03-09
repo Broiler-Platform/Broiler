@@ -310,19 +310,19 @@ Content-area pixel match 84.14% (target ≥ 85%, within range).
 
 | # | Task | Pixel Impact | CSS 2.1 Ref | Effort | Priority | Status |
 |---|---|---|---|---|---|---|
-| 9.1 | Anti-alias border triangle intersections (nose diamond) | ~800 px | §8.5 | M | P2 | **Blocked** — requires `BordersDrawHandler` solid-border trapezoid rendering |
+| 9.1 | Anti-alias border triangle intersections (nose diamond) | ~800 px | §8.5 | M | P2 | **Done** — `BordersDrawHandler` now uses trapezoid polygon rendering for solid borders |
 | 9.2 | Improve sans-serif font mapping for cross-platform consistency | ~500 px | §15.3 | S | P2 | Open |
 | 9.3 | Fine-tune text baseline and line-height calculation | ~300 px | §10.8 | S | P2 | Open |
 
-**9.1 Analysis (completed):**  Solid borders use the `DrawLine` code path in
-`BordersDrawHandler.cs` (lines 71–86), which renders each border as a centred
-pen stroke.  This means corner intersections are NOT rendered as diagonal
-polygon edges — they are just overlapping perpendicular lines.  The fix requires
-switching `BordersDrawHandler` to use `SetInOutsetRectanglePoints`/`DrawPolygon`
-(trapezoid rendering) for solid borders at corners where the two adjacent
-borders have different colours.  The `RGraphicsRasterBackend.RenderDrawBorder`
-IR path already uses trapezoid polygons for all solid borders and includes
-`FillBorderCorners` for same-colour corner seam prevention.
+**9.1 Implementation (completed):**  `BordersDrawHandler.DrawBorder` now uses
+`SetInOutsetRectanglePoints`/`DrawPolygon` (trapezoid rendering) for solid
+borders, replacing the previous `DrawLine` pen-stroke path.  This aligns
+`BordersDrawHandler` with the `RGraphicsRasterBackend.RenderDrawBorder` IR
+path, which already used trapezoid polygons for all solid borders.  A new
+`FillBorderCorners` method was added to `BordersDrawHandler.DrawBoxBorders`
+to fill corner rectangles where two adjacent solid borders share the same
+colour, preventing anti-aliased seams along diagonal edges — matching the
+same-colour corner seam prevention in `RGraphicsRasterBackend`.
 
 **Dependencies:** Task 9.1 is a prerequisite for meaningful improvement on
 tasks 9.2 and 9.3 — the nose diamond accounts for the largest contiguous
