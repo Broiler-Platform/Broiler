@@ -144,10 +144,10 @@ CLR execution with JSValue interop
 - Add per-object test suites (Array, String, Number, Date, Promise, etc.)
 
 ### Milestone 4 — Debugger and CLR Interop
-- Evaluate lighter debugger protocol alternatives (e.g., DAP) and replace V8 inspector if a suitable option exists
-- Isolate debugger behind interface
-- Isolate CLR interop behind interface
-- Add corresponding tests
+- [x] Evaluate lighter debugger protocol alternatives (e.g., DAP) and replace V8 inspector if a suitable option exists — see **DAP Evaluation** below
+- [x] Isolate debugger behind interface (`IDebugger` in `Debugger/IDebugger.cs`)
+- [x] Isolate CLR interop behind interface (`IClrInterop` in `Core/Clr/IClrInterop.cs`)
+- [x] Add corresponding tests (`DebuggerTests.cs`, `ClrInteropTests.cs`)
 
 ### Milestone 5 — Optimization and Polish
 - Implement improvements from `Improvements.md`
@@ -163,8 +163,43 @@ CLR execution with JSValue interop
 |----------|------------|
 | **Module separation strategy** | Separate assemblies (not namespace-only) |
 | **ECMAScript conformance target** | Latest spec, adopted incrementally (step by step) |
-| **Debugger protocol** | Replace V8 inspector with a lighter alternative if one exists (e.g., Debug Adapter Protocol) |
+| **Debugger protocol** | Retain V8 inspector protocol behind a new `IDebugger` interface — see **DAP Evaluation** below |
+| **CLR interop** | Isolated behind `IClrInterop`; swappable via `JSContext.ClrInterop` static property |
 | **Node.js polyfills (`modules/inbuilt/*.csx`)** | Consolidate into `YantraJS.NodePollyfill`; keep only actively used polyfills, remove dead `.csx` files, and convert remaining `.csx` scripts to compiled C# where feasible for better type safety and testability |
+
+---
+
+## DAP Evaluation
+
+The Debug Adapter Protocol (DAP) was evaluated as a potential replacement for
+the V8 inspector (Chrome DevTools Protocol) currently used by the debugger
+subsystem.
+
+### Finding: Retain V8 inspector protocol
+
+| Criterion | V8 Inspector (current) | DAP |
+|-----------|----------------------|-----|
+| **Existing implementation** | 27 files, fully functional | Would require a complete rewrite |
+| **Tooling ecosystem** | Chrome DevTools, VS Code via built-in CDP support | VS Code (native), other editors via adapters |
+| **Protocol complexity** | Higher (full CDP surface) | Lower (focused on breakpoints, stepping, variables) |
+| **Runtime integration** | Tight — `ScriptParsed`, `ConsoleApiCalled`, `GetProperties` already wired | Would need equivalent hooks |
+| **Migration cost** | None | High — new server, new message types, new serialization |
+
+**Decision:** The V8 inspector protocol is retained because:
+
+1. **The new `IDebugger` interface already provides the decoupling benefit.**
+   The runtime (`JSContext`) now depends only on `IDebugger`, not on
+   `V8InspectorProtocol` or any concrete debugger.  A DAP implementation
+   can be added later by implementing `IDebugger` without modifying the
+   runtime.
+
+2. **The existing V8 inspector implementation is complete and tested.**
+   Replacing it would be a large effort with no immediate functional gain.
+
+3. **DAP remains a viable future option.**  Because the debugger is now
+   behind an interface, a DAP adapter can be introduced as a new
+   `IDebugger` implementation without touching the existing V8 inspector
+   code.
 
 ---
 
