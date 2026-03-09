@@ -399,4 +399,33 @@ public partial class JSObject {
     [JSExport("getPrototypeOf")]
     internal static JSValue GetPrototypeOf(in Arguments a) => a.Get1().GetPrototypeOf();
 
+    [JSExport("groupBy")]
+    internal static JSValue GroupBy(in Arguments a)
+    {
+        var (items, callbackfn) = a.Get2();
+        if (items.IsNullOrUndefined)
+            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+        if (!callbackfn.IsFunction)
+            throw JSContext.Current.NewTypeError("CallbackFn must be a function");
+        var result = new JSObject();
+        var en = items.GetElementEnumerator();
+        int index = 0;
+        while (en.MoveNext(out var hasValue, out var item, out var _))
+        {
+            if (!hasValue)
+                continue;
+            var key = callbackfn.Call(JSUndefined.Value, item, new JSNumber(index));
+            var keyStr = key.ToString();
+            var group = result[keyStr];
+            if (group.IsNullOrUndefined)
+            {
+                group = new JSArray();
+                result.FastAddValue(keyStr, group, JSPropertyAttributes.EnumerableConfigurableValue);
+            }
+            (group as JSArray)?.Add(item);
+            index++;
+        }
+        return result;
+    }
+
 }

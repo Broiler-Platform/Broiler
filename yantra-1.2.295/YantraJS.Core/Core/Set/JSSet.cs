@@ -131,4 +131,142 @@ public partial class JSSet: JSObject {
             yield return entry;
         }
     }
+
+    [JSExport("union")]
+    public JSValue Union(in Arguments a)
+    {
+        var other = a.Get1();
+        if (!(other is JSSet otherSet))
+            throw JSContext.Current.NewTypeError("Set.prototype.union requires a Set argument");
+        var result = new JSSet(Arguments.Empty);
+        if (store != null)
+        {
+            foreach (var item in store)
+                result.Add(item);
+        }
+        if (otherSet.store != null)
+        {
+            foreach (var item in otherSet.store)
+                result.Add(item);
+        }
+        return result;
+    }
+
+    [JSExport("intersection")]
+    public JSValue Intersection(in Arguments a)
+    {
+        var other = a.Get1();
+        if (!(other is JSSet otherSet))
+            throw JSContext.Current.NewTypeError("Set.prototype.intersection requires a Set argument");
+        var result = new JSSet(Arguments.Empty);
+        if (store != null)
+        {
+            foreach (var item in store)
+            {
+                HashedString uk = item.ToUniqueID();
+                if (otherSet.index.TryGetValue(in uk, out _))
+                    result.Add(item);
+            }
+        }
+        return result;
+    }
+
+    [JSExport("difference")]
+    public JSValue Difference(in Arguments a)
+    {
+        var other = a.Get1();
+        if (!(other is JSSet otherSet))
+            throw JSContext.Current.NewTypeError("Set.prototype.difference requires a Set argument");
+        var result = new JSSet(Arguments.Empty);
+        if (store != null)
+        {
+            foreach (var item in store)
+            {
+                HashedString uk = item.ToUniqueID();
+                if (!otherSet.index.TryGetValue(in uk, out _))
+                    result.Add(item);
+            }
+        }
+        return result;
+    }
+
+    [JSExport("symmetricDifference")]
+    public JSValue SymmetricDifference(in Arguments a)
+    {
+        var other = a.Get1();
+        if (!(other is JSSet otherSet))
+            throw JSContext.Current.NewTypeError("Set.prototype.symmetricDifference requires a Set argument");
+        var result = new JSSet(Arguments.Empty);
+        if (store != null)
+        {
+            foreach (var item in store)
+            {
+                HashedString uk = item.ToUniqueID();
+                if (!otherSet.index.TryGetValue(in uk, out _))
+                    result.Add(item);
+            }
+        }
+        if (otherSet.store != null)
+        {
+            foreach (var item in otherSet.store)
+            {
+                HashedString uk = item.ToUniqueID();
+                if (!index.TryGetValue(in uk, out _))
+                    result.Add(item);
+            }
+        }
+        return result;
+    }
+
+    [JSExport("isSubsetOf")]
+    public JSValue IsSubsetOf(in Arguments a)
+    {
+        var other = a.Get1();
+        if (!(other is JSSet otherSet))
+            throw JSContext.Current.NewTypeError("Set.prototype.isSubsetOf requires a Set argument");
+        if (store == null)
+            return JSBoolean.True;
+        foreach (var item in store)
+        {
+            HashedString uk = item.ToUniqueID();
+            if (!otherSet.index.TryGetValue(in uk, out _))
+                return JSBoolean.False;
+        }
+        return JSBoolean.True;
+    }
+
+    [JSExport("isSupersetOf")]
+    public JSValue IsSupersetOf(in Arguments a)
+    {
+        var other = a.Get1();
+        if (!(other is JSSet otherSet))
+            throw JSContext.Current.NewTypeError("Set.prototype.isSupersetOf requires a Set argument");
+        if (otherSet.store == null)
+            return JSBoolean.True;
+        foreach (var item in otherSet.store)
+        {
+            HashedString uk = item.ToUniqueID();
+            if (!index.TryGetValue(in uk, out _))
+                return JSBoolean.False;
+        }
+        return JSBoolean.True;
+    }
+
+    [JSExport("isDisjointFrom")]
+    public JSValue IsDisjointFrom(in Arguments a)
+    {
+        var other = a.Get1();
+        if (!(other is JSSet otherSet))
+            throw JSContext.Current.NewTypeError("Set.prototype.isDisjointFrom requires a Set argument");
+        if (store != null)
+        {
+            foreach (var item in store)
+            {
+                HashedString uk = item.ToUniqueID();
+                if (otherSet.index.TryGetValue(in uk, out _))
+                    return JSBoolean.False;
+            }
+        }
+        return JSBoolean.True;
+    }
 }

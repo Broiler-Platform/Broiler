@@ -36,6 +36,34 @@ public partial class JSPromise
         }
     }
 
+    [JSExport("try")]
+    public static JSValue Try(in Arguments a)
+    {
+        var callbackfn = a.Get1();
+        if (!callbackfn.IsFunction)
+            throw JSContext.Current.NewTypeError("Promise.try requires a callable argument");
+        try
+        {
+            // Collect extra arguments beyond the callback
+            var extraArgs = new JSValue[a.Length > 1 ? a.Length - 1 : 0];
+            for (int i = 1; i < a.Length; i++)
+                extraArgs[i - 1] = a.GetAt(i);
+            var callArgs = new Arguments(JSUndefined.Value, extraArgs);
+            var result = callbackfn.InvokeFunction(callArgs);
+            if (result is JSPromise)
+                return result;
+            return new JSPromise(result, JSPromise.PromiseState.Resolved);
+        }
+        catch (JSException ex)
+        {
+            return new JSPromise(ex.Error ?? JSError.From(ex), JSPromise.PromiseState.Rejected);
+        }
+        catch (Exception ex)
+        {
+            return new JSPromise(JSError.From(ex), JSPromise.PromiseState.Rejected);
+        }
+    }
+
     [JSExport("resolve")]
     public static JSValue Resolve(in Arguments a) => new JSPromise(a.Get1(), JSPromise.PromiseState.Resolved);
 

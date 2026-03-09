@@ -614,21 +614,21 @@ column as work progresses.
 | § | Feature | Status | Assignee | PR |
 |---|---------|--------|----------|----|
 | 2.1 | Iterator helpers | ❌ Not started | — | — |
-| 2.2 | Set methods | ❌ Not started | — | — |
+| 2.2 | Set methods | ✅ Done | @copilot | Phase 1 PR |
 | 2.3 | Import attributes | ❌ Not started | — | — |
-| 2.4 | Promise.try | ❌ Not started | — | — |
-| 2.5 | RegExp.escape | ❌ Not started | — | — |
+| 2.4 | Promise.try | ✅ Done | @copilot | Phase 1 PR |
+| 2.5 | RegExp.escape | ✅ Done | @copilot | Phase 1 PR |
 | 2.6 | RegExp modifiers | ❌ Not started | — | — |
 | 2.7 | Duplicate named groups | ❌ Not started | — | — |
 | 2.8 | Float16Array | ❌ Not started | — | — |
 | 2.9 | ArrayBuffer.transfer | ❌ Not started | — | — |
-| 2.10 | Redeclarable eval vars | ❓ Needs audit | — | — |
+| 2.10 | Redeclarable eval vars | ⏳ Audited — eval scope update needs compiler work | — | — |
 | 4.1 | Temporal API | ❌ Not started | — | — |
 | 4.2 | Math.sumPrecise | ❌ Not started | — | — |
 | 4.3 | Uint8Array Base64/Hex | ❌ Not started | — | — |
-| 4.4 | Error.isError | ❌ Not started | — | — |
+| 4.4 | Error.isError | ✅ Done | @copilot | Phase 1 PR |
 | 4.5 | Array.fromAsync | ❌ Not started | — | — |
-| 4.6 | Object.groupBy / Map.groupBy | ❌ Not started | — | — |
+| 4.6 | Object.groupBy / Map.groupBy | ✅ Done | @copilot | Phase 1 PR |
 | 4.7 | JSON.parse source text | ❌ Not started | — | — |
 | 4.8 | Iterator.concat | ❌ Not started | — | — |
 | 4.9 | Map.getOrInsert | ❌ Not started | — | — |
@@ -639,8 +639,8 @@ column as work progresses.
 | L3 | Generator resumption | ⏳ In progress | — | — |
 | L4 | Number precision | ❌ Not started | — | — |
 | L5 | Finally return | ❌ Not started | — | — |
-| L6 | Destructuring elision | ❌ Not started | — | — |
-| L7 | Date day default | ❌ Not started | — | — |
+| L6 | Destructuring elision | ✅ Done | @copilot | Phase 1 PR |
+| L7 | Date day default | ✅ Done | @copilot | Phase 1 PR |
 | L8 | Promise SyncContext | ❌ Not started | — | — |
 
 ### Status Legend

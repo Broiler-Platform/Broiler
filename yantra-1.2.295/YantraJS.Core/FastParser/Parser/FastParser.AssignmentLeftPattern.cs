@@ -126,6 +126,13 @@ partial class FastParser
                     // added for empty square bracket pattern
                     if (stream.CheckAndConsume(TokenTypes.SquareBracketEnd))
                         break;
+                    // Handle elision (holes): var [a,,c] = [1,2,3]
+                    if (stream.Current.Type == TokenTypes.Comma)
+                    {
+                        nodes.Add(new AstEmptyExpression(stream.Current));
+                        stream.Consume();
+                        continue;
+                    }
                     var spread = stream.CheckAndConsume(TokenTypes.TripleDots, out var token);
                     if (!AssignmentLeftPattern(out var left, kind, modulePattern))
                         throw stream.Unexpected();
