@@ -161,10 +161,16 @@ public class CaptureService
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
-    /// Matches all &lt;script&gt; tags (both inline and data: URI) in document order.
+    /// Matches all &lt;script&gt; tags (both inline and with src attributes)
+    /// in document order. The tag attributes and body content are captured
+    /// so the caller can determine the script type.
     /// </summary>
-    private static readonly Regex AllScriptPattern = new(
-        @"<script[^>]*(?:\ssrc\s*=\s*[""']?(?<uri>data:[^""'\s>]+)[""']?)?[^>]*>(?<content>[\s\S]*?)</script>",
+    private static readonly Regex AnyScriptPattern = new(
+        @"<script(?<attrs>[^>]*)>(?<content>[\s\S]*?)</script>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex SrcAttrPattern = new(
+        @"\ssrc\s*=\s*(?:""(?<uri>data:[^""]+)""|'(?<uri2>data:[^']+)'|(?<uri3>data:[^\s>]+))",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex StylePattern = new(
@@ -431,17 +437,25 @@ public class CaptureService
     internal static string ExecuteScriptsWithDom(string html, string url)
     {
         var scripts = new List<string>();
-        foreach (Match match in AllScriptPattern.Matches(html))
+        foreach (Match match in AnyScriptPattern.Matches(html))
         {
-            var dataUri = match.Groups["uri"].Value;
-            if (!string.IsNullOrEmpty(dataUri))
+            var attrs = match.Groups["attrs"].Value;
+            var srcMatch = SrcAttrPattern.Match(attrs);
+            if (srcMatch.Success)
             {
+                // data: URI script — pick whichever named group matched
+                var dataUri = srcMatch.Groups["uri"].Value;
+                if (string.IsNullOrEmpty(dataUri)) dataUri = srcMatch.Groups["uri2"].Value;
+                if (string.IsNullOrEmpty(dataUri)) dataUri = srcMatch.Groups["uri3"].Value;
                 var decoded = DecodeDataUri(dataUri);
                 if (!string.IsNullOrEmpty(decoded))
                     scripts.Add(decoded);
             }
             else
             {
+                // Inline script (skip external src= scripts that are not data: URIs)
+                if (attrs.Contains("src", StringComparison.OrdinalIgnoreCase))
+                    continue;
                 var content = match.Groups["content"].Value.Trim();
                 if (!string.IsNullOrEmpty(content))
                     scripts.Add(content);
