@@ -40,8 +40,9 @@ public class Acid2DifferentialTests : IDisposable
     /// where at least one of the actual or reference images has a non-white
     /// pixel (R/G/B &lt; 250).  The full-image match is inflated by the
     /// large white background so this metric focuses on the rendered face.
+    /// v6: Raised from 0.85 → 0.88 to lock in v5 improvements (current ≥89%).
     /// </summary>
-    private const double MinContentMatchRatio = 0.85;
+    private const double MinContentMatchRatio = 0.88;
 
     private static readonly DeterministicRenderConfig Config = new()
     {
@@ -282,6 +283,7 @@ public class Acid2DifferentialTests : IDisposable
     /// match threshold.  This guards against regressions in relative positioning,
     /// float/clear interaction, and margin collapsing in the smile/chin area.
     /// P3.3: Threshold raised from 95% → 98% after P3.2 fill-coordinate fix.
+    /// v6: Raised from 98% → 99% to lock in current level (current ≥99.8%).
     /// </summary>
     [Fact]
     public void Acid2Top_SmileRegion_MeetsMinimumThreshold()
@@ -317,8 +319,8 @@ public class Acid2DifferentialTests : IDisposable
         double smileMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
 
         Assert.True(
-            smileMatch >= 0.98,
-            $"Acid2 #top smile-region match {smileMatch:P2} is below minimum 98.00%. " +
+            smileMatch >= 0.99,
+            $"Acid2 #top smile-region match {smileMatch:P2} is below minimum 99.00%. " +
             $"Matching content pixels: {matchContent}/{totalContent}");
     }
 
@@ -329,6 +331,8 @@ public class Acid2DifferentialTests : IDisposable
     /// P2.4: Threshold raised from 88% → 90% after P2.1 AA audit confirmed
     /// that the existing SkiaSharp rendering with <c>IsAntialias = true</c>
     /// and correct trapezoid construction achieves ≥90% overall nose match.
+    /// v6: Raised from 90% → 93% to lock in margin:auto and pseudo-element fixes
+    /// (current ≥93%).
     /// </summary>
     [Fact]
     public void Acid2Top_NoseRegion_MeetsMinimumThreshold()
@@ -364,8 +368,8 @@ public class Acid2DifferentialTests : IDisposable
         double noseMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
 
         Assert.True(
-            noseMatch >= 0.90,
-            $"Acid2 #top nose-region match {noseMatch:P2} is below minimum 90.00%. " +
+            noseMatch >= 0.93,
+            $"Acid2 #top nose-region match {noseMatch:P2} is below minimum 93.00%. " +
             $"Matching content pixels: {matchContent}/{totalContent}");
     }
 
@@ -581,6 +585,7 @@ public class Acid2DifferentialTests : IDisposable
     /// match threshold.  This region tests CSS 2.1 §8.3.1 margin collapsing
     /// and border corner anti-aliasing at the bottom of the face.
     /// P3.3: Threshold raised from 88% → 95% after P3.2 fill-coordinate fix.
+    /// v6: Raised from 95% → 99% to lock in perfect chin match (current 100%).
     /// </summary>
     [Fact]
     public void Acid2Top_ChinRegion_MeetsMinimumThreshold()
@@ -616,8 +621,8 @@ public class Acid2DifferentialTests : IDisposable
         double chinMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
 
         Assert.True(
-            chinMatch >= 0.95,
-            $"Acid2 #top chin-region match {chinMatch:P2} is below minimum 95.00%. " +
+            chinMatch >= 0.99,
+            $"Acid2 #top chin-region match {chinMatch:P2} is below minimum 99.00%. " +
             $"Matching content pixels: {matchContent}/{totalContent}");
     }
 
