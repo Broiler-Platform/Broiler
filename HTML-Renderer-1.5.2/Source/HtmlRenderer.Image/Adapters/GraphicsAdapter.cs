@@ -71,12 +71,15 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
         paint.Color = Utils.Convert(color);
         paint.IsAntialias = true;
 
-        // SkiaSharp draws text from baseline, so we need to offset by ascent
-        var metrics = fontAdapter.Font.Metrics;
+        // Use the CSS px-sized render font for correct glyph dimensions.
+        // Baseline positioning uses the render font's own metrics so the
+        // top of the text aligns with point.Y.
+        var renderFont = fontAdapter.RenderFont;
+        var metrics = renderFont.Metrics;
         float y = (float)point.Y - metrics.Ascent;
         float x = (float)point.X;
 
-        canvas.DrawText(str, x, y, fontAdapter.Font, paint);
+        canvas.DrawText(str, x, y, renderFont, paint);
     }
 
     public override RBrush GetTextureBrush(RImage image, RectangleF dstRect, PointF translateTransformLocation)
