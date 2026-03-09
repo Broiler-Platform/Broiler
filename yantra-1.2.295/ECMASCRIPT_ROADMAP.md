@@ -284,7 +284,7 @@ Adds zero-copy buffer transfer and resize capabilities.
 
 **Status:** ❓ Needs investigation
 **Priority:** P2 — Low
-**Spec:** [tc39/proposal-redeclarable-global-eval-vars](https://github.com/nicolo-ribaudo/tc39-proposal-redeclarable-global-eval-vars)
+**Spec:** [tc39/proposal-redeclarable-global-eval-vars](https://github.com/nicolo-ribaudo/proposal-redeclarable-global-eval-vars)
 
 Allows `eval`-introduced `var` declarations to coexist with `let`/`const`
 globals in scripts.
@@ -366,7 +366,7 @@ feature expected in ES2026.
 
 **Status:** ❌ Not implemented
 **Priority:** P2 — Low
-**Spec:** [tc39/proposal-arraybuffer-base64](https://github.com/nicolo-ribaudo/proposal-arraybuffer-base64)
+**Spec:** [tc39/proposal-arraybuffer-base64](https://github.com/tc39/proposal-arraybuffer-base64)
 
 | Sub-task | Description | Estimate |
 |----------|-------------|----------|
@@ -383,7 +383,7 @@ feature expected in ES2026.
 
 **Status:** ❌ Not implemented
 **Priority:** P2 — Low
-**Spec:** [tc39/proposal-is-error](https://github.com/nicolo-ribaudo/tc39-proposal-is-error)
+**Spec:** [tc39/proposal-is-error](https://github.com/tc39/proposal-is-error)
 
 | Sub-task | Description | Estimate |
 |----------|-------------|----------|
@@ -423,7 +423,7 @@ feature expected in ES2026.
 
 **Status:** ❌ Not implemented
 **Priority:** P3 — Low
-**Spec:** [tc39/proposal-json-parse-with-source](https://github.com/nicolo-ribaudo/tc39-proposal-json-parse-with-source)
+**Spec:** [tc39/proposal-json-parse-with-source](https://github.com/tc39/proposal-json-parse-with-source)
 
 | Sub-task | Description | Estimate |
 |----------|-------------|----------|
@@ -567,7 +567,7 @@ Address pre-existing spec deviations.
 
 ### 6.1 Test262 Integration
 
-[Test262](https://github.com/nicolo-ribaudo/test262) is the official ECMAScript
+[Test262](https://github.com/tc39/test262) is the official ECMAScript
 conformance test suite maintained by TC39. Integrating it is critical for
 validating compliance.
 
@@ -670,7 +670,7 @@ column as work progresses.
 - [ECMA-262, 16th Edition (ES2025)](https://ecma-international.org/publications-and-standards/standards/ecma-262/)
 - [TC39 Finished Proposals](https://github.com/tc39/proposals/blob/main/finished-proposals.md)
 - [TC39 Active Proposals](https://github.com/tc39/proposals)
-- [Test262 Conformance Suite](https://github.com/nicolo-ribaudo/test262)
+- [Test262 Conformance Suite](https://github.com/tc39/test262)
 - [YantraJS Refactoring Roadmap](REFACTORING_ROADMAP.md)
 - [YantraJS Known Limitations](UNSUPPORTED.md)
 - [YantraJS Subsystem Map](SUBSYSTEM_MAP.md)
