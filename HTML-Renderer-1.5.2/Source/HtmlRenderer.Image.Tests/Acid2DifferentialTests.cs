@@ -2,6 +2,7 @@ using System.Drawing;
 using SkiaSharp;
 using TheArtOfDev.HtmlRenderer.Core.IR;
 using TheArtOfDev.HtmlRenderer.Image;
+using TheArtOfDev.HtmlRenderer.Image.Adapters;
 
 namespace HtmlRenderer.Image.Tests;
 
@@ -53,6 +54,9 @@ public class Acid2DifferentialTests : IDisposable
     private readonly string _acid2Html;
     private readonly string _referencePath;
 
+    private static bool _referenceFontLoaded;
+    private static readonly object _fontLoadLock = new();
+
     public Acid2DifferentialTests()
     {
         // Walk up from the test assembly output directory to the repo root.
@@ -61,6 +65,20 @@ public class Acid2DifferentialTests : IDisposable
             dir = Directory.GetParent(dir)?.FullName;
 
         Assert.NotNull(dir); // repo root must be found
+
+        // P1.4: Load bundled DejaVu Sans font and map it to "sans-serif"
+        // for deterministic rendering that matches the Chromium reference
+        // screenshot (generated on Linux where sans-serif → DejaVu Sans).
+        lock (_fontLoadLock)
+        {
+            if (!_referenceFontLoaded)
+            {
+                var fontPath = Path.Combine(dir, "acid", "fonts", "DejaVuSans.ttf");
+                if (File.Exists(fontPath))
+                    SkiaImageAdapter.Instance.LoadFontFromFile(fontPath, "sans-serif");
+                _referenceFontLoaded = true;
+            }
+        }
 
         var htmlPath = Path.Combine(dir, "acid", "acid2", "acid2.html");
         Assert.True(File.Exists(htmlPath), $"acid2.html not found at {htmlPath}");
@@ -452,8 +470,13 @@ public class Acid2DifferentialTests : IDisposable
     /// <summary>
     /// Validates the forehead region (rows 51–68) meets a minimum content-area
     /// match threshold.  This region contains the "Hello World!" text rendered
-    /// with <c>font: 2em/24px sans-serif</c>.  Priority 2 improvements
-    /// (font resolution normalisation, sub-pixel positioning) target this area.
+    /// with <c>font: 2em/24px sans-serif</c>.
+    ///
+    /// Priority 1 fix: FontAdapter now renders glyphs at CSS px size (×96/72)
+    /// via a dedicated RenderFont, fixing the systematic 25% size mismatch.
+    /// Glyph bounding boxes now match the reference (≈125px wide), raising the
+    /// threshold from 0.5% to 2.0%.  Further improvement requires matching
+    /// Chromium's LCD sub-pixel anti-aliasing (Priority 2).
     /// </summary>
     [Fact]
     public void Acid2Top_ForeheadRegion_MeetsMinimumThreshold()
@@ -489,11 +512,10 @@ public class Acid2DifferentialTests : IDisposable
         double foreheadMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
 
         Assert.True(
-            foreheadMatch >= 0.005,
-            $"Acid2 #top forehead-region match {foreheadMatch:P2} is below minimum 0.50%. " +
+            foreheadMatch >= 0.02,
+            $"Acid2 #top forehead-region match {foreheadMatch:P2} is below minimum 2.00%. " +
             $"Matching content pixels: {matchContent}/{totalContent}. " +
-            $"Known limitation: internal font sizes are in typographic points " +
-            $"(75% of CSS px), causing systematic glyph size mismatch.");
+            $"Remaining gap is anti-aliasing difference (grayscale vs LCD sub-pixel).");
     }
 
     /// <summary>
