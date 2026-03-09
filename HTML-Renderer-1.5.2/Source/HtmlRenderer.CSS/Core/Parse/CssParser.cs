@@ -851,14 +851,11 @@ internal sealed class CssParser
             if (!string.IsNullOrEmpty(fontFamily))
                 properties["font-family"] = ParseFontFamilyProperty(fontFamily);
 
-            if (!string.IsNullOrEmpty(fontStyle))
-                properties["font-style"] = fontStyle;
-
-            if (!string.IsNullOrEmpty(fontVariant))
-                properties["font-variant"] = fontVariant;
-
-            if (!string.IsNullOrEmpty(fontWeight))
-                properties["font-weight"] = fontWeight;
+            // CSS 2.1 §15.8: The font shorthand resets all sub-properties.
+            // When a component is omitted, it reverts to its initial value.
+            properties["font-style"] = !string.IsNullOrEmpty(fontStyle) ? fontStyle : "normal";
+            properties["font-variant"] = !string.IsNullOrEmpty(fontVariant) ? fontVariant : "normal";
+            properties["font-weight"] = !string.IsNullOrEmpty(fontWeight) ? fontWeight : "normal";
 
             if (!string.IsNullOrEmpty(fontSize))
                 properties["font-size"] = fontSize;

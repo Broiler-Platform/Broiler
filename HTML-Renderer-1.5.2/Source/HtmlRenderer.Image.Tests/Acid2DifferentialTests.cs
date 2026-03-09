@@ -450,6 +450,53 @@ public class Acid2DifferentialTests : IDisposable
     }
 
     /// <summary>
+    /// Validates the forehead region (rows 51–68) meets a minimum content-area
+    /// match threshold.  This region contains the "Hello World!" text rendered
+    /// with <c>font: 2em/24px sans-serif</c>.  Priority 2 improvements
+    /// (font resolution normalisation, sub-pixel positioning) target this area.
+    /// </summary>
+    [Fact]
+    public void Acid2Top_ForeheadRegion_MeetsMinimumThreshold()
+    {
+        using var actual = RenderAtAnchorTop(_acid2Html);
+        using var baseline = SKBitmap.Decode(_referencePath);
+        Assert.NotNull(baseline);
+
+        int tolerance = Config.ColorTolerance;
+        int totalContent = 0, matchContent = 0;
+
+        for (int y = 51; y <= 68; y++)
+        {
+            for (int x = 0; x < Math.Min(actual.Width, baseline.Width); x++)
+            {
+                var a = actual.GetPixel(x, y);
+                var r = baseline.GetPixel(x, y);
+
+                bool isContent = a.Red < 250 || a.Green < 250 || a.Blue < 250
+                              || r.Red < 250 || r.Green < 250 || r.Blue < 250;
+
+                if (isContent)
+                {
+                    totalContent++;
+                    if (Math.Abs(a.Red - r.Red) <= tolerance
+                     && Math.Abs(a.Green - r.Green) <= tolerance
+                     && Math.Abs(a.Blue - r.Blue) <= tolerance)
+                        matchContent++;
+                }
+            }
+        }
+
+        double foreheadMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
+
+        Assert.True(
+            foreheadMatch >= 0.005,
+            $"Acid2 #top forehead-region match {foreheadMatch:P2} is below minimum 0.50%. " +
+            $"Matching content pixels: {matchContent}/{totalContent}. " +
+            $"Known limitation: internal font sizes are in typographic points " +
+            $"(75% of CSS px), causing systematic glyph size mismatch.");
+    }
+
+    /// <summary>
     /// Verifies the nose pseudo-element selector ".nose div :after" (with
     /// descendant combinator before the pseudo-element) does not generate an
     /// extra ::after box on .nose > div itself—only on descendants of

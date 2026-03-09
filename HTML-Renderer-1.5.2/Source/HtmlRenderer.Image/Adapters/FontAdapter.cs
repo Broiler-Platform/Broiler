@@ -22,7 +22,15 @@ internal sealed class FontAdapter : RFont
         // where sub-pixel colour fringes have been composited away, so
         // grayscale AA produces glyph shapes that match the reference more
         // closely and eliminates per-sub-pixel colour differences.
-        Font = new SKFont(typeface, (float)size) { Edging = SKFontEdging.Antialias };
+        // Priority 2: Enable sub-pixel text positioning (Subpixel = true)
+        // for more precise glyph placement.  This is orthogonal to the AA
+        // edging mode and aligns baseline positioning with Chromium's
+        // HarfBuzz/FreeType stack.
+        Font = new SKFont(typeface, (float)size)
+        {
+            Edging = SKFontEdging.Antialias,
+            Subpixel = true
+        };
 
         // Calculate metrics
         var metrics = Font.Metrics;
