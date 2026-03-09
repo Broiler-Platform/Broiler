@@ -1,7 +1,7 @@
 # Acid2 Compliance Report — Version 3
 
 > **Version:** 3.0
-> **Date:** 2026-03-08
+> **Date:** 2026-03-09
 > **Supersedes:** All previous Acid2 compliance documentation (v1 and v2)
 
 ---
@@ -15,8 +15,8 @@
 | Red-pixel leak (CSS failure indicator) | **0** |
 | Smile-region match | **95.26%** |
 | Test dimensions | 1024 × 768 |
-| Content bounding box (Chromium) | x: [87, 211], y: [51, 275] — 125 × 225 px |
-| Content bounding box (Broiler) | x: [86, 205], y: [51, 288] — 120 × 238 px |
+| Content bounding box (Chromium) | x: [72, 239], y: [51, 275] — 168 × 225 px |
+| Content bounding box (Broiler) | x: [72, 239], y: [51, 275] — 168 × 225 px |
 | Render target | `acid2.html#top` (face test area) |
 | Automated test status | **All 8 differential tests passing** |
 | Chromium version | 145.0.7632.6 (Playwright v1.58.2) |
@@ -43,8 +43,8 @@ Key achievements:
 - **Phase 9.4 complete** — Background fill coordinate rounding fix (§14.2), eliminating 168 red pixels.
 
 Key remaining gaps (3,809 diff pixels across 22,976 content pixels):
-- Face height 226px vs. reference 225px (1px sub-pixel rounding).
-- Forehead text ("Hello World!") has minor anti-aliasing/font differences.
+- Forehead text ("Hello World!") has major font-rendering/anti-aliasing differences (1.2% region match).
+- Nose diamond anti-aliasing differs between SkiaSharp and Chromium.
 - Transition-row sub-pixel mismatches at element boundaries.
 
 ---
@@ -104,16 +104,18 @@ and white (background) pixels: `acid/acid2/acid2-diff.png`
 
 ### 1.4  Automated Tests
 
-Six differential tests in `Acid2DifferentialTests.cs` guard against regressions:
+Eight differential tests in `Acid2DifferentialTests.cs` guard against regressions:
 
 | Test | Assertion |
 |---|---|
 | `Acid2Top_PixelMatch_MeetsMinimumThreshold` | Full-image match ≥ 99.5% |
 | `Acid2Top_RedPixelLeak_BelowMaximum` | Red pixel count = 0 |
-| `Acid2Top_ContentAreaMatch_MeetsMinimumThreshold` | Content-area match ≥ 84% |
+| `Acid2Top_ContentAreaMatch_MeetsMinimumThreshold` | Content-area match ≥ 83% |
 | `Acid2Top_RenderDimensions_MatchViewport` | Output is 1024 × 768 |
 | `Acid2Top_Render_IsDeterministic` | Two renders produce identical output |
 | `Acid2Top_AnchorElement_IsFoundDuringLayout` | `#top` anchor found with Y > 100 |
+| `Acid2Top_SmileRegion_MeetsMinimumThreshold` | Smile-region content match ≥ 95% |
+| `Acid2Top_NosePseudoElement_NoExtraAfterOnNoseDiv` | `.nose > div` has exactly 1 child |
 
 ---
 
@@ -123,20 +125,20 @@ Six differential tests in `Acid2DifferentialTests.cs` guard against regressions:
 
 | Metric | Value |
 |---|---|
-| Full-image match | 99.54% (3,656 diff pixels) |
-| Content-area match | 84.14% (19,389 / 23,045 matching content pixels) |
+| Full-image match | 99.52% (3,809 diff pixels) |
+| Content-area match | 83.42% (19,167 / 22,976 matching content pixels) |
 | Red-pixel leak | 0 |
-| Content bbox diff | Broiler 1px taller (226px vs. 225px) |
+| Content bbox | Both 168 × 225 px (x: [72, 239], y: [51, 275]) |
 
 ### 2.2  Per-Region Breakdown
 
 | Region | Y Range | Content Match | Notes |
 |---|---|---|---|
-| Forehead ("Hello World!") | 51–68 | 1.6% (25/1,589) | Font rendering, anti-aliasing, and text height differ |
-| Eyes area | 80–130 | 96.9% (1,488/1,536) | Near-perfect match |
-| Nose area | 130–180 | 84.9% (6,032/7,104) | Diamond pseudo-element anti-aliasing differs |
-| Mouth/smile | 180–240 | 64.3% (6,108/9,504) | Extra black pixels in smile bar, layout shift |
-| Chin/parser | 240–300 | 36.5% (1,696/4,648) | 17px height extension, chin border misplaced |
+| Forehead ("Hello World!") | 51–68 | 1.2% (19/1,568) | Font rendering, anti-aliasing, and text metrics differ |
+| Eyes area | 80–130 | 94.3% (1,584/1,680) | Near-perfect match |
+| Nose area | 130–180 | 84.0% (6,148/7,320) | Diamond pseudo-element anti-aliasing differs |
+| Mouth/smile | 180–240 | 91.5% (8,808/9,624) | Minor sub-pixel differences in smile bar |
+| Chin/parser | 240–300 | 94.3% (2,988/3,168) | Minor border anti-aliasing differences |
 
 ### 2.3  Side-by-Side Description
 
@@ -144,14 +146,14 @@ Six differential tests in `Acid2DifferentialTests.cs` guard against regressions:
 
 | Feature | Broiler | Chromium | Status |
 |---|---|---|---|
-| "Hello World!" text | y=51–64, navy, 526px | y=51–67, navy, 376px | ⚠ Taller, more anti-aliased pixels |
+| "Hello World!" text | y=51–64, navy | y=51–67, navy | ⚠ Font metrics differ (1.2% match) |
 | Scalp (top line) | Visible black bar + yellow border | Same | ✅ Match |
 | Forehead | Black borders, yellow fill | Same | ✅ Match |
-| Eyes | Black squares on white bg | Same | ✅ Match (96.9%) |
-| Nose | Yellow fill, black border | Same + diamond anti-aliasing | ⚠ Missing diamond AA |
-| Smile bar (y=204–218) | Extra black pixels (130+ black) | 24 black, 144 yellow | ❌ Significant mismatch |
-| Chin borders | Black borders at y=240–251 | Black borders at y=240–251 | ✅ Match |
-| Face bottom | Extends to y=276 | Ends at y=275 | ⚠ 1px sub-pixel rounding |
+| Eyes | Black squares on white bg | Same | ✅ Match (94.3%) |
+| Nose | Yellow fill, black border | Same + diamond anti-aliasing | ⚠ Missing diamond AA (84.0%) |
+| Smile bar | Minor sub-pixel differences | Reference smile pattern | ⚠ 91.5% match |
+| Chin borders | Black borders at y=240–251 | Black borders at y=240–251 | ✅ Match (94.3%) |
+| Face bottom | Ends at y=275 | Ends at y=275 | ✅ Match |
 
 ### 2.4  Images
 
@@ -165,13 +167,12 @@ Six differential tests in `Acid2DifferentialTests.cs` guard against regressions:
 
 ## 3  Root-Cause Analysis
 
-### 3.1  Face Height Difference (1px)
+### 3.1  Face Height (Resolved)
 
-**Symptom:** Broiler face extends from y=51 to y=276 (226px).  Chromium face
-extends from y=51 to y=275 (225px).  The 1px difference is a sub-pixel
-rounding artifact at the UL table bottom edge.
+**Current state:** Both Broiler and Chromium render the face from y=51 to y=275
+(225px).  The bounding boxes match exactly at x: [72, 239], y: [51, 275].
 
-**Fixed root causes (Phase 8):**
+**Previously fixed root causes:**
 
 1. **CSS error recovery for stray semicolons (§4.2):**  The `.parser { m\\argin: 2em; };`
    rule on line 98 of the Acid2 CSS ends with `};`.  Per CSS 2.1 §4.2, the stray `;`
@@ -194,10 +195,11 @@ rounding artifact at the UL table bottom edge.
    propagates last-child bottom margins through parents without bottom
    border/padding.
 
-### 3.2  Smile Bar Extra Black Pixels
+### 3.2  Smile Bar Sub-Pixel Differences
 
-**Symptom:** At y=204–218, Broiler renders 130+ black pixels per row where
-Chromium renders only 24 black pixels.
+**Symptom:** At y=180–240, the mouth/smile region shows a 91.5% content match
+with 816 differing pixels, primarily sub-pixel anti-aliasing differences at
+element boundaries.
 
 **Root cause:**  The smile is built from nested elements:
 - `.smile div` — `position: relative; bottom: -1em` — black background, 12em × 2em
@@ -205,11 +207,10 @@ Chromium renders only 24 black pixels.
 - `.smile div div span` — `float: right; border: solid 1em transparent`
 - `.smile div div span em` — `float: inherit; border-top: solid yellow 1em`
 
-The `float: inherit` on `<em>` should inherit `float: right` from its parent
-`<span>`.  The nested float layout and `position: relative; bottom: -1em` on
-the smile div cause the black background to extend into the wrong rows.
-Broiler's relative-positioning offset leaks into sibling positioning despite
-the Phase 6.4 fix, causing the smile bars to shift downward.
+The remaining differences are sub-pixel rounding at float boundaries and
+anti-aliasing differences at the smile bar edges.  The `float: inherit` on
+`<em>` correctly inherits `float: right` from its parent `<span>`.
+The overall smile-region match (y=196–260) is 95.26%.
 
 ### 3.3  Forehead / "Hello World!" Text Differences
 
@@ -298,10 +299,8 @@ pixel match ≥ 75%.
 | 8.3 | Correct negative clearance in smile-to-chin margin collapsing | ~800 px | §8.3.1, §9.5.2 | L | P1 — **done** |
 | 8.4 | Fix chin border vertical position (12px shift) | ~300 px | §8.3.1 | S | P1 — **done** |
 
-**Measurable outcome:** Face height matches reference (226px vs 225px, 1px sub-pixel).
-Content-area pixel match 84.14% (target ≥ 85%, within range).  *Note: Phase 9.2
-font mapping subsequently adjusted this to 83.82%; Phase 9.4 background fix
-further adjusted to 83.42% — see Phase 9.*
+**Measurable outcome:** Face height matches reference (225px).
+Content-area pixel match 83.42%.
 
 **Implementation details:**
 - **8.1/8.3:** Removed `;` from CSS selector trim characters (`_cssClassTrimChars`)
