@@ -6,6 +6,11 @@ namespace TheArtOfDev.HtmlRenderer.Image.Adapters;
 
 internal sealed class FontAdapter : RFont
 {
+    /// <summary>
+    /// Ratio to convert typographic points to CSS pixels (96 DPI / 72 DPI).
+    /// </summary>
+    private const double PtToCssPx = 96.0 / 72.0;
+
     private readonly double _size;
     private readonly FontStyle _style;
     private double _height = -1;
@@ -39,7 +44,7 @@ internal sealed class FontAdapter : RFont
         // that characters are drawn at the correct CSS pixel dimensions.
         // The layout font (Font) is kept at pt size so that all existing
         // metrics, text measurement, and layout calculations are preserved.
-        RenderFont = new SKFont(typeface, (float)(size * (96.0 / 72.0)))
+        RenderFont = new SKFont(typeface, (float)(size * PtToCssPx))
         {
             Edging = SKFontEdging.Antialias,
             Subpixel = true
