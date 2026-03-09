@@ -512,11 +512,11 @@ public readonly partial struct Arguments
     public (int, int, int, int, int, int, int) Get7Int()
     {
         if (Length == 0)
-            return (0, 0, 0, 0, 0, 0, 0);
+            return (0, 0, 1, 0, 0, 0, 0);
         if (Length == 1)
-            return (Arg0!.IntValue, 0, 0, 0, 0, 0, 0);
+            return (Arg0!.IntValue, 0, 1, 0, 0, 0, 0);
         if (Length == 2)
-            return (Arg0!.IntValue, Arg1!.IntValue, 0, 0, 0, 0, 0);
+            return (Arg0!.IntValue, Arg1!.IntValue, 1, 0, 0, 0, 0);
         if (Length == 3)
             return (Arg0!.IntValue, Arg1!.IntValue, Arg2!.IntValue, 0, 0, 0, 0);
         if (Length == 4)

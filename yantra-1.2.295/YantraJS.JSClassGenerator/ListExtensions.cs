@@ -123,6 +123,7 @@ internal static class ListExtensions
             case "finally":
             case "return":
             case "throw":
+            case "try":
             case "is":
             case "for":
                 name = "@" + name;

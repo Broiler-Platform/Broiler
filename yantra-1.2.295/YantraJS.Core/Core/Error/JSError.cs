@@ -59,6 +59,13 @@ public partial class JSError : JSObject
         FastAddValue(KeyStrings.stack, Stack.Marshal(), JSPropertyAttributes.ConfigurableValue);
     }
 
+    [JSExport("isError")]
+    internal static JSValue IsError(in Arguments a)
+    {
+        var arg = a.Get1();
+        return arg is JSError ? JSBoolean.True : JSBoolean.False;
+    }
+
     [JSExport("toString")]
     public new JSValue ToString(in Arguments a)
     {

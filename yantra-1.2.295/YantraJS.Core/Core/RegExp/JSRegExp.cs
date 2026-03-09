@@ -11,6 +11,29 @@ namespace YantraJS.Core;
 public partial class JSRegExp: JSObject
 {
 
+    [JSExport("escape")]
+    internal static JSValue Escape(in Arguments a)
+    {
+        var input = a.Get1();
+        if (input.IsNullOrUndefined)
+            throw JSContext.Current.NewTypeError("RegExp.escape requires a string argument");
+        var str = input.ToString();
+        var sb = new StringBuilder(str.Length + 4);
+        for (int i = 0; i < str.Length; i++)
+        {
+            var c = str[i];
+            if (c == '^' || c == '$' || c == '\\' || c == '.' || c == '*' ||
+                c == '+' || c == '?' || c == '(' || c == ')' || c == '[' ||
+                c == ']' || c == '{' || c == '}' || c == '|' || c == '/')
+            {
+                sb.Append('\\');
+            }
+            sb.Append(c);
+        }
+        return new JSString(sb.ToString());
+    }
+
+
     [JSExport("source")]
     public readonly string pattern;
 

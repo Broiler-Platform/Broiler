@@ -167,6 +167,13 @@ partial class FastCompiler
                     {
                         switch (element.Type)
                         {
+                            case FastNodeType.EmptyExpression:
+                                // Elision: advance iterator without assigning
+                                using (var skipTemp = scope.Top.GetTempVariable(typeof(JSValue)))
+                                {
+                                    inits.Add(IElementEnumeratorBuilder.MoveNext(destExp, skipTemp.Expression));
+                                }
+                                break;
                             case FastNodeType.Identifier:
                                 var id = element as AstIdentifier;
                                 // inits.Add(CreateAssignment(id, start));
