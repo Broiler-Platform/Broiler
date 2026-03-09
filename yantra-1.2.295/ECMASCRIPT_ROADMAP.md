@@ -613,7 +613,7 @@ column as work progresses.
 
 | § | Feature | Status | Assignee | PR |
 |---|---------|--------|----------|----|
-| 2.1 | Iterator helpers | ❌ Not started | — | — |
+| 2.1 | Iterator helpers | ✅ Done | @copilot | Phase 2 PR |
 | 2.2 | Set methods | ✅ Done | @copilot | Phase 1 PR |
 | 2.3 | Import attributes | ❌ Not started | — | — |
 | 2.4 | Promise.try | ✅ Done | @copilot | Phase 1 PR |
@@ -621,16 +621,16 @@ column as work progresses.
 | 2.6 | RegExp modifiers | ❌ Not started | — | — |
 | 2.7 | Duplicate named groups | ❌ Not started | — | — |
 | 2.8 | Float16Array | ❌ Not started | — | — |
-| 2.9 | ArrayBuffer.transfer | ❌ Not started | — | — |
+| 2.9 | ArrayBuffer.transfer | ✅ Done | @copilot | Phase 2 PR |
 | 2.10 | Redeclarable eval vars | ⏳ Audited — eval scope update needs compiler work | — | — |
 | 4.1 | Temporal API | ❌ Not started | — | — |
 | 4.2 | Math.sumPrecise | ❌ Not started | — | — |
 | 4.3 | Uint8Array Base64/Hex | ❌ Not started | — | — |
 | 4.4 | Error.isError | ✅ Done | @copilot | Phase 1 PR |
-| 4.5 | Array.fromAsync | ❌ Not started | — | — |
+| 4.5 | Array.fromAsync | ✅ Done | @copilot | Phase 2 PR |
 | 4.6 | Object.groupBy / Map.groupBy | ✅ Done | @copilot | Phase 1 PR |
 | 4.7 | JSON.parse source text | ❌ Not started | — | — |
-| 4.8 | Iterator.concat | ❌ Not started | — | — |
+| 4.8 | Iterator.concat | ✅ Done | @copilot | Phase 2 PR |
 | 4.9 | Map.getOrInsert | ❌ Not started | — | — |
 | 4.10 | Atomics / SharedArrayBuffer | ❌ Not started | — | — |
 | 4.11 | structuredClone | ❌ Not started | — | — |
