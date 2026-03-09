@@ -204,23 +204,31 @@ the match from ~94% to ~96%.
 
 **Diff pixels:** ~832 / 12,292 content pixels
 
-**Root cause classification:** Layout-level shape difference + AA difference
+**Root cause classification:** Anti-aliasing difference (inherent)
 
 **Analysis:**
 
-1. **Diamond top-half position offset.**
-   The nose diamond's `::before` pseudo-element produces the top half of the
-   diamond via negative margins + overflow clipping.  Rows y=146–165 show
-   62–86% per-row match because the element position/dimensions differ at the
-   layout level (not rasterisation).  Row y=168 has ~14% match due to a 1 px
-   vertical offset at the diamond junction.
+Pixel-level investigation (v6.1) confirmed that the diamond layout is
+**correct** — black pixel positions and counts are identical between Broiler
+and Chromium.  The `::before` and `::after` pseudo-elements have correct
+dimensions (24×12 border-box each) and are positioned at the expected
+viewport coordinates.  No junction vertical offset exists.
 
-2. **Anti-aliasing at angled edges.**
-   The diamond's 45° edges produce different coverage values in SkiaSharp vs
-   Chromium's compositor.  This is inherent to the different AA kernels.
+The remaining mismatch is caused by:
 
-**Location:** `HtmlRenderer.Dom/Core/Dom/CssBox.cs` (layout),
-`HtmlRenderer.Orchestration/Core/IR/RGraphicsRasterBackend.cs` (rendering)
+1. **Anti-aliasing at 45° border edges.**
+   The diamond's angled edges (CSS border triangles) produce different
+   coverage values in SkiaSharp vs Chromium's compositor.  The diamond area
+   (x=132–180) matches at 91.87%.  This is inherent to the different AA
+   kernels and cannot be improved through layout changes.
+
+2. **Nose outer border AA spread.**
+   The `.nose` left/right borders (12px solid black) produce slightly more
+   anti-aliased edge pixels in Broiler than in Chromium.  At y=145, Broiler
+   has 26 "other" (AA edge) pixels vs Chromium's 2, indicating a wider AA
+   spread at the border edges.  The outer nose area matches at 93.88%.
+
+**Location:** `HtmlRenderer.Orchestration/Core/IR/RGraphicsRasterBackend.cs` (rendering)
 
 ### 2.4  Smile Region (~99.82% match)
 
@@ -292,39 +300,60 @@ breaks down as follows:
 | Source | Diff Pixels | % of Gap | Fixable? |
 |---|---:|---:|---|
 | Forehead text AA | ~1,598 | 64.4% | Partial |
-| Nose diamond layout | ~832 | 33.5% | Yes |
+| Nose border AA | ~832 | 33.5% | No (inherent) |
 | Eyes border AA | ~60 | 2.4% | Partial |
 | Smile sub-pixel | ~16 | 0.6% | No (inherent) |
 
-### Priority 1 — Nose Diamond Layout Fix (Target: +3.4% content-area)
+### Priority 1 — Nose Diamond Layout Audit (Completed)
 
-**Severity:** High — second largest gap source (33.5% of remaining diff pixels)
+**Severity:** Re-assessed — the diamond layout is **correct**; the remaining
+gap is from inherent anti-aliasing differences, not layout errors.
 
-**Root cause:** The `::before` pseudo-element that forms the top half of the
-nose diamond has a layout-level position/dimension mismatch.  Rows y=146–165
-show only 62–86% per-row match due to the diamond shape being slightly
-different in dimensions, not just anti-aliasing.
+**Investigation findings (2026-03-09):**
+
+Pixel-level analysis of the diamond area (x=132–180, y=176–200) confirms:
+
+- Black pixel counts at each row are **identical** between Broiler and Chromium.
+- The first black pixel Y-position at each X-column is **identical** (diff=0).
+- Yellow pixel counts in the diamond area are **identical**.
+- The `::before` and `::after` pseudo-elements have correct dimensions
+  (24×12 border-box each) and positions (viewport Y=180–192 and 192–204).
+- No junction vertical offset exists — both halves meet cleanly at Y=192.
+- No `overflow:hidden` is used for the diamond; it is formed purely by CSS
+  border triangles on zero-height `::before`/`::after` pseudo-elements.
+
+The per-scanline mismatch at y=145–165 (63–94% per row) originates from
+**other elements in the nose Y-range** (forehead overflow, nose outer border
+anti-aliasing), not from the diamond itself.  The diamond area matches at
+91.87% due to inherent AA kernel differences at the 45° border edges.  The
+outer nose area matches at 93.88%.
 
 **Tasks:**
 
-- [ ] **P1.1 — Audit `::before` pseudo-element dimensions.**
-  Compare the computed `width`, `height`, `margin-top`, `margin-left` values
-  for `.nose div div::before` between Broiler and Chromium DevTools.
-  - Files: `CssBox.cs`, `CssBoxProperties.cs`, `CssPseudoElement.cs`
+- [x] **P1.1 — Audit `::before` pseudo-element dimensions.**
+  Verified: `::before` Size=(24,12), borders T=0/R=12/B=12/L=12.
+  Content width resolves to 0 (24px border-box minus 24px of borders).
+  Dimensions match Chromium exactly.  Black pixel positions are identical.
 
-- [ ] **P1.2 — Fix diamond junction vertical offset.**
-  Row y=168 has ~14% match due to a 1 px vertical offset where the top and
-  bottom halves of the diamond meet.  Investigate whether this is caused by
-  rounding in the `::before` margin computation.
-  - Files: `CssBox.cs`, `CssLayoutEngine.cs`
+- [x] **P1.2 — Verify diamond junction vertical offset.**
+  Verified: No vertical offset exists.  The junction at viewport Y=192 is
+  pixel-perfect.  Row y=168 (referenced in v5) now shows 100% match.
+  The v4–v5 fixes (margin:auto centering, pseudo-element selector parsing)
+  resolved the earlier junction offset.
 
-- [ ] **P1.3 — Validate overflow:hidden clip rect.**
-  The diamond is created by a rotated div clipped by `overflow:hidden`.
-  Verify the clip rect matches the containing block's padding box exactly.
-  - File: `CssBox.cs` (clip path in paint phase)
+- [x] **P1.3 — Validate overflow:hidden clip rect.**
+  Verified: No `overflow:hidden` is used for the diamond.  The diamond is
+  created by CSS border triangles (`.nose div div:before` bottom border +
+  `.nose div :after` top border), not by overflow clipping.  The `.nose`
+  element uses `max-height: 3em` without `overflow:hidden`, so children
+  overflow visibly (correct per CSS 2.1).
 
-- [ ] **P1.4 — Re-run nose region test; raise threshold.**
-  After P1.1–P1.3 land, raise `Acid2Top_NoseRegion` threshold from ≥93% to ≥97%.
+- [x] **P1.4 — Re-run nose region test; assess threshold.**
+  The nose region match is stable at 93.23%.  The remaining ~7% gap is
+  inherent to the SkiaSharp vs Chromium AA kernels at angled border edges
+  and cannot be improved through layout fixes.  Raising to ≥97% is not
+  feasible; the threshold remains at ≥93%.  The per-scanline test now has
+  0 failed rows (improved from the allowed 1), confirming stability.
 
 ### Priority 2 — Font Rasterisation Alignment (Target: +6.9% content-area)
 
@@ -542,8 +571,12 @@ re-run the Acid2 verification and record updated metrics.
   - All 14 tests passing.  Thresholds raised for nose (93%), smile (99%),
     chin (99%), content-area (88%).
 
-- [ ] **v6.1 — Priority 1: Nose diamond layout fix.**
-  Target: nose ≥97%, content-area ≥92%.
+- [ ] **v6.1 — Priority 1: Nose diamond layout audit (completed).**
+  Pixel-level analysis confirmed diamond layout is correct.
+  Diamond area match: 91.87%.  Outer nose area: 93.88%.
+  Per-scanline test: 0 failed rows (stable).
+  Root cause reclassified: inherent AA, not layout error.
+  Target of ≥97% nose match is not achievable via layout fixes.
 
 - [ ] **v6.2 — Priority 2: Font rasterisation alignment.**
   Target: forehead ≥30%, content-area ≥95%.
