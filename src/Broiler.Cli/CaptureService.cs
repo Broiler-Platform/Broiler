@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using Broiler.App.Rendering;
 using SkiaSharp;
@@ -155,6 +156,17 @@ public class CaptureService
         @"<script(?![^>]*\ssrc\s*=)[^>]*>(?<content>[\s\S]*?)</script>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    private static readonly Regex DataScriptPattern = new(
+        @"<script[^>]*\ssrc\s*=\s*[""']?(?<uri>data:[^""'\s>]+)[""']?[^>]*>\s*</script>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Matches all &lt;script&gt; tags (both inline and data: URI) in document order.
+    /// </summary>
+    private static readonly Regex AllScriptPattern = new(
+        @"<script[^>]*(?:\ssrc\s*=\s*[""']?(?<uri>data:[^""'\s>]+)[""']?)?[^>]*>(?<content>[\s\S]*?)</script>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private static readonly Regex StylePattern = new(
         @"<style[^>]*>(?<content>[\s\S]*?)</style>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -293,6 +305,10 @@ public class CaptureService
             html = await LinkNavigator.FollowFirstLinkAsync(html, options.Url, httpClient);
         }
 
+        // Execute inline scripts via DomBridge so JS-generated content
+        // is present before rendering.
+        html = ExecuteScriptsWithDom(html, options.Url);
+
         var format = options.ImageFormat == ImageFormat.Jpeg
             ? SKEncodedImageFormat.Jpeg
             : SKEncodedImageFormat.Png;
@@ -404,6 +420,94 @@ public class CaptureService
                     RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScripts", $"Script execution error: {ex.Message}", ex);
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Executes inline and <c>data:</c> URI scripts using <see cref="DomBridge"/>
+    /// so that JavaScript-generated DOM content is included in the rendered output.
+    /// Returns the serialised HTML after script execution.
+    /// </summary>
+    internal static string ExecuteScriptsWithDom(string html, string url)
+    {
+        var scripts = new List<string>();
+        foreach (Match match in AllScriptPattern.Matches(html))
+        {
+            var dataUri = match.Groups["uri"].Value;
+            if (!string.IsNullOrEmpty(dataUri))
+            {
+                var decoded = DecodeDataUri(dataUri);
+                if (!string.IsNullOrEmpty(decoded))
+                    scripts.Add(decoded);
+            }
+            else
+            {
+                var content = match.Groups["content"].Value.Trim();
+                if (!string.IsNullOrEmpty(content))
+                    scripts.Add(content);
+            }
+        }
+
+        if (scripts.Count == 0)
+            return html;
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, url);
+
+        foreach (var script in scripts)
+        {
+            try
+            {
+                context.Eval(script);
+            }
+            catch (Exception ex)
+            {
+                // Script execution errors are non-fatal for capture
+                RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScriptsWithDom", $"Script execution error: {ex.Message}", ex);
+            }
+        }
+
+        return bridge.SerializeToHtml();
+    }
+
+    /// <summary>
+    /// Decodes a <c>data:</c> URI to its text content.
+    /// Supports <c>data:text/javascript,...</c> (percent-encoded) and
+    /// <c>data:text/javascript;base64,...</c> formats.
+    /// </summary>
+    internal static string DecodeDataUri(string dataUri)
+    {
+        if (!dataUri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
+
+        var rest = dataUri[5..]; // strip "data:"
+        var commaIdx = rest.IndexOf(',');
+        if (commaIdx < 0)
+            return string.Empty;
+
+        var meta = rest[..commaIdx];
+        var payload = rest[(commaIdx + 1)..];
+
+        if (meta.Contains("base64", StringComparison.OrdinalIgnoreCase))
+        {
+            // Percent-decode first (some Acid3 data URIs percent-encode the base64)
+            var decoded = Uri.UnescapeDataString(payload);
+            // Strip whitespace (RFC 2045 allows folding)
+            decoded = Regex.Replace(decoded, @"\s+", string.Empty);
+            try
+            {
+                var bytes = Convert.FromBase64String(decoded);
+                return Encoding.UTF8.GetString(bytes);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+        else
+        {
+            return Uri.UnescapeDataString(payload);
         }
     }
 

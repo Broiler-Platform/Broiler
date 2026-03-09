@@ -6,6 +6,7 @@
     <RootNamespace>Broiler.Cli</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <DefineConstants>$(DefineConstants);BROILER_CLI</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,6 +15,9 @@
 
   <ItemGroup>
     <Compile Include="..\Broiler.App\Rendering\RenderLogger.cs" Link="RenderLogger.cs" />
+    <Compile Include="..\Broiler.App\Rendering\DomBridge.cs" Link="DomBridge.cs" />
+    <Compile Include="..\Broiler.App\Rendering\HtmlTreeBuilder.cs" Link="HtmlTreeBuilder.cs" />
+    <Compile Include="..\Broiler.App\Rendering\HtmlTokenizer.cs" Link="HtmlTokenizer.cs" />
   </ItemGroup>
 
 
