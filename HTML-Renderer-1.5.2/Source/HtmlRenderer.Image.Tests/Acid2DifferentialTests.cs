@@ -281,6 +281,7 @@ public class Acid2DifferentialTests : IDisposable
     /// Validates the smile region (rows 196–260) meets a minimum content-area
     /// match threshold.  This guards against regressions in relative positioning,
     /// float/clear interaction, and margin collapsing in the smile/chin area.
+    /// P3.3: Threshold raised from 95% → 98% after P3.2 fill-coordinate fix.
     /// </summary>
     [Fact]
     public void Acid2Top_SmileRegion_MeetsMinimumThreshold()
@@ -316,8 +317,8 @@ public class Acid2DifferentialTests : IDisposable
         double smileMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
 
         Assert.True(
-            smileMatch >= 0.95,
-            $"Acid2 #top smile-region match {smileMatch:P2} is below minimum 95.00%. " +
+            smileMatch >= 0.98,
+            $"Acid2 #top smile-region match {smileMatch:P2} is below minimum 98.00%. " +
             $"Matching content pixels: {matchContent}/{totalContent}");
     }
 
@@ -532,6 +533,9 @@ public class Acid2DifferentialTests : IDisposable
     /// match threshold.  This region contains the eye outlines rendered with
     /// CSS borders.  Guards against regressions in border rasterisation and
     /// sub-pixel rounding at element boundaries.
+    /// P3.3: Threshold raised from 90% → 95% after P3.2 removed the
+    /// incorrect Math.Round on absolute fill coordinates, eliminating
+    /// the ~0.09 px viewport-space shift that caused AA bleed.
     /// </summary>
     [Fact]
     public void Acid2Top_EyesRegion_MeetsMinimumThreshold()
@@ -567,8 +571,8 @@ public class Acid2DifferentialTests : IDisposable
         double eyesMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
 
         Assert.True(
-            eyesMatch >= 0.90,
-            $"Acid2 #top eyes-region match {eyesMatch:P2} is below minimum 90.00%. " +
+            eyesMatch >= 0.95,
+            $"Acid2 #top eyes-region match {eyesMatch:P2} is below minimum 95.00%. " +
             $"Matching content pixels: {matchContent}/{totalContent}");
     }
 
@@ -576,6 +580,7 @@ public class Acid2DifferentialTests : IDisposable
     /// Validates the chin region (rows 261–275) meets a minimum content-area
     /// match threshold.  This region tests CSS 2.1 §8.3.1 margin collapsing
     /// and border corner anti-aliasing at the bottom of the face.
+    /// P3.3: Threshold raised from 88% → 95% after P3.2 fill-coordinate fix.
     /// </summary>
     [Fact]
     public void Acid2Top_ChinRegion_MeetsMinimumThreshold()
@@ -611,8 +616,8 @@ public class Acid2DifferentialTests : IDisposable
         double chinMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
 
         Assert.True(
-            chinMatch >= 0.88,
-            $"Acid2 #top chin-region match {chinMatch:P2} is below minimum 88.00%. " +
+            chinMatch >= 0.95,
+            $"Acid2 #top chin-region match {chinMatch:P2} is below minimum 95.00%. " +
             $"Matching content pixels: {matchContent}/{totalContent}");
     }
 
