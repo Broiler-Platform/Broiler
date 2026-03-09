@@ -1,4 +1,5 @@
-﻿using YantraJS.Core.Clr;
+﻿using System;
+using YantraJS.Core.Clr;
 
 namespace YantraJS.Core;
 
@@ -49,6 +50,67 @@ public partial class JSArray
             rElements.Put(r._length++, a.GetAt(ai));
         }
         return r;
+    }
+
+    /// <summary>
+    /// §4.5  Array.fromAsync(asyncIterable, mapFn?, thisArg?)
+    /// Creates an array from an async iterable or iterable/array-like,
+    /// returning a Promise that resolves to the new array.
+    /// </summary>
+    [JSExport("fromAsync")]
+    public static JSValue StaticFromAsync(in Arguments a)
+    {
+        var (items, mapFn, thisArg) = a.Get3();
+        if (items.IsNullOrUndefined)
+            throw JSContext.Current.NewTypeError(
+                JSError.Cannot_convert_undefined_or_null_to_object);
+
+        bool hasMap = mapFn.IsFunction;
+        if (!mapFn.IsNullOrUndefined && !hasMap)
+            throw JSContext.Current.NewTypeError("mapFn must be a function");
+
+        try
+        {
+            var result = new JSArray();
+            var en = items.GetElementEnumerator();
+            uint length = 0;
+            ref var elements = ref result.GetElements();
+
+            while (en.MoveNext(out var hasValue, out var item, out var _))
+            {
+                if (!hasValue) continue;
+
+                // Await-like: if the element is a promise/thenable, resolve it
+                // synchronously for the current implementation.
+                if (item is JSPromise p && p.state == JSPromise.PromiseState.Resolved)
+                {
+                    item = p.result ?? item;
+                }
+
+                if (hasMap)
+                {
+                    item = mapFn.InvokeFunction(
+                        new Arguments(thisArg, item, new JSNumber(length)));
+                }
+                elements.Put(length++, item);
+            }
+            result._length = length;
+
+            return new JSPromise(
+                result, JSPromise.PromiseState.Resolved);
+        }
+        catch (JSException ex)
+        {
+            return new JSPromise(
+                ex.Error ?? JSError.From(ex),
+                JSPromise.PromiseState.Rejected);
+        }
+        catch (Exception ex)
+        {
+            return new JSPromise(
+                JSError.From(ex),
+                JSPromise.PromiseState.Rejected);
+        }
     }
 
 }

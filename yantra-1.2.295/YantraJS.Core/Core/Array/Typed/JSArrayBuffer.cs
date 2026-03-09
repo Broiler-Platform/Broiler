@@ -1,5 +1,6 @@
 ﻿using System;
 using Yantra.Core;
+using YantraJS.Core.Clr;
 
 namespace YantraJS.Core.Typed;
 
@@ -23,7 +24,8 @@ namespace YantraJS.Core.Typed;
 [JSClassGenerator("ArrayBuffer")]
 public partial class JSArrayBuffer : JSObject
 {
-    internal readonly byte[] buffer;
+    internal byte[] buffer;
+    internal bool isDetached;
 
     public byte[] Buffer => buffer;
 
@@ -51,5 +53,98 @@ public partial class JSArrayBuffer : JSObject
     public override JSValue InvokeFunction(in Arguments a) => throw JSContext.Current.NewTypeError($"{this} is not a function");
 
     public override bool StrictEquals(JSValue value) => Object.ReferenceEquals(this, value);
+
+    // ---------------------------------------------------------------
+    // §2.9  ArrayBuffer.prototype.byteLength (getter)
+    // ---------------------------------------------------------------
+
+    [JSExport("byteLength")]
+    public int ByteLength
+    {
+        get
+        {
+            if (isDetached)
+                throw JSContext.Current.NewTypeError(
+                    "Cannot access byteLength of a detached ArrayBuffer");
+            return buffer.Length;
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // §2.9  ArrayBuffer.prototype.detached (getter)
+    // ---------------------------------------------------------------
+
+    [JSExport("detached")]
+    public bool Detached => isDetached;
+
+    // ---------------------------------------------------------------
+    // §2.9.1  ArrayBuffer.prototype.transfer(newLength?)
+    // ---------------------------------------------------------------
+
+    [JSExport("transfer")]
+    internal JSValue Transfer(in Arguments a)
+    {
+        if (isDetached)
+            throw JSContext.Current.NewTypeError(
+                "Cannot transfer a detached ArrayBuffer");
+
+        int newLength = a.Length > 0
+            ? a.Get1().AsInt32OrDefault()
+            : buffer.Length;
+
+        if (newLength < 0)
+            throw JSContext.Current.NewRangeError("Invalid ArrayBuffer length");
+
+        var newBuffer = new byte[newLength];
+        System.Array.Copy(buffer, newBuffer, Math.Min(buffer.Length, newLength));
+
+        // Detach the source buffer.
+        isDetached = true;
+        buffer = System.Array.Empty<byte>();
+
+        return new JSArrayBuffer(newBuffer);
+    }
+
+    // ---------------------------------------------------------------
+    // §2.9.2  ArrayBuffer.prototype.transferToFixedLength(newLength?)
+    // ---------------------------------------------------------------
+
+    [JSExport("transferToFixedLength")]
+    internal JSValue TransferToFixedLength(in Arguments a)
+    {
+        // In engines without resizable buffers the behaviour is identical
+        // to transfer().  YantraJS does not support resizable ArrayBuffers,
+        // so the result is always a fixed-length buffer.
+        return Transfer(in a);
+    }
+
+    // ---------------------------------------------------------------
+    // §2.9.3  ArrayBuffer.prototype.slice(begin, end)
+    // ---------------------------------------------------------------
+
+    [JSExport("slice")]
+    internal JSValue Slice(in Arguments a)
+    {
+        if (isDetached)
+            throw JSContext.Current.NewTypeError(
+                "Cannot slice a detached ArrayBuffer");
+
+        int len = buffer.Length;
+        var (beginVal, endVal) = a.Get2();
+
+        int begin = beginVal.IsUndefined ? 0 : beginVal.IntValue;
+        int end = endVal.IsUndefined ? len : endVal.IntValue;
+
+        if (begin < 0) begin = Math.Max(len + begin, 0);
+        else begin = Math.Min(begin, len);
+
+        if (end < 0) end = Math.Max(len + end, 0);
+        else end = Math.Min(end, len);
+
+        int newLen = Math.Max(end - begin, 0);
+        var newBuf = new byte[newLen];
+        System.Array.Copy(buffer, begin, newBuf, 0, newLen);
+        return new JSArrayBuffer(newBuf);
+    }
 
 }
