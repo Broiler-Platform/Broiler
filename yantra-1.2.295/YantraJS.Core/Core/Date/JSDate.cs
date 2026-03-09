@@ -21,6 +21,13 @@ public partial class JSDate: JSObject
 
     internal DateTimeOffset value;
 
+    /// <summary>
+    /// Raw ECMAScript time value (ms since epoch) for dates outside
+    /// .NET DateTimeOffset range (e.g., year 0 or negative years).
+    /// When NaN, the <see cref="value"/> field is authoritative.
+    /// </summary>
+    internal double rawTimeMs = double.NaN;
+
     public DateTimeOffset Value
     {
         get => value;
@@ -40,6 +47,28 @@ public partial class JSDate: JSObject
     //}
 
     public override string ToDetailString() => value.ToString();
+
+    /// <summary>
+    /// Returns the ECMAScript time value for this date (ms since epoch).
+    /// Uses <see cref="rawTimeMs"/> when set (for dates outside .NET range),
+    /// otherwise delegates to <see cref="JSDateStatic.ToJSDate"/>.
+    /// </summary>
+    internal double GetTimeMs()
+    {
+        if (!double.IsNaN(rawTimeMs))
+            return rawTimeMs;
+        return value.ToJSDate();
+    }
+
+    /// <summary>
+    /// Returns true if this date is valid (not NaN / invalid).
+    /// </summary>
+    internal bool IsValidDate()
+    {
+        if (!double.IsNaN(rawTimeMs))
+            return true;
+        return value != InvalidDate;
+    }
 
     public override bool ConvertTo(Type type, out object value)
     {

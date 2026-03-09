@@ -77,7 +77,11 @@ public partial class JSDate
     [JSExport("getDate", Length = 0)]
     internal JSValue GetDate(in Arguments a)
     {
-        
+        if (!double.IsNaN(rawTimeMs))
+        {
+            double localMs = JSDateMath.LocalTime(rawTimeMs);
+            return new JSNumber(JSDateMath.DateFromTime(localMs));
+        }
         if (value == DateTimeOffset.MinValue)
             return JSNumber.NaN;
         var result = value.Day;
@@ -139,7 +143,11 @@ public partial class JSDate
     [JSExport("getDay", Length = 0)]
     internal JSValue GetDay(in Arguments a)
     {
-        
+        if (!double.IsNaN(rawTimeMs))
+        {
+            double localMs = JSDateMath.LocalTime(rawTimeMs);
+            return new JSNumber(JSDateMath.WeekDay(localMs));
+        }
         if (value == DateTimeOffset.MinValue)
             return JSNumber.NaN;
         var result = value.DayOfWeek;
@@ -149,7 +157,11 @@ public partial class JSDate
     [JSExport("getFullYear", Length = 0)]
     internal JSValue GetFullYear(in Arguments a)
     {
-        
+        if (!double.IsNaN(rawTimeMs))
+        {
+            double localMs = JSDateMath.LocalTime(rawTimeMs);
+            return new JSNumber(JSDateMath.YearFromTime(localMs));
+        }
         if (value == DateTimeOffset.MinValue)
             return JSNumber.NaN;
         var result = value.Year;
@@ -159,7 +171,11 @@ public partial class JSDate
     [JSExport("getHours", Length = 0)]
     internal JSValue GetHours(in Arguments a)
     {
-        
+        if (!double.IsNaN(rawTimeMs))
+        {
+            double localMs = JSDateMath.LocalTime(rawTimeMs);
+            return new JSNumber(JSDateMath.HourFromTime(localMs));
+        }
         if (value == DateTimeOffset.MinValue)
             return JSNumber.NaN;
         var result = value.Hour;
@@ -171,7 +187,11 @@ public partial class JSDate
     [JSExport("getMilliseconds", Length = 0)]
     internal JSValue GetMilliSeconds(in Arguments a)
     {
-        
+        if (!double.IsNaN(rawTimeMs))
+        {
+            double localMs = JSDateMath.LocalTime(rawTimeMs);
+            return new JSNumber(JSDateMath.MsFromTime(localMs));
+        }
         if (value == DateTimeOffset.MinValue)
             return JSNumber.NaN;
         var result = value.Millisecond;
@@ -183,7 +203,11 @@ public partial class JSDate
     [JSExport("getMinutes", Length = 0)]
     internal JSValue GetMinutes(in Arguments a)
     {
-        
+        if (!double.IsNaN(rawTimeMs))
+        {
+            double localMs = JSDateMath.LocalTime(rawTimeMs);
+            return new JSNumber(JSDateMath.MinFromTime(localMs));
+        }
         if (value == DateTimeOffset.MinValue)
             return JSNumber.NaN;
         var result = value.Minute;
@@ -193,7 +217,11 @@ public partial class JSDate
     [JSExport("getMonth", Length = 0)]
     internal JSValue GetMonth(in Arguments a)
     {
-        
+        if (!double.IsNaN(rawTimeMs))
+        {
+            double localMs = JSDateMath.LocalTime(rawTimeMs);
+            return new JSNumber(JSDateMath.MonthFromTime(localMs));
+        }
         if (value == DateTimeOffset.MinValue)
             return JSNumber.NaN;
         var result = value.Month - 1;
@@ -204,7 +232,11 @@ public partial class JSDate
     [JSExport("getSeconds", Length = 0)]
     internal JSValue GetSeconds(in Arguments a)
     {
-        
+        if (!double.IsNaN(rawTimeMs))
+        {
+            double localMs = JSDateMath.LocalTime(rawTimeMs);
+            return new JSNumber(JSDateMath.SecFromTime(localMs));
+        }
         if (value == DateTimeOffset.MinValue)
             return JSNumber.NaN;
         var result = value.Second;
@@ -214,11 +246,9 @@ public partial class JSDate
     [JSExport("getTime", Length = 0)]
     internal JSValue GetTime(in Arguments a)
     {
-        
-        if (value == DateTimeOffset.MinValue)
+        if (!IsValidDate())
             return JSNumber.NaN;
-        var result = value.ToJSDate();
-        return new JSNumber(result);
+        return new JSNumber(GetTimeMs());
     }
 
     [JSExport("getTimezoneOffset", Length = 0)]
@@ -330,31 +360,40 @@ public partial class JSDate
 
             return JSNumber.NaN;
 
-        if (year <= 0) {
-            value = DateTimeOffset.MinValue;
-            return JSNumber.NaN;
-        }
-
-
         var date = value;
         var (_year, _month, _day) = a.Get3();
 
         var month = _month.IsUndefined ? date.Month - 1 : _month.IntValue;
-        var day = (_day.IsUndefined ? date.Day : _day.IntValue) - 1;
+        var day = (_day.IsUndefined ? date.Day : _day.IntValue);
 
-        try
+        // For years that .NET DateTimeOffset can handle (1–9999), use the fast path.
+        if (year >= 1 && year <= 9999)
         {
-            date = new DateTimeOffset((int)year, 1, 1, 
-                date.Hour, date.Minute, date.Second, 
-                date.Millisecond, value.Offset);
-            date = date.AddDays(day);
-            date = date.AddMonths(month);
-            value = date;
-        } catch (ArgumentOutOfRangeException)
-        {
-            value = DateTimeOffset.MinValue;
+            rawTimeMs = double.NaN; // clear any raw override
+            try
+            {
+                date = new DateTimeOffset((int)year, 1, 1, 
+                    date.Hour, date.Minute, date.Second, 
+                    date.Millisecond, value.Offset);
+                date = date.AddDays(day - 1);
+                date = date.AddMonths(month);
+                value = date;
+            } catch (ArgumentOutOfRangeException)
+            {
+                value = DateTimeOffset.MinValue;
+            }
+            return new JSNumber(value.ToJSDate());
         }
-        return new JSNumber(value.ToJSDate()); 
+
+        // For year 0 or negative years, use ECMAScript date math directly.
+        // This handles the proleptic Gregorian calendar correctly.
+        double timeWithinDay = JSDateMath.MakeTime(date.Hour, date.Minute, date.Second, date.Millisecond);
+        double dayValue = JSDateMath.MakeDay((long)year, month, day);
+        double utcMs = JSDateMath.UTC(JSDateMath.MakeDate(dayValue, timeWithinDay));
+        double result = JSDateMath.TimeClip(utcMs);
+        rawTimeMs = result;
+        value = DateTimeOffset.MinValue;
+        return new JSNumber(result);
     }
 
     [JSExport("setHours", Length = 4)]
