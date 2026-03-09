@@ -306,7 +306,7 @@ smile/mouth elements.
 
 ### 4.1  Current Test Suite
 
-The following 8 differential regression tests guard against Acid2
+The following 12 differential regression tests guard against Acid2
 compliance regressions.  All tests pass as of 2026-03-09:
 
 | Test | Threshold | Status |
@@ -319,6 +319,10 @@ compliance regressions.  All tests pass as of 2026-03-09:
 | `Acid2Top_AnchorElement_IsFoundDuringLayout` | #top Y > 100 | ✅ Pass |
 | `Acid2Top_SmileRegion_MeetsMinimumThreshold` | ≥ 95% smile-region | ✅ Pass |
 | `Acid2Top_NosePseudoElement_NoExtraAfterOnNoseDiv` | 1 child on .nose > div | ✅ Pass |
+| `Acid2Top_NoseDivDiv_IsCenteredByMarginAuto` | margin:auto centering | ✅ Pass |
+| `Acid2Top_NoseBottomDiamond_PerScanlineMatch` | Per-scanline coverage | ✅ Pass |
+| `Acid2Top_NoseRegion_MeetsMinimumThreshold` | ≥ 88% nose-region | ✅ Pass |
+| `Acid2Top_ForeheadRegion_MeetsMinimumThreshold` | ≥ 0.5% forehead-region | ✅ Pass |
 
 Test location: `HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/Acid2DifferentialTests.cs`
 
@@ -361,18 +365,36 @@ from 80.57% to ~90.7%.
 **Severity:** High visual impact but low structural impact — accounts for
 1,549 of 4,465 diff pixels (34.7%)
 
-**Tasks:**
-1. **Normalise font resolution** — Ensure Broiler resolves `sans-serif` to
-   the same font family as Chromium on the target platform.  Consider
-   bundling a reference font for deterministic test comparison.
-2. **Align font metrics** — Investigate ascent/descent/line-height
-   computation differences between SkiaSharp `SKFont` and Chromium's
-   HarfBuzz/FreeType stack.
-3. **Evaluate subpixel text rendering** — Consider adding an option for
-   LCD subpixel anti-aliasing to match Chromium's default.
+**Status: Partially addressed (v4.1)**
 
-**Estimated impact:** Closing this gap would raise the content-area match
-from ~90.7% to ~97.4%.
+Completed tasks:
+1. ✅ **CSS 2.1 font shorthand fix** — The `font:` shorthand now correctly
+   resets `font-style`, `font-variant`, and `font-weight` to their initial
+   values (`normal`) when omitted.  Previously, `font: 2em/24px sans-serif`
+   on an `<h2>` element left `font-weight: bold` from the UA stylesheet
+   in place, causing glyphs to be bolder than the reference.
+2. ✅ **Sub-pixel text positioning** — `SKFont.Subpixel = true` enables
+   fractional glyph positioning, aligning with Chromium's HarfBuzz/FreeType
+   text layout.
+3. ✅ **LoadFontFromFile API** — `SkiaImageAdapter.LoadFontFromFile(path)`
+   allows loading a bundled reference font for deterministic comparison.
+4. ✅ **Evaluated subpixel AA** — Grayscale AA (`SKFontEdging.Antialias`)
+   remains the correct choice for bitmap comparison.  LCD subpixel AA
+   introduces colour fringes that differ between rendering stacks.
+
+**Remaining limitation — font size coordinate system:**
+The CSS layout engine converts font sizes from CSS pixels to typographic
+points via `CssValueParser.ParseLength` with `fontAdjust=true` (multiplying
+by 72/96 = 0.75).  SkiaSharp's `SKFont` interprets its size parameter as
+canvas-pixel units, so fonts render at **75% of the intended CSS pixel
+size**.  The layout is self-consistent (em-relative values use
+`GetEmHeight()` which applies the inverse 96/72 scale), but glyph shapes
+do not match a browser rendering at the same CSS size.
+
+Fixing this requires a layout-engine-wide refactor to unify the internal
+coordinate system to CSS pixels and is tracked separately.
+
+**Current forehead match: ~0.6%** (regression guard set at ≥ 0.5%)
 
 ### Priority 3 — Border Anti-Aliasing (Eyes, Smile, Chin)
 
@@ -446,6 +468,14 @@ replacing the rasterisation backend:
 3. **Font metrics** — Ascent, descent, and line-height values depend on
    the font engine and font file version.  Different platforms produce
    different metrics for the same CSS font specification.
+4. **Font size coordinate system** — `CssValueParser.ParseLength` with
+   `fontAdjust=true` converts CSS `px` to typographic `pt` (×72/96 =
+   0.75).  SkiaSharp's `SKFont` interprets its size as canvas pixels, so
+   glyphs render at 75% of intended CSS size.  The layout is internally
+   consistent (em-relative values round-trip via `GetEmHeight()` ×96/72),
+   but text does not match a browser at the same CSS font-size.  Fixing
+   this requires unifying the coordinate system to CSS pixels throughout
+   the layout engine.
 
 ### 7.2  Test Environment Dependencies
 
@@ -474,3 +504,4 @@ replacing the rasterisation backend:
 | Version | Date | Changes |
 |---|---|---|
 | 4.0 | 2026-03-09 | Fresh verification; full comparison analysis; v4 roadmap |
+| 4.1 | 2026-03-09 | Priority 2: CSS 2.1 font shorthand fix, sub-pixel text positioning, LoadFontFromFile API, forehead regression test |

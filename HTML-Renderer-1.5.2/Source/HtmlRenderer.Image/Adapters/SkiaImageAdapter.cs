@@ -54,6 +54,36 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     public static SkiaImageAdapter Instance { get; } = new();
 
+    /// <summary>
+    /// Loads a TrueType/OpenType font from a file path and registers it as
+    /// an available font family.  Optionally maps a CSS name to the loaded
+    /// family (e.g. mapping "sans-serif" to a bundled reference font for
+    /// deterministic test comparison).
+    /// </summary>
+    /// <param name="path">Absolute path to a .ttf or .otf font file.</param>
+    /// <param name="mapFromName">
+    /// When non-null, adds a font-family mapping from this name to the
+    /// loaded font's family name (e.g. <c>"sans-serif"</c>).
+    /// </param>
+    /// <returns>The family name of the loaded font, or <c>null</c> on failure.</returns>
+    public string? LoadFontFromFile(string path, string? mapFromName = null)
+    {
+        var typeface = SKTypeface.FromFile(path);
+        if (typeface == null)
+            return null;
+
+        var familyName = typeface.FamilyName;
+        AddFontFamily(new FontFamilyAdapter(familyName));
+
+        if (!string.IsNullOrEmpty(mapFromName))
+            AddFontFamilyMapping(mapFromName!, familyName);
+
+        // Do not dispose the typeface — SkiaSharp's font manager retains
+        // a reference so that subsequent SKTypeface.FromFamilyName lookups
+        // can resolve the loaded family.  Disposing would invalidate it.
+        return familyName;
+    }
+
     protected override Color GetColorInt(string colorName)
     {
         if (SKColor.TryParse(colorName, out var color))
