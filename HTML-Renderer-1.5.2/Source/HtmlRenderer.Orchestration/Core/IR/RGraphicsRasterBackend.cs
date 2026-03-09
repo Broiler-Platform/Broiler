@@ -64,8 +64,13 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
     private static void RenderFillRect(RGraphics g, FillRectItem item)
     {
         using var brush = g.GetSolidBrush(item.Color);
-        // RGraphics.DrawRectangle(brush, ...) fills the rectangle (API convention)
-        g.DrawRectangle(brush, Math.Ceiling(item.Bounds.X), Math.Ceiling(item.Bounds.Y),
+        // CSS2.1 §14.2: backgrounds extend to the padding edge.  Use Round
+        // (not Ceiling) so the fill covers the element's top-left pixel even
+        // when the layout position has a fractional component.  Ceiling was
+        // incorrect because it shifts the fill up to 1 px right/down, creating
+        // a gap where parent backgrounds (e.g. 'background: red') leak through
+        // (see Acid2 nose §8.5 / Phase 9.4).
+        g.DrawRectangle(brush, Math.Round(item.Bounds.X), Math.Round(item.Bounds.Y),
             item.Bounds.Width, item.Bounds.Height);
     }
 
