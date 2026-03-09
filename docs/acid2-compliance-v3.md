@@ -10,37 +10,38 @@
 
 | Metric | Value |
 |---|---|
-| **Content-area pixel match** | **75.99%** (18,825 / 24,773 content pixels) |
-| **Full-image pixel match (incl. background)** | **99.24%** (780,484 / 786,432 pixels) |
-| Red-pixel leak (CSS failure indicator) | **0** |
+| **Content-area pixel match** | **83.82%** (19,299 / 23,024 content pixels) |
+| **Full-image pixel match (incl. background)** | **99.54%** (782,653 / 786,432 pixels) |
+| Red-pixel leak (CSS failure indicator) | **168** (nose anti-aliasing boundary) |
 | Test dimensions | 1024 × 768 |
 | Content bounding box (Chromium) | x: [87, 211], y: [51, 275] — 125 × 225 px |
 | Content bounding box (Broiler) | x: [86, 205], y: [51, 288] — 120 × 238 px |
 | Render target | `acid2.html#top` (face test area) |
 | Automated test status | **All 8 differential tests passing** |
 | Chromium version | 145.0.7632.6 (Playwright v1.58.2) |
-| Last verified | 2026-03-08 |
+| Last verified | 2026-03-09 |
 
 ### Current State
 
 Broiler's html-renderer produces a **recognisable but imperfect** Acid2 face.
 The full-image match of 99.54% is misleading because ~94% of the image is white
-background that matches trivially.  The content-area match of 84.14% isolates
+background that matches trivially.  The content-area match of 83.82% isolates
 the rendered face and is the true compliance metric.
 
 Key achievements:
-- **Zero red-pixel leak** — all CSS failure indicators eliminated.
 - **Face structure visible** — forehead, eyes, nose, smile, and chin are rendered.
 - **Deterministic output** — re-renders produce identical pixel output.
 - **Phase 7.1 complete** — float display adjustment (§9.7), float shrink-to-fit (§10.3.5), abs-pos right positioning (§10.3.7).
 - **Phase 7.2 complete** — CSS pseudo-element descendant combinator fix (§5.12), removing erroneous `::after` on `.nose > div`.
 - **Phase 7.3 complete** — Universal selector `*` ancestor matching fix (§5.3), enabling `* div.parser { border-width: 0 2em }` rule.
 - **Phase 8 complete** — CSS error-recovery fix for `};` stray-semicolon invalidating next rule (§4.2), parent–child bottom-margin propagation (§8.3.1).
+- **Phase 9.1 complete** — Anti-aliased border triangle intersections via trapezoid polygon rendering.
+- **Phase 9.2 complete** — CSS 2.1 §15.3 generic font family mapping with platform-aware fallback.
 
-Key remaining gaps (3,656 diff pixels across 23,045 content pixels):
+Key remaining gaps (3,725 diff pixels across 23,024 content pixels):
 - Face height 226px vs. reference 225px (1px sub-pixel rounding).
 - Forehead text ("Hello World!") has minor anti-aliasing/font differences.
-- Nose diamond pseudo-elements missing anti-aliased rendering.
+- 168 red pixels at nose anti-aliasing boundary (font-metric-dependent sub-pixel coverage).
 - Transition-row sub-pixel mismatches at element boundaries.
 
 ---
@@ -268,9 +269,9 @@ propagation was implemented.  The chin now matches the reference position.
 
 | Level | Metric | Status |
 |---|---|---|
-| Red-pixel elimination | 0 red pixels | ✅ Complete |
+| Red-pixel elimination | 168 red pixels (nose boundary) | 🔶 Regressed — font mapping exposed sub-pixel coverage gap |
 | Face structure | All features visible | ✅ Complete |
-| Content-area match | 84.14% | 🔶 In progress |
+| Content-area match | 83.82% | 🔶 In progress |
 | Full compliance | 100% content-area match | ❌ Not yet |
 
 ### Phase 7 — Smile Layout Fix (Target: ≥ 75% content-area match)
@@ -294,7 +295,8 @@ pixel match ≥ 75%.
 | 8.4 | Fix chin border vertical position (12px shift) | ~300 px | §8.3.1 | S | P1 — **done** |
 
 **Measurable outcome:** Face height matches reference (226px vs 225px, 1px sub-pixel).
-Content-area pixel match 84.14% (target ≥ 85%, within range).
+Content-area pixel match 84.14% (target ≥ 85%, within range).  *Note: Phase 9.2
+font mapping subsequently adjusted this to 83.82% — see Phase 9.*
 
 **Implementation details:**
 - **8.1/8.3:** Removed `;` from CSS selector trim characters (`_cssClassTrimChars`)
@@ -311,8 +313,9 @@ Content-area pixel match 84.14% (target ≥ 85%, within range).
 | # | Task | Pixel Impact | CSS 2.1 Ref | Effort | Priority | Status |
 |---|---|---|---|---|---|---|
 | 9.1 | Anti-alias border triangle intersections (nose diamond) | ~800 px | §8.5 | M | P2 | **Done** — `BordersDrawHandler` now uses trapezoid polygon rendering for solid borders |
-| 9.2 | Improve sans-serif font mapping for cross-platform consistency | ~500 px | §15.3 | S | P2 | Open |
+| 9.2 | Improve sans-serif font mapping for cross-platform consistency | ~500 px | §15.3 | S | P2 | **Done** — platform-aware generic family resolution in `SkiaImageAdapter` and `WpfAdapter` |
 | 9.3 | Fine-tune text baseline and line-height calculation | ~300 px | §10.8 | S | P2 | Open |
+| 9.4 | Eliminate nose red-pixel leak from font-metric sub-pixel shift | ~168 px | §8.5, §15.3 | M | P2 | Open — see 9.2 notes |
 
 **9.1 Implementation (completed):**  `BordersDrawHandler.DrawBorder` now uses
 `SetInOutsetRectanglePoints`/`DrawPolygon` (trapezoid rendering) for solid
@@ -323,6 +326,23 @@ path, which already used trapezoid polygons for all solid borders.  A new
 to fill corner rectangles where two adjacent solid borders share the same
 colour, preventing anti-aliased seams along diagonal edges — matching the
 same-colour corner seam prevention in `RGraphicsRasterBackend`.
+
+**9.2 Implementation (completed):**  `SkiaImageAdapter` now maps CSS 2.1 §15.3
+generic font families (`sans-serif`, `serif`, `monospace`, `cursive`, `fantasy`)
+to the first available system font from a prioritised fallback list.  Previously,
+SkiaSharp's `SKTypeface.FromFamilyName("sans-serif")` fell back to an emoji font
+on Linux, producing incorrect text metrics.  The mapping also handles the common
+`Helvetica` → Arial alias for web content.  The same mappings were added to
+`WpfAdapter` for cross-platform consistency.
+
+**Known regression (9.2 → 9.4):**  The correct font mapping changes `ActualWordSpacing`
+(whitespace character width) for all elements inheriting `sans-serif`.  This
+shifts border anti-aliasing boundaries at the nose pseudo-element coverage
+edges by sub-pixel amounts, exposing 168 red pixels at y=168 (x=84–227) and
+y=204 (x=96–119).  The root cause is font-metric-dependent `ActualWordSpacing`
+propagating through inline formatting contexts inside face elements.  Fixing
+this requires either normalising word spacing for border-only elements or
+improving sub-pixel coverage at border triangle intersections (tracked as 9.4).
 
 **Dependencies:** Task 9.1 is a prerequisite for meaningful improvement on
 tasks 9.2 and 9.3 — the nose diamond accounts for the largest contiguous
@@ -429,13 +449,17 @@ dotnet test HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests \
   - [x] Fix display:table/table-cell list item positioning ✓
   - [x] Chin border vertical position resolved ✓
 - [ ] **Phase 9** — Nose & forehead polish (target: ≥ 95% content match)
-  - [ ] Anti-alias border triangle intersections — **analysis complete, blocked**
-    - Solid borders use `DrawLine` path in `BordersDrawHandler.cs` (line-centered rendering)
-    - Diagonal intersections require trapezoid polygon rendering for solid borders at different-colour corners
-    - `RGraphicsRasterBackend.RenderDrawBorder` (IR path) already has trapezoid rendering but is not used for the main rendering pipeline
-    - Fix requires switching `BordersDrawHandler` solid-border rendering from `DrawLine` to `DrawPolygon` at corners with different border colours
-  - [ ] Improve font mapping consistency
-  - [ ] Fine-tune text baseline calculation
+  - [x] Anti-alias border triangle intersections (9.1) ✓
+    - [x] `BordersDrawHandler` switched to trapezoid polygon rendering for solid borders ✓
+    - [x] `FillBorderCorners` method for same-colour corner seam prevention ✓
+  - [x] Improve font mapping consistency (9.2) ✓
+    - [x] CSS 2.1 §15.3 generic family mapping (sans-serif, serif, monospace, cursive, fantasy) ✓
+    - [x] Platform-aware fallback lists in `SkiaImageAdapter` and `WpfAdapter` ✓
+    - [x] Helvetica → Arial alias with availability check ✓
+  - [ ] Fine-tune text baseline calculation (9.3)
+  - [ ] Eliminate nose red-pixel leak from font-metric sub-pixel shift (9.4)
+    - Font mapping change shifts `ActualWordSpacing` → border anti-aliasing boundary moves sub-pixel
+    - 168 red pixels at nose pseudo-element coverage edges (y=168, y=204)
 - [ ] **Phase 10** — Sub-pixel perfection (target: 100%)
   - [ ] Match Chromium anti-aliasing exactly
   - [ ] Pixel-perfect font glyph rendering
