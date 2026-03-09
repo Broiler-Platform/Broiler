@@ -46,7 +46,12 @@ public partial class JSContext: JSObject, IDisposable
     [EditorBrowsable(EditorBrowsableState.Never)]
     public static JSContext Current;
 
-    public JSDebugger Debugger;
+    /// <summary>
+    /// Gets or sets the debugger attached to this context.
+    /// When non-null the runtime notifies the debugger of parsed scripts
+    /// and exceptions via the <see cref="IDebugger"/> contract.
+    /// </summary>
+    public IDebugger Debugger;
 
     /// <summary>
     /// Gets or sets the built-in object registry used to populate new contexts.
@@ -55,6 +60,14 @@ public partial class JSContext: JSObject, IDisposable
     /// Defaults to <see cref="DefaultBuiltInRegistry.Instance"/>.
     /// </summary>
     public static IBuiltInRegistry BuiltInRegistry { get; set; } = DefaultBuiltInRegistry.Instance;
+
+    /// <summary>
+    /// Gets or sets the CLR interop provider used to marshal between .NET
+    /// objects and JavaScript values.  Custom implementations can override
+    /// the default marshalling behaviour.
+    /// Defaults to <see cref="DefaultClrInterop.Instance"/>.
+    /// </summary>
+    public static IClrInterop ClrInterop { get; set; } = DefaultClrInterop.Instance;
 
     /// <summary>
     /// Available only when Enable Clr Integration is true in JSModuleContext
