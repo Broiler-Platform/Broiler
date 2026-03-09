@@ -8,6 +8,13 @@ namespace TheArtOfDev.HtmlRenderer.Core.Dom;
 
 internal static class CssLayoutEngine
 {
+    /// <summary>
+    /// Approximate ratio of font ascent to total font height for typical
+    /// Latin fonts.  Used to compute baseline position when full font
+    /// metrics are not directly available (CSS2.1 §10.8 strut).
+    /// </summary>
+    private const double TypicalAscentRatio = 0.8;
+
     public static void MeasureImageSize(CssRectImage imageWord)
     {
         ArgumentNullException.ThrowIfNull(imageWord);
@@ -242,6 +249,22 @@ internal static class CssLayoutEngine
                     if (maxbottom - cury < box.ActualLineHeight)
                         maxbottom += box.ActualLineHeight - (maxbottom - cury);
 
+                    // CSS2.1 §10.8: The "strut" — each line box has a minimum
+                    // height from the block container's font and line-height.
+                    // For replaced inline elements (images), apply the block
+                    // container's strut so that baseline alignment pushes the
+                    // image down when the font is larger than the image.
+                    double strutHeight = 0;
+                    if (word.IsImage)
+                    {
+                        strutHeight = blockbox.ActualLineHeight;
+                        if (strutHeight <= 0)
+                            strutHeight = blockbox.ActualFont.Height;
+
+                        if (maxbottom - cury < strutHeight)
+                            maxbottom += strutHeight - (maxbottom - cury);
+                    }
+
                     if ((b.WhiteSpace != CssConstants.NoWrap && b.WhiteSpace != CssConstants.Pre && curx + word.Width + rightspacing > limitRight
                          && (b.WhiteSpace != CssConstants.PreWrap || !word.IsSpaces)) || word.IsLineBreak || wrapNoWrapBox)
                     {
@@ -263,7 +286,21 @@ internal static class CssLayoutEngine
                     line.ReportExistanceOf(word);
 
                     word.Left = curx;
-                    word.Top = cury;
+
+                    // CSS2.1 §10.8.1: Replaced inline elements (images) are
+                    // baseline-aligned by default — the bottom of the replaced
+                    // element sits on the baseline.  The baseline position
+                    // within the strut is at the font's ascent from the top.
+                    if (word.IsImage && strutHeight > word.Height)
+                    {
+                        double fontHeight = blockbox.ActualFont.Height;
+                        double baseline = fontHeight * TypicalAscentRatio;
+                        word.Top = Math.Max(cury, cury + baseline - word.Height);
+                    }
+                    else
+                    {
+                        word.Top = cury;
+                    }
 
                     if (!box.IsFixed)
                     {

@@ -317,26 +317,37 @@ internal static class PaintWalker
         if (fragment.ImageHandle == null)
             return;
 
-        var bounds = fragment.Bounds;
+        // Use GetPaintRects to handle inline replaced elements (e.g. <img>,
+        // <object data="data:image/…">) whose fragment.Bounds may have zero
+        // height because CssBox.Size is not set for inline boxes during layout.
+        // The correct dimensions are in InlineRects (from CssBox.Rectangles),
+        // populated during line-box layout.
+        var rects = GetPaintRects(fragment);
         var border = fragment.Border;
         var padding = fragment.Padding;
 
-        // Image dest rect: inside border + padding (matching CssBoxImage.PaintImp)
-        var r = new RectangleF(
-            (float)Math.Floor(bounds.X + border.Left + padding.Left),
-            (float)Math.Floor(bounds.Y + border.Top + padding.Top),
-            bounds.Width - (float)(border.Left + border.Right + padding.Left + padding.Right),
-            bounds.Height - (float)(border.Top + border.Bottom + padding.Top + padding.Bottom));
-
-        if (r.Width > 0 && r.Height > 0)
+        foreach (var bounds in rects)
         {
-            items.Add(new DrawImageItem
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+                continue;
+
+            // Image dest rect: inside border + padding (matching CssBoxImage.PaintImp)
+            var r = new RectangleF(
+                (float)Math.Floor(bounds.X + border.Left + padding.Left),
+                (float)Math.Floor(bounds.Y + border.Top + padding.Top),
+                bounds.Width - (float)(border.Left + border.Right + padding.Left + padding.Right),
+                bounds.Height - (float)(border.Top + border.Bottom + padding.Top + padding.Bottom));
+
+            if (r.Width > 0 && r.Height > 0)
             {
-                Bounds = r,
-                ImageHandle = fragment.ImageHandle,
-                SourceRect = fragment.ImageSourceRect,
-                DestRect = r,
-            });
+                items.Add(new DrawImageItem
+                {
+                    Bounds = r,
+                    ImageHandle = fragment.ImageHandle,
+                    SourceRect = fragment.ImageSourceRect,
+                    DestRect = r,
+                });
+            }
         }
     }
 
