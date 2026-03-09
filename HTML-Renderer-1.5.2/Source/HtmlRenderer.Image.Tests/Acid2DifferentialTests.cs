@@ -40,7 +40,7 @@ public class Acid2DifferentialTests : IDisposable
     /// pixel (R/G/B &lt; 250).  The full-image match is inflated by the
     /// large white background so this metric focuses on the rendered face.
     /// </summary>
-    private const double MinContentMatchRatio = 0.83;
+    private const double MinContentMatchRatio = 0.85;
 
     private static readonly DeterministicRenderConfig Config = new()
     {
@@ -301,6 +301,152 @@ public class Acid2DifferentialTests : IDisposable
             smileMatch >= 0.95,
             $"Acid2 #top smile-region match {smileMatch:P2} is below minimum 95.00%. " +
             $"Matching content pixels: {matchContent}/{totalContent}");
+    }
+
+    /// <summary>
+    /// Validates the nose region (rows 130–210) meets a minimum content-area
+    /// match threshold.  This guards against regressions in margin:auto centering,
+    /// pseudo-element border rendering, and the diamond rasterisation.
+    /// </summary>
+    [Fact]
+    public void Acid2Top_NoseRegion_MeetsMinimumThreshold()
+    {
+        using var actual = RenderAtAnchorTop(_acid2Html);
+        using var baseline = SKBitmap.Decode(_referencePath);
+        Assert.NotNull(baseline);
+
+        int tolerance = Config.ColorTolerance;
+        int totalContent = 0, matchContent = 0;
+
+        for (int y = 130; y <= 210; y++)
+        {
+            for (int x = 0; x < Math.Min(actual.Width, baseline.Width); x++)
+            {
+                var a = actual.GetPixel(x, y);
+                var r = baseline.GetPixel(x, y);
+
+                bool isContent = a.Red < 250 || a.Green < 250 || a.Blue < 250
+                              || r.Red < 250 || r.Green < 250 || r.Blue < 250;
+
+                if (isContent)
+                {
+                    totalContent++;
+                    if (Math.Abs(a.Red - r.Red) <= tolerance
+                     && Math.Abs(a.Green - r.Green) <= tolerance
+                     && Math.Abs(a.Blue - r.Blue) <= tolerance)
+                        matchContent++;
+                }
+            }
+        }
+
+        double noseMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
+
+        Assert.True(
+            noseMatch >= 0.88,
+            $"Acid2 #top nose-region match {noseMatch:P2} is below minimum 88.00%. " +
+            $"Matching content pixels: {matchContent}/{totalContent}");
+    }
+
+    /// <summary>
+    /// Per-scanline coverage test for the bottom diamond rows (y=180–203).
+    /// After the margin:auto centering fix, the ::after pseudo-element diamond
+    /// should match the Chromium reference at ≥85% per row.  These rows are
+    /// the most precisely rendered part of the nose region.
+    /// </summary>
+    [Fact]
+    public void Acid2Top_NoseBottomDiamond_PerScanlineMatch()
+    {
+        using var actual = RenderAtAnchorTop(_acid2Html);
+        using var baseline = SKBitmap.Decode(_referencePath);
+        Assert.NotNull(baseline);
+
+        int tolerance = Config.ColorTolerance;
+        int failedRows = 0;
+
+        for (int y = 180; y <= 203; y++)
+        {
+            int rowTotal = 0, rowMatch = 0;
+            for (int x = 0; x < Math.Min(actual.Width, baseline.Width); x++)
+            {
+                var a = actual.GetPixel(x, y);
+                var r = baseline.GetPixel(x, y);
+
+                bool isContent = a.Red < 250 || a.Green < 250 || a.Blue < 250
+                              || r.Red < 250 || r.Green < 250 || r.Blue < 250;
+
+                if (isContent)
+                {
+                    rowTotal++;
+                    if (Math.Abs(a.Red - r.Red) <= tolerance
+                     && Math.Abs(a.Green - r.Green) <= tolerance
+                     && Math.Abs(a.Blue - r.Blue) <= tolerance)
+                        rowMatch++;
+                }
+            }
+
+            if (rowTotal > 0)
+            {
+                double rowMatchRatio = (double)rowMatch / rowTotal;
+                if (rowMatchRatio < 0.85)
+                    failedRows++;
+            }
+        }
+
+        Assert.True(
+            failedRows == 0,
+            $"Acid2 #top nose bottom-diamond: {failedRows} row(s) at y=180–203 fell below 85% match. " +
+            "The ::after pseudo-element diamond border rendering may have regressed.");
+    }
+
+    /// <summary>
+    /// Validates that .nose div div with margin:auto is horizontally centered
+    /// within .nose > div.  CSS 2.1 §10.3.3 requires equal left/right margins
+    /// when both are auto and the element has an explicit width.
+    /// </summary>
+    [Fact]
+    public void Acid2Top_NoseDivDiv_IsCenteredByMarginAuto()
+    {
+        int w = ViewportWidth;
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.MaxSize = new SizeF(w, 99999);
+        container.SetHtml(_acid2Html);
+
+        using var bmp = new SKBitmap(w, 2000, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(bmp);
+        canvas.Clear(SKColors.White);
+        container.PerformLayout(canvas, new RectangleF(0, 0, w, 99999));
+
+        var root = container.HtmlContainerInt.Root;
+        var nose = FindBoxByClass(root, "nose");
+        Assert.NotNull(nose);
+
+        var noseDiv = nose.Boxes.FirstOrDefault();
+        Assert.NotNull(noseDiv);
+
+        var noseDivDiv = noseDiv.Boxes.FirstOrDefault();
+        Assert.NotNull(noseDivDiv);
+
+        // .nose div div should be centered: its left margin should equal its right margin
+        double marginLeft = noseDivDiv.ActualMarginLeft;
+        double marginRight = noseDivDiv.ActualMarginRight;
+
+        Assert.True(
+            Math.Abs(marginLeft - marginRight) < 1.0,
+            $"Expected .nose div div to be centered (equal auto margins), " +
+            $"but marginLeft={marginLeft:F2} and marginRight={marginRight:F2}.");
+
+        // Verify the element is within the parent's content area
+        double parentContentLeft = noseDiv.Location.X + noseDiv.ActualPaddingLeft;
+        double parentContentWidth = noseDiv.Size.Width - noseDiv.ActualPaddingLeft - noseDiv.ActualPaddingRight;
+        double childCenter = noseDivDiv.Location.X + noseDivDiv.Size.Width / 2;
+        double parentCenter = parentContentLeft + parentContentWidth / 2;
+
+        Assert.True(
+            Math.Abs(childCenter - parentCenter) < 1.0,
+            $"Expected .nose div div center ({childCenter:F2}) to be near " +
+            $"parent content center ({parentCenter:F2}).");
     }
 
     /// <summary>

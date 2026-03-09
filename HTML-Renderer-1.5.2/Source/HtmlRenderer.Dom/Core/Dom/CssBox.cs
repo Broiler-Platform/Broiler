@@ -337,6 +337,49 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                 Size = new SizeF((float)width, Size.Height);
 
+                // CSS2.1 §10.3.3: For block-level, non-replaced elements in
+                // normal flow with an explicit width and auto margins, resolve
+                // the auto margins so the element is centered horizontally.
+                if (Width != CssConstants.Auto && !string.IsNullOrEmpty(Width)
+                    && Float == CssConstants.None
+                    && Position != CssConstants.Absolute && Position != CssConstants.Fixed)
+                {
+                    double containingContentWidth = ContainingBlock.Size.Width
+                        - ContainingBlock.ActualPaddingLeft - ContainingBlock.ActualPaddingRight
+                        - ContainingBlock.ActualBorderLeftWidth - ContainingBlock.ActualBorderRightWidth;
+                    double remainingSpace = containingContentWidth - Size.Width;
+
+                    if (MarginLeft == CssConstants.Auto && MarginRight == CssConstants.Auto)
+                    {
+                        if (remainingSpace >= 0)
+                        {
+                            string halfMargin = (remainingSpace / 2).ToString("F4",
+                                System.Globalization.CultureInfo.InvariantCulture) + "px";
+                            MarginLeft = halfMargin;
+                            MarginRight = halfMargin;
+                        }
+                        else
+                        {
+                            MarginLeft = "0";
+                            MarginRight = "0";
+                        }
+                    }
+                    else if (MarginLeft == CssConstants.Auto)
+                    {
+                        double rightMargin = ActualMarginRight;
+                        double leftMargin = Math.Max(0, remainingSpace - rightMargin);
+                        MarginLeft = leftMargin.ToString("F4",
+                            System.Globalization.CultureInfo.InvariantCulture) + "px";
+                    }
+                    else if (MarginRight == CssConstants.Auto)
+                    {
+                        double leftMargin = ActualMarginLeft;
+                        double rightMargin = Math.Max(0, remainingSpace - leftMargin);
+                        MarginRight = rightMargin.ToString("F4",
+                            System.Globalization.CultureInfo.InvariantCulture) + "px";
+                    }
+                }
+
                 // CSS2.1 §10.3.7: Absolutely positioned non-replaced elements
                 // with auto width use shrink-to-fit when at least one of
                 // left/right is auto.  Shrink-to-fit =
