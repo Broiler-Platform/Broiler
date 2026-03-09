@@ -348,6 +348,19 @@ public partial class JSMath: JSObject
     }
 
     /// <summary>
+    /// ES2025 §2.8 — Math.f16round(x)
+    /// Rounds a number to the nearest IEEE 754 half-precision (16-bit) float.
+    /// </summary>
+    [JSExport("f16round")]
+    public static JSValue F16round(in Arguments args)
+    {
+        var first = args.Get1();
+        var d = first.DoubleValue;
+        var r = (double)(Half)d;
+        return new JSNumber(r);
+    }
+
+    /// <summary>
     /// https://github.com/paulbartrum/jurassic/blob/0522bcb42b29f87bdf65ae74b9a450179c1d168d/Jurassic/Library/MathObject.cs#L489
     /// </summary>
     /// <param name="args"></param>

@@ -317,15 +317,21 @@ public partial class JSRegExp: JSObject
     /// <param name="flags"> Available flags, which may be combined, are:
     /// g (global search for all occurrences of pattern)
     /// i (ignore case)
-    /// m (multiline search)</param>
+    /// m (multiline search)
+    /// s (dotAll – dot matches newlines)
+    /// u (unicode)
+    /// y (sticky)
+    /// v (unicodeSets)
+    /// d (hasIndices)</param>
     /// <returns> RegexOptions flags that correspond to the given flags. </returns>
     private static
-        (RegexOptions, bool, bool, bool)
+        (RegexOptions, bool, bool, bool, bool)
         ParseFlags(string flags)
     {
         bool globalSearch = false;
         bool ignoreCase = false;
         bool multiline = false;
+        bool dotAll = false;
 
         var options = RegexOptions.ECMAScript;
 
@@ -354,9 +360,19 @@ public partial class JSRegExp: JSObject
                     options |= RegexOptions.Multiline;
                     multiline = true;
                 }
-                else if (flag == 'u')
+                else if (flag == 's')
                 {
-                    // don't know what to do....
+                    if (dotAll)
+                        throw JSContext.Current.NewSyntaxError("The 's' flag cannot be specified twice");
+                    dotAll = true;
+                    // Singleline makes . match \n as well.
+                    // We remove ECMAScript mode because it does not support Singleline.
+                    options &= ~RegexOptions.ECMAScript;
+                    options |= RegexOptions.Singleline;
+                }
+                else if (flag == 'u' || flag == 'v' || flag == 'y' || flag == 'd')
+                {
+                    // Accepted but not enforced in this implementation.
                 }
                 else
                 {
@@ -364,20 +380,33 @@ public partial class JSRegExp: JSObject
                 }
             }
         }
-        return (options, globalSearch, ignoreCase, multiline);
+        return (options, globalSearch, ignoreCase, multiline, dotAll);
     }
 
     /// <summary>
     /// Creates a .NET Regex object using the given pattern and options.
+    /// Supports ES2025 inline pattern modifiers (§2.6) and duplicate
+    /// named capturing groups (§2.7).
     /// </summary>
-    /// <param name="pattern"> The pattern string. </param>
-    /// <param name="options"> The regular expression options. </param>
-    /// <returns> A constructed .NET Regex object. </returns>
     public static (Regex, bool, bool, bool) CreateRegex(string pattern, string flags)
     {
         try
         {
-            var (options, globalSearch, ignoreCase, multiline) = ParseFlags(flags);
+            var (options, globalSearch, ignoreCase, multiline, dotAll) = ParseFlags(flags);
+
+            // §2.6 — Detect inline pattern modifiers (?i:...) / (?-i:...) / (?ims:...) etc.
+            // .NET ECMAScript mode does not support them, so switch to default mode.
+            if ((options & RegexOptions.ECMAScript) != 0 && HasInlineModifiers(pattern))
+            {
+                options &= ~RegexOptions.ECMAScript;
+            }
+
+            // §2.7 — Detect duplicate named capturing groups.
+            // .NET ECMAScript mode does not allow them; default mode does.
+            if ((options & RegexOptions.ECMAScript) != 0 && HasDuplicateNamedGroups(pattern))
+            {
+                options &= ~RegexOptions.ECMAScript;
+            }
 
             if ((options & RegexOptions.Multiline) == RegexOptions.Multiline)
             {
@@ -436,6 +465,67 @@ public partial class JSRegExp: JSObject
         {
             return (null, false, false, false);
         }
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when the pattern contains inline modifier
+    /// groups such as <c>(?i:...)</c>, <c>(?-m:...)</c>, <c>(?si:...)</c>.
+    /// These are not supported in .NET ECMAScript mode.
+    /// </summary>
+    private static bool HasInlineModifiers(string pattern)
+    {
+        // Look for (?[imsx-]+: which is the inline-modifier syntax.
+        for (int i = 0; i < pattern.Length - 3; i++)
+        {
+            if (pattern[i] == '(' && pattern[i + 1] == '?')
+            {
+                int j = i + 2;
+                // Skip valid modifier characters
+                while (j < pattern.Length && (pattern[j] == 'i' || pattern[j] == 'm' ||
+                       pattern[j] == 's' || pattern[j] == 'x' || pattern[j] == '-'))
+                {
+                    j++;
+                }
+                // If followed by ':' and we consumed at least one modifier char, it's an inline modifier
+                if (j > i + 2 && j < pattern.Length && pattern[j] == ':')
+                    return true;
+            }
+            // Skip escaped characters
+            if (pattern[i] == '\\' && i + 1 < pattern.Length)
+                i++;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when the pattern contains more than one named
+    /// capturing group with the same name (ES2025 §2.7).
+    /// </summary>
+    private static bool HasDuplicateNamedGroups(string pattern)
+    {
+        var names = new System.Collections.Generic.HashSet<string>();
+        for (int i = 0; i < pattern.Length - 3; i++)
+        {
+            if (pattern[i] == '(' && i + 2 < pattern.Length &&
+                pattern[i + 1] == '?' && pattern[i + 2] == '<' &&
+                (i + 3 >= pattern.Length || (pattern[i + 3] != '=' && pattern[i + 3] != '!')))
+            {
+                // Extract the group name
+                int start = i + 3;
+                int end = pattern.IndexOf('>', start);
+                if (end > start)
+                {
+                    var name = pattern.Substring(start, end - start);
+                    if (!names.Add(name))
+                        return true;
+                    i = end;
+                }
+            }
+            // Skip escaped characters
+            if (pattern[i] == '\\' && i + 1 < pattern.Length)
+                i++;
+        }
+        return false;
     }
 
     public override string ToString() => $"/{pattern}/{flags}";

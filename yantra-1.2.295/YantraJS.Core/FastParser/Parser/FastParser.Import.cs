@@ -18,8 +18,9 @@ partial class FastParser
             stream.ExpectContextualKeyword(FastKeywords.from);
 
             var literal = ExpectStringLiteral();
+            var attrs = ImportAttributes();
             isAsync = true;
-            statement = new AstImportStatement(token, null, id, null, literal);
+            statement = new AstImportStatement(token, null, id, null, literal, attrs);
             return true;
 
         }
@@ -42,8 +43,9 @@ partial class FastParser
 
             stream.ExpectContextualKeyword(FastKeywords.from);
             var literal = ExpectStringLiteral();
+            var attrs = ImportAttributes();
             isAsync = true;
-            statement = new AstImportStatement(token, id, all, names, literal);
+            statement = new AstImportStatement(token, id, all, names, literal, attrs);
             return true;
         }
 
@@ -56,8 +58,9 @@ partial class FastParser
             }
             stream.ExpectContextualKeyword(FastKeywords.from);
             var literal = ExpectStringLiteral();
+            var attrs = ImportAttributes();
             isAsync = true;
-            statement = new AstImportStatement(token, id, all, names, literal);
+            statement = new AstImportStatement(token, id, all, names, literal, attrs);
             return true;
         }
 
@@ -106,5 +109,51 @@ partial class FastParser
                 // list.Clear();
             }
         }
+    }
+
+    /// <summary>
+    /// Parse optional import attributes: <c>with { key: "value", ... }</c>
+    /// (ES2025 §2.3 Import Attributes).
+    /// </summary>
+    IFastEnumerable<(StringSpan, AstLiteral)>? ImportAttributes()
+    {
+        // The `with` keyword is a reserved keyword, so use CheckAndConsume(FastKeywords)
+        if (!stream.CheckAndConsume(FastKeywords.@with))
+            return null;
+
+        if (!stream.CheckAndConsume(TokenTypes.CurlyBracketStart))
+            throw stream.Unexpected();
+
+        var list = new Sequence<(StringSpan, AstLiteral)>();
+
+        while (!stream.CheckAndConsume(TokenTypes.CurlyBracketEnd))
+        {
+            // Attribute key can be an identifier or a string literal
+            StringSpan key;
+            if (Identitifer(out var keyId))
+            {
+                key = keyId.Name;
+            }
+            else
+            {
+                throw stream.Unexpected();
+            }
+
+            // Expect colon separator
+            if (!stream.CheckAndConsume(TokenTypes.Colon))
+                throw stream.Unexpected();
+
+            // Attribute value must be a string literal
+            var value = ExpectStringLiteral();
+            list.Add((key, value));
+
+            if (stream.CheckAndConsume(TokenTypes.Comma))
+                continue;
+            if (stream.CheckAndConsume(TokenTypes.CurlyBracketEnd))
+                break;
+            throw stream.Unexpected();
+        }
+
+        return list;
     }
 }
