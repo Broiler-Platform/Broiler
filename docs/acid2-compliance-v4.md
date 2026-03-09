@@ -20,7 +20,7 @@ v1.58.0, Chromium 145.0.7632.6).  Both use a per-channel tolerance of 5.
 | Red-pixel leak | **0** | **0** |
 | Smile-region match | **95.26%** | **95.20%** |
 | Render target | `acid2.html#top` | `acid2.html#top` |
-| Automated test status | **All 8 tests passing** | — |
+| Automated test status | **All 14 tests passing** | — |
 | Chromium version | 145.0.7632.6 (Playwright v1.58.2) | 145.0.7632.6 (Playwright v1.58.0) |
 
 Additional invariants (same for both comparisons):
@@ -306,14 +306,14 @@ smile/mouth elements.
 
 ### 4.1  Current Test Suite
 
-The following 12 differential regression tests guard against Acid2
+The following 14 differential regression tests guard against Acid2
 compliance regressions.  All tests pass as of 2026-03-09:
 
 | Test | Threshold | Status |
 |---|---|---|
 | `Acid2Top_PixelMatch_MeetsMinimumThreshold` | ≥ 99.5% full-image | ✅ Pass |
 | `Acid2Top_RedPixelLeak_BelowMaximum` | 0 red pixels | ✅ Pass |
-| `Acid2Top_ContentAreaMatch_MeetsMinimumThreshold` | ≥ 83% content-area | ✅ Pass |
+| `Acid2Top_ContentAreaMatch_MeetsMinimumThreshold` | ≥ 85% content-area | ✅ Pass |
 | `Acid2Top_RenderDimensions_MatchViewport` | 1024 × 768 | ✅ Pass |
 | `Acid2Top_Render_IsDeterministic` | 0 diff pixels between renders | ✅ Pass |
 | `Acid2Top_AnchorElement_IsFoundDuringLayout` | #top Y > 100 | ✅ Pass |
@@ -323,6 +323,8 @@ compliance regressions.  All tests pass as of 2026-03-09:
 | `Acid2Top_NoseBottomDiamond_PerScanlineMatch` | Per-scanline coverage | ✅ Pass |
 | `Acid2Top_NoseRegion_MeetsMinimumThreshold` | ≥ 88% nose-region | ✅ Pass |
 | `Acid2Top_ForeheadRegion_MeetsMinimumThreshold` | ≥ 0.5% forehead-region | ✅ Pass |
+| `Acid2Top_EyesRegion_MeetsMinimumThreshold` | ≥ 90% eyes-region | ✅ Pass |
+| `Acid2Top_ChinRegion_MeetsMinimumThreshold` | ≥ 88% chin-region | ✅ Pass |
 
 Test location: `HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/Acid2DifferentialTests.cs`
 
@@ -338,7 +340,7 @@ thresholds should be raised:
 |---|---|---|
 | `MinMatchRatio` | 0.995 | Full-image pixel match floor |
 | `MaxRedPixelLeak` | 0 | Maximum red pixels (zero tolerance) |
-| `MinContentMatchRatio` | 0.83 | Content-area pixel match floor |
+| `MinContentMatchRatio` | 0.85 | Content-area pixel match floor |
 
 ---
 
@@ -405,8 +407,9 @@ coordinate system to CSS pixels and is tracked separately.
    rendering with Chromium's at sub-pixel level.
 2. **Align sub-pixel rounding** — Review all `Math.Round` calls in
    `RGraphicsRasterBackend` for consistency with CSS 2.1 rounding rules.
-3. **Add per-region regression tests** — Add eyes-region and chin-region
-   threshold tests to the differential test suite.
+3. ✅ **Add per-region regression tests** — Added `Acid2Top_EyesRegion`
+   (≥ 90%) and `Acid2Top_ChinRegion` (≥ 88%) threshold tests to the
+   differential test suite.
 
 **Estimated impact:** Closing this gap would raise the content-area match
 from ~97.4% to ~99%+.
@@ -414,11 +417,12 @@ from ~97.4% to ~99%+.
 ### Priority 4 — Automated Compliance Tracking
 
 **Tasks:**
-1. **Raise test thresholds** — After each priority is addressed, raise
-   `MinContentMatchRatio` and `MinMatchRatio` to lock in improvements.
-2. **Add region-specific tests** — Add `Acid2Top_ForeheadRegion`,
-   `Acid2Top_NoseRegion`, and `Acid2Top_ChinRegion` tests with per-region
-   thresholds.
+1. ✅ **Raise test thresholds** — `MinContentMatchRatio` raised from 0.83
+   to 0.85 to lock in content-area improvements.
+2. ✅ **Add region-specific tests** — Added `Acid2Top_ForeheadRegion`,
+   `Acid2Top_EyesRegion`, `Acid2Top_NoseRegion`, and `Acid2Top_ChinRegion`
+   tests with per-region thresholds.  All five face regions (forehead,
+   eyes, nose, smile, chin) now have dedicated regression guards.
 3. **CI integration** — Ensure differential tests run on every PR and
    block merges that reduce compliance.
 
@@ -505,3 +509,4 @@ replacing the rasterisation backend:
 |---|---|---|
 | 4.0 | 2026-03-09 | Fresh verification; full comparison analysis; v4 roadmap |
 | 4.1 | 2026-03-09 | Priority 2: CSS 2.1 font shorthand fix, sub-pixel text positioning, LoadFontFromFile API, forehead regression test |
+| 4.2 | 2026-03-09 | Priority 3.3/4.2: Added eyes-region and chin-region regression tests; raised MinContentMatchRatio to 0.85; all 14 tests passing |
