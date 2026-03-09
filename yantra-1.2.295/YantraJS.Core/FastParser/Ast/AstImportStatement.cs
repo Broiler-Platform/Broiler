@@ -6,10 +6,17 @@ public class AstImportStatement(
     AstIdentifier? defaultIdentifier,
     AstIdentifier? all,
     IFastEnumerable<(StringSpan, StringSpan)>? members,
-    AstLiteral source) : AstStatement(token, FastNodeType.ImportStatement, source.End)
+    AstLiteral source,
+    IFastEnumerable<(StringSpan, AstLiteral)>? attributes = null) : AstStatement(token, FastNodeType.ImportStatement, source.End)
 {
     public readonly AstIdentifier? Default = defaultIdentifier;
     public readonly AstIdentifier? All = all;
     public readonly IFastEnumerable<(StringSpan name, StringSpan asName)>? Members = members;
     public readonly AstLiteral Source = source;
+
+    /// <summary>
+    /// Import attributes from <c>with { key: "value" }</c> clause (ES2025 §2.3).
+    /// Each tuple is (attributeKey, attributeValue).
+    /// </summary>
+    public readonly IFastEnumerable<(StringSpan key, AstLiteral value)>? Attributes = attributes;
 }

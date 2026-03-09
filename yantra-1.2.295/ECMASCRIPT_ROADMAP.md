@@ -122,7 +122,7 @@ Adds mathematical set operations to `Set.prototype`.
 
 ### 2.3 Import Attributes & JSON Modules
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented (parser + AST + compiler)
 **Priority:** P1 — Medium
 **Spec:** [tc39/proposal-import-attributes](https://github.com/tc39/proposal-import-attributes)
 
@@ -190,7 +190,7 @@ RegExp.escape("hello.world") // "hello\\.world"
 
 ### 2.6 RegExp Pattern Modifiers (Inline Flags)
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented
 **Priority:** P2 — Low
 **Spec:** [tc39/proposal-regexp-modifiers](https://github.com/tc39/proposal-regexp-modifiers)
 
@@ -214,7 +214,7 @@ natively (`(?i:...)`) so this may map directly.
 
 ### 2.7 Duplicate Named Capturing Groups
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented
 **Priority:** P2 — Low
 **Spec:** [tc39/proposal-duplicate-named-capturing-groups](https://github.com/tc39/proposal-duplicate-named-capturing-groups)
 
@@ -238,7 +238,7 @@ may work with minimal changes.
 
 ### 2.8 Float16Array and Math.f16round
 
-**Status:** ❌ Not implemented
+**Status:** ✅ Implemented
 **Priority:** P2 — Low
 **Spec:** [tc39/proposal-float16array](https://github.com/tc39/proposal-float16array)
 
@@ -615,12 +615,12 @@ column as work progresses.
 |---|---------|--------|----------|----|
 | 2.1 | Iterator helpers | ✅ Done | @copilot | Phase 2 PR |
 | 2.2 | Set methods | ✅ Done | @copilot | Phase 1 PR |
-| 2.3 | Import attributes | ❌ Not started | — | — |
+| 2.3 | Import attributes | ✅ Done | @copilot | Phase 3 PR |
 | 2.4 | Promise.try | ✅ Done | @copilot | Phase 1 PR |
 | 2.5 | RegExp.escape | ✅ Done | @copilot | Phase 1 PR |
-| 2.6 | RegExp modifiers | ❌ Not started | — | — |
-| 2.7 | Duplicate named groups | ❌ Not started | — | — |
-| 2.8 | Float16Array | ❌ Not started | — | — |
+| 2.6 | RegExp modifiers | ✅ Done | @copilot | Phase 3 PR |
+| 2.7 | Duplicate named groups | ✅ Done | @copilot | Phase 3 PR |
+| 2.8 | Float16Array | ✅ Done | @copilot | Phase 3 PR |
 | 2.9 | ArrayBuffer.transfer | ✅ Done | @copilot | Phase 2 PR |
 | 2.10 | Redeclarable eval vars | ⏳ Audited — eval scope update needs compiler work | — | — |
 | 4.1 | Temporal API | ❌ Not started | — | — |

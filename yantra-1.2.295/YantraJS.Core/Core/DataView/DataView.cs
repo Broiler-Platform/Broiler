@@ -164,6 +164,18 @@ public partial class DataView : JSObject
     }
 
     /// <summary>
+    /// Gets a 16-bit floating point number (half-precision) at the specified byte offset
+    /// from the start of the DataView (ES2025 §2.8).
+    /// </summary>
+    [JSExport(Length = 2)]
+    public JSValue GetFloat16(in Arguments a)
+    {
+        int temp = GetInt16Int(in a);
+        var half = BitConverter.ToHalf(BitConverter.GetBytes((short)temp), 0);
+        return new JSNumber((double)half);
+    }
+
+    /// <summary>
     /// Gets a 64-bit floating point number at the specified byte offset from the start of the
     /// DataView.
     /// </summary>
@@ -332,6 +344,20 @@ public partial class DataView : JSObject
     {
         var (byteOffset, littleEndian, @this, value) = GetSetArgs(in a, 4);
         var bytes = BitConverter.GetBytes((float)value.DoubleValue);
+        @this.SetCore(byteOffset, bytes, littleEndian);
+        return JSUndefined.Value;
+    }
+
+    /// <summary>
+    /// Stores a 16-bit floating point (half-precision) value at the specified
+    /// byte offset from the start of the DataView (ES2025 §2.8).
+    /// </summary>
+    [JSExport(Length = 3)]
+    public JSValue SetFloat16(in Arguments a)
+    {
+        var (byteOffset, littleEndian, @this, value) = GetSetArgs(in a, 2);
+        var half = (Half)value.DoubleValue;
+        var bytes = BitConverter.GetBytes(half);
         @this.SetCore(byteOffset, bytes, littleEndian);
         return JSUndefined.Value;
     }

@@ -71,6 +71,32 @@ public partial class JSRegExp
         }
         result[KeyStrings.index] = new JSNumber(match.Index);
         result[KeyStrings.input] = a.Get1();
+
+        // Populate named groups (§2.7 — duplicate named capture groups support).
+        var groupNames = value.GetGroupNames();
+        if (groupNames.Length > 1) // First name is always "0" (the whole match)
+        {
+            var namedGroups = new JSObject();
+            bool hasNamedGroups = false;
+            for (int i = 0; i < groupNames.Length; i++)
+            {
+                var name = groupNames[i];
+                // Skip numeric group names (they're positional, not named)
+                if (name.Length > 0 && (name[0] < '0' || name[0] > '9'))
+                {
+                    hasNamedGroups = true;
+                    var g = match.Groups[name];
+                    namedGroups[name] = g.Success
+                        ? (JSValue)new JSString(g.Value)
+                        : JSUndefined.Value;
+                }
+            }
+            if (hasNamedGroups)
+            {
+                result[KeyStrings.GetOrCreate("groups")] = namedGroups;
+            }
+        }
+
         return result;
     }
 
