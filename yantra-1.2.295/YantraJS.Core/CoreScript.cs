@@ -9,6 +9,10 @@ using Exp = YantraJS.Expressions.YExpression;
 namespace YantraJS;
 
 
+/// <summary>
+/// Provides the top-level API for compiling and evaluating JavaScript source
+/// code within the current <see cref="JSContext"/>.
+/// </summary>
 public class CoreScript
 {
     private static IJSCompiler _compiler = new DefaultJSCompiler();
@@ -42,6 +46,14 @@ public class CoreScript
         }
     }
 
+    /// <summary>
+    /// Evaluates JavaScript code synchronously, pumping an async message loop
+    /// so that microtasks (e.g., resolved promises) are processed before
+    /// returning the result.
+    /// </summary>
+    /// <param name="code">The JavaScript source code to evaluate.</param>
+    /// <param name="location">Optional source location for diagnostics.</param>
+    /// <returns>The result of evaluating <paramref name="code"/>.</returns>
     public static JSValue EvaluateWithTasks(string code, string location = null)
     {
         var result = JSUndefined.Value;
@@ -56,6 +68,13 @@ public class CoreScript
     }
 
 
+    /// <summary>
+    /// Evaluates JavaScript code synchronously in the current context.
+    /// </summary>
+    /// <param name="code">The JavaScript source code to evaluate.</param>
+    /// <param name="location">Optional source location for diagnostics.</param>
+    /// <param name="codeCache">Optional code cache for compiled script reuse.</param>
+    /// <returns>The result of evaluating <paramref name="code"/>.</returns>
     public static JSValue Evaluate(string code, string location = null, ICodeCache codeCache = null)
     {
         var result = JSUndefined.Value;
@@ -65,6 +84,14 @@ public class CoreScript
         return result;
     }
 
+    /// <summary>
+    /// Evaluates JavaScript code asynchronously, awaiting any pending
+    /// <see cref="JSContext.WaitTask"/> before returning.
+    /// </summary>
+    /// <param name="code">The JavaScript source code to evaluate.</param>
+    /// <param name="location">Optional source location for diagnostics.</param>
+    /// <param name="codeCache">Optional code cache for compiled script reuse.</param>
+    /// <returns>The result of evaluating <paramref name="code"/>.</returns>
     public static async Task<JSValue> EvaluateAsync(
         string code, 
         string location = null, 
@@ -84,6 +111,10 @@ public class CoreScript
 
 }
 
+/// <summary>
+/// Holds a compiled expression tree entry representing a class or object
+/// member (property, getter, setter, or spread element).
+/// </summary>
 public class ExpressionHolder
 {
     public bool Static;

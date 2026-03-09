@@ -8,16 +8,24 @@ using YantraJS.Core.Core.Array;
 namespace YantraJS.Core;
 
 
+/// <summary>
+/// Represents the arguments passed to a JavaScript function call.
+/// Stores up to four inline arguments to avoid array allocation;
+/// additional arguments overflow into a heap-allocated array.
+/// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public readonly partial struct Arguments
 {
 
+    /// <summary>An empty arguments instance with <c>undefined</c> as <c>this</c>.</summary>
     public static Arguments Empty = new(JSUndefined.Value);
 
     private const int MinArray = 5;
 
+    /// <summary>Gets the number of arguments (excluding <c>this</c>).</summary>
     public readonly int Length;
 
+    /// <summary>Gets the <c>this</c> value for the call.</summary>
     public readonly JSValue? This;
 
     //public readonly JSValue? NewTarget;
