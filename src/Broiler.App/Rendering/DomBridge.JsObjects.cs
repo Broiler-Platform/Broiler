@@ -134,6 +134,7 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // setAttribute(name, value)
+        var bridgeForSet = this;
         obj.FastAddValue(
             (KeyString)"setAttribute",
             new JSFunction((in Arguments a) =>
@@ -153,6 +154,11 @@ public sealed partial class DomBridge
                         element.Style.Clear();
                         foreach (var kv in ParseStyle(attrVal))
                             element.Style[kv.Key] = kv.Value;
+                    }
+                    // Compile on* event handler attributes into functions
+                    else if (attrName.Length > 2 && attrName.StartsWith("on", StringComparison.OrdinalIgnoreCase))
+                    {
+                        bridgeForSet.CompileInlineEventAttribute(element, attrName, attrVal);
                     }
                 }
                 return JSUndefined.Value;
@@ -949,6 +955,9 @@ public sealed partial class DomBridge
                 }, $"set on{eventName}"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
+
+        // Compile on* HTML attributes into inline event handler functions
+        CompileInlineEventAttributes(element);
 
         // -- Form element support --
 

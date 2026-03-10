@@ -57,12 +57,19 @@ public sealed partial class DomBridge
         while (node != null) { path.Add(node); node = node.Parent; }
         path.Reverse();
 
+        // Include the document node at the very beginning of the path
+        // (first for capture, last for bubble) unless the target IS the document node.
+        if (target != _documentNode && !path.Contains(_documentNode))
+            path.Insert(0, _documentNode);
+
         var stopped = false;
         var immediateStopped = false;
         var prevented = false;
 
         // Set up event object properties
-        evt[(KeyString)"target"] = ToJSObject(target);
+        evt[(KeyString)"target"] = target == _documentNode
+            ? (_documentJSObject ?? (JSValue)JSNull.Value)
+            : (JSValue)ToJSObject(target);
         evt[(KeyString)"eventPhase"] = new JSNumber(0);
         evt[(KeyString)"defaultPrevented"] = JSBoolean.False;
         evt.FastAddValue((KeyString)"stopPropagation",
@@ -80,7 +87,9 @@ public sealed partial class DomBridge
         foreach (var ancestor in path)
         {
             if (stopped) break;
-            evt[(KeyString)"currentTarget"] = ToJSObject(ancestor);
+            evt[(KeyString)"currentTarget"] = ancestor == _documentNode
+                ? (_documentJSObject ?? (JSValue)JSNull.Value)
+                : (JSValue)ToJSObject(ancestor);
             FireListeners(ancestor, eventType, evt, capturePhase: true, ref stopped, ref immediateStopped);
         }
 
@@ -88,7 +97,9 @@ public sealed partial class DomBridge
         if (!stopped)
         {
             evt[(KeyString)"eventPhase"] = new JSNumber(2);
-            evt[(KeyString)"currentTarget"] = ToJSObject(target);
+            evt[(KeyString)"currentTarget"] = target == _documentNode
+                ? (_documentJSObject ?? (JSValue)JSNull.Value)
+                : (JSValue)ToJSObject(target);
             FireListeners(target, eventType, evt, capturePhase: null, ref stopped, ref immediateStopped);
         }
 
@@ -101,7 +112,9 @@ public sealed partial class DomBridge
             for (int i = path.Count - 1; i >= 0; i--)
             {
                 if (stopped) break;
-                evt[(KeyString)"currentTarget"] = ToJSObject(path[i]);
+                evt[(KeyString)"currentTarget"] = path[i] == _documentNode
+                    ? (_documentJSObject ?? (JSValue)JSNull.Value)
+                    : (JSValue)ToJSObject(path[i]);
                 FireListeners(path[i], eventType, evt, capturePhase: false, ref stopped, ref immediateStopped);
             }
         }
@@ -143,6 +156,46 @@ public sealed partial class DomBridge
                 try { inlineFn.InvokeFunction(new Arguments(inlineFn, evt)); }
                 catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.dispatchEvent", $"Inline handler error: {ex.Message}", ex); }
             }
+        }
+    }
+
+    /// <summary>
+    /// Compiles all <c>on*</c> HTML attributes (e.g. <c>onclick="code"</c>) on the given
+    /// element into <see cref="JSFunction"/> instances stored in <see cref="DomElement.InlineEventHandlers"/>.
+    /// Only compiles attributes that have not already been compiled.
+    /// </summary>
+    private void CompileInlineEventAttributes(DomElement element)
+    {
+        foreach (var eventName in InlineEventNames)
+        {
+            var attrName = $"on{eventName}";
+            if (element.Attributes.TryGetValue(attrName, out var code) &&
+                !string.IsNullOrEmpty(code) &&
+                !element.InlineEventHandlers.ContainsKey(eventName))
+            {
+                CompileInlineEventAttribute(element, attrName, code);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Compiles a single <c>on*</c> attribute value into a <see cref="JSFunction"/>
+    /// and stores it in <see cref="DomElement.InlineEventHandlers"/>.
+    /// </summary>
+    internal void CompileInlineEventAttribute(DomElement element, string attrName, string code)
+    {
+        if (_jsContext == null || string.IsNullOrEmpty(code) || attrName.Length <= 2) return;
+        var eventName = attrName[2..].ToLowerInvariant();
+        try
+        {
+            var fn = _jsContext.Eval($"(function(event) {{ {code} }})") as JSFunction;
+            if (fn != null)
+                element.InlineEventHandlers[eventName] = fn;
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.CompileInlineEventAttribute",
+                $"Failed to compile on{eventName} handler: {ex.Message}", ex);
         }
     }
 }

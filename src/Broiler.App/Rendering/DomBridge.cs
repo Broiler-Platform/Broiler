@@ -21,6 +21,8 @@ public sealed partial class DomBridge
         "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error"];
     private readonly List<DomElement> _elements = [];
     private readonly List<(JSFunction Callback, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
+    private readonly DomElement _documentNode = new("#document", null, null, string.Empty);
+    private JSObject? _documentJSObject;
     private JSContext? _jsContext;
 
     // window.location fields
