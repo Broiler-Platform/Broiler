@@ -190,6 +190,8 @@ public sealed partial class DomBridge
     private static bool IsCrossOrigin(string targetUrl, string pageUrl)
     {
         if (string.IsNullOrWhiteSpace(targetUrl)) return false;
+        // about:blank inherits the origin of the embedding document (always same-origin)
+        if (string.Equals(targetUrl, "about:blank", StringComparison.OrdinalIgnoreCase)) return false;
         // Relative URLs are always same-origin
         if (!Uri.TryCreate(targetUrl, UriKind.Absolute, out var targetUri)) return false;
         // file:// URLs are same-origin with each other

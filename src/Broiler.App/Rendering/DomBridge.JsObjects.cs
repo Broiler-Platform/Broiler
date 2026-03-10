@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using YantraJS.Core;
 
@@ -1799,6 +1800,8 @@ public sealed partial class DomBridge
     /// <summary>
     /// Gets or creates a full sub-document JSObject for iframe/object elements.
     /// The sub-document has its own DOM tree, createElement, getElementById, etc.
+    /// For same-origin HTTP/HTTPS resources, attempts to fetch and parse the content.
+    /// Non-HTML resources (by extension or Content-Type) get a minimal empty document.
     /// </summary>
     internal JSObject GetOrCreateSubDocument(DomElement containerElement)
     {
@@ -1809,31 +1812,145 @@ public sealed partial class DomBridge
             string.Equals(c.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
         if (docRoot == null)
         {
-            docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
-            docRoot.Parent = containerElement;
+            // Determine the resource URL for this container
+            var resourceUrl = GetSubResourceUrl(containerElement);
+            var fetchedHtml = TryFetchSubResource(resourceUrl);
 
-            var htmlEl = new DomElement("html", null, null, string.Empty);
-            htmlEl.Parent = docRoot;
-            docRoot.Children.Add(htmlEl);
+            if (!string.IsNullOrEmpty(fetchedHtml))
+            {
+                // Parse the fetched HTML into a sub-document tree
+                docRoot = BuildSubDocumentFromHtml(fetchedHtml, containerElement);
+            }
+            else
+            {
+                // Default: create an empty sub-document structure
+                docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+                docRoot.Parent = containerElement;
 
-            var headEl = new DomElement("head", null, null, string.Empty);
-            headEl.Parent = htmlEl;
-            htmlEl.Children.Add(headEl);
+                var htmlEl = new DomElement("html", null, null, string.Empty);
+                htmlEl.Parent = docRoot;
+                docRoot.Children.Add(htmlEl);
 
-            var bodyEl = new DomElement("body", null, null, string.Empty);
-            bodyEl.Parent = htmlEl;
-            htmlEl.Children.Add(bodyEl);
+                var headEl = new DomElement("head", null, null, string.Empty);
+                headEl.Parent = htmlEl;
+                htmlEl.Children.Add(headEl);
 
-            containerElement.Children.Insert(0, docRoot);
-            _elements.Add(docRoot);
-            _elements.Add(htmlEl);
-            _elements.Add(headEl);
-            _elements.Add(bodyEl);
+                var bodyEl = new DomElement("body", null, null, string.Empty);
+                bodyEl.Parent = htmlEl;
+                htmlEl.Children.Add(bodyEl);
+
+                containerElement.Children.Insert(0, docRoot);
+                _elements.Add(docRoot);
+                _elements.Add(htmlEl);
+                _elements.Add(headEl);
+                _elements.Add(bodyEl);
+            }
         }
 
         var doc = BuildSubDocument(docRoot);
         _subDocumentCache[containerElement] = doc;
         return doc;
+    }
+
+    /// <summary>
+    /// Gets the resource URL for a container element (iframe src or object data).
+    /// </summary>
+    private static string GetSubResourceUrl(DomElement containerElement)
+    {
+        var tag = containerElement.TagName?.ToLowerInvariant();
+        if (tag == "iframe")
+            return containerElement.Attributes.TryGetValue("src", out var src) ? src : string.Empty;
+        if (tag == "object")
+            return containerElement.Attributes.TryGetValue("data", out var data) ? data : string.Empty;
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Attempts to fetch a sub-resource URL and return its HTML content.
+    /// Returns <c>null</c> for non-HTML resources, about:blank, empty URLs,
+    /// or when the fetch fails.
+    /// </summary>
+    private string? TryFetchSubResource(string resourceUrl)
+    {
+        if (string.IsNullOrWhiteSpace(resourceUrl))
+            return null;
+
+        // about:blank gets an empty document (default behavior)
+        if (string.Equals(resourceUrl, "about:blank", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        // Non-HTML resources by extension get an empty document
+        if (IsNonHtmlResource(resourceUrl))
+            return null;
+
+        // Resolve relative URL against page URL
+        string resolvedUrl;
+        if (Uri.TryCreate(resourceUrl, UriKind.Absolute, out _))
+        {
+            resolvedUrl = resourceUrl;
+        }
+        else if (Uri.TryCreate(_pageUrl, UriKind.Absolute, out var baseUri) &&
+                 Uri.TryCreate(baseUri, resourceUrl, out var resolved))
+        {
+            resolvedUrl = resolved.AbsoluteUri;
+        }
+        else
+        {
+            return null;
+        }
+
+        // Only fetch HTTP/HTTPS URLs
+        if (!resolvedUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !resolvedUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        try
+        {
+            var response = SharedHttpClient.GetAsync(resolvedUrl).GetAwaiter().GetResult();
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            // Check Content-Type header for non-HTML content
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+            if (!string.IsNullOrEmpty(contentType) &&
+                !contentType.Contains("html", StringComparison.OrdinalIgnoreCase) &&
+                !contentType.Contains("xml", StringComparison.OrdinalIgnoreCase))
+            {
+                // Non-HTML content type (image/png, text/plain, etc.) → empty document
+                return null;
+            }
+
+            return response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Builds a sub-document tree from fetched HTML content.
+    /// </summary>
+    private DomElement BuildSubDocumentFromHtml(string html, DomElement containerElement)
+    {
+        var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+        docRoot.Parent = containerElement;
+
+        var builder = new HtmlTreeBuilder();
+        var (parsedRoot, allElements, _) = builder.Build(html);
+
+        // Move parsed children under the sub-document root
+        foreach (var child in parsedRoot.Children)
+        {
+            child.Parent = docRoot;
+            docRoot.Children.Add(child);
+        }
+
+        containerElement.Children.Insert(0, docRoot);
+        _elements.Add(docRoot);
+        _elements.AddRange(allElements);
+
+        return docRoot;
     }
 
     /// <summary>
