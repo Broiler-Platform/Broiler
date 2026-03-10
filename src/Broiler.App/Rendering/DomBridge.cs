@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Text.RegularExpressions;
 using YantraJS.Core;
 
@@ -740,6 +741,36 @@ public sealed class DomBridge
             ToJSObject(DocumentElement),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // document.body (getter — first <body> child of documentElement)
+        document.FastAddProperty(
+            (KeyString)"body",
+            new JSFunction((in Arguments a) =>
+            {
+                foreach (var child in DocumentElement.Children)
+                {
+                    if (string.Equals(child.TagName, "body", StringComparison.OrdinalIgnoreCase))
+                        return ToJSObject(child);
+                }
+                return JSNull.Value;
+            }, "get body"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.head (getter — first <head> child of documentElement)
+        document.FastAddProperty(
+            (KeyString)"head",
+            new JSFunction((in Arguments a) =>
+            {
+                foreach (var child in DocumentElement.Children)
+                {
+                    if (string.Equals(child.TagName, "head", StringComparison.OrdinalIgnoreCase))
+                        return ToJSObject(child);
+                }
+                return JSNull.Value;
+            }, "get head"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // document.title (getter / setter)
         document.FastAddProperty(
             (KeyString)"title",
@@ -948,6 +979,47 @@ public sealed class DomBridge
                     return [];
                 };
             ");
+
+        // document.write(html) — parse and append to body
+        document.FastAddValue(
+            (KeyString)"write",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSUndefined.Value;
+                var fragment = a[0].ToString();
+                var builder = new HtmlTreeBuilder();
+                var (docEl, allEls, _) = builder.Build($"<html><body>{fragment}</body></html>");
+                var bodyEl = docEl.Children.FirstOrDefault(c =>
+                    string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
+                if (bodyEl != null)
+                {
+                    // Find the <body> element in the main tree
+                    var mainBody = DocumentElement.Children.FirstOrDefault(c =>
+                        string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
+                    if (mainBody != null)
+                    {
+                        foreach (var child in bodyEl.Children)
+                        {
+                            child.Parent = mainBody;
+                            mainBody.Children.Add(child);
+                            _elements.Add(child);
+                        }
+                    }
+                }
+                return JSUndefined.Value;
+            }, "write", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.writeln(html) — same as write, with trailing newline
+        var writeFn = (JSFunction)document[(KeyString)"write"];
+        document.FastAddValue(
+            (KeyString)"writeln",
+            new JSFunction((in Arguments a) =>
+            {
+                var text = a.Length > 0 ? a[0].ToString() + "\n" : "\n";
+                return writeFn.InvokeFunction(new Arguments(writeFn, new JSString(text)));
+            }, "writeln", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
 
         context["document"] = document;
 
@@ -1714,7 +1786,11 @@ public sealed class DomBridge
                     return JSNull.Value;
                 if (!string.Equals(element.TagName, "canvas", System.StringComparison.OrdinalIgnoreCase))
                     return JSNull.Value;
+#if BROILER_CLI
+                return JSNull.Value; // Canvas 2D context not available in CLI mode
+#else
                 return BuildCanvas2DContext(element);
+#endif
             }, "getContext", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -2146,6 +2222,7 @@ public sealed class DomBridge
         return storage;
     }
 
+#if !BROILER_CLI
     /// <summary>
     /// Builds a minimal Canvas 2D rendering context exposing basic drawing
     /// operations as defined in the HTML Canvas 2D Context specification.
@@ -2279,6 +2356,114 @@ public sealed class DomBridge
         }, "measureText", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         return ctx;
+    }
+#endif
+
+    // ------------------------------------------------------------------
+    //  DOM → HTML serialisation
+    // ------------------------------------------------------------------
+
+    private static readonly HashSet<string> SerializerVoidTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "area", "base", "br", "col", "embed", "hr", "img", "input",
+        "link", "meta", "param", "source", "track", "wbr"
+    };
+
+    /// <summary>
+    /// Serialises the current DOM tree back to an HTML string.
+    /// Call this after JavaScript execution to obtain the modified page
+    /// content for re-rendering.
+    /// </summary>
+    public string SerializeToHtml()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("<!DOCTYPE html>");
+        SerializeElement(DocumentElement, sb);
+        return sb.ToString();
+    }
+
+    private static void SerializeElement(DomElement element, StringBuilder sb)
+    {
+        // Text nodes
+        if (element.IsTextNode)
+        {
+            sb.Append(element.TextContent ?? string.Empty);
+            return;
+        }
+
+        // Document fragments have no tag wrapper
+        if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var child in element.Children)
+                SerializeElement(child, sb);
+            return;
+        }
+
+        var tag = element.TagName.ToLowerInvariant();
+        sb.Append('<').Append(tag);
+
+        // Emit id attribute
+        if (!string.IsNullOrEmpty(element.Id))
+            sb.Append(" id=\"").Append(HtmlEncode(element.Id)).Append('"');
+
+        // Emit class attribute
+        if (!string.IsNullOrEmpty(element.ClassName))
+            sb.Append(" class=\"").Append(HtmlEncode(element.ClassName)).Append('"');
+
+        // Emit remaining attributes (skip id/class since already emitted)
+        foreach (var kvp in element.Attributes)
+        {
+            if (string.Equals(kvp.Key, "id", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(kvp.Key, "class", StringComparison.OrdinalIgnoreCase))
+                continue;
+            sb.Append(' ').Append(kvp.Key).Append("=\"").Append(HtmlEncode(kvp.Value)).Append('"');
+        }
+
+        // Emit inline style from the style dictionary
+        if (element.Style.Count > 0)
+        {
+            sb.Append(" style=\"");
+            var first = true;
+            foreach (var kvp in element.Style)
+            {
+                if (!first) sb.Append("; ");
+                sb.Append(kvp.Key).Append(": ").Append(HtmlEncode(kvp.Value));
+                first = false;
+            }
+            sb.Append('"');
+        }
+
+        sb.Append('>');
+
+        // Void elements have no closing tag
+        if (SerializerVoidTags.Contains(tag))
+            return;
+
+        // Children, textContent, or innerHTML
+        if (element.Children.Count > 0)
+        {
+            foreach (var child in element.Children)
+                SerializeElement(child, sb);
+        }
+        else if (!string.IsNullOrEmpty(element.TextContent))
+        {
+            sb.Append(HtmlEncode(element.TextContent));
+        }
+        else if (!string.IsNullOrEmpty(element.InnerHtml))
+        {
+            sb.Append(element.InnerHtml);
+        }
+
+        sb.Append("</").Append(tag).Append('>');
+    }
+
+    private static string HtmlEncode(string value)
+    {
+        return value
+            .Replace("&", "&amp;")
+            .Replace("<", "&lt;")
+            .Replace(">", "&gt;")
+            .Replace("\"", "&quot;");
     }
 }
 
