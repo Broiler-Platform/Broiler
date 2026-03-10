@@ -529,7 +529,8 @@ public sealed partial class DomBridge
                 var qualifiedName = a[0].ToString();
                 var publicId = a[1].ToString();
                 var systemId = a[2].ToString();
-                ValidateElementName(qualifiedName, context);                var doctype = new DomElement("#doctype", null, null, string.Empty);
+                ValidateElementName(qualifiedName, context);
+                var doctype = new DomElement("#doctype", null, null, string.Empty);
                 doctype.DomProperties["name"] = qualifiedName;
                 doctype.DomProperties["publicId"] = publicId;
                 doctype.DomProperties["systemId"] = systemId;
