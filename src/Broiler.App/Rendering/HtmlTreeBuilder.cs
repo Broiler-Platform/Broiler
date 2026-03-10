@@ -465,9 +465,8 @@ public sealed class HtmlTreeBuilder
             return;
         }
 
-        // Step 4: Simplified reparenting — move children of formattingEl
-        // that come after furthestBlock's subtree into a new clone of formattingEl
-        // For a simpler approach: just pop up to and including the formatting element
+        // Step 4: No full reparenting needed in this simplified algorithm.
+        // Just pop up to and including the formatting element to close it.
         while (openElements.Count > 0)
         {
             var popped = openElements.Pop();
