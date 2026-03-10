@@ -388,10 +388,12 @@ internal sealed class CssValueParser
             if (parts.Length == 3)
             {
                 var h = double.Parse(parts[0].Trim(), CultureInfo.InvariantCulture);
-                var s = double.Parse(parts[1].Trim().TrimEnd('%'), CultureInfo.InvariantCulture);
-                if (parts[1].Trim().EndsWith('%')) s /= 100.0;
-                var l = double.Parse(parts[2].Trim().TrimEnd('%'), CultureInfo.InvariantCulture);
-                if (parts[2].Trim().EndsWith('%')) l /= 100.0;
+                var sTrimmed = parts[1].Trim();
+                var s = double.Parse(sTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
+                if (sTrimmed.EndsWith('%')) s /= 100.0;
+                var lTrimmed = parts[2].Trim();
+                var l = double.Parse(lTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
+                if (lTrimmed.EndsWith('%')) l /= 100.0;
 
                 HslToRgb(h, s, l, out int r, out int g, out int b);
                 color = Color.FromArgb(r, g, b);
@@ -412,10 +414,12 @@ internal sealed class CssValueParser
             if (parts.Length == 4)
             {
                 var h = double.Parse(parts[0].Trim(), CultureInfo.InvariantCulture);
-                var s = double.Parse(parts[1].Trim().TrimEnd('%'), CultureInfo.InvariantCulture);
-                if (parts[1].Trim().EndsWith('%')) s /= 100.0;
-                var l = double.Parse(parts[2].Trim().TrimEnd('%'), CultureInfo.InvariantCulture);
-                if (parts[2].Trim().EndsWith('%')) l /= 100.0;
+                var sTrimmed = parts[1].Trim();
+                var s = double.Parse(sTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
+                if (sTrimmed.EndsWith('%')) s /= 100.0;
+                var lTrimmed = parts[2].Trim();
+                var l = double.Parse(lTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
+                if (lTrimmed.EndsWith('%')) l /= 100.0;
                 var a = double.Parse(parts[3].Trim(), CultureInfo.InvariantCulture);
 
                 HslToRgb(h, s, l, out int r, out int g, out int b);
