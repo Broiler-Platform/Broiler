@@ -184,8 +184,8 @@ public sealed partial class DomBridge
     /// </summary>
     internal void CompileInlineEventAttribute(DomElement element, string attrName, string code)
     {
-        if (_jsContext == null || string.IsNullOrEmpty(code)) return;
-        var eventName = attrName.Substring(2).ToLowerInvariant();
+        if (_jsContext == null || string.IsNullOrEmpty(code) || attrName.Length <= 2) return;
+        var eventName = attrName[2..].ToLowerInvariant();
         try
         {
             var fn = _jsContext.Eval($"(function(event) {{ {code} }})") as JSFunction;
