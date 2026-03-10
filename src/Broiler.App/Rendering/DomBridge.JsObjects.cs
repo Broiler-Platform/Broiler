@@ -133,6 +133,14 @@ public sealed partial class DomBridge
             BuildClassListObject(element),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // attributes — NamedNodeMap interface
+        obj.FastAddProperty(
+            (KeyString)"attributes",
+            new JSFunction((in Arguments _) => BuildNamedNodeMapObject(element, obj),
+                "get attributes"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // setAttribute(name, value)
         var bridgeForSet = this;
         obj.FastAddValue(
@@ -1808,6 +1816,46 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
+        // -- Phase 7: HTMLAreaElement properties --
+        if (tag == "area")
+        {
+            // shape, coords, alt, target — simple reflected attributes
+            foreach (var attrName in new[] { "shape", "coords", "alt", "target" })
+            {
+                var captured = attrName; // capture for closure
+                obj.FastAddProperty(
+                    (KeyString)captured,
+                    new JSFunction((in Arguments _) =>
+                        element.Attributes.TryGetValue(captured, out var v) ? (JSValue)new JSString(v) : new JSString(string.Empty),
+                        "get " + captured),
+                    new JSFunction((in Arguments a) =>
+                    {
+                        element.Attributes[captured] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                        return JSUndefined.Value;
+                    }, "set " + captured),
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+
+            // href — with URI resolution like <a>
+            obj.FastAddProperty(
+                (KeyString)"href",
+                new JSFunction((in Arguments _) =>
+                {
+                    if (!element.Attributes.TryGetValue("href", out var h))
+                        return new JSString(string.Empty);
+                    if (Uri.TryCreate(bridge._pageUrl, UriKind.Absolute, out var baseUri) &&
+                        Uri.TryCreate(baseUri, h, out var resolved))
+                        return new JSString(resolved.AbsoluteUri);
+                    return new JSString(h);
+                }, "get href"),
+                new JSFunction((in Arguments a) =>
+                {
+                    element.Attributes["href"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    return JSUndefined.Value;
+                }, "set href"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
         // -- Phase 6: SVG DOM interfaces --
 
         // SVG element properties — provide SVGAnimatedLength stubs for dimensional attributes
@@ -2645,4 +2693,126 @@ public sealed partial class DomBridge
     /// <summary>
     /// Builds a styleSheets collection JSObject for a sub-document.
     /// </summary>
+
+    // -- Phase 7: NamedNodeMap and Attr node helpers --
+
+    /// <summary>
+    /// Builds a NamedNodeMap-like JSObject for element.attributes, with
+    /// getNamedItem, setNamedItem, removeNamedItem, item, and length.
+    /// </summary>
+    private JSObject BuildNamedNodeMapObject(DomElement element, JSObject ownerObj)
+    {
+        var map = new JSObject();
+
+        // length — number of attributes
+        map.FastAddProperty(
+            (KeyString)"length",
+            new JSFunction((in Arguments _) => new JSNumber(element.Attributes.Count), "get length"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // getNamedItem(name) — returns Attr node or null
+        map.FastAddValue(
+            (KeyString)"getNamedItem",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSNull.Value;
+                var name = a[0].ToString();
+                if (!element.Attributes.TryGetValue(name, out var val))
+                    return JSNull.Value;
+                return BuildAttrNode(name, val, element, ownerObj);
+            }, "getNamedItem", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // setNamedItem(attr) — adds/replaces attribute from Attr node, returns old Attr or null
+        map.FastAddValue(
+            (KeyString)"setNamedItem",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSNull.Value;
+                var attrObj = a[0] as JSObject;
+                if (attrObj == null) return JSNull.Value;
+                var name = attrObj[(KeyString)"name"].ToString();
+                var value = attrObj[(KeyString)"value"].ToString();
+                JSValue old = JSNull.Value;
+                if (element.Attributes.TryGetValue(name, out var oldVal))
+                    old = BuildAttrNode(name, oldVal, element, ownerObj);
+                element.Attributes[name] = value;
+                // Sync special properties
+                if (string.Equals(name, "id", StringComparison.OrdinalIgnoreCase))
+                    element.Id = value;
+                else if (string.Equals(name, "class", StringComparison.OrdinalIgnoreCase))
+                    element.ClassName = value;
+                return old;
+            }, "setNamedItem", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // removeNamedItem(name) — removes and returns the Attr node
+        map.FastAddValue(
+            (KeyString)"removeNamedItem",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSNull.Value;
+                var name = a[0].ToString();
+                if (!element.Attributes.TryGetValue(name, out var val))
+                    return JSNull.Value;
+                element.Attributes.Remove(name);
+                // Sync special properties
+                if (string.Equals(name, "id", StringComparison.OrdinalIgnoreCase))
+                    element.Id = null;
+                else if (string.Equals(name, "class", StringComparison.OrdinalIgnoreCase))
+                    element.ClassName = null;
+                return BuildAttrNode(name, val, element, ownerObj);
+            }, "removeNamedItem", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // item(index) — returns Attr node at position
+        map.FastAddValue(
+            (KeyString)"item",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSNull.Value;
+                var idx = (int)a[0].DoubleValue;
+                var keys = element.Attributes.Keys.ToList();
+                if (idx < 0 || idx >= keys.Count) return JSNull.Value;
+                var name = keys[idx];
+                return BuildAttrNode(name, element.Attributes[name], element, ownerObj);
+            }, "item", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // Numeric index access — expose each attribute by index
+        var attrKeys = element.Attributes.Keys.ToList();
+        for (var i = 0; i < attrKeys.Count; i++)
+        {
+            var idx = i;
+            map.FastAddProperty(
+                (KeyString)idx.ToString(),
+                new JSFunction((in Arguments _) =>
+                {
+                    var keys = element.Attributes.Keys.ToList();
+                    if (idx >= keys.Count) return JSUndefined.Value;
+                    var n = keys[idx];
+                    return BuildAttrNode(n, element.Attributes[n], element, ownerObj);
+                }, "get " + idx),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
+        return map;
+    }
+
+    /// <summary>
+    /// Builds an Attr-like JSObject with name, value, specified, ownerElement, nodeType, nodeName.
+    /// </summary>
+    private static JSObject BuildAttrNode(string name, string value, DomElement element, JSObject ownerObj)
+    {
+        var attr = new JSObject();
+        attr.FastAddValue((KeyString)"name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue((KeyString)"value", new JSString(value), JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue((KeyString)"specified", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue((KeyString)"ownerElement", ownerObj, JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue((KeyString)"nodeType", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue((KeyString)"nodeName", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
+        return attr;
+    }
 }
