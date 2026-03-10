@@ -1506,7 +1506,7 @@ public sealed class DomBridge
             {
                 var text = a.Length > 0 ? a[0].ToString() : string.Empty;
                 element.TextContent = text;
-                // Setting textContent removes all children and replaces with a text node
+                // Setting textContent clears all children per DOM spec
                 element.Children.Clear();
                 return JSUndefined.Value;
             }, "set textContent"),
@@ -1783,7 +1783,8 @@ public sealed class DomBridge
 
                 newEl.Parent?.Children.Remove(newEl);
                 newEl.Parent = element;
-                // Re-find index after possible removal
+                // Re-find index: removing newEl from its old parent may have shifted
+                // indices if newEl was a sibling of refEl within this same parent.
                 idx = element.Children.IndexOf(refEl);
                 element.Children.Insert(idx, newEl);
                 return a[0];
@@ -2391,7 +2392,11 @@ public sealed class DomBridge
                 var result = filterFn.InvokeFunction(new Arguments(filterFn, ToJSObject(el)));
                 return (int)result.DoubleValue;
             }
-            catch { return 1; } // FILTER_ACCEPT on error
+            catch (Exception ex)
+            {
+                RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ApplyFilter", $"NodeFilter error: {ex.Message}", ex);
+                return 1; // FILTER_ACCEPT on error
+            }
         }
         return 1; // FILTER_ACCEPT
     }
@@ -2575,7 +2580,10 @@ public sealed class DomBridge
                 if (idx >= 0 && idx + 1 < siblings.Count)
                     return siblings[idx + 1];
             }
-            node = node.Parent!;
+            if (node.Parent != null)
+                node = node.Parent;
+            else
+                return null;
         }
         return null;
     }
@@ -3080,25 +3088,15 @@ public sealed class DomBridge
             }, "cloneRange", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // compareBoundaryPoints(how, sourceRange)
+        // compareBoundaryPoints(how, sourceRange) — stub: requires full document position comparison
         range.FastAddValue(
             (KeyString)"compareBoundaryPoints",
             new JSFunction((in Arguments a) =>
             {
                 if (a.Length < 2) throw new JSException("Failed to execute 'compareBoundaryPoints': 2 arguments required.");
-                var how = (int)a[0].DoubleValue;
-                var sourceRange = a[1] as JSObject;
-                if (sourceRange == null) return new JSNumber(0);
-
-                // Get source range boundaries
-                var srcStartContainerGetter = sourceRange[(KeyString)"startContainer"];
-                var srcStartOffsetGetter = sourceRange[(KeyString)"startOffset"];
-                var srcEndContainerGetter = sourceRange[(KeyString)"endContainer"];
-                var srcEndOffsetGetter = sourceRange[(KeyString)"endOffset"];
-
-                // Compare positions based on how parameter
                 // 0 = START_TO_START, 1 = START_TO_END, 2 = END_TO_END, 3 = END_TO_START
-                return new JSNumber(0); // Simplified — full implementation requires document position comparison
+                // Full implementation deferred — requires document-order position comparison
+                return new JSNumber(0);
             }, "compareBoundaryPoints", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
