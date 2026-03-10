@@ -648,6 +648,62 @@ public sealed partial class DomBridge
             implementation,
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // document-level addEventListener / removeEventListener / dispatchEvent
+        var docNode = _documentNode;
+        var bridgeRef = this;
+        document.FastAddValue(
+            (KeyString)"addEventListener",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2) return JSUndefined.Value;
+                var type = a[0].ToString();
+                var listener = a[1];
+                var capture = a.Length > 2 && a[2].BooleanValue;
+                if (!docNode.EventListeners.TryGetValue(type, out var listeners))
+                {
+                    listeners = [];
+                    docNode.EventListeners[type] = listeners;
+                }
+                listeners.Add((listener, capture));
+                return JSUndefined.Value;
+            }, "addEventListener", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        document.FastAddValue(
+            (KeyString)"removeEventListener",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2) return JSUndefined.Value;
+                var type = a[0].ToString();
+                var listener = a[1];
+                var capture = a.Length > 2 && a[2].BooleanValue;
+                if (docNode.EventListeners.TryGetValue(type, out var listeners))
+                {
+                    for (int i = listeners.Count - 1; i >= 0; i--)
+                    {
+                        if (listeners[i].Listener == listener && listeners[i].Capture == capture)
+                        {
+                            listeners.RemoveAt(i);
+                            break;
+                        }
+                    }
+                }
+                return JSUndefined.Value;
+            }, "removeEventListener", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        document.FastAddValue(
+            (KeyString)"dispatchEvent",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSBoolean.True;
+                var evt = a[0] as JSObject;
+                if (evt == null) return JSBoolean.True;
+                return bridgeRef.DispatchEventOnElement(docNode, evt);
+            }, "dispatchEvent", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        _documentJSObject = document;
         context["document"] = document;
 
         // window global

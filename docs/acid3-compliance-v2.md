@@ -396,29 +396,29 @@ Problems:
 
 ---
 
-### Phase 5: DOM Events Edge Cases (Priority: **High**)
+### Phase 5: DOM Events Edge Cases (Priority: **High**) ✅
 
 **Goal:** Pass tests 24, 26–27, 30–32, 73.
 
-- [ ] **5.1** Event handler attribute reflection
-  - [ ] `element.onclick` getter returns function (not string)
-  - [ ] Setting `element.onclick = null` removes handler
-  - [ ] `getAttribute('onclick')` returns source string
-- [ ] **5.2** Document-level event bubbling
-  - [ ] Events must bubble from element → body → html → document
-  - [ ] `document.addEventListener('click', ...)` must fire
-- [ ] **5.3** Event dispatch on text nodes
-  - [ ] `textNode.dispatchEvent(event)` must work
-  - [ ] Bubbling from text node → parent element → ... → document
-- [ ] **5.4** DOM tree GC survival
-  - [ ] JS-held references to detached DOM nodes must keep them alive
-  - [ ] Re-attaching detached nodes must work correctly
-- [ ] **5.5** Nested event dispatch
-  - [ ] Dispatching an event inside an event handler must work correctly
-  - [ ] Re-entrant dispatch must not corrupt event state
-- [ ] **5.6** Tests: 7 unit tests
+- [x] **5.1** Event handler attribute reflection
+  - [x] `element.onclick` getter returns function (not string)
+  - [x] Setting `element.onclick = null` removes handler
+  - [x] `getAttribute('onclick')` returns source string
+- [x] **5.2** Document-level event bubbling
+  - [x] Events must bubble from element → body → html → document
+  - [x] `document.addEventListener('click', ...)` must fire
+- [x] **5.3** Event dispatch on text nodes
+  - [x] `textNode.dispatchEvent(event)` must work
+  - [x] Bubbling from text node → parent element → ... → document
+- [x] **5.4** DOM tree GC survival
+  - [x] JS-held references to detached DOM nodes must keep them alive
+  - [x] Re-attaching detached nodes must work correctly
+- [x] **5.5** Nested event dispatch
+  - [x] Dispatching an event inside an event handler must work correctly
+  - [x] Re-entrant dispatch must not corrupt event state
+- [x] **5.6** Tests: 8 unit tests
 
-**Modules affected:** `DomBridge.Events.cs`, `DomBridge.cs`
+**Modules affected:** `DomBridge.Events.cs`, `DomBridge.cs`, `DomBridge.Registration.cs`, `DomBridge.JsObjects.cs`
 **Spec references:** [DOM Level 2 Events](https://www.w3.org/TR/DOM-Level-2-Events/events.html)
 
 ---
