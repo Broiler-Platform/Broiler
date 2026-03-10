@@ -101,13 +101,6 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Validates a form element or individual input element.
-    /// For forms, validates all child input elements.
-    /// For individual inputs, checks the <c>required</c> constraint.
-    /// </summary>
-
-
-    /// <summary>
     /// Recursively collects text content from a node and its descendants.
     /// </summary>
     private static void CollectTextContent(DomElement node, StringBuilder sb)
