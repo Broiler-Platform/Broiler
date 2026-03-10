@@ -468,16 +468,44 @@ score: **16–20 / 100**.
 **Expected impact:** CSS property access, CSSOM rules, HSL color support.
 Estimated additional score: **+3–6**.
 
-### Phase 8: Network and HTTP Compliance (Priority: Future)
+### Phase 8: Network and HTTP Compliance (Priority: Future) ✅
 
 **Goal:** Support tests requiring network access.
 
+**Status:** Completed 2026-03-10. All target APIs implemented.
+
 **Tasks:**
 
-1. **XHR / Fetch API**: `XMLHttpRequest` for tests 14–16
-2. **Content-Type handling**: Proper MIME type detection for loaded resources
-3. **HTTP status code handling**: `<object>` fallback behavior
-4. **CORS / same-origin**: Proper cross-origin policies
+1. ✅ **XHR / Fetch API**: Enhanced `XMLHttpRequest` with `getResponseHeader()`,
+   `getAllResponseHeaders()`, `overrideMimeType()`, `abort()`, `responseType`,
+   `responseURL`, `responseXML`, `withCredentials`, `timeout`, `onload`,
+   `onerror`, `onabort`, `onprogress`, `onloadstart`, `onloadend`, `ontimeout`
+   event handlers. Static state constants (`XMLHttpRequest.UNSENT` etc.).
+   `open()` now accepts async parameter, fires `onreadystatechange`, and resets
+   state. `send()` supports request body and headers, captures response headers
+   via `response.headers.forEach()`.
+2. ✅ **Content-Type handling**: `IsNonHtmlResource()` detects non-HTML content
+   types by file extension (image, text, font, audio, video, etc.).
+   `GetMimeTypeForExtension()` maps file extensions to MIME types.
+   Iframe `contentDocument` returns minimal empty sub-document for non-HTML
+   resources (prevents fallback text from being parsed as HTML).
+3. ✅ **HTTP status code handling**: Enhanced fetch() with full `response.headers`
+   object (`get()`, `has()`, `forEach()` methods), `response.url`, `response.type`,
+   `response.redirected`, `response.bodyUsed`, `response.clone()`,
+   `response.arrayBuffer()`. Fetch supports `method` (POST/PUT/DELETE),
+   `body`, and `headers` options. `<object>` element `type` property (MIME type
+   getter/setter). Object `.data` setter invalidates cached sub-document.
+4. ✅ **CORS / same-origin**: `IsCrossOrigin()` checks scheme+host+port for
+   cross-origin detection. Cross-origin `iframe.contentDocument` returns `null`.
+   Cross-origin `iframe.contentWindow` returns `null`. Cross-origin
+   `object.contentDocument` returns `null`. `file://` URLs treated as same-origin.
+   Relative URLs always same-origin. Iframe `src` property (read/write) with
+   sub-document cache invalidation on change.
+
+**Tests added:** 36 tests in `NetworkAndHttpTests.cs`. Total CLI tests: 239 (203 + 36).
+
+**Expected impact:** Tests 14–16 (HTTP/Content-Type/object). Estimated additional
+score: **+15–17**.
 
 ## 5 Estimated Progression
 
@@ -491,7 +519,7 @@ Estimated additional score: **+3–6**.
 | Phase 5 ✅ | 51–64 / 100 | HTML DOM interfaces |
 | Phase 6 ✅ | 54–72 / 100 | SVG DOM |
 | Phase 7 ✅ | 60–78 / 100 | CSS rendering fixes |
-| Phase 8 | 75–95 / 100 | Network/HTTP compliance |
+| Phase 8 ✅ | 75–95 / 100 | Network/HTTP compliance |
 
 > **Note:** Achieving 100/100 requires pixel-perfect rendering matching the
 > Acid3 reference page, smooth animation, and complete JavaScript conformance.

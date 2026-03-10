@@ -1902,9 +1902,11 @@ public sealed class DomBridge
                     try {
                         var opts = { method: self._method };
                         if (body && self._method !== 'GET' && self._method !== 'HEAD') {
-                            opts.body = body;
+                            opts.body = '' + body;
                         }
-                        if (Object.keys(self._headers).length > 0) {
+                        var hasHeaders = false;
+                        for (var k in self._headers) { hasHeaders = true; break; }
+                        if (hasHeaders) {
                             opts.headers = self._headers;
                         }
                         if (typeof self.onloadstart === 'function') {
