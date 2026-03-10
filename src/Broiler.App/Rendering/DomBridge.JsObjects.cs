@@ -2037,9 +2037,9 @@ public sealed partial class DomBridge
         if (resourceUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
         {
             var (mimeType, body) = DecodeDataUriParts(resourceUrl);
-            // Only return as HTML if the MIME type is HTML or XHTML
-            if (mimeType.Contains("html", StringComparison.OrdinalIgnoreCase) ||
-                mimeType.Contains("xhtml", StringComparison.OrdinalIgnoreCase) ||
+            // Only return as HTML if the MIME type is text/html or application/xhtml+xml
+            if (string.Equals(mimeType, "text/html", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(mimeType, "application/xhtml+xml", StringComparison.OrdinalIgnoreCase) ||
                 string.IsNullOrEmpty(mimeType))
                 return !string.IsNullOrEmpty(body) ? body : null;
             return null;

@@ -219,8 +219,10 @@ public sealed partial class DomBridge
                 var bytes = Convert.FromBase64String(decoded);
                 body = Encoding.UTF8.GetString(bytes);
             }
-            catch
+            catch (FormatException)
             {
+                // Malformed base64 payload — return empty body so the caller
+                // falls back to the default empty-document path.
                 body = string.Empty;
             }
         }
