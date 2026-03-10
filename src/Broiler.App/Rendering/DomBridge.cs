@@ -21,6 +21,7 @@ public sealed partial class DomBridge
         "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error"];
     private readonly List<DomElement> _elements = [];
     private readonly List<(JSFunction Callback, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
+    private JSContext? _jsContext;
 
     // window.location fields
     private string _pageUrl = string.Empty;
@@ -271,6 +272,9 @@ public sealed class DomElement(
 
     /// <summary>Namespace URI for elements created with createElementNS.</summary>
     public string? NamespaceURI { get; set; }
+
+    /// <summary>Maps (namespace, localName) → qualifiedName for namespace-aware attribute methods.</summary>
+    public Dictionary<(string? Namespace, string LocalName), string> NsAttrMap { get; } = new();
 }
 
 /// <summary>Options for MutationObserver.observe().</summary>

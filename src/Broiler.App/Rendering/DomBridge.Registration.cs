@@ -27,6 +27,7 @@ public sealed partial class DomBridge
 
     private void RegisterDocument(JSContext context)
     {
+        _jsContext = context;
         var document = new JSObject();
 
         // document.documentElement (the <html> element)
@@ -165,7 +166,7 @@ public sealed partial class DomBridge
                 if (a.Length == 0)
                     throw new JSException("Failed to execute 'createElement': 1 argument required, but only 0 present.");
                 var tag = a[0].ToString().ToLowerInvariant();
-                ValidateElementName(tag);
+                ValidateElementName(tag, context);
                 var el = new DomElement(tag, null, null, string.Empty);
                 _elements.Add(el);
                 return ToJSObject(el);
@@ -429,9 +430,9 @@ public sealed partial class DomBridge
             (KeyString)"createElementNS",
             new JSFunction((in Arguments a) =>
             {
-                var ns = a.Length > 0 ? a[0].ToString() : null;
+                var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
                 var localName = a.Length > 1 ? a[1].ToString() : (a.Length > 0 ? a[0].ToString() : "div");
-                ValidateQualifiedName(localName, ns);
+                ValidateQualifiedName(localName, ns, context);
                 var el = new DomElement(localName, null, null, string.Empty);
                 if (!string.IsNullOrEmpty(ns))
                     el.NamespaceURI = ns;
@@ -528,7 +529,7 @@ public sealed partial class DomBridge
                 var qualifiedName = a[0].ToString();
                 var publicId = a[1].ToString();
                 var systemId = a[2].ToString();
-                ValidateElementName(qualifiedName);
+                ValidateElementName(qualifiedName, context);
                 var doctype = new DomElement("#doctype", null, null, string.Empty);
                 doctype.DomProperties["name"] = qualifiedName;
                 doctype.DomProperties["publicId"] = publicId;
@@ -549,7 +550,7 @@ public sealed partial class DomBridge
                 var doctypeArg = a.Length > 2 ? a[2] : null;
 
                 if (!string.IsNullOrEmpty(qName))
-                    ValidateQualifiedName(qName, ns);
+                    ValidateQualifiedName(qName, ns, context);
 
                 // Build a new document root
                 var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
@@ -994,6 +995,9 @@ public sealed partial class DomBridge
 
         // DOMException constructor
         RegisterDOMException(context);
+
+        // Node constructor with type constants
+        RegisterNodeConstructor(context);
     }
 
     /// <summary>

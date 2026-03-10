@@ -243,6 +243,9 @@ public sealed partial class DomBridge
         var style = new Dictionary<string, string>(source.Style, StringComparer.OrdinalIgnoreCase);
         var clone = new DomElement(source.TagName, source.Id, source.ClassName, source.InnerHtml, style, attrs, source.IsTextNode);
         clone.TextContent = source.TextContent;
+        clone.NamespaceURI = source.NamespaceURI;
+        foreach (var kv in source.NsAttrMap)
+            clone.NsAttrMap[kv.Key] = kv.Value;
 
         if (deep)
         {
@@ -886,15 +889,25 @@ public sealed partial class DomBridge
         RegexOptions.Compiled);
 
     /// <summary>
+    /// Throws a proper <c>DOMException</c> with the given name/code via the JS-registered constructor.
+    /// </summary>
+    private static void ThrowDOMException(JSContext context, string message, string name)
+    {
+        var escaped = message.Replace("\\", "\\\\").Replace("'", "\\'");
+        context.Eval($"throw new DOMException('{escaped}', '{name}');");
+    }
+
+    /// <summary>
     /// Validates an element/doctype name per the XML spec.
     /// Throws a DOMException with INVALID_CHARACTER_ERR (code 5) for invalid names.
     /// </summary>
-    private static void ValidateElementName(string name)
+    private static void ValidateElementName(string name, JSContext context)
     {
         if (string.IsNullOrEmpty(name) || !ValidXmlNamePattern.IsMatch(name))
         {
-            throw new JSException(
-                $"Failed to execute 'createElement': The tag name provided ('{name}') is not a valid name.");
+            ThrowDOMException(context,
+                $"Failed to execute 'createElement': The tag name provided ('{name}') is not a valid name.",
+                "InvalidCharacterError");
         }
     }
 
@@ -902,13 +915,14 @@ public sealed partial class DomBridge
     /// Validates a qualified name and namespace per the Namespaces in XML spec.
     /// Throws a DOMException with NAMESPACE_ERR (code 14) for namespace violations.
     /// </summary>
-    private static void ValidateQualifiedName(string qualifiedName, string? ns)
+    private static void ValidateQualifiedName(string qualifiedName, string? ns, JSContext context)
     {
         // First validate the name characters (allows optional single colon for prefix:localName)
         if (string.IsNullOrEmpty(qualifiedName) || !ValidXmlQualifiedNamePattern.IsMatch(qualifiedName))
         {
-            throw new JSException(
-                $"Failed to execute 'createElementNS': The qualified name provided ('{qualifiedName}') is not a valid name.");
+            ThrowDOMException(context,
+                $"Failed to execute 'createElementNS': The qualified name provided ('{qualifiedName}') is not a valid name.",
+                "InvalidCharacterError");
         }
 
         var colonIndex = qualifiedName.IndexOf(':');
@@ -917,16 +931,18 @@ public sealed partial class DomBridge
             // Prefixed name: namespace must not be null
             if (string.IsNullOrEmpty(ns))
             {
-                throw new JSException(
-                    $"Failed to execute 'createElementNS': The namespace URI provided is empty for qualified name '{qualifiedName}'.");
+                ThrowDOMException(context,
+                    $"Failed to execute 'createElementNS': The namespace URI provided is empty for qualified name '{qualifiedName}'.",
+                    "NamespaceError");
             }
 
             var prefix = qualifiedName[..colonIndex];
             // "xml" prefix must be the XML namespace
             if (prefix == "xml" && ns != "http://www.w3.org/XML/1998/namespace")
             {
-                throw new JSException(
-                    $"Failed to execute 'createElementNS': The namespace URI for prefix 'xml' is invalid.");
+                ThrowDOMException(context,
+                    $"Failed to execute 'createElementNS': The namespace URI for prefix 'xml' is invalid.",
+                    "NamespaceError");
             }
         }
     }
@@ -995,6 +1011,40 @@ public sealed partial class DomBridge
             DOMException.DATA_CLONE_ERR = 25;
             DOMException.prototype = Object.create(Error.prototype);
             DOMException.prototype.constructor = DOMException;
+        ");
+    }
+
+    /// <summary>
+    /// Registers the <c>Node</c> constructor with DOM type constants on the JS context.
+    /// </summary>
+    private static void RegisterNodeConstructor(JSContext context)
+    {
+        context.Eval(@"
+            function Node() {}
+            Node.ELEMENT_NODE = 1;
+            Node.ATTRIBUTE_NODE = 2;
+            Node.TEXT_NODE = 3;
+            Node.CDATA_SECTION_NODE = 4;
+            Node.ENTITY_REFERENCE_NODE = 5;
+            Node.ENTITY_NODE = 6;
+            Node.PROCESSING_INSTRUCTION_NODE = 7;
+            Node.COMMENT_NODE = 8;
+            Node.DOCUMENT_NODE = 9;
+            Node.DOCUMENT_TYPE_NODE = 10;
+            Node.DOCUMENT_FRAGMENT_NODE = 11;
+            Node.NOTATION_NODE = 12;
+            Node.prototype.ELEMENT_NODE = 1;
+            Node.prototype.ATTRIBUTE_NODE = 2;
+            Node.prototype.TEXT_NODE = 3;
+            Node.prototype.CDATA_SECTION_NODE = 4;
+            Node.prototype.ENTITY_REFERENCE_NODE = 5;
+            Node.prototype.ENTITY_NODE = 6;
+            Node.prototype.PROCESSING_INSTRUCTION_NODE = 7;
+            Node.prototype.COMMENT_NODE = 8;
+            Node.prototype.DOCUMENT_NODE = 9;
+            Node.prototype.DOCUMENT_TYPE_NODE = 10;
+            Node.prototype.DOCUMENT_FRAGMENT_NODE = 11;
+            Node.prototype.NOTATION_NODE = 12;
         ");
     }
 }
