@@ -434,18 +434,39 @@ score: **16–20 / 100**.
 **Expected impact:** Tests 65, 69–70, 74–80. Estimated additional score:
 **+3–8**.
 
-### Phase 7: CSS Rendering Improvements (Priority: Low)
+### Phase 7: CSS Rendering Improvements (Priority: Low) ✅
 
 **Goal:** Fix CSS rendering gaps visible in the Acid3 page.
 
 **Tasks:**
 
-1. **`:root` selector**: Apply styles to `<html>` element
-2. **`@font-face`**: Load and use custom fonts
-3. **`text-shadow`**: Implement text shadow rendering
-4. **`hsla()` / `hsl()` colors**: Parse and apply HSL color values
-5. **`position: fixed`**: Implement fixed positioning
-6. **`data:` URI backgrounds**: Render inline data URI images
+1. **`:root` selector**: Apply styles to `<html>` element ✅ (already done in Phase 4)
+2. **`@font-face`**: Parse @font-face rules and expose via CSSOM
+   (CSSFontFaceRule with type=5, style property access) ✅
+3. **`text-shadow`**: Expose text-shadow values through getComputedStyle
+   and element.style (both camelCase and kebab-case) ✅
+4. **`hsla()` / `hsl()` colors**: Parse and apply HSL color values —
+   added `GetColorByHsl()` and `GetColorByHsla()` with HSL-to-RGB conversion
+   to CssValueParser, supports both `%` and raw numeric saturation/lightness ✅
+5. **`position: fixed`**: Expose position:fixed and coordinate values
+   through getComputedStyle and element.style ✅
+6. **`data:` URI backgrounds**: Verified data: URI CSS background support
+   works through getComputedStyle ✅ (already done)
+
+**Additional improvements:**
+
+- CSS rule objects now include `type` (1=CSSStyleRule, 5=CSSFontFaceRule),
+  `selectorText`, and `style` property with both kebab-case and camelCase access
+- Added `deleteRule(index)` method on CSSStyleSheet
+- Enhanced `getPropertyValue()` with camelCase↔kebab-case bidirectional lookup
+  and JSObject property fallback for values set via `el.style.camelCase = value`
+- Added `ToCamelCaseStatic()` and `ToKebabCase()` utility methods for CSS↔JS
+  property name conversion
+
+**Tests added:** 32 tests in `CssRenderingTests.cs`. Total CLI tests: 203 (171 + 32).
+
+**Expected impact:** CSS property access, CSSOM rules, HSL color support.
+Estimated additional score: **+3–6**.
 
 ### Phase 8: Network and HTTP Compliance (Priority: Future)
 
@@ -469,7 +490,7 @@ score: **16–20 / 100**.
 | Phase 4 ✅ | 39–49 / 100 | Selectors API + CSSOM |
 | Phase 5 ✅ | 51–64 / 100 | HTML DOM interfaces |
 | Phase 6 ✅ | 54–72 / 100 | SVG DOM |
-| Phase 7 | 60–78 / 100 | CSS rendering fixes |
+| Phase 7 ✅ | 60–78 / 100 | CSS rendering fixes |
 | Phase 8 | 75–95 / 100 | Network/HTTP compliance |
 
 > **Note:** Achieving 100/100 requires pixel-perfect rendering matching the

@@ -242,6 +242,14 @@ internal sealed class CssValueParser
                 {
                     return GetColorByRgba(str, idx, length, out color);
                 }
+                else if (length > 9 && CommonUtils.SubStringEquals(str, idx, 4, "hsl(") && str[length - 1] == ')')
+                {
+                    return GetColorByHsl(str, idx, length, out color);
+                }
+                else if (length > 12 && CommonUtils.SubStringEquals(str, idx, 5, "hsla(") && str[length - 1] == ')')
+                {
+                    return GetColorByHsla(str, idx, length, out color);
+                }
                 else
                 {
                     return GetColorByName(str, idx, length, out color);
@@ -369,6 +377,87 @@ internal sealed class CssValueParser
 
         color = Color.Empty;
         return false;
+    }
+
+    private static bool GetColorByHsl(string str, int idx, int length, out Color color)
+    {
+        try
+        {
+            var inner = str.Substring(idx + 4, length - idx - 5); // content between "hsl(" and ")"
+            var parts = inner.Split(',');
+            if (parts.Length == 3)
+            {
+                var h = double.Parse(parts[0].Trim(), CultureInfo.InvariantCulture);
+                var sTrimmed = parts[1].Trim();
+                var s = double.Parse(sTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
+                if (sTrimmed.EndsWith('%')) s /= 100.0;
+                var lTrimmed = parts[2].Trim();
+                var l = double.Parse(lTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
+                if (lTrimmed.EndsWith('%')) l /= 100.0;
+
+                HslToRgb(h, s, l, out int r, out int g, out int b);
+                color = Color.FromArgb(r, g, b);
+                return true;
+            }
+        }
+        catch { /* fall through */ }
+        color = Color.Empty;
+        return false;
+    }
+
+    private static bool GetColorByHsla(string str, int idx, int length, out Color color)
+    {
+        try
+        {
+            var inner = str.Substring(idx + 5, length - idx - 6); // content between "hsla(" and ")"
+            var parts = inner.Split(',');
+            if (parts.Length == 4)
+            {
+                var h = double.Parse(parts[0].Trim(), CultureInfo.InvariantCulture);
+                var sTrimmed = parts[1].Trim();
+                var s = double.Parse(sTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
+                if (sTrimmed.EndsWith('%')) s /= 100.0;
+                var lTrimmed = parts[2].Trim();
+                var l = double.Parse(lTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
+                if (lTrimmed.EndsWith('%')) l /= 100.0;
+                var a = double.Parse(parts[3].Trim(), CultureInfo.InvariantCulture);
+
+                HslToRgb(h, s, l, out int r, out int g, out int b);
+                int alpha = Math.Max(0, Math.Min(255, (int)Math.Round(a * 255)));
+                color = Color.FromArgb(alpha, r, g, b);
+                return true;
+            }
+        }
+        catch { /* fall through */ }
+        color = Color.Empty;
+        return false;
+    }
+
+    /// <summary>
+    /// Converts HSL color values to RGB.
+    /// H is in degrees [0, 360), S and L are in [0, 1].
+    /// </summary>
+    private static void HslToRgb(double h, double s, double l, out int r, out int g, out int b)
+    {
+        h = ((h % 360) + 360) % 360;
+        s = Math.Max(0, Math.Min(1, s));
+        l = Math.Max(0, Math.Min(1, l));
+
+        double c = (1 - Math.Abs(2 * l - 1)) * s;
+        double x = c * (1 - Math.Abs((h / 60) % 2 - 1));
+        double m = l - c / 2;
+
+        double r1, g1, b1;
+        if (h < 60) { r1 = c; g1 = x; b1 = 0; }
+        else if (h < 120) { r1 = x; g1 = c; b1 = 0; }
+        else if (h < 180) { r1 = 0; g1 = c; b1 = x; }
+        else if (h < 240) { r1 = 0; g1 = x; b1 = c; }
+        else if (h < 300) { r1 = x; g1 = 0; b1 = c; }
+        else { r1 = c; g1 = 0; b1 = x; }
+
+        r = Math.Max(0, Math.Min(255, (int)Math.Round((r1 + m) * 255)));
+        g = Math.Max(0, Math.Min(255, (int)Math.Round((g1 + m) * 255)));
+        b = Math.Max(0, Math.Min(255, (int)Math.Round((b1 + m) * 255)));
     }
 
     private bool GetColorByName(string str, int idx, int length, out Color color)

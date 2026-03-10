@@ -4001,6 +4001,8 @@ public sealed class DomBridge
 
         // Internal rules storage for this stylesheet
         var rulesStorage = new List<string>();
+        // Flag to skip text-based rebuild (set by deleteRule)
+        var skipRebuild = false;
 
         // Parse initial rules from the style element's text content
         var initialText = CollectStyleElementText(styleElement);
@@ -4018,30 +4020,33 @@ public sealed class DomBridge
             (KeyString)"cssRules",
             new JSFunction((in Arguments _) =>
             {
-                // Re-read text-based rules from the style element
-                var currentText = CollectStyleElementText(styleElement);
-                var currentHash = currentText ?? string.Empty;
-
-                // Only rebuild from text if text content changed
-                if (currentHash != lastTextHash)
+                if (!skipRebuild)
                 {
-                    rulesStorage.Clear();
-                    if (!string.IsNullOrWhiteSpace(currentText))
-                    {
-                        foreach (var rule in ParseCssRuleStrings(currentText))
-                            rulesStorage.Add(rule);
-                    }
-                    lastTextHash = currentHash;
+                    // Re-read text-based rules from the style element
+                    var currentText = CollectStyleElementText(styleElement);
+                    var currentHash = currentText ?? string.Empty;
 
-                    // Re-insert any programmatically added rules
-                    if (styleElement.DomProperties.TryGetValue("_insertedRules", out var inserted) && inserted is List<(int Index, string Rule)> insertedRules)
+                    // Only rebuild from text if text content changed
+                    if (currentHash != lastTextHash)
                     {
-                        foreach (var (idx, rule) in insertedRules.OrderBy(r => r.Index))
+                        rulesStorage.Clear();
+                        if (!string.IsNullOrWhiteSpace(currentText))
                         {
-                            if (idx <= rulesStorage.Count)
-                                rulesStorage.Insert(idx, rule);
-                            else
+                            foreach (var rule in ParseCssRuleStrings(currentText))
                                 rulesStorage.Add(rule);
+                        }
+                        lastTextHash = currentHash;
+
+                        // Re-insert any programmatically added rules
+                        if (styleElement.DomProperties.TryGetValue("_insertedRules", out var inserted) && inserted is List<(int Index, string Rule)> insertedRules)
+                        {
+                            foreach (var (idx, rule) in insertedRules.OrderBy(r => r.Index))
+                            {
+                                if (idx <= rulesStorage.Count)
+                                    rulesStorage.Insert(idx, rule);
+                                else
+                                    rulesStorage.Add(rule);
+                            }
                         }
                     }
                 }
@@ -4049,8 +4054,7 @@ public sealed class DomBridge
                 var arr = new JSArray();
                 foreach (var rule in rulesStorage)
                 {
-                    var ruleObj = new JSObject();
-                    ruleObj.FastAddValue((KeyString)"cssText", new JSString(rule), JSPropertyAttributes.EnumerableConfigurableValue);
+                    var ruleObj = BuildCssRuleObject(rule);
                     arr.Add(ruleObj);
                 }
                 return arr;
@@ -4074,10 +4078,29 @@ public sealed class DomBridge
                 ((List<(int Index, string Rule)>)existing).Add((index, ruleText));
 
                 // Invalidate cache so next cssRules access rebuilds
+                skipRebuild = false;
                 lastTextHash = string.Empty;
 
                 return new JSNumber(index);
             }, "insertRule", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // deleteRule(index) — removes a rule at the given index
+        sheet.FastAddValue(
+            (KeyString)"deleteRule",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                {
+                    var dv = a[0].DoubleValue;
+                    var idx = double.IsNaN(dv) ? 0 : (int)dv;
+                    if (idx >= 0 && idx < rulesStorage.Count)
+                        rulesStorage.RemoveAt(idx);
+                    // Skip text-based rebuild since we modified programmatically
+                    skipRebuild = true;
+                }
+                return JSUndefined.Value;
+            }, "deleteRule", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return sheet;
@@ -4120,6 +4143,122 @@ public sealed class DomBridge
             }
         }
         return rules;
+    }
+
+    /// <summary>
+    /// Builds a CSSRule JSObject from a CSS rule string.
+    /// Sets <c>type</c> (1 = CSSStyleRule, 5 = CSSFontFaceRule),
+    /// <c>cssText</c>, <c>selectorText</c>, and <c>style</c> properties.
+    /// </summary>
+    private static JSObject BuildCssRuleObject(string ruleText)
+    {
+        var ruleObj = new JSObject();
+        ruleObj.FastAddValue((KeyString)"cssText", new JSString(ruleText), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        if (ruleText.TrimStart().StartsWith("@font-face", StringComparison.OrdinalIgnoreCase))
+        {
+            // CSSFontFaceRule — type 5
+            ruleObj.FastAddValue((KeyString)"type", new JSNumber(5), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // Extract declarations from @font-face { ... }
+            int braceOpen = ruleText.IndexOf('{');
+            int braceClose = ruleText.LastIndexOf('}');
+            if (braceOpen >= 0 && braceClose > braceOpen)
+            {
+                var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
+                var styleObj = new JSObject();
+                foreach (var decl in declarations.Split(';'))
+                {
+                    var colonIdx = decl.IndexOf(':');
+                    if (colonIdx > 0)
+                    {
+                        var prop = decl[..colonIdx].Trim();
+                        var val = decl[(colonIdx + 1)..].Trim();
+                        if (!string.IsNullOrEmpty(prop))
+                        {
+                            // Expose as both kebab-case and camelCase
+                            styleObj.FastAddValue((KeyString)prop, new JSString(val), JSPropertyAttributes.EnumerableConfigurableValue);
+                            var camel = ToCamelCaseStatic(prop);
+                            if (camel != prop)
+                                styleObj.FastAddValue((KeyString)camel, new JSString(val), JSPropertyAttributes.EnumerableConfigurableValue);
+                        }
+                    }
+                }
+                ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+            }
+        }
+        else
+        {
+            // CSSStyleRule — type 1
+            ruleObj.FastAddValue((KeyString)"type", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // Extract selector text
+            int braceOpen = ruleText.IndexOf('{');
+            if (braceOpen >= 0)
+            {
+                var selectorText = ruleText[..braceOpen].Trim();
+                ruleObj.FastAddValue((KeyString)"selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
+
+                int braceClose = ruleText.LastIndexOf('}');
+                if (braceClose > braceOpen)
+                {
+                    var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
+                    var styleObj = new JSObject();
+                    foreach (var decl in declarations.Split(';'))
+                    {
+                        var colonIdx = decl.IndexOf(':');
+                        if (colonIdx > 0)
+                        {
+                            var prop = decl[..colonIdx].Trim();
+                            var val = decl[(colonIdx + 1)..].Trim();
+                            if (!string.IsNullOrEmpty(prop))
+                            {
+                                styleObj.FastAddValue((KeyString)prop, new JSString(val), JSPropertyAttributes.EnumerableConfigurableValue);
+                                var camel = ToCamelCaseStatic(prop);
+                                if (camel != prop)
+                                    styleObj.FastAddValue((KeyString)camel, new JSString(val), JSPropertyAttributes.EnumerableConfigurableValue);
+                            }
+                        }
+                    }
+                    ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+                }
+            }
+        }
+
+        return ruleObj;
+    }
+
+    /// <summary>Converts CSS kebab-case property names to JS camelCase.</summary>
+    private static string ToCamelCaseStatic(string cssName)
+    {
+        var sb = new StringBuilder();
+        bool upper = false;
+        foreach (char c in cssName)
+        {
+            if (c == '-') { upper = true; continue; }
+            sb.Append(upper ? char.ToUpperInvariant(c) : c);
+            upper = false;
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Converts JS camelCase property names to CSS kebab-case.</summary>
+    private static string ToKebabCase(string camelName)
+    {
+        var sb = new StringBuilder();
+        foreach (char c in camelName)
+        {
+            if (char.IsUpper(c))
+            {
+                sb.Append('-');
+                sb.Append(char.ToLowerInvariant(c));
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
+        return sb.ToString();
     }
 
     /// <summary>
@@ -5523,7 +5662,7 @@ public sealed class DomBridge
                 }
                 else
                 {
-                    // Skip other @-rules
+                    // Skip other @-rules (but don't fail on them)
                     int braceIdx = cssText.IndexOf('{', pos);
                     int semiIdx = cssText.IndexOf(';', pos);
                     if (braceIdx >= 0 && (semiIdx < 0 || braceIdx < semiIdx))
@@ -5815,13 +5954,34 @@ public sealed class DomBridge
             }, "setProperty", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // style.getPropertyValue(property)
+        // style.getPropertyValue(property) — checks element.Style dict first, then
+        // tries camelCase conversion for kebab-case input (or vice versa),
+        // and also checks JSObject properties (set via el.style.camelCase = value).
         style.FastAddValue(
             (KeyString)"getPropertyValue",
             new JSFunction((in Arguments a) =>
             {
-                if (a.Length > 0 && element.Style.TryGetValue(a[0].ToString(), out var val))
-                    return new JSString(val);
+                if (a.Length > 0)
+                {
+                    var prop = a[0].ToString();
+                    if (element.Style.TryGetValue(prop, out var val))
+                        return new JSString(val);
+                    // Try camelCase version of kebab-case input
+                    var camel = ToCamelCaseStatic(prop);
+                    if (camel != prop && element.Style.TryGetValue(camel, out val))
+                        return new JSString(val);
+                    // Try kebab-case version of camelCase input
+                    var kebab = ToKebabCase(prop);
+                    if (kebab != prop && element.Style.TryGetValue(kebab, out val))
+                        return new JSString(val);
+                    // Check JSObject properties (set via el.style.propertyName = value)
+                    var jsVal = a.This?[(KeyString)camel];
+                    if (jsVal != null && !jsVal.IsUndefined && !jsVal.IsNull)
+                        return jsVal;
+                    jsVal = a.This?[(KeyString)prop];
+                    if (jsVal != null && !jsVal.IsUndefined && !jsVal.IsNull)
+                        return jsVal;
+                }
                 return new JSString(string.Empty);
             }, "getPropertyValue", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
