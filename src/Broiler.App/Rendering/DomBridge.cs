@@ -2651,20 +2651,24 @@ public sealed class DomBridge
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // name (read/write) — for form elements; syncs with content attribute
-        obj.FastAddProperty(
-            (KeyString)"name",
-            new JSFunction((in Arguments a) =>
-            {
-                if (element.Attributes.TryGetValue("name", out var n))
-                    return new JSString(n);
-                return new JSString(string.Empty);
-            }, "get name"),
-            new JSFunction((in Arguments a) =>
-            {
-                element.Attributes["name"] = a.Length > 0 ? a[0].ToString() : string.Empty;
-                return JSUndefined.Value;
-            }, "set name"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        // Skip for DOCTYPE nodes which have their own name property (doctype name)
+        if (!string.Equals(element.TagName, "#doctype", StringComparison.OrdinalIgnoreCase))
+        {
+            obj.FastAddProperty(
+                (KeyString)"name",
+                new JSFunction((in Arguments a) =>
+                {
+                    if (element.Attributes.TryGetValue("name", out var n))
+                        return new JSString(n);
+                    return new JSString(string.Empty);
+                }, "get name"),
+                new JSFunction((in Arguments a) =>
+                {
+                    element.Attributes["name"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    return JSUndefined.Value;
+                }, "set name"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
 
         // disabled (read/write) — for form controls
         obj.FastAddProperty(
@@ -3759,12 +3763,12 @@ public sealed class DomBridge
                         bridge._elements.Add(doctype);
                     }
 
-                    foreach (var child in parsedDoc.Children)
-                    {
-                        child.Parent = docRoot;
-                        docRoot.Children.Add(child);
-                        bridge._elements.Add(child);
-                    }
+                    // parsedDoc is the <html> element from HtmlTreeBuilder.
+                    // Add it directly to docRoot (not its children).
+                    parsedDoc.Parent = docRoot;
+                    docRoot.Children.Add(parsedDoc);
+                    if (!bridge._elements.Contains(parsedDoc))
+                        bridge._elements.Add(parsedDoc);
                     foreach (var el in allEls)
                     {
                         if (!bridge._elements.Contains(el))
