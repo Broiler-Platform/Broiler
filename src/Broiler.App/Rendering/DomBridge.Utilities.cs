@@ -184,6 +184,55 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Decodes a <c>data:</c> URI and returns the MIME type and decoded body content.
+    /// Supports percent-encoded and base64-encoded payloads, as well as nested data URIs.
+    /// </summary>
+    private static (string mimeType, string body) DecodeDataUriParts(string dataUri)
+    {
+        if (!dataUri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            return (string.Empty, string.Empty);
+
+        var rest = dataUri[5..]; // strip "data:"
+        var commaIdx = rest.IndexOf(',');
+        if (commaIdx < 0)
+            return (string.Empty, string.Empty);
+
+        var meta = rest[..commaIdx]; // e.g. "text/html;base64" or "text/html;charset=utf-8"
+        var payload = rest[(commaIdx + 1)..];
+
+        // Extract MIME type (before any semicolons)
+        var mimeType = meta;
+        var semiIdx = meta.IndexOf(';');
+        if (semiIdx >= 0)
+            mimeType = meta[..semiIdx];
+        if (string.IsNullOrEmpty(mimeType))
+            mimeType = "text/plain"; // default per RFC 2397
+
+        string body;
+        if (meta.Contains("base64", StringComparison.OrdinalIgnoreCase))
+        {
+            var decoded = Uri.UnescapeDataString(payload);
+            // Strip whitespace (RFC 2045 allows folding)
+            decoded = Regex.Replace(decoded, @"\s", string.Empty);
+            try
+            {
+                var bytes = Convert.FromBase64String(decoded);
+                body = Encoding.UTF8.GetString(bytes);
+            }
+            catch
+            {
+                body = string.Empty;
+            }
+        }
+        else
+        {
+            body = Uri.UnescapeDataString(payload);
+        }
+
+        return (mimeType.Trim(), body);
+    }
+
+    /// <summary>
     /// Returns <c>true</c> if the target URL is cross-origin relative to the page URL.
     /// Relative URLs and file:// URLs are treated as same-origin.
     /// </summary>
@@ -192,6 +241,8 @@ public sealed partial class DomBridge
         if (string.IsNullOrWhiteSpace(targetUrl)) return false;
         // about:blank inherits the origin of the embedding document (always same-origin)
         if (string.Equals(targetUrl, "about:blank", StringComparison.OrdinalIgnoreCase)) return false;
+        // data: URIs inherit the origin of the embedding document (always same-origin)
+        if (targetUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) return false;
         // Relative URLs are always same-origin
         if (!Uri.TryCreate(targetUrl, UriKind.Absolute, out var targetUri)) return false;
         // file:// URLs are same-origin with each other
