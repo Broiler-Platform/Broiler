@@ -186,7 +186,9 @@ public sealed partial class DomBridge
             if (c == '*' && i > 0 && bracketDepth == 0 && parenDepth == 0)
             {
                 var prev = selector[i - 1];
-                if (char.IsLetterOrDigit(prev) || prev == '_' || prev == '-')
+                // Insert space only if preceded by a tag/class/id character,
+                // but not a namespace separator '|' or combinator/punctuation.
+                if ((char.IsLetterOrDigit(prev) || prev == '_' || prev == '-') && prev != '|')
                 {
                     sb.Append(' ');
                 }

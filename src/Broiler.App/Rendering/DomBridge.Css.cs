@@ -29,6 +29,10 @@ public sealed partial class DomBridge
         @"@media\s+(?<query>[^{]+)\{(?<content>(?:[^{}]|\{[^}]*\})*)\}",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    private static readonly Regex PseudoSpecificityPattern = new(
+        @"::?[a-zA-Z-]+(?:\([^)]*\))?",
+        RegexOptions.Compiled);
+
     /// <summary>
     /// Parsed CSS rules extracted from <c>&lt;style&gt;</c> blocks, stored as
     /// (selector, specificity, declarations) triples.
@@ -53,8 +57,7 @@ public sealed partial class DomBridge
         s = AttributeSelectorPattern.Replace(s, m => { b++; return string.Empty; });
 
         // Count pseudo-classes and pseudo-elements
-        var pseudoRx = new Regex(@"::?[a-zA-Z-]+(?:\([^)]*\))?");
-        s = pseudoRx.Replace(s, m =>
+        s = PseudoSpecificityPattern.Replace(s, m =>
         {
             var token = m.Value;
             if (token.StartsWith("::", StringComparison.Ordinal))
