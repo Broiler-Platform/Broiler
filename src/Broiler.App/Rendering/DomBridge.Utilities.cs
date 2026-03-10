@@ -867,11 +867,20 @@ public sealed partial class DomBridge
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Regex for valid XML Name (simplified): must start with a letter, underscore, or colon,
-    /// followed by letters, digits, hyphens, underscores, dots, or colons.
+    /// Regex for valid XML Name: must start with a letter or underscore,
+    /// followed by letters, digits, hyphens, underscores, or dots.
+    /// Colons are NOT allowed (use <see cref="ValidXmlQualifiedNamePattern"/> for qualified names).
     /// </summary>
     private static readonly Regex ValidXmlNamePattern = new(
-        @"^[a-zA-Z_:][\w.\-:]*$",
+        @"^[a-zA-Z_][\w.\-]*$",
+        RegexOptions.Compiled);
+
+    /// <summary>
+    /// Regex for valid XML QName: either a simple name or prefix:localName
+    /// where both prefix and localName are valid XML names (no colons).
+    /// </summary>
+    private static readonly Regex ValidXmlQualifiedNamePattern = new(
+        @"^[a-zA-Z_][\w.\-]*(?::[a-zA-Z_][\w.\-]*)?$",
         RegexOptions.Compiled);
 
     /// <summary>
@@ -893,8 +902,8 @@ public sealed partial class DomBridge
     /// </summary>
     private static void ValidateQualifiedName(string qualifiedName, string? ns)
     {
-        // First validate the name characters
-        if (string.IsNullOrEmpty(qualifiedName) || !ValidXmlNamePattern.IsMatch(qualifiedName))
+        // First validate the name characters (allows optional single colon for prefix:localName)
+        if (string.IsNullOrEmpty(qualifiedName) || !ValidXmlQualifiedNamePattern.IsMatch(qualifiedName))
         {
             throw new JSException(
                 $"Failed to execute 'createElementNS': The qualified name provided ('{qualifiedName}') is not a valid name.");
