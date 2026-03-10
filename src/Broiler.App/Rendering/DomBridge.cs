@@ -2289,8 +2289,19 @@ public sealed class DomBridge
                 var idx = element.Children.IndexOf(oldEl);
                 if (idx < 0) return a[1];
 
+                // If newChild is already in this parent, remove it first and re-find idx
+                if (ReferenceEquals(newEl.Parent, element))
+                {
+                    element.Children.Remove(newEl);
+                    idx = element.Children.IndexOf(oldEl);
+                    if (idx < 0) return a[1];
+                }
+                else
+                {
+                    newEl.Parent?.Children.Remove(newEl);
+                }
+
                 oldEl.Parent = null;
-                newEl.Parent?.Children.Remove(newEl);
                 newEl.Parent = element;
                 element.Children[idx] = newEl;
                 return a[1]; // returns the old child
@@ -2627,6 +2638,18 @@ public sealed class DomBridge
                 var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
                 return FindInDescendants(element, sel, true, bridge);
             }, "querySelectorAll", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // getElementsByTagName on elements — searches descendants in tree order
+        obj.FastAddValue(
+            (KeyString)"getElementsByTagName",
+            new JSFunction((in Arguments a) =>
+            {
+                var tagSearch = a.Length > 0 ? a[0].ToString().ToLowerInvariant() : string.Empty;
+                var results = new List<JSValue>();
+                CollectDescendantsByTag(element, tagSearch, results, bridge);
+                return new JSArray(results);
+            }, "getElementsByTagName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getContext(contextType) — for <canvas> elements
@@ -4355,7 +4378,7 @@ public sealed class DomBridge
         // (per HTMLFormControlsCollection spec behavior)
         var collection = new FormElementsCollection(form, bridge);
         for (int i = 0; i < controls.Count; i++)
-            collection.FastAddValue((KeyString)i.ToString(), ToJSObject(controls[i]),
+            collection.FastAddValue((uint)i, ToJSObject(controls[i]),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
         collection.FastAddProperty(
@@ -4380,6 +4403,19 @@ public sealed class DomBridge
         {
             result.Add(child);
             CollectDescendants(child, result);
+        }
+    }
+
+    /// <summary>
+    /// Collects descendant elements matching a tag name in tree order (depth-first).
+    /// </summary>
+    private static void CollectDescendantsByTag(DomElement root, string tagName, List<JSValue> results, DomBridge bridge)
+    {
+        foreach (var child in root.Children)
+        {
+            if (string.Equals(child.TagName, tagName, System.StringComparison.OrdinalIgnoreCase))
+                results.Add(bridge.ToJSObject(child));
+            CollectDescendantsByTag(child, tagName, results, bridge);
         }
     }
 
