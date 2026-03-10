@@ -159,6 +159,16 @@ public sealed class HtmlTreeBuilder
                     break;
                 }
 
+                case TokenType.Comment:
+                {
+                    var commentNode = new DomElement("#comment", null, null, string.Empty, isTextNode: false);
+                    commentNode.TextContent = token.Data ?? string.Empty;
+                    var commentParent = openElements.Count > 0 ? openElements.Peek() : body;
+                    AppendChild(commentParent, commentNode);
+                    allElements.Add(commentNode);
+                    break;
+                }
+
                 case TokenType.EndOfFile:
                     break;
             }

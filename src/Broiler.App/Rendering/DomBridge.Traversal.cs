@@ -35,16 +35,10 @@ public sealed partial class DomBridge
 
         if (filterFn != null)
         {
-            try
-            {
-                var result = filterFn.InvokeFunction(new Arguments(filterFn, ToJSObject(el)));
-                return (int)result.DoubleValue;
-            }
-            catch (Exception ex)
-            {
-                RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ApplyFilter", $"NodeFilter error: {ex.Message}", ex);
-                return 1; // FILTER_ACCEPT on error
-            }
+            // Per DOM Level 2 Traversal spec, exceptions thrown by NodeFilter
+            // callbacks must propagate to the caller — they must NOT be swallowed.
+            var result = filterFn.InvokeFunction(new Arguments(filterFn, ToJSObject(el)));
+            return (int)result.DoubleValue;
         }
         return 1; // FILTER_ACCEPT
     }
@@ -611,7 +605,11 @@ public sealed partial class DomBridge
                 startContainer = el;
                 startOffset = 0;
                 endContainer = el;
-                endOffset = el.Children.Count;
+                // For text/comment nodes, endOffset is the character length
+                if (el.IsTextNode || string.Equals(el.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+                    endOffset = (el.TextContent ?? string.Empty).Length;
+                else
+                    endOffset = el.Children.Count;
                 UpdateCollapsed();
                 return JSUndefined.Value;
             }, "selectNodeContents", 1),
@@ -754,10 +752,22 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var sb = new StringBuilder();
-                var nodes = GetNodesInRange(startContainer, startOffset, endContainer, endOffset);
-                foreach (var node in nodes)
+                // Handle case where range is within a single text/comment node
+                if (ReferenceEquals(startContainer, endContainer) &&
+                    (startContainer.IsTextNode || string.Equals(startContainer.TagName, "#comment", StringComparison.OrdinalIgnoreCase)))
                 {
-                    CollectTextContent(node, sb);
+                    var text = startContainer.TextContent ?? string.Empty;
+                    var s = Math.Max(0, Math.Min(startOffset, text.Length));
+                    var e = Math.Max(s, Math.Min(endOffset, text.Length));
+                    sb.Append(text, s, e - s);
+                }
+                else
+                {
+                    var nodes = GetNodesInRange(startContainer, startOffset, endContainer, endOffset);
+                    foreach (var node in nodes)
+                    {
+                        CollectTextContent(node, sb);
+                    }
                 }
                 return new JSString(sb.ToString());
             }, "toString", 0),
