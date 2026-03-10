@@ -113,6 +113,10 @@ public sealed class DomBridge
         @"\[(?<name>[a-zA-Z][a-zA-Z0-9_:-]*)(?:(?<op>[~|^$*]?=)(?<value>[""'][^""']*[""']|[^\]]*))?\]",
         RegexOptions.Compiled);
 
+    private static readonly Regex DocTypePattern = new(
+        @"<!DOCTYPE\s+(\w+)(?:\s+PUBLIC\s+""([^""]*)""(?:\s+""([^""]*)"")?)?\s*>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private void ParseHtml(string html)
     {
         _elements.Clear();
@@ -1379,12 +1383,83 @@ public sealed class DomBridge
             (KeyString)"createElementNS",
             new JSFunction((in Arguments a) =>
             {
-                // Ignore namespace, just create element with local name
+                var ns = a.Length > 0 ? a[0].ToString() : null;
                 var localName = a.Length > 1 ? a[1].ToString() : (a.Length > 0 ? a[0].ToString() : "div");
                 var el = new DomElement(localName, null, null, string.Empty);
+                if (!string.IsNullOrEmpty(ns))
+                    el.NamespaceURI = ns;
                 _elements.Add(el);
                 return ToJSObject(el);
             }, "createElementNS", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.images — collection of all <img> elements
+        document.FastAddProperty(
+            (KeyString)"images",
+            new JSFunction((in Arguments _) =>
+            {
+                var results = new List<JSValue>();
+                foreach (var el in _elements)
+                {
+                    if (string.Equals(el.TagName, "img", StringComparison.OrdinalIgnoreCase))
+                        results.Add(ToJSObject(el));
+                }
+                return new JSArray(results);
+            }, "get images"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.links — collection of all <a> and <area> elements with href
+        document.FastAddProperty(
+            (KeyString)"links",
+            new JSFunction((in Arguments _) =>
+            {
+                var results = new List<JSValue>();
+                foreach (var el in _elements)
+                {
+                    if ((string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(el.TagName, "area", StringComparison.OrdinalIgnoreCase)) &&
+                        el.Attributes.ContainsKey("href"))
+                        results.Add(ToJSObject(el));
+                }
+                return new JSArray(results);
+            }, "get links"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.styleSheets — collection of stylesheet objects for main document
+        document.FastAddProperty(
+            (KeyString)"styleSheets",
+            new JSFunction((in Arguments _) =>
+            {
+                var styleEls = new List<DomElement>();
+                foreach (var el in _elements)
+                {
+                    if (string.Equals(el.TagName, "style", StringComparison.OrdinalIgnoreCase))
+                        styleEls.Add(el);
+                }
+                var arr = new JSArray();
+                foreach (var styleEl in styleEls)
+                    arr.Add(BuildStyleSheetObject(styleEl));
+                return arr;
+            }, "get styleSheets"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.open() — for main document
+        document.FastAddValue(
+            (KeyString)"open",
+            new JSFunction((in Arguments _) =>
+            {
+                // Main document open is a no-op in our implementation
+                return document;
+            }, "open", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.close() — for main document
+        document.FastAddValue(
+            (KeyString)"close",
+            new JSFunction((in Arguments _) => JSUndefined.Value, "close", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         context["document"] = document;
@@ -1975,6 +2050,7 @@ public sealed class DomBridge
                 if (string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) return new JSNumber(8); // COMMENT_NODE
                 if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return new JSNumber(9); // DOCUMENT_NODE
                 if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return new JSNumber(11); // DOCUMENT_FRAGMENT_NODE
+                if (string.Equals(element.TagName, "#doctype", StringComparison.OrdinalIgnoreCase)) return new JSNumber(10); // DOCUMENT_TYPE_NODE
                 return new JSNumber(1); // ELEMENT_NODE
             }, "get nodeType"),
             null,
@@ -1989,8 +2065,39 @@ public sealed class DomBridge
                 if (string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) return new JSString("#comment");
                 if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return new JSString("#document");
                 if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return new JSString("#document-fragment");
+                if (string.Equals(element.TagName, "#doctype", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new JSString(GetDocTypeName(element));
+                }
                 return new JSString(element.TagName.ToUpperInvariant());
             }, "get nodeName"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // localName (read-only) — null for non-element nodes; tag name (lowercase) for elements
+        obj.FastAddProperty(
+            (KeyString)"localName",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.IsTextNode) return JSNull.Value;
+                if (element.TagName.StartsWith("#")) return JSNull.Value; // #comment, #document, etc.
+                return new JSString(element.TagName.ToLowerInvariant());
+            }, "get localName"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // namespaceURI (read-only) — returns namespace URI for elements created via createElementNS
+        obj.FastAddProperty(
+            (KeyString)"namespaceURI",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.NamespaceURI != null)
+                    return new JSString(element.NamespaceURI);
+                // Default namespace for HTML elements
+                if (!element.IsTextNode && !element.TagName.StartsWith("#"))
+                    return new JSString("http://www.w3.org/1999/xhtml");
+                return JSNull.Value;
+            }, "get namespaceURI"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -2027,6 +2134,45 @@ public sealed class DomBridge
                 return JSUndefined.Value;
             }, "set data"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // DOCTYPE-specific properties
+        if (string.Equals(element.TagName, "#doctype", StringComparison.OrdinalIgnoreCase))
+        {
+            obj.FastAddProperty(
+                (KeyString)"name",
+                new JSFunction((in Arguments _) =>
+                {
+                    return new JSString(GetDocTypeName(element));
+                }, "get name"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            obj.FastAddProperty(
+                (KeyString)"publicId",
+                new JSFunction((in Arguments _) =>
+                {
+                    var pubId = element.DomProperties.TryGetValue("publicId", out var p) ? p?.ToString() ?? string.Empty : string.Empty;
+                    return new JSString(pubId);
+                }, "get publicId"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            obj.FastAddProperty(
+                (KeyString)"systemId",
+                new JSFunction((in Arguments _) =>
+                {
+                    var sysId = element.DomProperties.TryGetValue("systemId", out var s) ? s?.ToString() ?? string.Empty : string.Empty;
+                    return new JSString(sysId);
+                }, "get systemId"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            obj.FastAddProperty(
+                (KeyString)"internalSubset",
+                new JSFunction((in Arguments _) => JSNull.Value, "get internalSubset"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
 
         // ownerDocument (read-only) — returns the document element wrapper
         obj.FastAddProperty(
@@ -2509,20 +2655,24 @@ public sealed class DomBridge
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // name (read/write) — for form elements; syncs with content attribute
-        obj.FastAddProperty(
-            (KeyString)"name",
-            new JSFunction((in Arguments a) =>
-            {
-                if (element.Attributes.TryGetValue("name", out var n))
-                    return new JSString(n);
-                return new JSString(string.Empty);
-            }, "get name"),
-            new JSFunction((in Arguments a) =>
-            {
-                element.Attributes["name"] = a.Length > 0 ? a[0].ToString() : string.Empty;
-                return JSUndefined.Value;
-            }, "set name"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        // Skip for DOCTYPE nodes which have their own name property (doctype name)
+        if (!string.Equals(element.TagName, "#doctype", StringComparison.OrdinalIgnoreCase))
+        {
+            obj.FastAddProperty(
+                (KeyString)"name",
+                new JSFunction((in Arguments a) =>
+                {
+                    if (element.Attributes.TryGetValue("name", out var n))
+                        return new JSString(n);
+                    return new JSString(string.Empty);
+                }, "get name"),
+                new JSFunction((in Arguments a) =>
+                {
+                    element.Attributes["name"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    return JSUndefined.Value;
+                }, "set name"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
 
         // disabled (read/write) — for form controls
         obj.FastAddProperty(
@@ -2670,15 +2820,25 @@ public sealed class DomBridge
             }, "getContext", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // contentWindow — for <iframe> elements (sandboxed, same-origin stub)
+        // contentWindow / contentDocument — for <iframe> elements with full sub-document DOM
         if (string.Equals(element.TagName, "iframe", System.StringComparison.OrdinalIgnoreCase))
         {
+            obj.FastAddProperty(
+                (KeyString)"contentDocument",
+                new JSFunction((in Arguments _) => GetOrCreateSubDocument(element), "get contentDocument"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
             obj.FastAddProperty(
                 (KeyString)"contentWindow",
                 new JSFunction((in Arguments _) =>
                 {
                     var iframeWindow = new JSObject();
-                    iframeWindow.FastAddValue((KeyString)"document", new JSObject(), JSPropertyAttributes.EnumerableConfigurableValue);
+                    iframeWindow.FastAddProperty(
+                        (KeyString)"document",
+                        new JSFunction((in Arguments __) => GetOrCreateSubDocument(element), "get document"),
+                        null,
+                        JSPropertyAttributes.EnumerableConfigurableProperty);
                     var iframeLocation = new JSObject();
                     if (element.Attributes.TryGetValue("src", out var iframeSrc))
                         iframeLocation.FastAddValue((KeyString)"href", new JSString(iframeSrc), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -2690,17 +2850,11 @@ public sealed class DomBridge
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
-            obj.FastAddProperty(
-                (KeyString)"contentDocument",
-                new JSFunction((in Arguments _) =>
-                {
-                    // Return a minimal document for sandboxed same-origin iframes
-                    var iframeDoc = new JSObject();
-                    iframeDoc.FastAddValue((KeyString)"body", new JSObject(), JSPropertyAttributes.EnumerableConfigurableValue);
-                    return iframeDoc;
-                }, "get contentDocument"),
-                null,
-                JSPropertyAttributes.EnumerableConfigurableProperty);
+            // getSVGDocument() — returns contentDocument (same as contentDocument for same-origin)
+            obj.FastAddValue(
+                (KeyString)"getSVGDocument",
+                new JSFunction((in Arguments _) => GetOrCreateSubDocument(element), "getSVGDocument", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
 
             // sandbox attribute access
             obj.FastAddProperty(
@@ -3142,7 +3296,7 @@ public sealed class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
-        // HTMLObjectElement — data property with URI resolution
+        // HTMLObjectElement — data property with URI resolution + contentDocument + getSVGDocument
         if (tag == "object")
         {
             obj.FastAddProperty(
@@ -3163,6 +3317,19 @@ public sealed class DomBridge
                     return JSUndefined.Value;
                 }, "set data"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // contentDocument for <object> element
+            obj.FastAddProperty(
+                (KeyString)"contentDocument",
+                new JSFunction((in Arguments _) => bridge.GetOrCreateSubDocument(element), "get contentDocument"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // getSVGDocument() for <object> element
+            obj.FastAddValue(
+                (KeyString)"getSVGDocument",
+                new JSFunction((in Arguments _) => bridge.GetOrCreateSubDocument(element), "getSVGDocument", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         // HTMLAnchorElement — href property with URI resolution
@@ -3187,7 +3354,800 @@ public sealed class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
+        // -- Phase 6: SVG DOM interfaces --
+
+        // SVG element properties — provide SVGAnimatedLength stubs for dimensional attributes
+        if (element.NamespaceURI == "http://www.w3.org/2000/svg" ||
+            tag == "svg" || tag == "rect" || tag == "circle" || tag == "ellipse" ||
+            tag == "line" || tag == "polyline" || tag == "polygon" || tag == "path" ||
+            tag == "text" || tag == "g" || tag == "use" || tag == "image" ||
+            tag == "svg:svg" || tag == "svg:rect" || tag == "svg:text" || tag == "svg:g")
+        {
+            // For SVG dimensional attributes, provide SVGAnimatedLength objects with baseVal/animVal
+            foreach (var dimAttr in new[] { "width", "height", "x", "y", "cx", "cy", "r", "rx", "ry" })
+            {
+                var attrName = dimAttr; // capture for closure
+                obj.FastAddProperty(
+                    (KeyString)attrName,
+                    new JSFunction((in Arguments _) =>
+                    {
+                        var animLength = new JSObject();
+                        var valueStr = element.Attributes.TryGetValue(attrName, out var v) ? v : "0";
+                        double.TryParse(valueStr, System.Globalization.NumberStyles.Any,
+                            System.Globalization.CultureInfo.InvariantCulture, out var numVal);
+
+                        var baseVal = new JSObject();
+                        baseVal.FastAddValue((KeyString)"value", new JSNumber(numVal), JSPropertyAttributes.EnumerableConfigurableValue);
+                        baseVal.FastAddValue((KeyString)"valueInSpecifiedUnits", new JSNumber(numVal), JSPropertyAttributes.EnumerableConfigurableValue);
+                        baseVal.FastAddValue((KeyString)"unitType", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue); // SVG_LENGTHTYPE_NUMBER
+
+                        var animVal = new JSObject();
+                        animVal.FastAddValue((KeyString)"value", new JSNumber(numVal), JSPropertyAttributes.EnumerableConfigurableValue);
+                        animVal.FastAddValue((KeyString)"valueInSpecifiedUnits", new JSNumber(numVal), JSPropertyAttributes.EnumerableConfigurableValue);
+                        animVal.FastAddValue((KeyString)"unitType", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+
+                        animLength.FastAddValue((KeyString)"baseVal", baseVal, JSPropertyAttributes.EnumerableConfigurableValue);
+                        animLength.FastAddValue((KeyString)"animVal", animVal, JSPropertyAttributes.EnumerableConfigurableValue);
+                        return animLength;
+                    }, $"get {attrName}"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+
+            // SVGTextContentElement methods
+            if (tag == "text" || tag == "svg:text" || tag == "tspan" || tag == "svg:tspan" ||
+                tag == "textpath" || tag == "svg:textpath")
+            {
+                obj.FastAddValue(
+                    (KeyString)"getNumberOfChars",
+                    new JSFunction((in Arguments _) =>
+                    {
+                        var sb = new StringBuilder();
+                        CollectTextContent(element, sb);
+                        return new JSNumber(sb.Length);
+                    }, "getNumberOfChars", 0),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+            }
+        }
+
         return obj;
+    }
+
+    // ── Phase 6: Sub-document cache ──────────────────────────────────────────
+    private readonly Dictionary<DomElement, JSObject> _subDocumentCache = [];
+
+    /// <summary>
+    /// Gets or creates a full sub-document JSObject for iframe/object elements.
+    /// The sub-document has its own DOM tree, createElement, getElementById, etc.
+    /// </summary>
+    internal JSObject GetOrCreateSubDocument(DomElement containerElement)
+    {
+        if (_subDocumentCache.TryGetValue(containerElement, out var cached))
+            return cached;
+
+        var docRoot = containerElement.Children.FirstOrDefault(c =>
+            string.Equals(c.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
+        if (docRoot == null)
+        {
+            docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+            docRoot.Parent = containerElement;
+
+            var htmlEl = new DomElement("html", null, null, string.Empty);
+            htmlEl.Parent = docRoot;
+            docRoot.Children.Add(htmlEl);
+
+            var headEl = new DomElement("head", null, null, string.Empty);
+            headEl.Parent = htmlEl;
+            htmlEl.Children.Add(headEl);
+
+            var bodyEl = new DomElement("body", null, null, string.Empty);
+            bodyEl.Parent = htmlEl;
+            htmlEl.Children.Add(bodyEl);
+
+            containerElement.Children.Insert(0, docRoot);
+            _elements.Add(docRoot);
+            _elements.Add(htmlEl);
+            _elements.Add(headEl);
+            _elements.Add(bodyEl);
+        }
+
+        var doc = BuildSubDocument(docRoot);
+        _subDocumentCache[containerElement] = doc;
+        return doc;
+    }
+
+    /// <summary>
+    /// Builds a full document JSObject for a sub-document tree rooted at the given element.
+    /// </summary>
+    private JSObject BuildSubDocument(DomElement docRoot)
+    {
+        var doc = new JSObject();
+        var bridge = this;
+
+        DomElement GetDocumentElement() =>
+            docRoot.Children.FirstOrDefault(c => !c.IsTextNode && !c.TagName.StartsWith("#"))
+            ?? docRoot;
+
+        doc.FastAddProperty(
+            (KeyString)"documentElement",
+            new JSFunction((in Arguments _) => ToJSObject(GetDocumentElement()), "get documentElement"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // body
+        doc.FastAddProperty(
+            (KeyString)"body",
+            new JSFunction((in Arguments _) =>
+            {
+                var htmlEl = GetDocumentElement();
+                foreach (var child in htmlEl.Children)
+                {
+                    if (string.Equals(child.TagName, "body", StringComparison.OrdinalIgnoreCase))
+                        return ToJSObject(child);
+                }
+                return JSNull.Value;
+            }, "get body"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // head
+        doc.FastAddProperty(
+            (KeyString)"head",
+            new JSFunction((in Arguments _) =>
+            {
+                var htmlEl = GetDocumentElement();
+                foreach (var child in htmlEl.Children)
+                {
+                    if (string.Equals(child.TagName, "head", StringComparison.OrdinalIgnoreCase))
+                        return ToJSObject(child);
+                }
+                return JSNull.Value;
+            }, "get head"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // childNodes
+        doc.FastAddProperty(
+            (KeyString)"childNodes",
+            new JSFunction((in Arguments _) =>
+            {
+                var arr = new JSArray();
+                foreach (var child in docRoot.Children)
+                    arr.Add(ToJSObject(child));
+                return arr;
+            }, "get childNodes"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // firstChild
+        doc.FastAddProperty(
+            (KeyString)"firstChild",
+            new JSFunction((in Arguments _) =>
+            {
+                return docRoot.Children.Count > 0
+                    ? (JSValue)ToJSObject(docRoot.Children[0])
+                    : JSNull.Value;
+            }, "get firstChild"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // lastChild
+        doc.FastAddProperty(
+            (KeyString)"lastChild",
+            new JSFunction((in Arguments _) =>
+            {
+                return docRoot.Children.Count > 0
+                    ? (JSValue)ToJSObject(docRoot.Children[^1])
+                    : JSNull.Value;
+            }, "get lastChild"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // hasChildNodes()
+        doc.FastAddValue(
+            (KeyString)"hasChildNodes",
+            new JSFunction((in Arguments _) =>
+                docRoot.Children.Count > 0 ? JSBoolean.True : JSBoolean.False,
+                "hasChildNodes", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // nodeType = DOCUMENT_NODE (9)
+        doc.FastAddProperty(
+            (KeyString)"nodeType",
+            new JSFunction((in Arguments _) => new JSNumber(9), "get nodeType"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // nodeName = "#document"
+        doc.FastAddProperty(
+            (KeyString)"nodeName",
+            new JSFunction((in Arguments _) => new JSString("#document"), "get nodeName"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // localName = null for document
+        doc.FastAddProperty(
+            (KeyString)"localName",
+            new JSFunction((in Arguments _) => JSNull.Value, "get localName"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // getElementById(id)
+        doc.FastAddValue(
+            (KeyString)"getElementById",
+            new JSFunction((in Arguments a) =>
+            {
+                var id = a.Length > 0 ? a[0].ToString() : string.Empty;
+                var found = FindInSubTree(docRoot, el => el.Id == id);
+                return found != null ? (JSValue)ToJSObject(found) : JSNull.Value;
+            }, "getElementById", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // getElementsByTagName(tag)
+        doc.FastAddValue(
+            (KeyString)"getElementsByTagName",
+            new JSFunction((in Arguments a) =>
+            {
+                var tagName = a.Length > 0 ? a[0].ToString().ToLowerInvariant() : string.Empty;
+                var results = new List<JSValue>();
+                CollectByTagName(docRoot, tagName, results);
+                return new JSArray(results);
+            }, "getElementsByTagName", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // createElement(tag)
+        doc.FastAddValue(
+            (KeyString)"createElement",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    throw new JSException("Failed to execute 'createElement': 1 argument required.");
+                var tagName = a[0].ToString().ToLowerInvariant();
+                var el = new DomElement(tagName, null, null, string.Empty);
+                _elements.Add(el);
+                return ToJSObject(el);
+            }, "createElement", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // createTextNode(text)
+        doc.FastAddValue(
+            (KeyString)"createTextNode",
+            new JSFunction((in Arguments a) =>
+            {
+                var text = a.Length > 0 ? a[0].ToString() : string.Empty;
+                var el = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+                el.TextContent = text;
+                _elements.Add(el);
+                return ToJSObject(el);
+            }, "createTextNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // createComment(data)
+        doc.FastAddValue(
+            (KeyString)"createComment",
+            new JSFunction((in Arguments a) =>
+            {
+                var data = a.Length > 0 ? a[0].ToString() : string.Empty;
+                var el = new DomElement("#comment", null, null, string.Empty);
+                el.TextContent = data;
+                _elements.Add(el);
+                return ToJSObject(el);
+            }, "createComment", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // createElementNS(ns, localName)
+        doc.FastAddValue(
+            (KeyString)"createElementNS",
+            new JSFunction((in Arguments a) =>
+            {
+                var ns = a.Length > 0 ? a[0].ToString() : null;
+                var localName = a.Length > 1 ? a[1].ToString() : (a.Length > 0 ? a[0].ToString() : "div");
+                var el = new DomElement(localName, null, null, string.Empty);
+                if (!string.IsNullOrEmpty(ns))
+                    el.NamespaceURI = ns;
+                _elements.Add(el);
+                return ToJSObject(el);
+            }, "createElementNS", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // createEvent(type)
+        doc.FastAddValue(
+            (KeyString)"createEvent",
+            new JSFunction((in Arguments a) =>
+            {
+                var evt = new JSObject();
+                evt.FastAddValue((KeyString)"type", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"view", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"stopPropagation",
+                    new JSFunction((in Arguments __) => JSUndefined.Value, "stopPropagation", 0),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"stopImmediatePropagation",
+                    new JSFunction((in Arguments __) => JSUndefined.Value, "stopImmediatePropagation", 0),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"preventDefault",
+                    new JSFunction((in Arguments __) => JSUndefined.Value, "preventDefault", 0),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        return JSUndefined.Value;
+                    }, "initEvent", 3),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initUIEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"detail"] = initArgs[4];
+                        return JSUndefined.Value;
+                    }, "initUIEvent", 5),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                return evt;
+            }, "createEvent", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // querySelector / querySelectorAll
+        doc.FastAddValue(
+            (KeyString)"querySelector",
+            new JSFunction((in Arguments a) =>
+            {
+                var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
+                var found = FindInSubTree(docRoot, el => MatchesSelector(el, selector));
+                return found != null ? (JSValue)ToJSObject(found) : JSNull.Value;
+            }, "querySelector", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        doc.FastAddValue(
+            (KeyString)"querySelectorAll",
+            new JSFunction((in Arguments a) =>
+            {
+                var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
+                var results = new List<JSValue>();
+                CollectMatching(docRoot, el => MatchesSelector(el, selector), results);
+                return new JSArray(results);
+            }, "querySelectorAll", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.open()
+        doc.FastAddValue(
+            (KeyString)"open",
+            new JSFunction((in Arguments _) =>
+            {
+                docRoot.Children.Clear();
+                return doc;
+            }, "open", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.close()
+        doc.FastAddValue(
+            (KeyString)"close",
+            new JSFunction((in Arguments _) => JSUndefined.Value, "close", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.write(html)
+        doc.FastAddValue(
+            (KeyString)"write",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSUndefined.Value;
+                var fragment = a[0].ToString();
+
+                // Parse DOCTYPE if present
+                var doctype = bridge.ParseDocType(fragment);
+
+                var treeBuilder = new HtmlTreeBuilder();
+                var (parsedDoc, allEls, _) = treeBuilder.Build(fragment);
+
+                if (docRoot.Children.Count == 0)
+                {
+                    if (doctype != null)
+                    {
+                        doctype.Parent = docRoot;
+                        docRoot.Children.Add(doctype);
+                        bridge._elements.Add(doctype);
+                    }
+
+                    // parsedDoc is the <html> element from HtmlTreeBuilder.
+                    // Add it directly to docRoot (not its children).
+                    parsedDoc.Parent = docRoot;
+                    docRoot.Children.Add(parsedDoc);
+                    if (!bridge._elements.Contains(parsedDoc))
+                        bridge._elements.Add(parsedDoc);
+                    foreach (var el in allEls)
+                    {
+                        if (!bridge._elements.Contains(el))
+                            bridge._elements.Add(el);
+                    }
+                }
+                else
+                {
+                    var bodyEl = bridge.FindInSubTree(docRoot, el =>
+                        string.Equals(el.TagName, "body", StringComparison.OrdinalIgnoreCase));
+                    if (bodyEl != null)
+                    {
+                        var parsedBody = FindInTree(parsedDoc, el =>
+                            string.Equals(el.TagName, "body", StringComparison.OrdinalIgnoreCase));
+                        if (parsedBody != null)
+                        {
+                            foreach (var child in parsedBody.Children)
+                            {
+                                child.Parent = bodyEl;
+                                bodyEl.Children.Add(child);
+                            }
+                        }
+                    }
+                    foreach (var el in allEls)
+                    {
+                        if (!bridge._elements.Contains(el))
+                            bridge._elements.Add(el);
+                    }
+                }
+                return JSUndefined.Value;
+            }, "write", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.images
+        doc.FastAddProperty(
+            (KeyString)"images",
+            new JSFunction((in Arguments _) =>
+            {
+                var results = new List<JSValue>();
+                CollectByTagName(docRoot, "img", results);
+                return new JSArray(results);
+            }, "get images"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.links
+        doc.FastAddProperty(
+            (KeyString)"links",
+            new JSFunction((in Arguments _) =>
+            {
+                var results = new List<JSValue>();
+                CollectMatching(docRoot, el =>
+                    string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) &&
+                    el.Attributes.ContainsKey("href"), results);
+                return new JSArray(results);
+            }, "get links"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.styleSheets
+        doc.FastAddProperty(
+            (KeyString)"styleSheets",
+            new JSFunction((in Arguments _) => bridge.BuildStyleSheetsCollection(docRoot), "get styleSheets"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // removeChild on document
+        doc.FastAddValue(
+            (KeyString)"removeChild",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSNull.Value;
+                var childObj = a[0] as JSObject;
+                if (childObj == null) return JSNull.Value;
+                foreach (var child in docRoot.Children.ToList())
+                {
+                    if (bridge._jsObjectCache.TryGetValue(child, out var cached) && cached == childObj)
+                    {
+                        docRoot.Children.Remove(child);
+                        child.Parent = null;
+                        return childObj;
+                    }
+                }
+                return childObj;
+            }, "removeChild", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // appendChild on document
+        doc.FastAddValue(
+            (KeyString)"appendChild",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSNull.Value;
+                var childObj = a[0] as JSObject;
+                if (childObj == null) return a.Length > 0 ? a[0] : JSNull.Value;
+                foreach (var kvp in bridge._jsObjectCache)
+                {
+                    if (kvp.Value == childObj)
+                    {
+                        var child = kvp.Key;
+                        if (child.Parent != null)
+                            child.Parent.Children.Remove(child);
+                        child.Parent = docRoot;
+                        docRoot.Children.Add(child);
+                        return childObj;
+                    }
+                }
+                return a[0];
+            }, "appendChild", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // Node type constants
+        doc.FastAddValue((KeyString)"ELEMENT_NODE", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+        doc.FastAddValue((KeyString)"TEXT_NODE", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
+        doc.FastAddValue((KeyString)"COMMENT_NODE", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
+        doc.FastAddValue((KeyString)"DOCUMENT_NODE", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
+        doc.FastAddValue((KeyString)"DOCUMENT_FRAGMENT_NODE", new JSNumber(11), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        return doc;
+    }
+
+    /// <summary>Finds the first element in a sub-tree matching a predicate.</summary>
+    private DomElement? FindInSubTree(DomElement root, Func<DomElement, bool> predicate)
+    {
+        foreach (var child in root.Children)
+        {
+            if (!child.IsTextNode && !child.TagName.StartsWith("#") && predicate(child))
+                return child;
+            var found = FindInSubTree(child, predicate);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    /// <summary>Finds the first element in a tree matching a predicate (includes the root).</summary>
+    private static DomElement? FindInTree(DomElement root, Func<DomElement, bool> predicate)
+    {
+        if (predicate(root)) return root;
+        foreach (var child in root.Children)
+        {
+            var found = FindInTree(child, predicate);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    /// <summary>Collects all elements matching a tag name in a sub-tree.</summary>
+    private void CollectByTagName(DomElement root, string tag, List<JSValue> results)
+    {
+        foreach (var child in root.Children)
+        {
+            if (!child.IsTextNode && string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase))
+                results.Add(ToJSObject(child));
+            CollectByTagName(child, tag, results);
+        }
+    }
+
+    /// <summary>Collects all elements matching a predicate in a sub-tree.</summary>
+    private void CollectMatching(DomElement root, Func<DomElement, bool> predicate, List<JSValue> results)
+    {
+        foreach (var child in root.Children)
+        {
+            if (!child.IsTextNode && predicate(child))
+                results.Add(ToJSObject(child));
+            CollectMatching(child, predicate, results);
+        }
+    }
+
+    /// <summary>Collects all DomElement nodes in a sub-tree for tracking.</summary>
+    private static void CollectSubDocElements(DomElement root, List<DomElement> list)
+    {
+        list.Add(root);
+        foreach (var child in root.Children)
+            CollectSubDocElements(child, list);
+    }
+
+    /// <summary>
+    /// Builds a styleSheets collection JSObject for a sub-document.
+    /// </summary>
+    private JSArray BuildStyleSheetsCollection(DomElement docRoot)
+    {
+        var styleEls = new List<DomElement>();
+        CollectStyleElements(docRoot, styleEls);
+
+        var arr = new JSArray();
+        foreach (var styleEl in styleEls)
+        {
+            var sheet = BuildStyleSheetObject(styleEl);
+            arr.Add(sheet);
+        }
+
+        return arr;
+    }
+
+    /// <summary>Collects all style elements in the sub-tree.</summary>
+    private static void CollectStyleElements(DomElement root, List<DomElement> results)
+    {
+        foreach (var child in root.Children)
+        {
+            if (string.Equals(child.TagName, "style", StringComparison.OrdinalIgnoreCase))
+                results.Add(child);
+            CollectStyleElements(child, results);
+        }
+    }
+
+    /// <summary>
+    /// Builds a CSSStyleSheet JSObject for a style element.
+    /// </summary>
+    private JSObject BuildStyleSheetObject(DomElement styleElement)
+    {
+        var sheet = new JSObject();
+
+        // ownerNode
+        sheet.FastAddProperty(
+            (KeyString)"ownerNode",
+            new JSFunction((in Arguments _) => ToJSObject(styleElement), "get ownerNode"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // href — null for inline stylesheets
+        sheet.FastAddProperty(
+            (KeyString)"href",
+            new JSFunction((in Arguments _) => JSNull.Value, "get href"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // Internal rules storage for this stylesheet
+        var rulesStorage = new List<string>();
+
+        // Parse initial rules from the style element's text content
+        var initialText = CollectStyleElementText(styleElement);
+        if (!string.IsNullOrWhiteSpace(initialText))
+        {
+            foreach (var rule in ParseCssRuleStrings(initialText))
+                rulesStorage.Add(rule);
+        }
+
+        // Track last known text content to detect changes
+        var lastTextHash = string.Empty;
+
+        // cssRules — live collection that combines text-based and inserted rules
+        sheet.FastAddProperty(
+            (KeyString)"cssRules",
+            new JSFunction((in Arguments _) =>
+            {
+                // Re-read text-based rules from the style element
+                var currentText = CollectStyleElementText(styleElement);
+                var currentHash = currentText ?? string.Empty;
+
+                // Only rebuild from text if text content changed
+                if (currentHash != lastTextHash)
+                {
+                    rulesStorage.Clear();
+                    if (!string.IsNullOrWhiteSpace(currentText))
+                    {
+                        foreach (var rule in ParseCssRuleStrings(currentText))
+                            rulesStorage.Add(rule);
+                    }
+                    lastTextHash = currentHash;
+
+                    // Re-insert any programmatically added rules
+                    if (styleElement.DomProperties.TryGetValue("_insertedRules", out var inserted) && inserted is List<(int Index, string Rule)> insertedRules)
+                    {
+                        foreach (var (idx, rule) in insertedRules.OrderBy(r => r.Index))
+                        {
+                            if (idx <= rulesStorage.Count)
+                                rulesStorage.Insert(idx, rule);
+                            else
+                                rulesStorage.Add(rule);
+                        }
+                    }
+                }
+
+                var arr = new JSArray();
+                foreach (var rule in rulesStorage)
+                {
+                    var ruleObj = new JSObject();
+                    ruleObj.FastAddValue((KeyString)"cssText", new JSString(rule), JSPropertyAttributes.EnumerableConfigurableValue);
+                    arr.Add(ruleObj);
+                }
+                return arr;
+            }, "get cssRules"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // insertRule(rule, index) — invalidates the text cache so cssRules rebuilds
+        sheet.FastAddValue(
+            (KeyString)"insertRule",
+            new JSFunction((in Arguments a) =>
+            {
+                var ruleText = a.Length > 0 ? a[0].ToString() : string.Empty;
+                var index = a.Length > 1 ? (int)a[1].DoubleValue : 0;
+
+                if (!styleElement.DomProperties.TryGetValue("_insertedRules", out var existing) || existing is not List<(int, string)>)
+                {
+                    existing = new List<(int Index, string Rule)>();
+                    styleElement.DomProperties["_insertedRules"] = existing;
+                }
+                ((List<(int Index, string Rule)>)existing).Add((index, ruleText));
+
+                // Invalidate cache so next cssRules access rebuilds
+                lastTextHash = string.Empty;
+
+                return new JSNumber(index);
+            }, "insertRule", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        return sheet;
+    }
+
+    /// <summary>Collects all text content from a style element's children.</summary>
+    private static string CollectStyleElementText(DomElement styleElement)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var child in styleElement.Children)
+        {
+            if (child.IsTextNode && child.TextContent != null)
+                sb.Append(child.TextContent);
+        }
+        // Also check InnerHtml as fallback
+        if (sb.Length == 0 && !string.IsNullOrEmpty(styleElement.InnerHtml))
+            sb.Append(styleElement.InnerHtml);
+        return sb.ToString();
+    }
+
+    /// <summary>Parses CSS text into individual rule strings.</summary>
+    private static List<string> ParseCssRuleStrings(string cssText)
+    {
+        var rules = new List<string>();
+        var depth = 0;
+        var start = 0;
+        for (int i = 0; i < cssText.Length; i++)
+        {
+            if (cssText[i] == '{') depth++;
+            else if (cssText[i] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    var rule = cssText.Substring(start, i - start + 1).Trim();
+                    if (rule.Length > 0)
+                        rules.Add(rule);
+                    start = i + 1;
+                }
+            }
+        }
+        return rules;
+    }
+
+    /// <summary>
+    /// Parses a DOCTYPE declaration and creates a DomElement representing the DocumentType node.
+    /// </summary>
+    private DomElement? ParseDocType(string html)
+    {
+        var match = DocTypePattern.Match(html);
+        if (!match.Success) return null;
+
+        var name = match.Groups[1].Value;
+        var publicId = match.Groups[2].Success ? match.Groups[2].Value : string.Empty;
+        var systemId = match.Groups[3].Success ? match.Groups[3].Value : string.Empty;
+
+        var doctype = new DomElement("#doctype", null, null, string.Empty);
+        doctype.DomProperties["name"] = name;
+        doctype.DomProperties["publicId"] = publicId;
+        doctype.DomProperties["systemId"] = systemId;
+        doctype.DomProperties["internalSubset"] = null;
+
+        return doctype;
+    }
+
+    /// <summary>Gets the lowercase name from a DOCTYPE DomElement.</summary>
+    private static string GetDocTypeName(DomElement element)
+    {
+        var dtName = element.DomProperties.TryGetValue("name", out var n) ? n?.ToString() ?? "html" : "html";
+        return dtName.ToLowerInvariant();
     }
 
     /// <summary>
@@ -5353,6 +6313,9 @@ public sealed class DomElement(
 
     /// <summary>Inline event handler properties keyed by event type (e.g. "click" for onclick).</summary>
     public Dictionary<string, JSValue> InlineEventHandlers { get; } = new(System.StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Namespace URI for elements created with createElementNS.</summary>
+    public string? NamespaceURI { get; set; }
 }
 
 /// <summary>Options for MutationObserver.observe().</summary>

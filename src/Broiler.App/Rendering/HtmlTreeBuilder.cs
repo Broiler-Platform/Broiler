@@ -17,7 +17,7 @@ public sealed class HtmlTreeBuilder
 
     private static readonly HashSet<string> StructuralTags = new(StringComparer.OrdinalIgnoreCase)
     {
-        "html", "head", "body", "title"
+        "html", "head", "body"
     };
 
     // Elements that auto-close a current <p>.
@@ -90,6 +90,11 @@ public sealed class HtmlTreeBuilder
                     if (string.Equals(tag, "title", StringComparison.OrdinalIgnoreCase))
                     {
                         inTitle = true;
+                        // Create a <title> element and add to <head>
+                        var titleEl = new DomElement("title", null, null, string.Empty);
+                        AppendChild(head, titleEl);
+                        allElements.Add(titleEl);
+                        openElements.Push(titleEl);
                         break;
                     }
 
@@ -113,6 +118,10 @@ public sealed class HtmlTreeBuilder
                     if (string.Equals(tag, "title", StringComparison.OrdinalIgnoreCase))
                     {
                         inTitle = false;
+                        // Pop the title element from the stack
+                        if (openElements.Count > 0 &&
+                            string.Equals(openElements.Peek().TagName, "title", StringComparison.OrdinalIgnoreCase))
+                            openElements.Pop();
                         break;
                     }
 
@@ -131,6 +140,12 @@ public sealed class HtmlTreeBuilder
                     if (inTitle)
                     {
                         title += token.Data;
+                        // Also add a text node to the <title> element
+                        var titleText = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+                        titleText.TextContent = token.Data;
+                        var titleParent = openElements.Count > 0 ? openElements.Peek() : head;
+                        AppendChild(titleParent, titleText);
+                        allElements.Add(titleText);
                         break;
                     }
 
