@@ -2063,8 +2063,7 @@ public sealed class DomBridge
                 if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return new JSString("#document-fragment");
                 if (string.Equals(element.TagName, "#doctype", StringComparison.OrdinalIgnoreCase))
                 {
-                    var dtName = element.DomProperties.TryGetValue("name", out var n) ? n?.ToString() ?? "html" : "html";
-                    return new JSString(dtName.ToLowerInvariant());
+                    return new JSString(GetDocTypeName(element));
                 }
                 return new JSString(element.TagName.ToUpperInvariant());
             }, "get nodeName"),
@@ -2139,8 +2138,7 @@ public sealed class DomBridge
                 (KeyString)"name",
                 new JSFunction((in Arguments _) =>
                 {
-                    var dtName = element.DomProperties.TryGetValue("name", out var n) ? n?.ToString() ?? "html" : "html";
-                    return new JSString(dtName.ToLowerInvariant());
+                    return new JSString(GetDocTypeName(element));
                 }, "get name"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -3958,7 +3956,7 @@ public sealed class DomBridge
             arr.Add(sheet);
         }
 
-        return arr as JSObject ?? new JSObject();
+        return arr;
     }
 
     /// <summary>Collects all style elements in the sub-tree.</summary>
@@ -4121,6 +4119,13 @@ public sealed class DomBridge
         doctype.DomProperties["internalSubset"] = null;
 
         return doctype;
+    }
+
+    /// <summary>Gets the lowercase name from a DOCTYPE DomElement.</summary>
+    private static string GetDocTypeName(DomElement element)
+    {
+        var dtName = element.DomProperties.TryGetValue("name", out var n) ? n?.ToString() ?? "html" : "html";
+        return dtName.ToLowerInvariant();
     }
 
     /// <summary>
