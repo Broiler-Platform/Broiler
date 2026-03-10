@@ -113,6 +113,10 @@ public sealed class DomBridge
         @"\[(?<name>[a-zA-Z][a-zA-Z0-9_:-]*)(?:(?<op>[~|^$*]?=)(?<value>[""'][^""']*[""']|[^\]]*))?\]",
         RegexOptions.Compiled);
 
+    private static readonly Regex DocTypePattern = new(
+        @"<!DOCTYPE\s+(\w+)(?:\s+PUBLIC\s+""([^""]*)""(?:\s+""([^""]*)"")?)?\s*>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private void ParseHtml(string html)
     {
         _elements.Clear();
@@ -3948,7 +3952,7 @@ public sealed class DomBridge
     /// <summary>
     /// Builds a styleSheets collection JSObject for a sub-document.
     /// </summary>
-    private JSObject BuildStyleSheetsCollection(DomElement docRoot)
+    private JSArray BuildStyleSheetsCollection(DomElement docRoot)
     {
         var styleEls = new List<DomElement>();
         CollectStyleElements(docRoot, styleEls);
@@ -4006,26 +4010,39 @@ public sealed class DomBridge
                 rulesStorage.Add(rule);
         }
 
-        // cssRules — live collection
+        // Track last known text content to detect changes
+        var lastTextHash = string.Empty;
+
+        // cssRules — live collection that combines text-based and inserted rules
         sheet.FastAddProperty(
             (KeyString)"cssRules",
             new JSFunction((in Arguments _) =>
             {
-                rulesStorage.Clear();
+                // Re-read text-based rules from the style element
                 var currentText = CollectStyleElementText(styleElement);
-                if (!string.IsNullOrWhiteSpace(currentText))
+                var currentHash = currentText ?? string.Empty;
+
+                // Only rebuild from text if text content changed
+                if (currentHash != lastTextHash)
                 {
-                    foreach (var rule in ParseCssRuleStrings(currentText))
-                        rulesStorage.Add(rule);
-                }
-                if (styleElement.DomProperties.TryGetValue("_insertedRules", out var inserted) && inserted is List<(int Index, string Rule)> insertedRules)
-                {
-                    foreach (var (idx, rule) in insertedRules.OrderBy(r => r.Index))
+                    rulesStorage.Clear();
+                    if (!string.IsNullOrWhiteSpace(currentText))
                     {
-                        if (idx <= rulesStorage.Count)
-                            rulesStorage.Insert(idx, rule);
-                        else
+                        foreach (var rule in ParseCssRuleStrings(currentText))
                             rulesStorage.Add(rule);
+                    }
+                    lastTextHash = currentHash;
+
+                    // Re-insert any programmatically added rules
+                    if (styleElement.DomProperties.TryGetValue("_insertedRules", out var inserted) && inserted is List<(int Index, string Rule)> insertedRules)
+                    {
+                        foreach (var (idx, rule) in insertedRules.OrderBy(r => r.Index))
+                        {
+                            if (idx <= rulesStorage.Count)
+                                rulesStorage.Insert(idx, rule);
+                            else
+                                rulesStorage.Add(rule);
+                        }
                     }
                 }
 
@@ -4041,7 +4058,7 @@ public sealed class DomBridge
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // insertRule(rule, index)
+        // insertRule(rule, index) — invalidates the text cache so cssRules rebuilds
         sheet.FastAddValue(
             (KeyString)"insertRule",
             new JSFunction((in Arguments a) =>
@@ -4055,6 +4072,9 @@ public sealed class DomBridge
                     styleElement.DomProperties["_insertedRules"] = existing;
                 }
                 ((List<(int Index, string Rule)>)existing).Add((index, ruleText));
+
+                // Invalidate cache so next cssRules access rebuilds
+                lastTextHash = string.Empty;
 
                 return new JSNumber(index);
             }, "insertRule", 2),
@@ -4107,9 +4127,7 @@ public sealed class DomBridge
     /// </summary>
     private DomElement? ParseDocType(string html)
     {
-        var match = System.Text.RegularExpressions.Regex.Match(html,
-            @"<!DOCTYPE\s+(\w+)(?:\s+PUBLIC\s+""([^""]*)""(?:\s+""([^""]*)"")?)?\s*>",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var match = DocTypePattern.Match(html);
         if (!match.Success) return null;
 
         var name = match.Groups[1].Value;

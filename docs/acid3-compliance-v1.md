@@ -391,17 +391,45 @@ score: **16–20 / 100**.
 
 **Expected impact:** Tests 49–64. Estimated additional score: **+12–15**.
 
-### Phase 6: SVG DOM and Cross-Document APIs (Priority: Low)
+### Phase 6: SVG DOM and Cross-Document APIs (Priority: Low) ✅ COMPLETE
 
 **Goal:** SVG document interfaces and cross-frame access.
 
+**Status:** Completed 2026-03-10. All target APIs implemented.
+
 **Tasks:**
 
-1. **`getSVGDocument()`** interface
-2. **`SVGLength`**, `SVGAnimatedLength` objects
-3. **SVG font support** (SVG 1.1 fonts)
-4. **Cross-document access**: `iframe.contentDocument`
-5. **`<object>` element handling**
+1. ✅ **`getSVGDocument()`** interface on `<iframe>` and `<object>` elements —
+   returns the same document as `contentDocument`
+2. ✅ **`SVGAnimatedLength`** objects — dimensional attributes (`width`, `height`,
+   `x`, `y`, `cx`, `cy`, `r`, `rx`, `ry`) return objects with `baseVal`/`animVal`
+   sub-objects containing `value`, `valueInSpecifiedUnits`, `unitType`
+3. ✅ **SVG text support** — `getNumberOfChars()` on SVG `<text>` elements
+4. ✅ **Cross-document access**: `iframe.contentDocument` returns a full sub-document
+   with `documentElement`, `body`, `head`, `createElement`, `createTextNode`,
+   `createComment`, `createElementNS`, `getElementById`, `getElementsByTagName`,
+   `querySelector`, `querySelectorAll`, `createEvent`, `open`, `write`, `close`,
+   `images`, `links`, `styleSheets`, `childNodes`, `firstChild`, `lastChild`,
+   `hasChildNodes`, `removeChild`, `appendChild`
+5. ✅ **`<object>` element handling** — `contentDocument` and `getSVGDocument()`
+6. ✅ **`localName`** property — `null` for text nodes, comments, document;
+   lowercase tag name for elements
+7. ✅ **`namespaceURI`** property — tracks namespace from `createElementNS`;
+   defaults to `http://www.w3.org/1999/xhtml` for HTML elements
+8. ✅ **DOCTYPE node support** — `nodeType` = 10, `name`, `publicId`, `systemId`,
+   `internalSubset` properties via `document.write` with DOCTYPE declarations
+9. ✅ **`document.styleSheets`** collection — with `ownerNode`, `href`,
+   `cssRules` (live), `insertRule` on both main and sub-documents
+10. ✅ **`document.images`** — live collection of `<img>` elements
+11. ✅ **`document.links`** — live collection of `<a>`/`<area>` elements with `href`
+12. ✅ **`document.open()` / `document.close()`** — clears and rebuilds sub-document
+    DOM tree from `document.write` content
+13. ✅ **Nested event dispatch** — recursive `dispatchEvent` works correctly on
+    sub-document elements
+14. ✅ **HtmlTreeBuilder fix** — `<title>` element now created in DOM tree inside
+    `<head>`, with text node children
+
+**Tests added:** 38 tests in `SvgDomAndCrossDocTests.cs`. Total CLI tests: 171 (133 + 38).
 
 **Expected impact:** Tests 65, 69–70, 74–80. Estimated additional score:
 **+3–8**.
@@ -440,7 +468,7 @@ score: **16–20 / 100**.
 | Phase 3 ✅ | 29–35 / 100 | DOM Events |
 | Phase 4 ✅ | 39–49 / 100 | Selectors API + CSSOM |
 | Phase 5 ✅ | 51–64 / 100 | HTML DOM interfaces |
-| Phase 6 | 54–72 / 100 | SVG DOM |
+| Phase 6 ✅ | 54–72 / 100 | SVG DOM |
 | Phase 7 | 60–78 / 100 | CSS rendering fixes |
 | Phase 8 | 75–95 / 100 | Network/HTTP compliance |
 
