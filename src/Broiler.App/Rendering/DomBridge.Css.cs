@@ -29,6 +29,10 @@ public sealed partial class DomBridge
         @"@media\s+(?<query>[^{]+)\{(?<content>(?:[^{}]|\{[^}]*\})*)\}",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    private static readonly Regex PseudoSpecificityPattern = new(
+        @"::?[a-zA-Z-]+(?:\([^)]*\))?",
+        RegexOptions.Compiled);
+
     /// <summary>
     /// Parsed CSS rules extracted from <c>&lt;style&gt;</c> blocks, stored as
     /// (selector, specificity, declarations) triples.
@@ -51,6 +55,33 @@ public sealed partial class DomBridge
 
         // Remove attribute selectors and count them
         s = AttributeSelectorPattern.Replace(s, m => { b++; return string.Empty; });
+
+        // Count pseudo-classes and pseudo-elements
+        s = PseudoSpecificityPattern.Replace(s, m =>
+        {
+            var token = m.Value;
+            if (token.StartsWith("::", StringComparison.Ordinal))
+            {
+                c++; // pseudo-elements contribute to c
+            }
+            else
+            {
+                // :not() — specificity is that of its argument
+                if (token.StartsWith(":not(", StringComparison.OrdinalIgnoreCase) && token.EndsWith(")"))
+                {
+                    var inner = token[5..^1].Trim();
+                    var innerSpec = CalculateSpecificity(inner);
+                    a += innerSpec / 100;
+                    b += (innerSpec / 10) % 10;
+                    c += innerSpec % 10;
+                }
+                else
+                {
+                    b++; // pseudo-classes contribute to b
+                }
+            }
+            return string.Empty;
+        });
 
         foreach (var ch in s)
         {
@@ -167,6 +198,7 @@ public sealed partial class DomBridge
     private JSObject BuildComputedStyleObject(DomElement? element)
     {
         var computed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var computedSpecificity = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         if (element != null)
         {
@@ -185,7 +217,7 @@ public sealed partial class DomBridge
                 if (cssText.Length == 0 && styleEl.TextContent != null)
                     cssText.Append(styleEl.TextContent);
 
-                ParseAndApplyCssRules(cssText.ToString(), element, computed);
+                ParseAndApplyCssRules(cssText.ToString(), element, computed, computedSpecificity);
             }
 
             // Inline styles (from the style="" attribute) override CSS rules.
@@ -223,13 +255,25 @@ public sealed partial class DomBridge
                 obj.FastAddValue((KeyString)camel, new JSString(kv.Value), JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
-        // getPropertyValue method
+        // getPropertyValue method (supports both kebab-case and camelCase lookups)
         obj.FastAddValue(
             (KeyString)"getPropertyValue",
             new JSFunction((in Arguments a) =>
             {
-                if (a.Length > 0 && computed.TryGetValue(a[0].ToString(), out var val))
-                    return new JSString(val);
+                if (a.Length > 0)
+                {
+                    var name = a[0].ToString();
+                    if (computed.TryGetValue(name, out var val))
+                        return new JSString(val);
+                    // Try kebab-case conversion for camelCase input
+                    var kebab = ToKebabCase(name);
+                    if (kebab != name && computed.TryGetValue(kebab, out val))
+                        return new JSString(val);
+                    // Try camelCase conversion for kebab-case input
+                    var camel = ToCamelCase(name);
+                    if (camel != name && computed.TryGetValue(camel, out val))
+                        return new JSString(val);
+                }
                 return new JSString(string.Empty);
             }, "getPropertyValue", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -240,8 +284,10 @@ public sealed partial class DomBridge
     /// <summary>
     /// Parses CSS text into rules and applies matching rules to the computed style dictionary.
     /// Handles @media queries by evaluating the media condition.
+    /// Tracks per-property specificity so higher-specificity rules win regardless of source order.
     /// </summary>
-    private void ParseAndApplyCssRules(string cssText, DomElement element, Dictionary<string, string> computed)
+    private void ParseAndApplyCssRules(string cssText, DomElement element,
+        Dictionary<string, string> computed, Dictionary<string, int> computedSpecificity)
     {
         int pos = 0;
         while (pos < cssText.Length)
@@ -275,7 +321,7 @@ public sealed partial class DomBridge
                     {
                         var innerCss = cssText[blockStart..pos];
                         if (EvaluateMediaQuery(mediaQuery))
-                            ParseAndApplyCssRules(innerCss, element, computed);
+                            ParseAndApplyCssRules(innerCss, element, computed, computedSpecificity);
                     }
                     if (pos < cssText.Length) pos++; // skip '}'
                 }
@@ -319,21 +365,28 @@ public sealed partial class DomBridge
 
             // Check if selector matches element (handle comma-separated selectors)
             var selectors = SplitCommaSelectors(selectorText);
-            bool matched = false;
+            int bestSpecificity = -1;
             foreach (var sel in selectors)
             {
-                if (MatchesSelector(element, sel.Trim()))
+                var trimmed = sel.Trim();
+                if (MatchesSelector(element, trimmed))
                 {
-                    matched = true;
-                    break;
+                    var spec = CalculateSpecificity(trimmed);
+                    if (spec > bestSpecificity) bestSpecificity = spec;
                 }
             }
 
-            if (matched)
+            if (bestSpecificity >= 0)
             {
-                // Parse declarations
+                // Parse declarations — only overwrite if specificity >= current
                 foreach (var kv in ParseStyle(declarationsText))
-                    computed[kv.Key] = kv.Value;
+                {
+                    if (!computedSpecificity.TryGetValue(kv.Key, out var prevSpec) || bestSpecificity >= prevSpec)
+                    {
+                        computed[kv.Key] = kv.Value;
+                        computedSpecificity[kv.Key] = bestSpecificity;
+                    }
+                }
             }
         }
     }

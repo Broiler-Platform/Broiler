@@ -423,25 +423,25 @@ Problems:
 
 ---
 
-### Phase 6: CSS Selectors & CSSOM Polish (Priority: **High**)
+### Phase 6: CSS Selectors & CSSOM Polish (Priority: **High**) ✅
 
 **Goal:** Pass tests 0, 33–34, 42, 44–48.
 
-- [ ] **6.1** Dynamic selector re-evaluation
-  - [ ] After DOM mutation, `querySelector`/`querySelectorAll` must reflect new state
-  - [ ] Combinators (`+`, `~`, `>`, ` `) must work after `appendChild`/`removeChild`
-- [ ] **6.2** Selector parser edge cases
-  - [ ] `div*` (no space before `*`) must parse as `div *`
-  - [ ] Escaped characters in selectors
-- [ ] **6.3** `:link` and `:visited` pseudo-classes
-  - [ ] `:link` matches `<a href="...">` elements
-  - [ ] `:visited` returns same styles as `:link` (privacy)
-- [ ] **6.4** CSS `cursor` property values
-  - [ ] Support CSS3 cursor keywords in `getComputedStyle`
-- [ ] **6.5** `getComputedStyle` cascade accuracy
-  - [ ] `:last-child` + `white-space: pre-wrap` cascade (test 0)
-  - [ ] Specificity calculation for complex selectors
-- [ ] **6.6** Tests: 8 unit tests
+- [x] **6.1** Dynamic selector re-evaluation
+  - [x] After DOM mutation, `querySelector`/`querySelectorAll` must reflect new state
+  - [x] Combinators (`+`, `~`, `>`, ` `) must work after `appendChild`/`removeChild`
+- [x] **6.2** Selector parser edge cases
+  - [x] `div*` (no space before `*`) must parse as `div *`
+  - [x] Escaped characters in selectors
+- [x] **6.3** `:link` and `:visited` pseudo-classes
+  - [x] `:link` matches `<a href="...">` elements
+  - [x] `:visited` returns same styles as `:link` (privacy)
+- [x] **6.4** CSS `cursor` property values
+  - [x] Support CSS3 cursor keywords in `getComputedStyle`
+- [x] **6.5** `getComputedStyle` cascade accuracy
+  - [x] `:last-child` + `white-space: pre-wrap` cascade (test 0)
+  - [x] Specificity calculation for complex selectors
+- [x] **6.6** Tests: 8 unit tests
 
 **Modules affected:** `DomBridge.Selectors.cs`, `DomBridge.Css.cs`, `CssValueParser.cs`
 **Spec references:** [Selectors Level 3](https://www.w3.org/TR/selectors-3/), [CSSOM](https://www.w3.org/TR/cssom-1/)
