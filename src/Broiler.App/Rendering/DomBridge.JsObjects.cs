@@ -393,10 +393,10 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments a) =>
                 {
                     var offset = a.Length > 0 ? (int)a[0].DoubleValue : 0;
-                    var count = a.Length > 1 ? (int)a[1].DoubleValue : 0;
+                    var count = a.Length > 1 ? Math.Max(0, (int)a[1].DoubleValue) : 0;
                     var text = element.TextContent ?? string.Empty;
                     if (offset < 0 || offset > text.Length) throw new JSException("INDEX_SIZE_ERR");
-                    var end = Math.Min(offset + count, text.Length);
+                    var end = (int)Math.Min((long)offset + count, text.Length);
                     return new JSString(text.Substring(offset, end - offset));
                 }, "substringData", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -416,10 +416,10 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments a) =>
                 {
                     var offset = a.Length > 0 ? (int)a[0].DoubleValue : 0;
-                    var count = a.Length > 1 ? (int)a[1].DoubleValue : 0;
+                    var count = a.Length > 1 ? Math.Max(0, (int)a[1].DoubleValue) : 0;
                     var text = element.TextContent ?? string.Empty;
                     if (offset < 0 || offset > text.Length) throw new JSException("INDEX_SIZE_ERR");
-                    var end = Math.Min(offset + count, text.Length);
+                    var end = (int)Math.Min((long)offset + count, text.Length);
                     element.TextContent = text.Remove(offset, end - offset);
                     return JSUndefined.Value;
                 }, "deleteData", 2),
@@ -443,11 +443,11 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments a) =>
                 {
                     var offset = a.Length > 0 ? (int)a[0].DoubleValue : 0;
-                    var count = a.Length > 1 ? (int)a[1].DoubleValue : 0;
+                    var count = a.Length > 1 ? Math.Max(0, (int)a[1].DoubleValue) : 0;
                     var data = a.Length > 2 ? a[2].ToString() : string.Empty;
                     var text = element.TextContent ?? string.Empty;
                     if (offset < 0 || offset > text.Length) throw new JSException("INDEX_SIZE_ERR");
-                    var end = Math.Min(offset + count, text.Length);
+                    var end = (int)Math.Min((long)offset + count, text.Length);
                     element.TextContent = text.Remove(offset, end - offset).Insert(offset, data);
                     return JSUndefined.Value;
                 }, "replaceData", 3),
