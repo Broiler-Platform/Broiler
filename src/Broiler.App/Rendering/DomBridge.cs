@@ -17,6 +17,8 @@ public sealed class DomBridge
 {
     private const int FetchTimeoutSeconds = 30;
     private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(FetchTimeoutSeconds) };
+    private static readonly string[] InlineEventNames = ["click", "load", "change", "input", "submit", "mousedown",
+        "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error"];
     private readonly List<DomElement> _elements = [];
     private readonly List<(JSFunction Callback, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
 
@@ -907,9 +909,6 @@ public sealed class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var evt = new JSObject();
-                var eventType = string.Empty;
-                var bubbles = false;
-                var cancelable = false;
                 evt.FastAddValue((KeyString)"type", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -917,8 +916,13 @@ public sealed class DomBridge
                 evt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"view", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"stopPropagation",
                     new JSFunction((in Arguments _) => JSUndefined.Value, "stopPropagation", 0),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"stopImmediatePropagation",
+                    new JSFunction((in Arguments _) => JSUndefined.Value, "stopImmediatePropagation", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"preventDefault",
                     new JSFunction((in Arguments _) => JSUndefined.Value, "preventDefault", 0),
@@ -934,6 +938,22 @@ public sealed class DomBridge
                             evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
                         return JSUndefined.Value;
                     }, "initEvent", 3),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"initUIEvent",
+                    new JSFunction((in Arguments initArgs) =>
+                    {
+                        if (initArgs.Length > 0)
+                            evt[(KeyString)"type"] = new JSString(initArgs[0].ToString());
+                        if (initArgs.Length > 1)
+                            evt[(KeyString)"bubbles"] = initArgs[1].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 2)
+                            evt[(KeyString)"cancelable"] = initArgs[2].BooleanValue ? JSBoolean.True : JSBoolean.False;
+                        if (initArgs.Length > 3)
+                            evt[(KeyString)"view"] = initArgs[3];
+                        if (initArgs.Length > 4)
+                            evt[(KeyString)"detail"] = initArgs[4];
+                        return JSUndefined.Value;
+                    }, "initUIEvent", 5),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 return evt;
             }, "createEvent", 1),
@@ -1939,7 +1959,7 @@ public sealed class DomBridge
 
         // -- DOM events --
 
-        // addEventListener(type, listener)
+        // addEventListener(type, listener, useCapture)
         obj.FastAddValue(
             (KeyString)"addEventListener",
             new JSFunction((in Arguments a) =>
@@ -1947,17 +1967,18 @@ public sealed class DomBridge
                 if (a.Length < 2) return JSUndefined.Value;
                 var type = a[0].ToString();
                 var listener = a[1];
+                var capture = a.Length > 2 && a[2].BooleanValue;
                 if (!element.EventListeners.TryGetValue(type, out var listeners))
                 {
                     listeners = [];
                     element.EventListeners[type] = listeners;
                 }
-                listeners.Add(listener);
+                listeners.Add((listener, capture));
                 return JSUndefined.Value;
-            }, "addEventListener", 2),
+            }, "addEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // removeEventListener(type, listener)
+        // removeEventListener(type, listener, useCapture)
         obj.FastAddValue(
             (KeyString)"removeEventListener",
             new JSFunction((in Arguments a) =>
@@ -1965,10 +1986,20 @@ public sealed class DomBridge
                 if (a.Length < 2) return JSUndefined.Value;
                 var type = a[0].ToString();
                 var listener = a[1];
+                var capture = a.Length > 2 && a[2].BooleanValue;
                 if (element.EventListeners.TryGetValue(type, out var listeners))
-                    listeners.Remove(listener);
+                {
+                    for (int i = listeners.Count - 1; i >= 0; i--)
+                    {
+                        if (listeners[i].Listener == listener && listeners[i].Capture == capture)
+                        {
+                            listeners.RemoveAt(i);
+                            break;
+                        }
+                    }
+                }
                 return JSUndefined.Value;
-            }, "removeEventListener", 2),
+            }, "removeEventListener", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // dispatchEvent(event) — DOM Events Level 3 with capture/target/bubble phases
@@ -1984,6 +2015,56 @@ public sealed class DomBridge
                 return bridge.DispatchEventOnElement(element, evt);
             }, "dispatchEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // element.click() — creates and dispatches a MouseEvent
+        obj.FastAddValue(
+            (KeyString)"click",
+            new JSFunction((in Arguments _) =>
+            {
+                var evt = new JSObject();
+                evt.FastAddValue((KeyString)"type", new JSString("click"), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"cancelable", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"stopPropagation",
+                    new JSFunction((in Arguments __) => JSUndefined.Value, "stopPropagation", 0),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"stopImmediatePropagation",
+                    new JSFunction((in Arguments __) => JSUndefined.Value, "stopImmediatePropagation", 0),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                evt.FastAddValue((KeyString)"preventDefault",
+                    new JSFunction((in Arguments __) => JSUndefined.Value, "preventDefault", 0),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+                bridge.DispatchEventOnElement(element, evt);
+                return JSUndefined.Value;
+            }, "click", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // on* inline event handler properties (onclick, onload, etc.)
+        foreach (var eventName in InlineEventNames)
+        {
+            obj.FastAddProperty(
+                (KeyString)$"on{eventName}",
+                new JSFunction((in Arguments _) =>
+                {
+                    if (element.InlineEventHandlers.TryGetValue(eventName, out var handler))
+                        return handler;
+                    return JSNull.Value;
+                }, $"get on{eventName}"),
+                new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length > 0 && a[0] is JSFunction fn)
+                        element.InlineEventHandlers[eventName] = fn;
+                    else
+                        element.InlineEventHandlers.Remove(eventName);
+                    return JSUndefined.Value;
+                }, $"set on{eventName}"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
 
         // -- Form element support --
 
@@ -2019,7 +2100,7 @@ public sealed class DomBridge
             }, "set checked"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // type (read-only) — for input elements
+        // type (read/write) — for input elements
         obj.FastAddProperty(
             (KeyString)"type",
             new JSFunction((in Arguments a) =>
@@ -2028,7 +2109,11 @@ public sealed class DomBridge
                     return new JSString(t);
                 return new JSString(string.Empty);
             }, "get type"),
-            null,
+            new JSFunction((in Arguments a) =>
+            {
+                element.Attributes["type"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                return JSUndefined.Value;
+            }, "set type"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // name (read-only) — for form elements
@@ -2118,7 +2203,7 @@ public sealed class DomBridge
 
                     if (element.EventListeners.TryGetValue("submit", out var submitListeners))
                     {
-                        foreach (var listener in submitListeners.ToList())
+                        foreach (var (listener, _) in submitListeners.ToList())
                         {
                             if (listener is JSFunction fn)
                             {
@@ -2302,14 +2387,18 @@ public sealed class DomBridge
         path.Reverse();
 
         var stopped = false;
+        var immediateStopped = false;
         var prevented = false;
 
         // Set up event object properties
-        evt.FastAddValue((KeyString)"target", ToJSObject(target), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt[(KeyString)"target"] = ToJSObject(target);
+        evt[(KeyString)"eventPhase"] = new JSNumber(0);
+        evt[(KeyString)"defaultPrevented"] = JSBoolean.False;
         evt.FastAddValue((KeyString)"stopPropagation",
             new JSFunction((in Arguments _) => { stopped = true; return JSUndefined.Value; }, "stopPropagation", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"stopImmediatePropagation",
+            new JSFunction((in Arguments _) => { stopped = true; immediateStopped = true; return JSUndefined.Value; }, "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddValue((KeyString)"preventDefault",
             new JSFunction((in Arguments _) => { prevented = true; evt[(KeyString)"defaultPrevented"] = JSBoolean.True; return JSUndefined.Value; }, "preventDefault", 0),
@@ -2321,26 +2410,28 @@ public sealed class DomBridge
         {
             if (stopped) break;
             evt[(KeyString)"currentTarget"] = ToJSObject(ancestor);
-            FireListeners(ancestor, eventType, evt, ref stopped);
+            FireListeners(ancestor, eventType, evt, capturePhase: true, ref stopped, ref immediateStopped);
         }
 
-        // Phase 2: Target
+        // Phase 2: Target — fire ALL listeners (both capture and bubble) in registration order
         if (!stopped)
         {
             evt[(KeyString)"eventPhase"] = new JSNumber(2);
             evt[(KeyString)"currentTarget"] = ToJSObject(target);
-            FireListeners(target, eventType, evt, ref stopped);
+            FireListeners(target, eventType, evt, capturePhase: null, ref stopped, ref immediateStopped);
         }
 
-        // Phase 3: Bubble (parent of target → root)
-        if (!stopped)
+        // Phase 3: Bubble (parent of target → root) — only if event.bubbles is true
+        var bubblesVal = evt[(KeyString)"bubbles"];
+        var eventBubbles = bubblesVal != null && bubblesVal.BooleanValue;
+        if (!stopped && eventBubbles)
         {
             evt[(KeyString)"eventPhase"] = new JSNumber(3);
             for (int i = path.Count - 1; i >= 0; i--)
             {
                 if (stopped) break;
                 evt[(KeyString)"currentTarget"] = ToJSObject(path[i]);
-                FireListeners(path[i], eventType, evt, ref stopped);
+                FireListeners(path[i], eventType, evt, capturePhase: false, ref stopped, ref immediateStopped);
             }
         }
 
@@ -2348,18 +2439,38 @@ public sealed class DomBridge
     }
 
     /// <summary>
-    /// Fires all registered listeners for the given event type on a single element.
+    /// Fires registered listeners for the given event type on a single element.
+    /// When <paramref name="capturePhase"/> is <c>true</c>, only capture listeners fire.
+    /// When <c>false</c>, only bubble listeners fire.
+    /// When <c>null</c> (target phase), all listeners fire in registration order plus the inline handler.
     /// </summary>
-    private static void FireListeners(DomElement el, string eventType, JSObject evt, ref bool stopped)
+    private static void FireListeners(DomElement el, string eventType, JSObject evt,
+        bool? capturePhase, ref bool stopped, ref bool immediateStopped)
     {
-        if (!el.EventListeners.TryGetValue(eventType, out var listeners)) return;
-        foreach (var listener in listeners.ToList())
+        if (el.EventListeners.TryGetValue(eventType, out var listeners))
         {
-            if (stopped) break;
-            if (listener is JSFunction fn)
+            foreach (var (listener, capture) in listeners.ToList())
             {
-                try { fn.InvokeFunction(new Arguments(fn, evt)); }
-                catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.dispatchEvent", $"Event listener error: {ex.Message}", ex); }
+                if (immediateStopped) break;
+                // In capture/bubble phases, only fire matching listeners.
+                // In target phase (capturePhase == null), fire all listeners.
+                if (capturePhase.HasValue && capture != capturePhase.Value) continue;
+                if (listener is JSFunction fn)
+                {
+                    try { fn.InvokeFunction(new Arguments(fn, evt)); }
+                    catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.dispatchEvent", $"Event listener error: {ex.Message}", ex); }
+                }
+            }
+        }
+
+        // Fire inline event handler (on* property) — fires after addEventListener listeners on the target,
+        // and during bubble phase on ancestors (like a bubble listener).
+        if (!immediateStopped && (capturePhase == null || capturePhase == false))
+        {
+            if (el.InlineEventHandlers.TryGetValue(eventType, out var inlineHandler) && inlineHandler is JSFunction inlineFn)
+            {
+                try { inlineFn.InvokeFunction(new Arguments(inlineFn, evt)); }
+                catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.dispatchEvent", $"Inline handler error: {ex.Message}", ex); }
             }
         }
     }
@@ -3794,8 +3905,12 @@ public sealed class DomElement(
     /// <summary>Text content for text nodes.</summary>
     public string? TextContent { get; set; }
 
-    /// <summary>Registered event listeners keyed by event type (e.g. "click", "input", "submit").</summary>
-    public Dictionary<string, List<JSValue>> EventListeners { get; } = new(System.StringComparer.OrdinalIgnoreCase);
+    /// <summary>Registered event listeners keyed by event type (e.g. "click", "input", "submit").
+    /// Each entry stores the listener and whether it was registered for the capture phase.</summary>
+    public Dictionary<string, List<(JSValue Listener, bool Capture)>> EventListeners { get; } = new(System.StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Inline event handler properties keyed by event type (e.g. "click" for onclick).</summary>
+    public Dictionary<string, JSValue> InlineEventHandlers { get; } = new(System.StringComparer.OrdinalIgnoreCase);
 }
 
 /// <summary>Options for MutationObserver.observe().</summary>
