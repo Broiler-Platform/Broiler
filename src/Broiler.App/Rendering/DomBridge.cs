@@ -130,6 +130,10 @@ public sealed class DomBridge
         }
         _elements.AddRange(allElements);
 
+        // Ensure DocumentElement is in _elements so querySelector can find it
+        if (!_elements.Contains(DocumentElement))
+            _elements.Insert(0, DocumentElement);
+
         // Extract <style> blocks and apply cascaded styles
         ExtractStyleBlocks(html);
         ApplyCascadedStyles();
@@ -441,13 +445,16 @@ public sealed class DomBridge
         var current = new System.Text.StringBuilder();
         char pendingCombinator = '\0';
         int depth = 0;
+        int bracketDepth = 0;
 
         for (int i = 0; i < selector.Length; i++)
         {
             var c = selector[i];
             if (c == '(') { depth++; current.Append(c); continue; }
             if (c == ')') { depth--; current.Append(c); continue; }
-            if (depth > 0) { current.Append(c); continue; }
+            if (c == '[') { bracketDepth++; current.Append(c); continue; }
+            if (c == ']') { bracketDepth--; current.Append(c); continue; }
+            if (depth > 0 || bracketDepth > 0) { current.Append(c); continue; }
 
             if (c == '>' || c == '+' || c == '~')
             {
@@ -3735,13 +3742,21 @@ public sealed class DomBridge
                     if (child.IsTextNode && child.TextContent != null)
                         cssText.Append(child.TextContent);
                 }
+                // Also check direct TextContent (set via JS textContent setter)
+                if (cssText.Length == 0 && styleEl.TextContent != null)
+                    cssText.Append(styleEl.TextContent);
 
                 ParseAndApplyCssRules(cssText.ToString(), element, computed);
             }
 
-            // Inline styles override everything
-            foreach (var kv in element.Style)
-                computed[kv.Key] = kv.Value;
+            // Inline styles (from the style="" attribute) override CSS rules.
+            // We parse the attribute directly rather than using element.Style because
+            // ApplyCascadedStyles() may have merged CSS rules into element.Style.
+            if (element.Attributes.TryGetValue("style", out var inlineStyleAttr) && !string.IsNullOrEmpty(inlineStyleAttr))
+            {
+                foreach (var kv in ParseStyle(inlineStyleAttr))
+                    computed[kv.Key] = kv.Value;
+            }
         }
 
         var obj = new JSObject();
