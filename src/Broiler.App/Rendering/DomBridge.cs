@@ -1021,6 +1021,95 @@ public sealed class DomBridge
             }, "writeln", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // -- Phase 2: NodeFilter, TreeWalker, NodeIterator, Range --
+
+        // NodeFilter constants
+        var nodeFilter = new JSObject();
+        nodeFilter.FastAddValue((KeyString)"FILTER_ACCEPT", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"FILTER_REJECT", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"FILTER_SKIP", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"SHOW_ALL", new JSNumber(0xFFFFFFFF), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"SHOW_ELEMENT", new JSNumber(0x1), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"SHOW_ATTRIBUTE", new JSNumber(0x2), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"SHOW_TEXT", new JSNumber(0x4), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"SHOW_CDATA_SECTION", new JSNumber(0x8), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"SHOW_ENTITY_REFERENCE", new JSNumber(0x10), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"SHOW_ENTITY", new JSNumber(0x20), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"SHOW_PROCESSING_INSTRUCTION", new JSNumber(0x40), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"SHOW_COMMENT", new JSNumber(0x80), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"SHOW_DOCUMENT", new JSNumber(0x100), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"SHOW_DOCUMENT_TYPE", new JSNumber(0x200), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"SHOW_DOCUMENT_FRAGMENT", new JSNumber(0x400), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue((KeyString)"SHOW_NOTATION", new JSNumber(0x800), JSPropertyAttributes.EnumerableConfigurableValue);
+        context["NodeFilter"] = nodeFilter;
+
+        // document.createTreeWalker(root, whatToShow, filter)
+        var bridgeForTraversal = this;
+        document.FastAddValue(
+            (KeyString)"createTreeWalker",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    throw new JSException("Failed to execute 'createTreeWalker': 1 argument required.");
+                var rootObj = a[0] as JSObject;
+                if (rootObj == null)
+                    throw new JSException("Failed to execute 'createTreeWalker': parameter 1 is not of type 'Node'.");
+                var rootEl = bridgeForTraversal.FindDomElementByJSObject(rootObj);
+                if (rootEl == null) return JSNull.Value;
+
+                var whatToShow = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? (int)a[1].DoubleValue : unchecked((int)0xFFFFFFFF);
+                var filterFn = a.Length > 2 && a[2] is JSFunction f ? f : (a.Length > 2 && a[2] is JSObject filterObj ? filterObj[(KeyString)"acceptNode"] as JSFunction : null);
+
+                return bridgeForTraversal.BuildTreeWalker(rootEl, whatToShow, filterFn);
+            }, "createTreeWalker", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.createNodeIterator(root, whatToShow, filter)
+        document.FastAddValue(
+            (KeyString)"createNodeIterator",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    throw new JSException("Failed to execute 'createNodeIterator': 1 argument required.");
+                var rootObj = a[0] as JSObject;
+                if (rootObj == null)
+                    throw new JSException("Failed to execute 'createNodeIterator': parameter 1 is not of type 'Node'.");
+                var rootEl = bridgeForTraversal.FindDomElementByJSObject(rootObj);
+                if (rootEl == null) return JSNull.Value;
+
+                var whatToShow = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? (int)a[1].DoubleValue : unchecked((int)0xFFFFFFFF);
+                var filterFn = a.Length > 2 && a[2] is JSFunction f ? f : (a.Length > 2 && a[2] is JSObject filterObj ? filterObj[(KeyString)"acceptNode"] as JSFunction : null);
+
+                return bridgeForTraversal.BuildNodeIterator(rootEl, whatToShow, filterFn);
+            }, "createNodeIterator", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.createRange()
+        document.FastAddValue(
+            (KeyString)"createRange",
+            new JSFunction((in Arguments a) => bridgeForTraversal.BuildRange(), "createRange", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.createComment(data)
+        document.FastAddValue(
+            (KeyString)"createComment",
+            new JSFunction((in Arguments a) =>
+            {
+                var data = a.Length > 0 ? a[0].ToString() : string.Empty;
+                var el = new DomElement("#comment", null, null, string.Empty, isTextNode: false);
+                el.TextContent = data;
+                _elements.Add(el);
+                return ToJSObject(el);
+            }, "createComment", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // Node type constants on document
+        document.FastAddValue((KeyString)"ELEMENT_NODE", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"TEXT_NODE", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"COMMENT_NODE", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"DOCUMENT_NODE", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"DOCUMENT_FRAGMENT_NODE", new JSNumber(11), JSPropertyAttributes.EnumerableConfigurableValue);
+
         context["document"] = document;
 
         // window global
@@ -1354,10 +1443,19 @@ public sealed class DomBridge
             new JSString(element.TagName.ToUpperInvariant()),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddValue(
+        obj.FastAddProperty(
             (KeyString)"id",
-            element.Id != null ? new JSString(element.Id) : (JSValue)JSNull.Value,
-            JSPropertyAttributes.EnumerableConfigurableValue);
+            new JSFunction((in Arguments a) =>
+                element.Id != null ? (JSValue)new JSString(element.Id) : JSNull.Value,
+                "get id"),
+            new JSFunction((in Arguments a) =>
+            {
+                var val = a.Length > 0 ? a[0].ToString() : string.Empty;
+                element.Id = val;
+                element.Attributes["id"] = val;
+                return JSUndefined.Value;
+            }, "set id"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // className (read/write)
         obj.FastAddProperty(
@@ -1387,11 +1485,29 @@ public sealed class DomBridge
         obj.FastAddProperty(
             (KeyString)"textContent",
             new JSFunction((in Arguments a) =>
-                element.TextContent != null ? (JSValue)new JSString(element.TextContent) : new JSString(element.InnerHtml),
-                "get textContent"),
+            {
+                // For text nodes, return the direct text content
+                if (element.IsTextNode)
+                    return element.TextContent != null ? (JSValue)new JSString(element.TextContent) : new JSString(string.Empty);
+                // For element nodes with direct TextContent set (e.g., via JS setter)
+                if (element.TextContent != null && element.Children.Count == 0)
+                    return new JSString(element.TextContent);
+                // For element nodes, recursively collect text from descendants
+                if (element.Children.Count > 0)
+                {
+                    var sb = new StringBuilder();
+                    CollectTextContent(element, sb);
+                    return new JSString(sb.ToString());
+                }
+                // Fallback to InnerHtml if no children and no TextContent
+                return new JSString(element.InnerHtml);
+            }, "get textContent"),
             new JSFunction((in Arguments a) =>
             {
-                element.TextContent = a.Length > 0 ? a[0].ToString() : string.Empty;
+                var text = a.Length > 0 ? a[0].ToString() : string.Empty;
+                element.TextContent = text;
+                // Setting textContent clears all children per DOM spec
+                element.Children.Clear();
                 return JSUndefined.Value;
             }, "set textContent"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -1414,7 +1530,16 @@ public sealed class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 if (a.Length >= 2)
-                    element.Attributes[a[0].ToString()] = a[1].ToString();
+                {
+                    var attrName = a[0].ToString();
+                    var attrVal = a[1].ToString();
+                    element.Attributes[attrName] = attrVal;
+                    // Sync special properties
+                    if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
+                        element.Id = attrVal;
+                    else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
+                        element.ClassName = attrVal;
+                }
                 return JSUndefined.Value;
             }, "setAttribute", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1486,6 +1611,264 @@ public sealed class DomBridge
                     ? (JSValue)ToJSObject(siblings[idx + 1])
                     : JSNull.Value;
             }, "get nextSibling"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // previousSibling (read-only, dynamic)
+        obj.FastAddProperty(
+            (KeyString)"previousSibling",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.Parent == null) return JSNull.Value;
+                var siblings = element.Parent.Children;
+                var idx = siblings.IndexOf(element);
+                return idx > 0
+                    ? (JSValue)ToJSObject(siblings[idx - 1])
+                    : JSNull.Value;
+            }, "get previousSibling"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // nodeType (read-only)
+        obj.FastAddProperty(
+            (KeyString)"nodeType",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.IsTextNode) return new JSNumber(3); // TEXT_NODE
+                if (string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) return new JSNumber(8); // COMMENT_NODE
+                if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return new JSNumber(9); // DOCUMENT_NODE
+                if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return new JSNumber(11); // DOCUMENT_FRAGMENT_NODE
+                return new JSNumber(1); // ELEMENT_NODE
+            }, "get nodeType"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // nodeName (read-only)
+        obj.FastAddProperty(
+            (KeyString)"nodeName",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.IsTextNode) return new JSString("#text");
+                if (string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) return new JSString("#comment");
+                if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return new JSString("#document");
+                if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return new JSString("#document-fragment");
+                return new JSString(element.TagName.ToUpperInvariant());
+            }, "get nodeName"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // nodeValue (read/write) — null for elements, text content for text/comment nodes
+        obj.FastAddProperty(
+            (KeyString)"nodeValue",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+                    return element.TextContent != null ? (JSValue)new JSString(element.TextContent) : JSNull.Value;
+                return JSNull.Value;
+            }, "get nodeValue"),
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+                    element.TextContent = a.Length > 0 ? a[0].ToString() : string.Empty;
+                return JSUndefined.Value;
+            }, "set nodeValue"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // ownerDocument (read-only) — returns the document element wrapper
+        obj.FastAddProperty(
+            (KeyString)"ownerDocument",
+            new JSFunction((in Arguments a) =>
+            {
+                // The documentElement itself has ownerDocument = null per spec,
+                // but for simplicity we return the document element's JSObject for all nodes
+                return ToJSObject(DocumentElement);
+            }, "get ownerDocument"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // parentElement (read-only, dynamic) — like parentNode but returns null for non-element parents
+        obj.FastAddProperty(
+            (KeyString)"parentElement",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.Parent == null) return JSNull.Value;
+                if (element.Parent.IsTextNode) return JSNull.Value;
+                return (JSValue)ToJSObject(element.Parent);
+            }, "get parentElement"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // hasChildNodes()
+        obj.FastAddValue(
+            (KeyString)"hasChildNodes",
+            new JSFunction((in Arguments a) =>
+                element.Children.Count > 0 ? JSBoolean.True : JSBoolean.False,
+                "hasChildNodes", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // hasAttribute(name)
+        obj.FastAddValue(
+            (KeyString)"hasAttribute",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSBoolean.False;
+                return element.Attributes.ContainsKey(a[0].ToString()) ? JSBoolean.True : JSBoolean.False;
+            }, "hasAttribute", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // removeAttribute(name)
+        obj.FastAddValue(
+            (KeyString)"removeAttribute",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0) element.Attributes.Remove(a[0].ToString());
+                return JSUndefined.Value;
+            }, "removeAttribute", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // contains(otherNode) — returns true if otherNode is a descendant
+        obj.FastAddValue(
+            (KeyString)"contains",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSBoolean.False;
+                var otherObj = a[0] as JSObject;
+                if (otherObj == null) return JSBoolean.False;
+                var otherEl = FindDomElementByJSObject(otherObj);
+                if (otherEl == null) return JSBoolean.False;
+                if (ReferenceEquals(element, otherEl)) return JSBoolean.True;
+                return IsDescendant(element, otherEl) ? JSBoolean.True : JSBoolean.False;
+            }, "contains", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // cloneNode(deep)
+        obj.FastAddValue(
+            (KeyString)"cloneNode",
+            new JSFunction((in Arguments a) =>
+            {
+                var deep = a.Length > 0 && a[0].BooleanValue;
+                var clone = CloneDomElement(element, deep);
+                _elements.Add(clone);
+                return ToJSObject(clone);
+            }, "cloneNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // insertBefore(newChild, refChild)
+        obj.FastAddValue(
+            (KeyString)"insertBefore",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSUndefined.Value;
+                var newChildObj = a[0] as JSObject;
+                if (newChildObj == null) return JSUndefined.Value;
+                var newEl = FindDomElementByJSObject(newChildObj);
+                if (newEl == null) return a[0];
+
+                // If refChild is null/undefined, act like appendChild
+                if (a.Length < 2 || a[1].IsNull || a[1].IsUndefined)
+                {
+                    newEl.Parent?.Children.Remove(newEl);
+                    newEl.Parent = element;
+                    element.Children.Add(newEl);
+                    return a[0];
+                }
+
+                var refChildObj = a[1] as JSObject;
+                if (refChildObj == null) return a[0];
+                var refEl = FindDomElementByJSObject(refChildObj);
+                if (refEl == null) return a[0];
+
+                var idx = element.Children.IndexOf(refEl);
+                if (idx < 0) throw new JSException("NotFoundError: The node before which the new node is to be inserted is not a child of this node.");
+
+                newEl.Parent?.Children.Remove(newEl);
+                newEl.Parent = element;
+                // Re-find index: removing newEl from its old parent may have shifted
+                // indices if newEl was a sibling of refEl within this same parent.
+                idx = element.Children.IndexOf(refEl);
+                element.Children.Insert(idx, newEl);
+                return a[0];
+            }, "insertBefore", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // children (read-only) — element children only (no text nodes)
+        obj.FastAddProperty(
+            (KeyString)"children",
+            new JSFunction((in Arguments a) =>
+            {
+                var result = new List<JSValue>();
+                foreach (var child in element.Children)
+                {
+                    if (!child.IsTextNode)
+                        result.Add(ToJSObject(child));
+                }
+                return new JSArray(result);
+            }, "get children"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // childElementCount (read-only)
+        obj.FastAddProperty(
+            (KeyString)"childElementCount",
+            new JSFunction((in Arguments a) =>
+                new JSNumber(element.Children.Count(c => !c.IsTextNode)),
+                "get childElementCount"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // firstElementChild (read-only)
+        obj.FastAddProperty(
+            (KeyString)"firstElementChild",
+            new JSFunction((in Arguments a) =>
+            {
+                var first = element.Children.FirstOrDefault(c => !c.IsTextNode);
+                return first != null ? (JSValue)ToJSObject(first) : JSNull.Value;
+            }, "get firstElementChild"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // lastElementChild (read-only)
+        obj.FastAddProperty(
+            (KeyString)"lastElementChild",
+            new JSFunction((in Arguments a) =>
+            {
+                var last = element.Children.LastOrDefault(c => !c.IsTextNode);
+                return last != null ? (JSValue)ToJSObject(last) : JSNull.Value;
+            }, "get lastElementChild"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // nextElementSibling (read-only)
+        obj.FastAddProperty(
+            (KeyString)"nextElementSibling",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.Parent == null) return JSNull.Value;
+                var siblings = element.Parent.Children;
+                var idx = siblings.IndexOf(element);
+                for (var i = idx + 1; i < siblings.Count; i++)
+                {
+                    if (!siblings[i].IsTextNode) return (JSValue)ToJSObject(siblings[i]);
+                }
+                return JSNull.Value;
+            }, "get nextElementSibling"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // previousElementSibling (read-only)
+        obj.FastAddProperty(
+            (KeyString)"previousElementSibling",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.Parent == null) return JSNull.Value;
+                var siblings = element.Parent.Children;
+                var idx = siblings.IndexOf(element);
+                for (var i = idx - 1; i >= 0; i--)
+                {
+                    if (!siblings[i].IsTextNode) return (JSValue)ToJSObject(siblings[i]);
+                }
+                return JSNull.Value;
+            }, "get previousElementSibling"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -1981,6 +2364,836 @@ public sealed class DomBridge
         }
     }
 
+    // -------- Phase 2: TreeWalker, NodeIterator, Range builders --------
+
+    /// <summary>
+    /// Returns <c>true</c> if the node type of <paramref name="el"/> matches
+    /// the <paramref name="whatToShow"/> bitmask, and the optional
+    /// <paramref name="filterFn"/> accepts the node.
+    /// </summary>
+    private int ApplyFilter(DomElement el, int whatToShow, JSFunction? filterFn)
+    {
+        var nodeType = GetNodeType(el);
+        var showBit = nodeType switch
+        {
+            1 => 0x1,    // SHOW_ELEMENT
+            3 => 0x4,    // SHOW_TEXT
+            8 => 0x80,   // SHOW_COMMENT
+            9 => 0x100,  // SHOW_DOCUMENT
+            11 => 0x400, // SHOW_DOCUMENT_FRAGMENT
+            _ => 0x0
+        };
+        if ((whatToShow & showBit) == 0) return 3; // FILTER_SKIP
+
+        if (filterFn != null)
+        {
+            try
+            {
+                var result = filterFn.InvokeFunction(new Arguments(filterFn, ToJSObject(el)));
+                return (int)result.DoubleValue;
+            }
+            catch (Exception ex)
+            {
+                RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ApplyFilter", $"NodeFilter error: {ex.Message}", ex);
+                return 1; // FILTER_ACCEPT on error
+            }
+        }
+        return 1; // FILTER_ACCEPT
+    }
+
+    /// <summary>
+    /// Builds a DOM <c>TreeWalker</c> object.
+    /// </summary>
+    private JSObject BuildTreeWalker(DomElement root, int whatToShow, JSFunction? filterFn)
+    {
+        var tw = new JSObject();
+        var currentNode = root;
+
+        tw.FastAddValue(
+            (KeyString)"root",
+            ToJSObject(root),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        tw.FastAddProperty(
+            (KeyString)"currentNode",
+            new JSFunction((in Arguments a) => ToJSObject(currentNode), "get currentNode"),
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && a[0] is JSObject nodeObj)
+                {
+                    var el = FindDomElementByJSObject(nodeObj);
+                    if (el != null) currentNode = el;
+                }
+                return JSUndefined.Value;
+            }, "set currentNode"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        tw.FastAddValue(
+            (KeyString)"whatToShow",
+            new JSNumber(whatToShow),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // parentNode()
+        tw.FastAddValue(
+            (KeyString)"parentNode",
+            new JSFunction((in Arguments a) =>
+            {
+                var node = currentNode;
+                while (node != null && !ReferenceEquals(node, root))
+                {
+                    node = node.Parent;
+                    if (node == null) break;
+                    var result = ApplyFilter(node, whatToShow, filterFn);
+                    if (result == 1) { currentNode = node; return (JSValue)ToJSObject(node); } // ACCEPT
+                }
+                return JSNull.Value;
+            }, "parentNode", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // firstChild()
+        tw.FastAddValue(
+            (KeyString)"firstChild",
+            new JSFunction((in Arguments a) =>
+            {
+                return TreeWalkerTraverseChildren(currentNode, true, root, whatToShow, filterFn, ref currentNode);
+            }, "firstChild", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // lastChild()
+        tw.FastAddValue(
+            (KeyString)"lastChild",
+            new JSFunction((in Arguments a) =>
+            {
+                return TreeWalkerTraverseChildren(currentNode, false, root, whatToShow, filterFn, ref currentNode);
+            }, "lastChild", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // nextSibling()
+        tw.FastAddValue(
+            (KeyString)"nextSibling",
+            new JSFunction((in Arguments a) =>
+            {
+                return TreeWalkerTraverseSiblings(currentNode, true, root, whatToShow, filterFn, ref currentNode);
+            }, "nextSibling", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // previousSibling()
+        tw.FastAddValue(
+            (KeyString)"previousSibling",
+            new JSFunction((in Arguments a) =>
+            {
+                return TreeWalkerTraverseSiblings(currentNode, false, root, whatToShow, filterFn, ref currentNode);
+            }, "previousSibling", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // nextNode() — depth-first pre-order traversal forward
+        tw.FastAddValue(
+            (KeyString)"nextNode",
+            new JSFunction((in Arguments a) =>
+            {
+                var node = currentNode;
+                // Try children first
+                while (true)
+                {
+                    if (node.Children.Count > 0)
+                    {
+                        node = node.Children[0];
+                        var result = ApplyFilter(node, whatToShow, filterFn);
+                        if (result == 1) { currentNode = node; return (JSValue)ToJSObject(node); }
+                        if (result == 2) // REJECT — skip subtree
+                        {
+                            // Move to next sibling or ancestor's sibling
+                            node = GetNextSkippingChildren(node, root);
+                            if (node == null) return JSNull.Value;
+                            var r2 = ApplyFilter(node, whatToShow, filterFn);
+                            if (r2 == 1) { currentNode = node; return (JSValue)ToJSObject(node); }
+                            continue;
+                        }
+                        // SKIP — descend into children
+                        continue;
+                    }
+                    // No children — next sibling or ancestor's next sibling
+                    node = GetNextSkippingChildren(node, root);
+                    if (node == null) return JSNull.Value;
+                    var r = ApplyFilter(node, whatToShow, filterFn);
+                    if (r == 1) { currentNode = node; return (JSValue)ToJSObject(node); }
+                    if (r == 2) // REJECT — skip subtree
+                    {
+                        node = GetNextSkippingChildren(node, root);
+                        if (node == null) return JSNull.Value;
+                        var r3 = ApplyFilter(node, whatToShow, filterFn);
+                        if (r3 == 1) { currentNode = node; return (JSValue)ToJSObject(node); }
+                        continue;
+                    }
+                    // SKIP — continue loop
+                }
+            }, "nextNode", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // previousNode() — depth-first pre-order traversal backward
+        tw.FastAddValue(
+            (KeyString)"previousNode",
+            new JSFunction((in Arguments a) =>
+            {
+                var node = currentNode;
+                while (true)
+                {
+                    // Try previous sibling's deepest descendant
+                    if (node.Parent != null && !ReferenceEquals(node, root))
+                    {
+                        var siblings = node.Parent.Children;
+                        var idx = siblings.IndexOf(node);
+                        if (idx > 0)
+                        {
+                            node = siblings[idx - 1];
+                            // Go to deepest last child
+                            while (node.Children.Count > 0)
+                                node = node.Children[^1];
+                            var result = ApplyFilter(node, whatToShow, filterFn);
+                            if (result == 1) { currentNode = node; return (JSValue)ToJSObject(node); }
+                            continue;
+                        }
+                        // Move to parent
+                        node = node.Parent;
+                        if (ReferenceEquals(node, root)) return JSNull.Value;
+                        var r = ApplyFilter(node, whatToShow, filterFn);
+                        if (r == 1) { currentNode = node; return (JSValue)ToJSObject(node); }
+                        continue;
+                    }
+                    return JSNull.Value;
+                }
+            }, "previousNode", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        return tw;
+    }
+
+    /// <summary>Helper: get next sibling or ancestor's next sibling, skipping subtree.</summary>
+    private static DomElement? GetNextSkippingChildren(DomElement node, DomElement root)
+    {
+        while (node != null && !ReferenceEquals(node, root))
+        {
+            if (node.Parent != null)
+            {
+                var siblings = node.Parent.Children;
+                var idx = siblings.IndexOf(node);
+                if (idx >= 0 && idx + 1 < siblings.Count)
+                    return siblings[idx + 1];
+            }
+            if (node.Parent != null)
+                node = node.Parent;
+            else
+                return null;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// TreeWalker helper: traverse to first/last child.
+    /// </summary>
+    private JSValue TreeWalkerTraverseChildren(DomElement node, bool first, DomElement root, int whatToShow, JSFunction? filterFn, ref DomElement currentNode)
+    {
+        if (node.Children.Count == 0) return JSNull.Value;
+        var child = first ? node.Children[0] : node.Children[^1];
+        while (child != null)
+        {
+            var result = ApplyFilter(child, whatToShow, filterFn);
+            if (result == 1) { currentNode = child; return ToJSObject(child); }
+            if (result == 3 && child.Children.Count > 0) // SKIP — descend
+            {
+                child = first ? child.Children[0] : child.Children[^1];
+                continue;
+            }
+            // REJECT or SKIP with no children — next/previous sibling
+            child = GetSiblingInDirection(child, first, node);
+        }
+        return JSNull.Value;
+    }
+
+    /// <summary>
+    /// TreeWalker helper: traverse to next/previous sibling.
+    /// </summary>
+    private JSValue TreeWalkerTraverseSiblings(DomElement node, bool next, DomElement root, int whatToShow, JSFunction? filterFn, ref DomElement currentNode)
+    {
+        var sibling = node;
+        while (true)
+        {
+            if (sibling.Parent == null || ReferenceEquals(sibling, root)) return JSNull.Value;
+            var siblings = sibling.Parent.Children;
+            var idx = siblings.IndexOf(sibling);
+            var target = next ? (idx + 1 < siblings.Count ? siblings[idx + 1] : null) : (idx > 0 ? siblings[idx - 1] : null);
+            if (target != null)
+            {
+                var result = ApplyFilter(target, whatToShow, filterFn);
+                if (result == 1) { currentNode = target; return ToJSObject(target); }
+                if (result == 3 && target.Children.Count > 0) // SKIP — try children
+                {
+                    var child = TreeWalkerTraverseChildren(target, next, root, whatToShow, filterFn, ref currentNode);
+                    if (!child.IsNull) return child;
+                }
+                sibling = target;
+                continue;
+            }
+            // No more siblings — move up
+            sibling = sibling.Parent;
+        }
+    }
+
+    /// <summary>Helper: get next/previous sibling, or null if past boundaries.</summary>
+    private static DomElement? GetSiblingInDirection(DomElement node, bool forward, DomElement boundary)
+    {
+        if (node.Parent == null || ReferenceEquals(node, boundary)) return null;
+        var siblings = node.Parent.Children;
+        var idx = siblings.IndexOf(node);
+        if (forward && idx + 1 < siblings.Count) return siblings[idx + 1];
+        if (!forward && idx > 0) return siblings[idx - 1];
+        return null;
+    }
+
+    /// <summary>
+    /// Builds a DOM <c>NodeIterator</c> object.
+    /// </summary>
+    private JSObject BuildNodeIterator(DomElement root, int whatToShow, JSFunction? filterFn)
+    {
+        var iter = new JSObject();
+        DomElement? referenceNode = root;
+        var pointerBeforeReferenceNode = true;
+        var detached = false;
+
+        iter.FastAddValue(
+            (KeyString)"root",
+            ToJSObject(root),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        iter.FastAddValue(
+            (KeyString)"whatToShow",
+            new JSNumber(whatToShow),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        iter.FastAddProperty(
+            (KeyString)"referenceNode",
+            new JSFunction((in Arguments a) => referenceNode != null ? (JSValue)ToJSObject(referenceNode) : JSNull.Value, "get referenceNode"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        iter.FastAddProperty(
+            (KeyString)"pointerBeforeReferenceNode",
+            new JSFunction((in Arguments a) => pointerBeforeReferenceNode ? JSBoolean.True : JSBoolean.False, "get pointerBeforeReferenceNode"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // nextNode()
+        iter.FastAddValue(
+            (KeyString)"nextNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (detached) return JSNull.Value;
+                var allNodes = GetDocumentOrderNodes(root);
+                var refIdx = referenceNode != null ? allNodes.IndexOf(referenceNode) : -1;
+                var startIdx = pointerBeforeReferenceNode ? refIdx : refIdx + 1;
+
+                for (var i = startIdx; i < allNodes.Count; i++)
+                {
+                    var result = ApplyFilter(allNodes[i], whatToShow, filterFn);
+                    if (result == 1) // FILTER_ACCEPT
+                    {
+                        referenceNode = allNodes[i];
+                        pointerBeforeReferenceNode = false;
+                        return (JSValue)ToJSObject(allNodes[i]);
+                    }
+                }
+                return JSNull.Value;
+            }, "nextNode", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // previousNode()
+        iter.FastAddValue(
+            (KeyString)"previousNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (detached) return JSNull.Value;
+                var allNodes = GetDocumentOrderNodes(root);
+                var refIdx = referenceNode != null ? allNodes.IndexOf(referenceNode) : -1;
+                var startIdx = pointerBeforeReferenceNode ? refIdx - 1 : refIdx;
+
+                for (var i = startIdx; i >= 0; i--)
+                {
+                    var result = ApplyFilter(allNodes[i], whatToShow, filterFn);
+                    if (result == 1)
+                    {
+                        referenceNode = allNodes[i];
+                        pointerBeforeReferenceNode = true;
+                        return (JSValue)ToJSObject(allNodes[i]);
+                    }
+                }
+                return JSNull.Value;
+            }, "previousNode", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // detach()
+        iter.FastAddValue(
+            (KeyString)"detach",
+            new JSFunction((in Arguments a) =>
+            {
+                detached = true;
+                return JSUndefined.Value;
+            }, "detach", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        return iter;
+    }
+
+    /// <summary>
+    /// Builds a DOM <c>Range</c> object.
+    /// </summary>
+    private JSObject BuildRange()
+    {
+        var range = new JSObject();
+        var startContainer = DocumentElement;
+        var startOffset = 0;
+        var endContainer = DocumentElement;
+        var endOffset = 0;
+        var collapsed = true;
+        var bridge = this;
+
+        // Helper to update collapsed state
+        void UpdateCollapsed()
+        {
+            collapsed = ReferenceEquals(startContainer, endContainer) && startOffset == endOffset;
+        }
+
+        // startContainer
+        range.FastAddProperty(
+            (KeyString)"startContainer",
+            new JSFunction((in Arguments a) => ToJSObject(startContainer), "get startContainer"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // startOffset
+        range.FastAddProperty(
+            (KeyString)"startOffset",
+            new JSFunction((in Arguments a) => new JSNumber(startOffset), "get startOffset"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // endContainer
+        range.FastAddProperty(
+            (KeyString)"endContainer",
+            new JSFunction((in Arguments a) => ToJSObject(endContainer), "get endContainer"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // endOffset
+        range.FastAddProperty(
+            (KeyString)"endOffset",
+            new JSFunction((in Arguments a) => new JSNumber(endOffset), "get endOffset"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // collapsed
+        range.FastAddProperty(
+            (KeyString)"collapsed",
+            new JSFunction((in Arguments a) => collapsed ? JSBoolean.True : JSBoolean.False, "get collapsed"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // commonAncestorContainer
+        range.FastAddProperty(
+            (KeyString)"commonAncestorContainer",
+            new JSFunction((in Arguments a) =>
+            {
+                var ancestor = FindCommonAncestor(startContainer, endContainer);
+                return ancestor != null ? (JSValue)ToJSObject(ancestor) : JSNull.Value;
+            }, "get commonAncestorContainer"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // setStart(node, offset)
+        range.FastAddValue(
+            (KeyString)"setStart",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2) throw new JSException("Failed to execute 'setStart': 2 arguments required.");
+                var nodeObj = a[0] as JSObject;
+                if (nodeObj == null) throw new JSException("Failed to execute 'setStart': parameter 1 is not of type 'Node'.");
+                var el = bridge.FindDomElementByJSObject(nodeObj);
+                if (el == null) return JSUndefined.Value;
+                startContainer = el;
+                startOffset = (int)a[1].DoubleValue;
+                UpdateCollapsed();
+                return JSUndefined.Value;
+            }, "setStart", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // setEnd(node, offset)
+        range.FastAddValue(
+            (KeyString)"setEnd",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2) throw new JSException("Failed to execute 'setEnd': 2 arguments required.");
+                var nodeObj = a[0] as JSObject;
+                if (nodeObj == null) throw new JSException("Failed to execute 'setEnd': parameter 1 is not of type 'Node'.");
+                var el = bridge.FindDomElementByJSObject(nodeObj);
+                if (el == null) return JSUndefined.Value;
+                endContainer = el;
+                endOffset = (int)a[1].DoubleValue;
+                UpdateCollapsed();
+                return JSUndefined.Value;
+            }, "setEnd", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // setStartBefore(node)
+        range.FastAddValue(
+            (KeyString)"setStartBefore",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) throw new JSException("Failed to execute 'setStartBefore': 1 argument required.");
+                var nodeObj = a[0] as JSObject;
+                if (nodeObj == null) return JSUndefined.Value;
+                var el = bridge.FindDomElementByJSObject(nodeObj);
+                if (el?.Parent == null) return JSUndefined.Value;
+                startContainer = el.Parent;
+                startOffset = el.Parent.Children.IndexOf(el);
+                UpdateCollapsed();
+                return JSUndefined.Value;
+            }, "setStartBefore", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // setStartAfter(node)
+        range.FastAddValue(
+            (KeyString)"setStartAfter",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) throw new JSException("Failed to execute 'setStartAfter': 1 argument required.");
+                var nodeObj = a[0] as JSObject;
+                if (nodeObj == null) return JSUndefined.Value;
+                var el = bridge.FindDomElementByJSObject(nodeObj);
+                if (el?.Parent == null) return JSUndefined.Value;
+                startContainer = el.Parent;
+                startOffset = el.Parent.Children.IndexOf(el) + 1;
+                UpdateCollapsed();
+                return JSUndefined.Value;
+            }, "setStartAfter", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // setEndBefore(node)
+        range.FastAddValue(
+            (KeyString)"setEndBefore",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) throw new JSException("Failed to execute 'setEndBefore': 1 argument required.");
+                var nodeObj = a[0] as JSObject;
+                if (nodeObj == null) return JSUndefined.Value;
+                var el = bridge.FindDomElementByJSObject(nodeObj);
+                if (el?.Parent == null) return JSUndefined.Value;
+                endContainer = el.Parent;
+                endOffset = el.Parent.Children.IndexOf(el);
+                UpdateCollapsed();
+                return JSUndefined.Value;
+            }, "setEndBefore", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // setEndAfter(node)
+        range.FastAddValue(
+            (KeyString)"setEndAfter",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) throw new JSException("Failed to execute 'setEndAfter': 1 argument required.");
+                var nodeObj = a[0] as JSObject;
+                if (nodeObj == null) return JSUndefined.Value;
+                var el = bridge.FindDomElementByJSObject(nodeObj);
+                if (el?.Parent == null) return JSUndefined.Value;
+                endContainer = el.Parent;
+                endOffset = el.Parent.Children.IndexOf(el) + 1;
+                UpdateCollapsed();
+                return JSUndefined.Value;
+            }, "setEndAfter", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // collapse(toStart)
+        range.FastAddValue(
+            (KeyString)"collapse",
+            new JSFunction((in Arguments a) =>
+            {
+                var toStart = a.Length > 0 && a[0].BooleanValue;
+                if (toStart)
+                {
+                    endContainer = startContainer;
+                    endOffset = startOffset;
+                }
+                else
+                {
+                    startContainer = endContainer;
+                    startOffset = endOffset;
+                }
+                collapsed = true;
+                return JSUndefined.Value;
+            }, "collapse", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // selectNode(node)
+        range.FastAddValue(
+            (KeyString)"selectNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) throw new JSException("Failed to execute 'selectNode': 1 argument required.");
+                var nodeObj = a[0] as JSObject;
+                if (nodeObj == null) return JSUndefined.Value;
+                var el = bridge.FindDomElementByJSObject(nodeObj);
+                if (el?.Parent == null) return JSUndefined.Value;
+                startContainer = el.Parent;
+                startOffset = el.Parent.Children.IndexOf(el);
+                endContainer = el.Parent;
+                endOffset = startOffset + 1;
+                UpdateCollapsed();
+                return JSUndefined.Value;
+            }, "selectNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // selectNodeContents(node)
+        range.FastAddValue(
+            (KeyString)"selectNodeContents",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) throw new JSException("Failed to execute 'selectNodeContents': 1 argument required.");
+                var nodeObj = a[0] as JSObject;
+                if (nodeObj == null) return JSUndefined.Value;
+                var el = bridge.FindDomElementByJSObject(nodeObj);
+                if (el == null) return JSUndefined.Value;
+                startContainer = el;
+                startOffset = 0;
+                endContainer = el;
+                endOffset = el.Children.Count;
+                UpdateCollapsed();
+                return JSUndefined.Value;
+            }, "selectNodeContents", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // cloneContents() — returns a document fragment with cloned nodes
+        range.FastAddValue(
+            (KeyString)"cloneContents",
+            new JSFunction((in Arguments a) =>
+            {
+                var fragment = new DomElement("#document-fragment", null, null, string.Empty);
+                bridge._elements.Add(fragment);
+                var nodes = GetNodesInRange(startContainer, startOffset, endContainer, endOffset);
+                foreach (var node in nodes)
+                {
+                    var clone = bridge.CloneDomElement(node, true);
+                    clone.Parent = fragment;
+                    fragment.Children.Add(clone);
+                    bridge._elements.Add(clone);
+                }
+                return bridge.ToJSObject(fragment);
+            }, "cloneContents", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // extractContents() — removes nodes from DOM and returns in a fragment
+        range.FastAddValue(
+            (KeyString)"extractContents",
+            new JSFunction((in Arguments a) =>
+            {
+                var fragment = new DomElement("#document-fragment", null, null, string.Empty);
+                bridge._elements.Add(fragment);
+                var nodes = GetNodesInRange(startContainer, startOffset, endContainer, endOffset);
+                foreach (var node in nodes)
+                {
+                    node.Parent?.Children.Remove(node);
+                    node.Parent = fragment;
+                    fragment.Children.Add(node);
+                }
+                // Collapse range to start after extraction
+                endContainer = startContainer;
+                endOffset = startOffset;
+                collapsed = true;
+                return bridge.ToJSObject(fragment);
+            }, "extractContents", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // deleteContents() — removes all nodes in the range
+        range.FastAddValue(
+            (KeyString)"deleteContents",
+            new JSFunction((in Arguments a) =>
+            {
+                var nodes = GetNodesInRange(startContainer, startOffset, endContainer, endOffset);
+                foreach (var node in nodes)
+                {
+                    node.Parent?.Children.Remove(node);
+                    node.Parent = null;
+                }
+                endContainer = startContainer;
+                endOffset = startOffset;
+                collapsed = true;
+                return JSUndefined.Value;
+            }, "deleteContents", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // insertNode(node)
+        range.FastAddValue(
+            (KeyString)"insertNode",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) throw new JSException("Failed to execute 'insertNode': 1 argument required.");
+                var nodeObj = a[0] as JSObject;
+                if (nodeObj == null) return JSUndefined.Value;
+                var el = bridge.FindDomElementByJSObject(nodeObj);
+                if (el == null) return JSUndefined.Value;
+
+                el.Parent?.Children.Remove(el);
+                el.Parent = startContainer;
+                var insertIdx = Math.Min(startOffset, startContainer.Children.Count);
+                startContainer.Children.Insert(insertIdx, el);
+                return JSUndefined.Value;
+            }, "insertNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // surroundContents(newParent)
+        range.FastAddValue(
+            (KeyString)"surroundContents",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) throw new JSException("Failed to execute 'surroundContents': 1 argument required.");
+                var nodeObj = a[0] as JSObject;
+                if (nodeObj == null) return JSUndefined.Value;
+                var newParent = bridge.FindDomElementByJSObject(nodeObj);
+                if (newParent == null) return JSUndefined.Value;
+
+                var nodes = GetNodesInRange(startContainer, startOffset, endContainer, endOffset);
+                foreach (var node in nodes)
+                {
+                    node.Parent?.Children.Remove(node);
+                    node.Parent = newParent;
+                    newParent.Children.Add(node);
+                }
+                newParent.Parent?.Children.Remove(newParent);
+                newParent.Parent = startContainer;
+                var idx = Math.Min(startOffset, startContainer.Children.Count);
+                startContainer.Children.Insert(idx, newParent);
+                return JSUndefined.Value;
+            }, "surroundContents", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // cloneRange()
+        range.FastAddValue(
+            (KeyString)"cloneRange",
+            new JSFunction((in Arguments a) =>
+            {
+                var clone = bridge.BuildRange();
+                // Set clone boundaries via internal approach
+                var setStartFn = clone[(KeyString)"setStart"] as JSFunction;
+                var setEndFn = clone[(KeyString)"setEnd"] as JSFunction;
+                setStartFn?.InvokeFunction(new Arguments(setStartFn, bridge.ToJSObject(startContainer), new JSNumber(startOffset)));
+                setEndFn?.InvokeFunction(new Arguments(setEndFn, bridge.ToJSObject(endContainer), new JSNumber(endOffset)));
+                return clone;
+            }, "cloneRange", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // compareBoundaryPoints(how, sourceRange) — stub: requires full document position comparison
+        range.FastAddValue(
+            (KeyString)"compareBoundaryPoints",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2) throw new JSException("Failed to execute 'compareBoundaryPoints': 2 arguments required.");
+                // 0 = START_TO_START, 1 = START_TO_END, 2 = END_TO_END, 3 = END_TO_START
+                // Full implementation deferred — requires document-order position comparison
+                return new JSNumber(0);
+            }, "compareBoundaryPoints", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // toString() — returns text content of the range
+        range.FastAddValue(
+            (KeyString)"toString",
+            new JSFunction((in Arguments a) =>
+            {
+                var sb = new StringBuilder();
+                var nodes = GetNodesInRange(startContainer, startOffset, endContainer, endOffset);
+                foreach (var node in nodes)
+                {
+                    CollectTextContent(node, sb);
+                }
+                return new JSString(sb.ToString());
+            }, "toString", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // Range comparison constants
+        range.FastAddValue((KeyString)"START_TO_START", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        range.FastAddValue((KeyString)"START_TO_END", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+        range.FastAddValue((KeyString)"END_TO_END", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
+        range.FastAddValue((KeyString)"END_TO_START", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        return range;
+    }
+
+    /// <summary>
+    /// Finds the common ancestor of two nodes.
+    /// </summary>
+    private static DomElement? FindCommonAncestor(DomElement a, DomElement b)
+    {
+        var ancestors = new HashSet<DomElement>(ReferenceEqualityComparer.Instance);
+        var current = a;
+        while (current != null)
+        {
+            ancestors.Add(current);
+            current = current.Parent;
+        }
+        current = b;
+        while (current != null)
+        {
+            if (ancestors.Contains(current)) return current;
+            current = current.Parent;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the list of top-level nodes fully contained within the specified range boundaries.
+    /// For element containers, this returns children between the start and end offsets.
+    /// </summary>
+    private static List<DomElement> GetNodesInRange(DomElement startContainer, int startOffset, DomElement endContainer, int endOffset)
+    {
+        var result = new List<DomElement>();
+        if (ReferenceEquals(startContainer, endContainer))
+        {
+            // Same container — return children between offsets
+            for (var i = startOffset; i < Math.Min(endOffset, startContainer.Children.Count); i++)
+                result.Add(startContainer.Children[i]);
+            return result;
+        }
+
+        // Different containers — collect nodes between start and end
+        var ancestor = FindCommonAncestor(startContainer, endContainer);
+        if (ancestor == null) return result;
+
+        var allNodes = GetDocumentOrderNodes(ancestor);
+        var startIdx = allNodes.IndexOf(startContainer);
+        var endIdx = allNodes.IndexOf(endContainer);
+        if (startIdx < 0 || endIdx < 0) return result;
+
+        for (var i = startIdx + 1; i < endIdx; i++)
+        {
+            var node = allNodes[i];
+            // Only include top-level nodes (not descendants of already-included nodes)
+            var isDescendantOfIncluded = result.Any(r => IsDescendant(r, node));
+            if (!isDescendantOfIncluded)
+                result.Add(node);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Recursively collects text content from a node and its descendants.
+    /// </summary>
+    private static void CollectTextContent(DomElement node, StringBuilder sb)
+    {
+        if (node.IsTextNode)
+        {
+            sb.Append(node.TextContent ?? string.Empty);
+            return;
+        }
+        foreach (var child in node.Children)
+            CollectTextContent(child, sb);
+    }
+
     /// <summary>
     /// Finds the <see cref="DomElement"/> corresponding to a given <see cref="JSObject"/>
     /// by looking up the JS object cache.
@@ -1993,6 +3206,81 @@ public sealed class DomBridge
                 return kvp.Key;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> if <paramref name="candidate"/> is a descendant of
+    /// <paramref name="ancestor"/> in the DOM tree.
+    /// </summary>
+    private static bool IsDescendant(DomElement ancestor, DomElement candidate)
+    {
+        var current = candidate.Parent;
+        while (current != null)
+        {
+            if (ReferenceEquals(current, ancestor)) return true;
+            current = current.Parent;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Clones a <see cref="DomElement"/>. When <paramref name="deep"/> is true,
+    /// all descendants are recursively cloned.
+    /// </summary>
+    private DomElement CloneDomElement(DomElement source, bool deep)
+    {
+        var attrs = new Dictionary<string, string>(source.Attributes, StringComparer.OrdinalIgnoreCase);
+        var style = new Dictionary<string, string>(source.Style, StringComparer.OrdinalIgnoreCase);
+        var clone = new DomElement(source.TagName, source.Id, source.ClassName, source.InnerHtml, style, attrs, source.IsTextNode);
+        clone.TextContent = source.TextContent;
+
+        if (deep)
+        {
+            foreach (var child in source.Children)
+            {
+                var childClone = CloneDomElement(child, true);
+                childClone.Parent = clone;
+                clone.Children.Add(childClone);
+                _elements.Add(childClone);
+            }
+        }
+        return clone;
+    }
+
+    /// <summary>
+    /// Collects all descendants of <paramref name="root"/> in document order
+    /// (depth-first pre-order).
+    /// </summary>
+    private static void CollectDescendants(DomElement root, List<DomElement> result)
+    {
+        foreach (var child in root.Children)
+        {
+            result.Add(child);
+            CollectDescendants(child, result);
+        }
+    }
+
+    /// <summary>
+    /// Returns a flat list of all nodes in the subtree rooted at
+    /// <paramref name="root"/> in document order (including the root).
+    /// </summary>
+    private static List<DomElement> GetDocumentOrderNodes(DomElement root)
+    {
+        var list = new List<DomElement> { root };
+        CollectDescendants(root, list);
+        return list;
+    }
+
+    /// <summary>
+    /// Returns the node type constant for a <see cref="DomElement"/>.
+    /// </summary>
+    private static int GetNodeType(DomElement element)
+    {
+        if (element.IsTextNode) return 3; // TEXT_NODE
+        if (string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase)) return 8;
+        if (string.Equals(element.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return 9;
+        if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase)) return 11;
+        return 1; // ELEMENT_NODE
     }
 
     /// <summary>
@@ -2480,7 +3768,7 @@ public sealed class DomElement(
     bool isTextNode = false)
 {
     public string TagName { get; } = tagName;
-    public string? Id { get; } = id;
+    public string? Id { get; set; } = id;
 
     /// <summary>The element's CSS class string; mutable via <c>classList</c> or <c>className</c>.</summary>
     public string? ClassName { get; set; } = className;
