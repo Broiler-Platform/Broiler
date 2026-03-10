@@ -67,7 +67,25 @@ public sealed class HtmlTreeBuilder
                     if (string.Equals(tag, "html", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(tag, "head", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(tag, "body", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Merge attributes from the token onto the pre-created element
+                        var target = string.Equals(tag, "html", StringComparison.OrdinalIgnoreCase) ? root
+                            : string.Equals(tag, "head", StringComparison.OrdinalIgnoreCase) ? head
+                            : body;
+                        if (token.Attributes != null)
+                        {
+                            foreach (var kvp in token.Attributes)
+                            {
+                                if (string.Equals(kvp.Key, "id", StringComparison.OrdinalIgnoreCase))
+                                    target.Id = kvp.Value;
+                                else if (string.Equals(kvp.Key, "class", StringComparison.OrdinalIgnoreCase))
+                                    target.ClassName = kvp.Value;
+                                else
+                                    target.Attributes[kvp.Key] = kvp.Value;
+                            }
+                        }
                         break;
+                    }
 
                     if (string.Equals(tag, "title", StringComparison.OrdinalIgnoreCase))
                     {
