@@ -1606,7 +1606,10 @@ public sealed class DomBridge
                 var hVal = opts[(KeyString)"headers"];
                 if (hVal is JSObject hObj)
                 {
-                    // Enumerate known request header names
+                    // Enumerate known request header names.
+                    // Note: YantraJS does not support Object.keys/for-in on all object
+                    // types reliably, so we probe a fixed set of common HTTP headers.
+                    // Custom headers outside this list will not be forwarded.
                     var commonHeaders = new[] { "Content-Type", "Accept", "Authorization",
                         "X-Requested-With", "Cache-Control", "Pragma", "If-Modified-Since",
                         "If-None-Match", "Range" };
@@ -1672,7 +1675,7 @@ public sealed class DomBridge
                         foreach (var kv in allHeaders)
                         {
                             try { cb.InvokeFunction(new Arguments(cb, new JSString(kv.Value), new JSString(kv.Key))); }
-                            catch { /* ignore callback errors */ }
+                            catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.headers.forEach", $"Callback error: {ex.Message}", ex); }
                         }
                     }
                     return JSUndefined.Value;

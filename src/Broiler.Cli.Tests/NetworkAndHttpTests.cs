@@ -407,7 +407,7 @@ xhr.open('GET', 'http://example.com');
 var r = [];
 r.push(xhr.responseText === '');
 r.push(xhr.responseURL === '');
-r.push(xhr._responseHeaders !== undefined);
+r.push(typeof xhr.getAllResponseHeaders === 'function');
 document.getElementById('result').textContent = r.join(',');
 </script>
 </body></html>";
