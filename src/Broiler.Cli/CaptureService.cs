@@ -173,6 +173,14 @@ public class CaptureService
         @"\ssrc\s*=\s*(?:""(?<uri>data:[^""]+)""|'(?<uri>data:[^']+)'|(?<uri>data:[^\s>]+))",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    /// <summary>
+    /// Matches any <c>src</c> attribute value (not just <c>data:</c> URIs).
+    /// Used to extract external script URLs for HTTP/HTTPS/file loading.
+    /// </summary>
+    private static readonly Regex AnySrcAttrPattern = new(
+        @"\ssrc\s*=\s*(?:""(?<uri>[^""]+)""|'(?<uri>[^']+)'|(?<uri>[^\s>]+))",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private static readonly Regex StylePattern = new(
         @"<style[^>]*>(?<content>[\s\S]*?)</style>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -434,9 +442,9 @@ public class CaptureService
     }
 
     /// <summary>
-    /// Executes inline and <c>data:</c> URI scripts using <see cref="DomBridge"/>
-    /// so that JavaScript-generated DOM content is included in the rendered output.
-    /// Returns the serialised HTML after script execution.
+    /// Executes inline, <c>data:</c> URI, and external <c>src</c> scripts using
+    /// <see cref="DomBridge"/> so that JavaScript-generated DOM content is included
+    /// in the rendered output. Returns the serialised HTML after script execution.
     /// </summary>
     internal static string ExecuteScriptsWithDom(string html, string url)
     {
@@ -454,12 +462,22 @@ public class CaptureService
             }
             else
             {
-                // Inline script (skip external src= scripts that are not data: URIs)
-                if (attrs.Contains("src", StringComparison.OrdinalIgnoreCase))
-                    continue;
-                var content = match.Groups["content"].Value.Trim();
-                if (!string.IsNullOrEmpty(content))
-                    scripts.Add(content);
+                // Check for any src= attribute (http/https/file/relative)
+                var anySrcMatch = AnySrcAttrPattern.Match(attrs);
+                if (anySrcMatch.Success)
+                {
+                    var srcUri = anySrcMatch.Groups["uri"].Value;
+                    var fetched = FetchExternalScript(srcUri, url);
+                    if (!string.IsNullOrEmpty(fetched))
+                        scripts.Add(fetched);
+                }
+                else
+                {
+                    // Inline script
+                    var content = match.Groups["content"].Value.Trim();
+                    if (!string.IsNullOrEmpty(content))
+                        scripts.Add(content);
+                }
             }
         }
 
@@ -485,6 +503,47 @@ public class CaptureService
 
         return bridge.SerializeToHtml();
     }
+
+    /// <summary>
+    /// Resolves and downloads an external script from an HTTP/HTTPS/file URL.
+    /// Relative URLs are resolved against the page <paramref name="pageUrl"/>.
+    /// Returns the script text content, or <c>string.Empty</c> on failure.
+    /// </summary>
+    internal static string FetchExternalScript(string scriptUrl, string pageUrl)
+    {
+        try
+        {
+            // Resolve relative URLs against the page URL
+            string resolvedUrl;
+            if (Uri.TryCreate(scriptUrl, UriKind.Absolute, out _))
+            {
+                resolvedUrl = scriptUrl;
+            }
+            else if (Uri.TryCreate(pageUrl, UriKind.Absolute, out var baseUri) &&
+                     Uri.TryCreate(baseUri, scriptUrl, out var resolved))
+            {
+                resolvedUrl = resolved.AbsoluteUri;
+            }
+            else
+            {
+                return string.Empty;
+            }
+
+            using var response = SharedHttpClient.GetAsync(resolvedUrl).GetAwaiter().GetResult();
+            if (!response.IsSuccessStatusCode)
+                return string.Empty;
+
+            return response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.FetchExternalScript",
+                $"Failed to fetch external script '{scriptUrl}': {ex.Message}", ex);
+            return string.Empty;
+        }
+    }
+
+    private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
 
     /// <summary>
     /// Decodes a <c>data:</c> URI to its text content.
