@@ -355,19 +355,39 @@ score: **16–20 / 100**.
 
 **Expected impact:** Tests 33–48. Estimated additional score: **+10–14**.
 
-### Phase 5: HTML DOM Interfaces (Priority: Medium)
+### Phase 5: HTML DOM Interfaces (Priority: Medium) ✅ COMPLETE
 
 **Goal:** Implement HTML-specific DOM interfaces.
 
+**Status:** Completed 2026-03-10. All 16 target tests (49–64) implemented.
+
 **Tasks:**
 
-1. **`HTMLTableElement`**: `createTHead()`, `insertRow()`, `deleteRow()`,
-   `rows`, `tBodies`
-2. **`HTMLFormElement`**: `.elements` collection
-3. **`HTMLSelectElement`**: `.add()`, `.options`
-4. **`HTMLInputElement`**: `.type`, `.checked`, `.value` (dynamic changes)
-5. **`HTMLOptionElement`**: `.defaultSelected`
-6. **`HTMLButtonElement`**: `.type`, attribute reflection
+1. ✅ **`HTMLTableElement`**: `createCaption()`, `createTHead()`, `createTFoot()`,
+   `deleteCaption()`, `deleteTHead()`, `deleteTFoot()`, `caption`, `tHead`,
+   `tFoot`, `tBodies`, `rows` (spec-ordered: thead → tbody/direct → tfoot),
+   `insertRow(index)`, `deleteRow(index)`
+2. ✅ **`HTMLTableSectionElement`** (thead/tbody/tfoot): `.rows`, `.insertRow()`
+3. ✅ **`HTMLTableRowElement`**: `.rowIndex`, `.sectionRowIndex`
+4. ✅ **`HTMLFormElement`**: `.elements` (with dynamic named access via
+   `FormElementsCollection` subclass), `.length`, `.action`
+5. ✅ **`HTMLSelectElement`**: `.add()`, `.options`, `.selectedIndex`
+6. ✅ **`HTMLInputElement`**: `.type` (lowercase getter), `.checked` (radio mutual
+   exclusion), `.value` (IDL-only, not reflected to content attribute), `.name`
+   (read/write, synced with attribute)
+7. ✅ **`HTMLOptionElement`**: `.defaultSelected`
+8. ✅ **`HTMLButtonElement`**: `.type` (default "submit"), `.value`
+9. ✅ **`HTMLLabelElement`**: `.htmlFor` ↔ `for` attribute
+10. ✅ **`HTMLMetaElement`**: `.httpEquiv` ↔ `http-equiv` attribute
+11. ✅ **`HTMLObjectElement`**: `.data` (with URI resolution)
+12. ✅ **`HTMLAnchorElement`**: `.href` (with URI resolution)
+13. ✅ **`className` / class attribute**: bidirectional sync, space preservation,
+   `hasAttribute('class')` after empty string set
+14. ✅ **`element.getElementsByTagName()`**: searches descendants in tree order
+15. ✅ **`replaceChild` bug fix**: handles case where newChild is sibling of oldChild
+16. ✅ **`removeAttribute` sync**: syncs className/id when removing class/id attributes
+
+**Tests added:** 34 tests in `HtmlDomTests.cs`. Total CLI tests: 133 (99 + 34).
 
 **Expected impact:** Tests 49–64. Estimated additional score: **+12–15**.
 
@@ -415,11 +435,11 @@ score: **16–20 / 100**.
 | Phase | Cumulative Score (est.) | Key Milestones |
 | ----- | ----------------------- | -------------- |
 | Current | 0 / 100 | No JS execution |
-| Phase 1 | 16–20 / 100 | JS engine in CLI, Bucket 6 passes |
-| Phase 2 | 26–30 / 100 | DOM Traversal + Range |
-| Phase 3 | 29–35 / 100 | DOM Events |
-| Phase 4 | 39–49 / 100 | Selectors API + CSSOM |
-| Phase 5 | 51–64 / 100 | HTML DOM interfaces |
+| Phase 1 ✅ | 16–20 / 100 | JS engine in CLI, Bucket 6 passes |
+| Phase 2 ✅ | 26–30 / 100 | DOM Traversal + Range |
+| Phase 3 ✅ | 29–35 / 100 | DOM Events |
+| Phase 4 ✅ | 39–49 / 100 | Selectors API + CSSOM |
+| Phase 5 ✅ | 51–64 / 100 | HTML DOM interfaces |
 | Phase 6 | 54–72 / 100 | SVG DOM |
 | Phase 7 | 60–78 / 100 | CSS rendering fixes |
 | Phase 8 | 75–95 / 100 | Network/HTTP compliance |

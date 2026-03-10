@@ -1738,7 +1738,7 @@ public sealed class DomBridge
 
     private readonly Dictionary<DomElement, JSObject> _jsObjectCache = [];
 
-    private JSObject ToJSObject(DomElement element)
+    internal JSObject ToJSObject(DomElement element)
     {
         if (_jsObjectCache.TryGetValue(element, out var cached))
             return cached;
@@ -1765,15 +1765,23 @@ public sealed class DomBridge
             }, "set id"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // className (read/write)
+        // className (read/write) — reflects the 'class' content attribute
         obj.FastAddProperty(
             (KeyString)"className",
             new JSFunction((in Arguments a) =>
-                element.ClassName != null ? (JSValue)new JSString(element.ClassName) : JSNull.Value,
-                "get className"),
+            {
+                // Prefer Attributes['class'] (synced by setAttribute and className setter).
+                // Fall back to element.ClassName for elements created with a class in the constructor
+                // but not yet synced to Attributes (e.g. parsed HTML elements).
+                if (element.Attributes.TryGetValue("class", out var cls))
+                    return new JSString(cls);
+                return element.ClassName != null ? (JSValue)new JSString(element.ClassName) : new JSString(string.Empty);
+            }, "get className"),
             new JSFunction((in Arguments a) =>
             {
-                element.ClassName = a.Length > 0 ? a[0].ToString() : string.Empty;
+                var val = a.Length > 0 ? a[0].ToString() : string.Empty;
+                element.ClassName = val;
+                element.Attributes["class"] = val;
                 return JSUndefined.Value;
             }, "set className"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -2067,7 +2075,16 @@ public sealed class DomBridge
             (KeyString)"removeAttribute",
             new JSFunction((in Arguments a) =>
             {
-                if (a.Length > 0) element.Attributes.Remove(a[0].ToString());
+                if (a.Length > 0)
+                {
+                    var attrName = a[0].ToString();
+                    element.Attributes.Remove(attrName);
+                    // Sync special properties
+                    if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
+                        element.Id = null;
+                    else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
+                        element.ClassName = null;
+                }
                 return JSUndefined.Value;
             }, "removeAttribute", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -2275,8 +2292,19 @@ public sealed class DomBridge
                 var idx = element.Children.IndexOf(oldEl);
                 if (idx < 0) return a[1];
 
+                // If newChild is already in this parent, remove it first and re-find idx
+                if (ReferenceEquals(newEl.Parent, element))
+                {
+                    element.Children.Remove(newEl);
+                    idx = element.Children.IndexOf(oldEl);
+                    if (idx < 0) return a[1];
+                }
+                else
+                {
+                    newEl.Parent?.Children.Remove(newEl);
+                }
+
                 oldEl.Parent = null;
-                newEl.Parent?.Children.Remove(newEl);
                 newEl.Parent = element;
                 element.Children[idx] = newEl;
                 return a[1]; // returns the old child
@@ -2395,17 +2423,25 @@ public sealed class DomBridge
         // -- Form element support --
 
         // value (read/write) — for input, textarea, select elements
+        // The IDL 'value' property is NOT reflected as a content attribute for inputs.
         obj.FastAddProperty(
             (KeyString)"value",
             new JSFunction((in Arguments a) =>
             {
+                if (element.DomProperties.TryGetValue("_value", out var domVal) && domVal is string sv)
+                    return new JSString(sv);
                 if (element.Attributes.TryGetValue("value", out var val))
                     return new JSString(val);
                 return new JSString(string.Empty);
             }, "get value"),
             new JSFunction((in Arguments a) =>
             {
-                element.Attributes["value"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                var tag = element.TagName.ToLowerInvariant();
+                var v = a.Length > 0 ? a[0].ToString() : string.Empty;
+                if (tag == "input")
+                    element.DomProperties["_value"] = v; // IDL value, not reflected
+                else
+                    element.Attributes["value"] = v;
                 return JSUndefined.Value;
             }, "set value"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -2419,20 +2455,50 @@ public sealed class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 if (a.Length > 0 && a[0].BooleanValue)
+                {
+                    // Radio button mutual exclusion: uncheck others in same group
+                    if (element.Attributes.TryGetValue("type", out var tp) &&
+                        string.Equals(tp, "radio", System.StringComparison.OrdinalIgnoreCase) &&
+                        element.Attributes.TryGetValue("name", out var radioName) &&
+                        !string.IsNullOrEmpty(radioName))
+                    {
+                        // Find the form parent (if any)
+                        var formParent = element.Parent;
+                        while (formParent != null && !string.Equals(formParent.TagName, "form", System.StringComparison.OrdinalIgnoreCase))
+                            formParent = formParent.Parent;
+                        if (formParent != null)
+                        {
+                            // Only iterate form controls, not all elements
+                            foreach (var sibling in CollectFormControls(formParent))
+                            {
+                                if (ReferenceEquals(sibling, element)) continue;
+                                if (!string.Equals(sibling.TagName, "input", System.StringComparison.OrdinalIgnoreCase)) continue;
+                                if (!sibling.Attributes.TryGetValue("type", out var st) ||
+                                    !string.Equals(st, "radio", System.StringComparison.OrdinalIgnoreCase)) continue;
+                                if (!sibling.Attributes.TryGetValue("name", out var sn) ||
+                                    !string.Equals(sn, radioName, System.StringComparison.Ordinal)) continue;
+                                sibling.Attributes.Remove("checked");
+                            }
+                        }
+                    }
                     element.Attributes["checked"] = "checked";
+                }
                 else
                     element.Attributes.Remove("checked");
                 return JSUndefined.Value;
             }, "set checked"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // type (read/write) — for input elements
+        // type (read/write) — for input/button elements; getter returns lowercase
         obj.FastAddProperty(
             (KeyString)"type",
             new JSFunction((in Arguments a) =>
             {
                 if (element.Attributes.TryGetValue("type", out var t))
-                    return new JSString(t);
+                    return new JSString(t.ToLowerInvariant());
+                // Default type values per HTML spec
+                var tag = element.TagName.ToLowerInvariant();
+                if (tag == "button") return new JSString("submit");
                 return new JSString(string.Empty);
             }, "get type"),
             new JSFunction((in Arguments a) =>
@@ -2442,7 +2508,7 @@ public sealed class DomBridge
             }, "set type"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // name (read-only) — for form elements
+        // name (read/write) — for form elements; syncs with content attribute
         obj.FastAddProperty(
             (KeyString)"name",
             new JSFunction((in Arguments a) =>
@@ -2451,7 +2517,11 @@ public sealed class DomBridge
                     return new JSString(n);
                 return new JSString(string.Empty);
             }, "get name"),
-            null,
+            new JSFunction((in Arguments a) =>
+            {
+                element.Attributes["name"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                return JSUndefined.Value;
+            }, "set name"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // disabled (read/write) — for form controls
@@ -2569,6 +2639,18 @@ public sealed class DomBridge
             }, "querySelectorAll", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // getElementsByTagName on elements — searches descendants in tree order
+        obj.FastAddValue(
+            (KeyString)"getElementsByTagName",
+            new JSFunction((in Arguments a) =>
+            {
+                var tagSearch = a.Length > 0 ? a[0].ToString().ToLowerInvariant() : string.Empty;
+                var results = new List<JSValue>();
+                CollectDescendantsByTag(element, tagSearch, results, bridge);
+                return new JSArray(results);
+            }, "getElementsByTagName", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // getContext(contextType) — for <canvas> elements
         obj.FastAddValue(
             (KeyString)"getContext",
@@ -2630,6 +2712,478 @@ public sealed class DomBridge
                         : new JSString(string.Empty);
                 }, "get sandbox"),
                 null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
+        // -- Phase 5: HTML DOM Interfaces --
+
+        var tag = element.TagName.ToLowerInvariant();
+
+        // HTMLTableElement interface
+        if (tag == "table")
+        {
+            // caption (get/set) — returns first <caption> child or null
+            obj.FastAddProperty(
+                (KeyString)"caption",
+                new JSFunction((in Arguments _) =>
+                {
+                    var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", System.StringComparison.OrdinalIgnoreCase));
+                    return cap != null ? (JSValue)ToJSObject(cap) : JSNull.Value;
+                }, "get caption"),
+                new JSFunction((in Arguments a) => JSUndefined.Value, "set caption"), // setting to same value is no-op
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // tHead (get/set) — returns first <thead> child or null
+            obj.FastAddProperty(
+                (KeyString)"tHead",
+                new JSFunction((in Arguments _) =>
+                {
+                    var th = element.Children.Find(c => string.Equals(c.TagName, "thead", System.StringComparison.OrdinalIgnoreCase));
+                    return th != null ? (JSValue)ToJSObject(th) : JSNull.Value;
+                }, "get tHead"),
+                new JSFunction((in Arguments a) => JSUndefined.Value, "set tHead"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // tFoot (get/set) — returns first <tfoot> child or null
+            obj.FastAddProperty(
+                (KeyString)"tFoot",
+                new JSFunction((in Arguments _) =>
+                {
+                    var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", System.StringComparison.OrdinalIgnoreCase));
+                    return tf != null ? (JSValue)ToJSObject(tf) : JSNull.Value;
+                }, "get tFoot"),
+                new JSFunction((in Arguments a) => JSUndefined.Value, "set tFoot"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // tBodies (read-only) — returns collection of <tbody> children
+            obj.FastAddProperty(
+                (KeyString)"tBodies",
+                new JSFunction((in Arguments _) =>
+                {
+                    var bodies = new List<JSValue>();
+                    foreach (var c in element.Children)
+                        if (string.Equals(c.TagName, "tbody", System.StringComparison.OrdinalIgnoreCase))
+                            bodies.Add(ToJSObject(c));
+                    var arr = new JSArray(bodies);
+                    arr.FastAddProperty(
+                        (KeyString)"length",
+                        new JSFunction((in Arguments __) => new JSNumber(bodies.Count), "get length"),
+                        null, JSPropertyAttributes.EnumerableConfigurableProperty);
+                    return arr;
+                }, "get tBodies"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // rows (read-only) — returns all <tr> elements in spec order:
+            // 1. thead rows, 2. tbody rows + direct tr children (in tree order), 3. tfoot rows
+            obj.FastAddProperty(
+                (KeyString)"rows",
+                new JSFunction((in Arguments _) => BuildTableRows(element), "get rows"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // createCaption() — returns existing or creates new <caption>
+            obj.FastAddValue(
+                (KeyString)"createCaption",
+                new JSFunction((in Arguments _) =>
+                {
+                    var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", System.StringComparison.OrdinalIgnoreCase));
+                    if (cap != null) return ToJSObject(cap);
+                    cap = new DomElement("caption", null, null, string.Empty);
+                    bridge._elements.Add(cap);
+                    cap.Parent = element;
+                    element.Children.Insert(0, cap);
+                    return ToJSObject(cap);
+                }, "createCaption", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // createTHead() — returns existing or creates new <thead>
+            obj.FastAddValue(
+                (KeyString)"createTHead",
+                new JSFunction((in Arguments _) =>
+                {
+                    var th = element.Children.Find(c => string.Equals(c.TagName, "thead", System.StringComparison.OrdinalIgnoreCase));
+                    if (th != null) return ToJSObject(th);
+                    th = new DomElement("thead", null, null, string.Empty);
+                    bridge._elements.Add(th);
+                    th.Parent = element;
+                    element.Children.Add(th);
+                    return ToJSObject(th);
+                }, "createTHead", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // createTFoot() — returns existing or creates new <tfoot>
+            obj.FastAddValue(
+                (KeyString)"createTFoot",
+                new JSFunction((in Arguments _) =>
+                {
+                    var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", System.StringComparison.OrdinalIgnoreCase));
+                    if (tf != null) return ToJSObject(tf);
+                    tf = new DomElement("tfoot", null, null, string.Empty);
+                    bridge._elements.Add(tf);
+                    tf.Parent = element;
+                    element.Children.Add(tf);
+                    return ToJSObject(tf);
+                }, "createTFoot", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // deleteCaption()
+            obj.FastAddValue(
+                (KeyString)"deleteCaption",
+                new JSFunction((in Arguments _) =>
+                {
+                    var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", System.StringComparison.OrdinalIgnoreCase));
+                    if (cap != null) { cap.Parent = null; element.Children.Remove(cap); }
+                    return JSUndefined.Value;
+                }, "deleteCaption", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // deleteTHead()
+            obj.FastAddValue(
+                (KeyString)"deleteTHead",
+                new JSFunction((in Arguments _) =>
+                {
+                    var th = element.Children.Find(c => string.Equals(c.TagName, "thead", System.StringComparison.OrdinalIgnoreCase));
+                    if (th != null) { th.Parent = null; element.Children.Remove(th); }
+                    return JSUndefined.Value;
+                }, "deleteTHead", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // deleteTFoot()
+            obj.FastAddValue(
+                (KeyString)"deleteTFoot",
+                new JSFunction((in Arguments _) =>
+                {
+                    var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", System.StringComparison.OrdinalIgnoreCase));
+                    if (tf != null) { tf.Parent = null; element.Children.Remove(tf); }
+                    return JSUndefined.Value;
+                }, "deleteTFoot", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // insertRow(index) — inserts a <tr> into the table
+            obj.FastAddValue(
+                (KeyString)"insertRow",
+                new JSFunction((in Arguments a) =>
+                {
+                    var index = a.Length > 0 ? (int)a[0].DoubleValue : -1;
+                    return InsertTableRow(element, index, bridge);
+                }, "insertRow", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // deleteRow(index)
+            obj.FastAddValue(
+                (KeyString)"deleteRow",
+                new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length == 0) return JSUndefined.Value;
+                    var index = (int)a[0].DoubleValue;
+                    var rows = CollectTableRows(element);
+                    if (index < 0) index = rows.Count + index;
+                    if (index >= 0 && index < rows.Count)
+                    {
+                        var row = rows[index];
+                        row.Parent?.Children.Remove(row);
+                        row.Parent = null;
+                    }
+                    return JSUndefined.Value;
+                }, "deleteRow", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+
+        // HTMLTableSectionElement (thead, tbody, tfoot) — rows and insertRow
+        if (tag == "thead" || tag == "tbody" || tag == "tfoot")
+        {
+            // rows — returns <tr> children of this section
+            obj.FastAddProperty(
+                (KeyString)"rows",
+                new JSFunction((in Arguments _) =>
+                {
+                    var rows = new List<JSValue>();
+                    foreach (var c in element.Children)
+                        if (string.Equals(c.TagName, "tr", System.StringComparison.OrdinalIgnoreCase))
+                            rows.Add(ToJSObject(c));
+                    var arr = new JSArray(rows);
+                    arr.FastAddProperty(
+                        (KeyString)"length",
+                        new JSFunction((in Arguments __) => new JSNumber(rows.Count), "get length"),
+                        null, JSPropertyAttributes.EnumerableConfigurableProperty);
+                    return arr;
+                }, "get rows"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // insertRow(index)
+            obj.FastAddValue(
+                (KeyString)"insertRow",
+                new JSFunction((in Arguments a) =>
+                {
+                    var index = a.Length > 0 ? (int)a[0].DoubleValue : -1;
+                    var tr = new DomElement("tr", null, null, string.Empty);
+                    bridge._elements.Add(tr);
+                    tr.Parent = element;
+                    var trRows = element.Children.Where(c =>
+                        string.Equals(c.TagName, "tr", System.StringComparison.OrdinalIgnoreCase)).ToList();
+                    if (index < 0 || index >= trRows.Count)
+                        element.Children.Add(tr);
+                    else
+                    {
+                        var refRow = trRows[index];
+                        var idx = element.Children.IndexOf(refRow);
+                        element.Children.Insert(idx, tr);
+                    }
+                    return ToJSObject(tr);
+                }, "insertRow", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+
+        // HTMLTableRowElement (tr) — rowIndex, sectionRowIndex, cells, insertCell, deleteCell
+        if (tag == "tr")
+        {
+            // rowIndex — position in the table's rows collection
+            obj.FastAddProperty(
+                (KeyString)"rowIndex",
+                new JSFunction((in Arguments _) =>
+                {
+                    // Find parent table
+                    var tableEl = element.Parent;
+                    if (tableEl != null && (string.Equals(tableEl.TagName, "thead", System.StringComparison.OrdinalIgnoreCase) ||
+                                            string.Equals(tableEl.TagName, "tbody", System.StringComparison.OrdinalIgnoreCase) ||
+                                            string.Equals(tableEl.TagName, "tfoot", System.StringComparison.OrdinalIgnoreCase)))
+                        tableEl = tableEl.Parent;
+                    if (tableEl == null || !string.Equals(tableEl.TagName, "table", System.StringComparison.OrdinalIgnoreCase))
+                        return new JSNumber(-1);
+                    var rows = CollectTableRows(tableEl);
+                    return new JSNumber(rows.IndexOf(element));
+                }, "get rowIndex"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // sectionRowIndex — position within the parent section
+            obj.FastAddProperty(
+                (KeyString)"sectionRowIndex",
+                new JSFunction((in Arguments _) =>
+                {
+                    var section = element.Parent;
+                    if (section == null) return new JSNumber(-1);
+                    var idx = 0;
+                    foreach (var c in section.Children)
+                    {
+                        if (ReferenceEquals(c, element)) return new JSNumber(idx);
+                        if (string.Equals(c.TagName, "tr", System.StringComparison.OrdinalIgnoreCase)) idx++;
+                    }
+                    return new JSNumber(-1);
+                }, "get sectionRowIndex"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
+        // HTMLFormElement interface
+        if (tag == "form")
+        {
+            // elements — returns collection of form controls with named access
+            obj.FastAddProperty(
+                (KeyString)"elements",
+                new JSFunction((in Arguments _) => BuildFormElementsCollection(element, bridge), "get elements"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // length — alias for elements.length
+            obj.FastAddProperty(
+                (KeyString)"length",
+                new JSFunction((in Arguments _) =>
+                {
+                    var controls = CollectFormControls(element);
+                    return new JSNumber(controls.Count);
+                }, "get length"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // action (read/write)
+            obj.FastAddProperty(
+                (KeyString)"action",
+                new JSFunction((in Arguments _) =>
+                    element.Attributes.TryGetValue("action", out var act)
+                        ? (JSValue)new JSString(act)
+                        : new JSString(string.Empty),
+                    "get action"),
+                new JSFunction((in Arguments a) =>
+                {
+                    element.Attributes["action"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    return JSUndefined.Value;
+                }, "set action"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
+        // HTMLSelectElement interface
+        if (tag == "select")
+        {
+            // add(option, refOption)
+            obj.FastAddValue(
+                (KeyString)"add",
+                new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length == 0) return JSUndefined.Value;
+                    var optObj = a[0] as JSObject;
+                    if (optObj == null) return JSUndefined.Value;
+                    var optEl = FindDomElementByJSObject(optObj);
+                    if (optEl == null) return JSUndefined.Value;
+
+                    DomElement? refEl = null;
+                    if (a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined)
+                    {
+                        var refObj = a[1] as JSObject;
+                        if (refObj != null) refEl = FindDomElementByJSObject(refObj);
+                    }
+
+                    optEl.Parent?.Children.Remove(optEl);
+                    optEl.Parent = element;
+                    if (refEl != null)
+                    {
+                        var idx = element.Children.IndexOf(refEl);
+                        if (idx >= 0) element.Children.Insert(idx, optEl);
+                        else element.Children.Add(optEl);
+                    }
+                    else
+                        element.Children.Add(optEl);
+                    return JSUndefined.Value;
+                }, "add", 2),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // options — returns collection of <option> children
+            obj.FastAddProperty(
+                (KeyString)"options",
+                new JSFunction((in Arguments _) =>
+                {
+                    var opts = new List<JSValue>();
+                    foreach (var c in element.Children)
+                        if (string.Equals(c.TagName, "option", System.StringComparison.OrdinalIgnoreCase))
+                            opts.Add(ToJSObject(c));
+                    var arr = new JSArray(opts);
+                    arr.FastAddProperty(
+                        (KeyString)"length",
+                        new JSFunction((in Arguments __) => new JSNumber(opts.Count), "get length"),
+                        null, JSPropertyAttributes.EnumerableConfigurableProperty);
+                    return arr;
+                }, "get options"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // selectedIndex — index of the selected option
+            obj.FastAddProperty(
+                (KeyString)"selectedIndex",
+                new JSFunction((in Arguments _) =>
+                {
+                    var idx = 0;
+                    foreach (var c in element.Children)
+                    {
+                        if (string.Equals(c.TagName, "option", System.StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (c.Attributes.ContainsKey("selected") ||
+                                (c.DomProperties.TryGetValue("_defaultSelected", out var ds) && ds is true))
+                                return new JSNumber(idx);
+                            idx++;
+                        }
+                    }
+                    return new JSNumber(0); // default: first option is selected
+                }, "get selectedIndex"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
+        // HTMLOptionElement interface
+        if (tag == "option")
+        {
+            // defaultSelected (read/write)
+            obj.FastAddProperty(
+                (KeyString)"defaultSelected",
+                new JSFunction((in Arguments _) =>
+                    element.DomProperties.TryGetValue("_defaultSelected", out var ds) && ds is true
+                        ? JSBoolean.True : JSBoolean.False,
+                    "get defaultSelected"),
+                new JSFunction((in Arguments a) =>
+                {
+                    element.DomProperties["_defaultSelected"] = a.Length > 0 && a[0].BooleanValue;
+                    return JSUndefined.Value;
+                }, "set defaultSelected"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
+        // HTMLLabelElement — htmlFor property (maps to 'for' content attribute)
+        if (tag == "label")
+        {
+            obj.FastAddProperty(
+                (KeyString)"htmlFor",
+                new JSFunction((in Arguments _) =>
+                    element.Attributes.TryGetValue("for", out var f)
+                        ? (JSValue)new JSString(f) : new JSString(string.Empty),
+                    "get htmlFor"),
+                new JSFunction((in Arguments a) =>
+                {
+                    element.Attributes["for"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    return JSUndefined.Value;
+                }, "set htmlFor"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
+        // HTMLMetaElement — httpEquiv property (maps to 'http-equiv' content attribute)
+        if (tag == "meta")
+        {
+            obj.FastAddProperty(
+                (KeyString)"httpEquiv",
+                new JSFunction((in Arguments _) =>
+                    element.Attributes.TryGetValue("http-equiv", out var he)
+                        ? (JSValue)new JSString(he) : new JSString(string.Empty),
+                    "get httpEquiv"),
+                new JSFunction((in Arguments a) =>
+                {
+                    element.Attributes["http-equiv"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    return JSUndefined.Value;
+                }, "set httpEquiv"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
+        // HTMLObjectElement — data property with URI resolution
+        if (tag == "object")
+        {
+            obj.FastAddProperty(
+                (KeyString)"data",
+                new JSFunction((in Arguments _) =>
+                {
+                    if (!element.Attributes.TryGetValue("data", out var d))
+                        return new JSString(string.Empty);
+                    // Resolve relative URI against base URL
+                    if (Uri.TryCreate(bridge._pageUrl, UriKind.Absolute, out var baseUri) &&
+                        Uri.TryCreate(baseUri, d, out var resolved))
+                        return new JSString(resolved.AbsoluteUri);
+                    return new JSString(d);
+                }, "get data"),
+                new JSFunction((in Arguments a) =>
+                {
+                    element.Attributes["data"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    return JSUndefined.Value;
+                }, "set data"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
+        // HTMLAnchorElement — href property with URI resolution
+        if (tag == "a")
+        {
+            obj.FastAddProperty(
+                (KeyString)"href",
+                new JSFunction((in Arguments _) =>
+                {
+                    if (!element.Attributes.TryGetValue("href", out var h))
+                        return new JSString(string.Empty);
+                    if (Uri.TryCreate(bridge._pageUrl, UriKind.Absolute, out var baseUri) &&
+                        Uri.TryCreate(baseUri, h, out var resolved))
+                        return new JSString(resolved.AbsoluteUri);
+                    return new JSString(h);
+                }, "get href"),
+                new JSFunction((in Arguments a) =>
+                {
+                    element.Attributes["href"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    return JSUndefined.Value;
+                }, "set href"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
@@ -3685,6 +4239,160 @@ public sealed class DomBridge
     }
 
     /// <summary>
+    /// Collects all &lt;tr&gt; elements in a table in HTML spec order:
+    /// 1. thead rows, 2. tbody rows + direct tr children (in tree order), 3. tfoot rows.
+    /// </summary>
+    private static List<DomElement> CollectTableRows(DomElement table)
+    {
+        var rows = new List<DomElement>();
+        // 1. All tr children of thead elements (in tree order)
+        foreach (var child in table.Children)
+        {
+            if (string.Equals(child.TagName, "thead", System.StringComparison.OrdinalIgnoreCase))
+                foreach (var c in child.Children)
+                    if (string.Equals(c.TagName, "tr", System.StringComparison.OrdinalIgnoreCase))
+                        rows.Add(c);
+        }
+        // 2. All tr children that are direct children of table, or children of tbody elements (in tree order)
+        foreach (var child in table.Children)
+        {
+            var ctag = child.TagName.ToLowerInvariant();
+            if (ctag == "tr")
+                rows.Add(child);
+            else if (ctag == "tbody")
+                foreach (var c in child.Children)
+                    if (string.Equals(c.TagName, "tr", System.StringComparison.OrdinalIgnoreCase))
+                        rows.Add(c);
+        }
+        // 3. All tr children of tfoot elements (in tree order)
+        foreach (var child in table.Children)
+        {
+            if (string.Equals(child.TagName, "tfoot", System.StringComparison.OrdinalIgnoreCase))
+                foreach (var c in child.Children)
+                    if (string.Equals(c.TagName, "tr", System.StringComparison.OrdinalIgnoreCase))
+                        rows.Add(c);
+        }
+        return rows;
+    }
+
+    /// <summary>
+    /// Builds a JSArray of table rows for the 'rows' property.
+    /// </summary>
+    private JSArray BuildTableRows(DomElement table)
+    {
+        var rows = CollectTableRows(table);
+        var jsRows = new List<JSValue>();
+        foreach (var r in rows)
+            jsRows.Add(ToJSObject(r));
+        var arr = new JSArray(jsRows);
+        arr.FastAddProperty(
+            (KeyString)"length",
+            new JSFunction((in Arguments _) => new JSNumber(jsRows.Count), "get length"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        return arr;
+    }
+
+    /// <summary>
+    /// Inserts a row into a table at the given index, per HTMLTableElement.insertRow() spec.
+    /// </summary>
+    private JSValue InsertTableRow(DomElement table, int index, DomBridge bridge)
+    {
+        var tr = new DomElement("tr", null, null, string.Empty);
+        bridge._elements.Add(tr);
+
+        var allRows = CollectTableRows(table);
+        if (allRows.Count == 0 || index == -1 || index == allRows.Count)
+        {
+            // Find the last section to append to, or create a tbody
+            DomElement? lastSection = null;
+            for (int i = table.Children.Count - 1; i >= 0; i--)
+            {
+                var ctag = table.Children[i].TagName.ToLowerInvariant();
+                if (ctag == "thead" || ctag == "tbody" || ctag == "tfoot")
+                {
+                    lastSection = table.Children[i];
+                    break;
+                }
+            }
+            if (lastSection == null && allRows.Count == 0)
+            {
+                // No sections and no rows at all: create a new tbody per spec
+                var tbody = new DomElement("tbody", null, null, string.Empty);
+                bridge._elements.Add(tbody);
+                tbody.Parent = table;
+                table.Children.Add(tbody);
+                lastSection = tbody;
+            }
+            if (lastSection != null)
+            {
+                tr.Parent = lastSection;
+                lastSection.Children.Add(tr);
+            }
+            else
+            {
+                tr.Parent = table;
+                table.Children.Add(tr);
+            }
+        }
+        else if (index >= 0 && index < allRows.Count)
+        {
+            var refRow = allRows[index];
+            var parent = refRow.Parent ?? table;
+            tr.Parent = parent;
+            var idx = parent.Children.IndexOf(refRow);
+            parent.Children.Insert(idx >= 0 ? idx : parent.Children.Count, tr);
+        }
+        return ToJSObject(tr);
+    }
+
+    /// <summary>
+    /// Collects form control elements (input, select, textarea, button) from a form.
+    /// </summary>
+    internal static List<DomElement> CollectFormControls(DomElement form)
+    {
+        var controls = new List<DomElement>();
+        CollectFormControlsRecursive(form, controls);
+        return controls;
+    }
+
+    private static void CollectFormControlsRecursive(DomElement parent, List<DomElement> controls)
+    {
+        foreach (var child in parent.Children)
+        {
+            var ctag = child.TagName.ToLowerInvariant();
+            if (ctag == "input" || ctag == "select" || ctag == "textarea" || ctag == "button")
+                controls.Add(child);
+            CollectFormControlsRecursive(child, controls);
+        }
+    }
+
+    /// <summary>
+    /// Builds a form.elements collection (JSObject with indexed + named access).
+    /// </summary>
+    private JSValue BuildFormElementsCollection(DomElement form, DomBridge bridge)
+    {
+        var controls = CollectFormControls(form);
+
+        // Use FormElementsCollection which returns null for missing named properties
+        // (per HTMLFormControlsCollection spec behavior)
+        var collection = new FormElementsCollection(form, bridge);
+        for (int i = 0; i < controls.Count; i++)
+            collection.FastAddValue((uint)i, ToJSObject(controls[i]),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+        collection.FastAddProperty(
+            (KeyString)"length",
+            new JSFunction((in Arguments _) =>
+            {
+                var currentControls = CollectFormControls(form);
+                return new JSNumber(currentControls.Count);
+            }, "get length"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        return collection;
+    }
+
+    /// <summary>
     /// Collects all descendants of <paramref name="root"/> in document order
     /// (depth-first pre-order).
     /// </summary>
@@ -3694,6 +4402,19 @@ public sealed class DomBridge
         {
             result.Add(child);
             CollectDescendants(child, result);
+        }
+    }
+
+    /// <summary>
+    /// Collects descendant elements matching a tag name in tree order (depth-first).
+    /// </summary>
+    private static void CollectDescendantsByTag(DomElement root, string tagName, List<JSValue> results, DomBridge bridge)
+    {
+        foreach (var child in root.Children)
+        {
+            if (string.Equals(child.TagName, tagName, System.StringComparison.OrdinalIgnoreCase))
+                results.Add(bridge.ToJSObject(child));
+            CollectDescendantsByTag(child, tagName, results, bridge);
         }
     }
 
@@ -4622,6 +5343,10 @@ public sealed class DomElement(
     /// <summary>Text content for text nodes.</summary>
     public string? TextContent { get; set; }
 
+    /// <summary>IDL-level properties that are NOT reflected as content attributes
+    /// (e.g. input.value, option.defaultSelected). Keyed by property name.</summary>
+    public Dictionary<string, object?> DomProperties { get; } = new(System.StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Registered event listeners keyed by event type (e.g. "click", "input", "submit").
     /// Each entry stores the listener and whether it was registered for the capture phase.</summary>
     public Dictionary<string, List<(JSValue Listener, bool Capture)>> EventListeners { get; } = new(System.StringComparer.OrdinalIgnoreCase);
@@ -4641,4 +5366,43 @@ public sealed class MutationObserverOptions
     public bool CharacterData { get; set; }
     /// <summary>Whether to observe the subtree.</summary>
     public bool Subtree { get; set; }
+}
+
+/// <summary>
+/// Custom JSObject subclass for HTMLFormControlsCollection that returns null
+/// (not undefined) for named property lookups that don't match any control.
+/// </summary>
+internal sealed class FormElementsCollection : JSObject
+{
+    private readonly DomElement _form;
+    private readonly DomBridge _bridge;
+
+    public FormElementsCollection(DomElement form, DomBridge bridge) : base()
+    {
+        _form = form;
+        _bridge = bridge;
+    }
+
+    protected override JSValue GetValue(KeyString key, JSValue receiver, bool throwError = true)
+    {
+        // First check own properties (length, numeric indices, known names)
+        var result = base.GetValue(key, receiver, false);
+        if (result != null && !result.IsUndefined)
+            return result;
+
+        // Dynamic named lookup in form controls
+        var prop = key.Value.ToString();
+        if (!string.IsNullOrEmpty(prop))
+        {
+            var controls = DomBridge.CollectFormControls(_form);
+            foreach (var ctrl in controls)
+            {
+                if (ctrl.Attributes.TryGetValue("name", out var name) &&
+                    string.Equals(name, prop, System.StringComparison.Ordinal))
+                    return _bridge.ToJSObject(ctrl);
+            }
+        }
+
+        return JSNull.Value; // HTMLFormControlsCollection returns null for missing names
+    }
 }
