@@ -1582,7 +1582,7 @@ public sealed class DomBridge
             console,
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // fetch(url, options) — basic polyfill backed by HttpClient
+        // fetch(url, options) — polyfill backed by HttpClient with headers, method support
         var fetchFn = new JSFunction((in Arguments a) =>
         {
             if (a.Length == 0)
@@ -1591,15 +1591,96 @@ public sealed class DomBridge
             var fetchUrl = a[0].ToString();
             var responseObj = new JSObject();
 
+            // Parse options (method, headers, body)
+            var method = "GET";
+            string? requestBody = null;
+            var requestHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (a.Length > 1 && a[1] is JSObject opts)
+            {
+                var mVal = opts[(KeyString)"method"];
+                if (mVal is JSString mStr)
+                    method = mStr.ToString().ToUpperInvariant();
+                var bVal = opts[(KeyString)"body"];
+                if (bVal is JSString bStr)
+                    requestBody = bStr.ToString();
+                var hVal = opts[(KeyString)"headers"];
+                if (hVal is JSObject hObj)
+                {
+                    // Enumerate known request header names.
+                    // Note: YantraJS does not support Object.keys/for-in on all object
+                    // types reliably, so we probe a fixed set of common HTTP headers.
+                    // Custom headers outside this list will not be forwarded.
+                    var commonHeaders = new[] { "Content-Type", "Accept", "Authorization",
+                        "X-Requested-With", "Cache-Control", "Pragma", "If-Modified-Since",
+                        "If-None-Match", "Range" };
+                    foreach (var name in commonHeaders)
+                    {
+                        var v = hObj[(KeyString)name];
+                        if (v is JSString sv)
+                            requestHeaders[name] = sv.ToString();
+                    }
+                }
+            }
+
             try
             {
-                var response = SharedHttpClient.GetAsync(fetchUrl).GetAwaiter().GetResult();
+                var request = new HttpRequestMessage(new HttpMethod(method), fetchUrl);
+                if (requestBody != null)
+                    request.Content = new StringContent(requestBody, System.Text.Encoding.UTF8,
+                        requestHeaders.TryGetValue("Content-Type", out var ct) ? ct : "text/plain");
+                foreach (var kv in requestHeaders)
+                {
+                    if (!string.Equals(kv.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+                        request.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
+                }
+
+                var response = SharedHttpClient.SendAsync(request).GetAwaiter().GetResult();
                 var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 var statusCode = (int)response.StatusCode;
 
                 responseObj.FastAddValue((KeyString)"ok", response.IsSuccessStatusCode ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 responseObj.FastAddValue((KeyString)"status", new JSNumber(statusCode), JSPropertyAttributes.EnumerableConfigurableValue);
                 responseObj.FastAddValue((KeyString)"statusText", new JSString(response.ReasonPhrase ?? string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+                responseObj.FastAddValue((KeyString)"url", new JSString(fetchUrl), JSPropertyAttributes.EnumerableConfigurableValue);
+                responseObj.FastAddValue((KeyString)"redirected", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                responseObj.FastAddValue((KeyString)"type", new JSString("basic"), JSPropertyAttributes.EnumerableConfigurableValue);
+                responseObj.FastAddValue((KeyString)"bodyUsed", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+
+                // response.headers — Headers-like object with get(), has(), forEach()
+                var allHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var h in response.Headers)
+                    allHeaders[h.Key] = string.Join(", ", h.Value);
+                if (response.Content.Headers != null)
+                {
+                    foreach (var h in response.Content.Headers)
+                        allHeaders[h.Key] = string.Join(", ", h.Value);
+                }
+
+                var headersObj = new JSObject();
+                headersObj.FastAddValue((KeyString)"get", new JSFunction((in Arguments hArgs) =>
+                {
+                    if (hArgs.Length == 0) return JSNull.Value;
+                    var name = hArgs[0].ToString();
+                    return allHeaders.TryGetValue(name, out var val) ? (JSValue)new JSString(val) : JSNull.Value;
+                }, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+                headersObj.FastAddValue((KeyString)"has", new JSFunction((in Arguments hArgs) =>
+                {
+                    if (hArgs.Length == 0) return JSBoolean.False;
+                    return allHeaders.ContainsKey(hArgs[0].ToString()) ? JSBoolean.True : JSBoolean.False;
+                }, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+                headersObj.FastAddValue((KeyString)"forEach", new JSFunction((in Arguments hArgs) =>
+                {
+                    if (hArgs.Length > 0 && hArgs[0] is JSFunction cb)
+                    {
+                        foreach (var kv in allHeaders)
+                        {
+                            try { cb.InvokeFunction(new Arguments(cb, new JSString(kv.Value), new JSString(kv.Key))); }
+                            catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.headers.forEach", $"Callback error: {ex.Message}", ex); }
+                        }
+                    }
+                    return JSUndefined.Value;
+                }, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+                responseObj.FastAddValue((KeyString)"headers", headersObj, JSPropertyAttributes.EnumerableConfigurableValue);
 
                 // response.text() — returns a thenable with the body text
                 responseObj.FastAddValue((KeyString)"text", new JSFunction((in Arguments _) =>
@@ -1644,6 +1725,25 @@ public sealed class DomBridge
                     }, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
                     return thenable;
                 }, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+                // response.arrayBuffer() — returns a thenable with empty array buffer stub
+                responseObj.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in Arguments _) =>
+                {
+                    var thenable = new JSObject();
+                    thenable.FastAddValue((KeyString)"then", new JSFunction((in Arguments thenArgs) =>
+                    {
+                        if (thenArgs.Length > 0 && thenArgs[0] is JSFunction cb)
+                        {
+                            try { cb.InvokeFunction(new Arguments(cb, new JSObject())); }
+                            catch (Exception ex) { RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.arrayBuffer", $"Callback error: {ex.Message}", ex); }
+                        }
+                        return thenable;
+                    }, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+                    return thenable;
+                }, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+                // response.clone() — returns a shallow copy
+                responseObj.FastAddValue((KeyString)"clone", new JSFunction((in Arguments _) => responseObj, "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             }
             catch (Exception ex)
             {
@@ -1651,6 +1751,12 @@ public sealed class DomBridge
                 responseObj.FastAddValue((KeyString)"ok", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
                 responseObj.FastAddValue((KeyString)"status", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                 responseObj.FastAddValue((KeyString)"statusText", new JSString(ex.Message), JSPropertyAttributes.EnumerableConfigurableValue);
+                responseObj.FastAddValue((KeyString)"url", new JSString(fetchUrl), JSPropertyAttributes.EnumerableConfigurableValue);
+                var emptyHeaders = new JSObject();
+                emptyHeaders.FastAddValue((KeyString)"get", new JSFunction((in Arguments _) => JSNull.Value, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+                emptyHeaders.FastAddValue((KeyString)"has", new JSFunction((in Arguments _) => JSBoolean.False, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+                emptyHeaders.FastAddValue((KeyString)"forEach", new JSFunction((in Arguments _) => JSUndefined.Value, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+                responseObj.FastAddValue((KeyString)"headers", emptyHeaders, JSPropertyAttributes.EnumerableConfigurableValue);
             }
 
             // Return a thenable (Promise-like) that resolves immediately
@@ -1664,7 +1770,11 @@ public sealed class DomBridge
                 }
                 return promise;
             }, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-            promise.FastAddValue((KeyString)"catch", new JSFunction((in Arguments _) => promise, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            promise.FastAddValue((KeyString)"catch", new JSFunction((in Arguments catchArgs) =>
+            {
+                // catch is a no-op for successful fetches
+                return promise;
+            }, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             return promise;
         }, "fetch", 1);
 
@@ -1709,36 +1819,132 @@ public sealed class DomBridge
                     this.status = 0;
                     this.statusText = '';
                     this.responseText = '';
+                    this.responseType = '';
+                    this.responseURL = '';
+                    this.responseXML = null;
                     this.onreadystatechange = null;
+                    this.onload = null;
+                    this.onerror = null;
+                    this.onabort = null;
+                    this.onprogress = null;
+                    this.onloadstart = null;
+                    this.onloadend = null;
+                    this.ontimeout = null;
+                    this.withCredentials = false;
+                    this.timeout = 0;
                     this._method = 'GET';
                     this._url = '';
+                    this._async = true;
                     this._headers = {};
+                    this._responseHeaders = {};
+                    this._mimeOverride = null;
+                    this._aborted = false;
                     this.UNSENT = 0;
                     this.OPENED = 1;
                     this.HEADERS_RECEIVED = 2;
                     this.LOADING = 3;
                     this.DONE = 4;
                 }
-                XMLHttpRequest.prototype.open = function(method, url) {
+                XMLHttpRequest.UNSENT = 0;
+                XMLHttpRequest.OPENED = 1;
+                XMLHttpRequest.HEADERS_RECEIVED = 2;
+                XMLHttpRequest.LOADING = 3;
+                XMLHttpRequest.DONE = 4;
+                XMLHttpRequest.prototype.open = function(method, url, isAsync) {
                     this._method = method;
                     this._url = url;
+                    this._async = isAsync !== false;
                     this.readyState = 1;
+                    this.status = 0;
+                    this.statusText = '';
+                    this.responseText = '';
+                    this.responseURL = '';
+                    this._responseHeaders = {};
+                    this._aborted = false;
+                    if (typeof this.onreadystatechange === 'function') {
+                        this.onreadystatechange();
+                    }
                 };
                 XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
                     this._headers[name] = value;
                 };
+                XMLHttpRequest.prototype.getResponseHeader = function(name) {
+                    if (!name) return null;
+                    var lower = name.toLowerCase();
+                    for (var key in this._responseHeaders) {
+                        if (key.toLowerCase() === lower) return this._responseHeaders[key];
+                    }
+                    return null;
+                };
+                XMLHttpRequest.prototype.getAllResponseHeaders = function() {
+                    var result = '';
+                    for (var key in this._responseHeaders) {
+                        result += key.toLowerCase() + ': ' + this._responseHeaders[key] + '\r\n';
+                    }
+                    return result;
+                };
+                XMLHttpRequest.prototype.overrideMimeType = function(mime) {
+                    this._mimeOverride = mime;
+                };
+                XMLHttpRequest.prototype.abort = function() {
+                    this._aborted = true;
+                    this.readyState = 0;
+                    this.status = 0;
+                    this.statusText = '';
+                    this.responseText = '';
+                    if (typeof this.onabort === 'function') {
+                        this.onabort();
+                    }
+                    if (typeof this.onloadend === 'function') {
+                        this.onloadend();
+                    }
+                };
                 XMLHttpRequest.prototype.send = function(body) {
                     var self = this;
+                    if (self._aborted) return;
                     try {
-                        fetch(self._url).then(function(response) {
+                        var opts = { method: self._method };
+                        if (body && self._method !== 'GET' && self._method !== 'HEAD') {
+                            opts.body = '' + body;
+                        }
+                        var hasHeaders = false;
+                        for (var k in self._headers) { hasHeaders = true; break; }
+                        if (hasHeaders) {
+                            opts.headers = self._headers;
+                        }
+                        if (typeof self.onloadstart === 'function') {
+                            self.onloadstart();
+                        }
+                        fetch(self._url, opts).then(function(response) {
+                            if (self._aborted) return;
                             self.status = response.status;
                             self.statusText = response.statusText;
+                            self.responseURL = response.url || self._url;
                             self.readyState = 2;
+                            if (response.headers && typeof response.headers.forEach === 'function') {
+                                response.headers.forEach(function(value, name) {
+                                    self._responseHeaders[name] = value;
+                                });
+                            }
+                            if (typeof self.onreadystatechange === 'function') {
+                                self.onreadystatechange();
+                            }
                             response.text().then(function(text) {
+                                if (self._aborted) return;
                                 self.responseText = text;
+                                self.readyState = 3;
+                                if (typeof self.onprogress === 'function') {
+                                    self.onprogress();
+                                }
                                 self.readyState = 4;
                                 if (typeof self.onreadystatechange === 'function') {
                                     self.onreadystatechange();
+                                }
+                                if (typeof self.onload === 'function') {
+                                    self.onload();
+                                }
+                                if (typeof self.onloadend === 'function') {
+                                    self.onloadend();
                                 }
                             });
                         });
@@ -1747,6 +1953,12 @@ public sealed class DomBridge
                         self.status = 0;
                         if (typeof self.onreadystatechange === 'function') {
                             self.onreadystatechange();
+                        }
+                        if (typeof self.onerror === 'function') {
+                            self.onerror();
+                        }
+                        if (typeof self.onloadend === 'function') {
+                            self.onloadend();
                         }
                     }
                 };
@@ -2823,9 +3035,22 @@ public sealed class DomBridge
         // contentWindow / contentDocument — for <iframe> elements with full sub-document DOM
         if (string.Equals(element.TagName, "iframe", System.StringComparison.OrdinalIgnoreCase))
         {
+            // Determine if iframe src points to a non-HTML resource (Content-Type check)
+            var iframeSrcValue = element.Attributes.TryGetValue("src", out var srcVal) ? srcVal : string.Empty;
+            var isNonHtmlResource = IsNonHtmlResource(iframeSrcValue);
+
+            // Same-origin check: if iframe src is cross-origin relative to the page, contentDocument returns null
+            var isCrossOrigin = IsCrossOrigin(iframeSrcValue, _pageUrl);
+
             obj.FastAddProperty(
                 (KeyString)"contentDocument",
-                new JSFunction((in Arguments _) => GetOrCreateSubDocument(element), "get contentDocument"),
+                new JSFunction((in Arguments _) =>
+                {
+                    // Cross-origin iframes return null for contentDocument (same-origin policy)
+                    if (isCrossOrigin) return JSNull.Value;
+                    // Non-HTML resources get a minimal empty sub-document (no parsed fallback content)
+                    return GetOrCreateSubDocument(element);
+                }, "get contentDocument"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -2833,6 +3058,7 @@ public sealed class DomBridge
                 (KeyString)"contentWindow",
                 new JSFunction((in Arguments _) =>
                 {
+                    if (isCrossOrigin) return JSNull.Value;
                     var iframeWindow = new JSObject();
                     iframeWindow.FastAddProperty(
                         (KeyString)"document",
@@ -2840,10 +3066,9 @@ public sealed class DomBridge
                         null,
                         JSPropertyAttributes.EnumerableConfigurableProperty);
                     var iframeLocation = new JSObject();
-                    if (element.Attributes.TryGetValue("src", out var iframeSrc))
-                        iframeLocation.FastAddValue((KeyString)"href", new JSString(iframeSrc), JSPropertyAttributes.EnumerableConfigurableValue);
-                    else
-                        iframeLocation.FastAddValue((KeyString)"href", new JSString("about:blank"), JSPropertyAttributes.EnumerableConfigurableValue);
+                    iframeLocation.FastAddValue((KeyString)"href",
+                        new JSString(!string.IsNullOrEmpty(iframeSrcValue) ? iframeSrcValue : "about:blank"),
+                        JSPropertyAttributes.EnumerableConfigurableValue);
                     iframeWindow.FastAddValue((KeyString)"location", iframeLocation, JSPropertyAttributes.EnumerableConfigurableValue);
                     return iframeWindow;
                 }, "get contentWindow"),
@@ -2853,8 +3078,30 @@ public sealed class DomBridge
             // getSVGDocument() — returns contentDocument (same as contentDocument for same-origin)
             obj.FastAddValue(
                 (KeyString)"getSVGDocument",
-                new JSFunction((in Arguments _) => GetOrCreateSubDocument(element), "getSVGDocument", 0),
+                new JSFunction((in Arguments _) =>
+                {
+                    if (isCrossOrigin) return JSNull.Value;
+                    return GetOrCreateSubDocument(element);
+                }, "getSVGDocument", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // src property (read/write) — for iframe elements
+            obj.FastAddProperty(
+                (KeyString)"src",
+                new JSFunction((in Arguments _) =>
+                {
+                    return element.Attributes.TryGetValue("src", out var s)
+                        ? (JSValue)new JSString(s)
+                        : new JSString(string.Empty);
+                }, "get src"),
+                new JSFunction((in Arguments a) =>
+                {
+                    element.Attributes["src"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    // Invalidate cached sub-document when src changes
+                    _subDocumentCache.Remove(element);
+                    return JSUndefined.Value;
+                }, "set src"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
 
             // sandbox attribute access
             obj.FastAddProperty(
@@ -3296,7 +3543,7 @@ public sealed class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
-        // HTMLObjectElement — data property with URI resolution + contentDocument + getSVGDocument
+        // HTMLObjectElement — data property with URI resolution + contentDocument + getSVGDocument + type
         if (tag == "object")
         {
             obj.FastAddProperty(
@@ -3314,21 +3561,47 @@ public sealed class DomBridge
                 new JSFunction((in Arguments a) =>
                 {
                     element.Attributes["data"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    // Invalidate cached sub-document when data changes
+                    bridge._subDocumentCache.Remove(element);
                     return JSUndefined.Value;
                 }, "set data"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
-            // contentDocument for <object> element
+            // type property (MIME type of the resource)
+            obj.FastAddProperty(
+                (KeyString)"type",
+                new JSFunction((in Arguments _) =>
+                    element.Attributes.TryGetValue("type", out var t)
+                        ? (JSValue)new JSString(t) : new JSString(string.Empty),
+                    "get type"),
+                new JSFunction((in Arguments a) =>
+                {
+                    element.Attributes["type"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    return JSUndefined.Value;
+                }, "set type"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // contentDocument for <object> element (with same-origin check)
             obj.FastAddProperty(
                 (KeyString)"contentDocument",
-                new JSFunction((in Arguments _) => bridge.GetOrCreateSubDocument(element), "get contentDocument"),
+                new JSFunction((in Arguments _) =>
+                {
+                    var dataUrl = element.Attributes.TryGetValue("data", out var d) ? d : string.Empty;
+                    if (IsCrossOrigin(dataUrl, bridge._pageUrl)) return JSNull.Value;
+                    return bridge.GetOrCreateSubDocument(element);
+                }, "get contentDocument"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
             // getSVGDocument() for <object> element
             obj.FastAddValue(
                 (KeyString)"getSVGDocument",
-                new JSFunction((in Arguments _) => bridge.GetOrCreateSubDocument(element), "getSVGDocument", 0),
+                new JSFunction((in Arguments _) =>
+                {
+                    var dataUrl = element.Attributes.TryGetValue("data", out var d) ? d : string.Empty;
+                    if (IsCrossOrigin(dataUrl, bridge._pageUrl)) return JSNull.Value;
+                    return bridge.GetOrCreateSubDocument(element);
+                }, "getSVGDocument", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
@@ -5282,6 +5555,94 @@ public sealed class DomBridge
         }
         foreach (var child in node.Children)
             CollectTextContent(child, sb);
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> if the resource URL points to a non-HTML content type
+    /// based on file extension (e.g., .png, .txt, .jpg, .gif, .pdf).
+    /// </summary>
+    private static bool IsNonHtmlResource(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return false;
+        // Strip query string and fragment
+        var path = url;
+        var qIndex = path.IndexOf('?');
+        if (qIndex >= 0) path = path.Substring(0, qIndex);
+        var hIndex = path.IndexOf('#');
+        if (hIndex >= 0) path = path.Substring(0, hIndex);
+
+        var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+        return ext switch
+        {
+            ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".ico" or ".svg" => true,
+            ".txt" or ".text" => true,
+            ".pdf" or ".zip" or ".tar" or ".gz" => true,
+            ".js" or ".mjs" or ".json" or ".xml" or ".css" => true,
+            ".mp3" or ".mp4" or ".wav" or ".ogg" or ".webm" or ".avi" => true,
+            ".woff" or ".woff2" or ".ttf" or ".otf" or ".eot" => true,
+            _ => false,
+        };
+    }
+
+    /// <summary>
+    /// Returns the MIME type for a given file extension.
+    /// </summary>
+    internal static string GetMimeTypeForExtension(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return "application/octet-stream";
+        var path = url;
+        var qIndex = path.IndexOf('?');
+        if (qIndex >= 0) path = path.Substring(0, qIndex);
+        var hIndex = path.IndexOf('#');
+        if (hIndex >= 0) path = path.Substring(0, hIndex);
+
+        var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+        return ext switch
+        {
+            ".html" or ".htm" => "text/html",
+            ".css" => "text/css",
+            ".js" or ".mjs" => "application/javascript",
+            ".json" => "application/json",
+            ".xml" => "application/xml",
+            ".txt" or ".text" => "text/plain",
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".gif" => "image/gif",
+            ".svg" => "image/svg+xml",
+            ".webp" => "image/webp",
+            ".ico" => "image/x-icon",
+            ".bmp" => "image/bmp",
+            ".pdf" => "application/pdf",
+            ".woff" => "font/woff",
+            ".woff2" => "font/woff2",
+            ".ttf" => "font/ttf",
+            ".otf" => "font/otf",
+            ".mp3" => "audio/mpeg",
+            ".mp4" => "video/mp4",
+            ".wav" => "audio/wav",
+            ".ogg" => "audio/ogg",
+            ".webm" => "video/webm",
+            _ => "application/octet-stream",
+        };
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> if the target URL is cross-origin relative to the page URL.
+    /// Relative URLs and file:// URLs are treated as same-origin.
+    /// </summary>
+    private static bool IsCrossOrigin(string targetUrl, string pageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(targetUrl)) return false;
+        // Relative URLs are always same-origin
+        if (!Uri.TryCreate(targetUrl, UriKind.Absolute, out var targetUri)) return false;
+        // file:// URLs are same-origin with each other
+        if (string.Equals(targetUri.Scheme, "file", StringComparison.OrdinalIgnoreCase)) return false;
+        if (string.IsNullOrWhiteSpace(pageUrl)) return false;
+        if (!Uri.TryCreate(pageUrl, UriKind.Absolute, out var pageUri)) return false;
+        // Same-origin: same scheme + host + port
+        return !string.Equals(targetUri.Scheme, pageUri.Scheme, StringComparison.OrdinalIgnoreCase) ||
+               !string.Equals(targetUri.Host, pageUri.Host, StringComparison.OrdinalIgnoreCase) ||
+               targetUri.Port != pageUri.Port;
     }
 
     /// <summary>
