@@ -3993,9 +3993,8 @@ public sealed class DomBridge
             }
             else
             {
-                // Unknown media type or malformed — check if it's parenthesized
-                // If we have "color" without parens, it's a syntax error per spec
-                // and the media query should not match
+                // Unknown media type or malformed (e.g. bare "color" without parens)
+                // — does not match per spec
                 result = false;
                 break;
             }
@@ -4049,28 +4048,32 @@ public sealed class DomBridge
             feature = condition.Trim().ToLowerInvariant();
         }
 
-        // Our virtual viewport: 0x0 by default, simulating a "screen" device with color support
-        // color depth ≥ 0, monochrome = 0
+        // Our virtual device: color display with 8 bits per color component, monochrome = 0.
+        // Default viewport: 0x0.
+        const int ColorDepth = 8;
+        const int MonochromeDepth = 0;
+
         switch (feature)
         {
             case "min-color":
-                // min-color: 0 means the device has at least 0 bits per color component
-                // A color display satisfies min-color: 0 but not necessarily min-color: 1
+                // min-color: N matches when device has at least N bits per color component
                 if (value != null && int.TryParse(value, out var minColor))
-                    return minColor <= 0; // We have 0+ color bits
+                    return minColor <= ColorDepth;
                 return false;
             case "max-color":
+                // max-color: N matches when device has at most N bits per color component
                 if (value != null && int.TryParse(value, out var maxColor))
-                    return maxColor >= 0; // Always true for max-color >= 0
+                    return maxColor >= ColorDepth;
                 return false;
             case "min-monochrome":
-                // We're a color device, monochrome = 0
+                // min-monochrome: N matches when device has at least N monochrome bits
                 if (value != null && int.TryParse(value, out var minMono))
-                    return minMono <= 0;
+                    return minMono <= MonochromeDepth;
                 return false;
             case "max-monochrome":
+                // max-monochrome: N matches when device has at most N monochrome bits
                 if (value != null && int.TryParse(value, out var maxMono))
-                    return maxMono >= 0;
+                    return maxMono >= MonochromeDepth;
                 return false;
             case "min-height":
             case "min-width":
