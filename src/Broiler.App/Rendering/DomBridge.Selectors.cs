@@ -38,7 +38,7 @@ public sealed partial class DomBridge
         var current = el;
         for (int i = parts.Count - 1; i >= 0; i--)
         {
-            var (combinator, compound) = parts[i];
+            var (_, compound) = parts[i];
             if (current == null) return false;
 
             if (i == parts.Count - 1)
@@ -48,6 +48,9 @@ public sealed partial class DomBridge
             }
             else
             {
+                // The combinator describing the relationship between parts[i]
+                // and parts[i+1] is stored in parts[i+1].
+                var combinator = parts[i + 1].Combinator;
                 switch (combinator)
                 {
                     case ' ': // descendant
@@ -90,6 +93,9 @@ public sealed partial class DomBridge
     /// </summary>
     private static List<(char Combinator, string Compound)> SplitSelectorParts(string selector)
     {
+        // Normalise edge-case: "div*" (tag immediately followed by *) → "div *"
+        selector = NormalizeImpliedDescendantStar(selector);
+
         var parts = new List<(char, string)>();
         var current = new System.Text.StringBuilder();
         char pendingCombinator = '\0';
@@ -99,6 +105,15 @@ public sealed partial class DomBridge
         for (int i = 0; i < selector.Length; i++)
         {
             var c = selector[i];
+
+            // Skip backslash-escaped characters (CSS escape sequences)
+            if (c == '\\' && i + 1 < selector.Length)
+            {
+                current.Append(selector[i + 1]);
+                i++;
+                continue;
+            }
+
             if (c == '(') { depth++; current.Append(c); continue; }
             if (c == ')') { depth--; current.Append(c); continue; }
             if (c == '[') { bracketDepth++; current.Append(c); continue; }
@@ -147,6 +162,38 @@ public sealed partial class DomBridge
             parts.Add((pendingCombinator, last));
 
         return parts;
+    }
+
+    /// <summary>
+    /// Normalises selectors like <c>div*</c> (tag immediately followed by
+    /// universal selector without whitespace) into <c>div *</c> so that the
+    /// implied descendant combinator is recognised.
+    /// </summary>
+    private static string NormalizeImpliedDescendantStar(string selector)
+    {
+        var sb = new StringBuilder(selector.Length + 4);
+        int bracketDepth = 0;
+        int parenDepth = 0;
+        for (int i = 0; i < selector.Length; i++)
+        {
+            var c = selector[i];
+            if (c == '[') bracketDepth++;
+            else if (c == ']') bracketDepth--;
+            else if (c == '(') parenDepth++;
+            else if (c == ')') parenDepth--;
+
+            // Only normalise * outside of [] and ()
+            if (c == '*' && i > 0 && bracketDepth == 0 && parenDepth == 0)
+            {
+                var prev = selector[i - 1];
+                if (char.IsLetterOrDigit(prev) || prev == '_' || prev == '-')
+                {
+                    sb.Append(' ');
+                }
+            }
+            sb.Append(c);
+        }
+        return sb.ToString();
     }
 
     /// <summary>
@@ -367,8 +414,10 @@ public sealed partial class DomBridge
                         !el.Attributes.ContainsKey("href")) return false;
                     break;
                 case "visited":
-                    // In our engine, no links are ever visited
-                    return false;
+                    // Privacy: :visited returns same results as :link
+                    if (!string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) ||
+                        !el.Attributes.ContainsKey("href")) return false;
+                    break;
                 default:
                     break; // Unknown pseudo-classes are ignored
             }
