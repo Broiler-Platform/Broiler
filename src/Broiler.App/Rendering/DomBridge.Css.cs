@@ -1,0 +1,535 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using YantraJS.Core;
+
+namespace Broiler.App.Rendering;
+
+/// <summary>
+/// CSS specificity calculation, style-block extraction, rule cascading,
+/// computed-style building, and media-query evaluation.
+/// </summary>
+public sealed partial class DomBridge
+{
+    // ------------------------------------------------------------------
+    //  CSS specificity (Level 3) and <style> / <link> cascading
+    // ------------------------------------------------------------------
+
+    private static readonly Regex StyleTagPattern = new(
+        @"<style[^>]*>(?<content>[\s\S]*?)</style>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex CssRulePattern = new(
+        @"(?<selector>[^{}@]+)\{(?<declarations>[^}]*)\}",
+        RegexOptions.Compiled);
+
+    private static readonly Regex MediaQueryPattern = new(
+        @"@media\s+(?<query>[^{]+)\{(?<content>(?:[^{}]|\{[^}]*\})*)\}",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Parsed CSS rules extracted from <c>&lt;style&gt;</c> blocks, stored as
+    /// (selector, specificity, declarations) triples.
+    /// </summary>
+    private readonly List<(string Selector, int Specificity, Dictionary<string, string> Declarations)> _cssRules = [];
+
+    /// <summary>Parsed CSS rules from embedded style blocks.</summary>
+    public IReadOnlyList<(string Selector, int Specificity, Dictionary<string, string> Declarations)> CssRules => _cssRules;
+
+    /// <summary>
+    /// Calculates CSS Specificity (Level 3) for a simple selector.
+    /// Returns a single integer encoding (a, b, c) where a = ID selectors,
+    /// b = class / attribute / pseudo-class selectors, c = type selectors.
+    /// Inline styles use specificity 1000 (handled externally).
+    /// </summary>
+    public static int CalculateSpecificity(string selector)
+    {
+        int a = 0, b = 0, c = 0;
+        var s = selector.Trim();
+
+        // Remove attribute selectors and count them
+        s = AttributeSelectorPattern.Replace(s, m => { b++; return string.Empty; });
+
+        foreach (var ch in s)
+        {
+            if (ch == '#') a++;
+            else if (ch == '.') b++;
+        }
+
+        // Count type selectors: letter-only tokens not preceded by # or .
+        var pos = 0;
+        while (pos < s.Length)
+        {
+            if (s[pos] == '#' || s[pos] == '.')
+            {
+                pos++;
+                while (pos < s.Length && s[pos] != '.' && s[pos] != '#' && !char.IsWhiteSpace(s[pos])) pos++;
+            }
+            else if (char.IsLetter(s[pos]))
+            {
+                var start = pos;
+                while (pos < s.Length && s[pos] != '.' && s[pos] != '#' && !char.IsWhiteSpace(s[pos])) pos++;
+                var token = s[start..pos].ToLowerInvariant();
+                if (token != "*") c++;
+            }
+            else
+            {
+                pos++;
+            }
+        }
+
+        return a * 100 + b * 10 + c;
+    }
+
+    /// <summary>
+    /// Extracts CSS rules from all <c>&lt;style&gt;</c> blocks in the HTML source
+    /// and stores them in <see cref="_cssRules"/> ordered by specificity.
+    /// </summary>
+    private void ExtractStyleBlocks(string html)
+    {
+        _cssRules.Clear();
+
+        foreach (Match styleMatch in StyleTagPattern.Matches(html))
+        {
+            var cssText = styleMatch.Groups["content"].Value;
+            ParseCssText(cssText);
+        }
+
+        _cssRules.Sort((x, y) => x.Specificity.CompareTo(y.Specificity));
+    }
+
+    /// <summary>
+    /// Parses raw CSS text into rules, handling <c>@media</c> queries.
+    /// Rules inside <c>@media screen</c> are included; <c>@media print</c> rules are skipped.
+    /// </summary>
+    private void ParseCssText(string cssText)
+    {
+        var remaining = MediaQueryPattern.Replace(cssText, m =>
+        {
+            var query = m.Groups["query"].Value.Trim();
+            var content = m.Groups["content"].Value;
+
+            if (query.Contains("screen", System.StringComparison.OrdinalIgnoreCase) ||
+                query.Equals("all", System.StringComparison.OrdinalIgnoreCase))
+            {
+                ExtractRulesFromCss(content);
+            }
+            return string.Empty;
+        });
+
+        ExtractRulesFromCss(remaining);
+    }
+
+    private void ExtractRulesFromCss(string css)
+    {
+        foreach (Match ruleMatch in CssRulePattern.Matches(css))
+        {
+            var selectorGroup = ruleMatch.Groups["selector"].Value.Trim();
+            var declarations = ParseStyle(ruleMatch.Groups["declarations"].Value);
+
+            foreach (var sel in selectorGroup.Split(','))
+            {
+                var selector = sel.Trim();
+                if (string.IsNullOrEmpty(selector)) continue;
+                var specificity = CalculateSpecificity(selector);
+                _cssRules.Add((selector, specificity, declarations));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Applies cascaded style rules to all parsed elements, following CSS specificity order.
+    /// Inline styles (specificity 1000) always win.
+    /// </summary>
+    private void ApplyCascadedStyles()
+    {
+        foreach (var el in _elements)
+        {
+            foreach (var (selector, _, declarations) in _cssRules)
+            {
+                if (MatchesSelector(el, selector))
+                {
+                    foreach (var kv in declarations)
+                    {
+                        if (!el.Attributes.TryGetValue("style", out var inlineStyle) ||
+                            !inlineStyle.Contains(kv.Key, System.StringComparison.OrdinalIgnoreCase))
+                        {
+                            el.Style[kv.Key] = kv.Value;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private JSObject BuildComputedStyleObject(DomElement? element)
+    {
+        var computed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        if (element != null)
+        {
+            // Collect CSS rules from style elements and match against element
+            foreach (var styleEl in _elements)
+            {
+                if (!string.Equals(styleEl.TagName, "style", StringComparison.OrdinalIgnoreCase)) continue;
+
+                var cssText = new StringBuilder();
+                foreach (var child in styleEl.Children)
+                {
+                    if (child.IsTextNode && child.TextContent != null)
+                        cssText.Append(child.TextContent);
+                }
+                // Also check direct TextContent (set via JS textContent setter)
+                if (cssText.Length == 0 && styleEl.TextContent != null)
+                    cssText.Append(styleEl.TextContent);
+
+                ParseAndApplyCssRules(cssText.ToString(), element, computed);
+            }
+
+            // Inline styles (from the style="" attribute) override CSS rules.
+            // We parse the attribute directly rather than using element.Style because
+            // ApplyCascadedStyles() may have merged CSS rules into element.Style.
+            if (element.Attributes.TryGetValue("style", out var inlineStyleAttr) && !string.IsNullOrEmpty(inlineStyleAttr))
+            {
+                foreach (var kv in ParseStyle(inlineStyleAttr))
+                    computed[kv.Key] = kv.Value;
+            }
+        }
+
+        var obj = new JSObject();
+
+        // Helper to convert CSS property name to JS camelCase (e.g., "z-index" -> "zIndex")
+        static string ToCamelCase(string cssName)
+        {
+            var sb = new StringBuilder();
+            bool upper = false;
+            foreach (char c in cssName)
+            {
+                if (c == '-') { upper = true; continue; }
+                sb.Append(upper ? char.ToUpperInvariant(c) : c);
+                upper = false;
+            }
+            return sb.ToString();
+        }
+
+        // Expose all computed properties as both camelCase and kebab-case
+        foreach (var kv in computed)
+        {
+            var camel = ToCamelCase(kv.Key);
+            obj.FastAddValue((KeyString)kv.Key, new JSString(kv.Value), JSPropertyAttributes.EnumerableConfigurableValue);
+            if (camel != kv.Key)
+                obj.FastAddValue((KeyString)camel, new JSString(kv.Value), JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+
+        // getPropertyValue method
+        obj.FastAddValue(
+            (KeyString)"getPropertyValue",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && computed.TryGetValue(a[0].ToString(), out var val))
+                    return new JSString(val);
+                return new JSString(string.Empty);
+            }, "getPropertyValue", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        return obj;
+    }
+
+    /// <summary>
+    /// Parses CSS text into rules and applies matching rules to the computed style dictionary.
+    /// Handles @media queries by evaluating the media condition.
+    /// </summary>
+    private void ParseAndApplyCssRules(string cssText, DomElement element, Dictionary<string, string> computed)
+    {
+        int pos = 0;
+        while (pos < cssText.Length)
+        {
+            SkipWhitespace(cssText, ref pos);
+            if (pos >= cssText.Length) break;
+
+            if (cssText[pos] == '@')
+            {
+                // Handle @media rules
+                if (cssText.Length > pos + 6 && cssText.Substring(pos, 6).Equals("@media", StringComparison.OrdinalIgnoreCase))
+                {
+                    pos += 6;
+                    SkipWhitespace(cssText, ref pos);
+                    // Extract media query up to '{'
+                    int braceStart = cssText.IndexOf('{', pos);
+                    if (braceStart < 0) break;
+                    var mediaQuery = cssText[pos..braceStart].Trim();
+                    pos = braceStart + 1;
+
+                    // Find matching closing brace
+                    int depth = 1;
+                    int blockStart = pos;
+                    while (pos < cssText.Length && depth > 0)
+                    {
+                        if (cssText[pos] == '{') depth++;
+                        else if (cssText[pos] == '}') depth--;
+                        if (depth > 0) pos++;
+                    }
+                    if (pos > blockStart)
+                    {
+                        var innerCss = cssText[blockStart..pos];
+                        if (EvaluateMediaQuery(mediaQuery))
+                            ParseAndApplyCssRules(innerCss, element, computed);
+                    }
+                    if (pos < cssText.Length) pos++; // skip '}'
+                }
+                else
+                {
+                    // Skip other @-rules (but don't fail on them)
+                    int braceIdx = cssText.IndexOf('{', pos);
+                    int semiIdx = cssText.IndexOf(';', pos);
+                    if (braceIdx >= 0 && (semiIdx < 0 || braceIdx < semiIdx))
+                    {
+                        pos = braceIdx + 1;
+                        int d = 1;
+                        while (pos < cssText.Length && d > 0)
+                        {
+                            if (cssText[pos] == '{') d++;
+                            else if (cssText[pos] == '}') d--;
+                            pos++;
+                        }
+                    }
+                    else if (semiIdx >= 0)
+                    {
+                        pos = semiIdx + 1;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                continue;
+            }
+
+            // Regular rule: selector { declarations }
+            int ruleOpenBrace = cssText.IndexOf('{', pos);
+            if (ruleOpenBrace < 0) break;
+            var selectorText = cssText[pos..ruleOpenBrace].Trim();
+            pos = ruleOpenBrace + 1;
+            int ruleCloseBrace = cssText.IndexOf('}', pos);
+            if (ruleCloseBrace < 0) break;
+            var declarationsText = cssText[pos..ruleCloseBrace].Trim();
+            pos = ruleCloseBrace + 1;
+
+            // Check if selector matches element (handle comma-separated selectors)
+            var selectors = SplitCommaSelectors(selectorText);
+            bool matched = false;
+            foreach (var sel in selectors)
+            {
+                if (MatchesSelector(element, sel.Trim()))
+                {
+                    matched = true;
+                    break;
+                }
+            }
+
+            if (matched)
+            {
+                // Parse declarations
+                foreach (var kv in ParseStyle(declarationsText))
+                    computed[kv.Key] = kv.Value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Splits a CSS selector string by commas, respecting parentheses.
+    /// </summary>
+    private static List<string> SplitCommaSelectors(string selectorText)
+    {
+        var result = new List<string>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < selectorText.Length; i++)
+        {
+            if (selectorText[i] == '(') depth++;
+            else if (selectorText[i] == ')') depth--;
+            else if (selectorText[i] == ',' && depth == 0)
+            {
+                result.Add(selectorText[start..i]);
+                start = i + 1;
+            }
+        }
+        result.Add(selectorText[start..]);
+        return result;
+    }
+
+    private static void SkipWhitespace(string text, ref int pos)
+    {
+        while (pos < text.Length && char.IsWhiteSpace(text[pos])) pos++;
+    }
+
+    /// <summary>
+    /// Evaluates a media query string. Supports basic queries needed for Acid3.
+    /// Evaluates comma-separated media queries (any match = true).
+    /// Supports <c>all</c>, <c>not all</c>, <c>only all</c>, and basic conditions
+    /// like <c>(min-color: 0)</c>, <c>(min-monochrome: 0)</c>.
+    /// </summary>
+    private static bool EvaluateMediaQuery(string query)
+    {
+        // Split by comma — any match means true
+        var queries = query.Split(',');
+        foreach (var q in queries)
+        {
+            if (EvaluateSingleMediaQuery(q.Trim()))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Evaluates a single (non-comma-separated) media query.
+    /// </summary>
+    private static bool EvaluateSingleMediaQuery(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return false;
+
+        bool negate = false;
+        var q = query.Trim();
+
+        // Handle "not" and "only" prefixes
+        if (q.StartsWith("not ", StringComparison.OrdinalIgnoreCase))
+        {
+            negate = true;
+            q = q[4..].TrimStart();
+        }
+        else if (q.StartsWith("only ", StringComparison.OrdinalIgnoreCase))
+        {
+            q = q[5..].TrimStart();
+        }
+
+        // Split by "and" to get media type and conditions
+        var parts = SplitMediaQueryParts(q);
+        bool result = true;
+
+        foreach (var part in parts)
+        {
+            var p = part.Trim();
+            if (string.IsNullOrEmpty(p)) continue;
+
+            if (p.Equals("all", StringComparison.OrdinalIgnoreCase) ||
+                p.Equals("screen", StringComparison.OrdinalIgnoreCase))
+            {
+                // Known media types — always match
+                continue;
+            }
+
+            // Parenthesized condition
+            if (p.StartsWith('(') && p.EndsWith(')'))
+            {
+                var condition = p[1..^1].Trim();
+                if (!EvaluateMediaCondition(condition))
+                {
+                    result = false;
+                    break;
+                }
+            }
+            else
+            {
+                // Unknown media type or malformed (e.g. bare "color" without parens)
+                // — does not match per spec
+                result = false;
+                break;
+            }
+        }
+
+        return negate ? !result : result;
+    }
+
+    /// <summary>
+    /// Splits a media query into parts by " and " (case-insensitive), respecting parentheses.
+    /// </summary>
+    private static List<string> SplitMediaQueryParts(string query)
+    {
+        var parts = new List<string>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < query.Length; i++)
+        {
+            if (query[i] == '(') depth++;
+            else if (query[i] == ')') depth--;
+            else if (depth == 0 && i + 5 <= query.Length)
+            {
+                var sub = query.Substring(i, Math.Min(5, query.Length - i));
+                if (sub.Equals(" and ", StringComparison.OrdinalIgnoreCase))
+                {
+                    parts.Add(query[start..i]);
+                    start = i + 5;
+                    i += 4;
+                }
+            }
+        }
+        parts.Add(query[start..]);
+        return parts;
+    }
+
+    /// <summary>
+    /// Evaluates a single media condition like <c>min-color: 0</c> or <c>bogus</c>.
+    /// </summary>
+    private static bool EvaluateMediaCondition(string condition)
+    {
+        var colonIdx = condition.IndexOf(':');
+        string feature;
+        string? value = null;
+        if (colonIdx >= 0)
+        {
+            feature = condition[..colonIdx].Trim().ToLowerInvariant();
+            value = condition[(colonIdx + 1)..].Trim();
+        }
+        else
+        {
+            feature = condition.Trim().ToLowerInvariant();
+        }
+
+        // Our virtual device: color display with 8 bits per color component, monochrome = 0.
+        // Default viewport: 0x0.
+        const int ColorDepth = 8;
+        const int MonochromeDepth = 0;
+
+        switch (feature)
+        {
+            case "min-color":
+                // min-color: N matches when device has at least N bits per color component
+                if (value != null && int.TryParse(value, out var minColor))
+                    return minColor <= ColorDepth;
+                return false;
+            case "max-color":
+                // max-color: N matches when device has at most N bits per color component
+                if (value != null && int.TryParse(value, out var maxColor))
+                    return maxColor >= ColorDepth;
+                return false;
+            case "min-monochrome":
+                // min-monochrome: N matches when device has at least N monochrome bits
+                if (value != null && int.TryParse(value, out var minMono))
+                    return minMono <= MonochromeDepth;
+                return false;
+            case "max-monochrome":
+                // max-monochrome: N matches when device has at most N monochrome bits
+                if (value != null && int.TryParse(value, out var maxMono))
+                    return maxMono >= MonochromeDepth;
+                return false;
+            case "min-height":
+            case "min-width":
+                // 0x0 viewport — min-height/min-width only match if value is 0
+                if (value != null)
+                {
+                    if (value == "0" || value == "0px") return true;
+                    return false; // Any positive value fails in 0x0 viewport
+                }
+                return false;
+            case "max-height":
+            case "max-width":
+                // 0x0 viewport — max-height/max-width matches everything >= 0
+                return true;
+            default:
+                // Unknown feature — does not match
+                return false;
+        }
+    }
+}

@@ -1,0 +1,619 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
+using YantraJS.Core;
+
+namespace Broiler.App.Rendering;
+
+/// <summary>
+/// CSS selector matching — compound selectors, combinators, pseudo-classes,
+/// pseudo-elements, and attribute selectors.
+/// </summary>
+public sealed partial class DomBridge
+{
+    // ------------------------------------------------------------------
+    //  CSS selector matching
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns <c>true</c> when <paramref name="el"/> matches the given CSS
+    /// selector.  Supports compound selectors, combinators (<c>&gt;</c>,
+    /// <c>+</c>, <c>~</c>, descendant), pseudo-classes (<c>:nth-child</c>,
+    /// <c>:not</c>, <c>:first-of-type</c>, <c>:first-child</c>,
+    /// <c>:last-child</c>), pseudo-elements (<c>::before</c>,
+    /// <c>::after</c>), <c>[attr]</c>, and <c>[attr=value]</c>.
+    /// </summary>
+    private static bool MatchesSelector(DomElement el, string selector)
+    {
+        selector = selector.Trim();
+        if (string.IsNullOrEmpty(selector)) return false;
+
+        // Split the selector into parts with combinators
+        var parts = SplitSelectorParts(selector);
+        if (parts.Count == 0) return false;
+
+        // Match from right to left
+        var current = el;
+        for (int i = parts.Count - 1; i >= 0; i--)
+        {
+            var (combinator, compound) = parts[i];
+            if (current == null) return false;
+
+            if (i == parts.Count - 1)
+            {
+                // Rightmost part: must match the target element
+                if (!MatchesCompound(current, compound)) return false;
+            }
+            else
+            {
+                switch (combinator)
+                {
+                    case ' ': // descendant
+                        var ancestor = current.Parent;
+                        while (ancestor != null)
+                        {
+                            if (MatchesCompound(ancestor, compound)) { current = ancestor; goto matched; }
+                            ancestor = ancestor.Parent;
+                        }
+                        return false;
+                    case '>': // child
+                        if (current.Parent == null || !MatchesCompound(current.Parent, compound)) return false;
+                        current = current.Parent;
+                        break;
+                    case '+': // adjacent sibling
+                        var prev = PreviousSibling(current);
+                        if (prev == null || !MatchesCompound(prev, compound)) return false;
+                        current = prev;
+                        break;
+                    case '~': // general sibling
+                        var sib = PreviousSibling(current);
+                        while (sib != null)
+                        {
+                            if (MatchesCompound(sib, compound)) { current = sib; goto matched; }
+                            sib = PreviousSibling(sib);
+                        }
+                        return false;
+                    default:
+                        return false;
+                }
+            }
+            matched:;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Splits a selector string into combinator-compound pairs, preserving order.
+    /// The first entry's combinator is <c>'\0'</c>.
+    /// </summary>
+    private static List<(char Combinator, string Compound)> SplitSelectorParts(string selector)
+    {
+        var parts = new List<(char, string)>();
+        var current = new System.Text.StringBuilder();
+        char pendingCombinator = '\0';
+        int depth = 0;
+        int bracketDepth = 0;
+
+        for (int i = 0; i < selector.Length; i++)
+        {
+            var c = selector[i];
+            if (c == '(') { depth++; current.Append(c); continue; }
+            if (c == ')') { depth--; current.Append(c); continue; }
+            if (c == '[') { bracketDepth++; current.Append(c); continue; }
+            if (c == ']') { bracketDepth--; current.Append(c); continue; }
+            if (depth > 0 || bracketDepth > 0) { current.Append(c); continue; }
+
+            if (c == '>' || c == '+' || c == '~')
+            {
+                var part = current.ToString().Trim();
+                if (part.Length > 0)
+                    parts.Add((pendingCombinator, part));
+                pendingCombinator = c;
+                current.Clear();
+            }
+            else if (char.IsWhiteSpace(c))
+            {
+                // Only set descendant combinator if no explicit combinator follows
+                var part = current.ToString().Trim();
+                if (part.Length > 0)
+                {
+                    // Look ahead for an explicit combinator
+                    var j = i + 1;
+                    while (j < selector.Length && char.IsWhiteSpace(selector[j])) j++;
+                    if (j < selector.Length && (selector[j] == '>' || selector[j] == '+' || selector[j] == '~'))
+                    {
+                        parts.Add((pendingCombinator, part));
+                        pendingCombinator = selector[j];
+                        current.Clear();
+                        i = j; // skip to the combinator
+                    }
+                    else
+                    {
+                        parts.Add((pendingCombinator, part));
+                        pendingCombinator = ' ';
+                        current.Clear();
+                    }
+                }
+            }
+            else
+            {
+                current.Append(c);
+            }
+        }
+        var last = current.ToString().Trim();
+        if (last.Length > 0)
+            parts.Add((pendingCombinator, last));
+
+        return parts;
+    }
+
+    /// <summary>
+    /// Returns the previous element sibling of the given element, or <c>null</c>.
+    /// </summary>
+    private static DomElement PreviousSibling(DomElement el)
+    {
+        if (el.Parent == null) return null;
+        var siblings = el.Parent.Children;
+        var idx = siblings.IndexOf(el);
+        for (int i = idx - 1; i >= 0; i--)
+            if (!siblings[i].IsTextNode) return siblings[i];
+        return null;
+    }
+
+    /// <summary>
+    /// Matches a compound selector (no combinators) against an element.
+    /// Handles tag, #id, .class, [attr], :pseudo-class, and ::pseudo-element.
+    /// </summary>
+    private static bool MatchesCompound(DomElement el, string compound)
+    {
+        if (string.IsNullOrEmpty(compound)) return false;
+
+        // Strip ::before / ::after pseudo-elements (they match the element itself)
+        compound = StripPseudoElements(compound);
+
+        // Extract and remove [attr] / [attr=value] / [attr|=value] / etc. tokens
+        var attrFilters = new List<(string Name, string Op, string Value)>();
+        compound = AttributeSelectorPattern.Replace(compound, m =>
+        {
+            var name = m.Groups["name"].Value.Trim();
+            var op = m.Groups["op"].Success ? m.Groups["op"].Value : null;
+            var value = m.Groups["value"].Success
+                ? m.Groups["value"].Value.Trim().Trim('"', '\'')
+                : null;
+            attrFilters.Add((name, op, value));
+            return string.Empty;
+        });
+
+        // Extract and process pseudo-classes
+        if (!ProcessPseudoClasses(el, ref compound)) return false;
+
+        string tagFilter = null;
+        string idFilter = null;
+        var classFilters = new List<string>();
+
+        var pos = 0;
+        while (pos < compound.Length)
+        {
+            char c = compound[pos];
+            if (c == '#')
+            {
+                pos++;
+                var start = pos;
+                while (pos < compound.Length && compound[pos] != '.' && compound[pos] != '#' && compound[pos] != ':' && compound[pos] != '[') pos++;
+                idFilter = compound[start..pos];
+            }
+            else if (c == '.')
+            {
+                pos++;
+                var start = pos;
+                while (pos < compound.Length && compound[pos] != '.' && compound[pos] != '#' && compound[pos] != ':' && compound[pos] != '[') pos++;
+                classFilters.Add(compound[start..pos]);
+            }
+            else if (char.IsLetter(c) || c == '*')
+            {
+                var start = pos;
+                while (pos < compound.Length && compound[pos] != '.' && compound[pos] != '#' && compound[pos] != ':' && compound[pos] != '[') pos++;
+                var tag = compound[start..pos].ToLowerInvariant();
+                if (tag != "*")
+                    tagFilter = tag;
+            }
+            else
+            {
+                pos++;
+            }
+        }
+
+        if (tagFilter != null && !string.Equals(el.TagName, tagFilter, System.StringComparison.OrdinalIgnoreCase)) return false;
+        if (idFilter != null && !string.Equals(el.Id, idFilter, System.StringComparison.Ordinal)) return false;
+
+        if (classFilters.Count > 0)
+        {
+            var elementClasses = new System.Collections.Generic.HashSet<string>(
+                (el.ClassName ?? string.Empty).Split(' ').Where(s => s.Length > 0),
+                System.StringComparer.Ordinal);
+            foreach (var cls in classFilters)
+                if (!elementClasses.Contains(cls)) return false;
+        }
+
+        foreach (var (name, op, value) in attrFilters)
+        {
+            // Presence-only check [attr]
+            if (op == null)
+            {
+                if (!el.Attributes.ContainsKey(name)) return false;
+                continue;
+            }
+            if (!el.Attributes.TryGetValue(name, out var attrVal)) return false;
+            if (value == null) continue;
+            switch (op)
+            {
+                case "=":
+                    if (attrVal != value) return false;
+                    break;
+                case "|=":
+                    if (attrVal != value && !attrVal.StartsWith(value + "-", StringComparison.Ordinal)) return false;
+                    break;
+                case "~=":
+                    if (!attrVal.Split(' ').Contains(value)) return false;
+                    break;
+                case "^=":
+                    if (!attrVal.StartsWith(value, StringComparison.Ordinal)) return false;
+                    break;
+                case "$=":
+                    if (!attrVal.EndsWith(value, StringComparison.Ordinal)) return false;
+                    break;
+                case "*=":
+                    if (!attrVal.Contains(value, StringComparison.Ordinal)) return false;
+                    break;
+                default:
+                    if (attrVal != value) return false;
+                    break;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Strips <c>::before</c> and <c>::after</c> pseudo-elements from the compound
+    /// selector, returning the remaining selector text.
+    /// </summary>
+    private static string StripPseudoElements(string compound)
+    {
+        var idx = compound.IndexOf("::", System.StringComparison.Ordinal);
+        if (idx >= 0)
+            return compound[..idx];
+        return compound;
+    }
+
+    private static readonly Regex PseudoClassPattern = new(
+        @":(?<name>[a-zA-Z-]+)(?:\((?<arg>[^)]*)\))?",
+        RegexOptions.Compiled);
+
+    /// <summary>
+    /// Processes pseudo-class selectors (<c>:nth-child</c>, <c>:not</c>,
+    /// <c>:first-of-type</c>, <c>:first-child</c>, <c>:last-child</c>)
+    /// from the compound selector and validates them against <paramref name="el"/>.
+    /// Updates <paramref name="compound"/> in place (pseudo-classes removed).
+    /// Returns <c>false</c> if a pseudo-class does not match.
+    /// </summary>
+    private static bool ProcessPseudoClasses(DomElement el, ref string compound)
+    {
+        var matches = PseudoClassPattern.Matches(compound);
+        if (matches.Count == 0) return true;
+
+        foreach (Match m in matches)
+        {
+            var pseudoName = m.Groups["name"].Value.ToLowerInvariant();
+            var arg = m.Groups["arg"].Success ? m.Groups["arg"].Value.Trim() : null;
+
+            switch (pseudoName)
+            {
+                case "first-child":
+                    if (!IsNthChild(el, 1)) return false;
+                    break;
+                case "last-child":
+                    if (!IsLastChild(el)) return false;
+                    break;
+                case "only-child":
+                    if (!IsOnlyChild(el)) return false;
+                    break;
+                case "first-of-type":
+                    if (!IsFirstOfType(el)) return false;
+                    break;
+                case "last-of-type":
+                    if (!IsLastOfType(el)) return false;
+                    break;
+                case "only-of-type":
+                    if (!IsOnlyOfType(el)) return false;
+                    break;
+                case "nth-child":
+                    if (arg == null || !MatchesNthChild(el, arg)) return false;
+                    break;
+                case "nth-last-child":
+                    if (arg == null || !MatchesNthLastChild(el, arg)) return false;
+                    break;
+                case "nth-of-type":
+                    if (arg == null || !MatchesNthOfType(el, arg)) return false;
+                    break;
+                case "nth-last-of-type":
+                    if (arg == null || !MatchesNthLastOfType(el, arg)) return false;
+                    break;
+                case "empty":
+                    if (!IsEmpty(el)) return false;
+                    break;
+                case "root":
+                    if (el.Parent != null && !string.Equals(el.Parent.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return false;
+                    break;
+                case "not":
+                    if (arg != null && MatchesCompound(el, arg)) return false;
+                    break;
+                case "lang":
+                    if (arg == null || !MatchesLang(el, arg)) return false;
+                    break;
+                case "enabled":
+                    if (!IsFormElement(el) || el.Attributes.ContainsKey("disabled")) return false;
+                    break;
+                case "disabled":
+                    if (!IsFormElement(el) || !el.Attributes.ContainsKey("disabled")) return false;
+                    break;
+                case "checked":
+                    if (!IsCheckable(el) || !el.Attributes.ContainsKey("checked")) return false;
+                    break;
+                case "link":
+                    if (!string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) ||
+                        !el.Attributes.ContainsKey("href")) return false;
+                    break;
+                case "visited":
+                    // In our engine, no links are ever visited
+                    return false;
+                default:
+                    break; // Unknown pseudo-classes are ignored
+            }
+        }
+
+        compound = PseudoClassPattern.Replace(compound, string.Empty);
+        return true;
+    }
+
+    private static bool IsNthChild(DomElement el, int n)
+    {
+        if (el.Parent == null) return n == 1;
+        int index = 1;
+        foreach (var child in el.Parent.Children)
+        {
+            if (child.IsTextNode) continue;
+            if (ReferenceEquals(child, el)) return index == n;
+            index++;
+        }
+        return false;
+    }
+
+    private static bool IsLastChild(DomElement el)
+    {
+        if (el.Parent == null) return true;
+        for (int i = el.Parent.Children.Count - 1; i >= 0; i--)
+        {
+            var child = el.Parent.Children[i];
+            if (child.IsTextNode) continue;
+            return ReferenceEquals(child, el);
+        }
+        return false;
+    }
+
+    private static bool IsFirstOfType(DomElement el)
+    {
+        if (el.Parent == null) return true;
+        foreach (var child in el.Parent.Children)
+        {
+            if (child.IsTextNode) continue;
+            if (string.Equals(child.TagName, el.TagName, System.StringComparison.OrdinalIgnoreCase))
+                return ReferenceEquals(child, el);
+        }
+        return false;
+    }
+
+    private static bool IsOnlyChild(DomElement el)
+    {
+        if (el.Parent == null) return true;
+        int count = 0;
+        foreach (var child in el.Parent.Children)
+        {
+            if (child.IsTextNode) continue;
+            count++;
+            if (count > 1) return false;
+        }
+        return count == 1;
+    }
+
+    private static bool IsLastOfType(DomElement el)
+    {
+        if (el.Parent == null) return true;
+        for (int i = el.Parent.Children.Count - 1; i >= 0; i--)
+        {
+            var child = el.Parent.Children[i];
+            if (child.IsTextNode) continue;
+            if (string.Equals(child.TagName, el.TagName, StringComparison.OrdinalIgnoreCase))
+                return ReferenceEquals(child, el);
+        }
+        return false;
+    }
+
+    private static bool IsOnlyOfType(DomElement el)
+    {
+        if (el.Parent == null) return true;
+        int count = 0;
+        foreach (var child in el.Parent.Children)
+        {
+            if (child.IsTextNode) continue;
+            if (string.Equals(child.TagName, el.TagName, StringComparison.OrdinalIgnoreCase))
+            {
+                count++;
+                if (count > 1) return false;
+            }
+        }
+        return count == 1;
+    }
+
+    private static bool IsEmpty(DomElement el)
+    {
+        foreach (var child in el.Children)
+        {
+            if (!child.IsTextNode && !string.Equals(child.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (child.IsTextNode && !string.IsNullOrEmpty(child.TextContent))
+                return false;
+        }
+        return true;
+    }
+
+    private static bool MatchesLang(DomElement el, string lang)
+    {
+        var current = el;
+        while (current != null)
+        {
+            if (current.Attributes.TryGetValue("lang", out var val))
+            {
+                return string.Equals(val, lang, StringComparison.OrdinalIgnoreCase)
+                    || val.StartsWith(lang + "-", StringComparison.OrdinalIgnoreCase);
+            }
+            current = current.Parent;
+        }
+        return false;
+    }
+
+    private static bool IsFormElement(DomElement el)
+    {
+        var tag = el.TagName.ToLowerInvariant();
+        return tag == "input" || tag == "button" || tag == "select" || tag == "textarea";
+    }
+
+    private static bool IsCheckable(DomElement el)
+    {
+        if (!string.Equals(el.TagName, "input", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (el.Attributes.TryGetValue("type", out var t))
+        {
+            var type = t.ToLowerInvariant();
+            return type == "checkbox" || type == "radio";
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Evaluates the <c>:nth-child()</c> argument expression against an element.
+    /// Supports <c>odd</c>, <c>even</c>, integer values, and <c>An+B</c> notation.
+    /// </summary>
+    private static bool MatchesNthChild(DomElement el, string expr)
+    {
+        if (el.Parent == null) return false;
+        int index = 0;
+        foreach (var child in el.Parent.Children)
+        {
+            if (child.IsTextNode) continue;
+            index++;
+            if (ReferenceEquals(child, el)) break;
+        }
+
+        return EvaluateNthExpression(index, expr);
+    }
+
+    /// <summary>
+    /// Evaluates the <c>:nth-last-child()</c> argument expression against an element.
+    /// Like <c>:nth-child()</c> but counted from the last element.
+    /// </summary>
+    private static bool MatchesNthLastChild(DomElement el, string expr)
+    {
+        if (el.Parent == null) return false;
+        int totalNonText = 0;
+        int positionFromEnd = 0;
+        bool found = false;
+        for (int i = el.Parent.Children.Count - 1; i >= 0; i--)
+        {
+            var child = el.Parent.Children[i];
+            if (child.IsTextNode) continue;
+            totalNonText++;
+            if (ReferenceEquals(child, el))
+            {
+                positionFromEnd = totalNonText;
+                found = true;
+            }
+        }
+        if (!found) return false;
+        return EvaluateNthExpression(positionFromEnd, expr);
+    }
+
+    /// <summary>
+    /// Evaluates the <c>:nth-of-type()</c> argument expression against an element.
+    /// Counts the element's position among siblings of the same tag name.
+    /// </summary>
+    private static bool MatchesNthOfType(DomElement el, string expr)
+    {
+        if (el.Parent == null) return false;
+        int index = 0;
+        foreach (var child in el.Parent.Children)
+        {
+            if (child.IsTextNode) continue;
+            if (string.Equals(child.TagName, el.TagName, StringComparison.OrdinalIgnoreCase))
+            {
+                index++;
+                if (ReferenceEquals(child, el)) break;
+            }
+        }
+        return EvaluateNthExpression(index, expr);
+    }
+
+    /// <summary>
+    /// Evaluates the <c>:nth-last-of-type()</c> argument expression against an element.
+    /// Counts the element's position from last among siblings of the same tag name.
+    /// </summary>
+    private static bool MatchesNthLastOfType(DomElement el, string expr)
+    {
+        if (el.Parent == null) return false;
+        int positionFromEnd = 0;
+        bool found = false;
+        for (int i = el.Parent.Children.Count - 1; i >= 0; i--)
+        {
+            var child = el.Parent.Children[i];
+            if (child.IsTextNode) continue;
+            if (string.Equals(child.TagName, el.TagName, StringComparison.OrdinalIgnoreCase))
+            {
+                positionFromEnd++;
+                if (ReferenceEquals(child, el)) { found = true; break; }
+            }
+        }
+        if (!found) return false;
+        return EvaluateNthExpression(positionFromEnd, expr);
+    }
+
+    /// <summary>
+    /// Shared evaluator for An+B expressions used by :nth-child, :nth-last-child,
+    /// :nth-of-type, and :nth-last-of-type.
+    /// </summary>
+    private static bool EvaluateNthExpression(int index, string expr)
+    {
+        expr = expr.Trim().ToLowerInvariant();
+        if (expr == "odd") return index % 2 == 1;
+        if (expr == "even") return index % 2 == 0;
+        if (int.TryParse(expr, out var exact)) return index == exact;
+
+        var nIdx = expr.IndexOf('n');
+        if (nIdx >= 0)
+        {
+            var aPart = expr[..nIdx].Trim();
+            int a = string.IsNullOrEmpty(aPart) || aPart == "+" ? 1 : aPart == "-" ? -1 : int.TryParse(aPart, out var av) ? av : 1;
+            int b = 0;
+            var bPart = expr[(nIdx + 1)..].Trim();
+            if (!string.IsNullOrEmpty(bPart))
+                int.TryParse(bPart.Replace(" ", ""), out b);
+
+            if (a == 0) return index == b;
+            return (index - b) % a == 0 && (index - b) / a >= 0;
+        }
+
+        return false;
+    }
+
+}
