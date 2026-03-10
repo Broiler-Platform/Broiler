@@ -1906,7 +1906,7 @@ public sealed partial class DomBridge
 
         try
         {
-            var response = SharedHttpClient.GetAsync(resolvedUrl).GetAwaiter().GetResult();
+            using var response = SharedHttpClient.GetAsync(resolvedUrl).GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)
                 return null;
 

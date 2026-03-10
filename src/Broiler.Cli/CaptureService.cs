@@ -529,8 +529,7 @@ public class CaptureService
                 return string.Empty;
             }
 
-            using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-            var response = httpClient.GetAsync(resolvedUrl).GetAwaiter().GetResult();
+            using var response = SharedHttpClient.GetAsync(resolvedUrl).GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)
                 return string.Empty;
 
@@ -543,6 +542,8 @@ public class CaptureService
             return string.Empty;
         }
     }
+
+    private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
 
     /// <summary>
     /// Decodes a <c>data:</c> URI to its text content.
