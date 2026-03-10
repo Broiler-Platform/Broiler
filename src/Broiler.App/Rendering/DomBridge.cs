@@ -1770,6 +1770,9 @@ public sealed class DomBridge
             (KeyString)"className",
             new JSFunction((in Arguments a) =>
             {
+                // Prefer Attributes['class'] (synced by setAttribute and className setter).
+                // Fall back to element.ClassName for elements created with a class in the constructor
+                // but not yet synced to Attributes (e.g. parsed HTML elements).
                 if (element.Attributes.TryGetValue("class", out var cls))
                     return new JSString(cls);
                 return element.ClassName != null ? (JSValue)new JSString(element.ClassName) : new JSString(string.Empty);
@@ -2465,7 +2468,8 @@ public sealed class DomBridge
                             formParent = formParent.Parent;
                         if (formParent != null)
                         {
-                            foreach (var sibling in bridge._elements)
+                            // Only iterate form controls, not all elements
+                            foreach (var sibling in CollectFormControls(formParent))
                             {
                                 if (ReferenceEquals(sibling, element)) continue;
                                 if (!string.Equals(sibling.TagName, "input", System.StringComparison.OrdinalIgnoreCase)) continue;
@@ -2473,12 +2477,7 @@ public sealed class DomBridge
                                     !string.Equals(st, "radio", System.StringComparison.OrdinalIgnoreCase)) continue;
                                 if (!sibling.Attributes.TryGetValue("name", out var sn) ||
                                     !string.Equals(sn, radioName, System.StringComparison.Ordinal)) continue;
-                                // Check if same form parent
-                                var sibForm = sibling.Parent;
-                                while (sibForm != null && !string.Equals(sibForm.TagName, "form", System.StringComparison.OrdinalIgnoreCase))
-                                    sibForm = sibForm.Parent;
-                                if (ReferenceEquals(sibForm, formParent))
-                                    sibling.Attributes.Remove("checked");
+                                sibling.Attributes.Remove("checked");
                             }
                         }
                     }
@@ -4317,7 +4316,7 @@ public sealed class DomBridge
             }
             if (lastSection == null && allRows.Count == 0)
             {
-                // Create a tbody
+                // No sections and no rows at all: create a new tbody per spec
                 var tbody = new DomElement("tbody", null, null, string.Empty);
                 bridge._elements.Add(tbody);
                 tbody.Parent = table;
