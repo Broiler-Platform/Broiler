@@ -356,11 +356,11 @@ public sealed partial class DomBridge
                 (KeyString)"splitText",
                 new JSFunction((in Arguments a) =>
                 {
-                    if (a.Length == 0) throw new JSException("Failed to execute 'splitText': 1 argument required.");
+                    if (a.Length == 0) throw new JSException("Failed to execute 'splitText' on 'Text': 1 argument required, but only 0 present.");
                     var offset = (int)a[0].DoubleValue;
                     var text = element.TextContent ?? string.Empty;
                     if (offset < 0 || offset > text.Length)
-                        throw new JSException("Failed to execute 'splitText': The offset " + offset + " is larger than the node's length.");
+                        throw new JSException("Failed to execute 'splitText' on 'Text': The offset " + offset + " is larger than the node's length " + text.Length + ".");
 
                     var remainingText = text.Substring(offset);
                     element.TextContent = text.Substring(0, offset);

@@ -161,11 +161,11 @@ public sealed class HtmlTreeBuilder
 
                 case TokenType.Comment:
                 {
-                    var commentEl = new DomElement("#comment", null, null, string.Empty, isTextNode: false);
-                    commentEl.TextContent = token.Data ?? string.Empty;
+                    var commentNode = new DomElement("#comment", null, null, string.Empty, isTextNode: false);
+                    commentNode.TextContent = token.Data ?? string.Empty;
                     var commentParent = openElements.Count > 0 ? openElements.Peek() : body;
-                    AppendChild(commentParent, commentEl);
-                    allElements.Add(commentEl);
+                    AppendChild(commentParent, commentNode);
+                    allElements.Add(commentNode);
                     break;
                 }
 
