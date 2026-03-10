@@ -555,6 +555,70 @@ public sealed partial class DomBridge
             }, "removeAttribute", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // setAttributeNS(namespace, qualifiedName, value)
+        obj.FastAddValue(
+            (KeyString)"setAttributeNS",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length >= 3)
+                {
+                    var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
+                    var qName = a[1].ToString();
+                    var val = a[2].ToString();
+                    var localName = qName.Contains(':') ? qName[(qName.IndexOf(':') + 1)..] : qName;
+                    element.Attributes[qName] = val;
+                    element.NsAttrMap[(ns, localName)] = qName;
+                }
+                return JSUndefined.Value;
+            }, "setAttributeNS", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // getAttributeNS(namespace, localName)
+        obj.FastAddValue(
+            (KeyString)"getAttributeNS",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2) return JSNull.Value;
+                var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
+                var localName = a[1].ToString();
+                if (element.NsAttrMap.TryGetValue((ns, localName), out var qName) &&
+                    element.Attributes.TryGetValue(qName, out var val))
+                    return (JSValue)new JSString(val);
+                return JSNull.Value;
+            }, "getAttributeNS", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // removeAttributeNS(namespace, localName)
+        obj.FastAddValue(
+            (KeyString)"removeAttributeNS",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length >= 2)
+                {
+                    var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
+                    var localName = a[1].ToString();
+                    if (element.NsAttrMap.TryGetValue((ns, localName), out var qName))
+                    {
+                        element.Attributes.Remove(qName);
+                        element.NsAttrMap.Remove((ns, localName));
+                    }
+                }
+                return JSUndefined.Value;
+            }, "removeAttributeNS", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // hasAttributeNS(namespace, localName)
+        obj.FastAddValue(
+            (KeyString)"hasAttributeNS",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2) return JSBoolean.False;
+                var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
+                var localName = a[1].ToString();
+                return element.NsAttrMap.ContainsKey((ns, localName)) ? JSBoolean.True : JSBoolean.False;
+            }, "hasAttributeNS", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // contains(otherNode) — returns true if otherNode is a descendant
         obj.FastAddValue(
             (KeyString)"contains",
@@ -2404,7 +2468,7 @@ public sealed partial class DomBridge
                 var qualifiedName = a[0].ToString();
                 var publicId = a[1].ToString();
                 var systemId = a[2].ToString();
-                ValidateElementName(qualifiedName);
+                ValidateElementName(qualifiedName, _jsContext!);
                 var dt = new DomElement("#doctype", null, null, string.Empty);
                 dt.DomProperties["name"] = qualifiedName;
                 dt.DomProperties["publicId"] = publicId;
@@ -2423,7 +2487,7 @@ public sealed partial class DomBridge
                 var doctypeArg = a.Length > 2 ? a[2] : null;
 
                 if (!string.IsNullOrEmpty(qName))
-                    ValidateQualifiedName(qName, ns);
+                    ValidateQualifiedName(qName, ns, _jsContext!);
 
                 var subDocRoot = new DomElement("#subdoc-root", null, null, string.Empty);
                 _elements.Add(subDocRoot);
