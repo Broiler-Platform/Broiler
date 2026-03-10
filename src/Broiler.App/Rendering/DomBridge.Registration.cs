@@ -165,6 +165,7 @@ public sealed partial class DomBridge
                 if (a.Length == 0)
                     throw new JSException("Failed to execute 'createElement': 1 argument required, but only 0 present.");
                 var tag = a[0].ToString().ToLowerInvariant();
+                ValidateElementName(tag);
                 var el = new DomElement(tag, null, null, string.Empty);
                 _elements.Add(el);
                 return ToJSObject(el);
@@ -420,6 +421,7 @@ public sealed partial class DomBridge
         document.FastAddValue((KeyString)"TEXT_NODE", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"COMMENT_NODE", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"DOCUMENT_NODE", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"DOCUMENT_TYPE_NODE", new JSNumber(10), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"DOCUMENT_FRAGMENT_NODE", new JSNumber(11), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.createElementNS(namespace, tagName)
@@ -429,6 +431,7 @@ public sealed partial class DomBridge
             {
                 var ns = a.Length > 0 ? a[0].ToString() : null;
                 var localName = a.Length > 1 ? a[1].ToString() : (a.Length > 0 ? a[0].ToString() : "div");
+                ValidateQualifiedName(localName, ns);
                 var el = new DomElement(localName, null, null, string.Empty);
                 if (!string.IsNullOrEmpty(ns))
                     el.NamespaceURI = ns;
@@ -504,6 +507,144 @@ public sealed partial class DomBridge
         document.FastAddValue(
             (KeyString)"close",
             new JSFunction((in Arguments _) => JSUndefined.Value, "close", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.implementation — DOMImplementation
+        var implementation = new JSObject();
+
+        // implementation.hasFeature() — always returns true per spec
+        implementation.FastAddValue(
+            (KeyString)"hasFeature",
+            new JSFunction((in Arguments _) => JSBoolean.True, "hasFeature", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // implementation.createDocumentType(qualifiedName, publicId, systemId)
+        implementation.FastAddValue(
+            (KeyString)"createDocumentType",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 3)
+                    throw new JSException("Failed to execute 'createDocumentType' on 'DOMImplementation': 3 arguments required.");
+                var qualifiedName = a[0].ToString();
+                var publicId = a[1].ToString();
+                var systemId = a[2].ToString();
+                ValidateElementName(qualifiedName);
+                var doctype = new DomElement("#doctype", null, null, string.Empty);
+                doctype.DomProperties["name"] = qualifiedName;
+                doctype.DomProperties["publicId"] = publicId;
+                doctype.DomProperties["systemId"] = systemId;
+                doctype.DomProperties["internalSubset"] = null;
+                _elements.Add(doctype);
+                return ToJSObject(doctype);
+            }, "createDocumentType", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // implementation.createDocument(namespace, qualifiedName, doctype)
+        implementation.FastAddValue(
+            (KeyString)"createDocument",
+            new JSFunction((in Arguments a) =>
+            {
+                var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
+                var qName = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? a[1].ToString() : null;
+                var doctypeArg = a.Length > 2 ? a[2] : null;
+
+                if (!string.IsNullOrEmpty(qName))
+                    ValidateQualifiedName(qName, ns);
+
+                // Build a new document root
+                var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+                _elements.Add(docRoot);
+
+                // Append doctype if provided
+                if (doctypeArg is JSObject dtObj)
+                {
+                    // Find the DomElement for the doctype JSObject
+                    foreach (var kvp in _jsObjectCache)
+                    {
+                        if (kvp.Value == dtObj)
+                        {
+                            var dtEl = kvp.Key;
+                            dtEl.Parent = docRoot;
+                            docRoot.Children.Add(dtEl);
+                            break;
+                        }
+                    }
+                }
+
+                // Create document element if qualifiedName is provided
+                if (!string.IsNullOrEmpty(qName))
+                {
+                    var docEl = new DomElement(qName, null, null, string.Empty);
+                    if (!string.IsNullOrEmpty(ns))
+                        docEl.NamespaceURI = ns;
+                    docEl.Parent = docRoot;
+                    docRoot.Children.Add(docEl);
+                    _elements.Add(docEl);
+                }
+
+                return BuildSubDocument(docRoot);
+            }, "createDocument", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // implementation.createHTMLDocument(title)
+        implementation.FastAddValue(
+            (KeyString)"createHTMLDocument",
+            new JSFunction((in Arguments a) =>
+            {
+                var title = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
+
+                // Build a new HTML document root with html/head/body
+                var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+                _elements.Add(docRoot);
+
+                // Add DOCTYPE
+                var doctype = new DomElement("#doctype", null, null, string.Empty);
+                doctype.DomProperties["name"] = "html";
+                doctype.DomProperties["publicId"] = string.Empty;
+                doctype.DomProperties["systemId"] = string.Empty;
+                doctype.DomProperties["internalSubset"] = null;
+                doctype.Parent = docRoot;
+                docRoot.Children.Add(doctype);
+                _elements.Add(doctype);
+
+                var htmlEl = new DomElement("html", null, null, string.Empty);
+                htmlEl.NamespaceURI = "http://www.w3.org/1999/xhtml";
+                htmlEl.Parent = docRoot;
+                docRoot.Children.Add(htmlEl);
+                _elements.Add(htmlEl);
+
+                var headEl = new DomElement("head", null, null, string.Empty);
+                headEl.Parent = htmlEl;
+                htmlEl.Children.Add(headEl);
+                _elements.Add(headEl);
+
+                // Add <title> element if title argument is provided
+                if (title != null)
+                {
+                    var titleEl = new DomElement("title", null, null, string.Empty);
+                    titleEl.Parent = headEl;
+                    headEl.Children.Add(titleEl);
+                    _elements.Add(titleEl);
+
+                    var titleText = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+                    titleText.TextContent = title;
+                    titleText.Parent = titleEl;
+                    titleEl.Children.Add(titleText);
+                    _elements.Add(titleText);
+                }
+
+                var bodyEl = new DomElement("body", null, null, string.Empty);
+                bodyEl.Parent = htmlEl;
+                htmlEl.Children.Add(bodyEl);
+                _elements.Add(bodyEl);
+
+                return BuildSubDocument(docRoot);
+            }, "createHTMLDocument", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        document.FastAddValue(
+            (KeyString)"implementation",
+            implementation,
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         context["document"] = document;
@@ -850,6 +991,9 @@ public sealed partial class DomBridge
 
         context["console"] = console;
         context["fetch"] = fetchFn;
+
+        // DOMException constructor
+        RegisterDOMException(context);
     }
 
     /// <summary>

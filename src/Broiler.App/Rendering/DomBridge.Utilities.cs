@@ -861,4 +861,129 @@ public sealed partial class DomBridge
         return ctx;
     }
 #endif
+
+    // ------------------------------------------------------------------
+    //  Element name validation
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Regex for valid XML Name (simplified): must start with a letter, underscore, or colon,
+    /// followed by letters, digits, hyphens, underscores, dots, or colons.
+    /// </summary>
+    private static readonly Regex ValidXmlNamePattern = new(
+        @"^[a-zA-Z_:][\w.\-:]*$",
+        RegexOptions.Compiled);
+
+    /// <summary>
+    /// Validates an element/doctype name per the XML spec.
+    /// Throws a DOMException with INVALID_CHARACTER_ERR (code 5) for invalid names.
+    /// </summary>
+    private static void ValidateElementName(string name)
+    {
+        if (string.IsNullOrEmpty(name) || !ValidXmlNamePattern.IsMatch(name))
+        {
+            throw new JSException(
+                $"Failed to execute 'createElement': The tag name provided ('{name}') is not a valid name.");
+        }
+    }
+
+    /// <summary>
+    /// Validates a qualified name and namespace per the Namespaces in XML spec.
+    /// Throws a DOMException with NAMESPACE_ERR (code 14) for namespace violations.
+    /// </summary>
+    private static void ValidateQualifiedName(string qualifiedName, string? ns)
+    {
+        // First validate the name characters
+        if (string.IsNullOrEmpty(qualifiedName) || !ValidXmlNamePattern.IsMatch(qualifiedName))
+        {
+            throw new JSException(
+                $"Failed to execute 'createElementNS': The qualified name provided ('{qualifiedName}') is not a valid name.");
+        }
+
+        var colonIndex = qualifiedName.IndexOf(':');
+        if (colonIndex >= 0)
+        {
+            // Prefixed name: namespace must not be null
+            if (string.IsNullOrEmpty(ns))
+            {
+                throw new JSException(
+                    $"Failed to execute 'createElementNS': The namespace URI provided is empty for qualified name '{qualifiedName}'.");
+            }
+
+            var prefix = qualifiedName[..colonIndex];
+            // "xml" prefix must be the XML namespace
+            if (prefix == "xml" && ns != "http://www.w3.org/XML/1998/namespace")
+            {
+                throw new JSException(
+                    $"Failed to execute 'createElementNS': The namespace URI for prefix 'xml' is invalid.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Registers the <c>DOMException</c> constructor on the JS context.
+    /// </summary>
+    private static void RegisterDOMException(JSContext context)
+    {
+        context.Eval(@"
+            function DOMException(message, name) {
+                this.message = message || '';
+                this.name = name || 'Error';
+                // Map name to legacy code
+                var codeMap = {
+                    'IndexSizeError': 1,
+                    'DOMStringSizeError': 2,
+                    'HierarchyRequestError': 3,
+                    'WrongDocumentError': 4,
+                    'InvalidCharacterError': 5,
+                    'NoDataAllowedError': 6,
+                    'NoModificationAllowedError': 7,
+                    'NotFoundError': 8,
+                    'NotSupportedError': 9,
+                    'InUseAttributeError': 10,
+                    'InvalidStateError': 11,
+                    'SyntaxError': 12,
+                    'InvalidModificationError': 13,
+                    'NamespaceError': 14,
+                    'InvalidAccessError': 15,
+                    'TypeMismatchError': 17,
+                    'SecurityError': 18,
+                    'NetworkError': 19,
+                    'AbortError': 20,
+                    'URLMismatchError': 21,
+                    'QuotaExceededError': 22,
+                    'TimeoutError': 23,
+                    'InvalidNodeTypeError': 24,
+                    'DataCloneError': 25
+                };
+                this.code = codeMap[this.name] || 0;
+            }
+            DOMException.INDEX_SIZE_ERR = 1;
+            DOMException.DOMSTRING_SIZE_ERR = 2;
+            DOMException.HIERARCHY_REQUEST_ERR = 3;
+            DOMException.WRONG_DOCUMENT_ERR = 4;
+            DOMException.INVALID_CHARACTER_ERR = 5;
+            DOMException.NO_DATA_ALLOWED_ERR = 6;
+            DOMException.NO_MODIFICATION_ALLOWED_ERR = 7;
+            DOMException.NOT_FOUND_ERR = 8;
+            DOMException.NOT_SUPPORTED_ERR = 9;
+            DOMException.INUSE_ATTRIBUTE_ERR = 10;
+            DOMException.INVALID_STATE_ERR = 11;
+            DOMException.SYNTAX_ERR = 12;
+            DOMException.INVALID_MODIFICATION_ERR = 13;
+            DOMException.NAMESPACE_ERR = 14;
+            DOMException.INVALID_ACCESS_ERR = 15;
+            DOMException.TYPE_MISMATCH_ERR = 17;
+            DOMException.SECURITY_ERR = 18;
+            DOMException.NETWORK_ERR = 19;
+            DOMException.ABORT_ERR = 20;
+            DOMException.URL_MISMATCH_ERR = 21;
+            DOMException.QUOTA_EXCEEDED_ERR = 22;
+            DOMException.TIMEOUT_ERR = 23;
+            DOMException.INVALID_NODE_TYPE_ERR = 24;
+            DOMException.DATA_CLONE_ERR = 25;
+            DOMException.prototype = Object.create(Error.prototype);
+            DOMException.prototype.constructor = DOMException;
+        ");
+    }
 }

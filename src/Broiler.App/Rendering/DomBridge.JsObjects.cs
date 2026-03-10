@@ -2152,7 +2152,130 @@ public sealed partial class DomBridge
         doc.FastAddValue((KeyString)"TEXT_NODE", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
         doc.FastAddValue((KeyString)"COMMENT_NODE", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
         doc.FastAddValue((KeyString)"DOCUMENT_NODE", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
+        doc.FastAddValue((KeyString)"DOCUMENT_TYPE_NODE", new JSNumber(10), JSPropertyAttributes.EnumerableConfigurableValue);
         doc.FastAddValue((KeyString)"DOCUMENT_FRAGMENT_NODE", new JSNumber(11), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.implementation on sub-documents
+        var subImpl = new JSObject();
+        subImpl.FastAddValue(
+            (KeyString)"hasFeature",
+            new JSFunction((in Arguments _) => JSBoolean.True, "hasFeature", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        subImpl.FastAddValue(
+            (KeyString)"createDocumentType",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 3)
+                    throw new JSException("Failed to execute 'createDocumentType' on 'DOMImplementation': 3 arguments required.");
+                var qualifiedName = a[0].ToString();
+                var publicId = a[1].ToString();
+                var systemId = a[2].ToString();
+                ValidateElementName(qualifiedName);
+                var dt = new DomElement("#doctype", null, null, string.Empty);
+                dt.DomProperties["name"] = qualifiedName;
+                dt.DomProperties["publicId"] = publicId;
+                dt.DomProperties["systemId"] = systemId;
+                dt.DomProperties["internalSubset"] = null;
+                _elements.Add(dt);
+                return ToJSObject(dt);
+            }, "createDocumentType", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        subImpl.FastAddValue(
+            (KeyString)"createDocument",
+            new JSFunction((in Arguments a) =>
+            {
+                var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
+                var qName = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? a[1].ToString() : null;
+                var doctypeArg = a.Length > 2 ? a[2] : null;
+
+                if (!string.IsNullOrEmpty(qName))
+                    ValidateQualifiedName(qName, ns);
+
+                var subDocRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+                _elements.Add(subDocRoot);
+
+                if (doctypeArg is JSObject dtObj)
+                {
+                    foreach (var kvp in _jsObjectCache)
+                    {
+                        if (kvp.Value == dtObj)
+                        {
+                            var dtEl = kvp.Key;
+                            dtEl.Parent = subDocRoot;
+                            subDocRoot.Children.Add(dtEl);
+                            break;
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(qName))
+                {
+                    var docEl = new DomElement(qName, null, null, string.Empty);
+                    if (!string.IsNullOrEmpty(ns))
+                        docEl.NamespaceURI = ns;
+                    docEl.Parent = subDocRoot;
+                    subDocRoot.Children.Add(docEl);
+                    _elements.Add(docEl);
+                }
+
+                return BuildSubDocument(subDocRoot);
+            }, "createDocument", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        subImpl.FastAddValue(
+            (KeyString)"createHTMLDocument",
+            new JSFunction((in Arguments a) =>
+            {
+                var subTitle = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
+
+                var subDocRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+                _elements.Add(subDocRoot);
+
+                var dt = new DomElement("#doctype", null, null, string.Empty);
+                dt.DomProperties["name"] = "html";
+                dt.DomProperties["publicId"] = string.Empty;
+                dt.DomProperties["systemId"] = string.Empty;
+                dt.DomProperties["internalSubset"] = null;
+                dt.Parent = subDocRoot;
+                subDocRoot.Children.Add(dt);
+                _elements.Add(dt);
+
+                var subHtml = new DomElement("html", null, null, string.Empty);
+                subHtml.NamespaceURI = "http://www.w3.org/1999/xhtml";
+                subHtml.Parent = subDocRoot;
+                subDocRoot.Children.Add(subHtml);
+                _elements.Add(subHtml);
+
+                var subHead = new DomElement("head", null, null, string.Empty);
+                subHead.Parent = subHtml;
+                subHtml.Children.Add(subHead);
+                _elements.Add(subHead);
+
+                if (subTitle != null)
+                {
+                    var subTitleEl = new DomElement("title", null, null, string.Empty);
+                    subTitleEl.Parent = subHead;
+                    subHead.Children.Add(subTitleEl);
+                    _elements.Add(subTitleEl);
+
+                    var subTitleText = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+                    subTitleText.TextContent = subTitle;
+                    subTitleText.Parent = subTitleEl;
+                    subTitleEl.Children.Add(subTitleText);
+                    _elements.Add(subTitleText);
+                }
+
+                var subBody = new DomElement("body", null, null, string.Empty);
+                subBody.Parent = subHtml;
+                subHtml.Children.Add(subBody);
+                _elements.Add(subBody);
+
+                return BuildSubDocument(subDocRoot);
+            }, "createHTMLDocument", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        doc.FastAddValue(
+            (KeyString)"implementation",
+            subImpl,
+            JSPropertyAttributes.EnumerableConfigurableValue);
 
         return doc;
     }
