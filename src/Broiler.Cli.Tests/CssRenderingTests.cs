@@ -1,0 +1,822 @@
+namespace Broiler.Cli.Tests;
+
+/// <summary>
+/// Tests for Phase 7 Acid3 compliance: CSS rendering improvements —
+/// hsl()/hsla() color parsing, @font-face rule handling, text-shadow
+/// property in getComputedStyle, position: fixed support, data: URI
+/// backgrounds, and :root selector styling.
+/// </summary>
+public class CssRenderingTests
+{
+    // ────────────────────── hsl() color parsing ──────────────────────
+
+    [Fact]
+    public void Hsl_Color_Applied_Via_Style()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var d = document.createElement('div');
+d.style.color = 'hsl(0, 100%, 50%)';
+document.getElementById('result').textContent = d.style.color;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("hsl(0, 100%, 50%)", result);
+    }
+
+    [Fact]
+    public void Hsl_Color_GetComputedStyle_Returns_Value()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { color: hsl(120, 100%, 50%); }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push(cs.color !== '');
+r.push(cs.getPropertyValue('color') !== '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Hsla_Color_Applied_Via_Style()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var d = document.createElement('div');
+d.style.color = 'hsla(0, 0%, 0%, 1.0)';
+document.getElementById('result').textContent = d.style.color;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("hsla(0, 0%, 0%, 1.0)", result);
+    }
+
+    [Fact]
+    public void Hsla_Color_GetComputedStyle_Returns_Value()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { color: hsla(0, 0%, 0%, 1.0); }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push(cs.color === 'hsla(0, 0%, 0%, 1.0)');
+r.push(cs.getPropertyValue('color') === 'hsla(0, 0%, 0%, 1.0)');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Hsla_Color_Without_Percent_Signs()
+    {
+        // Acid3 uses: color: hsla(0, 0, 0, 1) — without % on saturation/lightness
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { color: hsla(0, 0, 0, 1); }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+document.getElementById('result').textContent = cs.color;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("hsla(0, 0, 0, 1)", result);
+    }
+
+    [Fact]
+    public void Hsl_Color_Override_Previous_Value()
+    {
+        // Acid3 pattern: color: red; color: hsla(0, 0%, 0%, 1.0);
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { color: red; color: hsla(0, 0%, 0%, 1.0); }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+document.getElementById('result').textContent = cs.color;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("hsla(0, 0%, 0%, 1.0)", result);
+    }
+
+    // ────────────────────── @font-face rule handling ──────────────────────
+
+    [Fact]
+    public void FontFace_Rule_In_StyleSheet_CssRules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@font-face { font-family: ""TestFont""; src: url(test.ttf); }
+body { color: black; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rules = sheet.cssRules;
+r.push(rules.length >= 2);
+// Find the @font-face rule
+var fontRule = null;
+for (var i = 0; i < rules.length; i++) {
+    if (rules[i].type === 5) { fontRule = rules[i]; break; }
+}
+r.push(fontRule !== null);
+if (fontRule) {
+    r.push(fontRule.cssText.indexOf('@font-face') >= 0);
+}
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void FontFace_Rule_Style_Property_Access()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@font-face { font-family: ""AcidTest""; src: url(font.ttf); }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rules = sheet.cssRules;
+var fontRule = null;
+for (var i = 0; i < rules.length; i++) {
+    if (rules[i].type === 5) { fontRule = rules[i]; break; }
+}
+r.push(fontRule !== null);
+if (fontRule && fontRule.style) {
+    r.push(fontRule.style['font-family'] !== undefined);
+    r.push(fontRule.style.fontFamily !== undefined);
+}
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void StyleRule_Has_Type_1()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+body { color: black; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rules = sheet.cssRules;
+r.push(rules.length >= 1);
+r.push(rules[0].type === 1);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void StyleRule_SelectorText_Property()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+div.test { color: red; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rules = sheet.cssRules;
+r.push(rules[0].selectorText === 'div.test');
+r.push(rules[0].style !== undefined);
+r.push(rules[0].style.color === 'red');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    // ────────────────────── text-shadow property ──────────────────────
+
+    [Fact]
+    public void TextShadow_GetComputedStyle_Returns_Value()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { text-shadow: rgba(192, 192, 192, 1.0) 3px 3px; }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push(cs.textShadow !== undefined);
+r.push(cs.textShadow !== '');
+r.push(cs.getPropertyValue('text-shadow') !== '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void TextShadow_Set_Via_Style()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+el.style.textShadow = '2px 2px #ff0000';
+var r = [];
+r.push(el.style.textShadow === '2px 2px #ff0000');
+r.push(el.style.getPropertyValue('text-shadow') === '2px 2px #ff0000');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void TextShadow_CssText_Includes_Property()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"" style=""text-shadow: 1px 1px black;"">text</div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+document.getElementById('result').textContent = el.style.cssText.indexOf('text-shadow') >= 0;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true", result);
+    }
+
+    // ────────────────────── position: fixed ──────────────────────
+
+    [Fact]
+    public void PositionFixed_GetComputedStyle_Returns_Fixed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { position: fixed; left: 10px; top: 20px; }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push(cs.position === 'fixed');
+r.push(cs.left === '10px');
+r.push(cs.top === '20px');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void PositionFixed_Set_Via_Style()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+el.style.position = 'fixed';
+el.style.left = '130.5px';
+el.style.top = '84.3px';
+var r = [];
+r.push(el.style.position === 'fixed');
+r.push(el.style.left === '130.5px');
+r.push(el.style.top === '84.3px');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void PositionFixed_With_Percentage_Values()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { position: fixed; top: 10%; left: 10%; }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push(cs.position === 'fixed');
+r.push(cs.top === '10%');
+r.push(cs.left === '10%');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    // ────────────────────── data: URI backgrounds ──────────────────────
+
+    [Fact]
+    public void DataUri_Background_GetComputedStyle()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { background: url(data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7) no-repeat; }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push(cs.background !== undefined);
+r.push(cs.background !== '');
+r.push(cs.background.indexOf('data:image') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void DataUri_Background_Set_Via_Style()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+el.style.background = 'url(data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7)';
+var r = [];
+r.push(el.style.background.indexOf('data:image') >= 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true", result);
+    }
+
+    // ────────────────────── :root selector styling ──────────────────────
+
+    [Fact]
+    public void Root_Selector_GetComputedStyle_Applies()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+:root { background: silver; color: black; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.documentElement);
+var r = [];
+r.push(cs.background === 'silver');
+r.push(cs.color === 'black');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Root_Selector_Does_Not_Apply_To_Body()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+:root { background: silver; }
+body { background: white; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.body);
+var r = [];
+r.push(cs.background === 'white');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true", result);
+    }
+
+    // ────────────────────── CSS rule style object ──────────────────────
+
+    [Fact]
+    public void CssRule_Style_CamelCase_Access()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.test { background-color: red; font-size: 14px; z-index: 1; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rule = sheet.cssRules[0];
+r.push(rule.style.backgroundColor === 'red');
+r.push(rule.style.fontSize === '14px');
+r.push(rule.style.zIndex === '1');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void CssRule_Style_KebabCase_Access()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.test { background-color: red; font-size: 14px; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rule = sheet.cssRules[0];
+r.push(rule.style['background-color'] === 'red');
+r.push(rule.style['font-size'] === '14px');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    // ────────────────────── Acid3-specific CSS patterns ──────────────────────
+
+    [Fact]
+    public void Acid3_Style_Block_FontFace_And_Rules()
+    {
+        // Simulates the Acid3 CSS structure with @font-face + regular rules
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@font-face { font-family: ""AcidAhemTest""; src: url(font.ttf); }
+:root { background: silver; color: black; }
+body { background: white; }
+object { position: fixed; left: 130.5px; top: 84.3px; }
+h1:first-child { text-shadow: rgba(192, 192, 192, 1.0) 3px 3px; }
+#slash { color: red; color: hsla(0, 0%, 0%, 1.0); }
+</style>
+</head><body>
+<h1>Test</h1>
+<div id=""slash"">slash</div>
+<div id=""result""></div>
+<script>
+var r = [];
+var sheet = document.styleSheets[0];
+var rules = sheet.cssRules;
+r.push(rules.length >= 5);
+
+// Check @font-face rule
+var hasFontFace = false;
+for (var i = 0; i < rules.length; i++) {
+    if (rules[i].type === 5) { hasFontFace = true; break; }
+}
+r.push(hasFontFace);
+
+// Check getComputedStyle for #slash returns hsla color
+var cs = window.getComputedStyle(document.getElementById('slash'));
+r.push(cs.color === 'hsla(0, 0%, 0%, 1.0)');
+
+// Check :root gets silver background
+var rootCs = window.getComputedStyle(document.documentElement);
+r.push(rootCs.background === 'silver');
+
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void Acid3_Position_Fixed_Object_Element()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+object { position: fixed; left: 130.5px; top: 84.3px; background: transparent; }
+</style>
+</head><body>
+<object id=""target"" data=""empty.html""></object>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push(cs.position === 'fixed');
+r.push(cs.left === '130.5px');
+r.push(cs.top === '84.3px');
+r.push(cs.background === 'transparent');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void GetComputedStyle_Multiple_CamelCase_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { z-index: 1; background-color: red; border-width: 2px; font-size: 14px; text-shadow: 1px 1px black; }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push(cs.zIndex === '1');
+r.push(cs.backgroundColor === 'red');
+r.push(cs.borderWidth === '2px');
+r.push(cs.fontSize === '14px');
+r.push(cs.textShadow === '1px 1px black');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void FontFace_Rule_Does_Not_Match_As_Selector()
+    {
+        // @font-face should not be applied as a selector rule
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@font-face { font-family: ""TestFont""; src: url(test.ttf); }
+div { color: blue; }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push(cs.color === 'blue');
+// font-family from @font-face should NOT be applied to elements
+r.push(cs.fontFamily === undefined || cs.fontFamily === '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Multiple_StyleSheets_Both_Have_Rules()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@font-face { font-family: ""Font1""; src: url(a.ttf); }
+.a { color: red; }
+</style>
+<style>
+.b { color: blue; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(document.styleSheets.length >= 2);
+var sheet1 = document.styleSheets[0];
+var sheet2 = document.styleSheets[1];
+r.push(sheet1.cssRules.length >= 2);
+r.push(sheet2.cssRules.length >= 1);
+
+// Sheet1 should have @font-face (type=5) and style rule (type=1)
+var types1 = [];
+for (var i = 0; i < sheet1.cssRules.length; i++) types1.push(sheet1.cssRules[i].type);
+r.push(types1.indexOf(5) >= 0);
+r.push(types1.indexOf(1) >= 0);
+
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void DeleteRule_On_StyleSheet()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.a { color: red; }
+.b { color: blue; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var sheet = document.styleSheets[0];
+var initLen = sheet.cssRules.length;
+sheet.deleteRule(0);
+document.getElementById('result').textContent = initLen + ':' + sheet.cssRules.length;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("2:1", result);
+    }
+
+    [Fact]
+    public void Cursor_Property_GetComputedStyle()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { cursor: help; }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+document.getElementById('result').textContent = cs.cursor;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("help", result);
+    }
+
+    [Fact]
+    public void FontWeight_Bolder_GetComputedStyle()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { font-weight: bolder; font-size: 5em; }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push(cs.fontWeight === 'bolder');
+r.push(cs.fontSize === '5em');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void BorderWidth_Shorthand_GetComputedStyle()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { border-width: 0 0.2em 0.2em 0; }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push(cs.borderWidth !== undefined);
+r.push(cs.borderWidth !== '');
+r.push(cs.getPropertyValue('border-width') !== '');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void Margin_Negative_GetComputedStyle()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { margin-bottom: -0.4em; }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push(cs.marginBottom === '-0.4em');
+r.push(cs.getPropertyValue('margin-bottom') === '-0.4em');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+}
