@@ -337,6 +337,123 @@ public sealed partial class DomBridge
             }, "set data"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // length (read-only) — character count for text/comment nodes, child count for elements
+        obj.FastAddProperty(
+            (KeyString)"length",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+                    return new JSNumber((element.TextContent ?? string.Empty).Length);
+                return new JSNumber(element.Children.Count);
+            }, "get length"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // splitText(offset) — splits a text node at the given character offset
+        if (element.IsTextNode)
+        {
+            obj.FastAddValue(
+                (KeyString)"splitText",
+                new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length == 0) throw new JSException("Failed to execute 'splitText': 1 argument required.");
+                    var offset = (int)a[0].DoubleValue;
+                    var text = element.TextContent ?? string.Empty;
+                    if (offset < 0 || offset > text.Length)
+                        throw new JSException("Failed to execute 'splitText': The offset " + offset + " is larger than the node's length.");
+
+                    var remainingText = text.Substring(offset);
+                    element.TextContent = text.Substring(0, offset);
+
+                    var newNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+                    newNode.TextContent = remainingText;
+                    _elements.Add(newNode);
+
+                    // Insert new node as next sibling
+                    if (element.Parent != null)
+                    {
+                        var idx = element.Parent.Children.IndexOf(element);
+                        newNode.Parent = element.Parent;
+                        element.Parent.Children.Insert(idx + 1, newNode);
+                    }
+
+                    // Invalidate cached JSObject so length/data properties reflect the update
+                    _jsObjectCache.Remove(element);
+
+                    return ToJSObject(newNode);
+                }, "splitText", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+
+        // substringData(offset, count) — for text/comment CharacterData nodes
+        if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        {
+            obj.FastAddValue(
+                (KeyString)"substringData",
+                new JSFunction((in Arguments a) =>
+                {
+                    var offset = a.Length > 0 ? (int)a[0].DoubleValue : 0;
+                    var count = a.Length > 1 ? (int)a[1].DoubleValue : 0;
+                    var text = element.TextContent ?? string.Empty;
+                    if (offset < 0 || offset > text.Length) throw new JSException("INDEX_SIZE_ERR");
+                    var end = Math.Min(offset + count, text.Length);
+                    return new JSString(text.Substring(offset, end - offset));
+                }, "substringData", 2),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            obj.FastAddValue(
+                (KeyString)"appendData",
+                new JSFunction((in Arguments a) =>
+                {
+                    var data = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    element.TextContent = (element.TextContent ?? string.Empty) + data;
+                    return JSUndefined.Value;
+                }, "appendData", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            obj.FastAddValue(
+                (KeyString)"deleteData",
+                new JSFunction((in Arguments a) =>
+                {
+                    var offset = a.Length > 0 ? (int)a[0].DoubleValue : 0;
+                    var count = a.Length > 1 ? (int)a[1].DoubleValue : 0;
+                    var text = element.TextContent ?? string.Empty;
+                    if (offset < 0 || offset > text.Length) throw new JSException("INDEX_SIZE_ERR");
+                    var end = Math.Min(offset + count, text.Length);
+                    element.TextContent = text.Remove(offset, end - offset);
+                    return JSUndefined.Value;
+                }, "deleteData", 2),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            obj.FastAddValue(
+                (KeyString)"insertData",
+                new JSFunction((in Arguments a) =>
+                {
+                    var offset = a.Length > 0 ? (int)a[0].DoubleValue : 0;
+                    var data = a.Length > 1 ? a[1].ToString() : string.Empty;
+                    var text = element.TextContent ?? string.Empty;
+                    if (offset < 0 || offset > text.Length) throw new JSException("INDEX_SIZE_ERR");
+                    element.TextContent = text.Insert(offset, data);
+                    return JSUndefined.Value;
+                }, "insertData", 2),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            obj.FastAddValue(
+                (KeyString)"replaceData",
+                new JSFunction((in Arguments a) =>
+                {
+                    var offset = a.Length > 0 ? (int)a[0].DoubleValue : 0;
+                    var count = a.Length > 1 ? (int)a[1].DoubleValue : 0;
+                    var data = a.Length > 2 ? a[2].ToString() : string.Empty;
+                    var text = element.TextContent ?? string.Empty;
+                    if (offset < 0 || offset > text.Length) throw new JSException("INDEX_SIZE_ERR");
+                    var end = Math.Min(offset + count, text.Length);
+                    element.TextContent = text.Remove(offset, end - offset).Insert(offset, data);
+                    return JSUndefined.Value;
+                }, "replaceData", 3),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+
         // DOCTYPE-specific properties
         if (string.Equals(element.TagName, "#doctype", StringComparison.OrdinalIgnoreCase))
         {

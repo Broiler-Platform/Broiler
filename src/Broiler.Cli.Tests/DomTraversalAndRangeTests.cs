@@ -741,4 +741,394 @@ document.body.appendChild(out);
 
         Assert.Contains("3,first,third,second,second", result);
     }
+
+    // ══════════════════ Phase 2 v2: Edge Cases ══════════════════
+
+    // ─── 2.1 NodeFilter exception propagation ───
+
+    [Fact]
+    public void NodeFilter_Exception_Propagates_From_Iterator()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""root""><p>A</p><p>B</p></div>
+<script>
+var root = document.getElementById('root');
+var result = 'no-error';
+try {
+    var iter = document.createNodeIterator(root, NodeFilter.SHOW_ELEMENT, {
+        acceptNode: function(node) {
+            if (node.tagName === 'P') throw new Error('filter-bomb');
+            return NodeFilter.FILTER_ACCEPT;
+        }
+    });
+    iter.nextNode(); // root DIV — accepted
+    iter.nextNode(); // P — should throw
+    result = 'error-not-thrown';
+} catch (e) {
+    result = 'caught:' + e.message;
+}
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = result;
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("caught:filter-bomb", result);
+    }
+
+    [Fact]
+    public void NodeFilter_Exception_Propagates_From_TreeWalker()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""root""><p>A</p></div>
+<script>
+var root = document.getElementById('root');
+var result = 'no-error';
+try {
+    var tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+        acceptNode: function(node) {
+            if (node.tagName === 'P') throw new Error('tw-bomb');
+            return NodeFilter.FILTER_ACCEPT;
+        }
+    });
+    tw.nextNode(); // P — should throw
+    result = 'error-not-thrown';
+} catch (e) {
+    result = 'caught:' + e.message;
+}
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = result;
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("caught:tw-bomb", result);
+    }
+
+    // ─── 2.2 Iterator/Walker mutation handling ───
+
+    [Fact]
+    public void NodeIterator_Survives_Node_Removal_During_Iteration()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""root""><p id=""p1"">A</p><p id=""p2"">B</p><p id=""p3"">C</p></div>
+<script>
+var root = document.getElementById('root');
+var iter = document.createNodeIterator(root, NodeFilter.SHOW_ELEMENT, null);
+var r = [];
+iter.nextNode(); // root DIV
+var p1 = iter.nextNode(); // P#p1
+// Remove p1 from the DOM during iteration
+p1.parentNode.removeChild(p1);
+var next = iter.nextNode(); // should get P#p2
+if (next) r.push(next.id);
+next = iter.nextNode(); // should get P#p3
+if (next) r.push(next.id);
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join(',');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("p2", result);
+        Assert.Contains("p3", result);
+    }
+
+    [Fact]
+    public void TreeWalker_Survives_Current_Node_Removal()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""root""><p id=""p1"">A</p><p id=""p2"">B</p></div>
+<script>
+var root = document.getElementById('root');
+var tw = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+tw.firstChild(); // P#p1
+// For TreeWalker, removing currentNode is valid — user can set currentNode manually
+tw.currentNode = root;
+var child = tw.firstChild();
+var r = [];
+if (child) r.push(child.tagName);
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join(',');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("P", result);
+    }
+
+    // ─── 2.3 Range operations on comment nodes ───
+
+    [Fact]
+    public void Range_On_Comment_Node()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""container""><!-- hello world --></div>
+<script>
+var container = document.getElementById('container');
+var comment = container.firstChild;
+var range = document.createRange();
+range.setStart(comment, 3);
+range.setEnd(comment, 8);
+var r = [];
+r.push(comment.nodeType);     // 8 (COMMENT_NODE)
+r.push(comment.length);       // length of ' hello world '
+r.push(range.startOffset);    // 3
+r.push(range.endOffset);      // 8
+r.push(range.toString());     // 'lo wo' (characters 3-8 of ' hello world ')
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join('|');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("8|", result); // nodeType is 8
+        Assert.Contains("|3|8|", result); // startOffset=3, endOffset=8
+    }
+
+    [Fact]
+    public void Range_SelectNodeContents_On_Comment()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<script>
+var comment = document.createComment('test data');
+var range = document.createRange();
+range.selectNodeContents(comment);
+var r = [];
+r.push(range.startOffset);  // 0
+r.push(range.endOffset);    // 9 (length of 'test data')
+r.push(range.collapsed);    // false
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join(',');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("0,9,false", result);
+    }
+
+    [Fact]
+    public void Range_SelectNodeContents_On_TextNode()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"">hello world</div>
+<script>
+var target = document.getElementById('target');
+var textNode = target.firstChild;
+var range = document.createRange();
+range.selectNodeContents(textNode);
+var r = [];
+r.push(range.startOffset);  // 0
+r.push(range.endOffset);    // 11 (length of 'hello world')
+r.push(range.collapsed);    // false
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join(',');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("0,11,false", result);
+    }
+
+    // ─── 2.5 Text node splitText() ───
+
+    [Fact]
+    public void SplitText_Basic()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"">hello world</div>
+<script>
+var target = document.getElementById('target');
+var textNode = target.firstChild;
+var newNode = textNode.splitText(5);
+var r = [];
+r.push(textNode.data);        // 'hello'
+r.push(newNode.data);         // ' world'
+r.push(textNode.length);      // 5
+r.push(newNode.length);       // 6
+r.push(target.childNodes.length); // 2 (two text nodes now)
+r.push(newNode.nodeType);     // 3 (TEXT_NODE)
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join('|');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("hello| world|5|6|2|3", result);
+    }
+
+    [Fact]
+    public void SplitText_At_Beginning()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"">abcdef</div>
+<script>
+var target = document.getElementById('target');
+var textNode = target.firstChild;
+var newNode = textNode.splitText(0);
+var r = [];
+r.push(textNode.data);        // '' (empty)
+r.push(newNode.data);         // 'abcdef'
+r.push(target.childNodes.length); // 2
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join('|');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("|abcdef|2", result);
+    }
+
+    [Fact]
+    public void SplitText_At_End()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"">abcdef</div>
+<script>
+var target = document.getElementById('target');
+var textNode = target.firstChild;
+var newNode = textNode.splitText(6);
+var r = [];
+r.push(textNode.data);        // 'abcdef'
+r.push(newNode.data);         // '' (empty)
+r.push(target.childNodes.length); // 2
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join('|');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("abcdef||2", result);
+    }
+
+    // ─── 2.4 Range mutation awareness (splitText updates Range boundaries) ───
+
+    [Fact]
+    public void Range_Boundary_On_Text_Node_Character_Offset()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target"">hello world</div>
+<script>
+var target = document.getElementById('target');
+var textNode = target.firstChild;
+var range = document.createRange();
+range.setStart(textNode, 2);
+range.setEnd(textNode, 7);
+var r = [];
+r.push(range.startOffset);    // 2
+r.push(range.endOffset);      // 7
+r.push(range.toString());     // 'llo w'
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join('|');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("2|7|llo w", result);
+    }
+
+    [Fact]
+    public void Range_DeleteContents_Updates_Boundaries()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""target""><p>A</p><p>B</p><p>C</p></div>
+<script>
+var target = document.getElementById('target');
+var range = document.createRange();
+range.selectNodeContents(target);
+range.deleteContents();
+var r = [];
+r.push(target.childNodes.length);  // 0
+r.push(range.collapsed);           // true
+r.push(range.startOffset);         // 0
+r.push(range.endOffset);           // 0
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join(',');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("0,true,0,0", result);
+    }
+
+    // ─── CharacterData methods ───
+
+    [Fact]
+    public void CharacterData_Methods_On_Comment()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<script>
+var comment = document.createComment('hello');
+var r = [];
+r.push(comment.data);            // 'hello'
+r.push(comment.length);          // 5
+comment.appendData(' world');
+r.push(comment.data);            // 'hello world'
+r.push(comment.substringData(6, 5)); // 'world'
+comment.deleteData(5, 6);
+r.push(comment.data);            // 'hello'
+comment.insertData(5, '!');
+r.push(comment.data);            // 'hello!'
+comment.replaceData(0, 5, 'hi');
+r.push(comment.data);            // 'hi!'
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join('|');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("hello|5|hello world|world|hello|hello!|hi!", result);
+    }
 }
