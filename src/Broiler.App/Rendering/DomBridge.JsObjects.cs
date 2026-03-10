@@ -1896,6 +1896,39 @@ public sealed partial class DomBridge
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
 
+            // SVG viewBox attribute — returns SVGAnimatedRect with baseVal {x,y,width,height}
+            if (tag == "svg" || tag == "svg:svg")
+            {
+                obj.FastAddProperty(
+                    (KeyString)"viewBox",
+                    new JSFunction((in Arguments _) =>
+                    {
+                        var animRect = new JSObject();
+                        var baseRect = new JSObject();
+                        double vbX = 0, vbY = 0, vbW = 0, vbH = 0;
+                        if (element.Attributes.TryGetValue("viewBox", out var vb) && !string.IsNullOrWhiteSpace(vb))
+                        {
+                            var parts = vb.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length >= 4)
+                            {
+                                double.TryParse(parts[0], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out vbX);
+                                double.TryParse(parts[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out vbY);
+                                double.TryParse(parts[2], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out vbW);
+                                double.TryParse(parts[3], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out vbH);
+                            }
+                        }
+                        baseRect.FastAddValue((KeyString)"x", new JSNumber(vbX), JSPropertyAttributes.EnumerableConfigurableValue);
+                        baseRect.FastAddValue((KeyString)"y", new JSNumber(vbY), JSPropertyAttributes.EnumerableConfigurableValue);
+                        baseRect.FastAddValue((KeyString)"width", new JSNumber(vbW), JSPropertyAttributes.EnumerableConfigurableValue);
+                        baseRect.FastAddValue((KeyString)"height", new JSNumber(vbH), JSPropertyAttributes.EnumerableConfigurableValue);
+                        animRect.FastAddValue((KeyString)"baseVal", baseRect, JSPropertyAttributes.EnumerableConfigurableValue);
+                        animRect.FastAddValue((KeyString)"animVal", baseRect, JSPropertyAttributes.EnumerableConfigurableValue);
+                        return animRect;
+                    }, "get viewBox"),
+                    null,
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+
             // SVGTextContentElement methods
             if (tag == "text" || tag == "svg:text" || tag == "tspan" || tag == "svg:tspan" ||
                 tag == "textpath" || tag == "svg:textpath")

@@ -470,29 +470,29 @@ Problems:
 
 ---
 
-### Phase 8: SVG DOM & Dynamic Content (Priority: **Medium**)
+### Phase 8: SVG DOM & Dynamic Content (Priority: **Medium**) ✅
 
 **Goal:** Pass tests 65–74, 80.
 
-- [ ] **8.1** SVG document loading
-  - [ ] Load SVG via `<object>` and `<iframe>`
-  - [ ] Parse SVG XML and build SVG DOM
-- [ ] **8.2** `getSVGDocument()` returning real SVG DOM
-  - [ ] SVG elements with proper namespace
-  - [ ] SVG-specific properties (viewBox, etc.)
-- [ ] **8.3** Dynamic `<style>` modification
-  - [ ] Changing `textContent` of `<style>` element updates stylesheet
-  - [ ] `document.styleSheets` reflects changes
-- [ ] **8.4** UTF-16 surrogate pair handling
-  - [ ] `String.fromCharCode(0xD800, 0xDC00)` in text nodes
-  - [ ] `charCodeAt()` returns correct values
-- [ ] **8.5** XML encoding detection
-  - [ ] `<?xml version="1.0" encoding="UTF-8"?>` respected
-- [ ] **8.6** HTML parsing conformance
-  - [ ] Foster-parented elements
-  - [ ] Implied tag closing rules
-  - [ ] Misnested formatting elements
-- [ ] **8.7** Tests: 10 unit tests
+- [x] **8.1** SVG document loading
+  - [x] Load SVG via `<object>` and `<iframe>`
+  - [x] Parse SVG XML and build SVG DOM
+- [x] **8.2** `getSVGDocument()` returning real SVG DOM
+  - [x] SVG elements with proper namespace
+  - [x] SVG-specific properties (viewBox, etc.)
+- [x] **8.3** Dynamic `<style>` modification
+  - [x] Changing `textContent` of `<style>` element updates stylesheet
+  - [x] `document.styleSheets` reflects changes
+- [x] **8.4** UTF-16 surrogate pair handling
+  - [x] `String.fromCharCode(0xD800, 0xDC00)` in text nodes
+  - [x] `charCodeAt()` returns correct values
+- [x] **8.5** XML encoding detection
+  - [x] `<?xml version="1.0" encoding="UTF-8"?>` respected
+- [x] **8.6** HTML parsing conformance
+  - [x] Foster-parented elements
+  - [x] Implied tag closing rules
+  - [x] Misnested formatting elements
+- [x] **8.7** Tests: 12 unit tests
 
 **Modules affected:** `DomBridge.JsObjects.cs`, `DomBridge.StyleSheets.cs`, `HtmlTreeBuilder.cs`, `HtmlTokenizer.cs`
 
