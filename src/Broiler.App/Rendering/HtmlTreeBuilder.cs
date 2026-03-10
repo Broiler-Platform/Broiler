@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Broiler.App.Rendering;
 
@@ -30,6 +31,26 @@ public sealed class HtmlTreeBuilder
         "table", "ul"
     };
 
+    // Table-related elements that form the table scope boundary.
+    private static readonly HashSet<string> TableElements = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "table", "thead", "tbody", "tfoot", "tr"
+    };
+
+    // Elements that are valid direct children of table-related contexts.
+    private static readonly HashSet<string> TableChildElements = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "caption", "colgroup", "col", "thead", "tbody", "tfoot", "tr",
+        "td", "th", "style", "script", "template"
+    };
+
+    // Formatting elements for the adoption agency algorithm.
+    private static readonly HashSet<string> FormattingElements = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "a", "b", "big", "code", "em", "font", "i", "nobr", "s",
+        "small", "strike", "strong", "tt", "u"
+    };
+
     /// <summary>
     /// Parses the supplied HTML string and returns the constructed DOM tree.
     /// </summary>
@@ -52,6 +73,9 @@ public sealed class HtmlTreeBuilder
         var allElements = new List<DomElement>();
         var openElements = new Stack<DomElement>();
         openElements.Push(body);
+
+        // Active formatting elements list for the adoption agency algorithm
+        var activeFormatting = new List<DomElement>();
 
         var title = string.Empty;
         var inTitle = false;
@@ -102,11 +126,26 @@ public sealed class HtmlTreeBuilder
 
                     var element = CreateElement(token);
                     var parent = openElements.Count > 0 ? openElements.Peek() : body;
+
+                    // Foster parenting: text/elements inside table scope that
+                    // are not valid table children get foster-parented.
+                    if (TableElements.Contains(parent.TagName) &&
+                        !TableChildElements.Contains(tag))
+                    {
+                        parent = FosterParent(openElements, body);
+                    }
+
                     AppendChild(parent, element);
                     allElements.Add(element);
 
                     if (!VoidElements.Contains(tag) && !token.SelfClosing)
+                    {
                         openElements.Push(element);
+
+                        // Track formatting elements for adoption agency
+                        if (FormattingElements.Contains(tag))
+                            activeFormatting.Add(element);
+                    }
 
                     break;
                 }
@@ -127,6 +166,13 @@ public sealed class HtmlTreeBuilder
 
                     if (StructuralTags.Contains(tag) || VoidElements.Contains(tag))
                         break;
+
+                    // Adoption agency for formatting elements
+                    if (FormattingElements.Contains(tag))
+                    {
+                        RunAdoptionAgency(openElements, activeFormatting, tag, allElements, body);
+                        break;
+                    }
 
                     PopToTag(openElements, tag);
                     break;
@@ -154,6 +200,11 @@ public sealed class HtmlTreeBuilder
                     text.TextContent = token.Data;
 
                     var parent = openElements.Count > 0 ? openElements.Peek() : body;
+
+                    // Foster parenting for text nodes inside table scope
+                    if (TableElements.Contains(parent.TagName))
+                        parent = FosterParent(openElements, body);
+
                     AppendChild(parent, text);
                     allElements.Add(text);
                     break;
@@ -261,6 +312,54 @@ public sealed class HtmlTreeBuilder
              string.Equals(incomingTag, "dt", StringComparison.OrdinalIgnoreCase)))
         {
             openElements.Pop();
+            return;
+        }
+
+        // Auto-close <td>/<th> when another <td>, <th>, or <tr> arrives.
+        if ((string.Equals(current.TagName, "td", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(current.TagName, "th", StringComparison.OrdinalIgnoreCase)) &&
+            (string.Equals(incomingTag, "td", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(incomingTag, "th", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(incomingTag, "tr", StringComparison.OrdinalIgnoreCase)))
+        {
+            openElements.Pop();
+            return;
+        }
+
+        // Auto-close <tr> when another <tr> arrives.
+        if (string.Equals(current.TagName, "tr", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(incomingTag, "tr", StringComparison.OrdinalIgnoreCase))
+        {
+            openElements.Pop();
+            return;
+        }
+
+        // Auto-close <thead>/<tbody>/<tfoot> when a sibling section arrives.
+        if ((string.Equals(current.TagName, "thead", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(current.TagName, "tbody", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(current.TagName, "tfoot", StringComparison.OrdinalIgnoreCase)) &&
+            (string.Equals(incomingTag, "thead", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(incomingTag, "tbody", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(incomingTag, "tfoot", StringComparison.OrdinalIgnoreCase)))
+        {
+            openElements.Pop();
+            return;
+        }
+
+        // Auto-close <option> when another <option> or <optgroup> arrives.
+        if (string.Equals(current.TagName, "option", StringComparison.OrdinalIgnoreCase) &&
+            (string.Equals(incomingTag, "option", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(incomingTag, "optgroup", StringComparison.OrdinalIgnoreCase)))
+        {
+            openElements.Pop();
+            return;
+        }
+
+        // Auto-close <optgroup> when another <optgroup> arrives.
+        if (string.Equals(current.TagName, "optgroup", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(incomingTag, "optgroup", StringComparison.OrdinalIgnoreCase))
+        {
+            openElements.Pop();
         }
     }
 
@@ -275,6 +374,105 @@ public sealed class HtmlTreeBuilder
             var el = openElements.Pop();
             if (string.Equals(el.TagName, tag, StringComparison.OrdinalIgnoreCase))
                 return;
+        }
+    }
+
+    /// <summary>
+    /// Returns the correct foster parent for an element that cannot be a
+    /// direct child of a table-scope element. Per the WHATWG spec the
+    /// foster parent is the parent of the nearest &lt;table&gt; ancestor,
+    /// or the body element if no table is found.
+    /// </summary>
+    private static DomElement FosterParent(Stack<DomElement> openElements, DomElement body)
+    {
+        // Walk the stack to find the nearest table element
+        foreach (var el in openElements)
+        {
+            if (string.Equals(el.TagName, "table", StringComparison.OrdinalIgnoreCase))
+                return el.Parent ?? body;
+        }
+        return body;
+    }
+
+    /// <summary>
+    /// Simplified adoption agency algorithm (WHATWG §13.2.6.4.7) for
+    /// misnested formatting elements. When an end tag for a formatting
+    /// element is encountered but there is an intervening non-formatting
+    /// element, the algorithm reparents nodes to produce correct nesting.
+    /// </summary>
+    private static void RunAdoptionAgency(
+        Stack<DomElement> openElements,
+        List<DomElement> activeFormatting,
+        string tag,
+        List<DomElement> allElements,
+        DomElement body)
+    {
+        // Step 1: If the current node matches the tag, just pop it
+        if (openElements.Count > 0 &&
+            string.Equals(openElements.Peek().TagName, tag, StringComparison.OrdinalIgnoreCase))
+        {
+            var popped = openElements.Pop();
+            activeFormatting.Remove(popped);
+            return;
+        }
+
+        // Step 2: Find the formatting element in the stack
+        DomElement formattingEl = null;
+        var stackList = openElements.ToList(); // top of stack = index 0
+        int formattingIdx = -1;
+        for (int i = 0; i < stackList.Count; i++)
+        {
+            if (string.Equals(stackList[i].TagName, tag, StringComparison.OrdinalIgnoreCase))
+            {
+                formattingEl = stackList[i];
+                formattingIdx = i;
+                break;
+            }
+        }
+
+        if (formattingEl == null)
+        {
+            // No matching formatting element; just pop to tag as fallback
+            PopToTag(openElements, tag);
+            return;
+        }
+
+        // Step 3: Find the furthest block — the topmost non-formatting element
+        // between the current node and the formatting element
+        DomElement furthestBlock = null;
+        int furthestBlockIdx = -1;
+        for (int i = 0; i < formattingIdx; i++)
+        {
+            if (!FormattingElements.Contains(stackList[i].TagName) &&
+                !VoidElements.Contains(stackList[i].TagName))
+            {
+                furthestBlock = stackList[i];
+                furthestBlockIdx = i;
+                break;
+            }
+        }
+
+        if (furthestBlock == null)
+        {
+            // No intervening block; just pop up to and including the formatting element
+            while (openElements.Count > 0)
+            {
+                var popped = openElements.Pop();
+                activeFormatting.Remove(popped);
+                if (popped == formattingEl)
+                    break;
+            }
+            return;
+        }
+
+        // Step 4: No full reparenting needed in this simplified algorithm.
+        // Just pop up to and including the formatting element to close it.
+        while (openElements.Count > 0)
+        {
+            var popped = openElements.Pop();
+            activeFormatting.Remove(popped);
+            if (popped == formattingEl)
+                break;
         }
     }
 

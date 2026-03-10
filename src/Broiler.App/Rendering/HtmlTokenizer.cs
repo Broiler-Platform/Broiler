@@ -90,6 +90,7 @@ public sealed class HtmlTokenizer
             case State.TagOpen:
                 if (eof) { _buf.Append('<'); _state = State.Data; }
                 else if (c == '!') { _pos++; _state = State.MarkupDeclarationOpen; }
+                else if (c == '?') { _pos++; SkipProcessingInstruction(); _state = State.Data; }
                 else if (c == '/') { _pos++; _state = State.EndTagOpen; }
                 else if (char.IsLetter(c)) { Reset(false); _state = State.TagName; }
                 else { _buf.Append('<'); _state = State.Data; }
@@ -267,5 +268,27 @@ public sealed class HtmlTokenizer
             _pos++;
         if (_pos < _input.Length)
             _pos++;
+    }
+
+    /// <summary>
+    /// Skips an XML processing instruction (<c>&lt;?...?&gt;</c>), such as
+    /// <c>&lt;?xml version="1.0" encoding="UTF-8"?&gt;</c>.
+    /// </summary>
+    private void SkipProcessingInstruction()
+    {
+        while (_pos < _input.Length)
+        {
+            if (_input[_pos] == '?' && _pos + 1 < _input.Length && _input[_pos + 1] == '>')
+            {
+                _pos += 2;
+                return;
+            }
+            if (_input[_pos] == '>')
+            {
+                _pos++;
+                return;
+            }
+            _pos++;
+        }
     }
 }
