@@ -17,6 +17,8 @@ public sealed class DomBridge
 {
     private const int FetchTimeoutSeconds = 30;
     private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(FetchTimeoutSeconds) };
+    private static readonly string[] InlineEventNames = ["click", "load", "change", "input", "submit", "mousedown",
+        "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error"];
     private readonly List<DomElement> _elements = [];
     private readonly List<(JSFunction Callback, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
 
@@ -2043,26 +2045,24 @@ public sealed class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // on* inline event handler properties (onclick, onload, etc.)
-        foreach (var eventName in new[] { "click", "load", "change", "input", "submit", "mousedown",
-            "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error" })
+        foreach (var eventName in InlineEventNames)
         {
-            var evtName = eventName; // closure capture
             obj.FastAddProperty(
-                (KeyString)$"on{evtName}",
+                (KeyString)$"on{eventName}",
                 new JSFunction((in Arguments _) =>
                 {
-                    if (element.InlineEventHandlers.TryGetValue(evtName, out var handler))
+                    if (element.InlineEventHandlers.TryGetValue(eventName, out var handler))
                         return handler;
                     return JSNull.Value;
-                }, $"get on{evtName}"),
+                }, $"get on{eventName}"),
                 new JSFunction((in Arguments a) =>
                 {
                     if (a.Length > 0 && a[0] is JSFunction fn)
-                        element.InlineEventHandlers[evtName] = fn;
+                        element.InlineEventHandlers[eventName] = fn;
                     else
-                        element.InlineEventHandlers.Remove(evtName);
+                        element.InlineEventHandlers.Remove(eventName);
                     return JSUndefined.Value;
-                }, $"set on{evtName}"),
+                }, $"set on{eventName}"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
