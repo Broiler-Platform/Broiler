@@ -290,20 +290,41 @@ public sealed partial class DomBridge
                 {
                     return new JSString(GetDocTypeName(element));
                 }
+                // Non-HTML namespace elements preserve original case (per DOM spec)
+                if (!string.IsNullOrEmpty(element.NamespaceURI) &&
+                    !string.Equals(element.NamespaceURI, "http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase))
+                    return new JSString(element.TagName);
                 return new JSString(element.TagName.ToUpperInvariant());
             }, "get nodeName"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // localName (read-only) — null for non-element nodes; tag name (lowercase) for elements
+        // localName (read-only) — null for non-element nodes; local part of tag name for elements
         obj.FastAddProperty(
             (KeyString)"localName",
             new JSFunction((in Arguments a) =>
             {
                 if (element.IsTextNode) return JSNull.Value;
                 if (element.TagName.StartsWith("#")) return JSNull.Value; // #comment, #document, etc.
-                return new JSString(element.TagName.ToLowerInvariant());
+                var name = element.TagName;
+                var colonIdx = name.IndexOf(':');
+                if (colonIdx >= 0)
+                    name = name[(colonIdx + 1)..];
+                return new JSString(name.ToLowerInvariant());
             }, "get localName"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // prefix (read-only) — namespace prefix or null
+        obj.FastAddProperty(
+            (KeyString)"prefix",
+            new JSFunction((in Arguments a) =>
+            {
+                var colonIdx = element.TagName.IndexOf(':');
+                if (colonIdx >= 0)
+                    return new JSString(element.TagName[..colonIdx]);
+                return JSNull.Value;
+            }, "get prefix"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -2491,7 +2512,9 @@ public sealed partial class DomBridge
             {
                 if (a.Length == 0)
                     throw new JSException("Failed to execute 'createElement': 1 argument required.");
-                var tagName = a[0].ToString().ToLowerInvariant();
+                var tagName = a[0].ToString();
+                ValidateElementName(tagName, _jsContext!);
+                tagName = tagName.ToLowerInvariant();
                 var el = new DomElement(tagName, null, null, string.Empty);
                 el.OwnerDocRoot = docRoot;
                 _elements.Add(el);
@@ -2532,8 +2555,9 @@ public sealed partial class DomBridge
             (KeyString)"createElementNS",
             new JSFunction((in Arguments a) =>
             {
-                var ns = a.Length > 0 ? a[0].ToString() : null;
+                var ns = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
                 var localName = a.Length > 1 ? a[1].ToString() : (a.Length > 0 ? a[0].ToString() : "div");
+                ValidateQualifiedName(localName, ns, _jsContext!);
                 var el = new DomElement(localName, null, null, string.Empty);
                 if (!string.IsNullOrEmpty(ns))
                     el.NamespaceURI = ns;
