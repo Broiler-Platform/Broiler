@@ -1024,19 +1024,19 @@ public class CssBoxModel
         // Check for physical units with conversion factors (96 DPI).
         if (value.EndsWith("cm", StringComparison.OrdinalIgnoreCase))
         {
-            var num = value.Substring(0, value.Length - 2);
+            var num = value[..^2];
             return float.TryParse(num, NumberStyles.Float, CultureInfo.InvariantCulture, out float cm)
                 ? cm * 37.7952756f : defaultValue; // 96 / 2.54
         }
         if (value.EndsWith("mm", StringComparison.OrdinalIgnoreCase))
         {
-            var num = value.Substring(0, value.Length - 2);
+            var num = value[..^2];
             return float.TryParse(num, NumberStyles.Float, CultureInfo.InvariantCulture, out float mm)
                 ? mm * 3.77952756f : defaultValue; // 96 / 25.4
         }
         if (value.EndsWith("in", StringComparison.OrdinalIgnoreCase))
         {
-            var num = value.Substring(0, value.Length - 2);
+            var num = value[..^2];
             return float.TryParse(num, NumberStyles.Float, CultureInfo.InvariantCulture, out float inches)
                 ? inches * 96f : defaultValue;
         }

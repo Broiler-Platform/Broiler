@@ -184,7 +184,7 @@ document.getElementById('result').textContent = cs.getPropertyValue('font-family
 
         // Element should still occupy space (non-zero dimensions).
         Assert.Equal(CssVisibility.Hidden, box.Visibility);
-        Assert.True(box.Dimensions.Width > 0 || box.Dimensions.Height >= 0);
+        Assert.True(box.Dimensions.Width > 0);
     }
 
     [Fact]

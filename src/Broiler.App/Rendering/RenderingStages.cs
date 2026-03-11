@@ -115,7 +115,7 @@ public class Painter
             var src = bgImage;
             if (src.StartsWith("url(", StringComparison.OrdinalIgnoreCase))
             {
-                src = src.Substring(4);
+                src = src[4..];
                 if (src.EndsWith(")")) src = src[..^1];
                 src = src.Trim('\'', '"', ' ');
             }
