@@ -299,6 +299,9 @@ public sealed partial class DomBridge
         clone.NamespaceURI = source.NamespaceURI;
         foreach (var kv in source.NsAttrMap)
             clone.NsAttrMap[kv.Key] = kv.Value;
+        // Copy DomProperties (e.g., checked state for inputs)
+        foreach (var kv in source.DomProperties)
+            clone.DomProperties[kv.Key] = kv.Value;
 
         if (deep)
         {
@@ -438,6 +441,29 @@ public sealed partial class DomBridge
             if (ctag == "input" || ctag == "select" || ctag == "textarea" || ctag == "button")
                 controls.Add(child);
             CollectFormControlsRecursive(child, controls);
+        }
+    }
+
+    /// <summary>
+    /// Recursively unchecks all radio inputs with the given name within the scope,
+    /// except for the specified element. Used for radio button mutual exclusion.
+    /// </summary>
+    private static void UncheckRadioSiblings(DomElement scope, DomElement except, string radioName)
+    {
+        foreach (var child in scope.Children)
+        {
+            if (!child.IsTextNode && !ReferenceEquals(child, except))
+            {
+                if (string.Equals(child.TagName, "input", System.StringComparison.OrdinalIgnoreCase) &&
+                    child.Attributes.TryGetValue("type", out var st) &&
+                    string.Equals(st, "radio", System.StringComparison.OrdinalIgnoreCase) &&
+                    child.Attributes.TryGetValue("name", out var sn) &&
+                    string.Equals(sn, radioName, System.StringComparison.Ordinal))
+                {
+                    child.DomProperties["checked"] = false;
+                }
+                UncheckRadioSiblings(child, except, radioName);
+            }
         }
     }
 

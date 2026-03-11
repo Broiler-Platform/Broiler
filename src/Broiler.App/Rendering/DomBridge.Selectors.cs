@@ -439,7 +439,16 @@ public sealed partial class DomBridge
                     if (!IsFormElement(el) || !el.Attributes.ContainsKey("disabled")) return false;
                     break;
                 case "checked":
-                    if (!IsCheckable(el) || !el.Attributes.ContainsKey("checked")) return false;
+                    // Check the IDL property (DomProperties) first; this tracks the "dirty"
+                    // checked state set by JS. Falls back to the content attribute.
+                    if (!IsCheckable(el))
+                        return false;
+                    if (el.DomProperties.TryGetValue("checked", out var chkVal))
+                    {
+                        if (chkVal is not true) return false;
+                    }
+                    else if (!el.Attributes.ContainsKey("checked"))
+                        return false;
                     break;
                 case "link":
                     if (!string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) ||
