@@ -1964,6 +1964,16 @@ public sealed partial class DomBridge
             }
         }
 
+        // Node type constants (DOM spec: these exist on all Node objects)
+        obj.FastAddValue((KeyString)"ELEMENT_NODE", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"ATTRIBUTE_NODE", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"TEXT_NODE", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"CDATA_SECTION_NODE", new JSNumber(4), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"COMMENT_NODE", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"DOCUMENT_NODE", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"DOCUMENT_TYPE_NODE", new JSNumber(10), JSPropertyAttributes.EnumerableConfigurableValue);
+        obj.FastAddValue((KeyString)"DOCUMENT_FRAGMENT_NODE", new JSNumber(11), JSPropertyAttributes.EnumerableConfigurableValue);
+
         return obj;
     }
 
@@ -2903,6 +2913,61 @@ public sealed partial class DomBridge
         doc.FastAddValue(
             (KeyString)"implementation",
             subImpl,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // defaultView — return the main window object so getComputedStyle is accessible
+        if (_windowJSObject != null)
+        {
+            doc.FastAddValue(
+                (KeyString)"defaultView",
+                _windowJSObject,
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+
+        // createTreeWalker(root, whatToShow, filter)
+        doc.FastAddValue(
+            (KeyString)"createTreeWalker",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    throw new JSException("Failed to execute 'createTreeWalker': 1 argument required.");
+                var rootObj = a[0] as JSObject;
+                if (rootObj == null)
+                    throw new JSException("Failed to execute 'createTreeWalker': parameter 1 is not of type 'Node'.");
+                var rootEl = bridge.FindDomElementByJSObject(rootObj);
+                if (rootEl == null) return JSNull.Value;
+
+                var whatToShow = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? (int)a[1].DoubleValue : unchecked((int)0xFFFFFFFF);
+                var filterFn = a.Length > 2 && a[2] is JSFunction f ? f : (a.Length > 2 && a[2] is JSObject filterObj ? filterObj[(KeyString)"acceptNode"] as JSFunction : null);
+
+                return bridge.BuildTreeWalker(rootEl, whatToShow, filterFn);
+            }, "createTreeWalker", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // createNodeIterator(root, whatToShow, filter)
+        doc.FastAddValue(
+            (KeyString)"createNodeIterator",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0)
+                    throw new JSException("Failed to execute 'createNodeIterator': 1 argument required.");
+                var rootObj = a[0] as JSObject;
+                if (rootObj == null)
+                    throw new JSException("Failed to execute 'createNodeIterator': parameter 1 is not of type 'Node'.");
+                var rootEl = bridge.FindDomElementByJSObject(rootObj);
+                if (rootEl == null) return JSNull.Value;
+
+                var whatToShow = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? (int)a[1].DoubleValue : unchecked((int)0xFFFFFFFF);
+                var filterFn = a.Length > 2 && a[2] is JSFunction f ? f : (a.Length > 2 && a[2] is JSObject filterObj ? filterObj[(KeyString)"acceptNode"] as JSFunction : null);
+
+                return bridge.BuildNodeIterator(rootEl, whatToShow, filterFn);
+            }, "createNodeIterator", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // createRange()
+        doc.FastAddValue(
+            (KeyString)"createRange",
+            new JSFunction((in Arguments a) => bridge.BuildRange(), "createRange", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return doc;

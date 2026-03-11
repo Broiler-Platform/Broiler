@@ -806,6 +806,7 @@ public sealed partial class DomBridge
 
         // window global
         var window = new JSObject();
+        _windowJSObject = window;
         window.FastAddValue(
             (KeyString)"document",
             document,

@@ -23,6 +23,7 @@ public sealed partial class DomBridge
     private readonly List<(JSFunction Callback, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
     private readonly DomElement _documentNode = new("#document", null, null, string.Empty);
     private JSObject? _documentJSObject;
+    private JSObject? _windowJSObject;
     private readonly Dictionary<DomElement, JSObject> _docRootToDocJSObject = [];
     private JSContext? _jsContext;
 
@@ -100,7 +101,7 @@ public sealed partial class DomBridge
     /// </summary>
     public void FlushTimers()
     {
-        const int maxIterations = 500;
+        const int maxIterations = 1000;
         for (var iteration = 0; iteration < maxIterations; iteration++)
         {
             var pending = new List<(int Id, JSFunction Fn)>();
