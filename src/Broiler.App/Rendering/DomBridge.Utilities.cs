@@ -972,7 +972,9 @@ public sealed partial class DomBridge
     /// </summary>
     private static void ThrowDOMException(JSContext context, string message, string name)
     {
-        var escaped = message.Replace("\\", "\\\\").Replace("'", "\\'");
+        // Remove control characters first, then escape for JS string literal
+        var clean = message.Replace("\0", "").Replace("\r", "").Replace("\n", "");
+        var escaped = clean.Replace("\\", "\\\\").Replace("'", "\\'");
         context.Eval($"throw new DOMException('{escaped}', '{name}');");
     }
 
