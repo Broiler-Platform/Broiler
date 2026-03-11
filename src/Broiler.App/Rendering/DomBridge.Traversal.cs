@@ -405,18 +405,44 @@ public sealed partial class DomBridge
         {
             if (ReferenceEquals(containerA, containerB))
                 return offsetA > offsetB;
-            // Check if A is a descendant of B or vice versa
-            if (IsDescendant(containerB, containerA))
-                return true; // A inside B → generally "after"
+
+            // Check if B is a descendant of A
+            // Position (A, offsetA) is after (B, offsetB) if the child of A that
+            // contains B (or is B) has index < offsetA.
             if (IsDescendant(containerA, containerB))
+            {
+                // Find which child index of A contains B
+                var node = containerB;
+                while (node.Parent != null && !ReferenceEquals(node.Parent, containerA))
+                    node = node.Parent;
+                if (node.Parent != null)
+                {
+                    var childIdx = containerA.Children.IndexOf(node);
+                    return offsetA > childIdx;
+                }
                 return false;
+            }
+
+            // Check if A is a descendant of B
+            // Position (A, offsetA) is after (B, offsetB) if the child of B that
+            // contains A (or is A) has index >= offsetB.
+            if (IsDescendant(containerB, containerA))
+            {
+                var node = containerA;
+                while (node.Parent != null && !ReferenceEquals(node.Parent, containerB))
+                    node = node.Parent;
+                if (node.Parent != null)
+                {
+                    var childIdx = containerB.Children.IndexOf(node);
+                    return childIdx >= offsetB;
+                }
+                return true;
+            }
+
             // Compare positions in document order using their common ancestor
             var commonRoot = FindCommonAncestor(containerA, containerB);
             if (commonRoot == null)
-            {
-                // Fall back to document root
                 commonRoot = docRoot;
-            }
             var allNodes = GetDocumentOrderNodes(commonRoot);
             var idxA = allNodes.IndexOf(containerA);
             var idxB = allNodes.IndexOf(containerB);

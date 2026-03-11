@@ -1003,3 +1003,85 @@ document.body.appendChild(out);
         Assert.Contains("start=document", value);
     }
 }
+
+public class Acid3Phase4RangeTests
+{
+    [Fact]
+    public void Test8_MovingBoundaryPoints()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<script>
+var r = [];
+try {
+  var doc = document.implementation.createDocument(null, null, null);
+  var root = doc.createElement('root');
+  doc.appendChild(root);
+  var e1 = doc.createElement('e');
+  root.appendChild(e1);
+  var e2 = doc.createElement('e');
+  root.appendChild(e2);
+  var e3 = doc.createElement('e');
+  root.appendChild(e3);
+  var rng = doc.createRange();
+  rng.setStart(e2, 0);
+  rng.setEnd(e3, 0);
+  r.push('collapsed1=' + rng.collapsed);
+  rng.setEnd(e1, 0);
+  r.push('collapsed2=' + rng.collapsed);
+  r.push('startContainer=' + (rng.startContainer === e1));
+  r.push('startOffset=' + rng.startOffset);
+  r.push('endContainer=' + (rng.endContainer === e1));
+  r.push('endOffset=' + rng.endOffset);
+  rng.setStartBefore(e3);
+  r.push('collapsed3=' + rng.collapsed);
+  r.push('startContainer3=' + (rng.startContainer === root));
+  r.push('startOffset3=' + rng.startOffset);
+  r.push('endContainer3=' + (rng.endContainer === root));
+  r.push('endOffset3=' + rng.endOffset);
+  rng.setEndAfter(root);
+  r.push('collapsed4=' + rng.collapsed);
+  r.push('endContainer4=' + (rng.endContainer === doc));
+  r.push('endOffset4=' + rng.endOffset);
+  rng.setStartAfter(e2);
+  r.push('startContainer5=' + (rng.startContainer === root));
+  r.push('startOffset5=' + rng.startOffset);
+  // setEndBefore(doc) should throw
+  var threw = false;
+  try { rng.setEndBefore(doc); } catch(e) { threw = (e.code === e.INVALID_NODE_TYPE_ERR); }
+  r.push('threw=' + threw);
+  rng.collapse(false);
+  r.push('startContainer6=' + (rng.startContainer === doc));
+  r.push('startOffset6=' + rng.startOffset);
+} catch(e) {
+  r.push('ERROR:' + e.message + '/' + ('' + e));
+}
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join('|');
+document.body.appendChild(out);
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        var match = System.Text.RegularExpressions.Regex.Match(result, @"id=""result""[^>]*>([^<]+)<");
+        Assert.True(match.Success, $"Output: {result.Substring(0, Math.Min(500, result.Length))}");
+        var value = match.Groups[1].Value;
+        Assert.DoesNotContain("ERROR", value);
+        Assert.Contains("collapsed1=false", value);
+        Assert.Contains("collapsed2=true", value);
+        Assert.Contains("startContainer=true", value);
+        Assert.Contains("endContainer=true", value);
+        Assert.Contains("collapsed3=true", value);
+        Assert.Contains("startContainer3=true", value);
+        Assert.Contains("startOffset3=2", value);
+        Assert.Contains("endContainer3=true", value);
+        Assert.Contains("endOffset3=2", value);
+        Assert.Contains("endContainer4=true", value);
+        Assert.Contains("endOffset4=1", value);
+        Assert.Contains("startContainer5=true", value);
+        Assert.Contains("startOffset5=2", value);
+        Assert.Contains("threw=true", value);
+        Assert.Contains("startContainer6=true", value);
+        Assert.Contains("startOffset6=1", value);
+    }
+}
