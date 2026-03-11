@@ -195,6 +195,44 @@ public sealed partial class DomBridge
         }
     }
 
+    /// <summary>
+    /// Finds the document root ancestor for the given element by walking up the
+    /// parent chain. Stops at <c>#subdoc-root</c> or <c>#document</c> boundaries.
+    /// Returns the topmost node within the element's document scope.
+    /// </summary>
+    private static DomElement GetDocumentRootFor(DomElement el)
+    {
+        var root = el;
+        while (root.Parent != null)
+        {
+            // If we've reached a document root, stop here
+            if (root.TagName.StartsWith("#", StringComparison.Ordinal))
+                return root;
+            root = root.Parent;
+        }
+        return root;
+    }
+
+    /// <summary>
+    /// Recursively collects all <c>&lt;style&gt;</c> elements from a document tree.
+    /// Does not descend into sub-document boundaries (<c>#subdoc-root</c>).
+    /// </summary>
+    private static void CollectStyleElementsInTree(DomElement root, List<DomElement> styleElements)
+    {
+        foreach (var child in root.Children)
+        {
+            if (!child.IsTextNode)
+            {
+                if (string.Equals(child.TagName, "style", StringComparison.OrdinalIgnoreCase))
+                    styleElements.Add(child);
+
+                // Don't descend into sub-document roots (they have their own style scope)
+                if (!child.TagName.StartsWith("#subdoc", StringComparison.OrdinalIgnoreCase))
+                    CollectStyleElementsInTree(child, styleElements);
+            }
+        }
+    }
+
     private JSObject BuildComputedStyleObject(DomElement? element)
     {
         var computed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -202,11 +240,15 @@ public sealed partial class DomBridge
 
         if (element != null)
         {
-            // Collect CSS rules from style elements and match against element
-            foreach (var styleEl in _elements)
-            {
-                if (!string.Equals(styleEl.TagName, "style", StringComparison.OrdinalIgnoreCase)) continue;
+            // Find style elements scoped to the same document tree as the target element.
+            // This prevents CSS rules from the main document leaking into sub-document
+            // getComputedStyle calls (and vice versa).
+            var docRoot = GetDocumentRootFor(element);
+            var styleElements = new List<DomElement>();
+            CollectStyleElementsInTree(docRoot, styleElements);
 
+            foreach (var styleEl in styleElements)
+            {
                 var cssText = new StringBuilder();
                 foreach (var child in styleEl.Children)
                 {

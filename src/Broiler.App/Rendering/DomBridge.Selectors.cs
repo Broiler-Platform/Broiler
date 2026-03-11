@@ -18,6 +18,12 @@ public sealed partial class DomBridge
     // ------------------------------------------------------------------
 
     /// <summary>
+    /// ASCII whitespace characters used for splitting HTML class names.
+    /// Per the HTML spec, class attributes are split on space, tab, LF, CR, and form-feed.
+    /// </summary>
+    private static readonly char[] AsciiWhitespace = [' ', '\t', '\n', '\r', '\f'];
+
+    /// <summary>
     /// Returns <c>true</c> when <paramref name="el"/> matches the given CSS
     /// selector.  Supports compound selectors, combinators (<c>&gt;</c>,
     /// <c>+</c>, <c>~</c>, descendant), pseudo-classes (<c>:nth-child</c>,
@@ -106,11 +112,29 @@ public sealed partial class DomBridge
         {
             var c = selector[i];
 
-            // Skip backslash-escaped characters (CSS escape sequences)
+            // Handle CSS Unicode escapes: \XXXXXX (1-6 hex digits, optional trailing space)
             if (c == '\\' && i + 1 < selector.Length)
             {
-                current.Append(selector[i + 1]);
                 i++;
+                if (IsHexDigit(selector[i]))
+                {
+                    var hex = new StringBuilder();
+                    while (i < selector.Length && IsHexDigit(selector[i]) && hex.Length < 6)
+                    {
+                        hex.Append(selector[i]);
+                        i++;
+                    }
+                    // Optional trailing space is consumed as part of the escape
+                    if (i < selector.Length && selector[i] == ' ')
+                        i++;
+                    i--; // compensate for the for loop's i++
+                    var codePoint = int.Parse(hex.ToString(), System.Globalization.NumberStyles.HexNumber);
+                    current.Append(char.ConvertFromUtf32(codePoint));
+                }
+                else
+                {
+                    current.Append(selector[i]);
+                }
                 continue;
             }
 
@@ -279,8 +303,9 @@ public sealed partial class DomBridge
 
         if (classFilters.Count > 0)
         {
+            // Split class names on ASCII whitespace: space, tab, LF, CR, form-feed (per HTML spec)
             var elementClasses = new System.Collections.Generic.HashSet<string>(
-                (el.ClassName ?? string.Empty).Split(' ').Where(s => s.Length > 0),
+                (el.ClassName ?? string.Empty).Split(AsciiWhitespace, System.StringSplitOptions.RemoveEmptyEntries),
                 System.StringComparer.Ordinal);
             foreach (var cls in classFilters)
                 if (!elementClasses.Contains(cls)) return false;
@@ -394,7 +419,7 @@ public sealed partial class DomBridge
                     if (!IsEmpty(el)) return false;
                     break;
                 case "root":
-                    if (el.Parent != null && !string.Equals(el.Parent.TagName, "#document", StringComparison.OrdinalIgnoreCase)) return false;
+                    if (el.Parent != null && !el.Parent.TagName.StartsWith("#", StringComparison.Ordinal)) return false;
                     break;
                 case "not":
                     if (arg != null && MatchesCompound(el, arg)) return false;
@@ -429,9 +454,17 @@ public sealed partial class DomBridge
         return true;
     }
 
+    /// <summary>
+    /// Returns <c>true</c> if the element has a parent that is a real element
+    /// (not a document root like <c>#document</c> or <c>#subdoc-root</c>).
+    /// CSS structural pseudo-classes require an element parent per the spec.
+    /// </summary>
+    private static bool HasElementParent(DomElement el) =>
+        el.Parent != null && !el.Parent.TagName.StartsWith("#", StringComparison.Ordinal);
+
     private static bool IsNthChild(DomElement el, int n)
     {
-        if (el.Parent == null) return n == 1;
+        if (!HasElementParent(el)) return false;
         int index = 1;
         foreach (var child in el.Parent.Children)
         {
@@ -444,7 +477,7 @@ public sealed partial class DomBridge
 
     private static bool IsLastChild(DomElement el)
     {
-        if (el.Parent == null) return true;
+        if (!HasElementParent(el)) return false;
         for (int i = el.Parent.Children.Count - 1; i >= 0; i--)
         {
             var child = el.Parent.Children[i];
@@ -456,7 +489,7 @@ public sealed partial class DomBridge
 
     private static bool IsFirstOfType(DomElement el)
     {
-        if (el.Parent == null) return true;
+        if (!HasElementParent(el)) return false;
         foreach (var child in el.Parent.Children)
         {
             if (child.IsTextNode) continue;
@@ -468,7 +501,7 @@ public sealed partial class DomBridge
 
     private static bool IsOnlyChild(DomElement el)
     {
-        if (el.Parent == null) return true;
+        if (!HasElementParent(el)) return false;
         int count = 0;
         foreach (var child in el.Parent.Children)
         {
@@ -481,7 +514,7 @@ public sealed partial class DomBridge
 
     private static bool IsLastOfType(DomElement el)
     {
-        if (el.Parent == null) return true;
+        if (!HasElementParent(el)) return false;
         for (int i = el.Parent.Children.Count - 1; i >= 0; i--)
         {
             var child = el.Parent.Children[i];
@@ -494,7 +527,7 @@ public sealed partial class DomBridge
 
     private static bool IsOnlyOfType(DomElement el)
     {
-        if (el.Parent == null) return true;
+        if (!HasElementParent(el)) return false;
         int count = 0;
         foreach (var child in el.Parent.Children)
         {
@@ -666,5 +699,12 @@ public sealed partial class DomBridge
 
         return false;
     }
+
+    /// <summary>
+    /// Returns <c>true</c> if the character is a hexadecimal digit (0-9, a-f, A-F).
+    /// Used for parsing CSS Unicode escape sequences.
+    /// </summary>
+    private static bool IsHexDigit(char c) =>
+        (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
 
 }

@@ -450,6 +450,43 @@ public sealed partial class DomBridge
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // document.firstChild (getter — returns first child of document: DOCTYPE if present, else documentElement)
+        document.FastAddProperty(
+            (KeyString)"firstChild",
+            new JSFunction((in Arguments _) =>
+            {
+                return _documentNode.Children.Count > 0
+                    ? (JSValue)ToJSObject(_documentNode.Children[0])
+                    : JSNull.Value;
+            }, "get firstChild"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.lastChild (getter — returns last child of document, typically documentElement)
+        document.FastAddProperty(
+            (KeyString)"lastChild",
+            new JSFunction((in Arguments _) =>
+            {
+                return _documentNode.Children.Count > 0
+                    ? (JSValue)ToJSObject(_documentNode.Children[^1])
+                    : JSNull.Value;
+            }, "get lastChild"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.childNodes (getter — returns children of document node: [DOCTYPE, documentElement])
+        document.FastAddProperty(
+            (KeyString)"childNodes",
+            new JSFunction((in Arguments _) =>
+            {
+                var nodes = new List<JSValue>();
+                foreach (var child in _documentNode.Children)
+                    nodes.Add(ToJSObject(child));
+                return new JSArray(nodes);
+            }, "get childNodes"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // document.forms — collection of all <form> elements
         document.FastAddProperty(
             (KeyString)"forms",
