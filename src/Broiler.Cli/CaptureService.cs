@@ -537,6 +537,12 @@ public class CaptureService
             }
         }
 
+        // Fire body onload event after all scripts have executed
+        // (simulates end-of-parsing / window load in browsers).
+        // This is critical for test harnesses like Acid3 that bootstrap
+        // the test runner via <body onload="update()">.
+        bridge.FireWindowLoadEvent();
+
         // Flush all pending timers and rAF callbacks before capture
         bridge.FlushTimers();
 
