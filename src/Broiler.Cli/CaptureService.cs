@@ -181,6 +181,13 @@ public class CaptureService
         @"\ssrc\s*=\s*(?:""(?<uri>[^""]+)""|'(?<uri>[^']+)'|(?<uri>[^\s>]+))",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    /// <summary>
+    /// Matches the <c>defer</c> attribute on a script tag (standalone or with a value).
+    /// </summary>
+    private static readonly Regex DeferAttrPattern = new(
+        @"(?:^|\s)defer(?:\s|$|=)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private static readonly Regex StylePattern = new(
         @"<style[^>]*>(?<content>[\s\S]*?)</style>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -445,20 +452,28 @@ public class CaptureService
     /// Executes inline, <c>data:</c> URI, and external <c>src</c> scripts using
     /// <see cref="DomBridge"/> so that JavaScript-generated DOM content is included
     /// in the rendered output. Returns the serialised HTML after script execution.
+    /// Scripts with <c>defer</c> are executed after all regular scripts;
+    /// <c>async</c> scripts execute alongside regular scripts but are not
+    /// guaranteed order. All pending timers and rAF callbacks are flushed
+    /// before serialisation.
     /// </summary>
     internal static string ExecuteScriptsWithDom(string html, string url)
     {
         var scripts = new List<string>();
+        var deferredScripts = new List<string>();
         foreach (Match match in AnyScriptPattern.Matches(html))
         {
             var attrs = match.Groups["attrs"].Value;
+            var isDefer = DeferAttrPattern.IsMatch(attrs);
+            string? scriptContent = null;
+
             var srcMatch = SrcAttrPattern.Match(attrs);
             if (srcMatch.Success)
             {
                 // data: URI script
                 var decoded = DecodeDataUri(srcMatch.Groups["uri"].Value);
                 if (!string.IsNullOrEmpty(decoded))
-                    scripts.Add(decoded);
+                    scriptContent = decoded;
             }
             else
             {
@@ -469,25 +484,33 @@ public class CaptureService
                     var srcUri = anySrcMatch.Groups["uri"].Value;
                     var fetched = FetchExternalScript(srcUri, url);
                     if (!string.IsNullOrEmpty(fetched))
-                        scripts.Add(fetched);
+                        scriptContent = fetched;
                 }
                 else
                 {
                     // Inline script
                     var content = match.Groups["content"].Value.Trim();
                     if (!string.IsNullOrEmpty(content))
-                        scripts.Add(content);
+                        scriptContent = content;
                 }
             }
+
+            if (scriptContent == null) continue;
+
+            if (isDefer)
+                deferredScripts.Add(scriptContent);
+            else
+                scripts.Add(scriptContent);
         }
 
-        if (scripts.Count == 0)
+        if (scripts.Count == 0 && deferredScripts.Count == 0)
             return html;
 
         using var context = new JSContext();
         var bridge = new DomBridge();
         bridge.Attach(context, html, url);
 
+        // Execute regular and async scripts in document order
         foreach (var script in scripts)
         {
             try
@@ -500,6 +523,22 @@ public class CaptureService
                 RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScriptsWithDom", $"Script execution error: {ex.Message}", ex);
             }
         }
+
+        // Execute deferred scripts after all regular scripts (simulates end-of-parsing)
+        foreach (var script in deferredScripts)
+        {
+            try
+            {
+                context.Eval(script);
+            }
+            catch (Exception ex)
+            {
+                RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScriptsWithDom", $"Deferred script error: {ex.Message}", ex);
+            }
+        }
+
+        // Flush all pending timers and rAF callbacks before capture
+        bridge.FlushTimers();
 
         return bridge.SerializeToHtml();
     }

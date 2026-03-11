@@ -812,47 +812,90 @@ public sealed partial class DomBridge
             location,
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // window.setTimeout(fn, delay) — single-threaded; invokes callback immediately
-        var timerIdCounter = 0;
+        // window.setTimeout(fn, delay) — queues callback for deferred execution
         window.FastAddValue(
             (KeyString)"setTimeout",
             new JSFunction((in Arguments a) =>
             {
-                var id = ++timerIdCounter;
+                var id = ++_timerIdCounter;
                 if (a.Length > 0 && a[0] is JSFunction fn)
                 {
-                    try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-                    catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.setTimeout", $"Callback error: {ex.Message}", ex); }
+                    _timeoutCallbacks[id] = fn;
                 }
                 return new JSNumber(id);
             }, "setTimeout", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // window.clearTimeout(id) — no-op (timers fire immediately)
+        // window.clearTimeout(id) — removes queued callback
         window.FastAddValue(
             (KeyString)"clearTimeout",
-            new JSFunction((in Arguments a) => JSUndefined.Value, "clearTimeout", 1),
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                {
+                    var id = (int)a[0].DoubleValue;
+                    _timeoutCallbacks.Remove(id);
+                    _clearedTimerIds.Add(id);
+                }
+                return JSUndefined.Value;
+            }, "clearTimeout", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // window.setInterval(fn, delay) — returns id; single invocation
+        // window.setInterval(fn, delay) — queues repeating callback
         window.FastAddValue(
             (KeyString)"setInterval",
             new JSFunction((in Arguments a) =>
             {
-                var id = ++timerIdCounter;
+                var id = ++_timerIdCounter;
                 if (a.Length > 0 && a[0] is JSFunction fn)
                 {
-                    try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-                    catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.setInterval", $"Callback error: {ex.Message}", ex); }
+                    _intervalCallbacks[id] = fn;
                 }
                 return new JSNumber(id);
             }, "setInterval", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // window.clearInterval(id) — no-op
+        // window.clearInterval(id) — removes interval callback
         window.FastAddValue(
             (KeyString)"clearInterval",
-            new JSFunction((in Arguments a) => JSUndefined.Value, "clearInterval", 1),
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                {
+                    var id = (int)a[0].DoubleValue;
+                    _intervalCallbacks.Remove(id);
+                    _clearedTimerIds.Add(id);
+                }
+                return JSUndefined.Value;
+            }, "clearInterval", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // window.requestAnimationFrame(fn) — queues callback for pre-render execution
+        window.FastAddValue(
+            (KeyString)"requestAnimationFrame",
+            new JSFunction((in Arguments a) =>
+            {
+                var id = ++_rafIdCounter;
+                if (a.Length > 0 && a[0] is JSFunction fn)
+                {
+                    _rafCallbacks[id] = fn;
+                }
+                return new JSNumber(id);
+            }, "requestAnimationFrame", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // window.cancelAnimationFrame(id) — removes queued rAF callback
+        window.FastAddValue(
+            (KeyString)"cancelAnimationFrame",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                {
+                    var id = (int)a[0].DoubleValue;
+                    _rafCallbacks.Remove(id);
+                }
+                return JSUndefined.Value;
+            }, "cancelAnimationFrame", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.alert(msg) — logs to debug output
@@ -1097,6 +1140,14 @@ public sealed partial class DomBridge
 
         context["console"] = console;
         context["fetch"] = fetchFn;
+
+        // Expose timer functions as globals (matching window.* counterparts)
+        context["setTimeout"] = window[(KeyString)"setTimeout"];
+        context["clearTimeout"] = window[(KeyString)"clearTimeout"];
+        context["setInterval"] = window[(KeyString)"setInterval"];
+        context["clearInterval"] = window[(KeyString)"clearInterval"];
+        context["requestAnimationFrame"] = window[(KeyString)"requestAnimationFrame"];
+        context["cancelAnimationFrame"] = window[(KeyString)"cancelAnimationFrame"];
 
         // DOMException constructor
         RegisterDOMException(context);
