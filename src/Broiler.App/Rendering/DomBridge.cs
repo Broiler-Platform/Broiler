@@ -250,6 +250,16 @@ public sealed partial class DomBridge
     {
         _elements.Clear();
         _jsObjectCache.Clear();
+        _documentNode.Children.Clear();
+
+        // Parse DOCTYPE from the HTML and add it as first child of _documentNode
+        var doctype = ParseDocType(html);
+        if (doctype != null)
+        {
+            doctype.Parent = _documentNode;
+            _documentNode.Children.Add(doctype);
+            _elements.Add(doctype);
+        }
 
         // Use WHATWG-aligned tokeniser & tree builder
         var builder = new HtmlTreeBuilder();
@@ -262,6 +272,12 @@ public sealed partial class DomBridge
             DocumentElement.Children.Add(child);
         }
         _elements.AddRange(allElements);
+
+        // Connect DocumentElement to _documentNode so that document.firstChild works
+        // and structural pseudo-classes correctly detect the document root boundary
+        DocumentElement.Parent = _documentNode;
+        if (!_documentNode.Children.Contains(DocumentElement))
+            _documentNode.Children.Add(DocumentElement);
 
         // Ensure DocumentElement is in _elements so querySelector can find it
         if (!_elements.Contains(DocumentElement))

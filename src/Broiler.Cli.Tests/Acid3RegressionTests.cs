@@ -478,8 +478,8 @@ document.getElementById('result').textContent = r.join('|');
 </body></html>";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
-        // val1=pre-wrap (p2 is last-child), val1b='' (p1 is not last-child), val2=pre-wrap (p1 is now last-child)
-        Assert.Contains("pre-wrap||pre-wrap", result);
+        // val1=pre-wrap (p2 is last-child), val1b=normal (p1 is not last-child, default CSS value), val2=pre-wrap (p1 is now last-child)
+        Assert.Contains("pre-wrap|normal|pre-wrap", result);
     }
 
     /// <summary>

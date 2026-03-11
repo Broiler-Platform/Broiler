@@ -17,6 +17,37 @@ public sealed partial class DomBridge
     //  CSS specificity (Level 3) and <style> / <link> cascading
     // ------------------------------------------------------------------
 
+    /// <summary>
+    /// CSS initial values for commonly queried properties.
+    /// <c>getComputedStyle()</c> returns these when no CSS rule sets the property.
+    /// </summary>
+    private static readonly Dictionary<string, string> CssInitialValues = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["display"] = "inline",
+        ["position"] = "static",
+        ["float"] = "none",
+        ["visibility"] = "visible",
+        ["overflow"] = "visible",
+        ["text-transform"] = "none",
+        ["text-decoration"] = "none",
+        ["text-align"] = "start",
+        ["white-space"] = "normal",
+        ["cursor"] = "auto",
+        ["font-style"] = "normal",
+        ["font-weight"] = "normal",
+        ["font-size"] = "16px",
+        ["line-height"] = "normal",
+        ["color"] = "rgb(0, 0, 0)",
+        ["background-color"] = "rgba(0, 0, 0, 0)",
+        ["margin"] = "0px",
+        ["padding"] = "0px",
+        ["border-style"] = "none",
+        ["border-width"] = "0px",
+        ["opacity"] = "1",
+        ["vertical-align"] = "baseline",
+        ["clear"] = "none",
+    };
+
     private static readonly Regex StyleTagPattern = new(
         @"<style[^>]*>(?<content>[\s\S]*?)</style>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -195,6 +226,44 @@ public sealed partial class DomBridge
         }
     }
 
+    /// <summary>
+    /// Finds the document root ancestor for the given element by walking up the
+    /// parent chain. Stops at <c>#subdoc-root</c> or <c>#document</c> boundaries.
+    /// Returns the topmost node within the element's document scope.
+    /// </summary>
+    private static DomElement GetDocumentRootFor(DomElement el)
+    {
+        var root = el;
+        while (root.Parent != null)
+        {
+            // If we've reached a document root, stop here
+            if (root.TagName.StartsWith("#", StringComparison.Ordinal))
+                return root;
+            root = root.Parent;
+        }
+        return root;
+    }
+
+    /// <summary>
+    /// Recursively collects all <c>&lt;style&gt;</c> elements from a document tree.
+    /// Does not descend into sub-document boundaries (<c>#subdoc-root</c>).
+    /// </summary>
+    private static void CollectStyleElementsInTree(DomElement root, List<DomElement> styleElements)
+    {
+        foreach (var child in root.Children)
+        {
+            if (!child.IsTextNode)
+            {
+                if (string.Equals(child.TagName, "style", StringComparison.OrdinalIgnoreCase))
+                    styleElements.Add(child);
+
+                // Don't descend into sub-document roots (they have their own style scope)
+                if (!child.TagName.StartsWith("#subdoc", StringComparison.OrdinalIgnoreCase))
+                    CollectStyleElementsInTree(child, styleElements);
+            }
+        }
+    }
+
     private JSObject BuildComputedStyleObject(DomElement? element)
     {
         var computed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -202,11 +271,15 @@ public sealed partial class DomBridge
 
         if (element != null)
         {
-            // Collect CSS rules from style elements and match against element
-            foreach (var styleEl in _elements)
-            {
-                if (!string.Equals(styleEl.TagName, "style", StringComparison.OrdinalIgnoreCase)) continue;
+            // Find style elements scoped to the same document tree as the target element.
+            // This prevents CSS rules from the main document leaking into sub-document
+            // getComputedStyle calls (and vice versa).
+            var docRoot = GetDocumentRootFor(element);
+            var styleElements = new List<DomElement>();
+            CollectStyleElementsInTree(docRoot, styleElements);
 
+            foreach (var styleEl in styleElements)
+            {
                 var cssText = new StringBuilder();
                 foreach (var child in styleEl.Children)
                 {
@@ -226,6 +299,14 @@ public sealed partial class DomBridge
             if (element.Attributes.TryGetValue("style", out var inlineStyleAttr) && !string.IsNullOrEmpty(inlineStyleAttr))
             {
                 foreach (var kv in ParseStyle(inlineStyleAttr))
+                    computed[kv.Key] = kv.Value;
+            }
+
+            // Populate CSS initial values for properties not set by any rule.
+            // Real browsers return computed values for ALL CSS properties.
+            foreach (var kv in CssInitialValues)
+            {
+                if (!computed.ContainsKey(kv.Key))
                     computed[kv.Key] = kv.Value;
             }
         }

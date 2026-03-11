@@ -951,10 +951,34 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // element.click() — creates and dispatches a MouseEvent
+        // For checkboxes and radio buttons, toggles checked state.
         obj.FastAddValue(
             (KeyString)"click",
             new JSFunction((in Arguments _) =>
             {
+                // Toggle checked state for checkboxes/radio buttons (per HTML spec)
+                if (string.Equals(element.TagName, "input", StringComparison.OrdinalIgnoreCase))
+                {
+                    var inputType = element.Attributes.TryGetValue("type", out var t) ? t.ToLowerInvariant() : "text";
+                    if (inputType == "checkbox")
+                    {
+                        bool wasChecked = element.DomProperties.TryGetValue("checked", out var cv) && cv is true
+                            || (!element.DomProperties.ContainsKey("checked") && element.Attributes.ContainsKey("checked"));
+                        element.DomProperties["checked"] = !wasChecked;
+                    }
+                    else if (inputType == "radio")
+                    {
+                        element.DomProperties["checked"] = true;
+                        // Radio mutual exclusion
+                        if (element.Attributes.TryGetValue("name", out var radioName) && !string.IsNullOrEmpty(radioName))
+                        {
+                            var scope = element;
+                            while (scope.Parent != null) scope = scope.Parent;
+                            UncheckRadioSiblings(scope, element, radioName);
+                        }
+                    }
+                }
+
                 var evt = new JSObject();
                 evt.FastAddValue((KeyString)"type", new JSString("click"), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1030,14 +1054,23 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // checked (read/write) — for checkbox and radio inputs
+        // Uses DomProperties["checked"] as the "dirty" IDL state that tracks
+        // programmatic changes. setAttribute("checked") only sets the content
+        // attribute and does NOT affect this IDL state.
         obj.FastAddProperty(
             (KeyString)"checked",
             new JSFunction((in Arguments a) =>
-                element.Attributes.ContainsKey("checked") ? JSBoolean.True : JSBoolean.False,
-                "get checked"),
+            {
+                // IDL property takes precedence over content attribute
+                if (element.DomProperties.TryGetValue("checked", out var v))
+                    return v is true ? JSBoolean.True : JSBoolean.False;
+                return element.Attributes.ContainsKey("checked") ? JSBoolean.True : JSBoolean.False;
+            }, "get checked"),
             new JSFunction((in Arguments a) =>
             {
-                if (a.Length > 0 && a[0].BooleanValue)
+                bool newVal = a.Length > 0 && a[0].BooleanValue;
+                element.DomProperties["checked"] = newVal;
+                if (newVal)
                 {
                     // Radio button mutual exclusion: uncheck others in same group
                     if (element.Attributes.TryGetValue("type", out var tp) &&
@@ -1045,29 +1078,18 @@ public sealed partial class DomBridge
                         element.Attributes.TryGetValue("name", out var radioName) &&
                         !string.IsNullOrEmpty(radioName))
                     {
-                        // Find the form parent (if any)
-                        var formParent = element.Parent;
-                        while (formParent != null && !string.Equals(formParent.TagName, "form", System.StringComparison.OrdinalIgnoreCase))
-                            formParent = formParent.Parent;
-                        if (formParent != null)
+                        // Find the scope for radio group — form parent, or document root if not in a form
+                        var scope = element.Parent;
+                        while (scope != null && !string.Equals(scope.TagName, "form", System.StringComparison.OrdinalIgnoreCase))
+                            scope = scope.Parent;
+                        if (scope == null)
                         {
-                            // Only iterate form controls, not all elements
-                            foreach (var sibling in CollectFormControls(formParent))
-                            {
-                                if (ReferenceEquals(sibling, element)) continue;
-                                if (!string.Equals(sibling.TagName, "input", System.StringComparison.OrdinalIgnoreCase)) continue;
-                                if (!sibling.Attributes.TryGetValue("type", out var st) ||
-                                    !string.Equals(st, "radio", System.StringComparison.OrdinalIgnoreCase)) continue;
-                                if (!sibling.Attributes.TryGetValue("name", out var sn) ||
-                                    !string.Equals(sn, radioName, System.StringComparison.Ordinal)) continue;
-                                sibling.Attributes.Remove("checked");
-                            }
+                            scope = element;
+                            while (scope.Parent != null) scope = scope.Parent;
                         }
+                        UncheckRadioSiblings(scope, element, radioName);
                     }
-                    element.Attributes["checked"] = "checked";
                 }
-                else
-                    element.Attributes.Remove("checked");
                 return JSUndefined.Value;
             }, "set checked"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
