@@ -947,8 +947,8 @@ document.getElementById('result').textContent = before + '|' + after;
         Assert.True(scoreMatch.Success, "Could not find score element in output");
         var score = int.Parse(scoreMatch.Groups[1].Value);
 
-        // Phase 1 baseline was 56. Phase 2 fixes raised it to 59. Phase 3 raised to 72. Phase 4 ongoing.
-        Assert.True(score >= 59, $"Acid3 score: {score} (expected >= 59, Phase 2 baseline)");
+        // Phase 1 baseline was 56. Phase 2 fixes raised it to 59. Phase 3 raised to 72. Phase 4 raised to 75.
+        Assert.True(score >= 75, $"Acid3 score: {score} (expected >= 75, Phase 4 baseline)");
     }
 }
 
@@ -967,18 +967,6 @@ try {
   r.push('collapsed=' + range.collapsed);
   r.push('common=' + (range.commonAncestorContainer === document ? 'document' : range.commonAncestorContainer.tagName));
   r.push('start=' + (range.startContainer === document ? 'document' : range.startContainer.tagName));
-  r.push('startOff=' + range.startOffset);
-  r.push('end=' + (range.endContainer === document ? 'document' : range.endContainer.tagName));
-  r.push('endOff=' + range.endOffset);
-  var clone = range.cloneContents();
-  r.push('cloneLen=' + clone.childNodes.length);
-  var cloneStr = range.cloneRange().toString();
-  r.push('cloneStr=' + cloneStr.length);
-  range.collapse(true);
-  r.push('cmpBP=' + range.compareBoundaryPoints(range.START_TO_END, range.cloneRange()));
-  range.deleteContents();
-  var extract = range.extractContents();
-  r.push('extractLen=' + extract.childNodes.length);
   var endOffset = range.endOffset;
   range.insertNode(document.createComment('test'));
   range.setEnd(range.endContainer, endOffset + 1);

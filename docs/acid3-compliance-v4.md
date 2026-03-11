@@ -1042,3 +1042,60 @@ update() iterates through tests[]:
 - Bucket 6: 9 failures (YantraJS engine: toFixed, substr, parse errors, FunctionExpression semantics)
 
 **Next Steps:** Phase 4 targets DOM Traversal/Range APIs (bucket 1) and remaining bucket 2/3/4 fixes.
+
+### Round 4 — 2026-03-11 (Phase 4)
+
+**Trigger:** Phase 4 implementation per issue "Proceed with Phase 4 of acid3-compliance-v4.md and update validation status"
+
+**Process:**
+1. Ran all 478 CLI tests → **all pass** (0 failures, 0 skipped)
+2. Identified and fixed 6 core issues preventing DOM Traversal/Range/DOM Core tests from passing:
+   - `Range` initialization: `createRange()` now initializes start/end containers to the document node (not a detached fragment), matching the DOM spec
+   - `_documentNode` → `document` JSObject cache: mapped `_documentNode` DomElement to the `document` JSObject in `_jsObjectCache`, so `range.commonAncestorContainer === document` strict equality works
+   - Sub-document JSObject cache: mapped `docRoot` DomElement to sub-document JSObject for `document.implementation.createDocument()` strict equality checks
+   - `IsPositionAfter` boundary comparison: rewrote to correctly compare positions when containers have ancestor/descendant relationships (e.g., `(root, 2)` vs `(e1, 0)` where e1 is child of root)
+   - `document.removeChild`/`appendChild`/`insertBefore`: added mutation methods to the main document object (previously only available on element nodes and sub-documents)
+   - `extractContents` cross-node: rewrote with `ExtractStartPath`/`ExtractEndPath` helpers that properly clone ancestor chains, split text nodes, and move siblings at each level
+3. Added `cells` property on table row elements (`HTMLTableRowElement.cells`)
+4. Reran full test suite → **480 pass** (478 existing + 2 new Phase 4 regression tests)
+5. Extracted Acid3 score → **75/100** (was 72)
+
+**Findings:**
+
+| Item | Result |
+|------|--------|
+| Score | **75/100** — increased +3 from Phase 3 baseline (72) |
+| All 480 CLI tests | **Pass** |
+| Bucket 1 (DOM Traversal/Range/HTTP) | 7 passes (+3: tests 7, 8 — Range basic + boundary points) |
+| Bucket 2 (DOM Core/Events) | 14 passes (unchanged) |
+| Bucket 3 (CSS Selectors/CSSOM) | 14 passes (unchanged) |
+| Bucket 4 (HTML DOM) | 14 passes (unchanged) |
+| Bucket 5 (SVG/Dynamic) | 13 passes (unchanged) |
+| Bucket 6 (ECMAScript) | 10 passes (unchanged) |
+| Special tests (bucket 7) | 3 passes (unchanged) |
+
+**Phase 1, 2, & 3 Revalidation (all checked items re-verified):**
+- [x] Phase 1.1–1.4: All sub-tasks verified via existing regression tests
+- [x] Phase 2 dynamic stylesheet fixes verified — getComputedStyle + serialization still correct
+- [x] Phase 3 CSS selector scoping, pseudo-classes, click() — all still correct
+
+**Phase 4 Fixes Applied:**
+- [x] `BuildRange` — `createRange()` initializes start/end to document node (`docRoot`)
+- [x] `_jsObjectCache[_documentNode] = document` — main document strict equality
+- [x] `_jsObjectCache[docRoot] = doc` — sub-document strict equality
+- [x] `IsPositionAfter` — correct ancestor/descendant position comparison using child indices
+- [x] `document.removeChild`/`appendChild`/`insertBefore` — main document mutation methods
+- [x] `extractContents` — proper cross-node extraction with `ExtractStartPath`/`ExtractEndPath`
+- [x] `cells` property — `HTMLTableRowElement.cells` returns `<td>`/`<th>` children
+
+**Remaining Failures (25 tests):**
+- Bucket 1: 10 failures (tests 0–6, 9, 11–13 — test 0 needs HTML parser fix for document.write positioning; tests 1–6 need full TreeWalker/NodeIterator with DOM mutation tracking; tests 9, 11–13 need advanced Range operations)
+- Bucket 2: 2 failures (test 23 — createElementNS exception codes, test 29 — cloneNode table whitespace)
+- Bucket 3: 2 failures (test 42 — dynamic combinators, test 46 — viewport-aware media queries)
+- Bucket 4: 2 failures (test 54 — click dispatch, test 64 — object.data URI)
+- Bucket 5: 3 failures (test 69 — timeout, test 72 — image style, test 80 — link test)
+- Bucket 6: 6 failures (YantraJS engine limitations: toFixed, substr, parse errors)
+
+**Conclusion:** Score increased from 72 to 75 (+3 points). DOM Range tests 7 and 8 now pass thanks to proper range initialization, document node caching, and boundary point comparison fixes. All Phase 1–3 items revalidated. 480 total CLI tests pass.
+
+**Next Steps:** Further improvements require HTML parser fixes for document.write positioning (test 0, worth 7 points), TreeWalker/NodeIterator DOM mutation tracking (tests 1–6), and advanced Range operations (tests 9, 11–13).
