@@ -102,7 +102,7 @@ d.documentElement.appendChild(e1);
 var kungFuDeathGrip = [e1];
 d = null;
 
-// GC stress loop (smaller than Acid3's loop for unit test speed)
+// GC stress loop (Acid3 uses ~1000+ iterations based on Date.valueOf(); reduced to 10 for unit test speed)
 for (var i = 0; i < 10; i++) {
     var tmp = document.createTextNode('iteration ' + i);
     document.createElement('a').appendChild(tmp);

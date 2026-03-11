@@ -2331,10 +2331,10 @@ public sealed partial class DomBridge
                         .FirstOrDefault(c => string.Equals(c.TagName, "title", StringComparison.OrdinalIgnoreCase));
                     if (titleEl != null)
                     {
-                        // If textContent was set directly (clears children), use it
+                        // Two paths: (1) textContent setter clears children and stores text directly
+                        // in TextContent, (2) text set via child text nodes (e.g. createTextNode + appendChild).
                         if (titleEl.TextContent != null && titleEl.Children.Count == 0)
                             return new JSString(titleEl.TextContent);
-                        // Otherwise collect from child text nodes
                         var sb = new StringBuilder();
                         CollectTextContent(titleEl, sb);
                         return new JSString(sb.ToString());
