@@ -3013,7 +3013,7 @@ public sealed partial class DomBridge
         // createRange()
         doc.FastAddValue(
             (KeyString)"createRange",
-            new JSFunction((in Arguments a) => bridge.BuildRange(), "createRange", 0),
+            new JSFunction((in Arguments a) => bridge.BuildRange(docRoot), "createRange", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return doc;

@@ -947,7 +947,7 @@ document.getElementById('result').textContent = before + '|' + after;
         Assert.True(scoreMatch.Success, "Could not find score element in output");
         var score = int.Parse(scoreMatch.Groups[1].Value);
 
-        // Phase 1 baseline was 56. Phase 2 fixes raised it to 59.
-        Assert.True(score >= 59, $"Acid3 score regression: was {score}, expected >= 59 (Phase 2 baseline)");
+        // Phase 1 baseline was 56. Phase 2 fixes raised it to 59. Phase 3 raised to 72. Phase 4 ongoing.
+        Assert.True(score >= 59, $"Acid3 score: {score} (expected >= 59, Phase 2 baseline)");
     }
 }
