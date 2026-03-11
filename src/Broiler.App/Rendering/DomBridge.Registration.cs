@@ -703,6 +703,55 @@ public sealed partial class DomBridge
             }, "dispatchEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // document.contentType — returns the MIME type of the document
+        document.FastAddProperty(
+            (KeyString)"contentType",
+            new JSFunction((in Arguments _) =>
+            {
+                if (_pageUrl.EndsWith(".xhtml", StringComparison.OrdinalIgnoreCase) ||
+                    _pageUrl.EndsWith(".xht", StringComparison.OrdinalIgnoreCase) ||
+                    _pageUrl.Contains("application/xhtml+xml", StringComparison.OrdinalIgnoreCase))
+                    return new JSString("application/xhtml+xml");
+                return new JSString("text/html");
+            }, "get contentType"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.URL — returns the document URL
+        document.FastAddProperty(
+            (KeyString)"URL",
+            new JSFunction((in Arguments _) => new JSString(_pageUrl), "get URL"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.documentURI — same as document.URL
+        document.FastAddProperty(
+            (KeyString)"documentURI",
+            new JSFunction((in Arguments _) => new JSString(_pageUrl), "get documentURI"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.compatMode — "CSS1Compat" for standards mode, "BackCompat" for quirks
+        document.FastAddProperty(
+            (KeyString)"compatMode",
+            new JSFunction((in Arguments _) => new JSString("CSS1Compat"), "get compatMode"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.characterSet — always UTF-8
+        document.FastAddProperty(
+            (KeyString)"characterSet",
+            new JSFunction((in Arguments _) => new JSString("UTF-8"), "get characterSet"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.inputEncoding — alias for characterSet
+        document.FastAddProperty(
+            (KeyString)"inputEncoding",
+            new JSFunction((in Arguments _) => new JSString("UTF-8"), "get inputEncoding"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         _documentJSObject = document;
         context["document"] = document;
 

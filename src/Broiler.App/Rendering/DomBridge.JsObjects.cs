@@ -2022,7 +2022,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Attempts to fetch a sub-resource URL and return its HTML content.
     /// Returns <c>null</c> for non-HTML resources, about:blank, empty URLs,
-    /// or when the fetch fails.
+    /// or when the fetch fails.  Supports <c>data:</c> URIs with HTML content.
     /// </summary>
     private string? TryFetchSubResource(string resourceUrl)
     {
@@ -2032,6 +2032,18 @@ public sealed partial class DomBridge
         // about:blank gets an empty document (default behavior)
         if (string.Equals(resourceUrl, "about:blank", StringComparison.OrdinalIgnoreCase))
             return null;
+
+        // Handle data: URIs — decode and return HTML content directly
+        if (resourceUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            var (mimeType, body) = DecodeDataUriParts(resourceUrl);
+            // Only return as HTML if the MIME type is text/html or application/xhtml+xml
+            if (string.Equals(mimeType, "text/html", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(mimeType, "application/xhtml+xml", StringComparison.OrdinalIgnoreCase) ||
+                string.IsNullOrEmpty(mimeType))
+                return !string.IsNullOrEmpty(body) ? body : null;
+            return null;
+        }
 
         // Non-HTML resources by extension get an empty document
         if (IsNonHtmlResource(resourceUrl))

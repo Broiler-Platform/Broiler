@@ -502,22 +502,22 @@ Problems:
 
 **Goal:** Pass tests 81–100.
 
-- [ ] **9.1** Number-to-string precision
-  - [ ] `(1000000000000000128).toString()` edge cases
-  - [ ] Verify YantraJS matches V8 behaviour
-- [ ] **9.2** Date year 0 handling
-  - [ ] `setFullYear(0)` must set year to 0 (not invalid)
-  - [ ] Negative year handling
-- [ ] **9.3** Null byte in URI encoding
-  - [ ] `encodeURI('\0')` → `'%00'`
-  - [ ] `encodeURIComponent('\0')` → `'%00'`
-- [ ] **9.4** data: URI edge cases
-  - [ ] Nested data URIs
-  - [ ] data URIs with unusual MIME types
-- [ ] **9.5** XHTML DOM handling
-  - [ ] XHTML namespace `http://www.w3.org/1999/xhtml`
-  - [ ] Element namespace defaults in XHTML documents
-- [ ] **9.6** Tests: 7 unit tests
+- [x] **9.1** Number-to-string precision
+  - [x] `(1000000000000000128).toString()` edge cases
+  - [x] Verify YantraJS matches V8 behaviour
+- [x] **9.2** Date year 0 handling
+  - [x] `setFullYear(0)` must set year to 0 (not invalid)
+  - [x] Negative year handling
+- [x] **9.3** Null byte in URI encoding
+  - [x] `encodeURI('\0')` → `'%00'`
+  - [x] `encodeURIComponent('\0')` → `'%00'`
+- [x] **9.4** data: URI edge cases
+  - [x] Nested data URIs
+  - [x] data URIs with unusual MIME types
+- [x] **9.5** XHTML DOM handling
+  - [x] XHTML namespace `http://www.w3.org/1999/xhtml`
+  - [x] Element namespace defaults in XHTML documents
+- [x] **9.6** Tests: 7 unit tests
 
 **Modules affected:** YantraJS, `DomBridge.cs`
 
