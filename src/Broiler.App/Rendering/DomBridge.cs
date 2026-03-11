@@ -406,13 +406,23 @@ public sealed partial class DomBridge
     /// <summary>Checks whether <paramref name="v"/> looks like a CSS length or percentage.</summary>
     private static bool IsLengthOrPercentage(string v)
     {
-        if (v.EndsWith('%') || v.EndsWith("px") || v.EndsWith("em") ||
-            v.EndsWith("rem") || v.EndsWith("vh") || v.EndsWith("vw") ||
-            v.EndsWith("pt") || v.EndsWith("cm") || v.EndsWith("mm") ||
-            v.EndsWith("in") || v.EndsWith("ex") || v.EndsWith("ch") ||
-            v.EndsWith("vmin") || v.EndsWith("vmax"))
-            return true;
-        return v == "0" || (double.TryParse(v, out _));
+        if (v == "0") return true;
+
+        // Known CSS length/percentage units and their suffix lengths
+        ReadOnlySpan<string> units = ["vmin", "vmax", "rem", "px", "em", "vh", "vw", "pt", "cm", "mm", "in", "ex", "ch", "%"];
+
+        foreach (var unit in units)
+        {
+            if (v.EndsWith(unit, System.StringComparison.Ordinal) && v.Length > unit.Length)
+            {
+                var numPart = v[..^unit.Length];
+                if (double.TryParse(numPart, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out _))
+                    return true;
+            }
+        }
+
+        return false;
     }
 
 }
