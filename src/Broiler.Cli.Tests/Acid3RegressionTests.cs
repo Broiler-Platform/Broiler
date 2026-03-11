@@ -575,4 +575,219 @@ document.getElementById('result').textContent = cs.zIndex;
         // Inline style (z-index: 4) should win over #myid (z-index: 3)
         Assert.Contains("4", result);
     }
+
+    // ==================== Phase 1 v4: End-to-End Harness Tests ====================
+
+    /// <summary>
+    /// Verifies that document.write() registers all nested elements so that
+    /// getElementById can find deeply nested children (e.g., iframe with id
+    /// inside a map element, matching the Acid3 script 9 pattern).
+    /// </summary>
+    [Fact]
+    public void DocumentWrite_Registers_Nested_Elements()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""r""></div>
+<script>
+document.write('<map name=""""><area href="""" shape=""rect"" coords=""2,2,4,4"" alt=""x""><iframe src=""empty.html"" id=""selectors""></iframe><form action="""" name=""form""><input type=HIDDEN></form><table><tr><td><p></p></td></tr></table></map>');
+var r = document.getElementById('r');
+var results = [];
+// Check that nested elements can be found by getElementById
+var iframe = document.getElementById('selectors');
+results.push(iframe ? 'P' : 'F:no-iframe');
+// Check that form elements are accessible
+var forms = document.getElementsByTagName('form');
+results.push(forms.length > 0 ? 'P' : 'F:no-forms');
+// Check that the map element exists
+var maps = document.getElementsByTagName('map');
+results.push(maps.length > 0 ? 'P' : 'F:no-maps');
+// Check that the area element exists
+var areas = document.getElementsByTagName('area');
+results.push(areas.length > 0 ? 'P' : 'F:no-areas');
+// Check the table was created
+var tables = document.getElementsByTagName('table');
+results.push(tables.length > 0 ? 'P' : 'F:no-tables');
+r.textContent = results.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("P,P,P,P,P", result);
+    }
+
+    /// <summary>
+    /// Verifies that the Acid3 update() loop executes through setTimeout
+    /// chaining, processing multiple tests and producing a score > 0.
+    /// </summary>
+    [Fact]
+    public void Acid3_Update_Loop_Produces_Score_Via_SetTimeout()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<p id=""result""><span id=""score"">0</span><span id=""slash"">/</span><span>5</span></p>
+<div id=""r""></div>
+<script>
+var tests = [
+    function() { return 1; },
+    function() { return 1; },
+    function() { return 1; },
+    function() { return 1; },
+    function() { return 1; }
+];
+var score = 0, index = 0, delay = 0;
+function update() {
+    var span = document.getElementById('score');
+    if (index < tests.length) {
+        try {
+            var result = tests[index]();
+            if (result) score += 1;
+        } catch(e) {}
+        index += 1;
+        span.firstChild.data = '' + score;
+        setTimeout(update, delay);
+    }
+}
+update();
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // Score should be 5 after all tests pass
+        Assert.Contains(">5<", result);
+    }
+
+    /// <summary>
+    /// Verifies that the update() loop continues executing when some tests
+    /// throw errors (error-resilient execution).
+    /// </summary>
+    [Fact]
+    public void Acid3_Update_Loop_Continues_After_Test_Errors()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<p id=""result""><span id=""score"">0</span><span>/</span><span>5</span></p>
+<script>
+var tests = [
+    function() { return 1; },
+    function() { throw new Error('test 2 failed'); },
+    function() { return 1; },
+    function() { var x = null; x.foo(); },
+    function() { return 1; }
+];
+var score = 0, index = 0, delay = 0, errors = 0;
+function update() {
+    var span = document.getElementById('score');
+    if (index < tests.length) {
+        try {
+            var result = tests[index]();
+            if (result) score += 1;
+        } catch(e) {
+            errors += 1;
+        }
+        index += 1;
+        span.firstChild.data = '' + score;
+        setTimeout(update, delay);
+    }
+}
+update();
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // Score should be 3 (tests 0, 2, 4 pass; tests 1, 3 fail)
+        Assert.Contains(">3<", result);
+    }
+
+    /// <summary>
+    /// Verifies that body onload fires and triggers the update() function,
+    /// matching the Acid3 pattern: &lt;body onload="update()"&gt;.
+    /// </summary>
+    [Fact]
+    public void Body_Onload_Triggers_Update_Function()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head>
+<body onload=""update()"">
+<p id=""result""><span id=""score"">0</span></p>
+<script>
+var score = 0;
+function update() {
+    score = 42;
+    document.getElementById('score').firstChild.data = '' + score;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">42<", result);
+    }
+
+    /// <summary>
+    /// Verifies body onload + setTimeout chaining works together,
+    /// simulating the full Acid3 execution flow.
+    /// </summary>
+    [Fact]
+    public void Body_Onload_With_SetTimeout_Chain()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head>
+<body onload=""update()"">
+<p id=""result""><span id=""score"">0</span><span>/</span><span>3</span></p>
+<script>
+var tests = [
+    function() { return 1; },
+    function() { return 1; },
+    function() { return 1; }
+];
+var score = 0, index = 0;
+function update() {
+    var span = document.getElementById('score');
+    if (index < tests.length) {
+        try {
+            var result = tests[index]();
+            if (result) score += 1;
+        } catch(e) {}
+        index += 1;
+        span.firstChild.data = '' + score;
+        setTimeout(update, 0);
+    }
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains(">3<", result);
+    }
+
+    /// <summary>
+    /// End-to-end test that loads the actual Acid3 test page and verifies
+    /// the test harness executes to produce a score greater than 0.
+    /// </summary>
+    [Fact]
+    public void Acid3_EndToEnd_Score_GreaterThan_Zero()
+    {
+        // Navigate from bin/Debug/net8.0 up to the repo root, then into acid/acid3/
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
+        Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
+
+        var html = File.ReadAllText(acid3Path);
+        var url = new Uri(acid3Path).AbsoluteUri;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, url);
+
+        // Extract score from <span id="score">N</span>
+        var scoreMatch = System.Text.RegularExpressions.Regex.Match(
+            result, @"id=""score""[^>]*>(\d+)<");
+        Assert.True(scoreMatch.Success, "Could not find score element in output");
+        var score = int.Parse(scoreMatch.Groups[1].Value);
+        Assert.True(score > 0, $"Acid3 score should be > 0, but was {score}. " +
+            $"Score element content: {scoreMatch.Value}");
+    }
 }

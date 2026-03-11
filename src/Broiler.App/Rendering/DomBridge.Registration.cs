@@ -299,28 +299,39 @@ public sealed partial class DomBridge
             (KeyString)"write",
             new JSFunction((in Arguments a) =>
             {
-                if (a.Length == 0) return JSUndefined.Value;
-                var fragment = a[0].ToString();
-                var builder = new HtmlTreeBuilder();
-                var (docEl, allEls, _) = builder.Build($"<html><body>{fragment}</body></html>");
-                var bodyEl = docEl.Children.FirstOrDefault(c =>
-                    string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
-                if (bodyEl != null)
+                try
                 {
-                    // Find the <body> element in the main tree
-                    var mainBody = DocumentElement.Children.FirstOrDefault(c =>
+                    if (a.Length == 0) return JSUndefined.Value;
+                    var fragment = a[0].ToString();
+                    var builder = new HtmlTreeBuilder();
+                    var (docEl, allEls, _) = builder.Build($"<html><body>{fragment}</body></html>");
+                    var bodyEl = docEl.Children.FirstOrDefault(c =>
                         string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
-                    if (mainBody != null)
+                    if (bodyEl != null)
                     {
-                        foreach (var child in bodyEl.Children)
+                        // Find the <body> element in the main tree
+                        var mainBody = DocumentElement.Children.FirstOrDefault(c =>
+                            string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
+                        if (mainBody != null)
                         {
-                            child.Parent = mainBody;
-                            mainBody.Children.Add(child);
-                            _elements.Add(child);
+                            foreach (var child in bodyEl.Children)
+                            {
+                                child.Parent = mainBody;
+                                mainBody.Children.Add(child);
+                            }
+                            // Register ALL parsed elements (including deeply nested ones)
+                            // so getElementById, querySelector, etc. can find them
+                            _elements.AddRange(allEls);
                         }
                     }
+                    return JSUndefined.Value;
                 }
-                return JSUndefined.Value;
+                catch (Exception ex)
+                {
+                    RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.document.write",
+                        $"Error in document.write: {ex.Message}", ex);
+                    return JSUndefined.Value;
+                }
             }, "write", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
