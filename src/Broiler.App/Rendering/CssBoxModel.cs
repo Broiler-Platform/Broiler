@@ -11,6 +11,12 @@ public enum CssDisplay { Block, Inline, InlineBlock, None, Flex, Grid }
 /// <summary>CSS position property values.</summary>
 public enum CssPosition { Static, Relative, Absolute, Fixed }
 
+/// <summary>CSS visibility property values.</summary>
+public enum CssVisibility { Visible, Hidden, Collapse }
+
+/// <summary>CSS vertical-align property values for inline/inline-block layout.</summary>
+public enum CssVerticalAlign { Baseline, Top, Middle, Bottom, TextTop, TextBottom }
+
 /// <summary>CSS float property values.</summary>
 public enum CssFloat { None, Left, Right }
 
@@ -124,6 +130,10 @@ public class LayoutBox(DomElement element)
     public CssFloat Float;
     /// <summary>Resolved clear value.</summary>
     public CssClear Clear;
+    /// <summary>Resolved visibility value.</summary>
+    public CssVisibility Visibility;
+    /// <summary>Resolved vertical-align value for inline/inline-block elements.</summary>
+    public CssVerticalAlign VerticalAlign;
     /// <summary>Child layout boxes.</summary>
     public List<LayoutBox> Children = [];
 
@@ -200,7 +210,9 @@ public class CssBoxModel
             Display = ResolveDisplay(element),
             Position = ResolvePosition(element),
             Float = ResolveFloat(element),
-            Clear = ResolveClear(element)
+            Clear = ResolveClear(element),
+            Visibility = ResolveVisibility(element),
+            VerticalAlign = ResolveVerticalAlign(element)
         };
         if (box.Display == CssDisplay.None) return box;
 
@@ -394,8 +406,16 @@ public class CssBoxModel
         if (x > box.Dimensions.Width) box.Dimensions.Width = x;
     }
 
-    private void LayoutOutOfFlow(LayoutBox box, float containerWidth) =>
+    private void LayoutOutOfFlow(LayoutBox box, float containerWidth)
+    {
         LayoutBlock(box, containerWidth);
+        // Fixed-position elements are placed relative to the viewport origin.
+        if (box.Position == CssPosition.Fixed)
+        {
+            box.Dimensions.X = ParseCssValue(GetStyle(box.Element, "left"), containerWidth, 0f);
+            box.Dimensions.Y = ParseCssValue(GetStyle(box.Element, "top"), 0f, 0f);
+        }
+    }
 
     private static void ApplyPositionOffset(LayoutBox box)
     {
@@ -476,6 +496,27 @@ public class CssBoxModel
         if (val.Equals("right", StringComparison.OrdinalIgnoreCase)) return CssClear.Right;
         if (val.Equals("both", StringComparison.OrdinalIgnoreCase)) return CssClear.Both;
         return CssClear.None;
+    }
+
+    private static CssVisibility ResolveVisibility(DomElement el)
+    {
+        string val = GetStyle(el, "visibility");
+        if (val == null) return CssVisibility.Visible;
+        if (val.Equals("hidden", StringComparison.OrdinalIgnoreCase)) return CssVisibility.Hidden;
+        if (val.Equals("collapse", StringComparison.OrdinalIgnoreCase)) return CssVisibility.Collapse;
+        return CssVisibility.Visible;
+    }
+
+    private static CssVerticalAlign ResolveVerticalAlign(DomElement el)
+    {
+        string val = GetStyle(el, "vertical-align");
+        if (val == null) return CssVerticalAlign.Baseline;
+        if (val.Equals("top", StringComparison.OrdinalIgnoreCase)) return CssVerticalAlign.Top;
+        if (val.Equals("middle", StringComparison.OrdinalIgnoreCase)) return CssVerticalAlign.Middle;
+        if (val.Equals("bottom", StringComparison.OrdinalIgnoreCase)) return CssVerticalAlign.Bottom;
+        if (val.Equals("text-top", StringComparison.OrdinalIgnoreCase)) return CssVerticalAlign.TextTop;
+        if (val.Equals("text-bottom", StringComparison.OrdinalIgnoreCase)) return CssVerticalAlign.TextBottom;
+        return CssVerticalAlign.Baseline;
     }
 
     private static FlexDirection ResolveFlexDirection(DomElement el)
@@ -967,8 +1008,9 @@ public class CssBoxModel
     }
 
     /// <summary>
-    /// Parses a CSS length value such as "10px", "50%", or "auto".
+    /// Parses a CSS length value such as "10px", "50%", "2cm", or "auto".
     /// Percentages are resolved against <paramref name="containerSize"/>.
+    /// Physical units (cm, mm, in) are converted to pixels at 96 DPI.
     /// </summary>
     public static float ParseCssValue(string value, float containerSize, float defaultValue)
     {
@@ -978,6 +1020,26 @@ public class CssBoxModel
             return float.TryParse(value.AsSpan(0, value.Length - 1),
                 NumberStyles.Float, CultureInfo.InvariantCulture, out float pct)
                 ? containerSize * pct / 100f : defaultValue;
+
+        // Check for physical units with conversion factors (96 DPI).
+        if (value.EndsWith("cm", StringComparison.OrdinalIgnoreCase))
+        {
+            var num = value[..^2];
+            return float.TryParse(num, NumberStyles.Float, CultureInfo.InvariantCulture, out float cm)
+                ? cm * 37.7952756f : defaultValue; // 96 / 2.54
+        }
+        if (value.EndsWith("mm", StringComparison.OrdinalIgnoreCase))
+        {
+            var num = value[..^2];
+            return float.TryParse(num, NumberStyles.Float, CultureInfo.InvariantCulture, out float mm)
+                ? mm * 3.77952756f : defaultValue; // 96 / 25.4
+        }
+        if (value.EndsWith("in", StringComparison.OrdinalIgnoreCase))
+        {
+            var num = value[..^2];
+            return float.TryParse(num, NumberStyles.Float, CultureInfo.InvariantCulture, out float inches)
+                ? inches * 96f : defaultValue;
+        }
 
         string numeric = value;
         foreach (var suffix in new[] { "px", "em", "rem", "pt" })

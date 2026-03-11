@@ -527,29 +527,29 @@ Problems:
 
 **Goal:** Pixel-perfect rendering match.
 
-- [ ] **10.1** CSS `text-shadow` support
-  - [ ] Parse `text-shadow: rgba(r,g,b,a) Xpx Ypx`
-  - [ ] Render shadow offset using SkiaSharp
-- [ ] **10.2** `@font-face` loading
-  - [ ] Download external font files referenced in CSS
-  - [ ] Apply custom fonts to text rendering
-- [ ] **10.3** `visibility: hidden` rendering
-  - [ ] Elements with `visibility: hidden` must occupy space but not paint
-- [ ] **10.4** `display: inline-block` layout
-  - [ ] Proper inline-block layout with vertical-align
-  - [ ] Padding, border, margin on inline-blocks
-- [ ] **10.5** `position: fixed` / `position: absolute`
-  - [ ] Correct positioning relative to viewport / containing block
-- [ ] **10.6** CSS `border` shorthand with `dotted` style
-  - [ ] Dotted border rendering in SkiaSharp
-- [ ] **10.7** `cm` unit support
-  - [ ] `border: 2cm solid gray` → convert to pixels (1cm ≈ 37.8px)
-- [ ] **10.8** Background `data:` URI images
-  - [ ] Decode base64 PNG data URIs
-  - [ ] Render as background-image
-- [ ] **10.9** `::after` pseudo-element rendering
-  - [ ] Content generation and positioning for `::after`
-- [ ] **10.10** Tests: Automated pixel-comparison test against reference
+- [x] **10.1** CSS `text-shadow` support
+  - [x] Parse `text-shadow: rgba(r,g,b,a) Xpx Ypx`
+  - [x] Render shadow offset using SkiaSharp
+- [x] **10.2** `@font-face` loading
+  - [x] Download external font files referenced in CSS
+  - [x] Apply custom fonts to text rendering
+- [x] **10.3** `visibility: hidden` rendering
+  - [x] Elements with `visibility: hidden` must occupy space but not paint
+- [x] **10.4** `display: inline-block` layout
+  - [x] Proper inline-block layout with vertical-align
+  - [x] Padding, border, margin on inline-blocks
+- [x] **10.5** `position: fixed` / `position: absolute`
+  - [x] Correct positioning relative to viewport / containing block
+- [x] **10.6** CSS `border` shorthand with `dotted` style
+  - [x] Dotted border rendering in SkiaSharp
+- [x] **10.7** `cm` unit support
+  - [x] `border: 2cm solid gray` → convert to pixels (1cm ≈ 37.8px)
+- [x] **10.8** Background `data:` URI images
+  - [x] Decode base64 PNG data URIs
+  - [x] Render as background-image
+- [x] **10.9** `::after` pseudo-element rendering
+  - [x] Content generation and positioning for `::after`
+- [x] **10.10** Tests: Automated pixel-comparison test against reference
 
 **Modules affected:** `HtmlRenderer.CSS`, `HtmlRenderer.Rendering`, `HtmlRenderer.Image`
 

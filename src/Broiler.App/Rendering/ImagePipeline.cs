@@ -94,6 +94,35 @@ public static class ImageDecoder
         var pixelData = new byte[width * height * 4]; // all zeros = transparent black
         return new DecodedImage(width, height, format, pixelData, string.Empty);
     }
+
+    /// <summary>
+    /// Decodes a base64 data URI (e.g. "data:image/png;base64,...") into raw bytes.
+    /// Returns null if the URI is not a valid base64 data URI.
+    /// </summary>
+    public static byte[]? DecodeDataUri(string dataUri)
+    {
+        if (string.IsNullOrEmpty(dataUri) || !dataUri.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        // Find the comma that separates the header from the data.
+        int commaIdx = dataUri.IndexOf(',');
+        if (commaIdx < 0) return null;
+
+        var header = dataUri[..commaIdx];
+        var payload = dataUri[(commaIdx + 1)..];
+
+        if (!header.Contains("base64", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        try
+        {
+            return Convert.FromBase64String(payload);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+    }
 }
 
 /// <summary>A minimal SVG element representation for inline SVG rendering.</summary>

@@ -6,7 +6,7 @@ using System.Linq;
 namespace Broiler.App.Rendering;
 
 /// <summary>Types of paint commands produced during the paint stage.</summary>
-public enum PaintCommandType { Background, Border, Text, Image, BoxShadow, Group }
+public enum PaintCommandType { Background, Border, Text, Image, BoxShadow, Group, TextShadow }
 
 /// <summary>Represents a single painting instruction in the rendering pipeline.</summary>
 public class PaintCommand
@@ -23,6 +23,8 @@ public class PaintCommand
     public float BorderWidth { get; set; }
     /// <summary>Border radius in pixels.</summary>
     public float BorderRadius { get; set; }
+    /// <summary>CSS border-style (solid, dotted, dashed, etc.).</summary>
+    public string BorderStyle { get; set; } = "solid";
     /// <summary>Text content for text paint commands.</summary>
     public string Text { get; set; } = "";
     /// <summary>Font size in pixels.</summary>
@@ -39,6 +41,14 @@ public class PaintCommand
     public int ZIndex { get; set; }
     /// <summary>Child commands for group paint commands.</summary>
     public List<PaintCommand> Children { get; set; } = [];
+    /// <summary>CSS text-shadow color value.</summary>
+    public string TextShadowColor { get; set; } = "";
+    /// <summary>Text shadow horizontal offset in pixels.</summary>
+    public float TextShadowOffsetX { get; set; }
+    /// <summary>Text shadow vertical offset in pixels.</summary>
+    public float TextShadowOffsetY { get; set; }
+    /// <summary>Whether this element is visibility:hidden (occupies space but not painted).</summary>
+    public bool IsHidden { get; set; }
 }
 
 /// <summary>Represents a compositing layer that groups paint commands at the same z-index.</summary>
@@ -80,6 +90,10 @@ public class Painter
             box.Dimensions.Width, box.Dimensions.Height);
         var el = box.Element;
 
+        // Elements with visibility:hidden still occupy space but are not painted.
+        if (box.Visibility == CssVisibility.Hidden)
+            return commands;
+
         var bgColor = GetBackgroundColor(el);
         if (!string.IsNullOrEmpty(bgColor))
         {
@@ -88,6 +102,28 @@ public class Painter
                 Type = PaintCommandType.Background,
                 Bounds = bounds,
                 BackgroundColor = bgColor,
+                Opacity = GetOpacity(el),
+                ZIndex = GetZIndex(el)
+            });
+        }
+
+        // Background image (including data: URIs).
+        var bgImage = GetStyleValue(el, "background-image", "");
+        if (!string.IsNullOrEmpty(bgImage) && bgImage != "none")
+        {
+            // Extract URL from url('...') or url("...") or url(...)
+            var src = bgImage;
+            if (src.StartsWith("url(", StringComparison.OrdinalIgnoreCase))
+            {
+                src = src[4..];
+                if (src.EndsWith(")")) src = src[..^1];
+                src = src.Trim('\'', '"', ' ');
+            }
+            commands.Add(new PaintCommand
+            {
+                Type = PaintCommandType.Image,
+                Bounds = bounds,
+                ImageSource = src,
                 Opacity = GetOpacity(el),
                 ZIndex = GetZIndex(el)
             });
@@ -104,6 +140,7 @@ public class Painter
                 BorderColor = borderColor,
                 BorderWidth = borderWidth,
                 BorderRadius = GetBorderRadius(el),
+                BorderStyle = GetBorderStyle(el),
                 Opacity = GetOpacity(el),
                 ZIndex = GetZIndex(el)
             });
@@ -124,7 +161,7 @@ public class Painter
 
         if (el.IsTextNode && !string.IsNullOrEmpty(el.TextContent))
         {
-            commands.Add(new PaintCommand
+            var textCmd = new PaintCommand
             {
                 Type = PaintCommandType.Text,
                 Bounds = bounds,
@@ -134,7 +171,16 @@ public class Painter
                 Color = GetColor(el),
                 Opacity = GetOpacity(el),
                 ZIndex = GetZIndex(el)
-            });
+            };
+
+            // Parse text-shadow if present.
+            var textShadow = GetStyleValue(el, "text-shadow", "");
+            if (!string.IsNullOrEmpty(textShadow) && textShadow != "none")
+            {
+                ParseTextShadow(textShadow, textCmd);
+            }
+
+            commands.Add(textCmd);
         }
 
         return commands;
@@ -185,6 +231,73 @@ public class Painter
     /// <summary>Reads the color style from an element.</summary>
     public string GetColor(DomElement el)
         => GetStyleValue(el, "color", "#000000");
+
+    /// <summary>Reads the border-style from an element (default "solid").</summary>
+    public string GetBorderStyle(DomElement el)
+        => GetStyleValue(el, "border-style", "solid");
+
+    /// <summary>
+    /// Parses a CSS text-shadow value (e.g. "rgba(0,0,0,0.5) 2px 3px" or "2px 3px 0px red")
+    /// and populates the command's TextShadow properties.
+    /// </summary>
+    internal static void ParseTextShadow(string value, PaintCommand cmd)
+    {
+        // text-shadow formats:
+        //   <color> <offsetX> <offsetY>
+        //   <offsetX> <offsetY> <blur>? <color>?
+        //   rgba(r,g,b,a) Xpx Ypx
+        var parts = new List<string>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i <= value.Length; i++)
+        {
+            char c = i < value.Length ? value[i] : ' ';
+            if (c == '(') depth++;
+            else if (c == ')') depth--;
+            else if (c == ' ' && depth == 0 && i > start)
+            {
+                parts.Add(value[start..i]);
+                start = i + 1;
+            }
+            else if (i == value.Length && start < i)
+            {
+                parts.Add(value[start..i]);
+            }
+        }
+
+        var lengths = new List<float>();
+        string color = "";
+        foreach (var p in parts)
+        {
+            var trimmed = p.Trim();
+            if (string.IsNullOrEmpty(trimmed)) continue;
+
+            // Try parsing as a CSS length
+            if (trimmed.EndsWith("px", StringComparison.OrdinalIgnoreCase)
+                || char.IsDigit(trimmed[0])
+                || trimmed[0] == '-')
+            {
+                var num = trimmed.Replace("px", "").Trim();
+                if (float.TryParse(num, NumberStyles.Float, CultureInfo.InvariantCulture, out float v))
+                {
+                    lengths.Add(v);
+                    continue;
+                }
+            }
+            // Otherwise treat as color
+            color = trimmed;
+        }
+
+        if (lengths.Count >= 2)
+        {
+            cmd.TextShadowOffsetX = lengths[0];
+            cmd.TextShadowOffsetY = lengths[1];
+        }
+        if (!string.IsNullOrEmpty(color))
+            cmd.TextShadowColor = color;
+        else
+            cmd.TextShadowColor = "rgba(0,0,0,1)";
+    }
 
     private static string GetStyleValue(DomElement el, string property, string defaultValue)
     {
@@ -272,6 +385,7 @@ public class Compositor
                     BorderColor = cmd.BorderColor,
                     BorderWidth = cmd.BorderWidth,
                     BorderRadius = cmd.BorderRadius,
+                    BorderStyle = cmd.BorderStyle,
                     Text = cmd.Text,
                     FontSize = cmd.FontSize,
                     FontFamily = cmd.FontFamily,
@@ -279,7 +393,11 @@ public class Compositor
                     Opacity = cmd.Opacity * layer.Opacity,
                     ImageSource = cmd.ImageSource,
                     ZIndex = cmd.ZIndex,
-                    Children = cmd.Children
+                    Children = cmd.Children,
+                    TextShadowColor = cmd.TextShadowColor,
+                    TextShadowOffsetX = cmd.TextShadowOffsetX,
+                    TextShadowOffsetY = cmd.TextShadowOffsetY,
+                    IsHidden = cmd.IsHidden
                 };
                 result.Add(composited);
             }

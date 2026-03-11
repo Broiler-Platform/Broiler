@@ -66,6 +66,16 @@ public class CssFontFace
 
         return face;
     }
+
+    /// <summary>
+    /// Returns <c>true</c> if the font source is a data URI or a local() reference
+    /// that can be resolved without a network request.
+    /// </summary>
+    public bool IsLocalSource()
+    {
+        return Source.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+            || Source.StartsWith("local:", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 /// <summary>Manages a collection of <c>@font-face</c> declarations.</summary>
