@@ -53,8 +53,16 @@ public sealed class HtmlTokenizer
         AfterAttributeValueQuoted, SelfClosingStartTag,
         BogusComment, MarkupDeclarationOpen,
         CommentStart, Comment, CommentEndDash, CommentEnd,
-        Doctype
+        Doctype, RawText
     }
+
+    // Raw text elements: content is treated as text until matching end tag
+    private static readonly HashSet<string> RawTextElements = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "script", "style"
+    };
+
+    private string _rawTextTag; // tag name for raw text end tag matching
 
     private string _input;
     private int _pos;
@@ -106,13 +114,13 @@ public sealed class HtmlTokenizer
                 if (eof) { _state = State.Data; }
                 else if (char.IsWhiteSpace(c)) { _pos++; _state = State.BeforeAttributeName; }
                 else if (c == '/') { _pos++; _state = State.SelfClosingStartTag; }
-                else if (c == '>') { _pos++; yield return TagTok(); _state = State.Data; }
+                else if (c == '>') { _pos++; yield return TagTok(); if (_state != State.RawText) _state = State.Data; }
                 else { _tag.Append(char.ToLowerInvariant(c)); _pos++; }
                 break;
 
             case State.BeforeAttributeName:
                 if (eof) { Flush(); _state = State.Data; }
-                else if (c == '>') { Flush(); _pos++; yield return TagTok(); _state = State.Data; }
+                else if (c == '>') { Flush(); _pos++; yield return TagTok(); if (_state != State.RawText) _state = State.Data; }
                 else if (c == '/') { Flush(); _pos++; _state = State.SelfClosingStartTag; }
                 else if (char.IsWhiteSpace(c)) { _pos++; }
                 else { Flush(); _an = string.Empty; _av.Clear(); _state = State.AttributeName; }
@@ -147,7 +155,7 @@ public sealed class HtmlTokenizer
             case State.AttributeValueUnquoted:
                 if (eof) { Flush(); _state = State.Data; }
                 else if (char.IsWhiteSpace(c)) { Flush(); _pos++; _state = State.BeforeAttributeName; }
-                else if (c == '>') { Flush(); _pos++; yield return TagTok(); _state = State.Data; }
+                else if (c == '>') { Flush(); _pos++; yield return TagTok(); if (_state != State.RawText) _state = State.Data; }
                 else { _av.Append(c); _pos++; }
                 break;
 
@@ -156,14 +164,52 @@ public sealed class HtmlTokenizer
                 if (eof) { _state = State.Data; }
                 else if (char.IsWhiteSpace(c)) { _pos++; _state = State.BeforeAttributeName; }
                 else if (c == '/') { _pos++; _state = State.SelfClosingStartTag; }
-                else if (c == '>') { _pos++; yield return TagTok(); _state = State.Data; }
+                else if (c == '>') { _pos++; yield return TagTok(); if (_state != State.RawText) _state = State.Data; }
                 else { _state = State.BeforeAttributeName; }
                 break;
 
             case State.SelfClosingStartTag:
                 if (eof) { _state = State.Data; }
-                else if (c == '>') { _selfClose = true; _pos++; yield return TagTok(); _state = State.Data; }
+                else if (c == '>') { _selfClose = true; _pos++; yield return TagTok(); if (_state != State.RawText) _state = State.Data; }
                 else { _state = State.BeforeAttributeName; }
+                break;
+
+            case State.RawText:
+                // Read all content until matching </tagname>
+                {
+                    var endTag = "</" + _rawTextTag;
+                    while (_pos < _input.Length)
+                    {
+                        if (_input[_pos] == '<' && _pos + 1 < _input.Length && _input[_pos + 1] == '/' &&
+                            _pos + 2 + _rawTextTag.Length <= _input.Length &&
+                            string.Compare(_input, _pos + 2, _rawTextTag, 0, _rawTextTag.Length, StringComparison.OrdinalIgnoreCase) == 0)
+                        {
+                            var afterTag = _pos + 2 + _rawTextTag.Length;
+                            if (afterTag < _input.Length && (_input[afterTag] == '>' || char.IsWhiteSpace(_input[afterTag]) || _input[afterTag] == '/'))
+                            {
+                                // Found the matching end tag - emit accumulated text
+                                if (_buf.Length > 0) yield return CharTok();
+                                // Skip to after the '>'
+                                _pos = afterTag;
+                                while (_pos < _input.Length && _input[_pos] != '>') _pos++;
+                                if (_pos < _input.Length) _pos++; // skip '>'
+                                // Emit the end tag
+                                yield return new HtmlToken(TokenType.EndTag, name: _rawTextTag);
+                                _rawTextTag = null;
+                                _state = State.Data;
+                                break;
+                            }
+                        }
+                        _buf.Append(_input[_pos]);
+                        _pos++;
+                    }
+                    if (_pos >= _input.Length && _state == State.RawText)
+                    {
+                        // EOF in raw text - emit whatever we have
+                        if (_buf.Length > 0) yield return CharTok();
+                        _state = State.Data;
+                    }
+                }
                 break;
 
             case State.MarkupDeclarationOpen:
@@ -231,8 +277,16 @@ public sealed class HtmlTokenizer
     private HtmlToken TagTok()
     {
         Flush();
-        return new HtmlToken(_isEnd ? TokenType.EndTag : TokenType.StartTag,
-            name: _tag.ToString(), selfClosing: _selfClose, attributes: _attrs);
+        var tagName = _tag.ToString();
+        var tok = new HtmlToken(_isEnd ? TokenType.EndTag : TokenType.StartTag,
+            name: tagName, selfClosing: _selfClose, attributes: _attrs);
+        // Switch to raw text mode for script/style start tags
+        if (!_isEnd && !_selfClose && RawTextElements.Contains(tagName))
+        {
+            _rawTextTag = tagName;
+            _state = State.RawText;
+        }
+        return tok;
     }
 
     private HtmlToken CharTok()
