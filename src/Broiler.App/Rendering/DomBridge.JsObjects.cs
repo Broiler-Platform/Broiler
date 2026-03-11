@@ -2358,6 +2358,9 @@ public sealed partial class DomBridge
     {
         var doc = new JSObject();
         _docRootToDocJSObject[docRoot] = doc;
+        // Map docRoot → doc JSObject so that ToJSObject(docRoot) returns the doc
+        // object. This ensures strict equality checks like 'range.startContainer === doc' work.
+        _jsObjectCache[docRoot] = doc;
         var bridge = this;
 
         DomElement GetDocumentElement() =>

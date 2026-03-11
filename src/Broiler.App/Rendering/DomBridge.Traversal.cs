@@ -407,11 +407,17 @@ public sealed partial class DomBridge
                 return offsetA > offsetB;
             // Check if A is a descendant of B or vice versa
             if (IsDescendant(containerB, containerA))
-                return true; // A inside B → depends on offset but generally "after"
+                return true; // A inside B → generally "after"
             if (IsDescendant(containerA, containerB))
                 return false;
-            // Compare positions in document order
-            var allNodes = GetDocumentOrderNodes(bridge._documentNode);
+            // Compare positions in document order using their common ancestor
+            var commonRoot = FindCommonAncestor(containerA, containerB);
+            if (commonRoot == null)
+            {
+                // Fall back to document root
+                commonRoot = docRoot;
+            }
+            var allNodes = GetDocumentOrderNodes(commonRoot);
             var idxA = allNodes.IndexOf(containerA);
             var idxB = allNodes.IndexOf(containerB);
             if (idxA < 0 || idxB < 0) return false;
