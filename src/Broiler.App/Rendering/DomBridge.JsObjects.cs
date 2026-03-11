@@ -674,6 +674,10 @@ public sealed partial class DomBridge
                 var newEl = FindDomElementByJSObject(newChildObj);
                 if (newEl == null) return a[0];
 
+                // Prevent circular references (HierarchyRequestError per DOM spec)
+                if (ReferenceEquals(newEl, element) || IsDescendant(newEl, element))
+                    throw new JSException("HierarchyRequestError: The new child element contains the parent.");
+
                 // If refChild is null/undefined, act like appendChild
                 if (a.Length < 2 || a[1].IsNull || a[1].IsUndefined)
                 {
@@ -797,6 +801,10 @@ public sealed partial class DomBridge
                 var childEl = FindDomElementByJSObject(childObj);
                 if (childEl == null) return a[0];
 
+                // Prevent circular references (HierarchyRequestError per DOM spec)
+                if (ReferenceEquals(childEl, element) || IsDescendant(childEl, element))
+                    throw new JSException("HierarchyRequestError: The new child element contains the parent.");
+
                 // Remove from old parent if any
                 childEl.Parent?.Children.Remove(childEl);
                 childEl.Parent = element;
@@ -835,6 +843,10 @@ public sealed partial class DomBridge
                 var newEl = FindDomElementByJSObject(newChildObj);
                 var oldEl = FindDomElementByJSObject(oldChildObj);
                 if (newEl == null || oldEl == null) return a[1];
+
+                // Prevent circular references (HierarchyRequestError per DOM spec)
+                if (ReferenceEquals(newEl, element) || IsDescendant(newEl, element))
+                    throw new JSException("HierarchyRequestError: The new child element contains the parent.");
 
                 var idx = element.Children.IndexOf(oldEl);
                 if (idx < 0) return a[1];
