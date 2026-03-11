@@ -23,6 +23,7 @@ public sealed partial class DomBridge
     private readonly List<(JSFunction Callback, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
     private readonly DomElement _documentNode = new("#document", null, null, string.Empty);
     private JSObject? _documentJSObject;
+    private readonly Dictionary<DomElement, JSObject> _docRootToDocJSObject = [];
     private JSContext? _jsContext;
 
     // Timer & async execution queues
@@ -529,6 +530,10 @@ public sealed class DomElement(
 
     /// <summary>Namespace URI for elements created with createElementNS.</summary>
     public string? NamespaceURI { get; set; }
+
+    /// <summary>The document root element (<c>#subdoc-root</c>) that owns this element,
+    /// used to resolve <c>ownerDocument</c> for sub-document elements.</summary>
+    public DomElement? OwnerDocRoot { get; set; }
 
     /// <summary>Maps (namespace, localName) → qualifiedName for namespace-aware attribute methods.</summary>
     public Dictionary<(string? Namespace, string LocalName), string> NsAttrMap { get; } = new();
