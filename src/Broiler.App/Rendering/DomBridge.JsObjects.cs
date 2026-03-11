@@ -508,14 +508,17 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
-        // ownerDocument (read-only) — returns the document element wrapper
+        // ownerDocument (read-only) — returns the Document node (nodeType=9)
         obj.FastAddProperty(
             (KeyString)"ownerDocument",
             new JSFunction((in Arguments a) =>
             {
-                // The documentElement itself has ownerDocument = null per spec,
-                // but for simplicity we return the document element's JSObject for all nodes
-                return ToJSObject(DocumentElement);
+                // For elements in sub-documents, return the sub-document JSObject
+                if (element.OwnerDocRoot != null &&
+                    _docRootToDocJSObject.TryGetValue(element.OwnerDocRoot, out var subDoc))
+                    return subDoc;
+                // For main document elements, return the main document JSObject
+                return _documentJSObject ?? (JSValue)JSNull.Value;
             }, "get ownerDocument"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -2269,6 +2272,7 @@ public sealed partial class DomBridge
     private JSObject BuildSubDocument(DomElement docRoot)
     {
         var doc = new JSObject();
+        _docRootToDocJSObject[docRoot] = doc;
         var bridge = this;
 
         DomElement GetDocumentElement() =>
@@ -2310,6 +2314,62 @@ public sealed partial class DomBridge
                 }
                 return JSNull.Value;
             }, "get head"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // title (dynamic getter from <title> element in <head>)
+        doc.FastAddProperty(
+            (KeyString)"title",
+            new JSFunction((in Arguments _) =>
+            {
+                var htmlEl = GetDocumentElement();
+                var head = htmlEl.Children
+                    .FirstOrDefault(c => string.Equals(c.TagName, "head", StringComparison.OrdinalIgnoreCase));
+                if (head != null)
+                {
+                    var titleEl = head.Children
+                        .FirstOrDefault(c => string.Equals(c.TagName, "title", StringComparison.OrdinalIgnoreCase));
+                    if (titleEl != null)
+                    {
+                        // Two paths: (1) textContent setter clears children and stores text directly
+                        // in TextContent, (2) text set via child text nodes (e.g. createTextNode + appendChild).
+                        if (titleEl.TextContent != null && titleEl.Children.Count == 0)
+                            return new JSString(titleEl.TextContent);
+                        var sb = new StringBuilder();
+                        CollectTextContent(titleEl, sb);
+                        return new JSString(sb.ToString());
+                    }
+                }
+                return new JSString(string.Empty);
+            }, "get title"),
+            new JSFunction((in Arguments a) =>
+            {
+                var htmlEl = GetDocumentElement();
+                var head = htmlEl.Children
+                    .FirstOrDefault(c => string.Equals(c.TagName, "head", StringComparison.OrdinalIgnoreCase));
+                if (head != null)
+                {
+                    var titleEl = head.Children
+                        .FirstOrDefault(c => string.Equals(c.TagName, "title", StringComparison.OrdinalIgnoreCase));
+                    if (titleEl != null)
+                    {
+                        titleEl.TextContent = a.Length > 0 ? a[0].ToString() : string.Empty;
+                        titleEl.Children.Clear();
+                    }
+                }
+                return JSUndefined.Value;
+            }, "set title"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // forms (dynamic collection of <form> elements)
+        doc.FastAddProperty(
+            (KeyString)"forms",
+            new JSFunction((in Arguments _) =>
+            {
+                var results = new List<JSValue>();
+                CollectByTagName(docRoot, "form", results);
+                return new JSArray(results);
+            }, "get forms"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -2411,6 +2471,7 @@ public sealed partial class DomBridge
                     throw new JSException("Failed to execute 'createElement': 1 argument required.");
                 var tagName = a[0].ToString().ToLowerInvariant();
                 var el = new DomElement(tagName, null, null, string.Empty);
+                el.OwnerDocRoot = docRoot;
                 _elements.Add(el);
                 return ToJSObject(el);
             }, "createElement", 1),
@@ -2424,6 +2485,7 @@ public sealed partial class DomBridge
                 var text = a.Length > 0 ? a[0].ToString() : string.Empty;
                 var el = new DomElement("#text", null, null, string.Empty, isTextNode: true);
                 el.TextContent = text;
+                el.OwnerDocRoot = docRoot;
                 _elements.Add(el);
                 return ToJSObject(el);
             }, "createTextNode", 1),
@@ -2437,6 +2499,7 @@ public sealed partial class DomBridge
                 var data = a.Length > 0 ? a[0].ToString() : string.Empty;
                 var el = new DomElement("#comment", null, null, string.Empty);
                 el.TextContent = data;
+                el.OwnerDocRoot = docRoot;
                 _elements.Add(el);
                 return ToJSObject(el);
             }, "createComment", 1),
@@ -2452,6 +2515,7 @@ public sealed partial class DomBridge
                 var el = new DomElement(localName, null, null, string.Empty);
                 if (!string.IsNullOrEmpty(ns))
                     el.NamespaceURI = ns;
+                el.OwnerDocRoot = docRoot;
                 _elements.Add(el);
                 return ToJSObject(el);
             }, "createElementNS", 2),
@@ -2746,6 +2810,7 @@ public sealed partial class DomBridge
                         {
                             var dtEl = kvp.Key;
                             dtEl.Parent = subDocRoot;
+                            dtEl.OwnerDocRoot = subDocRoot;
                             subDocRoot.Children.Add(dtEl);
                             break;
                         }
@@ -2758,6 +2823,7 @@ public sealed partial class DomBridge
                     if (!string.IsNullOrEmpty(ns))
                         docEl.NamespaceURI = ns;
                     docEl.Parent = subDocRoot;
+                    docEl.OwnerDocRoot = subDocRoot;
                     subDocRoot.Children.Add(docEl);
                     _elements.Add(docEl);
                 }
@@ -2780,17 +2846,20 @@ public sealed partial class DomBridge
                 dt.DomProperties["systemId"] = string.Empty;
                 dt.DomProperties["internalSubset"] = null;
                 dt.Parent = subDocRoot;
+                dt.OwnerDocRoot = subDocRoot;
                 subDocRoot.Children.Add(dt);
                 _elements.Add(dt);
 
                 var subHtml = new DomElement("html", null, null, string.Empty);
                 subHtml.NamespaceURI = "http://www.w3.org/1999/xhtml";
                 subHtml.Parent = subDocRoot;
+                subHtml.OwnerDocRoot = subDocRoot;
                 subDocRoot.Children.Add(subHtml);
                 _elements.Add(subHtml);
 
                 var subHead = new DomElement("head", null, null, string.Empty);
                 subHead.Parent = subHtml;
+                subHead.OwnerDocRoot = subDocRoot;
                 subHtml.Children.Add(subHead);
                 _elements.Add(subHead);
 
@@ -2798,18 +2867,21 @@ public sealed partial class DomBridge
                 {
                     var subTitleEl = new DomElement("title", null, null, string.Empty);
                     subTitleEl.Parent = subHead;
+                    subTitleEl.OwnerDocRoot = subDocRoot;
                     subHead.Children.Add(subTitleEl);
                     _elements.Add(subTitleEl);
 
                     var subTitleText = new DomElement("#text", null, null, string.Empty, isTextNode: true);
                     subTitleText.TextContent = subTitle;
                     subTitleText.Parent = subTitleEl;
+                    subTitleText.OwnerDocRoot = subDocRoot;
                     subTitleEl.Children.Add(subTitleText);
                     _elements.Add(subTitleText);
                 }
 
                 var subBody = new DomElement("body", null, null, string.Empty);
                 subBody.Parent = subHtml;
+                subBody.OwnerDocRoot = subDocRoot;
                 subHtml.Children.Add(subBody);
                 _elements.Add(subBody);
 
