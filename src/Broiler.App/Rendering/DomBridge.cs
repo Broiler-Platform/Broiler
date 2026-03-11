@@ -92,12 +92,14 @@ public sealed partial class DomBridge
     /// <summary>
     /// Executes all pending <c>setTimeout</c>, <c>setInterval</c>, and
     /// <c>requestAnimationFrame</c> callbacks. Repeats until no new
-    /// callbacks are queued, up to a maximum of 100 iterations to prevent
-    /// infinite loops. Call this before DOM capture/serialisation.
+    /// callbacks are queued, up to a maximum of 500 iterations to prevent
+    /// infinite loops. The higher limit supports test harnesses like Acid3
+    /// that chain 100+ tests via <c>setTimeout</c>. Call this before DOM
+    /// capture/serialisation.
     /// </summary>
     public void FlushTimers()
     {
-        const int maxIterations = 100;
+        const int maxIterations = 500;
         for (var iteration = 0; iteration < maxIterations; iteration++)
         {
             var pending = new List<(int Id, JSFunction Fn)>();
@@ -153,6 +155,54 @@ public sealed partial class DomBridge
 
         // Clear all processed timer IDs after flush loop completes
         _clearedTimerIds.Clear();
+    }
+
+    /// <summary>
+    /// Fires the <c>load</c> event on the <c>&lt;body&gt;</c> element, which
+    /// triggers the inline <c>onload</c> attribute handler as well as any
+    /// <c>addEventListener('load', …)</c> listeners registered on the body.
+    /// In browsers, the body's <c>onload</c> fires after all synchronous
+    /// scripts have executed. This is critical for test harnesses like Acid3,
+    /// which use <c>&lt;body onload="update()"&gt;</c> to bootstrap the
+    /// test runner.
+    /// </summary>
+    public void FireWindowLoadEvent()
+    {
+        if (_jsContext == null) return;
+
+        // Find the <body> element by traversing the document tree.
+        // The body is a child of <html> (documentElement), which is a
+        // child of the document node. It may not appear in the flat
+        // _elements list because html/head/body are structural elements
+        // pre-created by HtmlTreeBuilder.
+        DomElement? body = null;
+        var htmlEl = _elements.FirstOrDefault(e =>
+            string.Equals(e.TagName, "html", StringComparison.OrdinalIgnoreCase));
+        if (htmlEl != null)
+        {
+            body = htmlEl.Children.FirstOrDefault(c =>
+                string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
+        }
+        if (body == null) return;
+
+        // Ensure the body's JS object is created so inline event attributes are compiled
+        ToJSObject(body);
+
+        // Dispatch a 'load' event on the body element if it has a load handler
+        if (body.InlineEventHandlers.ContainsKey("load") || body.EventListeners.Count > 0)
+        {
+            try
+            {
+                var evt = _jsContext.Eval("(function() { var e = document.createEvent('Event'); e.initEvent('load', false, false); return e; })()") as JSObject;
+                if (evt != null)
+                    DispatchEventOnElement(body, evt);
+            }
+            catch (Exception ex)
+            {
+                RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireWindowLoadEvent",
+                    $"Error firing window load event: {ex.Message}", ex);
+            }
+        }
     }
 
     // ------------------------------------------------------------------
