@@ -176,6 +176,9 @@ public sealed partial class DomBridge
             if (child.IsTextNode && child.TextContent != null)
                 sb.Append(child.TextContent);
         }
+        // Check direct TextContent (set via JS textContent setter, which clears children)
+        if (sb.Length == 0 && !string.IsNullOrEmpty(styleElement.TextContent))
+            sb.Append(styleElement.TextContent);
         // Also check InnerHtml as fallback
         if (sb.Length == 0 && !string.IsNullOrEmpty(styleElement.InnerHtml))
             sb.Append(styleElement.InnerHtml);

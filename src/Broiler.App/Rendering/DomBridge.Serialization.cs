@@ -98,6 +98,9 @@ public sealed partial class DomBridge
         if (SerializerVoidTags.Contains(tag))
             return;
 
+        // Raw text elements (<script>, <style>) must not HTML-encode their content
+        var isRawText = tag == "script" || tag == "style";
+
         // Children, textContent, or innerHTML
         if (element.Children.Count > 0)
         {
@@ -106,7 +109,7 @@ public sealed partial class DomBridge
         }
         else if (!string.IsNullOrEmpty(element.TextContent))
         {
-            sb.Append(HtmlEncode(element.TextContent));
+            sb.Append(isRawText ? element.TextContent : HtmlEncode(element.TextContent));
         }
         else if (!string.IsNullOrEmpty(element.InnerHtml))
         {

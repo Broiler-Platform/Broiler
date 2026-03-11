@@ -978,6 +978,14 @@ public sealed partial class DomBridge
                 "NamespaceError");
         }
 
+        // Check for trailing colon (e.g., "a:") — empty local name is a NamespaceError
+        if (!string.IsNullOrEmpty(qualifiedName) && qualifiedName.EndsWith(':'))
+        {
+            ThrowDOMException(context,
+                $"Failed to execute 'createElementNS': The qualified name provided ('{qualifiedName}') has an empty local name.",
+                "NamespaceError");
+        }
+
         // Validate the name characters (allows optional single colon for prefix:localName)
         if (string.IsNullOrEmpty(qualifiedName) || !ValidXmlQualifiedNamePattern.IsMatch(qualifiedName))
         {
@@ -1003,6 +1011,22 @@ public sealed partial class DomBridge
             {
                 ThrowDOMException(context,
                     $"Failed to execute 'createElementNS': The namespace URI for prefix 'xml' is invalid.",
+                    "NamespaceError");
+            }
+
+            // "xmlns" prefix must be the XMLNS namespace
+            if (prefix == "xmlns" && ns != "http://www.w3.org/2000/xmlns/")
+            {
+                ThrowDOMException(context,
+                    $"Failed to execute 'createElementNS': The namespace URI for prefix 'xmlns' is invalid.",
+                    "NamespaceError");
+            }
+
+            // Non-"xmlns" prefix must not use the XMLNS namespace
+            if (prefix != "xmlns" && ns == "http://www.w3.org/2000/xmlns/")
+            {
+                ThrowDOMException(context,
+                    $"Failed to execute 'createElementNS': The XMLNS namespace URI may only be used with prefix 'xmlns'.",
                     "NamespaceError");
             }
         }

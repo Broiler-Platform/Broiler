@@ -790,4 +790,164 @@ function update() {
         Assert.True(score > 0, $"Acid3 score should be > 0, but was {score}. " +
             $"Score element content: {scoreMatch.Value}");
     }
+
+    /// <summary>
+    /// Phase 2, Task 2.1: Verifies that setting textContent on a &lt;style&gt; element
+    /// causes getComputedStyle to pick up the new CSS rules. This tests the
+    /// dynamic stylesheet invalidation mechanism.
+    /// </summary>
+    [Fact]
+    public void DynamicStyle_TextContent_Updates_GetComputedStyle()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style id=""s"">p { color: red; }</style>
+</head><body>
+<p id=""t"">text</p>
+<div id=""result""></div>
+<script>
+var s = document.getElementById('s');
+var cs1 = document.defaultView.getComputedStyle(document.getElementById('t'), '');
+var before = cs1.getPropertyValue('color');
+// Dynamically change the style element's text content
+s.textContent = 'p { color: blue; }';
+var cs2 = document.defaultView.getComputedStyle(document.getElementById('t'), '');
+var after = cs2.getPropertyValue('color');
+document.getElementById('result').textContent = before + '|' + after;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("red|blue", result);
+    }
+
+    /// <summary>
+    /// Phase 2, Task 2.1: Verifies that the serialized HTML includes updated
+    /// CSS content from style elements whose textContent was changed via JS,
+    /// and that the CSS is not HTML-encoded (raw text elements).
+    /// </summary>
+    [Fact]
+    public void DynamicStyle_TextContent_Serialized_Correctly()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style id=""s"">body { background: red; }</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var s = document.getElementById('s');
+s.textContent = 'body { background: white; } p > span { color: green; }';
+document.getElementById('result').textContent = 'done';
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // Verify the new CSS content is in the serialized output
+        Assert.Contains("background: white", result);
+        // Verify CSS child combinator > is NOT HTML-encoded
+        Assert.Contains("p > span", result);
+        var styleStart = result.IndexOf("<style");
+        var styleEnd = result.IndexOf("</style>");
+        Assert.True(styleStart >= 0 && styleEnd > styleStart, "Missing <style> tags in output");
+        Assert.DoesNotContain("&gt;", result.Substring(styleStart, styleEnd - styleStart));
+    }
+
+    /// <summary>
+    /// Phase 2, Task 2.1: Verifies that cssRules getter picks up
+    /// new rules after textContent is changed on a style element.
+    /// </summary>
+    [Fact]
+    public void DynamicStyle_CssRules_Reflect_TextContent_Change()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style id=""s"">body { background: red; }</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var s = document.getElementById('s');
+var sheet = document.styleSheets[0];
+r.push(sheet.cssRules.length);
+s.textContent = 'p { color: blue; } div { margin: 0; }';
+r.push(sheet.cssRules.length);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // Before: 1 rule (body { background: red })
+        // After: 2 rules (p { color: blue } and div { margin: 0 })
+        Assert.Contains("1,2", result);
+    }
+
+    /// <summary>
+    /// Phase 2, Task 2.2: Verifies that CSS cascade re-evaluates correctly
+    /// after DOM mutations that affect which CSS selectors match.
+    /// Uses :last-child re-evaluation (same pattern as Acid3 test 0).
+    /// </summary>
+    [Fact]
+    public void CssCascade_After_Dom_Mutation_RemoveChild()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target:last-child { font-weight: bold; }
+</style>
+</head><body>
+<div id=""wrapper"">
+  <p id=""target"">Target</p>
+  <p id=""sibling"">Sibling</p>
+</div>
+<div id=""result""></div>
+<script>
+var wrapper = document.getElementById('wrapper');
+var sibling = document.getElementById('sibling');
+var target = document.getElementById('target');
+// Before: target is NOT :last-child
+var cs1 = document.defaultView.getComputedStyle(target, '');
+var before = cs1.getPropertyValue('font-weight');
+// Remove sibling, making target the last child element
+wrapper.removeChild(sibling);
+var cs2 = document.defaultView.getComputedStyle(target, '');
+var after = cs2.getPropertyValue('font-weight');
+document.getElementById('result').textContent = before + '|' + after;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // Before: empty (target is not :last-child)
+        // After: bold (target is now :last-child after sibling removal)
+        Assert.Contains("|bold", result);
+    }
+
+    /// <summary>
+    /// Phase 2 score validation: Verifies the Acid3 score after Phase 2
+    /// dynamic stylesheet fixes. The score should be higher than Phase 1's 56.
+    /// </summary>
+    [Fact]
+    public void Acid3_Phase2_Score_Validation()
+    {
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
+        Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
+
+        var html = File.ReadAllText(acid3Path);
+        var url = new Uri(acid3Path).AbsoluteUri;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, url);
+
+        // Extract score from <span id="score">N</span>
+        var scoreMatch = System.Text.RegularExpressions.Regex.Match(
+            result, @"id=""score""[^>]*>(\d+)<");
+        Assert.True(scoreMatch.Success, "Could not find score element in output");
+        var score = int.Parse(scoreMatch.Groups[1].Value);
+
+        // Phase 1 baseline was 56. Phase 2 fixes raised it to 59.
+        Assert.True(score >= 59, $"Acid3 score regression: was {score}, expected >= 59 (Phase 2 baseline)");
+    }
 }
