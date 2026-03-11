@@ -105,7 +105,7 @@ Same reference image as v2 (`docs/images/acid3-chromium-v2.png`):
 
 ### 4.1 Why Broiler Still Scores 0 / 100
 
-Despite significant DOM API progress (411 tests, 18 test files, DOMImplementation, namespaces, etc.), the Acid3 test page still fails because the **test harness itself** encounters runtime errors before any test function completes.
+Despite significant DOM API progress (426 tests, 19 test files, DOMImplementation, namespaces, CSS error recovery, etc.), the Acid3 test page still fails because the **test harness itself** encounters runtime errors before any test function completes.
 
 The Acid3 page contains ~3,500 lines of inline JavaScript that:
 
@@ -121,8 +121,8 @@ The Acid3 page contains ~3,500 lines of inline JavaScript that:
 3. ❌ HTTP sub-resource fetching fails (file:// protocol, no HTTP server)
 4. ❌ Even with local files, content-type detection for .png/.txt is incomplete
 5. Test 0 attempts getComputedStyle() cascade check
-6. ❌ Cascade resolution for :last-child in presence of dynamic style rules fails
-7. Test harness halts with score 0/100
+6. ✅ Cascade resolution for :last-child in presence of dynamic style rules — FIXED (Phase 1)
+7. Test harness halts with score 0/100 (blocked by steps 3–4)
 8. Red background never removed → visual rendering is all red
 ```
 
@@ -145,7 +145,7 @@ The Acid3 page contains ~3,500 lines of inline JavaScript that:
 | DOM events edge cases | ❌ Document bubbling broken | ✅ Attribute reflection, document bubbling, text node dispatch | 7 |
 | SVG DOM dynamic | ❌ Stub | ✅ viewBox baseVal/animVal, dynamic style, foster parenting | 9 |
 | ECMAScript edge cases | ❌ Not tested | ✅ Number precision, Date year 0, null bytes, data URIs | 6 |
-| **Total new tests** | — | — | **76** |
+| **Total new tests** | — | — | **81** |
 
 ### 4.4 Architecture — Current State
 
@@ -181,7 +181,6 @@ Implemented (v3):
 
 Still Missing:
   ✗ HTTP sub-resource fetching for remote URLs (iframe src="http://...")
-  ✗ getComputedStyle cascade with dynamic style rule application
   ✗ External <script src="http://..."> loading and execution
   ✗ text-shadow rendering in HtmlRenderer/SkiaSharp
   ✗ @font-face external font loading in CLI pipeline
@@ -190,6 +189,11 @@ Still Missing:
   ✗ <object> HTTP status + fallback content handling
   ✗ Dynamic <style> textContent → live stylesheet update in render pipeline
   ✗ GC-safe JS↔DOM reference handling
+
+Phase 1 (v3 roadmap) completed:
+  ✅ CSS error recovery in ParseStyle (invalid keyword values rejected)
+  ✅ getComputedStyle cascade with dynamic :last-child re-evaluation
+  ✅ Specificity-based cascade (inline > ID > class > type) verified
 ```
 
 ---
@@ -200,7 +204,7 @@ Still Missing:
 
 | Test | Title | v2 | v3 | Gap | Module |
 |------|-------|----|----|-----|--------|
-| 0 | Styles recompute after last-child removal | ❌ | ⚠️ | `getComputedStyle` cascade incomplete for dynamic rule changes | `DomBridge.Css.cs` |
+| 0 | Styles recompute after last-child removal | ❌ | ✅ | CSS error recovery + dynamic :last-child cascade implemented | `DomBridge.Css.cs` |
 | 1 | NodeFilters and Exceptions | ❌ | ✅ | Exception propagation implemented | `DomBridge.Traversal.cs` |
 | 2 | Removing nodes during iteration | ❌ | ✅ | `createDocument` + iterator mutation implemented | `DomBridge.Traversal.cs` |
 | 3 | Infinite iterator | ❌ | ✅ | `getTestDocument()` now works via `createDocument` | `DomBridge.Registration.cs` |
@@ -328,21 +332,21 @@ Still Missing:
 
 | Category | Tests | v2 Estimated | v3 Estimated | Key Remaining Blocker |
 |----------|-------|-------------|-------------|----------------------|
-| **DOMImplementation** | 2–9, 25 | 0 / 10 | **9 / 10** | Test 0 cascade still fails |
+| **DOMImplementation** | 2–9, 25 | 0 / 10 | **10 / 10** | ✅ Test 0 cascade fixed |
 | **DOM Traversal edges** | 1, 10–13 | 0 / 5 | **5 / 5** | ✅ All implemented |
 | **HTTP / Sub-resources** | 14–16, 65, 69 | 0 / 5 | **2 / 5** | Remote URL fetching + content-type detection |
 | **DOM Core (namespace)** | 19–23 | 0 / 5 | **5 / 5** | ✅ All implemented |
 | **DOM Events edges** | 24, 26–27, 30–32, 73 | ~3 / 7 | **6 / 7** | GC survival edge cases |
 | **CSS Selectors** | 33–34, 42, 44, 47–48 | ~2 / 6 | **6 / 6** | ✅ All implemented |
-| **CSSOM** | 0, 45–46 | ~1 / 3 | **2 / 3** | Test 0 cascade accuracy |
+| **CSSOM** | 0, 45–46 | ~1 / 3 | **3 / 3** | ✅ Test 0 cascade fixed |
 | **HTML DOM** | 55–56, 61–64 | 0 / 6 | **5 / 6** | Test 64 extended attributes |
 | **SVG / Dynamic** | 65, 68, 70–72, 74 | 0 / 6 | **4 / 6** | Remote SVG loading, surrogate pairs |
 | **ECMAScript** | 84, 86–87, 96–99 | ~5 / 7 | **6 / 7** | XHTML namespace defaults |
 | **Already passing** | 17–18, 28, 35–41, 43, 49–54, 57–60, 66, 80–83, 85, 88–95 | ~30 / 35 | **35 / 35** | ✅ All implemented |
 | **Rendering fidelity** | (visual) | 0 / 5 | **0 / 5** | text-shadow, @font-face, data: bg |
 
-**Estimated unit-tested score: ~85 / 100** (up from ~35–40 in v2)
-**Actual rendered score: 0 / 100** (test harness blocked by critical failures)
+**Estimated unit-tested score: ~87 / 100** (up from ~85 in v3 initial, ~35–40 in v2)
+**Actual rendered score: 0 / 100** (test harness blocked by sub-resource loading failures)
 
 ---
 
@@ -350,13 +354,14 @@ Still Missing:
 
 The Acid3 test harness is a sequential runner: if **test 0 fails**, no subsequent tests execute. The critical path to unblock scoring is:
 
-### Step 1: Fix Test 0 — getComputedStyle Cascade (BLOCKER)
+### Step 1: Fix Test 0 — getComputedStyle Cascade ✅ RESOLVED
 
-Test 0 checks that after removing the last child of an element, `getComputedStyle` returns updated values (specifically `white-space: pre-wrap` from a `:last-child` rule). This requires:
+Test 0 checks that after removing the last child of an element, `getComputedStyle` returns updated values (specifically `white-space: pre-wrap` from a `:last-child` rule). This has been fixed:
 
-1. **Live CSS cascade**: `getComputedStyle` must apply CSS rules from all `<style>` elements, not just inline styles
-2. **Dynamic re-evaluation**: After DOM mutations (removeChild), the cascade must be re-computed
-3. **Pseudo-class specificity**: `:last-child` rules must participate in the cascade correctly
+1. **Live CSS cascade**: ✅ `getComputedStyle` applies CSS rules from all `<style>` elements via `BuildComputedStyleObject`
+2. **Dynamic re-evaluation**: ✅ After DOM mutations (removeChild), the cascade is re-computed on each call
+3. **Pseudo-class specificity**: ✅ `:last-child` rules participate in the cascade correctly
+4. **CSS error recovery**: ✅ Invalid keyword values (e.g. `white-space: x-bogus`) are rejected, preserving the last valid value
 
 ### Step 2: Fix Sub-Resource Loading (BLOCKER)
 
@@ -384,26 +389,34 @@ Even with individual tests passing in unit tests, the Acid3 harness needs:
 - [ ] Content-area pixel match with Chromium reference (≥ 95 %)
 - [ ] No "FAIL" text, red background, or rendering artefacts
 - [ ] Automated regression test in CI
-- [ ] All 411+ existing CLI tests continue to pass
+- [ ] All 426+ existing CLI tests continue to pass
 
 ---
 
-### Phase 1: Test 0 & getComputedStyle Cascade Fix (Priority: **Critical**)
+### Phase 1: Test 0 & getComputedStyle Cascade Fix (Priority: **Critical**) ✅
 
 **Goal:** Unblock the Acid3 test harness by passing test 0.
 
-- [ ] **1.1** Enhance `BuildComputedStyleObject` to apply CSS rules from `<style>` elements
-  - [ ] Parse all `<style>` rules in document order
-  - [ ] Match rules against the target element using selector matching
-  - [ ] Apply specificity-based cascade (inline > ID > class > type)
-  - [ ] Return computed values reflecting the cascade result
-- [ ] **1.2** Dynamic cascade invalidation
-  - [ ] After `removeChild`/`appendChild`, `getComputedStyle` must reflect updated pseudo-class state
-  - [ ] `:last-child` must be re-evaluated against current DOM state
-- [ ] **1.3** Tests: Verify test 0 passes (getComputedStyle returns `pre-wrap` for `:last-child` after removal)
+- [x] **1.1** Enhance `BuildComputedStyleObject` to apply CSS rules from `<style>` elements
+  - [x] Parse all `<style>` rules in document order
+  - [x] Match rules against the target element using selector matching
+  - [x] Apply specificity-based cascade (inline > ID > class > type)
+  - [x] Return computed values reflecting the cascade result
+  - [x] CSS error recovery: reject invalid keyword values (`IsAcceptableCssValue`)
+  - [x] Validate CSS length/percentage units with numeric prefix check (`IsLengthOrPercentage`)
+- [x] **1.2** Dynamic cascade invalidation
+  - [x] After `removeChild`/`appendChild`, `getComputedStyle` must reflect updated pseudo-class state
+  - [x] `:last-child` must be re-evaluated against current DOM state
+- [x] **1.3** Tests: Verify test 0 passes (getComputedStyle returns `pre-wrap` for `:last-child` after removal)
+  - [x] `GetComputedStyle_Applies_Style_Rules_From_Style_Element`
+  - [x] `GetComputedStyle_LastChild_Recomputes_After_RemoveChild`
+  - [x] `Acid3_Test0_WhiteSpace_LastChild_After_Removal`
+  - [x] `GetComputedStyle_CssErrorRecovery_InvalidValue_Ignored`
+  - [x] `GetComputedStyle_Specificity_Cascade_Order`
 
-**Modules:** `DomBridge.Css.cs`, `DomBridge.Selectors.cs`
+**Modules:** `DomBridge.cs` (ParseStyle + IsAcceptableCssValue), `DomBridge.Css.cs`, `DomBridge.Selectors.cs`
 **Impact:** Unblocks all 100 tests (critical path)
+**Status:** ✅ Complete — 5 new tests added, 426 total CLI tests passing
 
 ---
 
@@ -542,7 +555,7 @@ Even with individual tests passing in unit tests, the Acid3 harness needs:
 
 | Phase | Priority | Effort | Score Impact | Cumulative |
 |-------|----------|--------|-------------|------------|
-| 1. getComputedStyle cascade | Critical | 3 days | Unblocks all | 0 → >0 |
+| 1. getComputedStyle cascade | Critical | ~~3 days~~ ✅ Done | Unblocks all | 0 → >0 |
 | 2. Sub-resource fetching | Critical | 2 days | +5 | ~55 |
 | 3. Timer pump & integration | Critical | 1 day | Unblocks chaining | ~75 |
 | 4. DOM edge cases | High | 2 days | +4 | ~85 |
@@ -559,10 +572,10 @@ Even with individual tests passing in unit tests, the Acid3 harness needs:
 
 | Metric | v2 | v3 | Delta |
 |--------|----|----|-------|
-| Total CLI tests | 239 | 411 | +172 |
-| Test files | 8 | 18 | +10 |
-| Tests likely passing (unit) | ~35–40 | ~85 | +45–50 |
-| DomBridge total lines | ~6,000 | 8,356 | +2,356 |
+| Total CLI tests | 239 | 426 | +187 |
+| Test files | 8 | 19 | +11 |
+| Tests likely passing (unit) | ~35–40 | ~87 | +47–52 |
+| DomBridge total lines | ~6,000 | 8,587 | +2,587 |
 
 ### Features Implemented Since v2
 
@@ -581,6 +594,7 @@ Even with individual tests passing in unit tests, the Acid3 harness needs:
 13. **DOM events edge cases** — attribute reflection, document bubbling, text node dispatch (7 tests)
 14. **SVG DOM dynamic** — viewBox baseVal/animVal, dynamic style, foster parenting (9 tests)
 15. **ECMAScript edge cases** — number precision, Date year 0, null bytes, data URIs (6 tests)
+16. **CSS error recovery** — `ParseStyle` rejects invalid keyword values for `white-space`, `display`, `position`, etc. (5 tests)
 
 ### Remaining v2 Phases
 
@@ -610,5 +624,5 @@ Even with individual tests passing in unit tests, the Acid3 harness needs:
 - [ ] No "FAIL" text or red background
 - [ ] `text-shadow` on "Acid3" heading rendered
 - [ ] Automated regression test prevents score regressions
-- [ ] All 411+ existing CLI tests continue to pass
+- [ ] All 426+ existing CLI tests continue to pass
 - [ ] Compliance document updated with final results

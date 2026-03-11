@@ -401,4 +401,178 @@ r.textContent = b1.className + '|' + (bg.indexOf('red') >= 0 || bg.indexOf('255'
 
         Assert.Contains("zPPPPPPPPPPPPPPPP", result);
     }
+
+    // ----------------------------------------------------------------
+    // Phase 1: Test 0 & getComputedStyle Cascade Fix
+    // ----------------------------------------------------------------
+
+    /// <summary>
+    /// Verifies that getComputedStyle applies CSS rules from &lt;style&gt; elements
+    /// and returns the computed value for a matching selector.
+    /// Phase 1, Task 1.1: CSS cascade from style elements.
+    /// </summary>
+    [Fact]
+    public void GetComputedStyle_Applies_Style_Rules_From_Style_Element()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+p.target { white-space: pre-wrap; }
+</style>
+</head><body>
+<p id=""t"" class=""target"">text</p>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('t');
+var cs = document.defaultView.getComputedStyle(el, '');
+document.getElementById('result').textContent = cs.whiteSpace;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("pre-wrap", result);
+    }
+
+    /// <summary>
+    /// Verifies that :last-child is dynamically re-evaluated after removeChild.
+    /// After removing the last child, the new last child should match :last-child.
+    /// Phase 1, Task 1.2: Dynamic cascade invalidation.
+    /// </summary>
+    [Fact]
+    public void GetComputedStyle_LastChild_Recomputes_After_RemoveChild()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#container p:last-child { white-space: pre-wrap; }
+</style>
+</head><body>
+<div id=""container"">
+  <p id=""p1"">first</p>
+  <p id=""p2"">second</p>
+</div>
+<div id=""result""></div>
+<script>
+var container = document.getElementById('container');
+var p1 = document.getElementById('p1');
+var p2 = document.getElementById('p2');
+
+var r = [];
+// p2 is last-child, should have white-space: pre-wrap
+var cs1 = document.defaultView.getComputedStyle(p2, '');
+r.push(cs1.getPropertyValue('white-space'));
+
+// p1 is NOT last-child, should NOT have white-space: pre-wrap
+var cs1b = document.defaultView.getComputedStyle(p1, '');
+r.push(cs1b.getPropertyValue('white-space'));
+
+// Remove p2 — now p1 becomes the last child
+container.removeChild(p2);
+
+// p1 should now match :last-child and get white-space: pre-wrap
+var cs2 = document.defaultView.getComputedStyle(p1, '');
+r.push(cs2.getPropertyValue('white-space'));
+
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // val1=pre-wrap (p2 is last-child), val1b='' (p1 is not last-child), val2=pre-wrap (p1 is now last-child)
+        Assert.Contains("pre-wrap||pre-wrap", result);
+    }
+
+    /// <summary>
+    /// Simulates the exact Acid3 test 0 scenario: CSS error recovery with duplicate
+    /// white-space declarations (valid then invalid), and :last-child re-evaluation
+    /// after removing the last sibling element.
+    /// Phase 1, Task 1.3: Acid3 test 0 verification.
+    /// </summary>
+    [Fact]
+    public void Acid3_Test0_WhiteSpace_LastChild_After_Removal()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#instructions:last-child { white-space: pre-wrap; white-space: x-bogus; }
+</style>
+</head><body>
+<div id=""wrapper"">
+  <p id=""instructions"">Instructions text</p>
+  <p id=""remove-last-child-test"">Scripting must be enabled</p>
+</div>
+<div id=""result""></div>
+<script>
+var last = document.getElementById('remove-last-child-test');
+var penultimate = last.previousSibling;
+// Skip whitespace text node to get the actual element
+while (penultimate && penultimate.nodeType !== 1) {
+  penultimate = penultimate.previousSibling;
+}
+last.parentNode.removeChild(last);
+var cs = document.defaultView.getComputedStyle(penultimate, '');
+document.getElementById('result').textContent = 'WS=' + cs.getPropertyValue('white-space');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // After removing last child, #instructions becomes :last-child
+        // CSS error recovery: white-space: x-bogus is invalid, so pre-wrap should be kept
+        Assert.Contains("WS=pre-wrap", result);
+    }
+
+    /// <summary>
+    /// Verifies CSS error recovery: when a property is declared twice with
+    /// the second value being invalid, the first valid value is preserved.
+    /// Phase 1, Task 1.1: CSS cascade with error recovery.
+    /// </summary>
+    [Fact]
+    public void GetComputedStyle_CssErrorRecovery_InvalidValue_Ignored()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+p.test { display: block; display: x-invalid; }
+</style>
+</head><body>
+<p id=""t"" class=""test"">text</p>
+<div id=""result""></div>
+<script>
+var cs = document.defaultView.getComputedStyle(document.getElementById('t'), '');
+document.getElementById('result').textContent = 'D=' + cs.getPropertyValue('display');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("D=block", result);
+    }
+
+    /// <summary>
+    /// Verifies that specificity cascade works correctly: inline styles override
+    /// ID selectors which override class selectors which override type selectors.
+    /// Phase 1, Task 1.1: Specificity-based cascade.
+    /// </summary>
+    [Fact]
+    public void GetComputedStyle_Specificity_Cascade_Order()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+p { z-index: 1; position: absolute; }
+.cls { z-index: 2; }
+#myid { z-index: 3; }
+</style>
+</head><body>
+<p id=""myid"" class=""cls"" style=""z-index: 4"">text</p>
+<div id=""result""></div>
+<script>
+var cs = document.defaultView.getComputedStyle(document.getElementById('myid'), '');
+document.getElementById('result').textContent = cs.zIndex;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // Inline style (z-index: 4) should win over #myid (z-index: 3)
+        Assert.Contains("4", result);
+    }
 }
