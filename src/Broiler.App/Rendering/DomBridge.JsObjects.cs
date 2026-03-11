@@ -2237,10 +2237,15 @@ public sealed partial class DomBridge
         containerElement.Children.Insert(0, docRoot);
         _elements.Add(docRoot);
         _elements.Add(parsedRoot);
-        // Add structural children (head, body) and all parsed elements
+        // Add structural children (head, body) that HtmlTreeBuilder does not include in allElements
         foreach (var child in parsedRoot.Children)
             AddElementsRecursive(child);
-        _elements.AddRange(allElements);
+        // Add non-structural elements from the builder (skip any already registered)
+        foreach (var el in allElements)
+        {
+            if (!_elements.Contains(el))
+                _elements.Add(el);
+        }
 
         return docRoot;
     }
