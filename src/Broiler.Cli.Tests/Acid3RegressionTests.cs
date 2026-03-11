@@ -848,7 +848,10 @@ document.getElementById('result').textContent = 'done';
         Assert.Contains("background: white", result);
         // Verify CSS child combinator > is NOT HTML-encoded
         Assert.Contains("p > span", result);
-        Assert.DoesNotContain("&gt;", result.Substring(result.IndexOf("<style"), result.IndexOf("</style>") - result.IndexOf("<style")));
+        var styleStart = result.IndexOf("<style");
+        var styleEnd = result.IndexOf("</style>");
+        Assert.True(styleStart >= 0 && styleEnd > styleStart, "Missing <style> tags in output");
+        Assert.DoesNotContain("&gt;", result.Substring(styleStart, styleEnd - styleStart));
     }
 
     /// <summary>
