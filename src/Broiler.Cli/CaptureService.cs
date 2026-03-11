@@ -568,6 +568,14 @@ public class CaptureService
                 return string.Empty;
             }
 
+            // Handle file:// URLs — read from local filesystem
+            if (resolvedUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+            {
+                var uri = new Uri(resolvedUrl);
+                var path = uri.LocalPath;
+                return File.Exists(path) ? File.ReadAllText(path) : string.Empty;
+            }
+
             using var response = SharedHttpClient.GetAsync(resolvedUrl).GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)
                 return string.Empty;

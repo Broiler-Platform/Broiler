@@ -1771,12 +1771,16 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
             // contentDocument for <object> element (with same-origin check)
+            // Returns null when the resource fails to load (HTTP 404, file not found, etc.)
+            // which signals that the fallback content (child nodes) should be visible.
             obj.FastAddProperty(
                 (KeyString)"contentDocument",
                 new JSFunction((in Arguments _) =>
                 {
                     var dataUrl = element.Attributes.TryGetValue("data", out var d) ? d : string.Empty;
                     if (IsCrossOrigin(dataUrl, bridge._pageUrl)) return JSNull.Value;
+                    // Check if the resource actually loaded successfully
+                    if (bridge.IsObjectLoadFailed(element)) return JSNull.Value;
                     return bridge.GetOrCreateSubDocument(element);
                 }, "get contentDocument"),
                 null,
@@ -1950,6 +1954,32 @@ public sealed partial class DomBridge
 
     // ── Phase 6: Sub-document cache ──────────────────────────────────────────
     private readonly Dictionary<DomElement, JSObject> _subDocumentCache = [];
+    private readonly HashSet<DomElement> _objectLoadFailures = [];
+
+    /// <summary>
+    /// Returns <c>true</c> if the resource for the given <c>&lt;object&gt;</c> element
+    /// failed to load (HTTP 404, file not found, etc.), meaning fallback content
+    /// should be visible and contentDocument should return null.
+    /// </summary>
+    private bool IsObjectLoadFailed(DomElement objectElement)
+    {
+        if (_objectLoadFailures.Contains(objectElement))
+            return true;
+
+        // Check if this is the first access — probe the resource
+        var resourceUrl = GetSubResourceUrl(objectElement);
+        if (string.IsNullOrWhiteSpace(resourceUrl))
+            return false; // No data attribute → empty sub-document, not a failure
+
+        var (_, contentType) = TryFetchSubResource(resourceUrl);
+        if (string.Equals(contentType, FetchFailedContentType, StringComparison.Ordinal))
+        {
+            _objectLoadFailures.Add(objectElement);
+            return true;
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// Gets or creates a full sub-document JSObject for iframe/object elements.
@@ -1968,42 +1998,104 @@ public sealed partial class DomBridge
         {
             // Determine the resource URL for this container
             var resourceUrl = GetSubResourceUrl(containerElement);
-            var fetchedHtml = TryFetchSubResource(resourceUrl);
+            var (fetchedContent, contentType) = TryFetchSubResource(resourceUrl);
 
-            if (!string.IsNullOrEmpty(fetchedHtml))
+            if (!string.IsNullOrEmpty(fetchedContent) &&
+                (contentType.Contains("html", StringComparison.OrdinalIgnoreCase) ||
+                 contentType.Contains("xml", StringComparison.OrdinalIgnoreCase) ||
+                 string.IsNullOrEmpty(contentType)))
             {
-                // Parse the fetched HTML into a sub-document tree
-                docRoot = BuildSubDocumentFromHtml(fetchedHtml, containerElement);
+                // HTML/XML content → parse and build full DOM
+                docRoot = BuildSubDocumentFromHtml(fetchedContent, containerElement);
+            }
+            else if (!string.IsNullOrEmpty(fetchedContent) &&
+                     contentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
+            {
+                // text/plain (or other text/* types) → document with pre-formatted text
+                docRoot = BuildSubDocumentWithText(fetchedContent, containerElement);
             }
             else
             {
                 // Default: create an empty sub-document structure
-                docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
-                docRoot.Parent = containerElement;
-
-                var htmlEl = new DomElement("html", null, null, string.Empty);
-                htmlEl.Parent = docRoot;
-                docRoot.Children.Add(htmlEl);
-
-                var headEl = new DomElement("head", null, null, string.Empty);
-                headEl.Parent = htmlEl;
-                htmlEl.Children.Add(headEl);
-
-                var bodyEl = new DomElement("body", null, null, string.Empty);
-                bodyEl.Parent = htmlEl;
-                htmlEl.Children.Add(bodyEl);
-
-                containerElement.Children.Insert(0, docRoot);
-                _elements.Add(docRoot);
-                _elements.Add(htmlEl);
-                _elements.Add(headEl);
-                _elements.Add(bodyEl);
+                // (binary resources like image/png, fetch failures, about:blank, etc.)
+                docRoot = BuildEmptySubDocument(containerElement);
             }
         }
 
         var doc = BuildSubDocument(docRoot);
         _subDocumentCache[containerElement] = doc;
         return doc;
+    }
+
+    /// <summary>
+    /// Creates a minimal empty sub-document structure (html > head + body).
+    /// </summary>
+    private DomElement BuildEmptySubDocument(DomElement containerElement)
+    {
+        var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+        docRoot.Parent = containerElement;
+
+        var htmlEl = new DomElement("html", null, null, string.Empty);
+        htmlEl.Parent = docRoot;
+        docRoot.Children.Add(htmlEl);
+
+        var headEl = new DomElement("head", null, null, string.Empty);
+        headEl.Parent = htmlEl;
+        htmlEl.Children.Add(headEl);
+
+        var bodyEl = new DomElement("body", null, null, string.Empty);
+        bodyEl.Parent = htmlEl;
+        htmlEl.Children.Add(bodyEl);
+
+        containerElement.Children.Insert(0, docRoot);
+        _elements.Add(docRoot);
+        _elements.Add(htmlEl);
+        _elements.Add(headEl);
+        _elements.Add(bodyEl);
+
+        return docRoot;
+    }
+
+    /// <summary>
+    /// Creates a sub-document with plain text content wrapped in a <c>&lt;pre&gt;</c> element.
+    /// Used for <c>text/plain</c> resources.
+    /// </summary>
+    private DomElement BuildSubDocumentWithText(string textContent, DomElement containerElement)
+    {
+        var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+        docRoot.Parent = containerElement;
+
+        var htmlEl = new DomElement("html", null, null, string.Empty);
+        htmlEl.Parent = docRoot;
+        docRoot.Children.Add(htmlEl);
+
+        var headEl = new DomElement("head", null, null, string.Empty);
+        headEl.Parent = htmlEl;
+        htmlEl.Children.Add(headEl);
+
+        var bodyEl = new DomElement("body", null, null, string.Empty);
+        bodyEl.Parent = htmlEl;
+        htmlEl.Children.Add(bodyEl);
+
+        // Wrap text content in <pre> element
+        var preEl = new DomElement("pre", null, null, string.Empty);
+        preEl.Parent = bodyEl;
+        bodyEl.Children.Add(preEl);
+
+        var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+        textNode.TextContent = textContent;
+        textNode.Parent = preEl;
+        preEl.Children.Add(textNode);
+
+        containerElement.Children.Insert(0, docRoot);
+        _elements.Add(docRoot);
+        _elements.Add(htmlEl);
+        _elements.Add(headEl);
+        _elements.Add(bodyEl);
+        _elements.Add(preEl);
+        _elements.Add(textNode);
+
+        return docRoot;
     }
 
     /// <summary>
@@ -2020,34 +2112,34 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Attempts to fetch a sub-resource URL and return its HTML content.
-    /// Returns <c>null</c> for non-HTML resources, about:blank, empty URLs,
-    /// or when the fetch fails.  Supports <c>data:</c> URIs with HTML content.
+    /// Attempts to fetch a sub-resource URL and return its content along with the
+    /// detected content type. Returns <c>(null, contentType)</c> for non-HTML resources,
+    /// about:blank, empty URLs, or when the fetch fails.
+    /// Supports <c>data:</c> URIs, <c>file://</c> URLs, and <c>http(s)://</c> URLs.
     /// </summary>
-    private string? TryFetchSubResource(string resourceUrl)
+    private (string? content, string contentType) TryFetchSubResource(string resourceUrl)
     {
         if (string.IsNullOrWhiteSpace(resourceUrl))
-            return null;
+            return (null, string.Empty);
 
         // about:blank gets an empty document (default behavior)
         if (string.Equals(resourceUrl, "about:blank", StringComparison.OrdinalIgnoreCase))
-            return null;
+            return (null, "text/html");
 
-        // Handle data: URIs — decode and return HTML content directly
+        // Handle data: URIs — decode and return content directly
         if (resourceUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
         {
             var (mimeType, body) = DecodeDataUriParts(resourceUrl);
-            // Only return as HTML if the MIME type is text/html or application/xhtml+xml
             if (string.Equals(mimeType, "text/html", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(mimeType, "application/xhtml+xml", StringComparison.OrdinalIgnoreCase) ||
                 string.IsNullOrEmpty(mimeType))
-                return !string.IsNullOrEmpty(body) ? body : null;
-            return null;
+                return (!string.IsNullOrEmpty(body) ? body : null, mimeType);
+            // Non-HTML data URIs: return body with detected MIME type
+            return (!string.IsNullOrEmpty(body) ? body : null, mimeType);
         }
 
-        // Non-HTML resources by extension get an empty document
-        if (IsNonHtmlResource(resourceUrl))
-            return null;
+        // Detect content type from extension for non-HTML resources
+        var extensionMime = GetMimeTypeForExtension(resourceUrl);
 
         // Resolve relative URL against page URL
         string resolvedUrl;
@@ -2062,35 +2154,67 @@ public sealed partial class DomBridge
         }
         else
         {
-            return null;
+            return (null, extensionMime);
+        }
+
+        // Handle file:// URLs — read directly from local filesystem
+        if (resolvedUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryReadFileResource(resolvedUrl, extensionMime);
         }
 
         // Only fetch HTTP/HTTPS URLs
         if (!resolvedUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
             !resolvedUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            return null;
+            return (null, extensionMime);
 
         try
         {
             using var response = SharedHttpClient.GetAsync(resolvedUrl).GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)
-                return null;
+                return (null, FetchFailedContentType);
 
-            // Check Content-Type header for non-HTML content
-            var contentType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
-            if (!string.IsNullOrEmpty(contentType) &&
-                !contentType.Contains("html", StringComparison.OrdinalIgnoreCase) &&
-                !contentType.Contains("xml", StringComparison.OrdinalIgnoreCase))
-            {
-                // Non-HTML content type (image/png, text/plain, etc.) → empty document
-                return null;
-            }
-
-            return response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            var contentType = response.Content.Headers.ContentType?.MediaType ?? extensionMime;
+            var content = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            return (content, contentType);
         }
         catch
         {
-            return null;
+            return (null, FetchFailedContentType);
+        }
+    }
+
+    /// <summary>Sentinel content type indicating a network/file fetch failure (404, connection refused, etc.).</summary>
+    private const string FetchFailedContentType = "__fetch_failed__";
+
+    /// <summary>
+    /// Reads a file:// URL from the local filesystem and returns its content with detected MIME type.
+    /// </summary>
+    private static (string? content, string contentType) TryReadFileResource(string fileUrl, string extensionMime)
+    {
+        try
+        {
+            var uri = new Uri(fileUrl);
+            var path = uri.LocalPath;
+            if (!System.IO.File.Exists(path))
+                return (null, string.Empty); // File not found → empty document (not a fetch failure)
+
+            // For binary content types (images, fonts, etc.) return null content with MIME type
+            if (extensionMime.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ||
+                extensionMime.StartsWith("font/", StringComparison.OrdinalIgnoreCase) ||
+                extensionMime.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) ||
+                extensionMime.StartsWith("video/", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(extensionMime, "application/pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                return (null, extensionMime);
+            }
+
+            var content = System.IO.File.ReadAllText(path);
+            return (content, extensionMime);
+        }
+        catch
+        {
+            return (null, string.Empty);
         }
     }
 
@@ -2105,18 +2229,33 @@ public sealed partial class DomBridge
         var builder = new HtmlTreeBuilder();
         var (parsedRoot, allElements, _) = builder.Build(html);
 
-        // Move parsed children under the sub-document root
-        foreach (var child in parsedRoot.Children)
-        {
-            child.Parent = docRoot;
-            docRoot.Children.Add(child);
-        }
+        // parsedRoot is the <html> element itself (HtmlTreeBuilder returns it directly).
+        // Move it under #subdoc-root as the documentElement.
+        parsedRoot.Parent = docRoot;
+        docRoot.Children.Add(parsedRoot);
 
         containerElement.Children.Insert(0, docRoot);
         _elements.Add(docRoot);
+        _elements.Add(parsedRoot);
+        // Add structural children (head, body) and all parsed elements
+        foreach (var child in parsedRoot.Children)
+            AddElementsRecursive(child);
         _elements.AddRange(allElements);
 
         return docRoot;
+    }
+
+    /// <summary>
+    /// Recursively adds a DomElement and all its descendants to the element tracking list.
+    /// Used by <see cref="BuildSubDocumentFromHtml"/> to register structural elements
+    /// (html, head, body) that <see cref="HtmlTreeBuilder"/> does not include in its allElements list.
+    /// </summary>
+    private void AddElementsRecursive(DomElement element)
+    {
+        if (!_elements.Contains(element))
+            _elements.Add(element);
+        foreach (var child in element.Children)
+            AddElementsRecursive(child);
     }
 
     /// <summary>
