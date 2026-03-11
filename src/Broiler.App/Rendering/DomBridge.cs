@@ -25,6 +25,14 @@ public sealed partial class DomBridge
     private JSObject? _documentJSObject;
     private JSContext? _jsContext;
 
+    // Timer & async execution queues
+    private int _timerIdCounter;
+    private readonly Dictionary<int, JSFunction> _timeoutCallbacks = new();
+    private readonly Dictionary<int, JSFunction> _intervalCallbacks = new();
+    private readonly HashSet<int> _clearedTimerIds = new();
+    private int _rafIdCounter;
+    private readonly Dictionary<int, JSFunction> _rafCallbacks = new();
+
     // window.location fields
     private string _pageUrl = string.Empty;
     private string _pageProtocol = string.Empty;
@@ -79,6 +87,72 @@ public sealed partial class DomBridge
         }
         ParseHtml(html);
         RegisterDocument(context);
+    }
+
+    /// <summary>
+    /// Executes all pending <c>setTimeout</c>, <c>setInterval</c>, and
+    /// <c>requestAnimationFrame</c> callbacks. Repeats until no new
+    /// callbacks are queued, up to a maximum of 100 iterations to prevent
+    /// infinite loops. Call this before DOM capture/serialisation.
+    /// </summary>
+    public void FlushTimers()
+    {
+        const int maxIterations = 100;
+        for (var iteration = 0; iteration < maxIterations; iteration++)
+        {
+            var pending = new List<(int Id, JSFunction Fn)>();
+
+            // Collect timeout callbacks
+            foreach (var kv in _timeoutCallbacks)
+            {
+                if (!_clearedTimerIds.Contains(kv.Key))
+                    pending.Add((kv.Key, kv.Value));
+            }
+            _timeoutCallbacks.Clear();
+
+            // Collect interval callbacks (execute once per flush, keep registered)
+            var intervalSnapshot = new List<(int Id, JSFunction Fn)>();
+            foreach (var kv in _intervalCallbacks)
+            {
+                if (!_clearedTimerIds.Contains(kv.Key))
+                    intervalSnapshot.Add((kv.Key, kv.Value));
+            }
+
+            // Collect rAF callbacks
+            var rafSnapshot = new List<(int Id, JSFunction Fn)>();
+            foreach (var kv in _rafCallbacks)
+                rafSnapshot.Add((kv.Key, kv.Value));
+            _rafCallbacks.Clear();
+
+            if (pending.Count == 0 && intervalSnapshot.Count == 0 && rafSnapshot.Count == 0)
+                break;
+
+            // Execute timeout callbacks
+            foreach (var (id, fn) in pending)
+            {
+                if (_clearedTimerIds.Contains(id)) continue;
+                try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
+                catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimers", $"setTimeout callback error: {ex.Message}", ex); }
+            }
+
+            // Execute interval callbacks (one tick per flush)
+            foreach (var (id, fn) in intervalSnapshot)
+            {
+                if (_clearedTimerIds.Contains(id)) continue;
+                try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
+                catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimers", $"setInterval callback error: {ex.Message}", ex); }
+            }
+
+            // Execute rAF callbacks
+            foreach (var (id, fn) in rafSnapshot)
+            {
+                try { fn.InvokeFunction(new Arguments(JSUndefined.Value, new JSNumber(0))); }
+                catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimers", $"rAF callback error: {ex.Message}", ex); }
+            }
+        }
+
+        // Clear all processed timer IDs after flush loop completes
+        _clearedTimerIds.Clear();
     }
 
     // ------------------------------------------------------------------

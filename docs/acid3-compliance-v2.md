@@ -559,18 +559,18 @@ Problems:
 
 **Goal:** Support the Acid3 test runner's phased execution model.
 
-- [ ] **11.1** `setTimeout` / `clearTimeout`
-  - [ ] Queue callbacks for deferred execution
-  - [ ] Execute all pending timers before rendering
-- [ ] **11.2** `setInterval` / `clearInterval`
-  - [ ] Periodic callback execution
-  - [ ] Clear interval by ID
-- [ ] **11.3** `requestAnimationFrame`
-  - [ ] Schedule callback before next render
-  - [ ] Execute all pending rAF callbacks before capture
-- [ ] **11.4** Script execution ordering
-  - [ ] `defer` and `async` script attributes
-  - [ ] Script execution relative to DOM parsing
+- [x] **11.1** `setTimeout` / `clearTimeout`
+  - [x] Queue callbacks for deferred execution
+  - [x] Execute all pending timers before rendering
+- [x] **11.2** `setInterval` / `clearInterval`
+  - [x] Periodic callback execution
+  - [x] Clear interval by ID
+- [x] **11.3** `requestAnimationFrame`
+  - [x] Schedule callback before next render
+  - [x] Execute all pending rAF callbacks before capture
+- [x] **11.4** Script execution ordering
+  - [x] `defer` and `async` script attributes
+  - [x] Script execution relative to DOM parsing
 
 **Modules affected:** `CaptureService.cs`, `DomBridge.Registration.cs`
 
