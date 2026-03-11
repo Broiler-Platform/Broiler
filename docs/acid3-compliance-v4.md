@@ -61,6 +61,7 @@ with sync_playwright() as p:
 | **Chromium 145 (live HTTP)** | **96 / 100** | Buckets 1, 3–6 fully lit; bucket 2 at 13/16 |
 | **Chromium 145 (file://)** | **43 / 100** | Many tests need HTTP for sub-resources |
 | **Broiler CLI v4** | **0 / 100** | Red "FAIL" background; test harness never completes |
+| **Broiler CLI v4 (Phase 1 recheck)** | **56 / 100** | FlushTimers fix + tokenizer raw text + DOMException fixes |
 | *Broiler CLI v3* | *0 / 100* | *(same score; identical rendering)* |
 
 ---
@@ -389,10 +390,10 @@ Critical Gaps:
 | **Network** | ✅ 36 tests | ❌ | Blocked by test 0 |
 | **Rendering** | ✅ 32 tests | ❌ | Red flood obscures everything |
 | **SVG advanced (75–79)** | ❌ Not impl. | ❌ | SMIL, SVG fonts — not scored |
-| **Total** | **467 pass** | **28 / 100** | |
+| **Total** | **473 pass** | **56 / 100** | |
 
 **Estimated unit-tested score: ~94 / 100** (all tests except 67–68, 75–79)
-**Actual rendered score: 28 / 100** (harness executes successfully after Phase 1 fix)
+**Actual rendered score: 56 / 100** (after Phase 1 recheck fixes)
 
 ---
 
@@ -488,6 +489,40 @@ document.write('<map name=""><area href="" shape="rect" coords="2,2,4,4" alt="<\
 
 **Phase 1 Total Effort: 1.5 days** (vs estimated 4–6 days)
 **Actual Score Impact: 0 → 28** (harness now executes successfully)
+
+#### Phase 1 Recheck (2026-03-11)
+
+Phase 1 was rechecked and verified. During the recheck, several critical issues were identified and fixed:
+
+1. **FlushTimers maxIterations too low (500 → 1000):** Test 69 retries up to 500 times waiting for iframe `onload` events (which never fire in CLI mode). Combined with the 69 tests before it, this exhausted the 500-iteration limit, preventing tests 70–99 from ever running. Increasing to 1000 allows all 100 tests to complete. **Impact: +22 points (28 → 50).**
+
+2. **HtmlTokenizer raw text handling:** The tokenizer had no special handling for `<script>` and `<style>` elements, causing HTML tags inside script content (e.g., `<form>`, `<input>` in `document.write()` string literals) to be parsed as real DOM elements. Added `RawText` state that reads script/style content as character data until the matching end tag. This fixed phantom DOM elements and corrected `form.elements.length`, `getElementsByTagName` results, and `className` on elements. **Impact: +5 points (51 → 56).**
+
+3. **DOMException prototype constants:** Error code constants (e.g., `HIERARCHY_REQUEST_ERR`, `INVALID_CHARACTER_ERR`) were set on the `DOMException` constructor but not on the prototype, so instances couldn't access them via `e.HIERARCHY_REQUEST_ERR`. Added all constants to `DOMException.prototype`. **Impact: +1 point (50 → 51).**
+
+4. **Node type constants on all elements:** Added `ELEMENT_NODE`, `TEXT_NODE`, `COMMENT_NODE`, `DOCUMENT_NODE`, `DOCUMENT_FRAGMENT_NODE` to all element JS objects (previously only on `document`).
+
+5. **Sub-document APIs:** Added `defaultView`, `createNodeIterator`, `createTreeWalker`, `createRange` to sub-documents created by `BuildSubDocument()`.
+
+6. **Proper DOMException for HierarchyRequestError:** Changed `appendChild`, `insertBefore`, `replaceChild` to throw proper `DOMException` (with `code: 3`) instead of plain `JSException`.
+
+7. **tagName case sensitivity:** Non-HTML namespace elements now preserve original case in `tagName` (per DOM spec), instead of always uppercasing.
+
+8. **ValidateQualifiedName:** Empty prefix (e.g., `:div`) now throws `NamespaceError` (code 14) instead of `InvalidCharacterError` (code 5).
+
+**Recheck Score: 28 → 56/100 (+28 points)**
+
+| Bucket | Before | After | Change |
+|--------|--------|-------|--------|
+| 1 (DOM Traversal/Range/HTTP) | 4/17 | 4/17 | — |
+| 2 (DOM Core/Events) | 7/16 | 10/16 | +3 |
+| 3 (CSS Selectors/CSSOM) | 2/16 | 2/16 | — |
+| 4 (HTML DOM) | 11/16 | 14/16 | +3 |
+| 5 (SVG/Dynamic) | 4/16 | 13/16 | +9 |
+| 6 (ECMAScript) | 0/19 | 10/19 | +10 |
+| **Total** | **28** | **56** | **+28** |
+
+All 473 existing CLI tests continue to pass (1 test updated for correct DOM spec behavior on non-HTML namespace tagName case).
 
 ---
 
