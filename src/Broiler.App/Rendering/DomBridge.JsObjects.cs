@@ -26,7 +26,11 @@ public sealed partial class DomBridge
 
         obj.FastAddValue(
             (KeyString)"tagName",
-            new JSString(element.TagName.ToUpperInvariant()),
+            new JSString(
+                string.IsNullOrEmpty(element.NamespaceURI) ||
+                string.Equals(element.NamespaceURI, "http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase)
+                    ? element.TagName.ToUpperInvariant()
+                    : element.TagName),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddProperty(
@@ -676,9 +680,7 @@ public sealed partial class DomBridge
 
                 // Prevent circular references (HierarchyRequestError per DOM spec)
                 if (ReferenceEquals(newEl, element) || IsDescendant(newEl, element))
-                    throw new JSException("HierarchyRequestError: The new child element contains the parent.");
-
-                // If refChild is null/undefined, act like appendChild
+                    ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
                 if (a.Length < 2 || a[1].IsNull || a[1].IsUndefined)
                 {
                     newEl.Parent?.Children.Remove(newEl);
@@ -803,9 +805,7 @@ public sealed partial class DomBridge
 
                 // Prevent circular references (HierarchyRequestError per DOM spec)
                 if (ReferenceEquals(childEl, element) || IsDescendant(childEl, element))
-                    throw new JSException("HierarchyRequestError: The new child element contains the parent.");
-
-                // Remove from old parent if any
+                    ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
                 childEl.Parent?.Children.Remove(childEl);
                 childEl.Parent = element;
                 element.Children.Add(childEl);
@@ -846,7 +846,7 @@ public sealed partial class DomBridge
 
                 // Prevent circular references (HierarchyRequestError per DOM spec)
                 if (ReferenceEquals(newEl, element) || IsDescendant(newEl, element))
-                    throw new JSException("HierarchyRequestError: The new child element contains the parent.");
+                    ThrowDOMException(_jsContext!, "The new child element contains the parent.", "HierarchyRequestError");
 
                 var idx = element.Children.IndexOf(oldEl);
                 if (idx < 0) return a[1];

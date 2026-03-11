@@ -649,7 +649,7 @@ document.getElementById('result').textContent = r.join(',');
 </body></html>";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
-        Assert.Contains("true,TEST", result);
+        Assert.Contains("true,test", result);
     }
 
     // ────────────────────── element.title ──────────────────────────────────

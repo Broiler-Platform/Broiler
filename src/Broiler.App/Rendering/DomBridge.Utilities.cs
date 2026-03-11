@@ -970,7 +970,15 @@ public sealed partial class DomBridge
     /// </summary>
     private static void ValidateQualifiedName(string qualifiedName, string? ns, JSContext context)
     {
-        // First validate the name characters (allows optional single colon for prefix:localName)
+        // Check for empty prefix (e.g., ":div") first — this is a NamespaceError
+        if (!string.IsNullOrEmpty(qualifiedName) && qualifiedName.StartsWith(':'))
+        {
+            ThrowDOMException(context,
+                $"Failed to execute 'createElementNS': The qualified name provided ('{qualifiedName}') has an empty prefix.",
+                "NamespaceError");
+        }
+
+        // Validate the name characters (allows optional single colon for prefix:localName)
         if (string.IsNullOrEmpty(qualifiedName) || !ValidXmlQualifiedNamePattern.IsMatch(qualifiedName))
         {
             ThrowDOMException(context,
@@ -1064,6 +1072,30 @@ public sealed partial class DomBridge
             DOMException.DATA_CLONE_ERR = 25;
             DOMException.prototype = Object.create(Error.prototype);
             DOMException.prototype.constructor = DOMException;
+            DOMException.prototype.INDEX_SIZE_ERR = 1;
+            DOMException.prototype.DOMSTRING_SIZE_ERR = 2;
+            DOMException.prototype.HIERARCHY_REQUEST_ERR = 3;
+            DOMException.prototype.WRONG_DOCUMENT_ERR = 4;
+            DOMException.prototype.INVALID_CHARACTER_ERR = 5;
+            DOMException.prototype.NO_DATA_ALLOWED_ERR = 6;
+            DOMException.prototype.NO_MODIFICATION_ALLOWED_ERR = 7;
+            DOMException.prototype.NOT_FOUND_ERR = 8;
+            DOMException.prototype.NOT_SUPPORTED_ERR = 9;
+            DOMException.prototype.INUSE_ATTRIBUTE_ERR = 10;
+            DOMException.prototype.INVALID_STATE_ERR = 11;
+            DOMException.prototype.SYNTAX_ERR = 12;
+            DOMException.prototype.INVALID_MODIFICATION_ERR = 13;
+            DOMException.prototype.NAMESPACE_ERR = 14;
+            DOMException.prototype.INVALID_ACCESS_ERR = 15;
+            DOMException.prototype.TYPE_MISMATCH_ERR = 17;
+            DOMException.prototype.SECURITY_ERR = 18;
+            DOMException.prototype.NETWORK_ERR = 19;
+            DOMException.prototype.ABORT_ERR = 20;
+            DOMException.prototype.URL_MISMATCH_ERR = 21;
+            DOMException.prototype.QUOTA_EXCEEDED_ERR = 22;
+            DOMException.prototype.TIMEOUT_ERR = 23;
+            DOMException.prototype.INVALID_NODE_TYPE_ERR = 24;
+            DOMException.prototype.DATA_CLONE_ERR = 25;
         ");
     }
 
