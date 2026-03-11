@@ -159,10 +159,12 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// Fires the <c>load</c> event on the <c>&lt;body&gt;</c> element, which
-    /// triggers any <c>onload</c> attribute handler. In browsers, the body's
-    /// <c>onload</c> fires after all synchronous scripts have executed.
-    /// This is critical for test harnesses like Acid3, which use
-    /// <c>&lt;body onload="update()"&gt;</c> to bootstrap the test runner.
+    /// triggers the inline <c>onload</c> attribute handler as well as any
+    /// <c>addEventListener('load', …)</c> listeners registered on the body.
+    /// In browsers, the body's <c>onload</c> fires after all synchronous
+    /// scripts have executed. This is critical for test harnesses like Acid3,
+    /// which use <c>&lt;body onload="update()"&gt;</c> to bootstrap the
+    /// test runner.
     /// </summary>
     public void FireWindowLoadEvent()
     {
@@ -186,8 +188,8 @@ public sealed partial class DomBridge
         // Ensure the body's JS object is created so inline event attributes are compiled
         ToJSObject(body);
 
-        // Dispatch a 'load' event on the body element
-        if (body.InlineEventHandlers.ContainsKey("load"))
+        // Dispatch a 'load' event on the body element if it has a load handler
+        if (body.InlineEventHandlers.ContainsKey("load") || body.EventListeners.Count > 0)
         {
             try
             {
