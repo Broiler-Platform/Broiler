@@ -14,6 +14,8 @@ public sealed partial class DomBridge
     //  DOM → HTML serialisation
     // ------------------------------------------------------------------
 
+    private const int MaxSerializationDepth = 1024;
+
     private static readonly HashSet<string> SerializerVoidTags = new(StringComparer.OrdinalIgnoreCase)
     {
         "area", "base", "br", "col", "embed", "hr", "img", "input",
@@ -36,8 +38,10 @@ public sealed partial class DomBridge
     private static void SerializeElement(DomElement element, StringBuilder sb, int depth = 0)
     {
         // Guard against excessively deep or circular DOM trees
-        if (depth > 1024)
-            return;
+        if (depth > MaxSerializationDepth)
+            throw new InvalidOperationException(
+                $"Maximum DOM serialization depth ({MaxSerializationDepth}) exceeded. " +
+                "This may indicate a circular reference in the DOM tree.");
 
         // Text nodes
         if (element.IsTextNode)
