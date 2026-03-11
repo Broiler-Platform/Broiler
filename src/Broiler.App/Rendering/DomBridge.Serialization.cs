@@ -14,6 +14,8 @@ public sealed partial class DomBridge
     //  DOM → HTML serialisation
     // ------------------------------------------------------------------
 
+    private const int MaxSerializationDepth = 1024;
+
     private static readonly HashSet<string> SerializerVoidTags = new(StringComparer.OrdinalIgnoreCase)
     {
         "area", "base", "br", "col", "embed", "hr", "img", "input",
@@ -33,8 +35,14 @@ public sealed partial class DomBridge
         return sb.ToString();
     }
 
-    private static void SerializeElement(DomElement element, StringBuilder sb)
+    private static void SerializeElement(DomElement element, StringBuilder sb, int depth = 0)
     {
+        // Guard against excessively deep or circular DOM trees
+        if (depth > MaxSerializationDepth)
+            throw new InvalidOperationException(
+                $"Maximum DOM serialization depth ({MaxSerializationDepth}) exceeded. " +
+                "This may indicate a circular reference in the DOM tree.");
+
         // Text nodes
         if (element.IsTextNode)
         {
@@ -46,7 +54,7 @@ public sealed partial class DomBridge
         if (string.Equals(element.TagName, "#document-fragment", StringComparison.OrdinalIgnoreCase))
         {
             foreach (var child in element.Children)
-                SerializeElement(child, sb);
+                SerializeElement(child, sb, depth + 1);
             return;
         }
 
@@ -94,7 +102,7 @@ public sealed partial class DomBridge
         if (element.Children.Count > 0)
         {
             foreach (var child in element.Children)
-                SerializeElement(child, sb);
+                SerializeElement(child, sb, depth + 1);
         }
         else if (!string.IsNullOrEmpty(element.TextContent))
         {
