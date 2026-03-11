@@ -275,7 +275,9 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// Parses a CSS inline style string (e.g. <c>"color: red; font-size: 12px"</c>)
-    /// into a property→value dictionary.
+    /// into a property→value dictionary. Implements CSS error recovery: when the
+    /// same property is declared multiple times, invalid values are discarded so
+    /// the last <em>valid</em> value wins (per CSS 2.1 §4.2 / CSS Syntax §5).
     /// </summary>
     private static Dictionary<string, string> ParseStyle(string styleValue)
     {
@@ -287,11 +289,130 @@ public sealed partial class DomBridge
             {
                 var prop = declaration[..colonIdx].Trim();
                 var val = declaration[(colonIdx + 1)..].Trim();
-                if (!string.IsNullOrEmpty(prop))
+                if (!string.IsNullOrEmpty(prop) && IsAcceptableCssValue(prop, val))
                     result[prop] = val;
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// CSS error recovery: returns <c>false</c> for values that are clearly
+    /// invalid for the given property.  Only properties with a closed set of
+    /// keyword values are validated; all other properties accept any non-empty value.
+    /// </summary>
+    private static bool IsAcceptableCssValue(string property, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return false;
+
+        // CSS-wide keywords are always valid
+        var v = value.ToLowerInvariant();
+        if (v is "inherit" or "initial" or "unset" or "revert") return true;
+
+        switch (property.ToLowerInvariant())
+        {
+            case "white-space":
+                return v is "normal" or "nowrap" or "pre" or "pre-wrap"
+                    or "pre-line" or "break-spaces";
+
+            case "display":
+                return v is "block" or "inline" or "inline-block" or "none"
+                    or "flex" or "inline-flex" or "grid" or "inline-grid"
+                    or "table" or "table-row" or "table-cell" or "table-column"
+                    or "table-row-group" or "table-header-group"
+                    or "table-footer-group" or "table-column-group"
+                    or "table-caption" or "list-item" or "contents"
+                    or "run-in" or "flow-root";
+
+            case "position":
+                return v is "static" or "relative" or "absolute" or "fixed" or "sticky";
+
+            case "float":
+            case "css-float":
+                return v is "none" or "left" or "right" or "inline-start" or "inline-end";
+
+            case "clear":
+                return v is "none" or "left" or "right" or "both" or "inline-start" or "inline-end";
+
+            case "visibility":
+                return v is "visible" or "hidden" or "collapse";
+
+            case "overflow":
+            case "overflow-x":
+            case "overflow-y":
+                return v is "visible" or "hidden" or "scroll" or "auto" or "clip";
+
+            case "text-align":
+                return v is "left" or "right" or "center" or "justify"
+                    or "start" or "end";
+
+            case "text-decoration-style":
+                return v is "solid" or "double" or "dotted" or "dashed" or "wavy";
+
+            case "text-transform":
+                return v is "none" or "capitalize" or "uppercase" or "lowercase" or "full-width";
+
+            case "vertical-align":
+                // Also accepts lengths/percentages, which won't match these keywords
+                return v is "baseline" or "sub" or "super" or "text-top"
+                    or "text-bottom" or "middle" or "top" or "bottom"
+                    || IsLengthOrPercentage(v);
+
+            case "box-sizing":
+                return v is "content-box" or "border-box";
+
+            case "cursor":
+                return v is "auto" or "default" or "none" or "context-menu"
+                    or "help" or "pointer" or "progress" or "wait"
+                    or "cell" or "crosshair" or "text" or "vertical-text"
+                    or "alias" or "copy" or "move" or "no-drop"
+                    or "not-allowed" or "grab" or "grabbing"
+                    or "e-resize" or "n-resize" or "ne-resize" or "nw-resize"
+                    or "s-resize" or "se-resize" or "sw-resize" or "w-resize"
+                    or "ew-resize" or "ns-resize" or "nesw-resize" or "nwse-resize"
+                    or "col-resize" or "row-resize" or "all-scroll" or "zoom-in" or "zoom-out"
+                    || v.StartsWith("url(", System.StringComparison.Ordinal);
+
+            case "list-style-type":
+                return v is "disc" or "circle" or "square" or "decimal"
+                    or "decimal-leading-zero" or "lower-roman" or "upper-roman"
+                    or "lower-greek" or "lower-latin" or "upper-latin"
+                    or "armenian" or "georgian" or "lower-alpha" or "upper-alpha"
+                    or "none";
+
+            case "border-style":
+            case "border-top-style":
+            case "border-right-style":
+            case "border-bottom-style":
+            case "border-left-style":
+            case "outline-style":
+                return v is "none" or "hidden" or "dotted" or "dashed"
+                    or "solid" or "double" or "groove" or "ridge"
+                    or "inset" or "outset";
+
+            case "font-style":
+                return v is "normal" or "italic" or "oblique";
+
+            case "font-weight":
+                return v is "normal" or "bold" or "bolder" or "lighter"
+                    || (int.TryParse(v, out var w) && w >= 1 && w <= 1000);
+
+            default:
+                // For all other properties accept any non-empty value
+                return true;
+        }
+    }
+
+    /// <summary>Checks whether <paramref name="v"/> looks like a CSS length or percentage.</summary>
+    private static bool IsLengthOrPercentage(string v)
+    {
+        if (v.EndsWith('%') || v.EndsWith("px") || v.EndsWith("em") ||
+            v.EndsWith("rem") || v.EndsWith("vh") || v.EndsWith("vw") ||
+            v.EndsWith("pt") || v.EndsWith("cm") || v.EndsWith("mm") ||
+            v.EndsWith("in") || v.EndsWith("ex") || v.EndsWith("ch") ||
+            v.EndsWith("vmin") || v.EndsWith("vmax"))
+            return true;
+        return v == "0" || (double.TryParse(v, out _));
     }
 
 }
