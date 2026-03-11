@@ -951,10 +951,32 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // element.click() — creates and dispatches a MouseEvent
+        // For checkboxes and radio buttons, toggles checked state.
         obj.FastAddValue(
             (KeyString)"click",
             new JSFunction((in Arguments _) =>
             {
+                // Toggle checked state for checkboxes/radio buttons (per HTML spec)
+                if (string.Equals(element.TagName, "input", StringComparison.OrdinalIgnoreCase))
+                {
+                    var inputType = element.Attributes.TryGetValue("type", out var t) ? t.ToLowerInvariant() : "text";
+                    if (inputType == "checkbox")
+                    {
+                        bool wasChecked = element.Attributes.ContainsKey("checked");
+                        if (wasChecked)
+                            element.Attributes.Remove("checked");
+                        else
+                            element.Attributes["checked"] = "checked";
+                        // Sync DomProperty
+                        element.DomProperties["checked"] = !wasChecked;
+                    }
+                    else if (inputType == "radio")
+                    {
+                        element.Attributes["checked"] = "checked";
+                        element.DomProperties["checked"] = true;
+                    }
+                }
+
                 var evt = new JSObject();
                 evt.FastAddValue((KeyString)"type", new JSString("click"), JSPropertyAttributes.EnumerableConfigurableValue);
                 evt.FastAddValue((KeyString)"bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);

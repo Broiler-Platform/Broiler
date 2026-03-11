@@ -212,7 +212,12 @@ public sealed partial class DomBridge
                 var prev = selector[i - 1];
                 // Insert space only if preceded by a tag/class/id character,
                 // but not a namespace separator '|' or combinator/punctuation.
-                if ((char.IsLetterOrDigit(prev) || prev == '_' || prev == '-') && prev != '|')
+                // Also, don't insert space when * is followed by ., #, [, or :
+                // (which makes it a compound selector like html*.test, not a descendant).
+                bool isCompound = i + 1 < selector.Length &&
+                    (selector[i + 1] == '.' || selector[i + 1] == '#' ||
+                     selector[i + 1] == '[' || selector[i + 1] == ':');
+                if (!isCompound && (char.IsLetterOrDigit(prev) || prev == '_' || prev == '-') && prev != '|')
                 {
                     sb.Append(' ');
                 }
