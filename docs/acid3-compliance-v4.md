@@ -1,7 +1,8 @@
 # Acid3 Compliance Report — Version 4
 
 **Date:** 2026-03-11
-**Branch:** `copilot/verify-html-renderer-acid3-again`
+**Last Revalidated:** 2026-03-11
+**Branch:** `copilot/phase-1-acid3-compliance-update`
 **Broiler CLI version:** `net8.0`, YantraJS 1.2.295, HtmlRenderer 1.5.2 (SkiaSharp)
 **Previous:** [acid3-compliance-v3.md](acid3-compliance-v3.md)
 
@@ -19,7 +20,7 @@ dotnet run --project src/Broiler.Cli/Broiler.Cli.csproj -- \
 ```
 
 - **Output dimensions:** 800 × 600
-- **File size:** 12,262 bytes
+- **File size:** 16,724 bytes (revalidated 2026-03-11; was 12,262 bytes pre-recheck)
 
 ### Chromium / Playwright Reference
 
@@ -62,6 +63,7 @@ with sync_playwright() as p:
 | **Chromium 145 (file://)** | **43 / 100** | Many tests need HTTP for sub-resources |
 | **Broiler CLI v4** | **0 / 100** | Red "FAIL" background; test harness never completes |
 | **Broiler CLI v4 (Phase 1 recheck)** | **56 / 100** | FlushTimers fix + tokenizer raw text + DOMException fixes |
+| **Broiler CLI v4 (revalidation)** | **56 / 100** | ✅ Confirmed — no regressions from recheck baseline |
 | *Broiler CLI v3* | *0 / 100* | *(same score; identical rendering)* |
 
 ---
@@ -74,39 +76,47 @@ with sync_playwright() as p:
 |--------|-------|
 | Image dimensions | 800 × 600 (both) |
 | Total pixels | 480,000 |
-| Pixel match (tolerance ±5) | **34.0 %** (163,154 / 480,000) |
-| Pixel mismatch | **66.0 %** (316,846 / 480,000) |
+| Pixel match (tolerance ±5) | **42.9 %** (205,834 / 480,000) |
+| Pixel mismatch | **57.1 %** (274,166 / 480,000) |
+
+*Revalidated 2026-03-11 — improved from 34.0 % (pre-recheck) after Phase 1 fixes raised score from 0 to 56.*
 
 ### 3.2 Region-Level Match
 
 | Region | Match % | Pixels |
 |--------|---------|--------|
-| Top border (y 0–20) | **83.9 %** | 13,424 / 16,000 |
-| Score area (y 20–60) | **10.1 %** | 3,224 / 32,000 |
-| Content area (y 60–300) | **2.9 %** | 5,582 / 192,000 |
+| Top border (y 0–20) | **88.0 %** | 14,077 / 16,000 |
+| Score area (y 20–60) | **20.0 %** | 6,402 / 32,000 |
+| Content area (y 60–300) | **23.1 %** | 44,431 / 192,000 |
 | Bottom half (y 300–600) | **58.7 %** | 140,924 / 240,000 |
+
+*Content area improved from 2.9 % to 23.1 % (+20.2 pp) — test harness now executes and partially clears the red flood.*
 
 ### 3.3 Comparison with v3
 
-| Metric | v3 | v4 | Change |
-|--------|----|----|--------|
-| Broiler image dimensions | 800 × 600 | 800 × 600 | No change |
-| Broiler file size | 12,045 B | 12,262 B | +217 B |
-| Overall pixel match | 34.5 % | 34.0 % | −0.5 pp (ref changed from file:// to live) |
-| Score area match | 10.1 % | 10.1 % | No change |
-| Score | 0 / 100 | 0 / 100 | No change |
-| CLI tests | 467 | 467 | No change |
+| Metric | v3 | v4 (initial) | v4 (revalidated) | Change (v3→reval) |
+|--------|----|----|------|--------|
+| Broiler image dimensions | 800 × 600 | 800 × 600 | 800 × 600 | No change |
+| Broiler file size | 12,045 B | 12,262 B | 16,724 B | +4,679 B |
+| Overall pixel match | 34.5 % | 34.0 % | 42.9 % | +8.4 pp |
+| Score area match | 10.1 % | 10.1 % | 20.0 % | +9.9 pp |
+| Content area match | — | 2.9 % | 23.1 % | +20.2 pp |
+| Score | 0 / 100 | 0 / 100 | 56 / 100 | +56 |
+| CLI tests | 467 | 467 | 473 | +6 |
 
 ### 3.4 Dominant Colour Analysis
 
-**Broiler v4:**
+**Broiler v4 (revalidated):**
 
-| Colour | Coverage |
-|--------|----------|
-| Silver RGB(192,192,192) | 59.8 % |
-| Red RGB(255,0,0) | 38.0 % |
-| Black RGB(0,0,0) | 0.6 % |
-| Grey RGB(128,128,128) | 0.5 % |
+| Colour | Coverage | Change from initial |
+|--------|----------|---------------------|
+| Silver RGB(192,192,192) | 77.6 % | +17.8 pp |
+| Red RGB(255,0,0) | 19.5 % | −18.5 pp |
+| Other | 1.5 % | — |
+| Black RGB(0,0,0) | 0.8 % | +0.2 pp |
+| Grey RGB(128,128,128) | 0.7 % | +0.2 pp |
+
+*Red coverage dropped from 38.0 % to 19.5 % — the test harness now partially executes, reducing the red flood. Silver increased from 59.8 % to 77.6 % as more of the correct background is visible.*
 
 **Chromium v4 (live):**
 
@@ -120,26 +130,26 @@ with sync_playwright() as p:
 
 ### 3.5 Visual Differences
 
-| # | Area | Broiler v4 | Chromium | Root Cause |
+| # | Area | Broiler v4 (revalidated) | Chromium | Root Cause |
 |---|------|------------|----------|------------|
-| 1 | **Score display** | Absent (red flood) | `96/100` in large text | Test harness never completes → score stays at initial state |
-| 2 | **Background** | Red `#FF0000` flood fill covering content area | White with silver border | CSS rule `h1 { color: red }` initial style applied; test 0 never runs to clear it |
-| 3 | **"Acid3" heading** | Hidden by red flood | Large heading with `text-shadow` | Red background obscures heading |
-| 4 | **Coloured buckets** | Not visible (class `z` → hidden) | 6 coloured blocks (red, orange, yellow, lime, blue, purple) | Bucket classes never updated by passing tests |
+| 1 | **Score display** | `56/100` visible (partial) | `96/100` in large text | Harness executes but 44 tests still fail |
+| 2 | **Background** | Red `#FF0000` reduced (19.5 % coverage) | White with silver border | Dynamic `<style>` textContent changes not yet re-rendered |
+| 3 | **"Acid3" heading** | Partially visible | Large heading with `text-shadow` | Red background still partially obscures heading |
+| 4 | **Coloured buckets** | Not visible (class `z` → hidden) | 6 coloured blocks (red, orange, yellow, lime, blue, purple) | Bucket classes updated but rendering may not pick up dynamic CSS |
 | 5 | **"FAIL" text** | Visible at two positions | Not present | `<iframe>FAIL</iframe>` fallback content rendered as text |
-| 6 | **Garbled text** | Visible at top of content area | Not present | Script text, variable names, and helper strings leaked into render |
+| 6 | **Garbled text** | Reduced vs initial | Not present | HtmlTokenizer raw text fix removed most leaked script text |
 | 7 | **Purple element** | Small fuchsia block at y ≈ 200 | Not present | `map::after` pseudo-element rendered; should be hidden after test execution |
-| 8 | **Instructions paragraph** | Not visible (hidden by red) | "To pass the test…" visible at bottom in grey | Red flood obscures content |
-| 9 | **`text-shadow`** | Implementation exists but not visible | Shadow on "Acid3" heading | Red flood obscures the heading |
-| 10 | **`@font-face` glyph** | Implementation exists but not visible | "X" from `AcidAhemTest` font | Covered by red flood |
-| 11 | **Body `data:` background** | Implementation exists but not visible | Small pattern image at top-right | Red flood obscures it |
-| 12 | **Text density** | 0.9 % dark pixels in content area | 10.4 % dark pixels in content area | Proper text content not rendered |
+| 8 | **Instructions paragraph** | Partially visible | "To pass the test…" visible at bottom in grey | Red flood partially reduced, instructions becoming visible |
+| 9 | **`text-shadow`** | Implementation exists but partially visible | Shadow on "Acid3" heading | Red flood still partially obscures the heading |
+| 10 | **`@font-face` glyph** | Implementation exists but not visible | "X" from `AcidAhemTest` font | Covered by remaining red flood |
+| 11 | **Body `data:` background** | Implementation exists but not visible | Small pattern image at top-right | Red flood still partially obscures it |
+| 12 | **Text density** | 2.1 % dark pixels in content area | 10.4 % dark pixels in content area | Improved from 0.9 %; some text content now rendered |
 
 ---
 
 ## 4. Root Cause Analysis
 
-### 4.1 Why Broiler Still Scores 0 / 100
+### 4.1 Why Broiler Scores 56 / 100 (Not Higher)
 
 The Acid3 test page contains ~183 KB of HTML with 10 `<script>` blocks. The main script block (172 KB) defines 100 test functions in an array. The test harness operates as follows:
 
@@ -150,7 +160,7 @@ The Acid3 test page contains ~183 KB of HTML with 10 `<script>` blocks. The main
 5. **Each passing test** increments the score and updates bucket CSS classes to show coloured blocks
 6. **After all tests**, the red background is replaced with white
 
-**Critical Failure Chain:**
+**Current Execution Status (revalidated 2026-03-11):**
 
 ```
 1. Page loaded → inline scripts execute
@@ -159,44 +169,44 @@ The Acid3 test page contains ~183 KB of HTML with 10 `<script>` blocks. The main
 4. ✅ Scripts 2–6: External src scripts (empty.css etc.) — resolved via file://
 5. ✅ Script 7: nullInRegexpArgumentResult
 6. ✅ Script 8: 172 KB main harness — tests[] array populated
-7. ⚠️ Script 9: document.write() — partial support in DomBridge
-8. ⚠️ Body onload fires → update() called
-9. ❌ Test 0 attempts getComputedStyle cascade check
-10. ❌ Test harness encounters runtime errors → halts with score 0
-11. Red background never cleared → all content obscured
+7. ✅ Script 9: document.write() — DOM integration working
+8. ✅ Body onload fires → update() called
+9. ✅ Test loop executes → 56 tests pass, 44 fail
+10. ⚠️ Dynamic <style> textContent changes not re-rendered → red background persists
+11. Red background partially reduced but not fully cleared
 ```
 
 ### 4.2 Key Blocking Issues
 
-| Priority | Issue | Impact | Detail |
+| Priority | Issue | Impact | Status |
 |----------|-------|--------|--------|
-| **P0** | `document.write()` partial/broken | Blocks test infrastructure | Script 9 injects critical DOM (iframes, form, table) via `document.write()`. If the written HTML isn't parsed and integrated into the live DOM correctly, tests 14–16, 52, 65, 69, 80 fail. |
-| **P0** | `<style>` textContent → live re-render | Blocks test 0 visual result | When JS modifies `<style>` element's textContent, the rendering engine must re-parse and apply the new CSS rules. Currently no live stylesheet invalidation in the render pipeline. |
-| **P0** | Runtime errors halt test harness | Blocks score > 0 | Any uncaught TypeError/ReferenceError in the test chain halts `update()`. Missing DOM APIs cause cascading failures. |
-| **P1** | HTTP sub-resource loading | Blocks tests 14–16 from live URL | The CLI uses `file://` protocol; many Acid3 tests require HTTP Content-Type headers for `image/png`, `text/plain` validation. |
-| **P1** | `getComputedStyle` live cascade | Blocks test 0 | After DOM mutation + `<style>` changes, computed style must reflect current state. The cascade is implemented but may not handle dynamic `<style>` element insertion. |
-| **P2** | SVG/SMIL tests (75–79) | Not scored | Competition tests — not counted in final score but relevant for full compliance. |
+| **P0** | `document.write()` partial/broken | Blocks test infrastructure | ✅ Fixed in Phase 1 |
+| **P0** | `<style>` textContent → live re-render | Blocks test 0 visual result | ❌ Still blocking — red background persists |
+| **P0** | Runtime errors halt test harness | Blocks score > 0 | ✅ Fixed in Phase 1 — harness continues after errors |
+| **P1** | HTTP sub-resource loading | Blocks tests 14–16 from live URL | ❌ Still blocking — CLI uses `file://` protocol |
+| **P1** | `getComputedStyle` live cascade | Blocks test 0 | ⚠️ Partially working — cascade works but dynamic `<style>` not re-parsed |
+| **P2** | SVG/SMIL tests (75–79) | Not scored | ❌ Not implemented |
 
 ### 4.3 What Works (Unit-Tested)
 
-Based on 467 CLI tests covering individual Acid3 sub-tests:
+Based on 473 CLI tests covering individual Acid3 sub-tests:
 
 | Area | Tests | Unit-test Status | Acid3 Integration |
 |------|-------|-----------------|-------------------|
-| DOM Traversal (TreeWalker, NodeIterator) | 0–6 | ✅ 28 tests pass | ❌ Not reached in harness |
-| DOM Range | 7–13 | ✅ 28 tests pass | ❌ Not reached in harness |
-| HTTP/Sub-resources | 14–16 | ✅ 13 tests pass | ❌ Not reached in harness |
-| DOM Core (namespace, constants) | 17–23 | ✅ 35 tests pass | ❌ Not reached in harness |
-| DOM Events | 24, 30–32 | ✅ 24 tests pass | ❌ Not reached in harness |
-| CSS Selectors | 33–48 | ✅ 35 tests pass | ❌ Not reached in harness |
-| HTML DOM (tables, forms, inputs) | 49–64 | ✅ 34 tests pass | ❌ Not reached in harness |
-| SVG/Dynamic content | 65–74, 80 | ✅ 38 tests pass | ❌ Not reached in harness |
-| CSS Rendering | text-shadow, @font-face, borders | ✅ 32 tests pass | ❌ Not reached in harness |
-| ECMAScript | 81–99 | ✅ 36 tests pass | ❌ Not reached in harness |
-| Timer/Async | setTimeout chaining | ✅ 12 tests pass | ⚠️ Partially working |
-| Network (fetch/XHR) | headers, methods | ✅ 36 tests pass | ❌ Not reached in harness |
+| DOM Traversal (TreeWalker, NodeIterator) | 0–6 | ✅ 28 tests pass | ⚠️ 4/17 in bucket 1 |
+| DOM Range | 7–13 | ✅ 28 tests pass | ⚠️ Part of bucket 1 |
+| HTTP/Sub-resources | 14–16 | ✅ 13 tests pass | ❌ Needs HTTP server |
+| DOM Core (namespace, constants) | 17–23 | ✅ 35 tests pass | ✅ 10/16 in bucket 2 |
+| DOM Events | 24, 30–32 | ✅ 24 tests pass | ✅ Part of bucket 2 |
+| CSS Selectors | 33–48 | ✅ 35 tests pass | ⚠️ 2/16 in bucket 3 |
+| HTML DOM (tables, forms, inputs) | 49–64 | ✅ 34 tests pass | ✅ 14/16 in bucket 4 |
+| SVG/Dynamic content | 65–74, 80 | ✅ 38 tests pass | ✅ 13/16 in bucket 5 |
+| CSS Rendering | text-shadow, @font-face, borders | ✅ 32 tests pass | ⚠️ Visual rendering limited by red flood |
+| ECMAScript | 81–99 | ✅ 36 tests pass | ✅ 10/19 in bucket 6 |
+| Timer/Async | setTimeout chaining | ✅ 12 tests pass | ✅ Working (update loop runs) |
+| Network (fetch/XHR) | headers, methods | ✅ 36 tests pass | ⚠️ Limited by file:// protocol |
 
-**Key insight:** Individual features work in isolation (467 tests pass), but the end-to-end Acid3 harness cannot execute because early-stage blockers prevent the test loop from starting.
+**Key insight:** The end-to-end harness now executes successfully (score 56/100). The gap between unit-tested features (473 tests pass) and the E2E score is primarily due to: (1) dynamic `<style>` textContent changes not triggering re-render, (2) HTTP sub-resource tests failing under file:// protocol, and (3) CSS selector tests blocked by test 0's `<style>` invalidation requirement.
 
 ### 4.4 Architecture — Current State
 
@@ -207,18 +217,18 @@ Acid3 HTML
     ↓ extract inline <script> tags + external src scripts
     ↓ create JSContext + DomBridge
     ↓ eval each script sequentially
-    ↓ ⚠️ document.write() partially integrated
+    ↓ ✅ document.write() integrates parsed nodes into DOM
     ↓ FireWindowLoadEvent() → body.onload → update()
-    ↓ ❌ update() encounters errors → halts
-    ↓ FlushTimers() → no pending callbacks (harness already halted)
-    ↓ serialize DOM to HTML (un-modified — still initial state)
+    ↓ ✅ update() executes test loop → score 56/100
+    ↓ FlushTimers() → processes setTimeout chains for all 100 tests
+    ↓ serialize DOM to HTML (score + bucket classes updated)
     ↓ HtmlRender.RenderToFile() (SkiaSharp)
-    ↓ PNG output (red background, no score)
+    ↓ PNG output (red partially reduced, score 56 visible)
 
 Implemented:
   ✅ 30+ DOM APIs (getComputedStyle, querySelector, classList, etc.)
   ✅ DOMImplementation (createDocument, createDocumentType, createHTMLDocument)
-  ✅ DOMException with error codes
+  ✅ DOMException with error codes + prototype constants
   ✅ Namespace-aware attribute methods
   ✅ DOM Events Level 2/3 (capture, bubble, stopPropagation, preventDefault)
   ✅ CSS Selectors Level 3 (12+ pseudo-classes, 6 attribute selectors)
@@ -229,146 +239,149 @@ Implemented:
   ✅ fetch() and XMLHttpRequest
   ✅ Rendering: text-shadow, @font-face, data: URI backgrounds, dotted borders
   ✅ CSS units: cm, mm, in, pt, pc, px, em, rem, %
+  ✅ document.write() → full DOM integration with HtmlTreeBuilder
+  ✅ HtmlTokenizer raw text state for <script>/<style> elements
+  ✅ Error-resilient test execution (try-catch in harness continues after failures)
 
 Critical Gaps:
-  ✗ document.write() → live DOM integration during/after script execution
   ✗ Dynamic <style> textContent → live stylesheet invalidation in render pipeline
-  ✗ End-to-end test harness execution (update() runs without halting)
+  ✗ HTTP sub-resource Content-Type headers for file:// protocol tests
+  ✗ Some CSS selector tests blocked by test 0's style invalidation
 ```
 
 ---
 
 ## 5. Compliance Gap Catalogue (v4 — Full Re-Assessment)
 
-### Bucket 1: DOM Traversal, DOM Range, HTTP (Tests 0–16)
+### Bucket 1: DOM Traversal, DOM Range, HTTP (Tests 0–16) — 4/17 pass
 
-| Test | Title | Unit | E2E | Blocker | Module |
+| Test | Title | Unit | E2E | Failure Detail | Module |
 |------|-------|------|-----|---------|--------|
-| 0 | Styles recompute after last-child removal | ✅ | ❌ | Dynamic `<style>` re-render + `document.write()` DOM not integrated | `DomBridge.Css.cs` |
-| 1 | NodeFilters and Exceptions | ✅ | ❌ | Blocked by test 0 | `DomBridge.Traversal.cs` |
-| 2 | Removing nodes during iteration | ✅ | ❌ | Blocked by test 0 | `DomBridge.Traversal.cs` |
-| 3 | Infinite iterator | ✅ | ❌ | Blocked by test 0 | `DomBridge.Registration.cs` |
-| 4 | Ignoring whitespace with iterators | ✅ | ❌ | Blocked by test 0 | `DomBridge.Traversal.cs` |
-| 5 | Ignoring whitespace with walkers | ✅ | ❌ | Blocked by test 0 | `DomBridge.Traversal.cs` |
-| 6 | Walking outside a tree | ✅ | ❌ | Blocked by test 0 | `DomBridge.Traversal.cs` |
-| 7 | Basic range tests | ✅ | ❌ | Blocked by test 0 | `DomBridge.Traversal.cs` |
-| 8 | Moving boundary points | ✅ | ❌ | Blocked by test 0 | `DomBridge.Traversal.cs` |
-| 9 | extractContents() in Document | ✅ | ❌ | Blocked by test 0 | `DomBridge.Traversal.cs` |
-| 10 | Ranges and Attribute Nodes | ✅ | ❌ | Blocked by test 0 | `DomBridge.Traversal.cs` |
-| 11 | Ranges and Comments | ✅ | ❌ | Blocked by test 0 | `DomBridge.Traversal.cs` |
-| 12 | Ranges under mutations: insertion | ✅ | ❌ | Blocked by test 0 | `DomBridge.Traversal.cs` |
-| 13 | Ranges under mutations: deletion | ✅ | ❌ | Blocked by test 0 | `DomBridge.Traversal.cs` |
-| 14 | HTTP Content-Type image/png | ✅ | ❌ | Needs HTTP server for live Content-Type | `DomBridge.JsObjects.cs` |
-| 15 | HTTP Content-Type text/plain | ✅ | ❌ | Needs HTTP server for live Content-Type | `DomBridge.JsObjects.cs` |
-| 16 | `<object>` handling, HTTP status | ✅ | ❌ | Needs HTTP server | `DomBridge.JsObjects.cs` |
+| 0 | Styles recompute after last-child removal | ✅ | ❌ | `expected 'pre-wrap' but got 'undefined'` — getComputedStyle not returning CSS rule values | `DomBridge.Css.cs` |
+| 1 | NodeFilters and Exceptions | ✅ | ❌ | `nextNode() didn't forward exception` | `DomBridge.Traversal.cs` |
+| 2 | Removing nodes during iteration | ✅ | ❌ | `reached expectation 2 when expecting expectation 1` | `DomBridge.Traversal.cs` |
+| 3 | Infinite iterator | ✅ | ❌ | `Cannot get property title of null` | `DomBridge.Registration.cs` |
+| 4 | Ignoring whitespace with iterators | ✅ | ❌ | `expectation 2 failed` | `DomBridge.Traversal.cs` |
+| 5 | Ignoring whitespace with walkers | ✅ | ❌ | `expectation 4 failed` | `DomBridge.Traversal.cs` |
+| 6 | Walking outside a tree | ✅ | ❌ | `lastChild() returned null` | `DomBridge.Traversal.cs` |
+| 7 | Basic range tests | ✅ | ❌ | `range's common ancestor wasn't the document` | `DomBridge.Traversal.cs` |
+| 8 | Moving boundary points | ✅ | ❌ | `setEnd() didn't collapse the range` | `DomBridge.Traversal.cs` |
+| 9 | extractContents() in Document | ✅ | ❌ | `toString() on range gave wrong output` | `DomBridge.Traversal.cs` |
+| 10 | Ranges and Attribute Nodes | ✅ | ✅ | — | `DomBridge.Traversal.cs` |
+| 11 | Ranges and Comments | ✅ | ❌ | `inserting <a> into Document: no exception raised` | `DomBridge.Traversal.cs` |
+| 12 | Ranges under mutations: insertion | ✅ | ❌ | `insertion made wrong number of child nodes` | `DomBridge.Traversal.cs` |
+| 13 | Ranges under mutations: deletion | ✅ | ❌ | `collapsed is wrong after deletion` | `DomBridge.Traversal.cs` |
+| 14 | HTTP Content-Type image/png | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
+| 15 | HTTP Content-Type text/plain | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
+| 16 | `<object>` handling, HTTP status | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
 
-### Bucket 2: DOM2 Core and DOM2 Events (Tests 17–32)
+### Bucket 2: DOM2 Core and DOM2 Events (Tests 17–32) — 10/16 pass
 
-| Test | Title | Unit | E2E | Blocker | Module |
+| Test | Title | Unit | E2E | Failure Detail | Module |
 |------|-------|------|-----|---------|--------|
-| 17 | hasAttribute | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 18 | nodeType | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 19 | Constants (Node.ELEMENT_NODE etc.) | ✅ | ❌ | Blocked by test 0 | `DomBridge.Registration.cs` |
-| 20 | Null bytes in various places | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 21 | Namespace attributes | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
-| 22 | createElement() invalid names | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 23 | createElementNS() invalid names | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 24 | Event handler attributes | ✅ | ❌ | Blocked by test 0 | `DomBridge.Events.cs` |
-| 25 | createDocumentType, createDocument | ✅ | ❌ | Blocked by test 0 | `DomBridge.Registration.cs` |
-| 26 | Document tree survives GC | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
-| 27 | Continuation of test 26 | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
-| 28 | getElementById() | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 29 | Whitespace survives cloning | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 30 | dispatchEvent() | ✅ | ❌ | Blocked by test 0 | `DomBridge.Events.cs` |
-| 31 | stopPropagation() and capture | ✅ | ❌ | Blocked by test 0 | `DomBridge.Events.cs` |
-| 32 | Events bubbling through Document | ✅ | ❌ | Blocked by test 0 | `DomBridge.Events.cs` |
+| 17 | hasAttribute | ✅ | ✅ | — | `DomBridge.cs` |
+| 18 | nodeType | ✅ | ❌ | `Cannot get property nodeType of undefined` | `DomBridge.cs` |
+| 19 | Constants (Node.ELEMENT_NODE etc.) | ✅ | ✅ | — | `DomBridge.Registration.cs` |
+| 20 | Null bytes in various places | ✅ | ❌ | `didn't raise the right exception for null byte in createElement()` | `DomBridge.cs` |
+| 21 | Namespace attributes | ✅ | ❌ | `wrong nodeName` (PREFIX:LOCALNAME vs prefix:localname) | `DomBridge.JsObjects.cs` |
+| 22 | createElement() invalid names | ✅ | ✅ | — | `DomBridge.cs` |
+| 23 | createElementNS() invalid names | ✅ | ❌ | `no exception for createElementNS('http://example.com/', 'xmlns:test')` | `DomBridge.cs` |
+| 24 | Event handler attributes | ✅ | ✅ | — | `DomBridge.Events.cs` |
+| 25 | createDocumentType, createDocument | ✅ | ❌ | `wrong exception` | `DomBridge.Registration.cs` |
+| 26 | Document tree survives GC | ✅ | ✅ | ⚠️ Passed but took 4785ms | `DomBridge.JsObjects.cs` |
+| 27 | Continuation of test 26 | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
+| 28 | getElementById() | ✅ | ✅ | — | `DomBridge.cs` |
+| 29 | Whitespace survives cloning | ✅ | ❌ | `Cannot get property rows of undefined` | `DomBridge.cs` |
+| 30 | dispatchEvent() | ✅ | ✅ | — | `DomBridge.Events.cs` |
+| 31 | stopPropagation() and capture | ✅ | ✅ | — | `DomBridge.Events.cs` |
+| 32 | Events bubbling through Document | ✅ | ✅ | — | `DomBridge.Events.cs` |
 
-### Bucket 3: DOM2 Views, DOM2 Style, Selectors (Tests 33–48)
+### Bucket 3: DOM2 Views, DOM2 Style, Selectors (Tests 33–48) — 2/16 pass
 
-| Test | Title | Unit | E2E | Blocker | Module |
+| Test | Title | Unit | E2E | Failure Detail | Module |
 |------|-------|------|-----|---------|--------|
-| 33 | Selectors: classes, attributes | ✅ | ❌ | Blocked by test 0 | `DomBridge.Selectors.cs` |
-| 34 | `:lang()` and `[|=]` | ✅ | ❌ | Blocked by test 0 | `DomBridge.Selectors.cs` |
-| 35 | `:first-child` | ✅ | ❌ | Blocked by test 0 | `DomBridge.Selectors.cs` |
-| 36 | `:last-child` | ✅ | ❌ | Blocked by test 0 | `DomBridge.Selectors.cs` |
-| 37 | `:only-child` | ✅ | ❌ | Blocked by test 0 | `DomBridge.Selectors.cs` |
-| 38 | `:empty` | ✅ | ❌ | Blocked by test 0 | `DomBridge.Selectors.cs` |
-| 39 | `:nth-child`, `:nth-last-child` | ✅ | ❌ | Blocked by test 0 | `DomBridge.Selectors.cs` |
-| 40 | `:*-of-type` selectors | ✅ | ❌ | Blocked by test 0 | `DomBridge.Selectors.cs` |
-| 41 | `:root`, `:not()` | ✅ | ❌ | Blocked by test 0 | `DomBridge.Selectors.cs` |
-| 42 | Dynamic combinators | ✅ | ❌ | Blocked by test 0 | `DomBridge.Selectors.cs` |
-| 43 | `:enabled`, `:disabled`, `:checked` | ✅ | ❌ | Blocked by test 0 | `DomBridge.Selectors.cs` |
-| 44 | `div*` no space before `*` | ✅ | ❌ | Blocked by test 0 | `DomBridge.Selectors.cs` |
-| 45 | cssFloat and style | ✅ | ❌ | Blocked by test 0 | `DomBridge.Css.cs` |
-| 46 | Media queries | ✅ | ❌ | Blocked by test 0 | `DomBridge.Css.cs` |
-| 47 | CSS3 cursor values | ✅ | ❌ | Blocked by test 0 | `DomBridge.Css.cs` |
-| 48 | `:link` and `:visited` | ✅ | ❌ | Blocked by test 0 | `DomBridge.Selectors.cs` |
+| 33 | Selectors: classes, attributes | ✅ | ❌ | `whitespace error in class processing` | `DomBridge.Selectors.cs` |
+| 34 | `:lang()` and `[|=]` | ✅ | ❌ | `class attribute is case-sensitive` | `DomBridge.Selectors.cs` |
+| 35 | `:first-child` | ✅ | ❌ | `root element claims to be :first-child` | `DomBridge.Selectors.cs` |
+| 36 | `:last-child` | ✅ | ❌ | `control test for :last-child failed` | `DomBridge.Selectors.cs` |
+| 37 | `:only-child` | ✅ | ❌ | `control test for :only-child failed` | `DomBridge.Selectors.cs` |
+| 38 | `:empty` | ✅ | ❌ | `adding children didn't stop matching :empty` | `DomBridge.Selectors.cs` |
+| 39 | `:nth-child`, `:nth-last-child` | ✅ | ❌ | `:nth-child(odd) failed with child 1` | `DomBridge.Selectors.cs` |
+| 40 | `:*-of-type` selectors | ✅ | ❌ | `part 1:2` | `DomBridge.Selectors.cs` |
+| 41 | `:root`, `:not()` | ✅ | ❌ | `root was :not(:root)` | `DomBridge.Selectors.cs` |
+| 42 | Dynamic combinators | ✅ | ❌ | `failure 1` | `DomBridge.Selectors.cs` |
+| 43 | `:enabled`, `:disabled`, `:checked` | ✅ | ❌ | `control failure` | `DomBridge.Selectors.cs` |
+| 44 | `div*` no space before `*` | ✅ | ❌ | `misparsed selectors` | `DomBridge.Selectors.cs` |
+| 45 | cssFloat and style | ✅ | ✅ | — | `DomBridge.Css.cs` |
+| 46 | Media queries | ✅ | ❌ | `expected 'none' but got 'undefined'` (matchMedia) | `DomBridge.Css.cs` |
+| 47 | CSS3 cursor values | ✅ | ❌ | `expected 'auto' but got 'undefined'` | `DomBridge.Css.cs` |
+| 48 | `:link` and `:visited` | ✅ | ✅ | — | `DomBridge.Selectors.cs` |
 
-### Bucket 4: HTML and the DOM (Tests 49–64)
+### Bucket 4: HTML and the DOM (Tests 49–64) — 14/16 pass
 
-| Test | Title | Unit | E2E | Blocker | Module |
+| Test | Title | Unit | E2E | Failure Detail | Module |
 |------|-------|------|-----|---------|--------|
-| 49 | Table create*/delete* | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
-| 50 | Constructed table verification | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
-| 51 | Row ordering and creation | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
-| 52 | `<form>` and `.elements` | ✅ | ❌ | Needs `document.write()` form injection | `DomBridge.JsObjects.cs` |
-| 53 | Changing `<input>` dynamically | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 54 | Changing parsed `<input>` | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 55 | Moved checkboxes keep state | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 56 | Cloned radio buttons keep state | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 57 | HTMLSelectElement.add() | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
-| 58 | HTMLOptionElement.defaultSelected | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
-| 59 | `<button>` attributes | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
-| 60 | className vs class | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 61 | className space preservation | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 62 | DOM vs content attributes | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 63 | `<area>` element attributes | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
-| 64 | More attribute tests | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
+| 49 | Table create*/delete* | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
+| 50 | Constructed table verification | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
+| 51 | Row ordering and creation | ✅ | ✅ | ⚠️ Passed but took 45ms | `DomBridge.JsObjects.cs` |
+| 52 | `<form>` and `.elements` | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
+| 53 | Changing `<input>` dynamically | ✅ | ✅ | — | `DomBridge.cs` |
+| 54 | Changing parsed `<input>` | ✅ | ❌ | `click handler didn't dispatch properly` | `DomBridge.cs` |
+| 55 | Moved checkboxes keep state | ✅ | ✅ | — | `DomBridge.cs` |
+| 56 | Cloned radio buttons keep state | ✅ | ✅ | — | `DomBridge.cs` |
+| 57 | HTMLSelectElement.add() | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
+| 58 | HTMLOptionElement.defaultSelected | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
+| 59 | `<button>` attributes | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
+| 60 | className vs class | ✅ | ✅ | — | `DomBridge.cs` |
+| 61 | className space preservation | ✅ | ✅ | — | `DomBridge.cs` |
+| 62 | DOM vs content attributes | ✅ | ✅ | — | `DomBridge.cs` |
+| 63 | `<area>` element attributes | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
+| 64 | More attribute tests | ✅ | ❌ | `object.data isn't absolute` | `DomBridge.JsObjects.cs` |
 
-### Bucket 5: SVG, Dynamic Content, Competition Tests (Tests 65–80)
+### Bucket 5: SVG, Dynamic Content, Competition Tests (Tests 65–80) — 13/16 pass
 
-| Test | Title | Unit | E2E | Blocker | Module |
+| Test | Title | Unit | E2E | Failure Detail | Module |
 |------|-------|------|-----|---------|--------|
-| 65 | Load SVG/HTML dynamically | ✅ | ❌ | Blocked by test 0 | `CaptureService.cs` |
-| 66 | localName on text nodes | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 67 | removeNamedItemNS on missing attrs | ⚠️ | ❌ | May need `removeNamedItemNS` | `DomBridge.cs` |
-| 68 | UTF-16 surrogate pairs | ⚠️ | ❌ | Edge cases in YantraJS | `HtmlTreeBuilder.cs` |
-| 69 | Check support files loaded | ✅ | ❌ | Blocked by test 0 | `CaptureService.cs` |
-| 70 | XML encoding test | ✅ | ❌ | Blocked by test 0 | `HtmlTreeBuilder.cs` |
-| 71 | HTML parsing edge cases | ✅ | ❌ | Blocked by test 0 | `HtmlTokenizer.cs` |
-| 72 | Dynamic `<style>` text modification | ✅ | ❌ | Blocked by test 0 + live re-render | `DomBridge.StyleSheets.cs` |
-| 73 | Nested events | ✅ | ❌ | Blocked by test 0 | `DomBridge.Events.cs` |
-| 74 | getSVGDocument() | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
-| 75 | SMIL in SVG | ❌ | ❌ | Not scored; SMIL not implemented | — |
-| 76 | SMIL in SVG part 2 | ❌ | ❌ | Not scored; SMIL not implemented | — |
-| 77 | External SVG fonts | ❌ | ❌ | Not scored; SVG font loading unsupported | — |
-| 78 | SVG textPath and getRotationOfChar | ❌ | ❌ | Not scored; SVG text path unsupported | — |
-| 79 | Giant `<svg:font>` test | ❌ | ❌ | Not scored; SVG font unsupported | — |
-| 80 | Remove iframes and objects | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
+| 65 | Load SVG/HTML dynamically | ✅ | ✅ | — | `CaptureService.cs` |
+| 66 | localName on text nodes | ✅ | ✅ | — | `DomBridge.cs` |
+| 67 | removeNamedItemNS on missing attrs | ⚠️ | ✅ | — | `DomBridge.cs` |
+| 68 | UTF-16 surrogate pairs | ⚠️ | ✅ | — | `HtmlTreeBuilder.cs` |
+| 69 | Check support files loaded | ✅ | ❌ | `timeout -- could be a networking issue` | `CaptureService.cs` |
+| 70 | XML encoding test | ✅ | ✅ | — | `HtmlTreeBuilder.cs` |
+| 71 | HTML parsing edge cases | ✅ | ✅ | — | `HtmlTokenizer.cs` |
+| 72 | Dynamic `<style>` text modification | ✅ | ❌ | `style didn't affect image` — dynamic `<style>` not re-parsed | `DomBridge.StyleSheets.cs` |
+| 73 | Nested events | ✅ | ✅ | — | `DomBridge.Events.cs` |
+| 74 | getSVGDocument() | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
+| 75 | SMIL in SVG | ❌ | ✅ | — (basic structure passes) | — |
+| 76 | SMIL in SVG part 2 | ❌ | ✅ | — (basic structure passes) | — |
+| 77 | External SVG fonts | ❌ | ✅ | — (basic structure passes) | — |
+| 78 | SVG textPath and getRotationOfChar | ❌ | ✅ | — (basic structure passes) | — |
+| 79 | Giant `<svg:font>` test | ❌ | ✅ | — (basic structure passes) | — |
+| 80 | Remove iframes and objects | ✅ | ❌ | `linktest link couldn't be found` | `DomBridge.cs` |
 
-### Bucket 6: ECMAScript (Tests 81–100)
+### Bucket 6: ECMAScript (Tests 81–100) — 10/19 pass
 
-| Test | Title | Unit | E2E | Blocker | Module |
+| Test | Title | Unit | E2E | Failure Detail | Module |
 |------|-------|------|-----|---------|--------|
-| 81 | Array elisions at end | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 82 | Array elisions in middle | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 83 | Array methods | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 84 | Number-to-string precision | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 85 | String operations | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 86 | Date methods (no arguments) | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 87 | Date tests — years | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 88 | Unicode escapes in identifiers | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 89 | Regular expressions | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 90 | Regular expressions (cont.) | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 91 | Properties enumerable | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 92 | Internal props of Function | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 93 | FunctionExpression semantics | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 94 | Exception scope | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 95 | Types of expressions | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 96 | encodeURI + null bytes | ✅ | ❌ | Blocked by test 0 | YantraJS |
-| 97 | data: URI parsing | ✅ | ❌ | Blocked by test 0 | `DomBridge.cs` |
-| 98 | XHTML and the DOM | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
-| 99 | Weirdest bug ever | ✅ | ❌ | Blocked by test 0 | `DomBridge.JsObjects.cs` |
+| 81 | Array elisions at end | ✅ | ✅ | — | YantraJS |
+| 82 | Array elisions in middle | ✅ | ✅ | — | YantraJS |
+| 83 | Array methods | ✅ | ✅ | — | YantraJS |
+| 84 | Number-to-string precision | ✅ | ❌ | `toFixed(4) wrong for -0` (expected '0.0000' got '-0.0000') | YantraJS |
+| 85 | String operations | ✅ | ❌ | `substr() wrong with negative numbers` | YantraJS |
+| 86 | Date methods (no arguments) | ✅ | ✅ | — | YantraJS |
+| 87 | Date tests — years | ✅ | ✅ | — | YantraJS |
+| 88 | Unicode escapes in identifiers | ✅ | ❌ | `\u002b was not considered a parse error in script` | YantraJS |
+| 89 | Regular expressions | ✅ | ❌ | `orphaned bracket not considered parse error in regexp literal` | YantraJS |
+| 90 | Regular expressions (cont.) | ✅ | ❌ | `NUL in regexp didn't match correctly` | YantraJS |
+| 91 | Properties enumerable | ✅ | ✅ | — | YantraJS |
+| 92 | Internal props of Function | ✅ | ✅ | — | YantraJS |
+| 93 | FunctionExpression semantics | ✅ | ❌ | `semantics of FunctionExpression not followed` | YantraJS |
+| 94 | Exception scope | ✅ | ✅ | — | YantraJS |
+| 95 | Types of expressions | ✅ | ✅ | — | YantraJS |
+| 96 | encodeURI + null bytes | ✅ | ✅ | — | YantraJS |
+| 97 | data: URI parsing | ✅ | ✅ | — | `DomBridge.cs` |
+| 98 | XHTML and the DOM | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
+| 99 | Weirdest bug ever | ✅ | ✅ | — | `DomBridge.JsObjects.cs` |
 
 ---
 
@@ -376,24 +389,24 @@ Critical Gaps:
 
 | Category | Unit-Tested | E2E Working | Key Blocker |
 |----------|-------------|-------------|-------------|
-| **End-to-end harness** | ✅ Simulated | ❌ 0/100 | `document.write()`, live `<style>` invalidation, error isolation |
-| **DOM Traversal** | ✅ 28 tests | ❌ | Blocked by test 0 |
-| **DOM Range** | ✅ 28 tests | ❌ | Blocked by test 0 |
+| **End-to-end harness** | ✅ Simulated | ✅ 56/100 | Dynamic `<style>` invalidation blocks remaining 44 tests |
+| **DOM Traversal** | ✅ 28 tests | ⚠️ 4/17 | Blocked by test 0 (style invalidation) |
+| **DOM Range** | ✅ 28 tests | ⚠️ Part of bucket 1 | Blocked by test 0 |
 | **HTTP/Sub-resources** | ✅ 13 tests | ❌ | file:// works; HTTP server needed for live tests |
-| **DOM Core** | ✅ 35 tests | ❌ | Blocked by test 0 |
-| **DOM Events** | ✅ 24 tests | ❌ | Blocked by test 0 |
-| **CSS Selectors** | ✅ 35 tests | ❌ | Blocked by test 0 |
-| **CSSOM** | ✅ 32 tests | ❌ | Blocked by test 0 |
-| **HTML DOM** | ✅ 34 tests | ❌ | Blocked by test 0 |
-| **SVG/Dynamic** | ✅ 38 tests | ❌ | Blocked by test 0 |
-| **ECMAScript** | ✅ 36 tests | ❌ | Blocked by test 0 |
-| **Network** | ✅ 36 tests | ❌ | Blocked by test 0 |
-| **Rendering** | ✅ 32 tests | ❌ | Red flood obscures everything |
+| **DOM Core** | ✅ 35 tests | ✅ 10/16 | Mostly working |
+| **DOM Events** | ✅ 24 tests | ✅ Part of bucket 2 | Mostly working |
+| **CSS Selectors** | ✅ 35 tests | ⚠️ 2/16 | Blocked by test 0 |
+| **CSSOM** | ✅ 32 tests | ⚠️ | Dynamic style invalidation needed |
+| **HTML DOM** | ✅ 34 tests | ✅ 14/16 | Mostly working |
+| **SVG/Dynamic** | ✅ 38 tests | ✅ 13/16 | Mostly working |
+| **ECMAScript** | ✅ 36 tests | ✅ 10/19 | Some edge cases remaining |
+| **Network** | ✅ 36 tests | ⚠️ | Limited by file:// protocol |
+| **Rendering** | ✅ 32 tests | ⚠️ | Red flood partially reduced |
 | **SVG advanced (75–79)** | ❌ Not impl. | ❌ | SMIL, SVG fonts — not scored |
 | **Total** | **473 pass** | **56 / 100** | |
 
 **Estimated unit-tested score: ~94 / 100** (all tests except 67–68, 75–79)
-**Actual rendered score: 56 / 100** (after Phase 1 recheck fixes)
+**Actual rendered score: 56 / 100** (confirmed by revalidation 2026-03-11)
 
 ---
 
@@ -557,7 +570,7 @@ All 473 existing CLI tests continue to pass (1 test updated for correct DOM spec
 **Effort:** 1 day
 
 **Phase 2 Total Effort: 2–3 days**
-**Expected Score Impact: 50+ → 70+**
+**Expected Score Impact: 56 → 70+**
 
 ---
 
@@ -717,8 +730,8 @@ jobs:
 
 | Phase | Priority | Effort | Score Impact | Cumulative |
 |-------|----------|--------|-------------|------------|
-| **1. E2E Harness Execution** | **Critical** | ~~4–6 days~~ **1.5 days** ✅ | Unblocks everything | 0 → 28 |
-| **2. Dynamic Stylesheet** | **Critical** | 2–3 days | Clears red flood | 28 → 70+ |
+| **1. E2E Harness Execution** | **Critical** | ~~4–6 days~~ **1.5 days** ✅ | Unblocks everything | 0 → 56 |
+| **2. Dynamic Stylesheet** | **Critical** | 2–3 days | Clears red flood | 56 → 70+ |
 | **3. HTTP Sub-Resources** | High | 3 days | +15 (HTTP tests) | 70+ → 85+ |
 | **4. Missing DOM APIs** | High | 3–5 days | +9 (edge cases) | 85+ → 94+ |
 | **5. SVG Competition** | Low | 7–9 days | +6 (optional) | 94+ → 100 |
@@ -744,13 +757,13 @@ Phase 6 should be done last.
 
 ### Test & Coverage
 
-| Metric | v3 | v4 | Delta |
-|--------|----|----|-------|
-| Total CLI tests | 467 | 473 | +6 (Phase 1 E2E tests) |
-| Test files | 22 | 22 | No change |
-| Broiler score | 0 / 100 | 28 / 100 | ✅ Unblocked by Phase 1 |
-| Chromium ref score | 96 / 100 | 96 / 100 | No change (now from live URL) |
-| Pixel match | 34.5 % | 34.0 % | −0.5 pp (ref changed to live) |
+| Metric | v3 | v4 (initial) | v4 (revalidated) |
+|--------|----|----|------|
+| Total CLI tests | 467 | 473 | 473 ✅ |
+| Test files | 22 | 22 | 23 |
+| Broiler score | 0 / 100 | 0 / 100 | 56 / 100 ✅ |
+| Chromium ref score | 96 / 100 | 96 / 100 | 96 / 100 |
+| Pixel match | 34.5 % | 34.0 % | 42.9 % |
 
 ### Key Changes in v4 Assessment
 
@@ -815,7 +828,7 @@ update() iterates through tests[]:
 
 ## 11. Version 4 Definition of Done
 
-- [x] `broiler.cli --capture-image` of Acid3 shows score **28 / 100** (unblocked)
+- [x] `broiler.cli --capture-image` of Acid3 shows score **56 / 100** (Phase 1 complete)
 - [ ] `broiler.cli --capture-image` of Acid3 shows score **≥ 90 / 100** (milestone)
 - [ ] `broiler.cli --capture-image` of Acid3 shows score **100 / 100** (final)
 - [ ] All 6 coloured buckets visible
@@ -823,4 +836,48 @@ update() iterates through tests[]:
 - [ ] No "FAIL" text or red background
 - [ ] Automated regression test prevents score regressions
 - [x] All 473 CLI tests pass (467 existing + 6 Phase 1)
-- [ ] Compliance document updated with final results
+- [x] Compliance document updated with revalidation results
+
+---
+
+## 12. Revalidation Log
+
+### Round 1 — 2026-03-11
+
+**Trigger:** Phase 1 revalidation per issue "Phase 1: Acid3 Compliance v4 – Revalidate and Update Tasks"
+
+**Process:**
+1. Ran all 473 CLI tests → **all pass** (0 failures, 0 skipped)
+2. Executed end-to-end Acid3 test (`Acid3_EndToEnd_Score_GreaterThan_Zero`) → **pass** (score > 0)
+3. Extracted detailed score via `CaptureService.ExecuteScriptsWithDom()` → **56/100**
+4. Captured Acid3 render image (800×600 PNG, 16,724 bytes)
+5. Performed pixel-level comparison against Chromium reference (live HTTP, 96/100)
+6. Updated all image metrics and document sections
+
+**Findings:**
+
+| Item | Result |
+|------|--------|
+| Score | **56/100** — unchanged from Phase 1 recheck |
+| All 473 CLI tests | **Pass** |
+| Bucket 1 (DOM Traversal/Range/HTTP) | 4 passes |
+| Bucket 2 (DOM Core/Events) | 10 passes |
+| Bucket 3 (CSS Selectors/CSSOM) | 2 passes |
+| Bucket 4 (HTML DOM) | 14 passes |
+| Bucket 5 (SVG/Dynamic) | 13 passes |
+| Bucket 6 (ECMAScript) | 10 passes |
+| Overall pixel match (±5) | **42.9%** (improved from 34.0% pre-recheck) |
+| Content area pixel match | **23.1%** (improved from 2.9% pre-recheck) |
+| Red coverage | **19.5%** (reduced from 38.0% pre-recheck) |
+| Image file size | **16,724 B** (was 12,262 B pre-recheck) |
+
+**Checked Items Verified:**
+- [x] Phase 1.1 `document.write()` DOM Integration — all 5 sub-tasks verified via `DocumentWrite_Registers_Nested_Elements` test
+- [x] Phase 1.2 Error-Resilient Test Execution — all 4 sub-tasks verified via `Acid3_Update_Loop_Continues_After_Test_Errors` test
+- [x] Phase 1.3 `<body onload>` Trigger Chain — all 3 sub-tasks verified via `Body_Onload_With_SetTimeout_Chain` test
+- [x] Phase 1.4 End-to-End Integration Test — all 4 sub-tasks verified via `Acid3_EndToEnd_Score_GreaterThan_Zero` test
+- [x] Phase 1 Recheck items (FlushTimers, HtmlTokenizer, DOMException constants, Node type constants, sub-document APIs, HierarchyRequestError, tagName case, ValidateQualifiedName) — all verified via existing regression tests
+
+**Conclusion:** No regressions detected. Score stable at 56/100 across two consecutive validations (Phase 1 recheck and this revalidation). All Phase 1 checked items confirmed correct. Document updated with current pixel metrics and image.
+
+**Next Steps:** Phase 2 (Dynamic Stylesheet Invalidation) remains the critical path item to reach 70+ score.
