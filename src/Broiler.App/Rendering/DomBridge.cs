@@ -149,10 +149,10 @@ public sealed partial class DomBridge
                 try { fn.InvokeFunction(new Arguments(JSUndefined.Value, new JSNumber(0))); }
                 catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimers", $"rAF callback error: {ex.Message}", ex); }
             }
-
-            // Clear processed timer IDs
-            _clearedTimerIds.Clear();
         }
+
+        // Clear all processed timer IDs after flush loop completes
+        _clearedTimerIds.Clear();
     }
 
     // ------------------------------------------------------------------
