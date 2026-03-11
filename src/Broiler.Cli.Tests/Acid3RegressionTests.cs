@@ -951,3 +951,55 @@ document.getElementById('result').textContent = before + '|' + after;
         Assert.True(score >= 59, $"Acid3 score: {score} (expected >= 59, Phase 2 baseline)");
     }
 }
+
+public class Acid3Phase4Diagnostics
+{
+    [Fact]
+    public void Acid3_Test7_Range_Basic()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head><title>Test</title></head><body>
+<script>
+var r = [];
+try {
+  var range = document.createRange();
+  r.push('created');
+  r.push('collapsed=' + range.collapsed);
+  r.push('common=' + (range.commonAncestorContainer === document ? 'document' : range.commonAncestorContainer.tagName));
+  r.push('start=' + (range.startContainer === document ? 'document' : range.startContainer.tagName));
+  r.push('startOff=' + range.startOffset);
+  r.push('end=' + (range.endContainer === document ? 'document' : range.endContainer.tagName));
+  r.push('endOff=' + range.endOffset);
+  var clone = range.cloneContents();
+  r.push('cloneLen=' + clone.childNodes.length);
+  var cloneStr = range.cloneRange().toString();
+  r.push('cloneStr=' + cloneStr.length);
+  range.collapse(true);
+  r.push('cmpBP=' + range.compareBoundaryPoints(range.START_TO_END, range.cloneRange()));
+  range.deleteContents();
+  var extract = range.extractContents();
+  r.push('extractLen=' + extract.childNodes.length);
+  var endOffset = range.endOffset;
+  range.insertNode(document.createComment('test'));
+  range.setEnd(range.endContainer, endOffset + 1);
+  r.push('afterInsert_collapsed=' + range.collapsed);
+  r.push('afterInsert_start=' + (range.startContainer === document ? 'document' : 'other'));
+  document.removeChild(document.firstChild);
+  r.push('removed');
+} catch(e) {
+  r.push('ERROR:' + e.message);
+}
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join('|');
+document.body.appendChild(out);
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        var match = System.Text.RegularExpressions.Regex.Match(result, @"id=""result""[^>]*>([^<]+)<");
+        Assert.True(match.Success, $"Output: {result.Substring(0, Math.Min(500, result.Length))}");
+        var value = match.Groups[1].Value;
+        Assert.Contains("common=document", value);
+        Assert.Contains("start=document", value);
+    }
+}

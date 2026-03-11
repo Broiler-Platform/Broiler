@@ -1623,6 +1623,26 @@ public sealed partial class DomBridge
                 }, "get sectionRowIndex"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // cells — returns collection of <td>/<th> children
+            obj.FastAddProperty(
+                (KeyString)"cells",
+                new JSFunction((in Arguments _) =>
+                {
+                    var cells = new List<JSValue>();
+                    foreach (var c in element.Children)
+                        if (string.Equals(c.TagName, "td", System.StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(c.TagName, "th", System.StringComparison.OrdinalIgnoreCase))
+                            cells.Add(ToJSObject(c));
+                    var arr = new JSArray(cells);
+                    arr.FastAddProperty(
+                        (KeyString)"length",
+                        new JSFunction((in Arguments __) => new JSNumber(cells.Count), "get length"),
+                        null, JSPropertyAttributes.EnumerableConfigurableProperty);
+                    return arr;
+                }, "get cells"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         // HTMLFormElement interface

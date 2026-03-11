@@ -30,6 +30,11 @@ public sealed partial class DomBridge
         _jsContext = context;
         var document = new JSObject();
 
+        // Map the document JSObject to _documentNode so that ToJSObject(_documentNode) returns
+        // the same object as the 'document' variable visible in JS. This ensures
+        // strict equality checks like 'range.commonAncestorContainer === document' work.
+        _jsObjectCache[_documentNode] = document;
+
         // document.documentElement (the <html> element)
         document.FastAddValue(
             (KeyString)"documentElement",
@@ -486,6 +491,76 @@ public sealed partial class DomBridge
             }, "get childNodes"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.removeChild(child)
+        var docNodeForMutation = _documentNode;
+        document.FastAddValue(
+            (KeyString)"removeChild",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSNull.Value;
+                var childObj = a[0] as JSObject;
+                if (childObj == null) return JSNull.Value;
+                var childEl = FindDomElementByJSObject(childObj);
+                if (childEl != null && docNodeForMutation.Children.Remove(childEl))
+                {
+                    childEl.Parent = null;
+                }
+                return a[0];
+            }, "removeChild", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.appendChild(child)
+        document.FastAddValue(
+            (KeyString)"appendChild",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSNull.Value;
+                var childObj = a[0] as JSObject;
+                if (childObj == null) return JSNull.Value;
+                var childEl = FindDomElementByJSObject(childObj);
+                if (childEl != null)
+                {
+                    childEl.Parent?.Children.Remove(childEl);
+                    childEl.Parent = docNodeForMutation;
+                    docNodeForMutation.Children.Add(childEl);
+                }
+                return a[0];
+            }, "appendChild", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // document.insertBefore(newChild, refChild)
+        document.FastAddValue(
+            (KeyString)"insertBefore",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSNull.Value;
+                var newObj = a[0] as JSObject;
+                if (newObj == null) return JSNull.Value;
+                var newEl = FindDomElementByJSObject(newObj);
+                if (newEl == null) return a[0];
+
+                newEl.Parent?.Children.Remove(newEl);
+                if (a.Length > 1 && a[1] is JSObject refObj && !a[1].IsNull)
+                {
+                    var refEl = FindDomElementByJSObject(refObj);
+                    if (refEl != null)
+                    {
+                        var idx = docNodeForMutation.Children.IndexOf(refEl);
+                        if (idx >= 0)
+                        {
+                            newEl.Parent = docNodeForMutation;
+                            docNodeForMutation.Children.Insert(idx, newEl);
+                            return a[0];
+                        }
+                    }
+                }
+                // If refChild is null or not found, append
+                newEl.Parent = docNodeForMutation;
+                docNodeForMutation.Children.Add(newEl);
+                return a[0];
+            }, "insertBefore", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.forms — collection of all <form> elements
         document.FastAddProperty(
