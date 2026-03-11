@@ -788,13 +788,11 @@ public sealed partial class DomBridge
                     return bridge.ToJSObject(fragment);
                 }
 
-                // Handle cross-node extraction with text node splitting
-                // Build the extracted fragment using the DOM spec algorithm:
-                // 1. If startContainer is a text node, split at startOffset
-                // 2. Extract fully-contained nodes
-                // 3. If endContainer is a text node, split at endOffset
+                // Handle cross-node extraction using the DOM spec algorithm:
+                // 1. Find common ancestor
+                // 2. Find first/last partially contained children
+                // 3. Clone start path, move fully contained, clone end path
 
-                // Find common ancestor
                 var ancestor = FindCommonAncestor(startContainer, endContainer);
                 if (ancestor == null)
                 {
@@ -804,64 +802,127 @@ public sealed partial class DomBridge
                     return bridge.ToJSObject(fragment);
                 }
 
-                // Handle text node start boundary
-                DomElement? startPartialClone = null;
-                if (startContainer.IsTextNode && startOffset > 0)
+                // Find the child of ancestor that is an ancestor of (or is) startContainer
+                DomElement? startAncestorChild = null;
                 {
-                    var text = startContainer.TextContent ?? string.Empty;
-                    var remainText = text.Substring(startOffset);
-                    startContainer.TextContent = text.Substring(0, startOffset);
-                    // We need to track what to add to the fragment's start portion
-                    startPartialClone = CreatePartialCloneForExtract(startContainer, ancestor, remainText, true, bridge);
+                    var node = startContainer;
+                    while (node != null && !ReferenceEquals(node.Parent, ancestor))
+                        node = node.Parent;
+                    startAncestorChild = node;
                 }
 
-                // Handle text node end boundary
-                DomElement? endPartialClone = null;
-                if (endContainer.IsTextNode && endOffset < (endContainer.TextContent ?? "").Length)
+                // Find the child of ancestor that is an ancestor of (or is) endContainer
+                DomElement? endAncestorChild = null;
                 {
-                    var text = endContainer.TextContent ?? string.Empty;
-                    var extractedPart = text.Substring(0, endOffset);
-                    endContainer.TextContent = text.Substring(endOffset);
-                    endPartialClone = CreatePartialCloneForExtract(endContainer, ancestor, extractedPart, false, bridge);
+                    var node = endContainer;
+                    while (node != null && !ReferenceEquals(node.Parent, ancestor))
+                        node = node.Parent;
+                    endAncestorChild = node;
                 }
 
-                // Collect fully-contained top-level nodes
-                var fullyContained = new List<DomElement>();
-                var allNodes = GetDocumentOrderNodes(ancestor);
-                var startIdx = allNodes.IndexOf(startContainer);
-                var endIdx = allNodes.IndexOf(endContainer);
-                if (startIdx >= 0 && endIdx >= 0)
+                var startIdx2 = startAncestorChild != null ? ancestor.Children.IndexOf(startAncestorChild) : -1;
+                var endIdx2 = endAncestorChild != null ? ancestor.Children.IndexOf(endAncestorChild) : -1;
+
+                // Clone start-side path (first partially contained child)
+                if (startAncestorChild != null && startIdx2 >= 0)
                 {
-                    for (var i = startIdx + 1; i < endIdx; i++)
+                    if (ReferenceEquals(startAncestorChild, startContainer))
                     {
-                        var node = allNodes[i];
-                        // Only top-level nodes (direct children of ancestor or nodes between start/end paths)
-                        if (IsContainedInRange(node, ancestor, startContainer, endContainer, allNodes))
+                        // Start container IS the direct child of ancestor
+                        if (startContainer.IsTextNode)
                         {
-                            if (!fullyContained.Any(r => IsDescendant(r, node)))
-                                fullyContained.Add(node);
+                            // Text node: split at startOffset
+                            var text = startContainer.TextContent ?? string.Empty;
+                            var extractedPart = text.Substring(startOffset);
+                            startContainer.TextContent = text.Substring(0, startOffset);
+                            var extractedNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+                            extractedNode.TextContent = extractedPart;
+                            bridge._elements.Add(extractedNode);
+                            extractedNode.Parent = fragment;
+                            fragment.Children.Add(extractedNode);
+                        }
+                        else
+                        {
+                            // Element: clone and extract children from startOffset
+                            var clone = CloneDomElement(startContainer, false);
+                            bridge._elements.Add(clone);
+                            for (var ci = startOffset; ci < startContainer.Children.Count; )
+                            {
+                                var child = startContainer.Children[ci];
+                                startContainer.Children.RemoveAt(ci);
+                                child.Parent = clone;
+                                clone.Children.Add(child);
+                            }
+                            clone.Parent = fragment;
+                            fragment.Children.Add(clone);
+                        }
+                    }
+                    else
+                    {
+                        // Start container is deeper — clone the path from startAncestorChild down
+                        var clone = ExtractStartPath(startAncestorChild, startContainer, startOffset, bridge);
+                        if (clone != null)
+                        {
+                            clone.Parent = fragment;
+                            fragment.Children.Add(clone);
                         }
                     }
                 }
 
-                // Build fragment: startPartialClone + fully contained + endPartialClone
-                if (startPartialClone != null)
+                // Move fully contained children between start and end paths
+                if (startIdx2 >= 0 && endIdx2 >= 0)
                 {
-                    startPartialClone.Parent = fragment;
-                    fragment.Children.Add(startPartialClone);
+                    for (var ci = startIdx2 + 1; ci < endIdx2; )
+                    {
+                        var child = ancestor.Children[ci];
+                        ancestor.Children.RemoveAt(ci);
+                        endIdx2--;
+                        child.Parent = fragment;
+                        fragment.Children.Add(child);
+                    }
                 }
 
-                foreach (var node in fullyContained)
+                // Clone end-side path (last partially contained child)
+                if (endAncestorChild != null && endIdx2 >= 0 &&
+                    !ReferenceEquals(startAncestorChild, endAncestorChild))
                 {
-                    node.Parent?.Children.Remove(node);
-                    node.Parent = fragment;
-                    fragment.Children.Add(node);
-                }
-
-                if (endPartialClone != null)
-                {
-                    endPartialClone.Parent = fragment;
-                    fragment.Children.Add(endPartialClone);
+                    if (ReferenceEquals(endAncestorChild, endContainer))
+                    {
+                        if (endContainer.IsTextNode)
+                        {
+                            var text = endContainer.TextContent ?? string.Empty;
+                            var extractedPart = text.Substring(0, endOffset);
+                            endContainer.TextContent = text.Substring(endOffset);
+                            var extractedNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+                            extractedNode.TextContent = extractedPart;
+                            bridge._elements.Add(extractedNode);
+                            extractedNode.Parent = fragment;
+                            fragment.Children.Add(extractedNode);
+                        }
+                        else
+                        {
+                            var clone = CloneDomElement(endContainer, false);
+                            bridge._elements.Add(clone);
+                            for (var ci = 0; ci < endOffset && endContainer.Children.Count > 0; ci++)
+                            {
+                                var child = endContainer.Children[0];
+                                endContainer.Children.RemoveAt(0);
+                                child.Parent = clone;
+                                clone.Children.Add(child);
+                            }
+                            clone.Parent = fragment;
+                            fragment.Children.Add(clone);
+                        }
+                    }
+                    else
+                    {
+                        var clone = ExtractEndPath(endAncestorChild, endContainer, endOffset, bridge);
+                        if (clone != null)
+                        {
+                            clone.Parent = fragment;
+                            fragment.Children.Add(clone);
+                        }
+                    }
                 }
 
                 // Collapse range to start after extraction
@@ -1320,5 +1381,164 @@ public sealed partial class DomBridge
             return false;
 
         return true;
+    }
+
+    /// <summary>
+    /// Extracts the start-side path for cross-node extractContents.
+    /// Clones ancestor chain from <paramref name="topNode"/> down to <paramref name="startContainer"/>,
+    /// moving content after the start boundary into the cloned structure.
+    /// </summary>
+    private static DomElement ExtractStartPath(DomElement topNode, DomElement startContainer, int startOffset, DomBridge bridge)
+    {
+        // Build chain: startContainer → parent → ... → topNode
+        var chain = new List<DomElement>();
+        var node = startContainer;
+        while (node != null)
+        {
+            chain.Add(node);
+            if (ReferenceEquals(node, topNode)) break;
+            node = node.Parent;
+        }
+
+        // Clone from top to bottom
+        DomElement? topClone = null;
+        DomElement? currentClone = null;
+
+        for (var i = chain.Count - 1; i >= 0; i--)
+        {
+            var original = chain[i];
+            var clone = bridge.CloneDomElement(original, false);
+            bridge._elements.Add(clone);
+
+            if (topClone == null) topClone = clone;
+            if (currentClone != null)
+            {
+                clone.Parent = currentClone;
+                currentClone.Children.Add(clone);
+            }
+
+            if (i == 0)
+            {
+                // This is the startContainer level
+                if (original.IsTextNode)
+                {
+                    // Split text node
+                    var text = original.TextContent ?? string.Empty;
+                    var extractedPart = text.Substring(startOffset);
+                    original.TextContent = text.Substring(0, startOffset);
+                    clone.TextContent = extractedPart;
+                }
+                else
+                {
+                    // Move children from startOffset onwards into clone
+                    for (var ci = startOffset; ci < original.Children.Count; )
+                    {
+                        var child = original.Children[ci];
+                        original.Children.RemoveAt(ci);
+                        child.Parent = clone;
+                        clone.Children.Add(child);
+                    }
+                }
+            }
+            else if (i < chain.Count - 1)
+            {
+                // Intermediate level — move siblings after the chain child
+                var nextInChain = chain[i - 1];
+                var childIdx = original.Children.IndexOf(nextInChain);
+                if (childIdx >= 0)
+                {
+                    for (var ci = childIdx + 1; ci < original.Children.Count; )
+                    {
+                        var child = original.Children[ci];
+                        original.Children.RemoveAt(ci);
+                        child.Parent = clone;
+                        clone.Children.Add(child);
+                    }
+                }
+            }
+
+            currentClone = clone;
+        }
+
+        return topClone!;
+    }
+
+    /// <summary>
+    /// Extracts the end-side path for cross-node extractContents.
+    /// Clones ancestor chain from <paramref name="topNode"/> down to <paramref name="endContainer"/>,
+    /// moving content before the end boundary into the cloned structure.
+    /// </summary>
+    private static DomElement ExtractEndPath(DomElement topNode, DomElement endContainer, int endOffset, DomBridge bridge)
+    {
+        // Build chain: endContainer → parent → ... → topNode
+        var chain = new List<DomElement>();
+        var node = endContainer;
+        while (node != null)
+        {
+            chain.Add(node);
+            if (ReferenceEquals(node, topNode)) break;
+            node = node.Parent;
+        }
+
+        DomElement? topClone = null;
+        DomElement? currentClone = null;
+
+        for (var i = chain.Count - 1; i >= 0; i--)
+        {
+            var original = chain[i];
+            var clone = bridge.CloneDomElement(original, false);
+            bridge._elements.Add(clone);
+
+            if (topClone == null) topClone = clone;
+            if (currentClone != null)
+            {
+                clone.Parent = currentClone;
+                currentClone.Children.Add(clone);
+            }
+
+            if (i == 0)
+            {
+                // This is the endContainer level
+                if (original.IsTextNode)
+                {
+                    var text = original.TextContent ?? string.Empty;
+                    var extractedPart = text.Substring(0, endOffset);
+                    original.TextContent = text.Substring(endOffset);
+                    clone.TextContent = extractedPart;
+                }
+                else
+                {
+                    // Move children before endOffset into clone
+                    for (var ci = 0; ci < endOffset && original.Children.Count > 0; ci++)
+                    {
+                        var child = original.Children[0];
+                        original.Children.RemoveAt(0);
+                        child.Parent = clone;
+                        clone.Children.Add(child);
+                    }
+                }
+            }
+            else if (i < chain.Count - 1)
+            {
+                // Intermediate level — move siblings before the chain child
+                var nextInChain = chain[i - 1];
+                var childIdx = original.Children.IndexOf(nextInChain);
+                if (childIdx >= 0)
+                {
+                    for (var ci = 0; ci < childIdx; )
+                    {
+                        var child = original.Children[0];
+                        original.Children.RemoveAt(0);
+                        childIdx--;
+                        child.Parent = clone;
+                        clone.Children.Add(child);
+                    }
+                }
+            }
+
+            currentClone = clone;
+        }
+
+        return topClone!;
     }
 }
