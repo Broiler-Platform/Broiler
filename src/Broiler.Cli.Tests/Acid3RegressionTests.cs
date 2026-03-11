@@ -772,12 +772,9 @@ function update() {
     [Fact]
     public void Acid3_EndToEnd_Score_GreaterThan_Zero()
     {
-        var acid3Path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html");
-        if (!File.Exists(acid3Path))
-        {
-            // Try alternate path
-            acid3Path = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
-        }
+        // Navigate from bin/Debug/net8.0 up to the repo root, then into acid/acid3/
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
         Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
 
         var html = File.ReadAllText(acid3Path);
