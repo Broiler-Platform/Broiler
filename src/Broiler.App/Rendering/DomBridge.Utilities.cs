@@ -969,13 +969,21 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// Throws a proper <c>DOMException</c> with the given name/code via the JS-registered constructor.
+    /// Constructs the DOMException object in C# and throws it as a <see cref="JSException"/>
+    /// so that JS try/catch blocks can intercept it with full <c>.code</c>, <c>.name</c>,
+    /// and <c>.message</c> properties intact.
     /// </summary>
     private static void ThrowDOMException(JSContext context, string message, string name)
     {
-        // Remove control characters first, then escape for JS string literal
-        var clean = message.Replace("\0", "").Replace("\r", "").Replace("\n", "");
-        var escaped = clean.Replace("\\", "\\\\").Replace("'", "\\'");
-        context.Eval($"throw new DOMException('{escaped}', '{name}');");
+        if (context["DOMException"] is JSFunction domExCtor)
+        {
+            var exObj = domExCtor.CreateInstance(
+                new Arguments(domExCtor, new JSString(message), new JSString(name)));
+            throw new JSException(exObj);
+        }
+
+        // Fallback when DOMException constructor is unavailable
+        throw new JSException(new JSString($"DOMException: {message} ({name})"));
     }
 
     /// <summary>
@@ -984,7 +992,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static void ValidateElementName(string name, JSContext context)
     {
-        if (string.IsNullOrEmpty(name) || !ValidXmlNamePattern.IsMatch(name))
+        if (string.IsNullOrEmpty(name) || name.Contains('\0') || !ValidXmlNamePattern.IsMatch(name))
         {
             ThrowDOMException(context,
                 $"Failed to execute 'createElement': The tag name provided ('{name}') is not a valid name.",

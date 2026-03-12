@@ -153,6 +153,9 @@ partial class JSNumber
     {
         var n = a.This.ToNumber();
         var nv = n.value;
+        // Per ECMAScript spec, -0 should produce "0" (not "-0")
+        if (nv == 0.0 && double.IsNegative(nv))
+            nv = 0.0;
         if (double.IsPositiveInfinity(nv))
             return JSConstants.Infinity;
         if (double.IsNegativeInfinity(nv))

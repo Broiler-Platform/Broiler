@@ -568,6 +568,18 @@ public class FastScanner
             case 'v':
                 next = '\v';
                 break;
+            case '0':
+                // \0 followed by an octal digit (0-7) is a legacy octal escape
+                var nextCh = Next();
+                if (nextCh >= '0' && nextCh <= '7')
+                {
+                    // Legacy octal escape \0N: consume the octal digit
+                    var octal = Consume();
+                    t.Append((char)(octal - '0'));
+                    return true;
+                }
+                next = '\0';
+                break;
             default:
                 t.Append(next);
                 return true;
