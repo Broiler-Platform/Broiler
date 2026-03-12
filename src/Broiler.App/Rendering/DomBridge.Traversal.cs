@@ -306,9 +306,11 @@ public sealed partial class DomBridge
     private JSObject BuildNodeIterator(DomElement root, int whatToShow, JSFunction? filterFn)
     {
         var iter = new JSObject();
-        DomElement? referenceNode = root;
-        var pointerBeforeReferenceNode = true;
+        var state = new IteratorState(root);
         var detached = false;
+
+        // Register this iterator for mutation tracking
+        _activeNodeIterators.Add(new WeakReference<IteratorState>(state));
 
         iter.FastAddValue(
             (KeyString)"root",
@@ -322,13 +324,13 @@ public sealed partial class DomBridge
 
         iter.FastAddProperty(
             (KeyString)"referenceNode",
-            new JSFunction((in Arguments a) => referenceNode != null ? (JSValue)ToJSObject(referenceNode) : JSNull.Value, "get referenceNode"),
+            new JSFunction((in Arguments a) => state.ReferenceNode != null ? (JSValue)ToJSObject(state.ReferenceNode) : JSNull.Value, "get referenceNode"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         iter.FastAddProperty(
             (KeyString)"pointerBeforeReferenceNode",
-            new JSFunction((in Arguments a) => pointerBeforeReferenceNode ? JSBoolean.True : JSBoolean.False, "get pointerBeforeReferenceNode"),
+            new JSFunction((in Arguments a) => state.PointerBeforeReferenceNode ? JSBoolean.True : JSBoolean.False, "get pointerBeforeReferenceNode"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -339,17 +341,40 @@ public sealed partial class DomBridge
             {
                 if (detached) return JSNull.Value;
                 var allNodes = GetDocumentOrderNodes(root);
-                var refIdx = referenceNode != null ? allNodes.IndexOf(referenceNode) : -1;
-                var startIdx = pointerBeforeReferenceNode ? refIdx : refIdx + 1;
+                var refIdx = state.ReferenceNode != null ? allNodes.IndexOf(state.ReferenceNode) : -1;
+                // If reference is detached, use last known position
+                if (refIdx < 0 && state.ReferenceNode != null)
+                    refIdx = state.LastKnownIndex >= 0 ? Math.Min(state.LastKnownIndex, allNodes.Count - 1) : -1;
+                var startIdx = state.PointerBeforeReferenceNode ? refIdx : refIdx + 1;
 
                 for (var i = startIdx; i < allNodes.Count; i++)
                 {
-                    var result = ApplyFilter(allNodes[i], whatToShow, filterFn);
+                    var candidateNode = allNodes[i];
+                    state.LastKnownIndex = i;
+                    var result = ApplyFilter(candidateNode, whatToShow, filterFn);
+                    // Rebuild allNodes after filter (filter may have mutated the tree)
+                    allNodes = GetDocumentOrderNodes(root);
                     if (result == 1) // FILTER_ACCEPT
                     {
-                        referenceNode = allNodes[i];
-                        pointerBeforeReferenceNode = false;
-                        return (JSValue)ToJSObject(allNodes[i]);
+                        state.ReferenceNode = candidateNode;
+                        state.PointerBeforeReferenceNode = false;
+                        // Update last known index to where the node is now (or was)
+                        var newIdx = allNodes.IndexOf(candidateNode);
+                        state.LastKnownIndex = newIdx >= 0 ? newIdx : i;
+                        return (JSValue)ToJSObject(candidateNode);
+                    }
+                    // After filter, the node may have been removed — adjust i if needed
+                    var nowIdx = allNodes.IndexOf(candidateNode);
+                    if (nowIdx < 0)
+                    {
+                        // Node was removed during filter. Next candidate is at i (same position)
+                        // since list shifted down. Adjust so the for-loop increment lands correctly.
+                        i--;
+                        if (i < startIdx - 1) i = startIdx - 1;
+                    }
+                    else
+                    {
+                        i = nowIdx; // Re-sync in case list shifted
                     }
                 }
                 return JSNull.Value;
@@ -363,18 +388,32 @@ public sealed partial class DomBridge
             {
                 if (detached) return JSNull.Value;
                 var allNodes = GetDocumentOrderNodes(root);
-                var refIdx = referenceNode != null ? allNodes.IndexOf(referenceNode) : -1;
-                var startIdx = pointerBeforeReferenceNode ? refIdx - 1 : refIdx;
+                var refIdx = state.ReferenceNode != null ? allNodes.IndexOf(state.ReferenceNode) : -1;
+                // If reference is detached, use last known position
+                if (refIdx < 0 && state.ReferenceNode != null)
+                    refIdx = state.LastKnownIndex >= 0 ? Math.Min(state.LastKnownIndex, allNodes.Count) : 0;
+                var startIdx = state.PointerBeforeReferenceNode ? refIdx - 1 : refIdx;
 
                 for (var i = startIdx; i >= 0; i--)
                 {
-                    var result = ApplyFilter(allNodes[i], whatToShow, filterFn);
+                    if (i >= allNodes.Count) { i = allNodes.Count; continue; }
+                    var candidateNode = allNodes[i];
+                    state.LastKnownIndex = i;
+                    var result = ApplyFilter(candidateNode, whatToShow, filterFn);
+                    // Rebuild allNodes after filter (filter may have mutated the tree)
+                    allNodes = GetDocumentOrderNodes(root);
                     if (result == 1)
                     {
-                        referenceNode = allNodes[i];
-                        pointerBeforeReferenceNode = true;
-                        return (JSValue)ToJSObject(allNodes[i]);
+                        state.ReferenceNode = candidateNode;
+                        state.PointerBeforeReferenceNode = true;
+                        var newIdx = allNodes.IndexOf(candidateNode);
+                        state.LastKnownIndex = newIdx >= 0 ? newIdx : i;
+                        return (JSValue)ToJSObject(candidateNode);
                     }
+                    // After filter, re-sync position in case list shifted
+                    var nowIdx = allNodes.IndexOf(candidateNode);
+                    if (nowIdx >= 0) i = nowIdx; // Re-sync
+                    // If node was removed (nowIdx < 0), i naturally decrements
                 }
                 return JSNull.Value;
             }, "previousNode", 0),
@@ -1656,6 +1695,160 @@ public sealed partial class DomBridge
                 state.AdjustForRemoval(parent, removedChild, index);
             else
                 _activeRanges.RemoveAt(i); // GC'd — prune
+        }
+    }
+
+    /// <summary>
+    /// Executes NodeIterator pre-removing steps per DOM §7.2.
+    /// Must be called BEFORE the node is actually removed from the tree
+    /// so that tree traversal can find neighboring nodes.
+    /// </summary>
+    private void NotifyNodeIteratorPreRemoval(DomElement nodeToBeRemoved)
+    {
+        for (var i = _activeNodeIterators.Count - 1; i >= 0; i--)
+        {
+            if (_activeNodeIterators[i].TryGetTarget(out var iterState))
+                iterState.AdjustForRemoval(nodeToBeRemoved);
+            else
+                _activeNodeIterators.RemoveAt(i); // GC'd — prune
+        }
+    }
+
+    /// <summary>
+    /// Tracks the state of a live <c>NodeIterator</c> so that DOM mutations
+    /// can adjust the reference node per the DOM Living Standard §7.2
+    /// "NodeIterator pre-removing steps".
+    /// </summary>
+    private sealed class IteratorState
+    {
+        public DomElement Root;
+        public DomElement? ReferenceNode;
+        public bool PointerBeforeReferenceNode;
+        public int LastKnownIndex = -1;
+
+        public IteratorState(DomElement root)
+        {
+            Root = root;
+            ReferenceNode = root;
+            PointerBeforeReferenceNode = true;
+        }
+
+        /// <summary>
+        /// Per DOM spec §7.2: when a node is removed that is the reference node
+        /// (or an inclusive descendant of it), advance the reference node to the
+        /// appropriate neighboring node within the iterator's root subtree.
+        /// </summary>
+        public void AdjustForRemoval(DomElement removedNode)
+        {
+            if (ReferenceNode == null) return;
+
+            // Only act if the removed node IS the reference node or is an
+            // ancestor of it (i.e., reference node is a descendant of removed).
+            if (!ReferenceEquals(ReferenceNode, removedNode) &&
+                !IsDescendantOf(ReferenceNode, removedNode))
+                return;
+
+            // Also only act if the removed node is within the iterator's root subtree.
+            if (!ReferenceEquals(removedNode, Root) && !IsDescendantOf(removedNode, Root))
+                return;
+
+            if (PointerBeforeReferenceNode)
+            {
+                // Pointer is before reference — advance reference to the next
+                // node following removedNode in document order that is an
+                // inclusive descendant of root.
+                var next = GetNextNodeAfter(removedNode, Root);
+                if (next != null)
+                {
+                    ReferenceNode = next;
+                    // pointerBeforeReferenceNode stays true
+                    return;
+                }
+                // If no following node, try the first preceding node
+                var prev = GetPreviousNodeBefore(removedNode, Root);
+                if (prev != null)
+                {
+                    ReferenceNode = prev;
+                    PointerBeforeReferenceNode = false;
+                }
+            }
+            else
+            {
+                // Pointer is after reference — advance reference to the first
+                // preceding node before removedNode in document order that is
+                // an inclusive descendant of root.
+                var prev = GetPreviousNodeBefore(removedNode, Root);
+                if (prev != null)
+                {
+                    ReferenceNode = prev;
+                    PointerBeforeReferenceNode = true;
+                    return;
+                }
+                // If no preceding node, try the next following node
+                var next = GetNextNodeAfter(removedNode, Root);
+                if (next != null)
+                {
+                    ReferenceNode = next;
+                    // pointerBeforeReferenceNode stays false
+                }
+            }
+        }
+
+        /// <summary>
+        /// Returns the first node following <paramref name="node"/> in document order
+        /// that is an inclusive descendant of <paramref name="root"/>, skipping the
+        /// subtree of <paramref name="node"/> (since it's being removed).
+        /// </summary>
+        private static DomElement? GetNextNodeAfter(DomElement node, DomElement root)
+        {
+            // Look for next sibling, then parent's next sibling, etc.
+            var current = node;
+            while (current != null && !ReferenceEquals(current, root))
+            {
+                if (current.Parent != null)
+                {
+                    var siblings = current.Parent.Children;
+                    var idx = siblings.IndexOf(current);
+                    if (idx >= 0 && idx + 1 < siblings.Count)
+                        return siblings[idx + 1];
+                }
+                current = current.Parent;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Returns the first node preceding <paramref name="node"/> in document order
+        /// that is an inclusive descendant of <paramref name="root"/>.
+        /// </summary>
+        private static DomElement? GetPreviousNodeBefore(DomElement node, DomElement root)
+        {
+            if (node.Parent == null) return null;
+            var siblings = node.Parent.Children;
+            var idx = siblings.IndexOf(node);
+            if (idx > 0)
+            {
+                // Go to the deepest last descendant of the previous sibling
+                var prev = siblings[idx - 1];
+                while (prev.Children.Count > 0)
+                    prev = prev.Children[^1];
+                return prev;
+            }
+            // No previous sibling — parent is the previous node (unless it's root)
+            if (!ReferenceEquals(node.Parent, root))
+                return node.Parent;
+            return null;
+        }
+
+        private static bool IsDescendantOf(DomElement node, DomElement potentialAncestor)
+        {
+            var current = node.Parent;
+            while (current != null)
+            {
+                if (ReferenceEquals(current, potentialAncestor)) return true;
+                current = current.Parent;
+            }
+            return false;
         }
     }
 }

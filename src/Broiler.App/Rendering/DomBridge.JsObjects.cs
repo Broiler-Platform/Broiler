@@ -847,6 +847,7 @@ public sealed partial class DomBridge
                 if (childEl == null) return a[0];
                 var idx = element.Children.IndexOf(childEl);
                 if (idx < 0) return a[0];
+                NotifyNodeIteratorPreRemoval(childEl);
                 element.Children.RemoveAt(idx);
                 childEl.Parent = null;
                 NotifyChildRemoved(element, childEl, idx);
@@ -3014,6 +3015,7 @@ public sealed partial class DomBridge
                         var idx = docRoot.Children.IndexOf(child);
                         if (idx >= 0)
                         {
+                            bridge.NotifyNodeIteratorPreRemoval(child);
                             docRoot.Children.RemoveAt(idx);
                             child.Parent = null;
                             bridge.NotifyChildRemoved(docRoot, child, idx);

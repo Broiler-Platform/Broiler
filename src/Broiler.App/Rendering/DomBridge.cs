@@ -22,6 +22,7 @@ public sealed partial class DomBridge
     private readonly List<DomElement> _elements = [];
     private readonly List<(JSFunction Callback, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
     private readonly List<WeakReference<RangeState>> _activeRanges = [];
+    private readonly List<WeakReference<IteratorState>> _activeNodeIterators = [];
     private readonly DomElement _documentNode = new("#document", null, null, string.Empty);
     private JSObject? _documentJSObject;
     private JSObject? _windowJSObject;

@@ -1813,4 +1813,119 @@ document.getElementById('score').textContent = ws;
         // Phase A baseline: at least +2 over Phase 4b (83) = 85
         Assert.True(score >= 85, $"Acid3 score: {score} (expected >= 85 after Phase A)");
     }
+
+    // ---- Phase C regression tests ----
+
+    /// <summary>
+    /// Test 2: NodeIterator correctly handles node removal during iteration.
+    /// When a node is removed that is the reference node, the iterator must
+    /// advance per DOM spec §7.2 "NodeIterator pre-removing steps".
+    /// </summary>
+    [Fact]
+    public void PhaseC_NodeIterator_PreRemoval_Steps()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var doc = document.implementation.createDocument('', 'html', null);
+doc.documentElement.appendChild(doc.createElement('body'));
+var t1 = doc.body.appendChild(doc.createElement('t1'));
+var t2 = doc.body.appendChild(doc.createElement('t2'));
+var t3 = doc.body.appendChild(doc.createElement('t3'));
+var t4 = doc.body.appendChild(doc.createElement('t4'));
+
+// Simple test: iterate forward, remove during previousNode
+var callCount2 = 0;
+var i2 = doc.createNodeIterator(doc.body, 0xFFFFFFFF, null, false);
+var fwd1 = i2.nextNode(); r.push('fwd1=' + (fwd1 ? fwd1.tagName : 'null'));
+var fwd2 = i2.nextNode(); r.push('fwd2=' + (fwd2 ? fwd2.tagName : 'null'));
+var fwd3 = i2.nextNode(); r.push('fwd3=' + (fwd3 ? fwd3.tagName : 'null'));
+var fwd4 = i2.nextNode(); r.push('fwd4=' + (fwd4 ? fwd4.tagName : 'null'));
+var fwd5 = i2.nextNode(); r.push('fwd5=' + (fwd5 ? fwd5.tagName : 'null'));
+// Now referenceNode = t4, pointerBefore = false
+// Remove t4
+doc.body.removeChild(t4);
+r.push('after_remove_ref=' + (i2.referenceNode ? i2.referenceNode.tagName : 'null'));
+r.push('after_remove_pbr=' + i2.pointerBeforeReferenceNode);
+// previousNode should find t3
+var bk1 = i2.previousNode();
+r.push('bk1=' + (bk1 ? bk1.tagName : 'null'));
+var bk2 = i2.previousNode();
+r.push('bk2=' + (bk2 ? bk2.tagName : 'null'));
+var bk3 = i2.previousNode();
+r.push('bk3=' + (bk3 ? bk3.tagName : 'null'));
+
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        Console.WriteLine("NodeIterator: " + result);
+        // After removing t4 (pointerBefore=false), reference should shift to t3 (pointerBefore=true)
+        Assert.Contains("after_remove_ref=T3", result);
+        Assert.Contains("bk1=T2", result);
+        Assert.Contains("bk2=T1", result);
+        Assert.Contains("bk3=BODY", result);
+    }
+
+    /// <summary>
+    /// Test 2 full scenario: NodeIterator with DOM mutations during filter callbacks.
+    /// </summary>
+    [Fact]
+    public void PhaseC_NodeIterator_Removal_During_Filter()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var doc = document.implementation.createDocument('', 'html', null);
+doc.documentElement.appendChild(doc.createElement('body'));
+var t1 = doc.body.appendChild(doc.createElement('t1'));
+var t2 = doc.body.appendChild(doc.createElement('t2'));
+var t3 = doc.body.appendChild(doc.createElement('t3'));
+var t4 = doc.body.appendChild(doc.createElement('t4'));
+var callCount = 0;
+var filterFunctions = [
+    function(node) { return true; },
+    function(node) { return true; },
+    function(node) { return true; },
+    function(node) { doc.body.removeChild(t4); return true; },
+    function(node) { return true; },
+    function(node) { doc.body.removeChild(t4); return 2; },
+    function(node) { return true; },
+    function(node) { doc.body.removeChild(t2); return true; },
+    function(node) { return true; }
+];
+var i = doc.createNodeIterator(doc.documentElement.lastChild, 0xFFFFFFFF,
+    function(node) { return filterFunctions[callCount++](node); }, true);
+
+try {
+    var n1 = i.nextNode(); r.push('n1=' + (n1 ? n1.tagName || n1.nodeName : 'null'));
+    var n2 = i.nextNode(); r.push('n2=' + (n2 ? n2.tagName || n2.nodeName : 'null'));
+    var n3 = i.nextNode(); r.push('n3=' + (n3 ? n3.tagName || n3.nodeName : 'null'));
+    var n4 = i.nextNode(); r.push('n4=' + (n4 ? n4.tagName || n4.nodeName : 'null'));
+    doc.body.appendChild(t4);
+    var n5 = i.nextNode(); r.push('n5=' + (n5 ? n5.tagName || n5.nodeName : 'null'));
+    var p1 = i.previousNode(); r.push('p1=' + (p1 ? p1.tagName || p1.nodeName : 'null'));
+    var p2 = i.previousNode(); r.push('p2=' + (p2 ? p2.tagName || p2.nodeName : 'null'));
+    var p3 = i.previousNode(); r.push('p3=' + (p3 ? p3.tagName || p3.nodeName : 'null'));
+} catch(e) {
+    r.push('ERROR=' + e.message);
+}
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        Console.WriteLine("Full Test 2: " + result);
+        Assert.Contains("n1=BODY", result);
+        Assert.Contains("n2=T1", result);
+        Assert.Contains("n3=T2", result);
+        Assert.Contains("n4=T3", result);
+        Assert.Contains("n5=T4", result);
+        Assert.Contains("p1=T3", result);
+        Assert.Contains("p2=T2", result);
+        Assert.Contains("p3=T1", result);
+    }
 }
