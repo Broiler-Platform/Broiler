@@ -300,7 +300,7 @@ public sealed partial class DomBridge
                 };
             ");
 
-        // document.write(html) — parse and append to body
+        // document.write(html) — parse and insert at the current script position
         document.FastAddValue(
             (KeyString)"write",
             new JSFunction((in Arguments a) =>
@@ -320,10 +320,37 @@ public sealed partial class DomBridge
                             string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
                         if (mainBody != null)
                         {
-                            foreach (var child in bodyEl.Children)
+                            // Find the currently executing <script> element so we can
+                            // insert the new nodes right after it (matching real browser
+                            // behaviour where document.write() inserts at the parser
+                            // insertion point).
+                            DomElement? currentScript = null;
+                            if (CurrentScriptIndex >= 0 && CurrentScriptIndex < _elements.Count)
                             {
-                                child.Parent = mainBody;
-                                mainBody.Children.Add(child);
+                                currentScript = _elements[CurrentScriptIndex];
+                                // Verify it's a <script> in mainBody
+                                if (currentScript.Parent != mainBody)
+                                    currentScript = null;
+                            }
+
+                            if (currentScript != null)
+                            {
+                                var insertIdx = mainBody.Children.IndexOf(currentScript) + 1;
+                                var children = new List<DomElement>(bodyEl.Children);
+                                for (int ci = 0; ci < children.Count; ci++)
+                                {
+                                    children[ci].Parent = mainBody;
+                                    mainBody.Children.Insert(insertIdx + ci, children[ci]);
+                                }
+                            }
+                            else
+                            {
+                                // Fallback: append to end
+                                foreach (var child in bodyEl.Children)
+                                {
+                                    child.Parent = mainBody;
+                                    mainBody.Children.Add(child);
+                                }
                             }
                             // Register ALL parsed elements (including deeply nested ones)
                             // so getElementById, querySelector, etc. can find them

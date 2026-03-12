@@ -240,8 +240,11 @@ public sealed class HtmlTreeBuilder
 
                     var parent = openElements.Count > 0 ? openElements.Peek() : body;
 
-                    // Foster parenting for text nodes inside table scope
-                    if (TableElements.Contains(parent.TagName))
+                    // Foster parenting for text nodes inside table scope.
+                    // Per HTML spec, only non-whitespace text is foster-parented;
+                    // whitespace text nodes are kept in the table element.
+                    if (TableElements.Contains(parent.TagName) &&
+                        !string.IsNullOrWhiteSpace(text.TextContent))
                         parent = FosterParent(openElements, body);
 
                     AppendChild(parent, text);
