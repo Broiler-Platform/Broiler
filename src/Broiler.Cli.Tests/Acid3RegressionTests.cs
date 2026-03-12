@@ -1073,3 +1073,386 @@ document.body.appendChild(out);
         Assert.Contains("startOffset6=1", value);
     }
 }
+
+/// <summary>
+/// Phase 5 Acid3 regression tests: SVG competition tests — SMIL animation
+/// stubs, SVG text content methods, SVGLength constants.
+/// </summary>
+public class Acid3Phase5Tests
+{
+    [Fact]
+    public void SVG_GetNumberOfChars_Returns_TextLength()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var svgns = 'http://www.w3.org/2000/svg';
+var doc = document.implementation.createDocument(svgns, 'svg', null);
+var svg = doc.documentElement;
+var text = doc.createElementNS(svgns, 'text');
+text.setAttribute('font-size', '4000');
+var tn = doc.createTextNode('abc');
+text.appendChild(tn);
+svg.appendChild(text);
+var r = [];
+r.push(typeof text.getNumberOfChars === 'function');
+r.push(text.getNumberOfChars() === 3);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void SVG_GetComputedTextLength_Returns_Number()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var svgns = 'http://www.w3.org/2000/svg';
+var doc = document.implementation.createDocument(svgns, 'svg', null);
+var text = doc.createElementNS(svgns, 'text');
+text.setAttribute('font-size', '100');
+text.appendChild(doc.createTextNode('ab'));
+doc.documentElement.appendChild(text);
+var r = [];
+r.push(typeof text.getComputedTextLength === 'function');
+var len = text.getComputedTextLength();
+r.push(typeof len === 'number');
+r.push(len > 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void SVG_GetSubStringLength_Returns_Number()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var svgns = 'http://www.w3.org/2000/svg';
+var doc = document.implementation.createDocument(svgns, 'svg', null);
+var text = doc.createElementNS(svgns, 'text');
+text.setAttribute('font-size', '100');
+text.appendChild(doc.createTextNode('abc'));
+doc.documentElement.appendChild(text);
+var r = [];
+r.push(typeof text.getSubStringLength === 'function');
+var len = text.getSubStringLength(0, 1);
+r.push(typeof len === 'number');
+r.push(len > 0);
+r.push(text.getSubStringLength(1, 0) === 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void SVG_GetStartPositionOfChar_Returns_Point()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var svgns = 'http://www.w3.org/2000/svg';
+var doc = document.implementation.createDocument(svgns, 'svg', null);
+var text = doc.createElementNS(svgns, 'text');
+text.setAttribute('font-size', '100');
+text.appendChild(doc.createTextNode('abc'));
+doc.documentElement.appendChild(text);
+var r = [];
+r.push(typeof text.getStartPositionOfChar === 'function');
+var pt = text.getStartPositionOfChar(0);
+r.push(typeof pt.x === 'number');
+r.push(typeof pt.y === 'number');
+r.push(pt.x === 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void SVG_GetEndPositionOfChar_Returns_Point()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var svgns = 'http://www.w3.org/2000/svg';
+var doc = document.implementation.createDocument(svgns, 'svg', null);
+var text = doc.createElementNS(svgns, 'text');
+text.setAttribute('font-size', '100');
+text.appendChild(doc.createTextNode('abc'));
+doc.documentElement.appendChild(text);
+var r = [];
+r.push(typeof text.getEndPositionOfChar === 'function');
+var pt = text.getEndPositionOfChar(0);
+r.push(typeof pt.x === 'number');
+r.push(pt.x > 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void SVG_GetRotationOfChar_Returns_Zero()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var svgns = 'http://www.w3.org/2000/svg';
+var doc = document.implementation.createDocument(svgns, 'svg', null);
+var text = doc.createElementNS(svgns, 'text');
+text.appendChild(doc.createTextNode('abc'));
+doc.documentElement.appendChild(text);
+var r = [];
+r.push(typeof text.getRotationOfChar === 'function');
+r.push(text.getRotationOfChar(0) === 0);
+r.push(text.getRotationOfChar(1) === 0);
+r.push(text.getRotationOfChar(2) === 0);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void SVG_GetRotationOfChar_Throws_INDEX_SIZE_ERR()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var svgns = 'http://www.w3.org/2000/svg';
+var doc = document.implementation.createDocument(svgns, 'svg', null);
+var text = doc.createElementNS(svgns, 'text');
+text.appendChild(doc.createTextNode('ab'));
+doc.documentElement.appendChild(text);
+var r = [];
+try {
+  text.getRotationOfChar(5);
+  r.push('no-throw');
+} catch(e) {
+  r.push('threw');
+}
+try {
+  text.getStartPositionOfChar(5);
+  r.push('no-throw');
+} catch(e) {
+  r.push('threw');
+}
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("threw,threw", result);
+    }
+
+    [Fact]
+    public void SVG_SetCurrentTime_GetCurrentTime()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var svgns = 'http://www.w3.org/2000/svg';
+var doc = document.implementation.createDocument(svgns, 'svg', null);
+var svg = doc.documentElement;
+var r = [];
+r.push(typeof svg.getCurrentTime === 'function');
+r.push(typeof svg.setCurrentTime === 'function');
+r.push(svg.getCurrentTime() === 0);
+svg.setCurrentTime(1000);
+r.push(svg.getCurrentTime() === 1000);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void SVG_SMIL_BeginElement_Exists()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var svgns = 'http://www.w3.org/2000/svg';
+var doc = document.implementation.createDocument(svgns, 'svg', null);
+var svg = doc.documentElement;
+var anim = doc.createElementNS(svgns, 'set');
+anim.setAttribute('begin', 'indefinite');
+anim.setAttribute('to', '0');
+anim.setAttribute('attributeName', 'width');
+anim.setAttribute('dur', 'indefinite');
+anim.setAttribute('fill', 'freeze');
+svg.appendChild(anim);
+var r = [];
+r.push(typeof anim.beginElement === 'function');
+r.push(typeof anim.endElement === 'function');
+r.push(typeof anim.getStartTime === 'function');
+anim.beginElement();
+r.push('ok');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,ok", result);
+    }
+
+    [Fact]
+    public void SVGLength_Constants_Exist()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(typeof SVGLength !== 'undefined');
+r.push(SVGLength.SVG_LENGTHTYPE_UNKNOWN === 0);
+r.push(SVGLength.SVG_LENGTHTYPE_NUMBER === 1);
+r.push(SVGLength.SVG_LENGTHTYPE_PERCENTAGE === 2);
+r.push(SVGLength.SVG_LENGTHTYPE_PX === 5);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void SVG_AnimatedLength_UnitType_Number()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var svgns = 'http://www.w3.org/2000/svg';
+var doc = document.implementation.createDocument(svgns, 'svg', null);
+var rect = doc.createElementNS(svgns, 'rect');
+rect.setAttribute('width', '100');
+rect.setAttribute('height', '50');
+doc.documentElement.appendChild(rect);
+var r = [];
+r.push(rect.width.baseVal.unitType === SVGLength.SVG_LENGTHTYPE_NUMBER);
+r.push(rect.width.baseVal.value === 100);
+r.push(rect.width.baseVal.valueInSpecifiedUnits === 100);
+r.push(rect.width.animVal.value === 100);
+r.push(rect.height.baseVal.value === 50);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
+
+    [Fact]
+    public void Acid3_Test75_SVG_Rect_Width_And_GetAttribute()
+    {
+        // Mirrors the actual (uncommented) Acid3 test 75 code
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var svgns = 'http://www.w3.org/2000/svg';
+var doc = document.implementation.createDocument(svgns, 'svg', null);
+var svg = doc.documentElement;
+var rect = doc.createElementNS(svgns, 'rect');
+rect.setAttribute('fill', 'red');
+rect.setAttribute('width', '100');
+rect.setAttribute('height', '100');
+rect.setAttribute('id', 'rect');
+svg.appendChild(rect);
+var r = [];
+r.push(rect.width ? 'has-width' : 'no-width');
+r.push(rect.getAttribute('width') === '100' ? 'attr-ok' : 'attr-bad');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("has-width,attr-ok", result);
+    }
+
+    [Fact]
+    public void Acid3_Test77_SVG_Text_GetNumberOfChars()
+    {
+        // Mirrors the actual (uncommented) Acid3 test 77 code
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var svgns = 'http://www.w3.org/2000/svg';
+var doc = document.implementation.createDocument(svgns, 'svg', null);
+var svg = doc.documentElement;
+var text = doc.createElementNS(svgns, 'text');
+text.setAttribute('y', '1em');
+text.setAttribute('font-size', '4000');
+text.setAttribute('font-family', 'ACID3svgfont');
+var textContent = doc.createTextNode('abc');
+text.appendChild(textContent);
+svg.appendChild(text);
+var r = [];
+r.push(text.getNumberOfChars ? 'has-method' : 'no-method');
+r.push(text.getNumberOfChars() === 3 ? 'count-ok' : 'count-bad');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("has-method,count-ok", result);
+    }
+
+    /// <summary>
+    /// Phase 5 score validation: Verifies the Acid3 score remains stable
+    /// after Phase 5 SVG competition test stubs.
+    /// </summary>
+    [Fact]
+    public void Acid3_Phase5_Score_Validation()
+    {
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
+        Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
+
+        var html = File.ReadAllText(acid3Path);
+        var url = new Uri(acid3Path).AbsoluteUri;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, url);
+
+        // Extract score from <span id="score">N</span>
+        var scoreMatch = System.Text.RegularExpressions.Regex.Match(
+            result, @"id=""score""[^>]*>(\d+)<");
+        Assert.True(scoreMatch.Success, "Could not find score element in output");
+        var score = int.Parse(scoreMatch.Groups[1].Value);
+
+        // Phase 5 baseline: score should be >= 75 (same as Phase 4 since tests 75-79 were already passing)
+        Assert.True(score >= 75, $"Acid3 score: {score} (expected >= 75, Phase 5 baseline)");
+    }
+}
