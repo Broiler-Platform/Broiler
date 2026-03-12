@@ -2268,4 +2268,103 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("value=true", result);
         Assert.Contains("no_leak=true", result);
     }
+
+    /// <summary>
+    /// Verifies that iframe fallback content is stripped from capture output
+    /// so that HtmlRenderer does not render "FAIL" text inside iframes.
+    /// </summary>
+    [Fact]
+    public void StripIframeContent_Removes_Fallback_Text()
+    {
+        var html = @"<html><body>
+<iframe src=""empty.png"">FAIL</iframe>
+<iframe src=""test.html""><p>FAIL content</p></iframe>
+<p id=""score"">OK</p>
+</body></html>";
+        var result = CaptureService.StripIframeContent(html);
+        Assert.DoesNotContain("FAIL", result);
+        Assert.Contains("id=\"score\"", result);
+        Assert.Contains("<iframe src=\"empty.png\"></iframe>", result);
+    }
+
+    /// <summary>
+    /// Verifies that object fallback content is stripped from capture output
+    /// so that HtmlRenderer does not render "FAIL" text inside objects.
+    /// </summary>
+    [Fact]
+    public void StripObjectContent_Removes_Fallback_Text()
+    {
+        var html = @"<html><body>
+<object data=""a.png""><object data=""b.png"">FAIL</object></object>
+<p id=""score"">OK</p>
+</body></html>";
+        var result = CaptureService.StripObjectContent(html);
+        Assert.DoesNotContain("FAIL", result);
+        Assert.Contains("id=\"score\"", result);
+        Assert.Contains("<object data=\"a.png\"></object>", result);
+    }
+
+    /// <summary>
+    /// Validates that the full Acid3 rendered output contains a visible
+    /// score and that the score is at least 88 (Phase 5 baseline).
+    /// </summary>
+    [Fact]
+    public void Acid3_Phase5_Score_At_Least_88()
+    {
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..",
+            "acid", "acid3", "acid3.html"));
+        Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
+
+        var html = File.ReadAllText(acid3Path);
+        var url = "http://acid3.acidtests.org/acid3.html";
+        var result = CaptureService.ExecuteScriptsWithDom(html, url);
+
+        var scoreMatch = System.Text.RegularExpressions.Regex.Match(
+            result, @"id=""score""[^>]*>(\d+)<");
+        Assert.True(scoreMatch.Success, "Score element not found in rendered output");
+        var score = int.Parse(scoreMatch.Groups[1].Value);
+
+        Console.WriteLine($"ACID3_SCORE={score}");
+        Assert.True(score >= 88, $"Acid3 score {score} is below Phase 5 baseline of 88");
+    }
+
+    /// <summary>
+    /// Validates that the rendered Acid3 HTML does not contain visible FAIL
+    /// text in the content area after the full stripping pipeline.
+    /// The only acceptable remaining FAIL is inside the document.write div
+    /// with id=" " which is below the viewport.
+    /// </summary>
+    [Fact]
+    public void Acid3_Phase5_No_Visible_Fail_Text_After_Stripping()
+    {
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..",
+            "acid", "acid3", "acid3.html"));
+        var html = File.ReadAllText(acid3Path);
+        var url = "http://acid3.acidtests.org/acid3.html";
+        var result = CaptureService.ExecuteScriptsWithDom(html, url);
+
+        // Apply the same stripping pipeline as CaptureImageAsync
+        result = CaptureService.StripScriptTags(result);
+        result = CaptureService.StripIframeContent(result);
+        result = CaptureService.StripObjectContent(result);
+
+        // After stripping, count standalone FAIL text occurrences in elements.
+        // The only acceptable FAIL is inside <div id=" ">FAIL</div> which is
+        // created by document.write() and positioned below the viewport.
+        var failMatches = System.Text.RegularExpressions.Regex.Matches(
+            result, @">FAIL<");
+        // Exclude the known <div id=" ">FAIL</div> at the end of the document
+        int unexpectedFails = 0;
+        foreach (System.Text.RegularExpressions.Match m in failMatches)
+        {
+            int start = Math.Max(0, m.Index - 30);
+            string context = result.Substring(start, Math.Min(60, result.Length - start));
+            if (!context.Contains("id=\" \""))
+                unexpectedFails++;
+        }
+        Assert.True(unexpectedFails == 0,
+            $"Found {unexpectedFails} unexpected visible FAIL text occurrences after stripping");
+    }
 }

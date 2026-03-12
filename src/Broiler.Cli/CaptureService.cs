@@ -197,6 +197,26 @@ public class CaptureService
         RegexOptions.Compiled);
 
     /// <summary>
+    /// Matches an <c>&lt;iframe&gt;…&lt;/iframe&gt;</c> element, capturing the
+    /// tag attributes and any inline fallback content.  Used to strip the
+    /// fallback content that HtmlRenderer would otherwise render because it
+    /// cannot load the external <c>src</c> resource.
+    /// </summary>
+    private static readonly Regex IframeContentPattern = new(
+        @"<iframe(?<attrs>[^>]*)>[\s\S]*?</iframe>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Matches an <c>&lt;object&gt;…&lt;/object&gt;</c> element (including
+    /// nested objects) and captures the entire block.  Used to strip the
+    /// fallback content that HtmlRenderer renders when it cannot load the
+    /// external <c>data</c> resource.
+    /// </summary>
+    private static readonly Regex ObjectContentPattern = new(
+        @"<object(?<attrs>[^>]*)>[\s\S]*?</object>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
     /// Captures website content from the specified URL, processes it using
     /// the local rendering engines (HTML-Renderer and YantraJS), and saves
     /// the result to the output path.
@@ -347,6 +367,14 @@ public class CaptureService
         // cause the image to tile across the page.  Since these images are
         // decorative they can be safely removed for capture rendering.
         html = StripCssDataUriBackgrounds(html);
+
+        // Strip fallback content from <iframe> and <object> elements.
+        // HtmlRenderer cannot load external resources referenced by these
+        // elements, so it renders the inline fallback content instead.
+        // For Acid3 (and similar test pages) this causes "FAIL" text and
+        // other hidden content to bleed through.
+        html = StripIframeContent(html);
+        html = StripObjectContent(html);
 
         var format = options.ImageFormat == ImageFormat.Jpeg
             ? SKEncodedImageFormat.Jpeg
@@ -652,6 +680,39 @@ public class CaptureService
     internal static string StripCssDataUriBackgrounds(string html)
     {
         return CssDataUriBgPattern.Replace(html, string.Empty);
+    }
+
+    /// <summary>
+    /// Replaces the fallback content of every <c>&lt;iframe&gt;</c> element
+    /// with an empty body.  HtmlRenderer cannot load external resources
+    /// referenced by <c>src</c>, so it renders the inline fallback content
+    /// instead — causing hidden text (e.g. "FAIL") to bleed through.
+    /// </summary>
+    internal static string StripIframeContent(string html)
+    {
+        return IframeContentPattern.Replace(html, m =>
+            $"<iframe{m.Groups["attrs"].Value}></iframe>");
+    }
+
+    /// <summary>
+    /// Replaces the fallback content of every <c>&lt;object&gt;</c> element
+    /// with an empty body.  HtmlRenderer cannot load external data resources,
+    /// so it renders the inline fallback content (which may include "FAIL"
+    /// text or nested objects) instead.
+    /// </summary>
+    internal static string StripObjectContent(string html)
+    {
+        // Object elements may be nested; we collapse from the inside out
+        // by applying the pattern repeatedly until no nested objects remain.
+        string result = html;
+        string previous;
+        do
+        {
+            previous = result;
+            result = ObjectContentPattern.Replace(result, m =>
+                $"<object{m.Groups["attrs"].Value}></object>");
+        } while (result != previous);
+        return result;
     }
 
     /// <summary>
