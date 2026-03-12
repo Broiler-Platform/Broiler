@@ -58,6 +58,25 @@ public sealed partial class DomBridge
             return;
         }
 
+        // Comment nodes → <!-- content -->
+        if (string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        {
+            sb.Append("<!--").Append(element.TextContent ?? string.Empty).Append("-->");
+            return;
+        }
+
+        // Sub-document roots (from iframe/object contentDocument) → unwrap children
+        if (string.Equals(element.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var child in element.Children)
+                SerializeElement(child, sb, depth + 1);
+            return;
+        }
+
+        // DOCTYPE nodes → skip (already emitted at the top of SerializeToHtml)
+        if (string.Equals(element.TagName, "#doctype", StringComparison.OrdinalIgnoreCase))
+            return;
+
         var tag = element.TagName.ToLowerInvariant();
         sb.Append('<').Append(tag);
 

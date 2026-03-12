@@ -21,6 +21,13 @@ public sealed class HtmlTreeBuilder
         "html", "head", "body"
     };
 
+    // Metadata elements that belong in <head> when encountered before an
+    // explicit <body> tag (WHATWG "in head" insertion mode).
+    private static readonly HashSet<string> HeadMetadataElements = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "style", "link", "meta", "base"
+    };
+
     // Elements that auto-close a current <p>.
     private static readonly HashSet<string> PClosers = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -74,6 +81,10 @@ public sealed class HtmlTreeBuilder
         var openElements = new Stack<DomElement>();
         openElements.Push(body);
 
+        // Track whether an explicit <body> tag has been seen; metadata
+        // elements encountered before <body> belong in <head>.
+        var bodyOpened = false;
+
         // Active formatting elements list for the adoption agency algorithm
         var activeFormatting = new List<DomElement>();
 
@@ -96,6 +107,8 @@ public sealed class HtmlTreeBuilder
                         var target = string.Equals(tag, "html", StringComparison.OrdinalIgnoreCase) ? root
                             : string.Equals(tag, "head", StringComparison.OrdinalIgnoreCase) ? head
                             : body;
+                        if (string.Equals(tag, "body", StringComparison.OrdinalIgnoreCase))
+                            bodyOpened = true;
                         if (token.Attributes != null)
                         {
                             foreach (var kvp in token.Attributes)
@@ -119,6 +132,19 @@ public sealed class HtmlTreeBuilder
                         AppendChild(head, titleEl);
                         allElements.Add(titleEl);
                         openElements.Push(titleEl);
+                        break;
+                    }
+
+                    // Metadata elements (<style>, <link>, <meta>, <base>) that
+                    // appear before an explicit <body> tag are placed in <head>
+                    // per the WHATWG "in head" insertion mode.
+                    if (!bodyOpened && HeadMetadataElements.Contains(tag))
+                    {
+                        var metaEl = CreateElement(token);
+                        AppendChild(head, metaEl);
+                        allElements.Add(metaEl);
+                        if (!VoidElements.Contains(tag) && !token.SelfClosing)
+                            openElements.Push(metaEl);
                         break;
                     }
 
