@@ -1559,6 +1559,7 @@ public sealed partial class DomBridge
         {
             StartContainer = root;
             EndContainer = root;
+            Collapsed = true;
         }
 
         public void UpdateCollapsed()
