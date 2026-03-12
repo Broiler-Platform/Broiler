@@ -2981,7 +2981,8 @@ public sealed partial class DomBridge
             {
                 var results = new List<JSValue>();
                 CollectMatching(docRoot, el =>
-                    string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) &&
+                    (string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(el.TagName, "area", StringComparison.OrdinalIgnoreCase)) &&
                     el.Attributes.ContainsKey("href"), results);
                 return new JSArray(results);
             }, "get links"),

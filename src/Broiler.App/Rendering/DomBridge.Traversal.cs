@@ -200,9 +200,9 @@ public sealed partial class DomBridge
                         }
                         // Move to parent
                         node = node.Parent;
-                        if (ReferenceEquals(node, root)) return JSNull.Value;
                         var r = ApplyFilter(node, whatToShow, filterFn);
                         if (r == 1) { currentNode = node; return (JSValue)ToJSObject(node); }
+                        if (ReferenceEquals(node, root)) return JSNull.Value;
                         continue;
                     }
                     return JSNull.Value;
@@ -279,8 +279,13 @@ public sealed partial class DomBridge
                 sibling = target;
                 continue;
             }
-            // No more siblings — move up
+            // No more siblings — move up (DOM spec steps 3.3-3.5)
             sibling = sibling.Parent;
+            if (sibling == null || ReferenceEquals(sibling, root)) return JSNull.Value;
+            // Per spec: if filter accepts parent, return null
+            // (the parent is a "real" node, so don't skip over it)
+            var parentResult = ApplyFilter(sibling, whatToShow, filterFn);
+            if (parentResult == 1) return JSNull.Value; // FILTER_ACCEPT
         }
     }
 

@@ -205,12 +205,47 @@ backgrounds matching their test progress.
 | 90 | JS Engine | Regex backreference `/(\3)(\1)(a)/` | YantraJS limitation |
 | 93 | JS Engine | FunctionExpression semantics | YantraJS limitation |
 
+### Phase 4b: TreeWalker DOM Spec Fixes (Score 81→83)
+
+- [x] Fix TreeWalker `previousNode()`: root node is now accepted when filter passes (moved root check after filter evaluation per DOM spec)
+- [x] Fix TreeWalker `nextSibling()`: added parent filter check per DOM spec step 3.5 — when no sibling is found and traversal moves to parent, if parent is FILTER_ACCEPT, return null
+- [x] Fix `document.links` in JsObjects.cs (sub-documents) to include `<area>` elements per HTML spec
+
+#### Phase 4b Score Improvement
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Acid3 DOM Score | 81/100 | 83/100 |
+| Subtests passing (sync) | 81 | 83 |
+| CLI tests passing | 503 | 507 |
+
+#### Updated Remaining Failures (17 subtests)
+
+| Test | Category | Error | Fixable? |
+|------|----------|-------|----------|
+| 0 | CSS | `:last-child` + `pre-wrap` (getComputedStyle timing) | Partially |
+| 2 | DOM Traversal | NodeIterator DOM mutation during iteration | Complex |
+| 4–5 | DOM Traversal | NodeIterator/TreeWalker full-tree comparison | DOM tree ordering |
+| 9, 12–13 | DOM Range | Range extractContents/mutations | Complex |
+| 46 | CSS | `@media` viewport queries | Viewport model needed |
+| 64 | DOM | `object.data` URI scheme (`file://` vs `http://`) | Test-env only |
+| 69 | Infrastructure | External iframe loading (retry) | Needs HTTP server |
+| 72 | DOM/CSS | Dynamic `<style>` affecting image height | Sub-doc CSS |
+| 80 | DOM | `document.links` collection ordering | DOM tree ordering |
+| 84 | JS Engine | `(-0).toExponential(4)` formatting | YantraJS bug |
+| 88 | JS Engine | `\u002b` identifier parsing | YantraJS limitation |
+| 89 | JS Engine | Regex orphaned bracket | YantraJS limitation |
+| 90 | JS Engine | Regex backreference `/(\3)(\1)(a)/` | YantraJS limitation |
+| 93 | JS Engine | FunctionExpression semantics | YantraJS limitation |
+
 ### Phase 5: Full Acid3 Compliance, Regression Guard & Automated Test Suite
 
 - [ ] Achieve 100/100 Acid3 score (or document remaining gaps)
 - [ ] Add regression tests for each fixed subtest
 - [ ] Automated CI test suite for Acid3 compliance
 - [ ] Final stacktrace review — all exceptions documented as normal or tracked
+
+**Detailed implementation roadmap:** [roadmap/yantrajs-and-dom-range.md](roadmap/yantrajs-and-dom-range.md)
 
 ---
 
@@ -219,9 +254,12 @@ backgrounds matching their test progress.
 - [Acid3 Test Page](http://acid3.acidtests.org/)
 - [acid3-compliance-v4.md](acid3-compliance-v4.md) — Previous version
 - [acid2-compliance-roadmap.md](../acid/acid2/acid2-compliance-roadmap.md) — Acid2 methodology reference
+- [roadmap/yantrajs-and-dom-range.md](roadmap/yantrajs-and-dom-range.md) — YantraJS & DOM Range implementation roadmap
 
 ---
 
-**Status:** Phase 4 complete — score improved from 78/100 to 81/100. Fixed CSS selector
-backtracking, implicit `<tbody>` creation, `document.write()` insertion position, and
-`whatToShow` overflow. 19 subtests remain failing (5 are YantraJS engine limitations).
+**Status:** Phase 4b complete — score improved from 81/100 to 83/100. Fixed TreeWalker
+`previousNode()`/`nextSibling()` per DOM spec, added `<area>` to `document.links`.
+17 subtests remain failing (5 are YantraJS engine limitations).
+See [roadmap/yantrajs-and-dom-range.md](roadmap/yantrajs-and-dom-range.md) for detailed
+Phase 5 implementation plan.

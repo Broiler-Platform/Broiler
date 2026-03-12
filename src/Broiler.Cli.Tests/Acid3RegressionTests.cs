@@ -1585,7 +1585,6 @@ document.getElementById('out').textContent = b1.className + ',' + b2.className;
 
         Console.WriteLine($"ACID3_PHASE3_SCORE={score}");
     }
-}
 
 // =====================================================================
 // Phase 4: Targeted Feature Implementation — Regression Tests
@@ -1723,4 +1722,5 @@ public void Acid3_Phase4_Score_At_Least_81()
     var score = int.Parse(scoreMatch.Groups[1].Value);
     Assert.True(score >= 81, $"Acid3 score should be >= 81, got {score}");
     Console.WriteLine($"ACID3_PHASE4_SCORE={score}");
+}
 }
