@@ -1,0 +1,29 @@
+name: Acid3 Regression
+
+on:
+  push:
+    branches: [main, master, 'copilot/**']
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  acid3:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore src/Broiler.Cli.Tests
+
+      - name: Build
+        run: dotnet build src/Broiler.Cli.Tests --no-restore
+
+      - name: Run Acid3 regression tests
+        run: dotnet test src/Broiler.Cli.Tests --no-build --filter "FullyQualifiedName~Acid3" -v normal
+
+      - name: Run full test suite
+        run: dotnet test src/Broiler.Cli.Tests --no-build
