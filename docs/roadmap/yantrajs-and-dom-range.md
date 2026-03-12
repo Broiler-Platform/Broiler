@@ -1,7 +1,7 @@
 # Roadmap: YantraJS Engine Improvements & DOM Range Operations
 
 **Date:** 2026-03-12  
-**Current Acid3 Score:** 85/100 (tests 64 and 84 now passing after Phase A)  
+**Current Acid3 Score:** 88/100 (Phase A + Phase B complete)  
 **Previous:** [acid3-compliance-v5.md](../acid3-compliance-v5.md)
 
 ---
@@ -12,7 +12,7 @@
 
 | Tier | Category | Tests | Effort | Score Impact |
 |------|----------|-------|--------|-------------|
-| **1** | DOM Range operations | 9, 12, 13 | Medium–High | +3 |
+| **1** | DOM Range operations | ~~9, 12, 13~~ | ~~Medium–High~~ | ~~+3~~ ✅ Done |
 | **2** | DOM/CSS feature gaps | 0, 2, 4–5, 46, 72, 80 | Medium | +7 |
 | **3** | YantraJS engine limitations | 84, 88, 89, 90, 93 | High (engine core) | +5 |
 | — | Infrastructure/env-only | 64, 69 | N/A (not fixable in current test env) | +2 |
@@ -62,16 +62,16 @@ var f = r.extractContents();
 
 **Implementation tasks:**
 
-- [ ] **T1.1** Implement spec-compliant `extractContents()` per [DOM Living Standard §Range.extractContents](https://dom.spec.whatwg.org/#dom-range-extractcontents):
-  - [ ] Find common ancestor container (existing `FindCommonAncestor`)
-  - [ ] Handle case: start container == end container (text split or child slice)
-  - [ ] Handle cross-container case with proper ancestor path cloning
-  - [ ] Split start text node: keep prefix in original, put suffix in cloned wrapper
-  - [ ] Move fully-contained intermediate siblings to fragment
-  - [ ] Split end text node: move prefix to cloned wrapper, keep suffix in original
-  - [ ] Collapse range to start after extraction
-- [ ] **T1.2** Add regression test: `Range_ExtractContents_Cross_Node_Partial_Text`
-- [ ] **T1.3** Validate test 9 passes with the Acid3 harness
+- [x] **T1.1** Implement spec-compliant `extractContents()` per [DOM Living Standard §Range.extractContents](https://dom.spec.whatwg.org/#dom-range-extractcontents):
+  - [x] Find common ancestor container (existing `FindCommonAncestor`)
+  - [x] Handle case: start container == end container (text split or child slice)
+  - [x] Handle cross-container case with proper ancestor path cloning
+  - [x] Split start text node: keep prefix in original, put suffix in cloned wrapper
+  - [x] Move fully-contained intermediate siblings to fragment
+  - [x] Split end text node: move prefix to cloned wrapper, keep suffix in original
+  - [x] Collapse range to start after extraction
+- [x] **T1.2** Add regression test: `Range_ExtractContents_Cross_Node_Partial_Text`
+- [x] **T1.3** Validate test 9 passes with the Acid3 harness
 
 **Estimated effort:** 4–6 hours
 
@@ -100,13 +100,13 @@ r.insertNode(p.lastChild);    // insert t2 at range start → splits t1
 
 **Implementation tasks:**
 
-- [ ] **T1.4** After `insertNode()` text splitting, update range boundary points:
-  - [ ] Set `startContainer` to the parent of the split
-  - [ ] Set `startOffset` to the index of the inserted node
-  - [ ] If `endContainer` was the same text node, adjust `endOffset` to account for the split
-  - [ ] Recalculate `collapsed` state
-- [ ] **T1.5** Add regression test: `Range_InsertNode_Updates_Boundaries_After_TextSplit`
-- [ ] **T1.6** Validate test 12 passes with the Acid3 harness
+- [x] **T1.4** After `insertNode()` text splitting, update range boundary points:
+  - [x] Set `startContainer` to the parent of the split
+  - [x] Set `startOffset` to the index of the inserted node
+  - [x] If `endContainer` was the same text node, adjust `endOffset` to account for the split
+  - [x] Recalculate `collapsed` state
+- [x] **T1.5** Add regression test: `Range_InsertNode_Updates_Boundaries_After_TextSplit`
+- [x] **T1.6** Validate test 12 passes with the Acid3 harness
 
 **Estimated effort:** 2–3 hours
 
@@ -134,18 +134,18 @@ Per [DOM Living Standard §Removing steps for Ranges](https://dom.spec.whatwg.or
 
 **Implementation tasks:**
 
-- [ ] **T1.7** Add a range registration system:
-  - [ ] Track active `Range` objects in the `DomBridge` (e.g., `List<WeakReference<RangeState>>`)
-  - [ ] Each Range stores its boundary points in a shared `RangeState` object
-  - [ ] When `removeChild()` / `insertBefore()` / `appendChild()` mutate the DOM, iterate registered ranges and adjust boundary points per spec
-- [ ] **T1.8** Implement boundary-point adjustment for `removeChild`:
-  - [ ] If `startContainer` is a descendant of the removed node: set `startContainer = parent`, `startOffset = index`
-  - [ ] If `endContainer` is a descendant of the removed node: same
-  - [ ] If `startContainer == parent` and `startOffset > index`: decrement
-  - [ ] Same for `endContainer`/`endOffset`
-  - [ ] Recalculate `collapsed`
-- [ ] **T1.9** Add regression test: `Range_Collapses_When_Ancestor_Removed`
-- [ ] **T1.10** Validate test 13 passes with the Acid3 harness
+- [x] **T1.7** Add a range registration system:
+  - [x] Track active `Range` objects in the `DomBridge` (e.g., `List<WeakReference<RangeState>>`)
+  - [x] Each Range stores its boundary points in a shared `RangeState` object
+  - [x] When `removeChild()` / `insertBefore()` / `appendChild()` mutate the DOM, iterate registered ranges and adjust boundary points per spec
+- [x] **T1.8** Implement boundary-point adjustment for `removeChild`:
+  - [x] If `startContainer` is a descendant of the removed node: set `startContainer = parent`, `startOffset = index`
+  - [x] If `endContainer` is a descendant of the removed node: same
+  - [x] If `startContainer == parent` and `startOffset > index`: decrement
+  - [x] Same for `endContainer`/`endOffset`
+  - [x] Recalculate `collapsed`
+- [x] **T1.9** Add regression test: `Range_Collapses_When_Ancestor_Removed`
+- [x] **T1.10** Validate test 13 passes with the Acid3 harness
 
 **Estimated effort:** 4–6 hours
 
@@ -343,13 +343,13 @@ These failures are in the YantraJS JavaScript engine itself (the `yantra-1.2.295
 | T4.1 | 64 | 15 min | +1 | ✅ Done |
 | T2.1–T2.2 | 0 | 2–3 hr | +0 (already passing) | ✅ Verified |
 
-### Phase B: DOM Range Core (Score +3, 2–3 days)
+### Phase B: DOM Range Core — ✅ Complete (Score 85→88, +3)
 
-| Task | Test | Effort | Impact |
-|------|------|--------|--------|
-| T1.1–T1.3 | 9 | 4–6 hr | +1 |
-| T1.4–T1.6 | 12 | 2–3 hr | +1 |
-| T1.7–T1.10 | 13 | 4–6 hr | +1 |
+| Task | Test | Effort | Impact | Status |
+|------|------|--------|--------|--------|
+| T1.1–T1.3 | 9 | 4–6 hr | +1 | ✅ Done |
+| T1.4–T1.6 | 12 | 2–3 hr | +1 | ✅ Done |
+| T1.7–T1.10 | 13 | 4–6 hr | +1 | ✅ Done |
 
 ### Phase C: DOM/CSS Features (Score +5–7, 3–5 days)
 

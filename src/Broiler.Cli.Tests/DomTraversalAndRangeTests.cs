@@ -1131,4 +1131,139 @@ document.body.appendChild(out);
 
         Assert.Contains("hello|5|hello world|world|hello|hello!|hi!", result);
     }
+
+    // ─── Phase B: DOM Range mutation regression tests ───
+
+    /// <summary>
+    /// T1.2: extractContents() across nested elements with partial text node
+    /// splitting — Acid3 test 9 scenario.
+    /// </summary>
+    [Fact]
+    public void Range_ExtractContents_Cross_Node_Partial_Text()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""container""><h1>Hello <em>Wonderful</em> Kitty</h1><p>How are you?</p></div>
+<script>
+var container = document.getElementById('container');
+var h1 = container.firstChild;             // <h1>
+var em = h1.childNodes[1];                 // <em>
+var t2 = em.firstChild;                    // 'Wonderful'
+var p = container.childNodes[1];           // <p>
+var range = document.createRange();
+range.setStart(t2, 6);                     // after 'Wonder' → extract 'ful'
+range.setEnd(p, 0);                        // before <p>'s children
+
+var fragment = range.extractContents();
+var r = [];
+// Fragment should contain cloned <h1> with <em>ful</em> Kitty, plus cloned <p>
+r.push(fragment.childNodes.length);         // 2 (cloned h1 + cloned p)
+var fh1 = fragment.firstChild;
+r.push(fh1.nodeName);                      // H1
+r.push(fh1.childNodes.length);             // 2 (em clone + ' Kitty' text)
+var fem = fh1.firstChild;
+r.push(fem.nodeName);                      // EM
+r.push(fem.textContent);                   // 'ful'
+r.push(fh1.childNodes[1].textContent);     // ' Kitty'
+
+// Original DOM should have: <h1>Hello <em>Wonder</em></h1><p>How are you?</p>
+r.push(em.textContent);                    // 'Wonder' (kept in original)
+r.push(h1.childNodes.length);              // 2 ('Hello ' + em)
+r.push(range.collapsed);                   // true
+
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join('|');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("2|H1|2|EM|ful| Kitty|Wonder|2|true", result);
+    }
+
+    /// <summary>
+    /// T1.5: insertNode() into a text node updates range boundaries after split.
+    /// Acid3 test 12 scenario.
+    /// </summary>
+    [Fact]
+    public void Range_InsertNode_Updates_Boundaries_After_TextSplit()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<p id=""target"">12345</p>
+<script>
+var p = document.getElementById('target');
+var t1 = p.firstChild;    // '12345'
+var range = document.createRange();
+range.setStart(t1, 2);    // after '12'
+range.setEnd(t1, 3);      // after '123' → selects '3'
+
+// Create a new text node and insert it
+var ins = document.createTextNode('ABCDE');
+range.insertNode(ins);
+
+// After split: p.childNodes = ['12', 'ABCDE', '345']
+var r = [];
+r.push(p.childNodes.length);               // 3
+r.push(p.childNodes[0].textContent);       // '12'
+r.push(p.childNodes[1].textContent);       // 'ABCDE'
+r.push(p.childNodes[2].textContent);       // '345'
+
+// Range boundaries should be updated to parent after text split
+r.push(range.startContainer === p);        // true (parent of split)
+r.push(range.startOffset);                 // 1 (index of inserted node)
+
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join('|');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("3|12|ABCDE|345|true|1", result);
+    }
+
+    /// <summary>
+    /// T1.9: Range boundary-point adjustment when ancestor is removed via
+    /// removeChild(). Acid3 test 13 scenario.
+    /// </summary>
+    [Fact]
+    public void Range_Collapses_When_Ancestor_Removed()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""wrapper""><p id=""target"">12345</p></div>
+<script>
+var wrapper = document.getElementById('wrapper');
+var p = document.getElementById('target');
+var t = p.firstChild;  // '12345'
+var range = document.createRange();
+range.setStart(t, 2);    // inside text node at offset 2
+range.setEnd(wrapper, 1); // at wrapper child index 1
+
+// Remove <p> from wrapper — range should collapse
+wrapper.removeChild(p);
+
+var r = [];
+r.push(range.startContainer === wrapper);  // true (adjusted to parent)
+r.push(range.startOffset);                 // 0 (index of removed child)
+r.push(range.endContainer === wrapper);    // true (adjusted if offset > index)
+r.push(range.endOffset);                   // 0 (decremented from 1)
+r.push(range.collapsed);                   // true
+
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent = r.join('|');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|0|true|0|true", result);
+    }
 }
