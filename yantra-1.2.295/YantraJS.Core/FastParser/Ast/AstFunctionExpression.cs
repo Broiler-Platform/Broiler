@@ -8,7 +8,8 @@ public class AstFunctionExpression(
     bool isAsync,
     bool generator,
     AstIdentifier? id,
-    IFastEnumerable<VariableDeclarator> declarators, AstStatement body) : AstExpression(token, FastNodeType.FunctionExpression, previousToken)
+    IFastEnumerable<VariableDeclarator> declarators, AstStatement body,
+    bool isStatement = false) : AstExpression(token, FastNodeType.FunctionExpression, previousToken)
 {
     public bool Async = isAsync;
     public bool Generator = generator;
@@ -16,6 +17,8 @@ public class AstFunctionExpression(
     public readonly IFastEnumerable<VariableDeclarator> Params = declarators;
     public readonly AstStatement Body = body;
     public readonly bool IsArrowFunction = isArrow;
+    // BROILER-PATCH: Track whether this is a function declaration vs expression (ES3 §13)
+    public new readonly bool IsStatement = isStatement;
 
     public override string ToString()
     {

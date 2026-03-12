@@ -69,10 +69,28 @@ partial class FastCompiler
 
                 FastFunctionScope.VariableScope jsFVarScope = null;
 
-                if (functionName != null)
+                // BROILER-PATCH: For function declarations, look up name in parent scope
+                // to bind the function. For function expressions, the name is local to
+                // the function body and must not leak to the parent scope (ES3 §13).
+                ParameterExpression fexprNameParam = null;
+                if (functionName != null && functionDeclaration.IsStatement)
                 {
                     jsFVarScope = previousScope.GetVariable(functionName);
 
+                }
+                else if (functionName != null && !functionDeclaration.IsStatement)
+                {
+                    // BROILER-PATCH: For function expressions, create a closure variable
+                    // in the parent scope that the function body captures. This variable
+                    // holds the function reference and is marked read-only.
+                    fexprNameParam = Exp.Parameter(typeof(JSVariable), functionName);
+                    var fexprVarScope = new FastFunctionScope.VariableScope
+                    {
+                        Name = functionName,
+                        Expression = JSVariable.ValueExpression(fexprNameParam),
+                        Create = false
+                    };
+                    cs.AddExternalVariable(functionName, fexprVarScope);
                 }
 
                 var s = cs;
@@ -264,6 +282,23 @@ partial class FastCompiler
                 {
                     jsFVarScope.SetPostInit(jsf);
                     return jsFVarScope.Expression;
+                }
+                // BROILER-PATCH: For function expressions with a name, wrap the result
+                // in a block that creates a read-only closure variable holding the
+                // function reference. The function body captures this variable.
+                if (fexprNameParam != null)
+                {
+                    var isReadOnlyField = typeof(JSVariable).GetField("IsReadOnly",
+                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                    var fexprVars = new Sequence<ParameterExpression>();
+                    fexprVars.Add(fexprNameParam);
+                    return Exp.Block(
+                        fexprVars,
+                        Exp.Assign(fexprNameParam,
+                            JSVariableBuilder.New(jsf, functionName)),
+                        Exp.Assign(Exp.Field(fexprNameParam, isReadOnlyField),
+                            Exp.Constant(true)),
+                        JSVariable.ValueExpression(fexprNameParam));
                 }
                 return jsf;
             }
