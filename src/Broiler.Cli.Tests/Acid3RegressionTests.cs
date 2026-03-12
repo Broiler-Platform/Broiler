@@ -1813,4 +1813,354 @@ document.getElementById('score').textContent = ws;
         // Phase A baseline: at least +2 over Phase 4b (83) = 85
         Assert.True(score >= 85, $"Acid3 score: {score} (expected >= 85 after Phase A)");
     }
+
+    // ---- Phase C regression tests ----
+
+    /// <summary>
+    /// Test 2: NodeIterator correctly handles node removal during iteration.
+    /// When a node is removed that is the reference node, the iterator must
+    /// advance per DOM spec §7.2 "NodeIterator pre-removing steps".
+    /// </summary>
+    [Fact]
+    public void PhaseC_NodeIterator_PreRemoval_Steps()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var doc = document.implementation.createDocument('', 'html', null);
+doc.documentElement.appendChild(doc.createElement('body'));
+var t1 = doc.body.appendChild(doc.createElement('t1'));
+var t2 = doc.body.appendChild(doc.createElement('t2'));
+var t3 = doc.body.appendChild(doc.createElement('t3'));
+var t4 = doc.body.appendChild(doc.createElement('t4'));
+
+// Simple test: iterate forward, remove during previousNode
+var callCount2 = 0;
+var i2 = doc.createNodeIterator(doc.body, 0xFFFFFFFF, null, false);
+var fwd1 = i2.nextNode(); r.push('fwd1=' + (fwd1 ? fwd1.tagName : 'null'));
+var fwd2 = i2.nextNode(); r.push('fwd2=' + (fwd2 ? fwd2.tagName : 'null'));
+var fwd3 = i2.nextNode(); r.push('fwd3=' + (fwd3 ? fwd3.tagName : 'null'));
+var fwd4 = i2.nextNode(); r.push('fwd4=' + (fwd4 ? fwd4.tagName : 'null'));
+var fwd5 = i2.nextNode(); r.push('fwd5=' + (fwd5 ? fwd5.tagName : 'null'));
+// Now referenceNode = t4, pointerBefore = false
+// Remove t4
+doc.body.removeChild(t4);
+r.push('after_remove_ref=' + (i2.referenceNode ? i2.referenceNode.tagName : 'null'));
+r.push('after_remove_pbr=' + i2.pointerBeforeReferenceNode);
+// previousNode should find t3
+var bk1 = i2.previousNode();
+r.push('bk1=' + (bk1 ? bk1.tagName : 'null'));
+var bk2 = i2.previousNode();
+r.push('bk2=' + (bk2 ? bk2.tagName : 'null'));
+var bk3 = i2.previousNode();
+r.push('bk3=' + (bk3 ? bk3.tagName : 'null'));
+
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        Console.WriteLine("NodeIterator: " + result);
+        // After removing t4 (pointerBefore=false), reference should shift to t3 (pointerBefore=true)
+        Assert.Contains("after_remove_ref=T3", result);
+        Assert.Contains("bk1=T2", result);
+        Assert.Contains("bk2=T1", result);
+        Assert.Contains("bk3=BODY", result);
+    }
+
+    /// <summary>
+    /// Test 2 full scenario: NodeIterator with DOM mutations during filter callbacks.
+    /// </summary>
+    [Fact]
+    public void PhaseC_NodeIterator_Removal_During_Filter()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var doc = document.implementation.createDocument('', 'html', null);
+doc.documentElement.appendChild(doc.createElement('body'));
+var t1 = doc.body.appendChild(doc.createElement('t1'));
+var t2 = doc.body.appendChild(doc.createElement('t2'));
+var t3 = doc.body.appendChild(doc.createElement('t3'));
+var t4 = doc.body.appendChild(doc.createElement('t4'));
+var callCount = 0;
+var filterFunctions = [
+    function(node) { return true; },
+    function(node) { return true; },
+    function(node) { return true; },
+    function(node) { doc.body.removeChild(t4); return true; },
+    function(node) { return true; },
+    function(node) { doc.body.removeChild(t4); return 2; },
+    function(node) { return true; },
+    function(node) { doc.body.removeChild(t2); return true; },
+    function(node) { return true; }
+];
+var i = doc.createNodeIterator(doc.documentElement.lastChild, 0xFFFFFFFF,
+    function(node) { return filterFunctions[callCount++](node); }, true);
+
+try {
+    var n1 = i.nextNode(); r.push('n1=' + (n1 ? n1.tagName || n1.nodeName : 'null'));
+    var n2 = i.nextNode(); r.push('n2=' + (n2 ? n2.tagName || n2.nodeName : 'null'));
+    var n3 = i.nextNode(); r.push('n3=' + (n3 ? n3.tagName || n3.nodeName : 'null'));
+    var n4 = i.nextNode(); r.push('n4=' + (n4 ? n4.tagName || n4.nodeName : 'null'));
+    doc.body.appendChild(t4);
+    var n5 = i.nextNode(); r.push('n5=' + (n5 ? n5.tagName || n5.nodeName : 'null'));
+    var p1 = i.previousNode(); r.push('p1=' + (p1 ? p1.tagName || p1.nodeName : 'null'));
+    var p2 = i.previousNode(); r.push('p2=' + (p2 ? p2.tagName || p2.nodeName : 'null'));
+    var p3 = i.previousNode(); r.push('p3=' + (p3 ? p3.tagName || p3.nodeName : 'null'));
+} catch(e) {
+    r.push('ERROR=' + e.message);
+}
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        Console.WriteLine("Full Test 2: " + result);
+        Assert.Contains("n1=BODY", result);
+        Assert.Contains("n2=T1", result);
+        Assert.Contains("n3=T2", result);
+        Assert.Contains("n4=T3", result);
+        Assert.Contains("n5=T4", result);
+        Assert.Contains("p1=T3", result);
+        Assert.Contains("p2=T2", result);
+        Assert.Contains("p3=T1", result);
+    }
+
+    /// <summary>
+    /// Test 46: Viewport-aware media queries — verify that setting the iframe
+    /// style changes the viewport for media query evaluation in the sub-document.
+    /// </summary>
+    [Fact]
+    public void PhaseC_Media_Queries_Viewport_Dimensions()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<iframe src=""about:blank"" id=""selectors""></iframe>
+<script>
+var r = [];
+var iframe = document.getElementById('selectors');
+var doc = iframe.contentDocument;
+if (!doc) { r.push('NO_CONTENT_DOC'); }
+else {
+    for (var i2 = doc.documentElement.childNodes.length-1; i2 >= 0; i2 -= 1)
+        doc.documentElement.removeChild(doc.documentElement.childNodes[i2]);
+    doc.documentElement.appendChild(doc.createElement('head'));
+    doc.documentElement.firstChild.appendChild(doc.createElement('title'));
+    doc.documentElement.appendChild(doc.createElement('body'));
+
+    var style = doc.createElement('style');
+    style.setAttribute('type', 'text/css');
+    style.appendChild(doc.createTextNode('@media all and (min-height: 1em) and (min-width: 1em) { #y1 { text-transform: uppercase; } }'));
+    style.appendChild(doc.createTextNode('@media all and (max-height: 1em) and (min-width: 1em) { #y2 { text-transform: uppercase; } }'));
+    style.appendChild(doc.createTextNode('@media all and (min-height: 1em) and (max-width: 1em) { #y3 { text-transform: uppercase; } }'));
+    style.appendChild(doc.createTextNode('@media all and (max-height: 1em) and (max-width: 1em) { #y4 { text-transform: uppercase; } }'));
+    doc.getElementsByTagName('head')[0].appendChild(style);
+
+    var names = ['y1', 'y2', 'y3', 'y4'];
+    for (var idx in names) {
+        var p = doc.createElement('p'); p.id = names[idx]; doc.body.appendChild(p);
+    }
+    var check = function(c) {
+        var p = doc.getElementById(c);
+        return doc.defaultView.getComputedStyle(p, '').textTransform;
+    };
+
+    // Viewport is 0x0
+    r.push('y1_0=' + check('y1'));
+    r.push('y4_0=' + check('y4'));
+
+    // Set viewport to 100x100
+    document.getElementById('selectors').setAttribute('style', 'height: 100px; width: 100px');
+    r.push('y1_100=' + check('y1'));
+    r.push('y2_100=' + check('y2'));
+    r.push('y3_100=' + check('y3'));
+    r.push('y4_100=' + check('y4'));
+
+    // Reset viewport to 0x0
+    document.getElementById('selectors').removeAttribute('style');
+    r.push('y1_reset=' + check('y1'));
+    r.push('y4_reset=' + check('y4'));
+}
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        Console.WriteLine("Media queries: " + result);
+        // 0x0: y1(min-h&min-w)=none, y4(max-h&max-w)=uppercase
+        Assert.Contains("y1_0=none", result);
+        Assert.Contains("y4_0=uppercase", result);
+        // 100x100: y1(min-h&min-w)=uppercase (100>16), y4(max-h&max-w)=none (100>16)
+        Assert.Contains("y1_100=uppercase", result);
+        Assert.Contains("y2_100=none", result);
+        Assert.Contains("y3_100=none", result);
+        Assert.Contains("y4_100=none", result);
+        // Reset: back to 0x0
+        Assert.Contains("y1_reset=none", result);
+        Assert.Contains("y4_reset=uppercase", result);
+    }
+
+    /// <summary>
+    /// Test 72: Dynamic style in sub-documents — img.height reflects CSS-computed value.
+    /// </summary>
+    [Fact]
+    public void PhaseC_SubDocument_Dynamic_Style_And_Image_Height()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<iframe src=""about:blank"" id=""selectors""></iframe>
+<script>
+var r = [];
+var iframe = document.getElementById('selectors');
+var doc = iframe.contentDocument;
+if (!doc) { r.push('NO_CONTENT_DOC'); }
+else {
+    for (var i2 = doc.documentElement.childNodes.length-1; i2 >= 0; i2 -= 1)
+        doc.documentElement.removeChild(doc.documentElement.childNodes[i2]);
+    doc.documentElement.appendChild(doc.createElement('head'));
+    doc.documentElement.firstChild.appendChild(doc.createElement('title'));
+    doc.documentElement.appendChild(doc.createElement('body'));
+
+    // Create img and style with height rule
+    var style = doc.createElement('style');
+    style.appendChild(doc.createTextNode('img { height: 10px; }'));
+    doc.getElementsByTagName('head')[0].appendChild(style);
+
+    var img = doc.createElement('img');
+    doc.body.appendChild(img);
+
+    // Check height via CSS
+    r.push('img_height=' + doc.images[0].height);
+
+    // Modify style text
+    style.firstChild.data = 'img { height: 20px; }';
+    r.push('img_height_modified=' + doc.images[0].height);
+
+    // Check ownerNode
+    r.push('ownerNode_ok=' + (doc.styleSheets[0].ownerNode === style));
+
+    // Check href (null for inline)
+    r.push('href_null=' + (doc.styleSheets[0].href === null));
+
+    // Check cssRules
+    r.push('cssRules_len=' + doc.styleSheets[0].cssRules.length);
+
+    // insertRule
+    doc.styleSheets[0].insertRule('img { height: 30px; }', 0);
+    r.push('after_insert_len=' + doc.styleSheets[0].cssRules.length);
+    r.push('img_height_after_insert=' + doc.images[0].height);
+}
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        Console.WriteLine("Test 72: " + result);
+        Assert.Contains("img_height=10", result);
+        Assert.Contains("img_height_modified=20", result);
+        Assert.Contains("ownerNode_ok=true", result);
+        Assert.Contains("href_null=true", result);
+    }
+
+    /// <summary>
+    /// Tests 4-5: Object identity — NodeIterator/TreeWalker nodes must be === to
+    /// nodes returned by getElementsByTagName, getElementById, etc.
+    /// </summary>
+    [Fact]
+    public void PhaseC_NodeIterator_Object_Identity()
+    {
+        // Simulate the Acid3 test 4 structure with h1, divs, etc.
+        var html = @"<!DOCTYPE html>
+<html><body>
+<h1>Title</h1>
+<div class=""buckets"">
+  <p id=""bucket1"">1</p>
+  <p id=""bucket2"">2</p>
+</div>
+<div id=""result""></div>
+<script>
+var r = [];
+var count = 0;
+var expect = function(node1, node2) {
+    count++;
+    if (node1 != node2) r.push('FAIL_' + count);
+    else r.push('OK_' + count);
+};
+var allButWS = function(node) { return (node.nodeType == 3 && node.data.match(/^\s*$/)) ? 2 : 1; };
+var i = document.createNodeIterator(document.body, 0x01 | 0x04 | 0x08 | 0x10 | 0x20, allButWS, true);
+
+expect(i.nextNode(), document.body);                               // 1
+expect(i.nextNode(), document.getElementsByTagName('h1')[0]);      // 2
+expect(i.nextNode(), document.getElementsByTagName('h1')[0].firstChild); // 3
+expect(i.nextNode(), document.getElementsByTagName('div')[0]);     // 4
+expect(i.nextNode(), document.getElementById('bucket1'));           // 5
+expect(i.nextNode(), document.getElementById('bucket1').firstChild); // 6
+expect(i.nextNode(), document.getElementById('bucket2'));           // 7
+expect(i.nextNode(), document.getElementById('bucket2').firstChild); // 8
+expect(i.nextNode(), document.getElementById('result'));            // 9
+
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        // Extract result div content
+        var match = System.Text.RegularExpressions.Regex.Match(result, @"id=""result""[^>]*>(.*?)</div>");
+        var resultContent = match.Success ? match.Groups[1].Value : "";
+        Console.WriteLine("Test 4 identity result: " + resultContent);
+        // All should be OK (same object identity)
+        Assert.DoesNotContain("FAIL", resultContent);
+    }
+
+    /// <summary>
+    /// Tests 4-5: Object identity with document.write() elements — ensure elements
+    /// created by document.write() maintain identity across getElementsByTagName and NodeIterator.
+    /// </summary>
+    [Fact]
+    public void PhaseC_NodeIterator_Identity_With_DocumentWrite()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<h1>Title</h1>
+<div id=""result""></div>
+<script>document.write('<map name=""""><area href="""" shape=""rect"" coords=""2,2,4,4"" alt=""x""><iframe src=""about:blank"">F<\/iframe><form action="""" name=""form""><input type=hidden><\/form><table><tr><td><p><\/table><\/map>');</script>
+<p id=""instructions"">Instructions</p>
+<script>
+var r = [];
+// Collect all elements via NodeIterator
+var iterNodes = {};
+var allButWS = function(node) { return (node.nodeType == 3 && node.data.match(/^\s*$/)) ? 2 : 1; };
+var iter = document.createNodeIterator(document.body, 0x01 | 0x04 | 0x08 | 0x10 | 0x20, allButWS, true);
+var n;
+while ((n = iter.nextNode()) !== null) {
+    if (n.tagName) iterNodes[n.tagName] = n;
+    if (n.id) iterNodes['#' + n.id] = n;
+}
+
+// Check that getElementsByTagName/getElementById return same objects
+function check(label, obj1, obj2) {
+    r.push((obj1 === obj2 ? 'OK_' : 'FAIL_') + label);
+}
+check('body', iterNodes['BODY'], document.body);
+check('h1', iterNodes['H1'], document.getElementsByTagName('h1')[0]);
+check('map', iterNodes['MAP'], document.getElementsByTagName('map')[0]);
+check('area', iterNodes['AREA'], document.getElementsByTagName('area')[0]);
+check('iframe', iterNodes['IFRAME'], document.getElementsByTagName('iframe')[0]);
+check('form', iterNodes['FORM'], document.forms[0]);
+check('table', iterNodes['TABLE'], document.getElementsByTagName('table')[0]);
+check('tbody', iterNodes['TBODY'], document.getElementsByTagName('tbody')[0]);
+check('instructions', iterNodes['#instructions'], document.getElementById('instructions'));
+check('result', iterNodes['#result'], document.getElementById('result'));
+
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        var match = System.Text.RegularExpressions.Regex.Match(result, @"id=""result""[^>]*>(.*?)</div>");
+        var resultContent = match.Success ? match.Groups[1].Value : "";
+        Console.WriteLine("DW identity result: " + resultContent);
+        Assert.DoesNotContain("FAIL", resultContent);
+    }
 }

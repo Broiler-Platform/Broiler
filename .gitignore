@@ -66,3 +66,4 @@ fuzz-failures/
 node_modules/
 package*.json
 *.log
+capture.png

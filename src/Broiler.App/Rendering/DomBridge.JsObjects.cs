@@ -847,6 +847,7 @@ public sealed partial class DomBridge
                 if (childEl == null) return a[0];
                 var idx = element.Children.IndexOf(childEl);
                 if (idx < 0) return a[0];
+                NotifyNodeIteratorPreRemoval(childEl);
                 element.Children.RemoveAt(idx);
                 childEl.Parent = null;
                 NotifyChildRemoved(element, childEl, idx);
@@ -1987,6 +1988,43 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
+        // HTMLImageElement — height/width return computed CSS value or HTML attribute
+        if (tag == "img")
+        {
+            foreach (var dim in new[] { "height", "width" })
+            {
+                var dimName = dim;
+                obj.FastAddProperty(
+                    (KeyString)dimName,
+                    new JSFunction((in Arguments _) =>
+                    {
+                        // First check computed style for this element
+                        var computed = bridge.BuildComputedStyleObject(element);
+                        var csVal = computed[(KeyString)dimName];
+                        if (csVal != null && !csVal.IsNull && !csVal.IsUndefined)
+                        {
+                            var cssStr = csVal.ToString();
+                            if (!string.IsNullOrEmpty(cssStr))
+                            {
+                                var px = ParseCssLengthToPixels(cssStr);
+                                if (px >= 0) return new JSNumber(px);
+                            }
+                        }
+                        // Fallback: HTML attribute
+                        if (element.Attributes.TryGetValue(dimName, out var attrVal) &&
+                            double.TryParse(attrVal, out var attrNum))
+                            return new JSNumber(attrNum);
+                        return new JSNumber(0);
+                    }, "get " + dimName),
+                    new JSFunction((in Arguments a) =>
+                    {
+                        element.Attributes[dimName] = a.Length > 0 ? a[0].ToString() : "0";
+                        return JSUndefined.Value;
+                    }, "set " + dimName),
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+        }
+
         // -- Phase 6: SVG DOM interfaces --
 
         // SVG element properties — provide SVGAnimatedLength stubs for dimensional attributes
@@ -3014,6 +3052,7 @@ public sealed partial class DomBridge
                         var idx = docRoot.Children.IndexOf(child);
                         if (idx >= 0)
                         {
+                            bridge.NotifyNodeIteratorPreRemoval(child);
                             docRoot.Children.RemoveAt(idx);
                             child.Parent = null;
                             bridge.NotifyChildRemoved(docRoot, child, idx);

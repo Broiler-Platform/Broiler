@@ -535,6 +535,7 @@ public sealed partial class DomBridge
                     var idx = docNodeForMutation.Children.IndexOf(childEl);
                     if (idx >= 0)
                     {
+                        NotifyNodeIteratorPreRemoval(childEl);
                         docNodeForMutation.Children.RemoveAt(idx);
                         childEl.Parent = null;
                         NotifyChildRemoved(docNodeForMutation, childEl, idx);
