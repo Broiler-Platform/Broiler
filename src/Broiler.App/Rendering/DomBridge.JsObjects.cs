@@ -844,9 +844,12 @@ public sealed partial class DomBridge
                 if (childObj == null) return JSUndefined.Value;
 
                 var childEl = FindDomElementByJSObject(childObj);
-                if (childEl == null || !element.Children.Remove(childEl))
-                    return a[0];
+                if (childEl == null) return a[0];
+                var idx = element.Children.IndexOf(childEl);
+                if (idx < 0) return a[0];
+                element.Children.RemoveAt(idx);
                 childEl.Parent = null;
+                NotifyChildRemoved(element, childEl, idx);
                 return a[0];
             }, "removeChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -3008,8 +3011,11 @@ public sealed partial class DomBridge
                 {
                     if (bridge._jsObjectCache.TryGetValue(child, out var cached) && cached == childObj)
                     {
-                        docRoot.Children.Remove(child);
+                        var idx = docRoot.Children.IndexOf(child);
+                        if (idx >= 0) docRoot.Children.RemoveAt(idx);
+                        else docRoot.Children.Remove(child);
                         child.Parent = null;
+                        if (idx >= 0) bridge.NotifyChildRemoved(docRoot, child, idx);
                         return childObj;
                     }
                 }

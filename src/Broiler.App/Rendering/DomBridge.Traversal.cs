@@ -972,8 +972,14 @@ public sealed partial class DomBridge
                     var parent = state.StartContainer.Parent;
                     if (parent == null) return JSUndefined.Value;
                     var text = state.StartContainer.TextContent ?? string.Empty;
-                    var beforeText = text.Substring(0, Math.Min(state.StartOffset, text.Length));
-                    var afterText = text.Substring(Math.Min(state.StartOffset, text.Length));
+                    var splitOffset = Math.Min(state.StartOffset, text.Length);
+                    var beforeText = text.Substring(0, splitOffset);
+                    var afterText = text.Substring(splitOffset);
+
+                    // Remember original text node for endContainer adjustment
+                    var originalTextNode = state.StartContainer;
+                    var originalEndIsSame = ReferenceEquals(state.EndContainer, originalTextNode);
+                    var originalEndOffset = state.EndOffset;
 
                     // Update original text node
                     state.StartContainer.TextContent = beforeText;
@@ -989,6 +995,18 @@ public sealed partial class DomBridge
                     parent.Children.Insert(textIdx + 1, el);
                     remainder.Parent = parent;
                     parent.Children.Insert(textIdx + 2, remainder);
+
+                    // Per spec: update range boundary points after text split
+                    state.StartContainer = parent;
+                    state.StartOffset = textIdx + 1; // index of inserted node
+
+                    if (originalEndIsSame)
+                    {
+                        // End was in the same text node — adjust for the split
+                        state.EndContainer = parent;
+                        state.EndOffset = textIdx + 2; // after the inserted node
+                    }
+                    state.UpdateCollapsed();
                 }
                 else
                 {
@@ -1401,29 +1419,35 @@ public sealed partial class DomBridge
             node = node.Parent;
         }
 
-        // Clone from top to bottom
-        DomElement? topClone = null;
-        DomElement? currentClone = null;
-
+        // Pass 1: Clone the ancestor chain from top to bottom, creating
+        // the skeletal tree structure.  Map each chain index to its clone.
+        var clones = new DomElement[chain.Count];
         for (var i = chain.Count - 1; i >= 0; i--)
         {
             var original = chain[i];
             var clone = bridge.CloneDomElement(original, false);
             bridge._elements.Add(clone);
-
-            if (topClone == null) topClone = clone;
-            if (currentClone != null)
+            clones[i] = clone;
+            if (i < chain.Count - 1)
             {
-                clone.Parent = currentClone;
-                currentClone.Children.Add(clone);
+                clone.Parent = clones[i + 1];
+                // Will position correctly in Pass 2
             }
+        }
+
+        // Pass 2: Process each level bottom-up so that each clone's
+        // child list is built in the correct order:
+        //   [next-in-chain clone, siblings moved from original]
+        for (var i = 0; i < chain.Count; i++)
+        {
+            var original = chain[i];
+            var clone = clones[i];
 
             if (i == 0)
             {
                 // This is the startContainer level
                 if (original.IsTextNode)
                 {
-                    // Split text node
                     var text = original.TextContent ?? string.Empty;
                     var extractedPart = text.Substring(startOffset);
                     original.TextContent = text.Substring(0, startOffset);
@@ -1431,7 +1455,6 @@ public sealed partial class DomBridge
                 }
                 else
                 {
-                    // Move children from startOffset onwards into clone
                     for (var ci = startOffset; ci < original.Children.Count; )
                     {
                         var child = original.Children[ci];
@@ -1441,9 +1464,16 @@ public sealed partial class DomBridge
                     }
                 }
             }
-            else if (i < chain.Count - 1)
+            else
             {
-                // Intermediate level — move siblings after the chain child
+                var parentClone = clones[i];
+                var childClone = clones[i - 1]; // next-in-chain clone
+
+                // First add the deeper clone (already populated from previous iterations)
+                childClone.Parent = parentClone;
+                parentClone.Children.Add(childClone);
+
+                // Then move siblings after the chain child in the original
                 var nextInChain = chain[i - 1];
                 var childIdx = original.Children.IndexOf(nextInChain);
                 if (childIdx >= 0)
@@ -1452,16 +1482,14 @@ public sealed partial class DomBridge
                     {
                         var child = original.Children[ci];
                         original.Children.RemoveAt(ci);
-                        child.Parent = clone;
-                        clone.Children.Add(child);
+                        child.Parent = parentClone;
+                        parentClone.Children.Add(child);
                     }
                 }
             }
-
-            currentClone = clone;
         }
 
-        return topClone!;
+        return clones[chain.Count - 1];
     }
 
     /// <summary>
@@ -1481,21 +1509,22 @@ public sealed partial class DomBridge
             node = node.Parent;
         }
 
-        DomElement? topClone = null;
-        DomElement? currentClone = null;
-
+        // Pass 1: Create clones for the chain
+        var clones = new DomElement[chain.Count];
         for (var i = chain.Count - 1; i >= 0; i--)
         {
             var original = chain[i];
             var clone = bridge.CloneDomElement(original, false);
             bridge._elements.Add(clone);
+            clones[i] = clone;
+        }
 
-            if (topClone == null) topClone = clone;
-            if (currentClone != null)
-            {
-                clone.Parent = currentClone;
-                currentClone.Children.Add(clone);
-            }
+        // Pass 2: Process bottom-up. For end-side, siblings before the
+        // chain child are moved, then the deeper clone is appended.
+        for (var i = 0; i < chain.Count; i++)
+        {
+            var original = chain[i];
+            var clone = clones[i];
 
             if (i == 0)
             {
@@ -1509,7 +1538,6 @@ public sealed partial class DomBridge
                 }
                 else
                 {
-                    // Move children before endOffset into clone
                     for (var ci = 0; ci < endOffset && original.Children.Count > 0; ci++)
                     {
                         var child = original.Children[0];
@@ -1519,9 +1547,12 @@ public sealed partial class DomBridge
                     }
                 }
             }
-            else if (i < chain.Count - 1)
+            else
             {
-                // Intermediate level — move siblings before the chain child
+                var parentClone = clones[i];
+                var childClone = clones[i - 1]; // next-in-chain clone
+
+                // First move siblings before the chain child in the original
                 var nextInChain = chain[i - 1];
                 var childIdx = original.Children.IndexOf(nextInChain);
                 if (childIdx >= 0)
@@ -1531,16 +1562,18 @@ public sealed partial class DomBridge
                         var child = original.Children[0];
                         original.Children.RemoveAt(0);
                         childIdx--;
-                        child.Parent = clone;
-                        clone.Children.Add(child);
+                        child.Parent = parentClone;
+                        parentClone.Children.Add(child);
                     }
                 }
-            }
 
-            currentClone = clone;
+                // Then add the deeper clone (already populated)
+                childClone.Parent = parentClone;
+                parentClone.Children.Add(childClone);
+            }
         }
 
-        return topClone!;
+        return clones[chain.Count - 1];
     }
 
     /// <summary>

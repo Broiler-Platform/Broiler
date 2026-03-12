@@ -530,9 +530,15 @@ public sealed partial class DomBridge
                 var childObj = a[0] as JSObject;
                 if (childObj == null) return JSNull.Value;
                 var childEl = FindDomElementByJSObject(childObj);
-                if (childEl != null && docNodeForMutation.Children.Remove(childEl))
+                if (childEl != null)
                 {
-                    childEl.Parent = null;
+                    var idx = docNodeForMutation.Children.IndexOf(childEl);
+                    if (idx >= 0)
+                    {
+                        docNodeForMutation.Children.RemoveAt(idx);
+                        childEl.Parent = null;
+                        NotifyChildRemoved(docNodeForMutation, childEl, idx);
+                    }
                 }
                 return a[0];
             }, "removeChild", 1),
