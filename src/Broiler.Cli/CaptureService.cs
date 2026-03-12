@@ -334,6 +334,20 @@ public class CaptureService
         // is present before rendering.
         html = ExecuteScriptsWithDom(html, options.Url);
 
+        // Strip <script> tags from the post-execution HTML — scripts have already
+        // been executed and their DOM modifications serialised.  Leaving them in
+        // is harmless for most pages (HtmlRenderer hides them via CSS) but
+        // removing them keeps the rendered HTML clean and avoids edge-cases where
+        // the content bleeds through.
+        html = StripScriptTags(html);
+
+        // Strip data-URI background images from CSS.  HtmlRenderer does not
+        // reliably parse the complex 'background' shorthand that combines
+        // url(), repeat, position and colour in one declaration, which can
+        // cause the image to tile across the page.  Since these images are
+        // decorative they can be safely removed for capture rendering.
+        html = StripCssDataUriBackgrounds(html);
+
         var format = options.ImageFormat == ImageFormat.Jpeg
             ? SKEncodedImageFormat.Jpeg
             : SKEncodedImageFormat.Png;
@@ -597,6 +611,38 @@ public class CaptureService
     }
 
     private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
+
+    /// <summary>
+    /// Removes all <c>&lt;script&gt;…&lt;/script&gt;</c> blocks from the HTML.
+    /// Called after scripts have been executed so the resulting HTML only
+    /// contains the visual content for rendering.
+    /// </summary>
+    internal static string StripScriptTags(string html)
+    {
+        return AnyScriptPattern.Replace(html, string.Empty);
+    }
+
+    /// <summary>
+    /// Regex matching a CSS <c>background</c> (or <c>background-image</c>)
+    /// declaration that contains a <c>data:</c> URI.  The entire declaration
+    /// (up to and including the trailing semicolon) is captured so it can be
+    /// removed before rendering.
+    /// </summary>
+    private static readonly Regex CssDataUriBgPattern = new(
+        @"background(?:-image)?\s*:[^;]*url\s*\(\s*[""']?data:[^)]+\)[^;]*;",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Strips CSS <c>background</c> declarations that reference
+    /// <c>data:</c> URI images.  HtmlRenderer does not reliably parse
+    /// the complex <c>background</c> shorthand when it contains a URL,
+    /// repeat mode, position and colour all in one value, which can
+    /// cause the image to tile and obscure page content.
+    /// </summary>
+    internal static string StripCssDataUriBackgrounds(string html)
+    {
+        return CssDataUriBgPattern.Replace(html, string.Empty);
+    }
 
     /// <summary>
     /// Decodes a <c>data:</c> URI to its text content.
