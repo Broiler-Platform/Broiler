@@ -388,7 +388,7 @@ public sealed partial class DomBridge
                 var rootEl = bridgeForTraversal.FindDomElementByJSObject(rootObj);
                 if (rootEl == null) return JSNull.Value;
 
-                var whatToShow = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? (int)a[1].DoubleValue : unchecked((int)0xFFFFFFFF);
+                var whatToShow = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? unchecked((int)(uint)a[1].DoubleValue) : unchecked((int)0xFFFFFFFF);
                 var filterFn = a.Length > 2 && a[2] is JSFunction f ? f : (a.Length > 2 && a[2] is JSObject filterObj ? filterObj[(KeyString)"acceptNode"] as JSFunction : null);
 
                 return bridgeForTraversal.BuildTreeWalker(rootEl, whatToShow, filterFn);
@@ -408,7 +408,7 @@ public sealed partial class DomBridge
                 var rootEl = bridgeForTraversal.FindDomElementByJSObject(rootObj);
                 if (rootEl == null) return JSNull.Value;
 
-                var whatToShow = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? (int)a[1].DoubleValue : unchecked((int)0xFFFFFFFF);
+                var whatToShow = a.Length > 1 && !a[1].IsNull && !a[1].IsUndefined ? unchecked((int)(uint)a[1].DoubleValue) : unchecked((int)0xFFFFFFFF);
                 var filterFn = a.Length > 2 && a[2] is JSFunction f ? f : (a.Length > 2 && a[2] is JSObject filterObj ? filterObj[(KeyString)"acceptNode"] as JSFunction : null);
 
                 return bridgeForTraversal.BuildNodeIterator(rootEl, whatToShow, filterFn);
