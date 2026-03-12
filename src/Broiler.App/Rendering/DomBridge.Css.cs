@@ -278,6 +278,9 @@ public sealed partial class DomBridge
             var styleElements = new List<DomElement>();
             CollectStyleElementsInTree(docRoot, styleElements);
 
+            // Determine viewport dimensions for media query evaluation
+            var (vpWidth, vpHeight) = GetViewportForDocRoot(docRoot);
+
             foreach (var styleEl in styleElements)
             {
                 var cssText = new StringBuilder();
@@ -290,7 +293,7 @@ public sealed partial class DomBridge
                 if (cssText.Length == 0 && styleEl.TextContent != null)
                     cssText.Append(styleEl.TextContent);
 
-                ParseAndApplyCssRules(cssText.ToString(), element, computed, computedSpecificity);
+                ParseAndApplyCssRules(cssText.ToString(), element, computed, computedSpecificity, vpWidth, vpHeight);
             }
 
             // Inline styles (from the style="" attribute) override CSS rules.
@@ -368,7 +371,8 @@ public sealed partial class DomBridge
     /// Tracks per-property specificity so higher-specificity rules win regardless of source order.
     /// </summary>
     private void ParseAndApplyCssRules(string cssText, DomElement element,
-        Dictionary<string, string> computed, Dictionary<string, int> computedSpecificity)
+        Dictionary<string, string> computed, Dictionary<string, int> computedSpecificity,
+        int viewportWidth = 0, int viewportHeight = 0)
     {
         int pos = 0;
         while (pos < cssText.Length)
@@ -401,8 +405,8 @@ public sealed partial class DomBridge
                     if (pos > blockStart)
                     {
                         var innerCss = cssText[blockStart..pos];
-                        if (EvaluateMediaQuery(mediaQuery))
-                            ParseAndApplyCssRules(innerCss, element, computed, computedSpecificity);
+                        if (EvaluateMediaQuery(mediaQuery, viewportWidth, viewportHeight))
+                            ParseAndApplyCssRules(innerCss, element, computed, computedSpecificity, viewportWidth, viewportHeight);
                     }
                     if (pos < cssText.Length) pos++; // skip '}'
                 }
@@ -505,13 +509,13 @@ public sealed partial class DomBridge
     /// Supports <c>all</c>, <c>not all</c>, <c>only all</c>, and basic conditions
     /// like <c>(min-color: 0)</c>, <c>(min-monochrome: 0)</c>.
     /// </summary>
-    private static bool EvaluateMediaQuery(string query)
+    private static bool EvaluateMediaQuery(string query, int viewportWidth = 0, int viewportHeight = 0)
     {
         // Split by comma — any match means true
         var queries = query.Split(',');
         foreach (var q in queries)
         {
-            if (EvaluateSingleMediaQuery(q.Trim()))
+            if (EvaluateSingleMediaQuery(q.Trim(), viewportWidth, viewportHeight))
                 return true;
         }
         return false;
@@ -520,7 +524,7 @@ public sealed partial class DomBridge
     /// <summary>
     /// Evaluates a single (non-comma-separated) media query.
     /// </summary>
-    private static bool EvaluateSingleMediaQuery(string query)
+    private static bool EvaluateSingleMediaQuery(string query, int viewportWidth = 0, int viewportHeight = 0)
     {
         if (string.IsNullOrWhiteSpace(query)) return false;
 
@@ -558,7 +562,7 @@ public sealed partial class DomBridge
             if (p.StartsWith('(') && p.EndsWith(')'))
             {
                 var condition = p[1..^1].Trim();
-                if (!EvaluateMediaCondition(condition))
+                if (!EvaluateMediaCondition(condition, viewportWidth, viewportHeight))
                 {
                     result = false;
                     break;
@@ -605,8 +609,9 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// Evaluates a single media condition like <c>min-color: 0</c> or <c>bogus</c>.
+    /// Viewport dimensions are used for height/width media features.
     /// </summary>
-    private static bool EvaluateMediaCondition(string condition)
+    private static bool EvaluateMediaCondition(string condition, int viewportWidth, int viewportHeight)
     {
         var colonIdx = condition.IndexOf(':');
         string feature;
@@ -622,48 +627,129 @@ public sealed partial class DomBridge
         }
 
         // Our virtual device: color display with 8 bits per color component, monochrome = 0.
-        // Default viewport: 0x0.
         const int ColorDepth = 8;
         const int MonochromeDepth = 0;
 
         switch (feature)
         {
             case "min-color":
-                // min-color: N matches when device has at least N bits per color component
                 if (value != null && int.TryParse(value, out var minColor))
                     return minColor <= ColorDepth;
                 return false;
             case "max-color":
-                // max-color: N matches when device has at most N bits per color component
                 if (value != null && int.TryParse(value, out var maxColor))
                     return maxColor >= ColorDepth;
                 return false;
             case "min-monochrome":
-                // min-monochrome: N matches when device has at least N monochrome bits
                 if (value != null && int.TryParse(value, out var minMono))
                     return minMono <= MonochromeDepth;
                 return false;
             case "max-monochrome":
-                // max-monochrome: N matches when device has at most N monochrome bits
                 if (value != null && int.TryParse(value, out var maxMono))
                     return maxMono >= MonochromeDepth;
                 return false;
             case "min-height":
-            case "min-width":
-                // 0x0 viewport — min-height/min-width only match if value is 0
                 if (value != null)
                 {
-                    if (value == "0" || value == "0px") return true;
-                    return false; // Any positive value fails in 0x0 viewport
+                    var px = ParseCssLengthToPixels(value);
+                    return px >= 0 && viewportHeight >= px;
                 }
                 return false;
             case "max-height":
+                if (value != null)
+                {
+                    var px = ParseCssLengthToPixels(value);
+                    return px >= 0 && viewportHeight <= px;
+                }
+                return true; // No value = bare feature check; height exists
+            case "min-width":
+                if (value != null)
+                {
+                    var px = ParseCssLengthToPixels(value);
+                    return px >= 0 && viewportWidth >= px;
+                }
+                return false;
             case "max-width":
-                // 0x0 viewport — max-height/max-width matches everything >= 0
-                return true;
+                if (value != null)
+                {
+                    var px = ParseCssLengthToPixels(value);
+                    return px >= 0 && viewportWidth <= px;
+                }
+                return true; // No value = bare feature check; width exists
             default:
-                // Unknown feature — does not match
                 return false;
         }
+    }
+
+    /// <summary>
+    /// Parses a CSS length value (e.g. "0", "100px", "1em") to pixels.
+    /// Returns -1 if the value cannot be parsed.
+    /// Default font size for em conversion is 16px.
+    /// </summary>
+    private static double ParseCssLengthToPixels(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return -1;
+
+        var v = value.Trim().ToLowerInvariant();
+        if (v.EndsWith("px"))
+        {
+            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var px))
+                return px;
+            return -1;
+        }
+        if (v.EndsWith("em") || v.EndsWith("rem"))
+        {
+            var numStr = v.EndsWith("rem") ? v[..^3] : v[..^2];
+            if (double.TryParse(numStr, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var em))
+                return em * 16.0; // 1em = 16px default
+            return -1;
+        }
+        // Plain number (treat as pixels)
+        if (double.TryParse(v, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var raw))
+            return raw;
+        return -1;
+    }
+
+    /// <summary>
+    /// Determines the viewport width and height for media query evaluation
+    /// based on the element's document root. For sub-documents inside iframes,
+    /// the viewport is the iframe container's CSS dimensions. For the main
+    /// document, the viewport is 0×0 (headless).
+    /// </summary>
+    private (int Width, int Height) GetViewportForDocRoot(DomElement docRoot)
+    {
+        // Walk up from docRoot to find the containing iframe/object element
+        // The docRoot is typically a #subdoc-root child of the iframe element
+        var parent = docRoot.Parent;
+        if (parent != null && !parent.TagName.StartsWith("#", StringComparison.Ordinal))
+        {
+            // parent is the iframe/object element — check its style for dimensions
+            if (parent.Attributes.TryGetValue("style", out var style) && !string.IsNullOrEmpty(style))
+            {
+                var w = ExtractCssDimension(style, "width");
+                var h = ExtractCssDimension(style, "height");
+                if (w > 0 || h > 0)
+                    return (w, h);
+            }
+        }
+        return (0, 0); // Default: headless 0×0 viewport
+    }
+
+    /// <summary>
+    /// Extracts a pixel dimension from a CSS style string for a given property name.
+    /// </summary>
+    private static int ExtractCssDimension(string style, string property)
+    {
+        var propIdx = style.IndexOf(property, StringComparison.OrdinalIgnoreCase);
+        if (propIdx < 0) return 0;
+        var colonIdx = style.IndexOf(':', propIdx);
+        if (colonIdx < 0) return 0;
+        var semiIdx = style.IndexOf(';', colonIdx);
+        var valueStr = semiIdx >= 0 ? style[(colonIdx + 1)..semiIdx].Trim() : style[(colonIdx + 1)..].Trim();
+        var px = ParseCssLengthToPixels(valueStr);
+        return px >= 0 ? (int)px : 0;
     }
 }

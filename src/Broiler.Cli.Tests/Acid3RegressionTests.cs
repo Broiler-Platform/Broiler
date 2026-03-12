@@ -1928,4 +1928,140 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("p2=T2", result);
         Assert.Contains("p3=T1", result);
     }
+
+    /// <summary>
+    /// Test 46: Viewport-aware media queries — verify that setting the iframe
+    /// style changes the viewport for media query evaluation in the sub-document.
+    /// </summary>
+    [Fact]
+    public void PhaseC_Media_Queries_Viewport_Dimensions()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<iframe src=""about:blank"" id=""selectors""></iframe>
+<script>
+var r = [];
+var iframe = document.getElementById('selectors');
+var doc = iframe.contentDocument;
+if (!doc) { r.push('NO_CONTENT_DOC'); }
+else {
+    for (var i2 = doc.documentElement.childNodes.length-1; i2 >= 0; i2 -= 1)
+        doc.documentElement.removeChild(doc.documentElement.childNodes[i2]);
+    doc.documentElement.appendChild(doc.createElement('head'));
+    doc.documentElement.firstChild.appendChild(doc.createElement('title'));
+    doc.documentElement.appendChild(doc.createElement('body'));
+
+    var style = doc.createElement('style');
+    style.setAttribute('type', 'text/css');
+    style.appendChild(doc.createTextNode('@media all and (min-height: 1em) and (min-width: 1em) { #y1 { text-transform: uppercase; } }'));
+    style.appendChild(doc.createTextNode('@media all and (max-height: 1em) and (min-width: 1em) { #y2 { text-transform: uppercase; } }'));
+    style.appendChild(doc.createTextNode('@media all and (min-height: 1em) and (max-width: 1em) { #y3 { text-transform: uppercase; } }'));
+    style.appendChild(doc.createTextNode('@media all and (max-height: 1em) and (max-width: 1em) { #y4 { text-transform: uppercase; } }'));
+    doc.getElementsByTagName('head')[0].appendChild(style);
+
+    var names = ['y1', 'y2', 'y3', 'y4'];
+    for (var idx in names) {
+        var p = doc.createElement('p'); p.id = names[idx]; doc.body.appendChild(p);
+    }
+    var check = function(c) {
+        var p = doc.getElementById(c);
+        return doc.defaultView.getComputedStyle(p, '').textTransform;
+    };
+
+    // Viewport is 0x0
+    r.push('y1_0=' + check('y1'));
+    r.push('y4_0=' + check('y4'));
+
+    // Set viewport to 100x100
+    document.getElementById('selectors').setAttribute('style', 'height: 100px; width: 100px');
+    r.push('y1_100=' + check('y1'));
+    r.push('y2_100=' + check('y2'));
+    r.push('y3_100=' + check('y3'));
+    r.push('y4_100=' + check('y4'));
+
+    // Reset viewport to 0x0
+    document.getElementById('selectors').removeAttribute('style');
+    r.push('y1_reset=' + check('y1'));
+    r.push('y4_reset=' + check('y4'));
+}
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        Console.WriteLine("Media queries: " + result);
+        // 0x0: y1(min-h&min-w)=none, y4(max-h&max-w)=uppercase
+        Assert.Contains("y1_0=none", result);
+        Assert.Contains("y4_0=uppercase", result);
+        // 100x100: y1(min-h&min-w)=uppercase (100>16), y4(max-h&max-w)=none (100>16)
+        Assert.Contains("y1_100=uppercase", result);
+        Assert.Contains("y2_100=none", result);
+        Assert.Contains("y3_100=none", result);
+        Assert.Contains("y4_100=none", result);
+        // Reset: back to 0x0
+        Assert.Contains("y1_reset=none", result);
+        Assert.Contains("y4_reset=uppercase", result);
+    }
+
+    /// <summary>
+    /// Test 72: Dynamic style in sub-documents — img.height reflects CSS-computed value.
+    /// </summary>
+    [Fact]
+    public void PhaseC_SubDocument_Dynamic_Style_And_Image_Height()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<iframe src=""about:blank"" id=""selectors""></iframe>
+<script>
+var r = [];
+var iframe = document.getElementById('selectors');
+var doc = iframe.contentDocument;
+if (!doc) { r.push('NO_CONTENT_DOC'); }
+else {
+    for (var i2 = doc.documentElement.childNodes.length-1; i2 >= 0; i2 -= 1)
+        doc.documentElement.removeChild(doc.documentElement.childNodes[i2]);
+    doc.documentElement.appendChild(doc.createElement('head'));
+    doc.documentElement.firstChild.appendChild(doc.createElement('title'));
+    doc.documentElement.appendChild(doc.createElement('body'));
+
+    // Create img and style with height rule
+    var style = doc.createElement('style');
+    style.appendChild(doc.createTextNode('img { height: 10px; }'));
+    doc.getElementsByTagName('head')[0].appendChild(style);
+
+    var img = doc.createElement('img');
+    doc.body.appendChild(img);
+
+    // Check height via CSS
+    r.push('img_height=' + doc.images[0].height);
+
+    // Modify style text
+    style.firstChild.data = 'img { height: 20px; }';
+    r.push('img_height_modified=' + doc.images[0].height);
+
+    // Check ownerNode
+    r.push('ownerNode_ok=' + (doc.styleSheets[0].ownerNode === style));
+
+    // Check href (null for inline)
+    r.push('href_null=' + (doc.styleSheets[0].href === null));
+
+    // Check cssRules
+    r.push('cssRules_len=' + doc.styleSheets[0].cssRules.length);
+
+    // insertRule
+    doc.styleSheets[0].insertRule('img { height: 30px; }', 0);
+    r.push('after_insert_len=' + doc.styleSheets[0].cssRules.length);
+    r.push('img_height_after_insert=' + doc.images[0].height);
+}
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        Console.WriteLine("Test 72: " + result);
+        Assert.Contains("img_height=10", result);
+        Assert.Contains("img_height_modified=20", result);
+        Assert.Contains("ownerNode_ok=true", result);
+        Assert.Contains("href_null=true", result);
+    }
 }
