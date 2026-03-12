@@ -44,9 +44,11 @@ public sealed class JSNull : JSValue
     {
         get
         {
+#if DEBUG
             var st = new System.Diagnostics.StackTrace(true);
             System.Console.Error.WriteLine($"[JSNull] Cannot get property {name} of null");
             System.Console.Error.WriteLine(st.ToString());
+#endif
             throw JSContext.Current.NewTypeError($"Cannot get property {name} of null");
         }
         set => throw JSContext.Current.NewTypeError($"Cannot set property {name} of null");

@@ -19,9 +19,9 @@ visible on stderr with full context: function name, file path, and caller line n
 
 | File | Location | Description |
 |------|----------|-------------|
-| `yantra-1.2.295/YantraJS.Core/Core/JSException.cs` | `Throw()` (line 131) | Added `[CallerMemberName]`, `[CallerFilePath]`, `[CallerLineNumber]` attributes and `Console.Error.WriteLine` with full `StackTrace` before throw |
-| `yantra-1.2.295/YantraJS.Core/Core/Primitive/JSNull.cs` | `this[KeyString name]` getter (line 45) | Added `Console.Error.WriteLine` with `StackTrace` before throw |
-| `yantra-1.2.295/YantraJS.Core/Core/Primitive/JSUndefined.cs` | `this[KeyString name]` getter (line 35) | Added `Console.Error.WriteLine` with `StackTrace` before throw |
+| `yantra-1.2.295/YantraJS.Core/Core/JSException.cs` | `Throw()` (line 131) | Added `[CallerMemberName]`, `[CallerFilePath]`, `[CallerLineNumber]` attributes and `Console.Error.WriteLine` with full `StackTrace` before throw (guarded by `#if DEBUG`) |
+| `yantra-1.2.295/YantraJS.Core/Core/Primitive/JSNull.cs` | `this[KeyString name]` getter (line 45) | Added `Console.Error.WriteLine` with `StackTrace` before throw (guarded by `#if DEBUG`) |
+| `yantra-1.2.295/YantraJS.Core/Core/Primitive/JSUndefined.cs` | `this[KeyString name]` getter (line 35) | Added `Console.Error.WriteLine` with `StackTrace` before throw (guarded by `#if DEBUG`) |
 
 ### Output Format
 

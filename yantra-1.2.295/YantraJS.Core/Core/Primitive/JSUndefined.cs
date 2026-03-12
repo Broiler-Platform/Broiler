@@ -34,9 +34,11 @@ public sealed class JSUndefined : JSValue
     public override JSValue this[KeyString name] {
         get
         {
+#if DEBUG
             var st = new System.Diagnostics.StackTrace(true);
             System.Console.Error.WriteLine($"[JSUndefined] Cannot get property {name} of undefined");
             System.Console.Error.WriteLine(st.ToString());
+#endif
             throw JSContext.Current.NewTypeError($"Cannot get property {name} of undefined");
         }
         set => throw JSContext.Current.NewTypeError($"Cannot set property {name} of undefined");

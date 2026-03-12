@@ -132,10 +132,12 @@ public class JSException: Exception
         [CallerFilePath] string filePath = null,
         [CallerLineNumber] int line = 0)
     {
+#if DEBUG
         var st = new System.Diagnostics.StackTrace(true);
         System.Console.Error.WriteLine($"[JSException.Throw] {value}");
         System.Console.Error.WriteLine($"  Function: {function}, File: {filePath}, Line: {line}");
         System.Console.Error.WriteLine(st.ToString());
+#endif
         throw value is JSError jse ? jse.Exception : new JSException(value);
     }
 
