@@ -2064,4 +2064,103 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("ownerNode_ok=true", result);
         Assert.Contains("href_null=true", result);
     }
+
+    /// <summary>
+    /// Tests 4-5: Object identity — NodeIterator/TreeWalker nodes must be === to
+    /// nodes returned by getElementsByTagName, getElementById, etc.
+    /// </summary>
+    [Fact]
+    public void PhaseC_NodeIterator_Object_Identity()
+    {
+        // Simulate the Acid3 test 4 structure with h1, divs, etc.
+        var html = @"<!DOCTYPE html>
+<html><body>
+<h1>Title</h1>
+<div class=""buckets"">
+  <p id=""bucket1"">1</p>
+  <p id=""bucket2"">2</p>
+</div>
+<div id=""result""></div>
+<script>
+var r = [];
+var count = 0;
+var expect = function(node1, node2) {
+    count++;
+    if (node1 != node2) r.push('FAIL_' + count);
+    else r.push('OK_' + count);
+};
+var allButWS = function(node) { return (node.nodeType == 3 && node.data.match(/^\s*$/)) ? 2 : 1; };
+var i = document.createNodeIterator(document.body, 0x01 | 0x04 | 0x08 | 0x10 | 0x20, allButWS, true);
+
+expect(i.nextNode(), document.body);                               // 1
+expect(i.nextNode(), document.getElementsByTagName('h1')[0]);      // 2
+expect(i.nextNode(), document.getElementsByTagName('h1')[0].firstChild); // 3
+expect(i.nextNode(), document.getElementsByTagName('div')[0]);     // 4
+expect(i.nextNode(), document.getElementById('bucket1'));           // 5
+expect(i.nextNode(), document.getElementById('bucket1').firstChild); // 6
+expect(i.nextNode(), document.getElementById('bucket2'));           // 7
+expect(i.nextNode(), document.getElementById('bucket2').firstChild); // 8
+expect(i.nextNode(), document.getElementById('result'));            // 9
+
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        // Extract result div content
+        var match = System.Text.RegularExpressions.Regex.Match(result, @"id=""result""[^>]*>(.*?)</div>");
+        var resultContent = match.Success ? match.Groups[1].Value : "";
+        Console.WriteLine("Test 4 identity result: " + resultContent);
+        // All should be OK (same object identity)
+        Assert.DoesNotContain("FAIL", resultContent);
+    }
+
+    /// <summary>
+    /// Tests 4-5: Object identity with document.write() elements — ensure elements
+    /// created by document.write() maintain identity across getElementsByTagName and NodeIterator.
+    /// </summary>
+    [Fact]
+    public void PhaseC_NodeIterator_Identity_With_DocumentWrite()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<h1>Title</h1>
+<div id=""result""></div>
+<script>document.write('<map name=""""><area href="""" shape=""rect"" coords=""2,2,4,4"" alt=""x""><iframe src=""about:blank"">F<\/iframe><form action="""" name=""form""><input type=hidden><\/form><table><tr><td><p><\/table><\/map>');</script>
+<p id=""instructions"">Instructions</p>
+<script>
+var r = [];
+// Collect all elements via NodeIterator
+var iterNodes = {};
+var allButWS = function(node) { return (node.nodeType == 3 && node.data.match(/^\s*$/)) ? 2 : 1; };
+var iter = document.createNodeIterator(document.body, 0x01 | 0x04 | 0x08 | 0x10 | 0x20, allButWS, true);
+var n;
+while ((n = iter.nextNode()) !== null) {
+    if (n.tagName) iterNodes[n.tagName] = n;
+    if (n.id) iterNodes['#' + n.id] = n;
+}
+
+// Check that getElementsByTagName/getElementById return same objects
+function check(label, obj1, obj2) {
+    r.push((obj1 === obj2 ? 'OK_' : 'FAIL_') + label);
+}
+check('body', iterNodes['BODY'], document.body);
+check('h1', iterNodes['H1'], document.getElementsByTagName('h1')[0]);
+check('map', iterNodes['MAP'], document.getElementsByTagName('map')[0]);
+check('area', iterNodes['AREA'], document.getElementsByTagName('area')[0]);
+check('iframe', iterNodes['IFRAME'], document.getElementsByTagName('iframe')[0]);
+check('form', iterNodes['FORM'], document.forms[0]);
+check('table', iterNodes['TABLE'], document.getElementsByTagName('table')[0]);
+check('tbody', iterNodes['TBODY'], document.getElementsByTagName('tbody')[0]);
+check('instructions', iterNodes['#instructions'], document.getElementById('instructions'));
+check('result', iterNodes['#result'], document.getElementById('result'));
+
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        var match = System.Text.RegularExpressions.Regex.Match(result, @"id=""result""[^>]*>(.*?)</div>");
+        var resultContent = match.Success ? match.Groups[1].Value : "";
+        Console.WriteLine("DW identity result: " + resultContent);
+        Assert.DoesNotContain("FAIL", resultContent);
+    }
 }

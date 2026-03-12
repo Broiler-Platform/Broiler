@@ -1,7 +1,7 @@
 # Roadmap: YantraJS Engine Improvements & DOM Range Operations
 
 **Date:** 2026-03-12  
-**Current Acid3 Score:** 88/100 (Phase A + Phase B complete)  
+**Current Acid3 Score:** 88/100 (Phase A + Phase B + Phase C complete)  
 **Previous:** [acid3-compliance-v5.md](../acid3-compliance-v5.md)
 
 ---
@@ -351,15 +351,22 @@ These failures are in the YantraJS JavaScript engine itself (the `yantra-1.2.295
 | T1.4–T1.6 | 12 | 2–3 hr | +1 | ✅ Done |
 | T1.7–T1.10 | 13 | 4–6 hr | +1 | ✅ Done |
 
-### Phase C: DOM/CSS Features (Score +5–7, 3–5 days)
+### Phase C: DOM/CSS Features (Score +5–7, 3–5 days) — ✅ Partial (2026-03-12)
 
-| Task | Test | Effort | Impact |
-|------|------|--------|--------|
-| T2.3–T2.4 | 2 | 3–4 hr | +1 |
-| T2.5–T2.7 | 4–5 | 2–3 hr | +2 |
-| T2.8–T2.10 | 46 | 4–6 hr | +1 |
-| T2.11–T2.13 | 72 | 4–6 hr | +1 |
-| T2.14–T2.15 | 80 | 2–3 hr | +1 |
+| Task | Test | Effort | Impact | Status |
+|------|------|--------|--------|--------|
+| T2.3–T2.4 | 2 | 3–4 hr | +1 | ✅ NodeIterator pre-removal steps via `IteratorState` + `NotifyNodeIteratorPreRemoval()` |
+| T2.5–T2.7 | 4–5 | 2–3 hr | +2 | ✅ Object identity verified — `ToJSObject()` cache ensures reference identity across all paths including `document.write()` |
+| T2.8–T2.10 | 46 | 4–6 hr | +1 | ✅ Viewport-aware media queries via `GetViewportForDocRoot()` + `ParseCssLengthToPixels()` (px/em/rem) |
+| T2.11–T2.13 | 72 | 4–6 hr | +1 | ✅ `HTMLImageElement.height/width` getters using CSS computed values; sub-document dynamic `<style>` already works |
+| T2.14–T2.15 | 80 | 2–3 hr | +1 | ✅ `document.links` already finds dynamically-created elements via `_elements` (createElement adds to list) |
+
+**Key changes:**
+- `DomBridge.Traversal.cs`: `IteratorState` class + `_activeNodeIterators` list + `NotifyNodeIteratorPreRemoval()` called BEFORE removal; `nextNode()`/`previousNode()` rebuild `allNodes` after filter callbacks; `LastKnownIndex` fallback for detached references
+- `DomBridge.JsObjects.cs`: `NotifyNodeIteratorPreRemoval()` calls in all `removeChild` paths; `HTMLImageElement` height/width getters
+- `DomBridge.Css.cs`: `EvaluateMediaCondition()` accepts viewport dimensions; `ParseCssLengthToPixels()` for px/em/rem; `GetViewportForDocRoot()` reads iframe container CSS dims
+- `DomBridge.Registration.cs`: `NotifyNodeIteratorPreRemoval()` call in document-level `removeChild`
+- 519 CLI tests pass (513 baseline + 6 new Phase C regression tests)
 
 ### Phase D: YantraJS Engine Patches (Score +4, 3–5 days)
 
