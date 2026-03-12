@@ -1455,4 +1455,52 @@ document.getElementById('result').textContent = r.join(',');
         // Phase 5 baseline: score should be >= 75 (same as Phase 4 since tests 75-79 were already passing)
         Assert.True(score >= 75, $"Acid3 score: {score} (expected >= 75, Phase 5 baseline)");
     }
+
+    [Fact]
+    public void Acid3_Phase6_Score_Validation()
+    {
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
+        Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
+
+        var html = File.ReadAllText(acid3Path);
+        var url = new Uri(acid3Path).AbsoluteUri;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, url);
+
+        // Extract score from <span id="score">N</span>
+        var scoreMatch = System.Text.RegularExpressions.Regex.Match(
+            result, @"id=""score""[^>]*>(\d+)<");
+        Assert.True(scoreMatch.Success, "Could not find score element in output");
+        var score = int.Parse(scoreMatch.Groups[1].Value);
+
+        // Output exact score for CI tracking
+        System.Console.WriteLine($"ACID3_SCORE={score}");
+
+        // Phase 6 baseline: score should be > 75 (improvement over Phase 5)
+        Assert.True(score > 75, $"Acid3 score: {score} (expected > 75, Phase 6 should improve beyond Phase 5)");
+    }
+
+    [Fact]
+    public void Acid3_SubmitButton_Click_Triggers_Form_Onsubmit()
+    {
+        var js = @"
+var form = document.getElementsByTagName('form')[0];
+var input = document.getElementsByTagName('input')[0];
+input.name = 'test';
+form.action = 'javascript:';
+var called = false;
+form.onsubmit = function(arg) {
+    arg.preventDefault();
+    called = true;
+};
+input.type = 'submit';
+input.click();
+document.getElementById('out').textContent = '' + called;
+";
+        var html = $"<html><head></head><body><form action='' name='form'><input type=HIDDEN></form><div id='out'>pending</div><script>{js}</script></body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true", result);
+        Assert.DoesNotContain("pending", result);
+    }
 }

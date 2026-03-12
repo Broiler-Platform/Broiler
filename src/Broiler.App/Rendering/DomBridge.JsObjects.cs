@@ -998,6 +998,48 @@ public sealed partial class DomBridge
                     new JSFunction((in Arguments __) => JSUndefined.Value, "preventDefault", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 bridge.DispatchEventOnElement(element, evt);
+
+                // Per HTML spec: clicking a submit button triggers form submission
+                if (string.Equals(element.TagName, "input", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(element.TagName, "button", StringComparison.OrdinalIgnoreCase))
+                {
+                    var btnType = element.Attributes.TryGetValue("type", out var bt) ? bt.ToLowerInvariant() : 
+                        (string.Equals(element.TagName, "button", StringComparison.OrdinalIgnoreCase) ? "submit" : "text");
+                    if (btnType == "submit")
+                    {
+                        // Find the parent form
+                        var form = element.Parent;
+                        while (form != null && !string.Equals(form.TagName, "form", StringComparison.OrdinalIgnoreCase))
+                            form = form.Parent;
+                        if (form != null)
+                        {
+                            // Dispatch a submit event on the form
+                            var submitEvt = new JSObject();
+                            submitEvt.FastAddValue((KeyString)"type", new JSString("submit"), JSPropertyAttributes.EnumerableConfigurableValue);
+                            submitEvt.FastAddValue((KeyString)"bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+                            submitEvt.FastAddValue((KeyString)"cancelable", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+                            submitEvt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                            submitEvt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                            submitEvt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                            submitEvt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                            submitEvt.FastAddValue((KeyString)"preventDefault",
+                                new JSFunction((in Arguments __) =>
+                                {
+                                    submitEvt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                                    return JSUndefined.Value;
+                                }, "preventDefault", 0),
+                                JSPropertyAttributes.EnumerableConfigurableValue);
+                            submitEvt.FastAddValue((KeyString)"stopPropagation",
+                                new JSFunction((in Arguments __) => JSUndefined.Value, "stopPropagation", 0),
+                                JSPropertyAttributes.EnumerableConfigurableValue);
+                            submitEvt.FastAddValue((KeyString)"stopImmediatePropagation",
+                                new JSFunction((in Arguments __) => JSUndefined.Value, "stopImmediatePropagation", 0),
+                                JSPropertyAttributes.EnumerableConfigurableValue);
+                            bridge.DispatchEventOnElement(form, submitEvt);
+                        }
+                    }
+                }
+
                 return JSUndefined.Value;
             }, "click", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
