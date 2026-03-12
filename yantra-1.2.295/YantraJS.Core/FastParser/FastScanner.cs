@@ -568,6 +568,9 @@ public class FastScanner
             case 'v':
                 next = '\v';
                 break;
+            case '0':
+                next = '\0';
+                break;
             default:
                 t.Append(next);
                 return true;
