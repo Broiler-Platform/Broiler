@@ -1,7 +1,7 @@
 # Roadmap: YantraJS Engine Improvements & DOM Range Operations
 
 **Date:** 2026-03-12  
-**Current Acid3 Score:** 85/100  
+**Current Acid3 Score:** 85/100 (tests 64 and 84 now passing after Phase A)  
 **Previous:** [acid3-compliance-v5.md](../acid3-compliance-v5.md)
 
 ---
