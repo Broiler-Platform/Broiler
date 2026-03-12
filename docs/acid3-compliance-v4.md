@@ -776,7 +776,7 @@ jobs:
 
 **Effort:** 0.5 days
 
-**Phase 6 Total Effort: 3–4 days** (actual: ~0.5 days)
+**Phase 6 Total Effort: 3–4 days** (actual: ~0.5 days — CI/automation patterns reused from existing test infrastructure; submit button fix was a targeted one-method change)
 
 ---
 

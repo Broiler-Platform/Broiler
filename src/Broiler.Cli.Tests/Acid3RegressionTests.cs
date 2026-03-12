@@ -1475,7 +1475,7 @@ document.getElementById('result').textContent = r.join(',');
         var score = int.Parse(scoreMatch.Groups[1].Value);
 
         // Output exact score for CI tracking
-        System.Console.WriteLine($"ACID3_SCORE={score}");
+        Console.WriteLine($"ACID3_SCORE={score}");
 
         // Phase 6 baseline: score should be > 75 (improvement over Phase 5)
         Assert.True(score > 75, $"Acid3 score: {score} (expected > 75, Phase 6 should improve beyond Phase 5)");

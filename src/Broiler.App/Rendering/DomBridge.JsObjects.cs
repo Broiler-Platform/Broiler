@@ -1003,11 +1003,15 @@ public sealed partial class DomBridge
                 if (string.Equals(element.TagName, "input", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(element.TagName, "button", StringComparison.OrdinalIgnoreCase))
                 {
-                    var btnType = element.Attributes.TryGetValue("type", out var bt) ? bt.ToLowerInvariant() : 
-                        (string.Equals(element.TagName, "button", StringComparison.OrdinalIgnoreCase) ? "submit" : "text");
+                    var btnType = "text";
+                    if (element.Attributes.TryGetValue("type", out var bt))
+                        btnType = bt.ToLowerInvariant();
+                    else if (string.Equals(element.TagName, "button", StringComparison.OrdinalIgnoreCase))
+                        btnType = "submit"; // <button> defaults to type="submit" per HTML spec
+
                     if (btnType == "submit")
                     {
-                        // Find the parent form
+                        // Walk up the DOM tree to find the parent <form>
                         var form = element.Parent;
                         while (form != null && !string.Equals(form.TagName, "form", StringComparison.OrdinalIgnoreCase))
                             form = form.Parent;
