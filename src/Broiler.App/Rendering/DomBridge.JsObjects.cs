@@ -3012,10 +3012,12 @@ public sealed partial class DomBridge
                     if (bridge._jsObjectCache.TryGetValue(child, out var cached) && cached == childObj)
                     {
                         var idx = docRoot.Children.IndexOf(child);
-                        if (idx >= 0) docRoot.Children.RemoveAt(idx);
-                        else docRoot.Children.Remove(child);
-                        child.Parent = null;
-                        if (idx >= 0) bridge.NotifyChildRemoved(docRoot, child, idx);
+                        if (idx >= 0)
+                        {
+                            docRoot.Children.RemoveAt(idx);
+                            child.Parent = null;
+                            bridge.NotifyChildRemoved(docRoot, child, idx);
+                        }
                         return childObj;
                     }
                 }

@@ -713,7 +713,7 @@ public sealed partial class DomBridge
                 state.StartContainer = el;
                 state.StartOffset = 0;
                 state.EndContainer = el;
-                // For text/comment nodes, state.EndOffset is the character length
+                // For text/comment nodes, endOffset is the character length
                 if (el.IsTextNode || string.Equals(el.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
                     state.EndOffset = (el.TextContent ?? string.Empty).Length;
                 else
@@ -803,7 +803,7 @@ public sealed partial class DomBridge
                     return bridge.ToJSObject(fragment);
                 }
 
-                // Find the child of ancestor that is an ancestor of (or is) state.StartContainer
+                // Find the child of ancestor that is an ancestor of (or is) startContainer
                 DomElement? startAncestorChild = null;
                 {
                     var node = state.StartContainer;
@@ -812,7 +812,7 @@ public sealed partial class DomBridge
                     startAncestorChild = node;
                 }
 
-                // Find the child of ancestor that is an ancestor of (or is) state.EndContainer
+                // Find the child of ancestor that is an ancestor of (or is) endContainer
                 DomElement? endAncestorChild = null;
                 {
                     var node = state.EndContainer;
@@ -832,7 +832,7 @@ public sealed partial class DomBridge
                         // Start container IS the direct child of ancestor
                         if (state.StartContainer.IsTextNode)
                         {
-                            // Text node: split at state.StartOffset
+                            // Text node: split at startOffset
                             var text = state.StartContainer.TextContent ?? string.Empty;
                             var extractedPart = text.Substring(state.StartOffset);
                             state.StartContainer.TextContent = text.Substring(0, state.StartOffset);
@@ -844,7 +844,7 @@ public sealed partial class DomBridge
                         }
                         else
                         {
-                            // Element: clone and extract children from state.StartOffset
+                            // Element: clone and extract children from startOffset
                             var clone = CloneDomElement(state.StartContainer, false);
                             bridge._elements.Add(clone);
                             for (var ci = state.StartOffset; ci < state.StartContainer.Children.Count; )
@@ -1044,7 +1044,7 @@ public sealed partial class DomBridge
                     var ancestor = FindCommonAncestor(state.StartContainer, state.EndContainer);
                     if (ancestor != null)
                     {
-                        // Check if state.StartContainer's ancestors up to common ancestor are partially selected
+                        // Check if startContainer's ancestors up to common ancestor are partially selected
                         var node = state.StartContainer;
                         while (node != null && !ReferenceEquals(node, ancestor))
                         {
@@ -1054,7 +1054,7 @@ public sealed partial class DomBridge
                                 if (!ReferenceEquals(node, state.StartContainer) || !ReferenceEquals(node, state.EndContainer))
                                 {
                                     // For the specific case test 11 tests: surround contents across two comments
-                                    // Both state.StartContainer and state.EndContainer are comment nodes with middle offsets
+                                    // Both startContainer and endContainer are comment nodes with middle offsets
                                     // This is a BAD_BOUNDARYPOINTS_ERR scenario
                                 }
                             }
@@ -1074,7 +1074,7 @@ public sealed partial class DomBridge
                     }
                 }
 
-                // Check: inserting newParent into state.StartContainer — must not violate hierarchy
+                // Check: inserting newParent into startContainer — must not violate hierarchy
                 // Document node can only have one element child
                 if (string.Equals(state.StartContainer.TagName, "#document", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(state.StartContainer.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))
