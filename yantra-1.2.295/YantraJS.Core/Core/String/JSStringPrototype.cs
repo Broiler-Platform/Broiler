@@ -77,7 +77,25 @@ public partial class JSString {
 
     [JSPrototypeMethod]
     [JSExport("substr")]
-    public static JSValue Substr(in Arguments a) => Substring(a);
+    public static JSValue Substr(in Arguments a)
+    {
+        var @this = a.This.AsString();
+        var start = a[0]?.IntegerValue ?? 0;
+        var length = a.TryGetAt(1, out var v)
+            ? (v.IsUndefined ? @this.Length : Math.Max(v.IntegerValue, 0))
+            : @this.Length;
+
+        // Per ECMAScript spec: if start is negative, use max(length + start, 0)
+        if (start < 0)
+            start = Math.Max(@this.Length + start, 0);
+        else
+            start = Math.Min(start, @this.Length);
+
+        var count = Math.Min(length, @this.Length - start);
+        if (count <= 0)
+            return JSString.Empty;
+        return new JSString(@this.Substring((int)start, (int)count));
+    }
 
     [JSPrototypeMethod]
     [JSExport("toString")]
