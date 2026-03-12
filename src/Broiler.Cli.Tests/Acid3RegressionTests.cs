@@ -2163,4 +2163,109 @@ document.getElementById('result').textContent = r.join('|');
         Console.WriteLine("DW identity result: " + resultContent);
         Assert.DoesNotContain("FAIL", resultContent);
     }
+
+    // ───── Phase D: YantraJS engine patches (tests 88, 89, 90, 93) ─────
+
+    /// <summary>
+    /// Test 88: Unicode escape \u002b (='+') in identifier must throw SyntaxError.
+    /// </summary>
+    [Fact]
+    public void PhaseD_UnicodeEscapeInIdentifier_ThrowsSyntaxError()
+    {
+        var html = @"<!DOCTYPE html><html><body><div id=""result""></div><script>
+var r = [];
+var ok = false;
+try {
+    eval('var test = { };\ntest.i= 0;\ntest.i\u005cu002b= 1;\ntest.i;\n');
+} catch (e) {
+    ok = true;
+}
+r.push('escape_rejected=' + ok);
+document.getElementById('result').textContent = r.join('|');
+</script></body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        Console.WriteLine("T88: " + result);
+        Assert.Contains("escape_rejected=true", result);
+    }
+
+    /// <summary>
+    /// Test 89: Empty character class [] matches nothing; /TA[])]/ is a SyntaxError.
+    /// </summary>
+    [Fact]
+    public void PhaseD_RegexEmptyCharacterClass()
+    {
+        var html = @"<!DOCTYPE html><html><body><div id=""result""></div><script>
+var r = [];
+var ok = true;
+try {
+    eval('/TA[])]/.exec(""TA]"")');
+    ok = false;
+} catch (e) { }
+r.push('unmatched_paren=' + ok);
+try {
+    if (eval('/[]/.exec("""")'))
+        ok = false;
+} catch (e) {
+    ok = false;
+}
+r.push('empty_class=' + ok);
+document.getElementById('result').textContent = r.join('|');
+</script></body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        Console.WriteLine("T89: " + result);
+        Assert.Contains("unmatched_paren=true", result);
+        Assert.Contains("empty_class=true", result);
+    }
+
+    /// <summary>
+    /// Test 90: Forward backreferences match empty string; \0 is NUL escape.
+    /// </summary>
+    [Fact]
+    public void PhaseD_RegexForwardBackreferences()
+    {
+        var html = @"<!DOCTYPE html><html><body><div id=""result""></div><script>
+var r = [];
+r.push('nul_no_match=' + !(/(1)\0(2)/.test('12')));
+r.push('nul_match=' + (/(1)\0(2)/.test('1' + '\0' + '2')));
+var x = /(\3)(\1)(a)/.exec('cat');
+r.push('fwd_ref=' + (x !== null && x.length === 4 && x[0] === 'a' && x[1] === '' && x[2] === '' && x[3] === 'a'));
+x = /(?!(text))(te.t)/.exec('text testing');
+r.push('neg_lookahead=' + (x.length === 3 && x[0] === 'test' && x[1] === undefined && x[2] === 'test'));
+document.getElementById('result').textContent = r.join('|');
+</script></body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        Console.WriteLine("T90: " + result);
+        Assert.Contains("nul_no_match=true", result);
+        Assert.Contains("nul_match=true", result);
+        Assert.Contains("fwd_ref=true", result);
+        Assert.Contains("neg_lookahead=true", result);
+    }
+
+    /// <summary>
+    /// Test 93: Named function expression name is read-only and local to body.
+    /// </summary>
+    [Fact]
+    public void PhaseD_NamedFunctionExpressionScope()
+    {
+        var html = @"<!DOCTYPE html><html><body><div id=""result""></div><script>
+var r = [];
+var functest;
+var vartest = 0;
+var value = (function functest(arg) {
+    if (arg) return 1;
+    vartest = 1;
+    functest = function (arg) { return 2; };
+    return functest(true);
+})(false);
+r.push('vartest=' + (vartest === 1));
+r.push('value=' + (value === 1));
+r.push('no_leak=' + (!functest));
+document.getElementById('result').textContent = r.join('|');
+</script></body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        Console.WriteLine("T93: " + result);
+        Assert.Contains("vartest=true", result);
+        Assert.Contains("value=true", result);
+        Assert.Contains("no_leak=true", result);
+    }
 }

@@ -187,6 +187,14 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
 
     private SharedParserStringMap<VariableScope> variableScopeList = new();
 
+    // BROILER-PATCH: Register an externally-created variable in this scope.
+    // Used for function expression names (ES3 §13) where the variable is
+    // declared in the parent scope's block but referenced in the function body.
+    internal void AddExternalVariable(in StringSpan name, VariableScope scope)
+    {
+        variableScopeList[name] = scope;
+    }
+
     public AstFunctionExpression Function { get; }
 
     public Expression ThisExpression => field ??= GetVariable("this", true).Expression;

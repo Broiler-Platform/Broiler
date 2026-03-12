@@ -7,24 +7,33 @@ namespace YantraJS.Core;
 
 public class JSVariable
 {
-    public JSValue Value;
+    // BROILER-PATCH: Support read-only variables for function expression names (ES3 §13)
+    private JSValue _value;
+    public JSValue Value
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => _value;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set { if (!IsReadOnly) _value = value; }
+    }
+    internal bool IsReadOnly;
 
-    static readonly FieldInfo _ValueField =
-        typeof(JSVariable).GetField("Value");
+    static readonly PropertyInfo _ValueProperty =
+        typeof(JSVariable).GetProperty("Value");
     internal readonly StringSpan Name;
     private KeyString key;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public JSVariable(JSValue v, string name)
     {
-        Value = v;
+        _value = v;
         Name = name;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public JSVariable(JSValue v, in StringSpan name)
     {
-        Value = v;
+        _value = v;
         Name = name;
     }
 
@@ -32,18 +41,18 @@ public class JSVariable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public JSVariable(in Arguments a, int i, string name)
     {
-        Value = a.GetAt(i);
+        _value = a.GetAt(i);
         Name = name;
     }
 
     public JSValue GlobalValue
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Value;
+        get => _value;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set
         {
-            Value = value;
+            _value = value;
             if (key.Value == null)
             {
                 key = KeyStrings.GetOrCreate(Name);
@@ -72,6 +81,6 @@ public class JSVariable
     //    return new JSVariable(a.GetAt(i), name);
     //}
 
-    internal static Expression ValueExpression(Expression exp) => Expression.Field(exp, _ValueField);
+    internal static Expression ValueExpression(Expression exp) => Expression.Property(exp, _ValueProperty);
 
 }

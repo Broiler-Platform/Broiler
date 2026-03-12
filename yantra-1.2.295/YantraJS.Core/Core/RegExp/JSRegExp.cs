@@ -394,6 +394,10 @@ public partial class JSRegExp: JSObject
         {
             var (options, globalSearch, ignoreCase, multiline, dotAll) = ParseFlags(flags);
 
+            // BROILER-PATCH: Transform ES3 empty character classes and forward backreferences
+            // for .NET compatibility (tests 89, 90)
+            pattern = TransformES3Patterns(pattern);
+
             // §2.6 — Detect inline pattern modifiers (?i:...) / (?-i:...) / (?ims:...) etc.
             // .NET ECMAScript mode does not support them, so switch to default mode.
             if ((options & RegexOptions.ECMAScript) != 0 && HasInlineModifiers(pattern))
@@ -526,6 +530,144 @@ public partial class JSRegExp: JSObject
                 i++;
         }
         return false;
+    }
+
+    // BROILER-PATCH: Transform ES3-specific regex patterns for .NET compatibility
+    // Handles empty character classes, forward backreferences, and NUL escapes.
+    private static string TransformES3Patterns(string pattern)
+    {
+        if (string.IsNullOrEmpty(pattern))
+            return pattern;
+
+        // Pass 1: Count total capturing groups for forward backreference detection
+        int totalGroups = CountCapturingGroups(pattern);
+
+        var sb = new StringBuilder(pattern.Length + 8);
+        bool inClass = false;
+        int groupsSeen = 0;
+        for (int i = 0; i < pattern.Length; i++)
+        {
+            char c = pattern[i];
+
+            if (c == '\\' && i + 1 < pattern.Length)
+            {
+                char next = pattern[i + 1];
+                if (!inClass && next >= '1' && next <= '9')
+                {
+                    // Backreference \N — check if it's a forward reference
+                    int refNum = 0;
+                    int j = i + 1;
+                    while (j < pattern.Length && pattern[j] >= '0' && pattern[j] <= '9')
+                    {
+                        refNum = refNum * 10 + (pattern[j] - '0');
+                        j++;
+                    }
+                    if (refNum > totalGroups)
+                    {
+                        // Reference to non-existent group — treat as empty match
+                        sb.Append("(?:)");
+                        i = j - 1;
+                        continue;
+                    }
+                    if (refNum > groupsSeen)
+                    {
+                        // Forward reference to not-yet-captured group — matches empty string per ES3
+                        sb.Append("(?:)");
+                        i = j - 1;
+                        continue;
+                    }
+                    // Normal backreference — pass through
+                    sb.Append(pattern, i, j - i);
+                    i = j - 1;
+                    continue;
+                }
+                if (next == '0')
+                {
+                    // \0 — NUL escape. Check if followed by an octal digit.
+                    if (i + 2 < pattern.Length && pattern[i + 2] >= '0' && pattern[i + 2] <= '7')
+                    {
+                        // \0N — octal escape, pass through to .NET
+                        sb.Append(c);
+                        continue;
+                    }
+                    // \0 alone — NUL character. Use \x00 for .NET compatibility.
+                    sb.Append("\\x00");
+                    i++; // skip the '0'
+                    continue;
+                }
+                // Other escapes — pass through
+                sb.Append(c);
+                sb.Append(next);
+                i++;
+                continue;
+            }
+
+            if (inClass)
+            {
+                if (c == ']')
+                    inClass = false;
+                sb.Append(c);
+                continue;
+            }
+
+            if (c == '[')
+            {
+                // Check for ES3 empty character class [] or [^]
+                if (i + 1 < pattern.Length && pattern[i + 1] == ']')
+                {
+                    // [] — empty character class, matches nothing
+                    sb.Append("[^\\s\\S]");
+                    i++; // skip ']'
+                    continue;
+                }
+                if (i + 2 < pattern.Length && pattern[i + 1] == '^' && pattern[i + 2] == ']')
+                {
+                    // [^] — complement of empty class, matches any character
+                    sb.Append("[\\s\\S]");
+                    i += 2; // skip '^]'
+                    continue;
+                }
+                inClass = true;
+                sb.Append(c);
+                continue;
+            }
+
+            if (c == '(' && (i + 1 >= pattern.Length || pattern[i + 1] != '?'))
+            {
+                groupsSeen++;
+            }
+
+            sb.Append(c);
+        }
+
+        return sb.ToString();
+    }
+
+    // Count the total number of capturing groups in the pattern
+    private static int CountCapturingGroups(string pattern)
+    {
+        int count = 0;
+        bool inClass = false;
+        for (int i = 0; i < pattern.Length; i++)
+        {
+            char c = pattern[i];
+            if (c == '\\' && i + 1 < pattern.Length)
+            {
+                i++; // skip escaped char
+                continue;
+            }
+            if (inClass)
+            {
+                if (c == ']') inClass = false;
+                continue;
+            }
+            if (c == '[') { inClass = true; continue; }
+            if (c == '(' && (i + 1 >= pattern.Length || pattern[i + 1] != '?'))
+            {
+                count++;
+            }
+        }
+        return count;
     }
 
     public override string ToString() => $"/{pattern}/{flags}";

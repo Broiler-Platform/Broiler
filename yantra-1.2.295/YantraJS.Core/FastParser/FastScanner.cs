@@ -884,6 +884,33 @@ public class FastScanner
                 sb.Clear();
             }
 
+            // BROILER-PATCH: Validate parentheses balance in regex pattern (ES3 §15.10.1)
+            // Reject patterns with unmatched ')' outside character classes
+            {
+                int depth = 0;
+                bool cls = false;
+                for (int vi = 0; vi < regExp.Length; vi++)
+                {
+                    char vc = regExp[vi];
+                    if (vc == '\\' && vi + 1 < regExp.Length) { vi++; continue; }
+                    if (cls) { if (vc == ']') cls = false; continue; }
+                    if (vc == '[')
+                    {
+                        // ES3: ] immediately after [ closes the class (empty class)
+                        if (vi + 1 < regExp.Length && regExp[vi + 1] == ']')
+                        {
+                            vi++; // skip ']'
+                            continue;
+                        }
+                        cls = true;
+                        continue;
+                    }
+                    if (vc == '(') depth++;
+                    if (vc == ')') { depth--; if (depth < 0) { token = null; return false; } }
+                }
+                if (depth != 0) { token = null; return false; }
+            }
+
             var flags = ScanFlags();
 
             // we should test if it is a valid JSRegEx
@@ -1070,7 +1097,27 @@ public class FastScanner
         do
         {
             first = Consume();
-
+            // BROILER-PATCH: Handle \uXXXX unicode escapes in identifiers (ES3 §7.6)
+            if (first == '\\')
+            {
+                first = Consume();
+                if (first != 'u')
+                    throw Unexpected();
+                // Read 4 hex digits and decode the code point
+                int cp = 0;
+                for (int hx = 0; hx < 4; hx++)
+                {
+                    first = Consume();
+                    if (!first.IsDigitPart(true, false))
+                        throw Unexpected();
+                    cp = cp * 16 + first.HexValue();
+                }
+                char decoded = (char)cp;
+                if (!decoded.IsIdentifierPart())
+                    throw Unexpected();
+                // Valid identifier character — continue scanning
+                continue;
+            }
         } while (first.IsIdentifierPart());
         var token = state.CommitIdentifier(keywords);
         return token;

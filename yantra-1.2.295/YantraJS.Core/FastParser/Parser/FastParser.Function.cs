@@ -30,7 +30,10 @@ partial class FastParser
         }
 
         if(Identitifer(out var id)) {
-            variableScope.Top.AddVariable(id.Start, id.Name, isStatement ? FastVariableKind.Let : FastVariableKind.Var);
+            // BROILER-PATCH: For function declarations, add name to parent scope (hoisted).
+            // For function expressions, do NOT add to parent scope (ES3 §13).
+            if (isStatement)
+                variableScope.Top.AddVariable(id.Start, id.Name, FastVariableKind.Let);
         }
 
         stream.Expect(TokenTypes.BracketStart);
@@ -45,7 +48,7 @@ partial class FastParser
             if(!Block(out var body))
                 throw stream.Unexpected();
 
-            node = new AstFunctionExpression(begin, PreviousToken, false, isAsync, generator, id, declarators, body);
+            node = new AstFunctionExpression(begin, PreviousToken, false, isAsync, generator, id, declarators, body, isStatement);
         } finally
         {
             scope.Dispose();
