@@ -2024,6 +2024,154 @@ public sealed partial class DomBridge
                         return new JSNumber(sb.Length);
                     }, "getNumberOfChars", 0),
                     JSPropertyAttributes.EnumerableConfigurableValue);
+
+                // getComputedTextLength() — returns estimated total advance width
+                obj.FastAddValue(
+                    (KeyString)"getComputedTextLength",
+                    new JSFunction((in Arguments _) =>
+                    {
+                        var sb = new StringBuilder();
+                        CollectTextContent(element, sb);
+                        // Stub: estimate using font-size * character count * 0.6 average advance ratio
+                        double fontSize = 16;
+                        if (element.Attributes.TryGetValue("font-size", out var fs))
+                        {
+                            var fsClean = fs.Replace("px", "").Replace("pt", "").Trim();
+                            double.TryParse(fsClean, System.Globalization.NumberStyles.Any,
+                                System.Globalization.CultureInfo.InvariantCulture, out fontSize);
+                        }
+                        return new JSNumber(sb.Length * fontSize * 0.6);
+                    }, "getComputedTextLength", 0),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+
+                // getSubStringLength(charnum, nchars) — returns advance width of substring
+                obj.FastAddValue(
+                    (KeyString)"getSubStringLength",
+                    new JSFunction((in Arguments a) =>
+                    {
+                        var sb = new StringBuilder();
+                        CollectTextContent(element, sb);
+                        var charnum = a.Length > 0 ? (int)a[0].DoubleValue : 0;
+                        var nchars = a.Length > 1 ? (int)a[1].DoubleValue : 0;
+                        if (charnum < 0 || charnum >= sb.Length)
+                            throw new JSException("INDEX_SIZE_ERR");
+                        if (nchars == 0) return new JSNumber(0);
+                        double fontSize = 16;
+                        if (element.Attributes.TryGetValue("font-size", out var fs))
+                        {
+                            var fsClean = fs.Replace("px", "").Replace("pt", "").Trim();
+                            double.TryParse(fsClean, System.Globalization.NumberStyles.Any,
+                                System.Globalization.CultureInfo.InvariantCulture, out fontSize);
+                        }
+                        return new JSNumber(nchars * fontSize * 0.6);
+                    }, "getSubStringLength", 2),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+
+                // getStartPositionOfChar(charnum) — returns SVGPoint {x, y}
+                obj.FastAddValue(
+                    (KeyString)"getStartPositionOfChar",
+                    new JSFunction((in Arguments a) =>
+                    {
+                        var sb = new StringBuilder();
+                        CollectTextContent(element, sb);
+                        var charnum = a.Length > 0 ? (int)a[0].DoubleValue : 0;
+                        if (charnum < 0 || charnum >= sb.Length)
+                            throw new JSException("INDEX_SIZE_ERR");
+                        double fontSize = 16;
+                        if (element.Attributes.TryGetValue("font-size", out var fs))
+                        {
+                            var fsClean = fs.Replace("px", "").Replace("pt", "").Trim();
+                            double.TryParse(fsClean, System.Globalization.NumberStyles.Any,
+                                System.Globalization.CultureInfo.InvariantCulture, out fontSize);
+                        }
+                        var pt = new JSObject();
+                        pt.FastAddValue((KeyString)"x", new JSNumber(charnum * fontSize * 0.6), JSPropertyAttributes.EnumerableConfigurableValue);
+                        pt.FastAddValue((KeyString)"y", new JSNumber(fontSize), JSPropertyAttributes.EnumerableConfigurableValue);
+                        return pt;
+                    }, "getStartPositionOfChar", 1),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+
+                // getEndPositionOfChar(charnum) — returns SVGPoint {x, y}
+                obj.FastAddValue(
+                    (KeyString)"getEndPositionOfChar",
+                    new JSFunction((in Arguments a) =>
+                    {
+                        var sb = new StringBuilder();
+                        CollectTextContent(element, sb);
+                        var charnum = a.Length > 0 ? (int)a[0].DoubleValue : 0;
+                        if (charnum < 0 || charnum >= sb.Length)
+                            throw new JSException("INDEX_SIZE_ERR");
+                        double fontSize = 16;
+                        if (element.Attributes.TryGetValue("font-size", out var fs))
+                        {
+                            var fsClean = fs.Replace("px", "").Replace("pt", "").Trim();
+                            double.TryParse(fsClean, System.Globalization.NumberStyles.Any,
+                                System.Globalization.CultureInfo.InvariantCulture, out fontSize);
+                        }
+                        var pt = new JSObject();
+                        pt.FastAddValue((KeyString)"x", new JSNumber((charnum + 1) * fontSize * 0.6), JSPropertyAttributes.EnumerableConfigurableValue);
+                        pt.FastAddValue((KeyString)"y", new JSNumber(fontSize), JSPropertyAttributes.EnumerableConfigurableValue);
+                        return pt;
+                    }, "getEndPositionOfChar", 1),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+
+                // getRotationOfChar(charnum) — returns rotation angle in degrees
+                obj.FastAddValue(
+                    (KeyString)"getRotationOfChar",
+                    new JSFunction((in Arguments a) =>
+                    {
+                        var sb = new StringBuilder();
+                        CollectTextContent(element, sb);
+                        var charnum = a.Length > 0 ? (int)a[0].DoubleValue : 0;
+                        if (charnum < 0 || charnum >= sb.Length)
+                            throw new JSException("INDEX_SIZE_ERR");
+                        // Default rotation is 0 degrees (horizontal text)
+                        return new JSNumber(0);
+                    }, "getRotationOfChar", 1),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+            }
+
+            // SVGSVGElement methods (getCurrentTime, setCurrentTime)
+            if (tag == "svg" || tag == "svg:svg")
+            {
+                double currentTime = 0;
+
+                obj.FastAddValue(
+                    (KeyString)"getCurrentTime",
+                    new JSFunction((in Arguments _) => new JSNumber(currentTime), "getCurrentTime", 0),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+
+                obj.FastAddValue(
+                    (KeyString)"setCurrentTime",
+                    new JSFunction((in Arguments a) =>
+                    {
+                        if (a.Length > 0)
+                            currentTime = a[0].DoubleValue;
+                        return JSUndefined.Value;
+                    }, "setCurrentTime", 1),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+            }
+
+            // SMIL animation element methods (beginElement, endElement, getStartTime)
+            if (tag == "set" || tag == "svg:set" ||
+                tag == "animate" || tag == "svg:animate" ||
+                tag == "animatetransform" || tag == "svg:animatetransform" ||
+                tag == "animatemotion" || tag == "svg:animatemotion")
+            {
+                obj.FastAddValue(
+                    (KeyString)"beginElement",
+                    new JSFunction((in Arguments _) => JSUndefined.Value, "beginElement", 0),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+
+                obj.FastAddValue(
+                    (KeyString)"endElement",
+                    new JSFunction((in Arguments _) => JSUndefined.Value, "endElement", 0),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
+
+                obj.FastAddValue(
+                    (KeyString)"getStartTime",
+                    new JSFunction((in Arguments _) => new JSNumber(0), "getStartTime", 0),
+                    JSPropertyAttributes.EnumerableConfigurableValue);
             }
         }
 

@@ -1320,6 +1320,9 @@ public sealed partial class DomBridge
 
         // Node constructor with type constants
         RegisterNodeConstructor(context);
+
+        // SVGLength interface constants
+        RegisterSVGLength(context);
     }
 
     /// <summary>
