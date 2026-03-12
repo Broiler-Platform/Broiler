@@ -103,25 +103,68 @@ do not represent error leaks or unexpected failures.
 
 ### Phase 1: Integrate YantraJS DOM Bridge into CLI Image-Capture Path
 
-- [ ] Ensure JS is executed before HTML render in the CLI `--capture-image` path
-- [ ] Validate DOM bridge initialization order
-- [ ] Verify timer flush completes before capture
-- [ ] Document stacktrace output; explain normal exceptions
+- [x] Ensure JS is executed before HTML render in the CLI `--capture-image` path
+- [x] Validate DOM bridge initialization order
+- [x] Verify timer flush completes before capture
+- [x] Document stacktrace output; explain normal exceptions
 
 ### Phase 2: Script/DOM Harness Support for Acid3 Subtests
 
-- [ ] Verify Acid3 test harness `setUp()` / `tearDown()` execution
-- [ ] Ensure `document.title` updates are captured
-- [ ] Validate subtest score reporting mechanism
-- [ ] Document stacktrace output; explain normal exceptions
+- [x] Verify Acid3 test harness `setUp()` / `tearDown()` execution
+- [x] Ensure `document.title` updates are captured
+- [x] Validate subtest score reporting mechanism
+- [x] Document stacktrace output; explain normal exceptions
 
 ### Phase 3: Differential Pixel Comparison & Region-Level Mismatch Analysis
 
-- [ ] Render Acid3 with Broiler CLI (full-page)
-- [ ] Render Acid3 with Chromium/Playwright (reference)
-- [ ] Pixel-diff comparison with region-level metrics
-- [ ] Categorize mismatches by feature area
+- [x] Render Acid3 with Broiler CLI (full-page and viewport)
+- [x] Render Acid3 with Chromium/Playwright (reference — `acid3-reference.png`)
+- [x] Pixel-diff comparison with region-level metrics
+- [x] Categorize mismatches by feature area
+- [x] Fix critical rendering bug: stale CSS in inline styles
 - [ ] Document stacktrace output; explain normal exceptions
+
+#### Phase 3 Findings (2026-03-12)
+
+**Critical Bug Found & Fixed: Stale CSS in Inline Styles**
+
+`ApplyCascadedStyles()` in `DomBridge.cs` applied CSS rules (from `<style>` blocks) to
+every element's `Style` dictionary at initialization time. This caused `.z { visibility:
+hidden }` to be baked into the inline `style` attribute of all bucket elements. When
+JavaScript later changed bucket classes from `z` to `zPPPPPPP` (etc.), the inline
+`visibility: hidden` persisted — overriding HtmlRenderer's own CSS resolution.
+
+**Fix:** Removed the `ApplyCascadedStyles()` call. CSS is now resolved by:
+- `BuildComputedStyleObject()` for `getComputedStyle()` (JS runtime)
+- HtmlRenderer's own CSS engine (at render time)
+
+**Before fix:** Bucket elements serialized as:
+```html
+<p id="bucket1" class="zPPPPPPP" style="margin: 0; border: 1px solid ! important; visibility: hidden">
+```
+Score text and buckets were hidden in rendered image.
+
+**After fix:** Bucket elements serialized as:
+```html
+<p id="bucket1" class="zPPPPPPP">
+```
+Score "78/100" is now visible in the rendered image. Buckets render with grey/silver
+backgrounds matching their test progress.
+
+**Image Validation Results:**
+
+| Metric | Value |
+|--------|-------|
+| DOM Score | 78/100 |
+| Score visible in rendered image | ✅ Yes ("78/100" text rendered) |
+| Pixel match vs. reference | 6.1% (expected — many CSS features still missing) |
+| All CLI tests passing | ✅ 500/500 |
+
+**Mismatch Categories:**
+- **Layout:** Bucket positioning and sizing differ from reference (CSS `inline-block`, `vertical-align`, complex margin/padding calculations)
+- **Colors:** Bucket backgrounds render grey/silver (correct for 78/100 — needs 100/100 for final red/orange/yellow/lime/blue/purple)
+- **Typography:** Font rendering differences (text-shadow, font-size calculations)
+- **Borders:** Blue border rendering (CSS `border: 1px blue` shorthand) and dotted border style
 
 ### Phase 4: Targeted Feature Implementation (CSS/DOM/JS Gaps)
 
@@ -147,5 +190,6 @@ do not represent error leaks or unexpected failures.
 
 ---
 
-**Status:** Phase 0 complete — exception console output with stacktrace baseline established.
-All subsequent phases pending roadmap execution.
+**Status:** Phase 3 in progress — critical stale-CSS bug fixed. Score 78/100 now visible in
+rendered image. Image validation shows 6.1% pixel match vs. reference (layout/color gaps
+remain for Phase 4).

@@ -1503,4 +1503,86 @@ document.getElementById('out').textContent = '' + called;
         Assert.Contains("true", result);
         Assert.DoesNotContain("pending", result);
     }
+
+    /// <summary>
+    /// Regression test: CSS class selector changes must not leave stale
+    /// inline styles from previously matching CSS rules.
+    /// Verifies that .z { visibility: hidden } does NOT persist in inline
+    /// styles after className changes from "z" to "zPPPP...".
+    /// </summary>
+    [Fact]
+    public void Acid3_Phase3_Bucket_Visibility_Not_Stale_After_Class_Change()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.z { visibility: hidden; }
+.zP { background: black; }
+.zPP { background: grey; }
+</style>
+</head><body>
+<p id=""bucket1"" class=""z"">B1</p>
+<p id=""bucket2"" class=""z"">B2</p>
+<div id=""out"">?</div>
+<script>
+var b1 = document.getElementById('bucket1');
+var b2 = document.getElementById('bucket2');
+b1.className = 'zP';
+b2.className = 'zPP';
+document.getElementById('out').textContent = b1.className + ',' + b2.className;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // Verify class was updated
+        Assert.Contains("zP,zPP", result);
+
+        // Critical: bucket elements must NOT have visibility:hidden in their
+        // serialized style attribute after className change
+        var bucket1Match = System.Text.RegularExpressions.Regex.Match(
+            result, @"id=""bucket1""[^>]*>");
+        Assert.True(bucket1Match.Success, "bucket1 element not found");
+        Assert.DoesNotContain("visibility", bucket1Match.Value.ToLower());
+
+        var bucket2Match = System.Text.RegularExpressions.Regex.Match(
+            result, @"id=""bucket2""[^>]*>");
+        Assert.True(bucket2Match.Success, "bucket2 element not found");
+        Assert.DoesNotContain("visibility", bucket2Match.Value.ToLower());
+    }
+
+    /// <summary>
+    /// Validates that after full Acid3 execution, bucket elements are
+    /// serialized without stale CSS inline styles.
+    /// </summary>
+    [Fact]
+    public void Acid3_Phase3_Full_Harness_Buckets_No_Stale_Styles()
+    {
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
+        Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
+
+        var html = File.ReadAllText(acid3Path);
+        var url = new Uri(acid3Path).AbsoluteUri;
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, url);
+
+        // All 6 buckets should NOT have visibility:hidden in inline styles
+        for (int i = 1; i <= 6; i++)
+        {
+            var bucketMatch = System.Text.RegularExpressions.Regex.Match(
+                result, $@"id=""bucket{i}""[^>]*>");
+            Assert.True(bucketMatch.Success, $"bucket{i} element not found");
+            Assert.DoesNotContain("visibility: hidden", bucketMatch.Value);
+        }
+
+        // Score should be present and > 0
+        var scoreMatch = System.Text.RegularExpressions.Regex.Match(
+            result, @"id=""score""[^>]*>(\d+)<");
+        Assert.True(scoreMatch.Success, "Could not find score element");
+        var score = int.Parse(scoreMatch.Groups[1].Value);
+        Assert.True(score > 0, $"Score should be > 0, got {score}");
+
+        Console.WriteLine($"ACID3_PHASE3_SCORE={score}");
+    }
 }
