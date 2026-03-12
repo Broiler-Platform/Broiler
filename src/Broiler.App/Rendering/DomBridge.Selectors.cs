@@ -40,57 +40,65 @@ public sealed partial class DomBridge
         var parts = SplitSelectorParts(selector);
         if (parts.Count == 0) return false;
 
-        // Match from right to left
-        var current = el;
-        for (int i = parts.Count - 1; i >= 0; i--)
-        {
-            var (_, compound) = parts[i];
-            if (current == null) return false;
+        // Rightmost part must match the target element
+        if (!MatchesCompound(el, parts[^1].Compound)) return false;
 
-            if (i == parts.Count - 1)
-            {
-                // Rightmost part: must match the target element
-                if (!MatchesCompound(current, compound)) return false;
-            }
-            else
-            {
-                // The combinator describing the relationship between parts[i]
-                // and parts[i+1] is stored in parts[i+1].
-                var combinator = parts[i + 1].Combinator;
-                switch (combinator)
+        // Match remaining parts from right to left with backtracking
+        return parts.Count == 1 || MatchPartsRecursive(parts, parts.Count - 2, el);
+    }
+
+    /// <summary>
+    /// Recursively matches selector parts from right to left with backtracking.
+    /// The combinator between parts[partIndex] and parts[partIndex+1] determines
+    /// the required relationship, and is stored in parts[partIndex+1].Combinator.
+    /// </summary>
+    private static bool MatchPartsRecursive(
+        List<(char Combinator, string Compound)> parts, int partIndex, DomElement current)
+    {
+        if (partIndex < 0) return true; // All parts matched
+        if (current == null) return false;
+
+        var compound = parts[partIndex].Compound;
+        var combinator = parts[partIndex + 1].Combinator;
+
+        switch (combinator)
+        {
+            case ' ': // descendant — try each ancestor, backtracking on failure
+                var ancestor = current.Parent;
+                while (ancestor != null)
                 {
-                    case ' ': // descendant
-                        var ancestor = current.Parent;
-                        while (ancestor != null)
-                        {
-                            if (MatchesCompound(ancestor, compound)) { current = ancestor; goto matched; }
-                            ancestor = ancestor.Parent;
-                        }
-                        return false;
-                    case '>': // child
-                        if (current.Parent == null || !MatchesCompound(current.Parent, compound)) return false;
-                        current = current.Parent;
-                        break;
-                    case '+': // adjacent sibling
-                        var prev = PreviousSibling(current);
-                        if (prev == null || !MatchesCompound(prev, compound)) return false;
-                        current = prev;
-                        break;
-                    case '~': // general sibling
-                        var sib = PreviousSibling(current);
-                        while (sib != null)
-                        {
-                            if (MatchesCompound(sib, compound)) { current = sib; goto matched; }
-                            sib = PreviousSibling(sib);
-                        }
-                        return false;
-                    default:
-                        return false;
+                    if (MatchesCompound(ancestor, compound) &&
+                        MatchPartsRecursive(parts, partIndex - 1, ancestor))
+                        return true;
+                    ancestor = ancestor.Parent;
                 }
-            }
-            matched:;
+                return false;
+
+            case '>': // child — parent must match (no backtracking needed)
+                return current.Parent != null &&
+                       MatchesCompound(current.Parent, compound) &&
+                       MatchPartsRecursive(parts, partIndex - 1, current.Parent);
+
+            case '+': // adjacent sibling — only one candidate
+                var prev = PreviousSibling(current);
+                return prev != null &&
+                       MatchesCompound(prev, compound) &&
+                       MatchPartsRecursive(parts, partIndex - 1, prev);
+
+            case '~': // general sibling — try each preceding sibling, backtracking on failure
+                var sib = PreviousSibling(current);
+                while (sib != null)
+                {
+                    if (MatchesCompound(sib, compound) &&
+                        MatchPartsRecursive(parts, partIndex - 1, sib))
+                        return true;
+                    sib = PreviousSibling(sib);
+                }
+                return false;
+
+            default:
+                return false;
         }
-        return true;
     }
 
     /// <summary>
