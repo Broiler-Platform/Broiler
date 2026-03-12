@@ -283,9 +283,15 @@ public sealed partial class DomBridge
         if (!_elements.Contains(DocumentElement))
             _elements.Insert(0, DocumentElement);
 
-        // Extract <style> blocks and apply cascaded styles
+        // Extract <style> blocks for getComputedStyle() resolution.
+        // Note: We intentionally do NOT call ApplyCascadedStyles() here.
+        // Merging CSS rules into element.Style would bake them into inline styles,
+        // which persist even after JS changes element classes (e.g. Acid3 bucket
+        // elements change from class="z" to "zPPPP..." but the .z { visibility:
+        // hidden } would remain in their inline style). HtmlRenderer has its own
+        // CSS engine that applies stylesheet rules at render time, so cascaded
+        // styles are correctly resolved without pre-merging.
         ExtractStyleBlocks(html);
-        ApplyCascadedStyles();
     }
 
     /// <summary>
