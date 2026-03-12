@@ -1464,7 +1464,9 @@ document.getElementById('result').textContent = r.join(',');
         Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
 
         var html = File.ReadAllText(acid3Path);
-        var url = new Uri(acid3Path).AbsoluteUri;
+        // Use the canonical http:// URL so that URI resolution in test 64
+        // (object.data) produces an absolute http:// URL instead of file://.
+        var url = "http://acid3.acidtests.org/acid3.html";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, url);
 
@@ -1723,4 +1725,92 @@ public void Acid3_Phase4_Score_At_Least_81()
     Assert.True(score >= 81, $"Acid3 score should be >= 81, got {score}");
     Console.WriteLine($"ACID3_PHASE4_SCORE={score}");
 }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Phase A: Quick wins — T3.1 (test 84), T4.1 (test 64), T2.1-T2.2 (test 0)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// T3.1: (-0).toExponential(4) must format as "0.0000e+0", not "-0.0000e+0".
+    /// ECMAScript specifies that negative zero formats as positive zero.
+    /// </summary>
+    [Fact]
+    public void PhaseA_NegativeZero_ToExponential_Formats_As_Positive()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body><div id=""result""></div>
+<script>
+var r = [];
+r.push((-0).toExponential(4));
+r.push((0).toExponential(4));
+r.push((-0).toExponential(0));
+document.getElementById('result').textContent = r.join(',');
+</script></body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("0.0000e+0,0.0000e+0,0e+0", result);
+    }
+
+    /// <summary>
+    /// T2.1-T2.2: After removing the last child, the new last child matches
+    /// :last-child and getComputedStyle returns the correct CSS value.
+    /// CSS value validation rejects unknown values (x-bogus).
+    /// </summary>
+    [Fact]
+    public void PhaseA_LastChild_CSS_ReEvaluation_After_DOM_Removal()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+  #instructions:last-child { white-space: pre-wrap; white-space: x-bogus; }
+</style>
+</head>
+<body>
+  <div id=""score"">0</div>
+  <p id=""instructions"">Hello</p>
+  <p id=""remove-last-child-test"">Remove me</p>
+<script>
+// Mirror Acid3 test 0: remove script first, then last child
+var scripts = document.getElementsByTagName('script');
+document.body.removeChild(scripts[scripts.length-1]);
+var last = document.getElementById('remove-last-child-test');
+var penultimate = last.previousSibling;
+penultimate = penultimate.previousSibling;
+last.parentNode.removeChild(last);
+var ws = document.defaultView.getComputedStyle(penultimate, '').whiteSpace;
+document.getElementById('score').textContent = ws;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains(">pre-wrap<", result);
+    }
+
+    /// <summary>
+    /// T4.1 + T3.1: Score validation with http:// URL (fixes test 64) and
+    /// negative zero toExponential (fixes test 84). Phase A should improve
+    /// score by at least 2 points over the Phase 4b baseline of 83.
+    /// </summary>
+    [Fact]
+    public void PhaseA_Score_Validation()
+    {
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
+        Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
+
+        var html = File.ReadAllText(acid3Path);
+        var url = "http://acid3.acidtests.org/acid3.html";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, url);
+
+        var scoreMatch = System.Text.RegularExpressions.Regex.Match(
+            result, @"id=""score""[^>]*>(\d+)<");
+        Assert.True(scoreMatch.Success, "Could not find score element in output");
+        var score = int.Parse(scoreMatch.Groups[1].Value);
+
+        Console.WriteLine($"ACID3_PHASE_A_SCORE={score}");
+
+        // Phase A baseline: at least +2 over Phase 4b (83) = 85
+        Assert.True(score >= 85, $"Acid3 score: {score} (expected >= 85 after Phase A)");
+    }
 }

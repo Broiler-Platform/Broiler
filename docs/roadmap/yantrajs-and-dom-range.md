@@ -1,7 +1,7 @@
 # Roadmap: YantraJS Engine Improvements & DOM Range Operations
 
 **Date:** 2026-03-12  
-**Current Acid3 Score:** 83/100  
+**Current Acid3 Score:** 85/100  
 **Previous:** [acid3-compliance-v5.md](../acid3-compliance-v5.md)
 
 ---
@@ -158,8 +158,8 @@ Per [DOM Living Standard §Removing steps for Ranges](https://dom.spec.whatwg.or
 **Issue:** `getComputedStyle().whiteSpace` returns `normal` instead of `pre-wrap` for the new last child after the original last child is removed. The CSS rule `#instructions:last-child { white-space: pre-wrap }` isn't re-evaluated after DOM mutation.
 
 **Tasks:**
-- [ ] **T2.1** Ensure `BuildComputedStyleObject()` re-evaluates CSS selectors against the *current* DOM state (not cached)
-- [ ] **T2.2** Verify `:last-child` matching in `MatchesSelector()` checks `el.Parent.Children[^1]`
+- [x] **T2.1** Ensure `BuildComputedStyleObject()` re-evaluates CSS selectors against the *current* DOM state (not cached)
+- [x] **T2.2** Verify `:last-child` matching in `MatchesSelector()` checks `el.Parent.Children[^1]`
 
 **Estimated effort:** 2–3 hours
 
@@ -239,7 +239,7 @@ These failures are in the YantraJS JavaScript engine itself (the `yantra-1.2.295
 **Root cause:** `JSNumberPrototype.ToExponential()` at line 114 of `JSNumberPrototype.cs` uses `nv.ToString(format)` which in .NET preserves the negative sign for `-0.0`. ECMAScript specifies that negative zero should format as `"0.0000e+0"` (positive format).
 
 **Fix:**
-- [ ] **T3.1** In `ToExponential()`, add check: `if (JSNumber.IsNegativeZero(nv)) nv = 0.0;` before formatting
+- [x] **T3.1** In `ToExponential()`, add check: `if (JSNumber.IsNegativeZero(nv)) nv = 0.0;` before formatting
 
 **File:** `yantra-1.2.295/YantraJS.Core/Core/Number/JSNumberPrototype.cs:114`  
 **Estimated effort:** 30 minutes
@@ -314,7 +314,7 @@ These failures are in the YantraJS JavaScript engine itself (the `yantra-1.2.295
 
 **Workaround:** Run the Acid3 test with `http://acid3.acidtests.org/` as the base URL instead of `file://`.
 
-- [ ] **T4.1** Update `Acid3_Phase6_Score_Validation` test to use `http://acid3.acidtests.org/` as URL
+- [x] **T4.1** Update `Acid3_Phase6_Score_Validation` test to use `http://acid3.acidtests.org/` as URL
 
 **Estimated effort:** 15 minutes
 
@@ -335,13 +335,13 @@ These failures are in the YantraJS JavaScript engine itself (the `yantra-1.2.295
 
 ## Implementation Priority & Schedule
 
-### Phase A: Quick Wins (Score +2–3, 1–2 days)
+### Phase A: Quick Wins — ✅ Complete (Score 83→85, +2)
 
-| Task | Test | Effort | Impact |
-|------|------|--------|--------|
-| T3.1 | 84 | 30 min | +1 |
-| T4.1 | 64 | 15 min | +1 |
-| T2.1–T2.2 | 0 | 2–3 hr | +1 |
+| Task | Test | Effort | Impact | Status |
+|------|------|--------|--------|--------|
+| T3.1 | 84 | 30 min | +1 | ✅ Done |
+| T4.1 | 64 | 15 min | +1 | ✅ Done |
+| T2.1–T2.2 | 0 | 2–3 hr | +0 (already passing) | ✅ Verified |
 
 ### Phase B: DOM Range Core (Score +3, 2–3 days)
 

@@ -118,6 +118,10 @@ partial class JSNumber
             return JSConstants.Infinity;
         if (double.IsNegativeInfinity(nv))
             return JSConstants.NegativeInfinity;
+        // BROILER-PATCH: ECMAScript specifies that negative zero formats as
+        // positive zero in toExponential (e.g., (-0).toExponential(4) === "0.0000e+0")
+        if (JSNumber.IsNegativeZero(nv))
+            nv = 0.0;
         if (a.Length > 0)
         {
             if (a.Get1() is JSNumber n1)
