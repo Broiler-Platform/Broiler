@@ -153,6 +153,19 @@ public sealed class HtmlTreeBuilder
                     var element = CreateElement(token);
                     var parent = openElements.Count > 0 ? openElements.Peek() : body;
 
+                    // Implicit <tbody>: per the HTML spec, when <tr> is encountered
+                    // inside <table> without an explicit section element (thead/tbody/tfoot),
+                    // an implied <tbody> is created to wrap the row.
+                    if (string.Equals(tag, "tr", StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(parent.TagName, "table", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var implicitTbody = new DomElement("tbody", null, null, string.Empty);
+                        AppendChild(parent, implicitTbody);
+                        allElements.Add(implicitTbody);
+                        openElements.Push(implicitTbody);
+                        parent = implicitTbody;
+                    }
+
                     // Foster parenting: text/elements inside table scope that
                     // are not valid table children get foster-parented.
                     if (TableElements.Contains(parent.TagName) &&
@@ -227,8 +240,11 @@ public sealed class HtmlTreeBuilder
 
                     var parent = openElements.Count > 0 ? openElements.Peek() : body;
 
-                    // Foster parenting for text nodes inside table scope
-                    if (TableElements.Contains(parent.TagName))
+                    // Foster parenting for text nodes inside table scope.
+                    // Per HTML spec, only non-whitespace text is foster-parented;
+                    // whitespace text nodes are kept in the table element.
+                    if (TableElements.Contains(parent.TagName) &&
+                        !string.IsNullOrWhiteSpace(text.TextContent))
                         parent = FosterParent(openElements, body);
 
                     AppendChild(parent, text);

@@ -1586,3 +1586,141 @@ document.getElementById('out').textContent = b1.className + ',' + b2.className;
         Console.WriteLine($"ACID3_PHASE3_SCORE={score}");
     }
 }
+
+// =====================================================================
+// Phase 4: Targeted Feature Implementation — Regression Tests
+// =====================================================================
+
+/// <summary>
+/// Phase 4: Verifies that whatToShow=0xFFFFFFFF doesn't overflow and
+/// NodeIterator correctly iterates all node types.
+/// </summary>
+[Fact]
+public void Acid3_Phase4_NodeIterator_ShowAll_0xFFFFFFFF()
+{
+    var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<p>Hello</p>
+<div id=""out""></div>
+<script>
+var r = [];
+var iter = document.createNodeIterator(document.body, 0xFFFFFFFF);
+var n = iter.nextNode();
+r.push(n ? n.nodeName : 'null');
+n = iter.nextNode();
+r.push(n ? n.nodeName : 'null');
+document.getElementById('out').textContent = r.join(',');
+</script>
+</body></html>";
+    var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+    Assert.Contains("BODY,", result);
+}
+
+/// <summary>
+/// Phase 4: CSS selector backtracking — complex selector with descendant
+/// + adjacent sibling + child combinators.
+/// </summary>
+[Fact]
+public void Acid3_Phase4_Selector_Backtracking()
+{
+    var html = @"<!DOCTYPE html>
+<html><head><style>
+* { z-index: 0; position: absolute; }
+#d1 ~ div div + div > div { z-index: 1; }
+</style></head><body>
+<div id=""out""></div>
+<script>
+var d1 = document.createElement('div'); d1.id = 'd1'; document.body.appendChild(d1);
+var d2 = document.createElement('div'); document.body.appendChild(d2);
+var d3 = document.createElement('div'); document.body.appendChild(d3);
+var d31 = document.createElement('div'); d3.appendChild(d31);
+var d310 = document.createElement('div'); d31.appendChild(d310);
+var d311 = document.createElement('div'); d31.appendChild(d311);
+var d3111 = document.createElement('div'); d311.appendChild(d3111);
+var z = document.defaultView.getComputedStyle(d3111, '').zIndex;
+document.getElementById('out').textContent = 'z=' + z;
+</script>
+</body></html>";
+    var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+    Assert.Contains("z=1", result);
+}
+
+/// <summary>
+/// Phase 4: Implicit tbody creation and table cloning.
+/// </summary>
+[Fact]
+public void Acid3_Phase4_Implicit_Tbody_Cloning()
+{
+    var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<table><tr><td><p></tbody> </table>
+<div id=""out""></div>
+<script>
+var r = [];
+var t = document.getElementsByTagName('table')[0];
+r.push('tBodies=' + t.tBodies.length);
+var t2 = t.cloneNode(true);
+r.push('clone_tBodies=' + t2.tBodies.length);
+r.push('clone_children=' + t2.childNodes.length);
+r.push('firstChild=' + t2.tBodies[0].rows[0].cells[0].firstChild.tagName);
+r.push('lastChild_data=' + (t2.lastChild.data || 'none'));
+document.getElementById('out').textContent = r.join('|');
+</script>
+</body></html>";
+    var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+    Assert.Contains("tBodies=1", result);
+    Assert.Contains("clone_tBodies=1", result);
+    Assert.Contains("clone_children=2", result);
+    Assert.Contains("firstChild=P", result);
+}
+
+/// <summary>
+/// Phase 4: document.write inserts at script position, not end of body.
+/// </summary>
+[Fact]
+public void Acid3_Phase4_DocumentWrite_Insertion_Position()
+{
+    var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<script>document.write('<div id=""written"">W<\/div>');</script>
+<p id=""after"">After</p>
+<div id=""out""></div>
+<script>
+var r = [];
+var body = document.body;
+var written = document.getElementById('written');
+var after = document.getElementById('after');
+// written should come BEFORE after in body
+var wIdx = -1, aIdx = -1;
+for (var i = 0; i < body.childNodes.length; i++) {
+    if (body.childNodes[i] === written) wIdx = i;
+    if (body.childNodes[i] === after) aIdx = i;
+}
+r.push('written_before_after=' + (wIdx < aIdx));
+r.push('wIdx=' + wIdx + ',aIdx=' + aIdx);
+document.getElementById('out').textContent = r.join('|');
+</script>
+</body></html>";
+    var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+    Assert.Contains("written_before_after=true", result);
+}
+
+/// <summary>
+/// Phase 4: Validates Acid3 harness score is at least 81.
+/// </summary>
+[Fact]
+public void Acid3_Phase4_Score_At_Least_81()
+{
+    var acid3Path = System.IO.Path.GetFullPath(System.IO.Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
+    var html = System.IO.File.ReadAllText(acid3Path);
+    var url = new System.Uri(acid3Path).AbsoluteUri;
+    var result = CaptureService.ExecuteScriptsWithDom(html, url);
+
+    var scoreMatch = System.Text.RegularExpressions.Regex.Match(
+        result, @"id=""score""[^>]*>(\d+)<");
+    Assert.True(scoreMatch.Success, "Could not find score element");
+    var score = int.Parse(scoreMatch.Groups[1].Value);
+    Assert.True(score >= 81, $"Acid3 score should be >= 81, got {score}");
+    Console.WriteLine($"ACID3_PHASE4_SCORE={score}");
+}

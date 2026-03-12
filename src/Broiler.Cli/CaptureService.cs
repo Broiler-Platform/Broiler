@@ -524,12 +524,21 @@ public class CaptureService
         var bridge = new DomBridge();
         bridge.Attach(context, html, url);
 
-        // Execute regular and async scripts in document order
-        foreach (var script in scripts)
+        // Execute regular and async scripts in document order.
+        // Track the corresponding <script> DOM element index so that
+        // document.write() can insert content at the correct position.
+        var scriptElements = bridge.Elements
+            .Select((el, idx) => (el, idx))
+            .Where(t => string.Equals(t.el.TagName, "script", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        for (int si = 0; si < scripts.Count; si++)
         {
+            if (si < scriptElements.Count)
+                bridge.CurrentScriptIndex = scriptElements[si].idx;
             try
             {
-                context.Eval(script);
+                context.Eval(scripts[si]);
             }
             catch (Exception ex)
             {
@@ -537,6 +546,7 @@ public class CaptureService
                 RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScriptsWithDom", $"Script execution error: {ex.Message}", ex);
             }
         }
+        bridge.CurrentScriptIndex = -1;
 
         // Execute deferred scripts after all regular scripts (simulates end-of-parsing)
         foreach (var script in deferredScripts)

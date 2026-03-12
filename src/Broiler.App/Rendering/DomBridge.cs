@@ -35,6 +35,14 @@ public sealed partial class DomBridge
     private int _rafIdCounter;
     private readonly Dictionary<int, JSFunction> _rafCallbacks = new();
 
+    /// <summary>
+    /// Index into <see cref="_elements"/> of the <c>&lt;script&gt;</c> element
+    /// that is currently executing.  Used by <c>document.write()</c> to insert
+    /// content at the correct DOM position.  Set to &lt;0 when no script is
+    /// running.
+    /// </summary>
+    internal int CurrentScriptIndex { get; set; } = -1;
+
     // window.location fields
     private string _pageUrl = string.Empty;
     private string _pageProtocol = string.Empty;

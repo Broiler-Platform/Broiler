@@ -38,6 +38,9 @@ public sealed partial class DomBridge
             // Per DOM Level 2 Traversal spec, exceptions thrown by NodeFilter
             // callbacks must propagate to the caller — they must NOT be swallowed.
             var result = filterFn.InvokeFunction(new Arguments(filterFn, ToJSObject(el)));
+            // Handle boolean return: true → 1 (ACCEPT), false → 2 (REJECT)
+            if (result is JSBoolean)
+                return result.BooleanValue ? 1 : 2;
             return (int)result.DoubleValue;
         }
         return 1; // FILTER_ACCEPT
