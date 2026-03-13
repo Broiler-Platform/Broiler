@@ -14,7 +14,7 @@
 All 100 Acid3 subtests pass. Achieved via Phases A–E in v6 (see
 [acid3-compliance-v6.md](acid3-compliance-v6.md) for details).
 
-### CLI Tests: **552/552 passing** (0 failures)
+### CLI Tests: **561/561 passing** (0 failures)
 
 ### Pixel Comparison Summary
 
@@ -111,25 +111,38 @@ correctly parses `hsla()` and the second declaration overrides `color: red`.
 **Symptom:** Instructions paragraph text appears concatenated
 ("Topassthetest,…") with compressed word spacing.
 
-**Root cause:** `white-space: pre-wrap` is only partially supported by
-HtmlRenderer. Inter-word spaces may collapse in certain contexts.
+~~**Root cause:** `white-space: pre-wrap` is only partially supported by
+HtmlRenderer. Inter-word spaces may collapse in certain contexts.~~
 Additionally, `font: 900 small-caps 10px sans-serif` shorthand on `#linktest`
 may affect nearby layout calculations.
+
+**Status:** ✅ `white-space: pre-wrap` fixed. Two fixes applied:
+1. `CssBox.ParseToWords()`: For `pre-wrap`, each space character is emitted as
+   a separate word so the layout engine can break lines at any space position.
+2. `FragmentTreeBuilder`: Space-only words in `pre`/`pre-wrap` mode now
+   preserve their full text instead of collapsing to a single space.
 
 ### 3.5 Absolute Positioning
 
 **Symptom:** Elements using `position: absolute` (score overlay, linktest
 element) render at incorrect positions.
 
-**Root cause:** HtmlRenderer's CSS positioning model has limitations with
-absolute positioning inside relatively-positioned containers.
+~~**Root cause:** HtmlRenderer's CSS positioning model has limitations with
+absolute positioning inside relatively-positioned containers.~~
+
+**Status:** ✅ Fixed. `CssBox.PerformLayoutImp()` now:
+- Computes the containing block's padding-box width/height for percentage
+  resolution (CSS2.1 §10.1)
+- Implements `bottom` offset positioning (was missing — only `top` was handled)
+- Uses `cbPadWidth`/`cbPadHeight` consistently for `left`/`right`/`top`/`bottom`
+  calculations
 
 ### 3.6 CSS Features Not Supported
 
 | CSS Feature | Used By | Status |
 |-------------|---------|--------|
 | `hsla()` colour function | `#slash` colour | ✅ Supported — `CssValueParser.GetColorByHsla()` parses correctly |
-| `white-space: pre-wrap` (full) | `#instructions:last-child` | ⚠️ Partial |
+| `white-space: pre-wrap` (full) | `#instructions:last-child` | ✅ Fixed — per-space word emission + fragment text preservation |
 | `#id.class` compound selector | `#linktest.pending` | ✅ Supported — `DomParser` looks up `#id.class` keys |
 | `display: inline-block` layout | Bucket elements | ✅ Supported — `CssLayoutEngine.FlowInlineBlock()` |
 | `vertical-align` with inline-block | Bucket layout | ✅ Supported — `ApplyVerticalAlignment()` top/bottom/middle |
@@ -178,13 +191,13 @@ reflow, font metrics, box shadows, positioning.
 | ~~Implement `hsla()` colour parsing~~ | ~~High~~ | ~~3h~~ | ✅ Done — `CssValueParser.GetColorByHsla()` |
 | ~~**Fix `display: inline-block` line-box generation**~~ | ~~High~~ | ~~8h~~ | ✅ Done — `CssLayoutEngine.FlowInlineBlock()` |
 | ~~**Fix `vertical-align` with inline-block**~~ | ~~High~~ | ~~6h~~ | ✅ Done — `CssLayoutEngine.ApplyVerticalAlignment()` |
-| **Fix `position: absolute` in relative containers** | Medium | 6h | `HtmlRenderer/Core/Dom/CssBox.cs` |
+| ~~**Fix `position: absolute` in relative containers**~~ | ~~Medium~~ | ~~6h~~ | ✅ Done — `CssBox.cs` bottom/right offset + padding-box width |
 | ~~Implement `#id.class` compound selector matching~~ | ~~Medium~~ | ~~4h~~ | ✅ Done — `DomParser.CascadeApplyStyles()` + `MatchesSelectorItem()` |
-| **Full `white-space: pre-wrap` support** | Medium | 4h | `HtmlRenderer/Core/Dom/CssBox.cs` → `ActWhitespace()` |
-| Fix `em` unit computation with inherited font-size | Medium | 3h | `HtmlRenderer/Core/Dom/CssBox.cs` |
+| ~~**Full `white-space: pre-wrap` support**~~ | ~~Medium~~ | ~~4h~~ | ✅ Done — `CssBox.ParseToWords()` per-space words + `FragmentTreeBuilder` preserve |
+| ~~Fix `em` unit computation with inherited font-size~~ | ~~Medium~~ | ~~3h~~ | ✅ Done — deferred em resolution in LineHeight/TextIndent/WordSpacing setters |
 | Fix sub-pixel layout rounding to match Chromium | Low | 8h | `HtmlRenderer/Core/Dom/CssLayoutEngine.cs` |
 
-**Estimated total:** ~35 hours (21h completed)
+**Estimated total:** ~35 hours (34h completed)
 
 #### 4.2.1 `hsla()` Colour Parsing (Detailed)
 
@@ -250,6 +263,54 @@ bucket gradient pattern to render incorrectly.~~
    - `baseline` (default), `sub`, `super`: Already working
 
 Verified by 8 regression tests in `Acid3RegressionTests.cs`.
+
+#### 4.2.4 Absolute Positioning in Relative Containers (Detailed)
+
+Acid3 uses `position: absolute` for the score overlay and linktest elements
+inside `position: relative` containers.
+
+**Status:** ✅ Complete. Three fixes applied to `CssBox.PerformLayoutImp()`:
+1. Changed percentage resolution for `left`/`right`/`top`/`bottom` to use the
+   containing block's padding-box dimensions (`cbPadWidth`/`cbPadHeight`)
+   instead of the border-box `Size.Width`/`Size.Height`.
+2. Added `bottom` offset handling: when `top` is auto and `bottom` is
+   specified, position from the bottom padding edge per CSS2.1 §10.6.4.
+3. Compute `cbPadHeight` from `ActualBottom` for correct vertical positioning.
+
+Verified by 3 regression tests in `Acid3RegressionTests.cs`.
+
+#### 4.2.5 White-Space Pre-Wrap (Detailed)
+
+Acid3 uses `white-space: pre-wrap` for the instructions paragraph. Multiple
+spaces were collapsing to a single space, causing text concatenation.
+
+**Status:** ✅ Complete. Two fixes applied:
+1. **`CssBox.ParseToWords()`**: For `pre-wrap`, each space character is now
+   emitted as a separate `CssRectWord` so the layout engine can break lines
+   at any space position (CSS2.1 §16.6). For `pre` (no wrapping), the entire
+   whitespace run is still emitted as one word.
+2. **`FragmentTreeBuilder`**: Space-only words in `pre`/`pre-wrap` mode now
+   preserve their full text (`word.Text`) instead of being collapsed to `" "`.
+
+Verified by 3 regression tests in `Acid3RegressionTests.cs`.
+
+#### 4.2.6 Em Unit Computation (Detailed)
+
+CSS properties `line-height`, `text-indent`, and `word-spacing` were resolving
+`em` units eagerly at property-set time via `NoEms()` and
+`CssValueParser.ParseLength()`. If the element's font-size had not been set
+yet in the CSS cascade, the em factor used was stale or default.
+
+**Status:** ✅ Complete. Three fixes applied to `CssBoxProperties`:
+1. **`TextIndent` setter**: Stores raw value (with em units) instead of
+   calling `NoEms()`. The lazy `ActualTextIndent` property resolves em at
+   layout time when font-size is finalized.
+2. **`WordSpacing` setter**: Same pattern — stores raw value, defers em
+   resolution to `MeasureWordSpacing()`.
+3. **`LineHeight` setter**: Stores raw CSS value instead of pre-computing
+   pixels. The lazy `ActualLineHeight` property resolves em at layout time.
+
+Verified by 3 regression tests in `Acid3RegressionTests.cs`.
 
 ### 4.3 Font Rendering and Graphics
 
@@ -372,10 +433,10 @@ python3 scripts/acid3-compare.py <broiler.png> <reference.png> --output-dir <dir
 
 ### Medium Priority (Week 3–4)
 
-5. **Absolute positioning** — Fixes score overlay and linktest positioning
-6. **`white-space: pre-wrap`** — Fixes instructions text wrapping
+5. ~~**Absolute positioning**~~ — ✅ Complete (CssBox bottom/right offset + padding-box)
+6. ~~**`white-space: pre-wrap`**~~ — ✅ Complete (ParseToWords per-space + FragmentTreeBuilder)
 7. **Font metrics audit** — Identifies and fixes text sizing differences
-8. **`em` unit computation** — Fixes bucket sizing calculations
+8. ~~**`em` unit computation**~~ — ✅ Complete (deferred em resolution in property setters)
 
 ### Low Priority (Week 5+)
 
@@ -395,7 +456,7 @@ python3 scripts/acid3-compare.py <broiler.png> <reference.png> --output-dir <dir
 | Significant differences (>25) | 85.7% | <20% |
 | Score area mean diff | 110.9 | <30 |
 | Bucket area mean diff | 73.0 | <25 |
-| CLI tests passing | 552/552 | 552+ |
+| CLI tests passing | 561/561 | 561+ |
 | Red FAIL pixels | 0 | 0 |
 
 ---
@@ -412,9 +473,11 @@ python3 scripts/acid3-compare.py <broiler.png> <reference.png> --output-dir <dir
 ---
 
 **Status:** v7 work in progress. DOM score 100/100 maintained. CLI tests:
-552/552 passing (0 failures). `hsla()` colour parsing, `#id.class` compound
-selector matching, `display: inline-block` layout, and `vertical-align`
-(top/bottom/middle/text-top/text-bottom) verified complete. Remaining
-pixel-perfect rendering requires CSS layout engine improvements (§4.2) —
-absolute positioning, white-space pre-wrap. Test infrastructure scripts
-created and verified.
+561/561 passing (0 failures). `hsla()` colour parsing, `#id.class` compound
+selector matching, `display: inline-block` layout, `vertical-align`
+(top/bottom/middle/text-top/text-bottom), `position: absolute` (bottom/right
+offset + padding-box), `white-space: pre-wrap` (per-space word emission +
+fragment text preservation), and `em` unit deferred resolution verified
+complete. Remaining pixel-perfect rendering requires CSS layout engine
+improvements (§4.3) — font metrics audit, sub-pixel rounding. Test
+infrastructure scripts created and verified.

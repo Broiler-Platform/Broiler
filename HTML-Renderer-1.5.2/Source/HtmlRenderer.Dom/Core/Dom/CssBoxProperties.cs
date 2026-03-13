@@ -372,7 +372,10 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
                 return;
             }
 
-            _lineHeight = $"{CssValueParser.ParseLength(value, Size.Height, GetEmHeight(), CssConstants.Em)}px";
+            // CSS2.1 §10.8: For explicit length values (px, em, pt, etc.),
+            // store the raw value and let ActualLineHeight resolve it at
+            // layout time when the element's font-size is finalized.
+            _lineHeight = value;
         }
     }
 
@@ -381,7 +384,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string TextIndent
     {
         get { return _textIndent; }
-        set { _textIndent = NoEms(value); }
+        set { _textIndent = value; }
     }
 
     public string TextAlign { get; set; } = string.Empty;
@@ -392,7 +395,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string WordSpacing
     {
         get { return _wordSpacing; }
-        set { _wordSpacing = NoEms(value); }
+        set { _wordSpacing = value; }
     }
 
     public string WordBreak { get; set; } = "normal";

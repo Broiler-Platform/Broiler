@@ -253,7 +253,21 @@ internal class CssBox : CssBoxProperties, IDisposable
                 if (endIdx > startIdx)
                 {
                     if (preserveSpaces)
-                        Words.Add(new CssRectWord(this, HtmlUtils.DecodeHtml(_text.Slice(startIdx, endIdx - startIdx).ToString()), false, false));
+                    {
+                        // CSS2.1 §16.6: For pre-wrap, emit each space as a
+                        // separate word so the layout engine can break lines
+                        // at any space position.  For pre, emit the entire
+                        // whitespace run as one word (no wrapping allowed).
+                        if (WhiteSpace == CssConstants.PreWrap)
+                        {
+                            for (int i = startIdx; i < endIdx; i++)
+                                Words.Add(new CssRectWord(this, _text.Slice(i, 1).ToString(), false, false));
+                        }
+                        else
+                        {
+                            Words.Add(new CssRectWord(this, HtmlUtils.DecodeHtml(_text.Slice(startIdx, endIdx - startIdx).ToString()), false, false));
+                        }
+                    }
                 }
                 else
                 {
@@ -667,29 +681,42 @@ internal class CssBox : CssBoxProperties, IDisposable
                     if (Position == CssConstants.Absolute)
                     {
                         var cb = FindPositionedContainingBlock();
+                        // CSS2.1 §10.1: The containing block for an absolutely
+                        // positioned element is the padding-box of the nearest
+                        // positioned ancestor.
                         double cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
                         double cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
-                        double cbContentWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+                        double cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+                        double cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
 
                         float newX = Location.X, newY = Location.Y;
 
                         if (Left != null && Left != CssConstants.Auto)
                         {
-                            double cssLeft = CssValueParser.ParseLength(Left, cb.Size.Width, GetEmHeight());
+                            double cssLeft = CssValueParser.ParseLength(Left, cbPadWidth, GetEmHeight());
                             newX = (float)(cbPadLeft + cssLeft + ActualMarginLeft);
                         }
                         else if (Right != null && Right != CssConstants.Auto)
                         {
                             // CSS2.1 §10.3.7: When left is auto and right is
                             // specified, position from the right padding edge.
-                            double cssRight = CssValueParser.ParseLength(Right, cb.Size.Width, GetEmHeight());
-                            newX = (float)(cbPadLeft + cbContentWidth - cssRight - ActualMarginRight - Size.Width);
+                            double cssRight = CssValueParser.ParseLength(Right, cbPadWidth, GetEmHeight());
+                            newX = (float)(cbPadLeft + cbPadWidth - cssRight - ActualMarginRight - Size.Width);
                         }
 
                         if (Top != null && Top != CssConstants.Auto)
                         {
-                            double cssTop = CssValueParser.ParseLength(Top, cb.Size.Height, GetEmHeight());
+                            double cssTop = CssValueParser.ParseLength(Top, cbPadHeight, GetEmHeight());
                             newY = (float)(cbPadTop + cssTop + ActualMarginTop);
+                        }
+                        else if (Bottom != null && Bottom != CssConstants.Auto)
+                        {
+                            // CSS2.1 §10.6.4: When top is auto and bottom is
+                            // specified, position from the bottom padding edge.
+                            double cssBottom = CssValueParser.ParseLength(Bottom, cbPadHeight, GetEmHeight());
+                            double boxHeight = ActualBottom - Location.Y;
+                            if (boxHeight <= 0) boxHeight = Size.Height;
+                            newY = (float)(cbPadTop + cbPadHeight - cssBottom - ActualMarginBottom - boxHeight);
                         }
 
                         Location = new PointF(newX, newY);

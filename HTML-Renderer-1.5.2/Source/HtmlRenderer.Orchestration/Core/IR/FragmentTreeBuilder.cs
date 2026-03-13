@@ -118,7 +118,11 @@ internal static class FragmentTreeBuilder
                 Y = (float)word.Top,
                 Width = (float)word.Width,
                 Height = (float)word.Height,
-                Text = word.IsSpaces ? " " : word.Text,
+                Text = word.IsSpaces
+                    ? (word.OwnerBox.WhiteSpace is CssConstants.Pre or CssConstants.PreWrap
+                        ? word.Text   // CSS2.1 §16.6: preserve space sequences in pre/pre-wrap
+                        : " ")
+                    : word.Text,
                 Style = ownerStyle,
                 FontHandle = word.OwnerBox.ActualFont,
                 Selected = word.Selected,
