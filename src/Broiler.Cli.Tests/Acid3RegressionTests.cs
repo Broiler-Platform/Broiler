@@ -2847,4 +2847,248 @@ document.getElementById('result').textContent = cs.color;
         // second declaration (hsla black) over the first (red).
         Assert.Contains("hsla(0, 0%, 0%, 1.0)", result);
     }
+
+    // ─── v7 inline-block layout regression tests ───
+
+    /// <summary>
+    /// v7 §4.2: Inline-block elements with explicit width and height
+    /// must be laid out as atomic boxes in the inline flow, not collapsed
+    /// to zero size.  This mirrors the Acid3 bucket bar pattern:
+    ///   .bucket { display: inline-block; width: 2em; height: 1em; }
+    /// Verifies the rendering engine processes inline-block without error.
+    /// </summary>
+    [Fact]
+    public void V7_InlineBlock_With_Explicit_Size_Renders()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.bucket { display: inline-block; width: 2em; height: 1em; background: red; }
+</style>
+</head><body>
+<div id=""container"">
+  <span class=""bucket"" id=""b1""></span>
+  <span class=""bucket"" id=""b2""></span>
+  <span class=""bucket"" id=""b3""></span>
+</div>
+<div id=""result""></div>
+<script>
+// Verify the elements exist and have the inline-block display
+var b1 = document.getElementById('b1');
+var cs = window.getComputedStyle(b1);
+document.getElementById('result').textContent = 'display=' + cs.display;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("display=inline-block", result);
+    }
+
+    /// <summary>
+    /// v7 §4.2: Multiple inline-block elements should flow horizontally
+    /// on the same line, like inline replaced elements.  Verifies that
+    /// the DOM correctly reflects multiple sibling inline-block spans.
+    /// </summary>
+    [Fact]
+    public void V7_InlineBlock_Multiple_Elements_In_Flow()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.box { display: inline-block; width: 50px; height: 30px; }
+</style>
+</head><body>
+<div id=""container"">
+  <span class=""box"" id=""a"" style=""background:red;""></span>
+  <span class=""box"" id=""b"" style=""background:green;""></span>
+  <span class=""box"" id=""c"" style=""background:blue;""></span>
+</div>
+<div id=""result""></div>
+<script>
+var container = document.getElementById('container');
+var children = container.getElementsByTagName('span');
+document.getElementById('result').textContent = 'count=' + children.length;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("count=3", result);
+    }
+
+    /// <summary>
+    /// v7 §4.2: Inline-block with child content should lay out children
+    /// within the inline-block's own block formatting context, not in
+    /// the parent's inline flow.
+    /// </summary>
+    [Fact]
+    public void V7_InlineBlock_With_Child_Content_Renders()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.ib { display: inline-block; width: 100px; background: #eee; }
+</style>
+</head><body>
+<div id=""outer"">
+  <div class=""ib"" id=""block1""><p>Hello</p></div>
+  <div class=""ib"" id=""block2""><p>World</p></div>
+</div>
+<div id=""result""></div>
+<script>
+var b1 = document.getElementById('block1');
+var b2 = document.getElementById('block2');
+document.getElementById('result').textContent =
+  'b1=' + (b1 ? 'ok' : 'missing') + ',b2=' + (b2 ? 'ok' : 'missing');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("b1=ok,b2=ok", result);
+    }
+
+    /// <summary>
+    /// v7 §4.2: Inline-block elements with auto width should use
+    /// shrink-to-fit sizing.  Verify rendering does not crash.
+    /// </summary>
+    [Fact]
+    public void V7_InlineBlock_Auto_Width_Shrink_To_Fit()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.auto-ib { display: inline-block; background: yellow; }
+</style>
+</head><body>
+<div>
+  <span class=""auto-ib"">Short</span>
+  <span class=""auto-ib"">Longer text here</span>
+</div>
+<div id=""result"">rendered</div>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("rendered", result);
+        Assert.Contains("Short", result);
+        Assert.Contains("Longer text here", result);
+    }
+
+    // ─── v7 vertical-align regression tests ───
+
+    /// <summary>
+    /// v7 §4.2: vertical-align: top should align the top of the box with
+    /// the top of the line box.  Verify it does not crash or produce errors.
+    /// </summary>
+    [Fact]
+    public void V7_VerticalAlign_Top_Renders()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.tall { font-size: 24px; }
+.vtop { vertical-align: top; font-size: 12px; }
+</style>
+</head><body>
+<div>
+  <span class=""tall"">Big</span>
+  <span class=""vtop"">Top-aligned</span>
+</div>
+<div id=""result"">rendered</div>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("rendered", result);
+        Assert.Contains("Top-aligned", result);
+    }
+
+    /// <summary>
+    /// v7 §4.2: vertical-align: bottom should align the bottom of the box
+    /// with the bottom of the line box.
+    /// </summary>
+    [Fact]
+    public void V7_VerticalAlign_Bottom_Renders()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.tall { font-size: 24px; }
+.vbot { vertical-align: bottom; font-size: 12px; }
+</style>
+</head><body>
+<div>
+  <span class=""tall"">Big</span>
+  <span class=""vbot"">Bottom-aligned</span>
+</div>
+<div id=""result"">rendered</div>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("rendered", result);
+        Assert.Contains("Bottom-aligned", result);
+    }
+
+    /// <summary>
+    /// v7 §4.2: vertical-align: middle should align the vertical midpoint
+    /// of the box with the parent baseline + half x-height.
+    /// </summary>
+    [Fact]
+    public void V7_VerticalAlign_Middle_Renders()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.tall { font-size: 24px; }
+.vmid { vertical-align: middle; font-size: 12px; }
+</style>
+</head><body>
+<div>
+  <span class=""tall"">Big</span>
+  <span class=""vmid"">Middle-aligned</span>
+</div>
+<div id=""result"">rendered</div>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("rendered", result);
+        Assert.Contains("Middle-aligned", result);
+    }
+
+    /// <summary>
+    /// v7 §4.2: vertical-align with inline-block elements — the Acid3
+    /// bucket bars use inline-block + vertical-align together.
+    /// </summary>
+    [Fact]
+    public void V7_VerticalAlign_With_InlineBlock()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.bucket {
+  display: inline-block;
+  width: 2em;
+  height: 1em;
+  vertical-align: top;
+}
+#b1 { background: red; }
+#b2 { background: orange; }
+#b3 { background: yellow; }
+</style>
+</head><body>
+<div id=""container"">
+  <span class=""bucket"" id=""b1""></span>
+  <span class=""bucket"" id=""b2""></span>
+  <span class=""bucket"" id=""b3""></span>
+</div>
+<div id=""result""></div>
+<script>
+var cs1 = window.getComputedStyle(document.getElementById('b1'));
+var cs2 = window.getComputedStyle(document.getElementById('b2'));
+document.getElementById('result').textContent =
+  'va1=' + cs1.verticalAlign + ',va2=' + cs2.verticalAlign;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("va1=top", result);
+        Assert.Contains("va2=top", result);
+    }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using TheArtOfDev.HtmlRenderer.Adapters;
+using TheArtOfDev.HtmlRenderer.Core.Parse;
 using TheArtOfDev.HtmlRenderer.Core.Utils;
 using System.Drawing;
 
@@ -321,27 +322,39 @@ internal static class CssLayoutEngine
             }
             else
             {
-                // Block-level child inside inline flow: force a line break
-                // before and after the block (CSS2.1 §9.2.1.1 anonymous
-                // block boxes).  This ensures elements like <p> inside an
-                // inline <form> start on their own line.
-                if (b.IsBlock)
+                if (b.Display == CssConstants.InlineBlock)
                 {
-                    if (curx > startx || maxbottom > cury)
+                    // CSS 2.1 §10.3.9/§10.6.6: Inline-block boxes are laid
+                    // out as blocks internally, then placed atomically in
+                    // the inline flow (like replaced inline elements).
+                    FlowInlineBlock(g, blockbox, b, limitRight, linespacing, startx,
+                        leftspacing, rightspacing,
+                        ref line, ref curx, ref cury, ref maxRight, ref maxbottom);
+                }
+                else
+                {
+                    // Block-level child inside inline flow: force a line break
+                    // before and after the block (CSS2.1 §9.2.1.1 anonymous
+                    // block boxes).  This ensures elements like <p> inside an
+                    // inline <form> start on their own line.
+                    if (b.IsBlock)
+                    {
+                        if (curx > startx || maxbottom > cury)
+                        {
+                            cury = maxbottom;
+                            curx = startx;
+                            line = new CssLineBox(blockbox);
+                        }
+                    }
+
+                    FlowBox(g, blockbox, b, limitRight, linespacing, startx, ref line, ref curx, ref cury, ref maxRight, ref maxbottom);
+
+                    if (b.IsBlock)
                     {
                         cury = maxbottom;
                         curx = startx;
                         line = new CssLineBox(blockbox);
                     }
-                }
-
-                FlowBox(g, blockbox, b, limitRight, linespacing, startx, ref line, ref curx, ref cury, ref maxRight, ref maxbottom);
-
-                if (b.IsBlock)
-                {
-                    cury = maxbottom;
-                    curx = startx;
-                    line = new CssLineBox(blockbox);
                 }
             }
 
@@ -374,6 +387,129 @@ internal static class CssLayoutEngine
         }
 
         box.LastHostingLineBox = line;
+    }
+
+    /// <summary>
+    /// CSS 2.1 §10.3.9 / §10.6.6: Lay out an inline-block box as a
+    /// block internally, then place it atomically in the inline flow.
+    /// The inline-block establishes a new block formatting context for
+    /// its children while participating in the parent's inline
+    /// formatting context as a single opaque box.
+    /// </summary>
+    private static void FlowInlineBlock(RGraphics g, CssBox blockbox, CssBox b,
+        double limitRight, double linespacing, double startx,
+        double leftspacing, double rightspacing,
+        ref CssLineBox line, ref double curx, ref double cury,
+        ref double maxRight, ref double maxbottom)
+    {
+        // Compute the container content width for resolving percentage and
+        // em-based lengths on the inline-block.
+        double containerWidth = blockbox.Size.Width
+            - blockbox.ActualPaddingLeft - blockbox.ActualPaddingRight
+            - blockbox.ActualBorderLeftWidth - blockbox.ActualBorderRightWidth;
+
+        // --- Compute inline-block content width ---
+        double ibContentWidth;
+        if (b.Width != CssConstants.Auto && !string.IsNullOrEmpty(b.Width))
+        {
+            ibContentWidth = CssValueParser.ParseLength(b.Width, containerWidth, b.GetEmHeight());
+        }
+        else
+        {
+            // CSS 2.1 §10.3.9: auto-width inline-block uses shrink-to-fit.
+            // Measure descendant words for intrinsic width computation.
+            MeasureDescendantWords(g, b);
+            b.GetMinMaxWidth(out double prefMin, out double prefMax);
+            if (double.IsNaN(prefMin)) prefMin = 0;
+            if (double.IsNaN(prefMax)) prefMax = 0;
+            double available = Math.Max(0, limitRight - curx - rightspacing
+                - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
+                - b.ActualPaddingLeft - b.ActualPaddingRight);
+            ibContentWidth = Math.Min(Math.Max(prefMin, available), prefMax);
+        }
+
+        double ibBoxWidth = ibContentWidth
+            + b.ActualBorderLeftWidth + b.ActualBorderRightWidth
+            + b.ActualPaddingLeft + b.ActualPaddingRight;
+
+        // --- Line wrap check ---
+        // Total inline extent: margin-left + box-width + margin-right.
+        // curx already includes leftspacing (margin+border+padding), so the
+        // border-box left edge is at curx - border - padding.
+        double ibBorderLeft = curx - b.ActualBorderLeftWidth - b.ActualPaddingLeft;
+        double edgeBeforeBox = ibBorderLeft - b.ActualMarginLeft;
+        double totalExtent = b.ActualMarginLeft + ibBoxWidth + b.ActualMarginRight;
+        if (edgeBeforeBox + totalExtent > limitRight && edgeBeforeBox > startx)
+        {
+            curx = startx + leftspacing;
+            cury = maxbottom + linespacing;
+            line = new CssLineBox(blockbox);
+            ibBorderLeft = curx - b.ActualBorderLeftWidth - b.ActualPaddingLeft;
+        }
+
+        // --- Position and size the inline-block ---
+        b.Location = new PointF((float)ibBorderLeft, (float)cury);
+        b.Size = new SizeF((float)ibBoxWidth, 0);
+        b.ActualBottom = cury;
+
+        // --- Lay out children inside the inline-block ---
+        if (DomUtils.ContainsInlinesOnly(b))
+        {
+            CreateLineBoxes(g, b);
+        }
+        else if (b.Boxes.Count > 0)
+        {
+            foreach (var child in b.Boxes)
+                child.PerformLayout(g);
+
+            double childMaxBottom = b.Location.Y;
+            foreach (var child in b.Boxes)
+                childMaxBottom = Math.Max(childMaxBottom, child.ActualBottom);
+            b.ActualBottom = childMaxBottom;
+        }
+
+        // --- Compute height ---
+        double ibHeight;
+        if (b.Height != CssConstants.Auto && !string.IsNullOrEmpty(b.Height))
+        {
+            double cssHeight = CssValueParser.ParseLength(b.Height, containerWidth, b.GetEmHeight());
+            ibHeight = cssHeight
+                + b.ActualBorderTopWidth + b.ActualBorderBottomWidth
+                + b.ActualPaddingTop + b.ActualPaddingBottom;
+        }
+        else
+        {
+            ibHeight = Math.Max(0, b.ActualBottom - b.Location.Y);
+        }
+
+        b.ActualBottom = b.Location.Y + ibHeight;
+        b.Size = new SizeF(b.Size.Width, (float)ibHeight);
+
+        // --- Register the inline-block as a rectangle in the line box ---
+        line.Rectangles[b] = new RectangleF(b.Location.X, b.Location.Y,
+            (float)ibBoxWidth, (float)ibHeight);
+
+        // --- Advance flow position ---
+        // curx has leftspacing (margin+border+padding) already added.
+        // After the inline-block, set curx so that after rightspacing
+        // (margin+border+padding right) is added, we end up at the
+        // right margin edge of the box.
+        curx = ibBorderLeft + ibBoxWidth
+            - b.ActualBorderRightWidth - b.ActualPaddingRight;
+
+        maxRight = Math.Max(maxRight, ibBorderLeft + ibBoxWidth);
+        maxbottom = Math.Max(maxbottom, b.ActualBottom);
+    }
+
+    /// <summary>
+    /// Recursively measures word sizes on all descendant boxes so that
+    /// intrinsic width calculations are reliable.
+    /// </summary>
+    private static void MeasureDescendantWords(RGraphics g, CssBox box)
+    {
+        box.MeasureWordsSize(g);
+        foreach (var child in box.Boxes)
+            MeasureDescendantWords(g, child);
     }
 
     private static void AdjustAbsolutePosition(CssBox box, double left, double top)
@@ -519,6 +655,15 @@ internal static class CssLayoutEngine
         foreach (var box in lineBox.Rectangles.Keys)
             baseline = Math.Max(baseline, lineBox.Rectangles[box].Top);
 
+        // Compute line box top and bottom for top/bottom/text-top/text-bottom alignment.
+        double lineTop = double.MaxValue;
+        double lineBottom = double.MinValue;
+        foreach (var rect in lineBox.Rectangles.Values)
+        {
+            lineTop = Math.Min(lineTop, rect.Top);
+            lineBottom = Math.Max(lineBottom, rect.Bottom);
+        }
+
         var boxes = new List<CssBox>(lineBox.Rectangles.Keys);
         foreach (CssBox box in boxes)
         {
@@ -532,19 +677,32 @@ internal static class CssLayoutEngine
                     lineBox.SetBaseLine(g, box, baseline - lineBox.Rectangles[box].Height * .2f);
                     break;
                 case CssConstants.TextTop:
-
+                case CssConstants.Top:
+                    // CSS 2.1 §10.8.1: Align the top of the box with the
+                    // top of the line box (or parent font top for text-top).
+                    if (lineTop < double.MaxValue)
+                        lineBox.SetBaseLine(g, box, lineTop);
                     break;
                 case CssConstants.TextBottom:
-
-                    break;
-                case CssConstants.Top:
-
-                    break;
                 case CssConstants.Bottom:
-
+                    // CSS 2.1 §10.8.1: Align the bottom of the box with the
+                    // bottom of the line box (or parent font bottom for text-bottom).
+                    if (lineBottom > double.MinValue && lineBox.Rectangles.ContainsKey(box))
+                    {
+                        double boxHeight = lineBox.Rectangles[box].Height;
+                        lineBox.SetBaseLine(g, box, lineBottom - boxHeight);
+                    }
                     break;
                 case CssConstants.Middle:
-
+                    // CSS 2.1 §10.8.1: Align the vertical midpoint of the box
+                    // with the baseline plus half the x-height of the parent.
+                    if (lineBox.Rectangles.ContainsKey(box))
+                    {
+                        double boxHeight = lineBox.Rectangles[box].Height;
+                        double parentFontHeight = box.ParentBox?.ActualFont.Height ?? 0;
+                        double halfXHeight = parentFontHeight * 0.25;
+                        lineBox.SetBaseLine(g, box, baseline + halfXHeight - boxHeight / 2);
+                    }
                     break;
                 default:
                     //case: baseline

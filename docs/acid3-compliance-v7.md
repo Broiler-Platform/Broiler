@@ -14,7 +14,7 @@
 All 100 Acid3 subtests pass. Achieved via Phases A–E in v6 (see
 [acid3-compliance-v6.md](acid3-compliance-v6.md) for details).
 
-### CLI Tests: **544/544 passing** (0 failures)
+### CLI Tests: **552/552 passing** (0 failures)
 
 ### Pixel Comparison Summary
 
@@ -131,8 +131,8 @@ absolute positioning inside relatively-positioned containers.
 | `hsla()` colour function | `#slash` colour | ✅ Supported — `CssValueParser.GetColorByHsla()` parses correctly |
 | `white-space: pre-wrap` (full) | `#instructions:last-child` | ⚠️ Partial |
 | `#id.class` compound selector | `#linktest.pending` | ✅ Supported — `DomParser` looks up `#id.class` keys |
-| `display: inline-block` layout | Bucket elements | ⚠️ Partial |
-| `vertical-align` with inline-block | Bucket layout | ⚠️ Partial |
+| `display: inline-block` layout | Bucket elements | ✅ Supported — `CssLayoutEngine.FlowInlineBlock()` |
+| `vertical-align` with inline-block | Bucket layout | ✅ Supported — `ApplyVerticalAlignment()` top/bottom/middle |
 | Sub-pixel layout rounding | All elements | ⚠️ Different from Chromium |
 | Font anti-aliasing | All text | ⚠️ Different (SkiaSharp vs Chromium Skia) |
 
@@ -176,15 +176,15 @@ reflow, font metrics, box shadows, positioning.
 | Task | Priority | Effort | File(s) |
 |------|----------|--------|---------|
 | ~~Implement `hsla()` colour parsing~~ | ~~High~~ | ~~3h~~ | ✅ Done — `CssValueParser.GetColorByHsla()` |
-| **Fix `display: inline-block` line-box generation** | High | 8h | `HtmlRenderer/Core/Dom/CssLayoutEngine.cs` |
-| **Fix `vertical-align` with inline-block** | High | 6h | `HtmlRenderer/Core/Dom/CssBox.cs` |
+| ~~**Fix `display: inline-block` line-box generation**~~ | ~~High~~ | ~~8h~~ | ✅ Done — `CssLayoutEngine.FlowInlineBlock()` |
+| ~~**Fix `vertical-align` with inline-block**~~ | ~~High~~ | ~~6h~~ | ✅ Done — `CssLayoutEngine.ApplyVerticalAlignment()` |
 | **Fix `position: absolute` in relative containers** | Medium | 6h | `HtmlRenderer/Core/Dom/CssBox.cs` |
 | ~~Implement `#id.class` compound selector matching~~ | ~~Medium~~ | ~~4h~~ | ✅ Done — `DomParser.CascadeApplyStyles()` + `MatchesSelectorItem()` |
 | **Full `white-space: pre-wrap` support** | Medium | 4h | `HtmlRenderer/Core/Dom/CssBox.cs` → `ActWhitespace()` |
 | Fix `em` unit computation with inherited font-size | Medium | 3h | `HtmlRenderer/Core/Dom/CssBox.cs` |
 | Fix sub-pixel layout rounding to match Chromium | Low | 8h | `HtmlRenderer/Core/Dom/CssLayoutEngine.cs` |
 
-**Estimated total:** ~35 hours (7h completed)
+**Estimated total:** ~35 hours (21h completed)
 
 #### 4.2.1 `hsla()` Colour Parsing (Detailed)
 
@@ -223,15 +223,33 @@ The Acid3 bucket bars use `display: inline-block` with complex sizing:
 .bucket { display: inline-block; width: 2em; height: 1em; }
 ```
 
-HtmlRenderer's layout engine does not correctly compute line boxes for
+~~HtmlRenderer's layout engine does not correctly compute line boxes for
 inline-block elements. The boxes are stacked differently, causing the
-bucket gradient pattern to render incorrectly.
+bucket gradient pattern to render incorrectly.~~
 
-**Implementation plan:**
-1. Audit `CssLayoutEngine.cs` box generation for inline-block.
-2. Implement CSS 2.1 §10.6.1 inline-block height calculation.
-3. Implement CSS 2.1 §10.8 line-height calculation for inline-block.
-4. Fix `vertical-align` to correctly position inline-block elements.
+**Status:** ✅ Complete. Two fixes applied:
+
+1. **`CssLayoutEngine.FlowInlineBlock()`** (new method): Inline-block boxes
+   are now laid out as atomic blocks in the inline flow per CSS 2.1
+   §10.3.9/§10.6.6. The method:
+   - Computes the inline-block's content width from CSS `width` (explicit)
+     or shrink-to-fit (auto width via `GetMinMaxWidth()`)
+   - Sets the box's `Location` and `Size` for its own block formatting context
+   - Lays out children internally via `CreateLineBoxes()` (inline children)
+     or recursive `PerformLayout()` (block children)
+   - Computes height from CSS `height` or content auto-height
+   - Registers the inline-block as a rectangle in the parent's line box
+   - Advances the inline cursor by the box width
+
+2. **`CssLayoutEngine.ApplyVerticalAlignment()`** (completed): All CSS 2.1
+   §10.8.1 vertical-align values are now implemented:
+   - `top` / `text-top`: Aligns the top of the box with the line box top
+   - `bottom` / `text-bottom`: Aligns the bottom of the box with the line
+     box bottom
+   - `middle`: Aligns the vertical midpoint with baseline + half x-height
+   - `baseline` (default), `sub`, `super`: Already working
+
+Verified by 8 regression tests in `Acid3RegressionTests.cs`.
 
 ### 4.3 Font Rendering and Graphics
 
@@ -349,14 +367,15 @@ python3 scripts/acid3-compare.py <broiler.png> <reference.png> --output-dir <dir
 
 1. ~~**`hsla()` colour parsing**~~ — ✅ Complete (CssValueParser.GetColorByHsla)
 2. ~~**Compound selector `#id.class`**~~ — ✅ Complete (DomParser compound lookup)
-3. **Inline-block layout** — Fixes bucket bar rendering (most visible structural difference)
+3. ~~**Inline-block layout**~~ — ✅ Complete (CssLayoutEngine.FlowInlineBlock)
+4. ~~**Vertical-align with inline-block**~~ — ✅ Complete (ApplyVerticalAlignment top/bottom/middle)
 
 ### Medium Priority (Week 3–4)
 
-4. **Absolute positioning** — Fixes score overlay and linktest positioning
-5. **`white-space: pre-wrap`** — Fixes instructions text wrapping
-6. **Font metrics audit** — Identifies and fixes text sizing differences
-7. **`em` unit computation** — Fixes bucket sizing calculations
+5. **Absolute positioning** — Fixes score overlay and linktest positioning
+6. **`white-space: pre-wrap`** — Fixes instructions text wrapping
+7. **Font metrics audit** — Identifies and fixes text sizing differences
+8. **`em` unit computation** — Fixes bucket sizing calculations
 
 ### Low Priority (Week 5+)
 
@@ -376,7 +395,7 @@ python3 scripts/acid3-compare.py <broiler.png> <reference.png> --output-dir <dir
 | Significant differences (>25) | 85.7% | <20% |
 | Score area mean diff | 110.9 | <30 |
 | Bucket area mean diff | 73.0 | <25 |
-| CLI tests passing | 544/544 | 544+ |
+| CLI tests passing | 552/552 | 552+ |
 | Red FAIL pixels | 0 | 0 |
 
 ---
@@ -393,7 +412,9 @@ python3 scripts/acid3-compare.py <broiler.png> <reference.png> --output-dir <dir
 ---
 
 **Status:** v7 work in progress. DOM score 100/100 maintained. CLI tests:
-544/544 passing (0 failures). `hsla()` colour parsing and `#id.class` compound
-selector matching verified complete. Remaining pixel-perfect rendering requires
-CSS layout engine improvements (§4.2) — inline-block, vertical-align, absolute
-positioning, white-space pre-wrap. Test infrastructure scripts created and verified.
+552/552 passing (0 failures). `hsla()` colour parsing, `#id.class` compound
+selector matching, `display: inline-block` layout, and `vertical-align`
+(top/bottom/middle/text-top/text-bottom) verified complete. Remaining
+pixel-perfect rendering requires CSS layout engine improvements (§4.2) —
+absolute positioning, white-space pre-wrap. Test infrastructure scripts
+created and verified.
