@@ -100,6 +100,41 @@ internal sealed class DomParser
             {
                 var id = box.HtmlTag.TryGetAttribute("id");
                 AssignCssBlocks(box, cssData, "#" + id);
+                AssignCssBlocks(box, cssData, box.HtmlTag.Name + "#" + id);
+
+                // CSS2.1 §5.8.3: compound selectors like #id.class must
+                // match elements that have the given ID AND all specified classes.
+                if (box.HtmlTag.HasAttribute("class"))
+                {
+                    var classes = box.HtmlTag.TryGetAttribute("class");
+                    var idPrefix = "#" + id;
+                    var classWords = classes.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    var classList = new List<string>(classWords.Length);
+                    foreach (var w in classWords)
+                        classList.Add("." + w);
+
+                    foreach (var cls in classList)
+                    {
+                        AssignCssBlocks(box, cssData, idPrefix + cls);
+                        AssignCssBlocks(box, cssData, box.HtmlTag.Name + idPrefix + cls);
+                    }
+
+                    // Try all 2-class permutations — mirrors the existing
+                    // compound class logic in AssignClassCssBlocks which
+                    // handles order-independent matching (CSS selectors
+                    // #id.a.b and #id.b.a are equivalent).
+                    if (classList.Count >= 2)
+                    {
+                        for (int i = 0; i < classList.Count; i++)
+                        {
+                            for (int j = 0; j < classList.Count; j++)
+                            {
+                                if (i == j) continue;
+                                AssignCssBlocks(box, cssData, idPrefix + classList[i] + classList[j]);
+                            }
+                        }
+                    }
+                }
             }
 
             TranslateAttributes(box.HtmlTag, box);
@@ -337,6 +372,33 @@ internal sealed class DomParser
             var id = box.HtmlTag.TryGetAttribute("id");
             if (selectorClass.Equals("#" + id, StringComparison.InvariantCultureIgnoreCase))
                 return true;
+
+            // Compound #id.class selector: "#foo.bar" matches id="foo" class="bar"
+            var idStr = "#" + id;
+            if (selectorClass.StartsWith(idStr, StringComparison.InvariantCultureIgnoreCase))
+            {
+                var rest = selectorClass.Substring(idStr.Length);
+                if (rest.Length > 0 && rest[0] == '.')
+                {
+                    if (!box.HtmlTag.HasAttribute("class"))
+                        return false;
+
+                    var className = box.HtmlTag.TryGetAttribute("class");
+                    var classParts = rest.Split('.');
+                    var classWords = (" " + className + " ").ToLower();
+                    bool allMatch = true;
+                    for (int i = 1; i < classParts.Length; i++)
+                    {
+                        if (string.IsNullOrEmpty(classParts[i])) continue;
+                        if (!classWords.Contains(" " + classParts[i].ToLower() + " "))
+                        {
+                            allMatch = false;
+                            break;
+                        }
+                    }
+                    if (allMatch) return true;
+                }
+            }
         }
 
         return false;

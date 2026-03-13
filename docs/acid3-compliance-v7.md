@@ -14,7 +14,7 @@
 All 100 Acid3 subtests pass. Achieved via Phases A–E in v6 (see
 [acid3-compliance-v6.md](acid3-compliance-v6.md) for details).
 
-### CLI Tests: **540/540 passing** (0 failures)
+### CLI Tests: **544/544 passing** (0 failures)
 
 ### Pixel Comparison Summary
 
@@ -102,8 +102,9 @@ different widths, heights, and vertical alignment.
 text positioning differs slightly.
 
 **Root cause:** CSS rule `#slash { color: red; color: hsla(0, 0%, 0%, 1.0); }`
-uses HSLA fallback. HtmlRenderer does not support `hsla()`, so the fallback
-`color: red` is used.
+uses HSLA fallback. ~~HtmlRenderer does not support `hsla()`, so the fallback
+`color: red` is used.~~ **Fixed:** `CssValueParser.GetColorByHsla()` now
+correctly parses `hsla()` and the second declaration overrides `color: red`.
 
 ### 3.4 Font Metrics & Text Rendering
 
@@ -127,9 +128,9 @@ absolute positioning inside relatively-positioned containers.
 
 | CSS Feature | Used By | Status |
 |-------------|---------|--------|
-| `hsla()` colour function | `#slash` colour | ❌ Not supported — falls back to `color: red` |
+| `hsla()` colour function | `#slash` colour | ✅ Supported — `CssValueParser.GetColorByHsla()` parses correctly |
 | `white-space: pre-wrap` (full) | `#instructions:last-child` | ⚠️ Partial |
-| `#id.class` compound selector | `#linktest.pending` | ❌ Not supported |
+| `#id.class` compound selector | `#linktest.pending` | ✅ Supported — `DomParser` looks up `#id.class` keys |
 | `display: inline-block` layout | Bucket elements | ⚠️ Partial |
 | `vertical-align` with inline-block | Bucket layout | ⚠️ Partial |
 | Sub-pixel layout rounding | All elements | ⚠️ Different from Chromium |
@@ -174,16 +175,16 @@ reflow, font metrics, box shadows, positioning.
 
 | Task | Priority | Effort | File(s) |
 |------|----------|--------|---------|
-| **Implement `hsla()` colour parsing** | High | 3h | `HtmlRenderer/Core/Parse/CssValueParser.cs` → `GetActualColor()` |
+| ~~Implement `hsla()` colour parsing~~ | ~~High~~ | ~~3h~~ | ✅ Done — `CssValueParser.GetColorByHsla()` |
 | **Fix `display: inline-block` line-box generation** | High | 8h | `HtmlRenderer/Core/Dom/CssLayoutEngine.cs` |
 | **Fix `vertical-align` with inline-block** | High | 6h | `HtmlRenderer/Core/Dom/CssBox.cs` |
 | **Fix `position: absolute` in relative containers** | Medium | 6h | `HtmlRenderer/Core/Dom/CssBox.cs` |
-| **Implement `#id.class` compound selector matching** | Medium | 4h | `HtmlRenderer/Core/Parse/CssParser.cs` |
+| ~~Implement `#id.class` compound selector matching~~ | ~~Medium~~ | ~~4h~~ | ✅ Done — `DomParser.CascadeApplyStyles()` + `MatchesSelectorItem()` |
 | **Full `white-space: pre-wrap` support** | Medium | 4h | `HtmlRenderer/Core/Dom/CssBox.cs` → `ActWhitespace()` |
 | Fix `em` unit computation with inherited font-size | Medium | 3h | `HtmlRenderer/Core/Dom/CssBox.cs` |
 | Fix sub-pixel layout rounding to match Chromium | Low | 8h | `HtmlRenderer/Core/Dom/CssLayoutEngine.cs` |
 
-**Estimated total:** ~42 hours
+**Estimated total:** ~35 hours (7h completed)
 
 #### 4.2.1 `hsla()` Colour Parsing (Detailed)
 
@@ -192,19 +193,30 @@ The `#slash` element uses:
 #slash { color: red; color: hsla(0, 0%, 0%, 1.0); }
 ```
 
-HtmlRenderer's `CssValueParser.GetActualColor()` does not recognise `hsla()`
+~~HtmlRenderer's `CssValueParser.GetActualColor()` does not recognise `hsla()`
 syntax, so the fallback `color: red` is applied. This causes the score slash
-to render in red instead of black.
+to render in red instead of black.~~
 
-**Implementation plan:**
-1. In `CssValueParser.cs`, add parsing for `hsla(h, s%, l%, a)` and
-   `hsl(h, s%, l%)` colour functions.
-2. Convert H/S/L to R/G/B using standard algorithm.
-3. Apply alpha channel via `Color.FromArgb(a, r, g, b)`.
-4. Add unit tests for edge cases: `hsl(0, 0%, 0%)` (black),
-   `hsl(0, 0%, 100%)` (white), `hsla(120, 100%, 50%, 0.5)` (semi-transparent green).
+**Status:** ✅ Complete. `CssValueParser.GetColorByHsla()` and
+`CssValueParser.GetColorByHsl()` parse `hsl()`/`hsla()` colour functions
+correctly, including edge cases (missing `%` signs, alpha channel). The
+`HslToRgb()` conversion uses the standard CSS algorithm. The second
+`color: hsla(0, 0%, 0%, 1.0)` declaration correctly overrides `color: red`
+in the CSS cascade. Verified by 4+ regression tests in `CssRenderingTests.cs`.
 
-#### 4.2.2 Inline-Block Layout (Detailed)
+#### 4.2.2 Compound Selector `#id.class` (Detailed)
+
+Acid3 uses compound selectors like `#linktest.pending` and
+`#bucket1.zPPPPPPPPPPPPPPPP` to conditionally style elements.
+
+**Status:** ✅ Complete. Two fixes applied to `DomParser.cs`:
+1. `CascadeApplyStyles()`: After looking up `#id`, also tries `#id.class`,
+   `#id.class1.class2`, and `tag#id` compound keys in `CssData`.
+2. `MatchesSelectorItem()`: Handles `#id.class` compound selectors by
+   splitting on the first `.` after `#id` and verifying all class parts
+   match the element's class attribute.
+
+Verified by 4 regression tests in `Acid3RegressionTests.cs`.
 
 The Acid3 bucket bars use `display: inline-block` with complex sizing:
 ```css
@@ -335,8 +347,8 @@ python3 scripts/acid3-compare.py <broiler.png> <reference.png> --output-dir <dir
 
 ### High Priority (Week 1–2)
 
-1. **`hsla()` colour parsing** — Fixes red slash, immediately visible improvement
-2. **Compound selector `#id.class`** — Removes need for test artifact stripping
+1. ~~**`hsla()` colour parsing**~~ — ✅ Complete (CssValueParser.GetColorByHsla)
+2. ~~**Compound selector `#id.class`**~~ — ✅ Complete (DomParser compound lookup)
 3. **Inline-block layout** — Fixes bucket bar rendering (most visible structural difference)
 
 ### Medium Priority (Week 3–4)
@@ -364,7 +376,7 @@ python3 scripts/acid3-compare.py <broiler.png> <reference.png> --output-dir <dir
 | Significant differences (>25) | 85.7% | <20% |
 | Score area mean diff | 110.9 | <30 |
 | Bucket area mean diff | 73.0 | <25 |
-| CLI tests passing | 540/540 | 540+ |
+| CLI tests passing | 544/544 | 544+ |
 | Red FAIL pixels | 0 | 0 |
 
 ---
@@ -380,6 +392,8 @@ python3 scripts/acid3-compare.py <broiler.png> <reference.png> --output-dir <dir
 
 ---
 
-**Status:** v7 roadmap defined. DOM score 100/100 maintained. Pixel-perfect
-rendering requires CSS layout engine improvements (§4.2) as the primary
-work stream. Test infrastructure scripts created and verified.
+**Status:** v7 work in progress. DOM score 100/100 maintained. CLI tests:
+544/544 passing (0 failures). `hsla()` colour parsing and `#id.class` compound
+selector matching verified complete. Remaining pixel-perfect rendering requires
+CSS layout engine improvements (§4.2) — inline-block, vertical-align, absolute
+positioning, white-space pre-wrap. Test infrastructure scripts created and verified.

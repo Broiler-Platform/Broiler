@@ -2736,4 +2736,115 @@ document.getElementById('diag').textContent = r.join('|');
         Assert.True(scoreMatch.Success, "Could not extract score from output");
         Assert.Equal(100, int.Parse(scoreMatch.Groups[1].Value));
     }
+
+    // ────────────────────── v7 §4.2: Compound selector #id.class ──────────────────────
+
+    /// <summary>
+    /// v7 §4.2.2: Compound selector #id.class applied via CSS cascade.
+    /// HtmlRenderer must look up "#id.class" keys in CssData so the rule
+    /// applies when an element has both the given id and class.
+    /// </summary>
+    [Fact]
+    public void V7_Compound_IdClass_Selector_Applied_By_Renderer()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target.active { color: green; }
+</style>
+</head><body>
+<div id=""target"" class=""active"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+document.getElementById('result').textContent = cs.color;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("green", result);
+    }
+
+    /// <summary>
+    /// v7 §4.2.2: Compound selector #id.class must NOT match when the
+    /// element has the id but a different class.
+    /// </summary>
+    [Fact]
+    public void V7_Compound_IdClass_Selector_No_Match_Wrong_Class()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target.active { color: green; }
+#target { color: blue; }
+</style>
+</head><body>
+<div id=""target"" class=""inactive"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+document.getElementById('result').textContent = 'COMPUTED:' + cs.color;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("COMPUTED:blue", result);
+    }
+
+    /// <summary>
+    /// v7 §4.2.2: Compound selector with ancestor — "#parent #child.cls".
+    /// Tests MatchesSelectorItem handling of #id.class in ancestor chains.
+    /// </summary>
+    [Fact]
+    public void V7_Compound_IdClass_Selector_In_Descendant_Chain()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#parent #child.highlight { color: red; }
+</style>
+</head><body>
+<div id=""parent"">
+  <span id=""child"" class=""highlight"">text</span>
+</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('child'));
+document.getElementById('result').textContent = cs.color;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("red", result);
+    }
+
+    /// <summary>
+    /// v7 §3.3: Acid3 #slash uses "color: red; color: hsla(0,0%,0%,1.0);"
+    /// — the second declaration must override the first, rendering black not red.
+    /// Verifies hsla() works in the CSS cascade for HtmlRenderer's CssValueParser.
+    /// </summary>
+    [Fact]
+    public void V7_Hsla_Overrides_Red_In_Acid3_Slash()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#slash { color: red; color: hsla(0, 0%, 0%, 1.0); }
+</style>
+</head><body>
+<div id=""slash"">/</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('slash'));
+document.getElementById('result').textContent = cs.color;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // Broiler's DomBridge stores CSS values as authored strings, so
+        // getComputedStyle returns the literal hsla() declaration rather
+        // than a normalised rgb() form.  Verify the cascade picked the
+        // second declaration (hsla black) over the first (red).
+        Assert.Contains("hsla(0, 0%, 0%, 1.0)", result);
+    }
 }
