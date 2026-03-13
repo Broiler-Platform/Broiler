@@ -1107,34 +1107,35 @@ fails at 36.
 **Test 5** (`expectation 14 failed`): Same pattern with `TreeWalker` using `FILTER_SKIP`.
 Currently passes expectations 1–13, fails at 14.
 
-**Root cause:** The NodeIterator/TreeWalker tree-walk visits nodes in a slightly different
-order than the browser because Broiler's HTML parser produces extra implicit elements
-(e.g., implicit `<tbody>` in tables, whitespace text node merging differences).
+**Root cause (identified during implementation):** The `_elements` flat list (used by
+`document.getElementsByTagName`, `document.links`, `document.forms`) appended elements
+from `document.write()` at the END rather than inserting them at the correct
+document-order position (after the executing script).  This caused collection indices
+like `document.getElementsByTagName('p')[7]` and `document.links[1]` to return the
+wrong elements when compared against NodeIterator/TreeWalker results (which correctly
+traverse the DOM tree in document order).
 
-**Implementation plan:**
+**Implementation (completed):**
 
-- [ ] **Step 1: Audit DOM tree structure** (~1 hour)
-  - Dump the full document-order node list from Broiler's DOM tree for acid3.html
-  - Compare against the expected sequence from the Acid3 test assertions (lines 377–456)
-  - Identify where the divergence starts at expectation 36
+- [x] **Step 1: Audit DOM tree structure** (~1 hour)
+  - Created diagnostic tests to trace NodeIterator walk and identity checks
+  - Confirmed DOM tree structure is correct (implicit `<tbody>`, table parsing, etc.)
+  - Identified that `_elements` ordering was the root cause, not parser issues
 
-- [ ] **Step 2: Fix text node identity stability** (~1 hour)
-  - File: `src/Broiler.App/Rendering/DomBridge.cs`, `ToJSObject()` (line 17)
-  - Ensure text nodes are cached in `_jsObjectCache` using reference equality
-  - Verify no code path creates duplicate `DomElement` instances for the same text node
+- [x] **Step 2: Fix `_elements` ordering in document.write handler** (~1 hour)
+  - File: `src/Broiler.App/Rendering/DomBridge.Registration.cs`, lines 355–370
+  - Changed `_elements.AddRange(allEls)` → `_elements.InsertRange(CurrentScriptIndex + 1, contentEls)`
+  - Filter out wrapper html/body elements from fragment parse
+  - File: `src/Broiler.App/Rendering/DomBridge.Utilities.cs`
+  - Added `CollectAllDescendantsFlat()` helper for collecting inserted element trees
 
-- [ ] **Step 3: Fix document-order traversal** (~2 hours)
-  - File: `src/Broiler.App/Rendering/DomBridge.Traversal.cs`, `CollectDescendants()`
-  - Verify the traversal visits all node types (elements + text) in document order
-  - Verify implicit parser-generated nodes (e.g., `<tbody>`) match browser behavior
-  - File: `src/Broiler.App/Rendering/HtmlTreeBuilder.cs`
-  - Audit implicit element insertion (tables, forms) to match HTML5 spec
+- [x] **Step 3: Regression tests** (~1 hour)
+  - `PhaseD_DocumentWrite_Elements_In_Document_Order` — verifies `document.links`,
+    `document.getElementsByTagName`, and NodeIterator return elements in consistent
+    document order after `document.write()` insertion
+  - `PhaseD_Acid3_Score_At_Least_97` — verifies Acid3 score is 97+
 
-- [ ] **Step 4: Regression tests** (~1 hour)
-  - `PhaseD_NodeIterator_Full_Tree_Identity` — mirror test 4's exact assertion sequence
-  - `PhaseD_TreeWalker_Full_Tree_Identity` — mirror test 5's exact assertion sequence
-
-**Score impact:** 95 → **97/100** (+2 points)
+**Score impact:** 95 → **97/100** (+2 points)  ✅ Complete
 
 ---
 
@@ -1203,10 +1204,10 @@ linktest anchor created in test 48.  The iframe `onload` handler that removes th
 | A | Visual fixes (stripping) | 90 | Done | ✅ Complete |
 | B | Tests 46, 64 + YantraJS for-in | 94 | Done | ✅ Complete |
 | C | Test 0 (CSS comment parsing) | 95 | Done | ✅ Complete |
-| D | Tests 4, 5 (DOM traversal identity) | 97 | ~6 hours | 🔲 Planned |
+| D | Tests 4, 5 (DOM traversal identity) | 97 | Done | ✅ Complete |
 | E | Tests 69, 72, 80 (sub-doc loading) | 100 | ~10 hours | 🔲 Planned |
 
-**Total remaining effort: ~16 hours to reach 100/100.**
+**Total remaining effort: ~10 hours to reach 100/100.**
 
 ### 7.6 Revalidation Iteration Log
 
@@ -1220,3 +1221,7 @@ linktest anchor created in test 48.  The iframe `onload` handler that removes th
 | 6 | 2026-03-13 | Test 0 fix investigation | Unit tests pass; full harness needs investigation | 94/100 |
 | 7 | 2026-03-13 | Test 4 identity investigation | Root cause identified; no quick fix | 94/100 |
 | 8 | 2026-03-13 | CSS comment parsing fix (`ParseAndApplyCssRules`) | Test 0 passes — `#instructions:last-child` rule now parsed correctly | **95/100** |
+| 9 | 2026-03-13 | Phase D: Fix `_elements` ordering for `document.write()` | Tests 4 & 5 pass — `_elements.InsertRange` at correct position | **97/100** |
+| 10 | 2026-03-13 | Full CLI test suite revalidation (534 tests) | All pass (0 failures) | 97/100 |
+| 11 | 2026-03-13 | Revalidation of Phase A–C tasks | All confirmed ✅ | 97/100 |
+| 12 | 2026-03-13 | Phase D regression tests | `PhaseD_DocumentWrite_Elements_In_Document_Order` + `PhaseD_Acid3_Score_At_Least_97` pass | 97/100 |

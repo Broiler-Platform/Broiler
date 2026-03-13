@@ -2478,4 +2478,85 @@ document.getElementById('result').textContent = r.join('|');
         // No linktest text should remain
         Assert.DoesNotContain("YOU SHOULD NOT SEE THIS AT ALL", result);
     }
+
+    /// <summary>
+    /// Phase D regression: document.write elements must be registered in
+    /// document order so that getElementsByTagName, document.links, etc.
+    /// return elements in the same order as DOM tree traversal (NodeIterator).
+    /// </summary>
+    [Fact]
+    public void PhaseD_DocumentWrite_Elements_In_Document_Order()
+    {
+        // map/area is inserted BEFORE instructions by document.write()
+        // So document.links should be: [area, a] (area first in doc order)
+        var html = @"<!DOCTYPE html><html><head><title>T</title></head><body>
+<p id=""result""><span id=""score"">0</span></p>
+<script>document.write('<map name=""""><area href="""" shape=""rect"" coords=""2,2,4,4"" alt=""x""><form action="""" name=""form""><input type=HIDDEN><\/form><table><tr><td><p><\/table><\/map>');</script>
+<p id=""instructions"">Text <a href=""reference.html"">link</a>.</p>
+<div id=""diag""></div>
+<script>
+var r = [];
+// p elements: result, p(in td), instructions — document.write's p(td) must come BEFORE instructions
+var ps = document.getElementsByTagName('p');
+r.push('p_count=' + ps.length);
+var foundTdP = false;
+var foundInst = false;
+for (var pi = 0; pi < ps.length; pi++) {
+    if (ps[pi].id === 'instructions') foundInst = true;
+    if (!ps[pi].id && ps[pi].parentNode && ps[pi].parentNode.tagName === 'TD') {
+        foundTdP = true;
+        // This p(td) must come BEFORE instructions in the list
+        r.push('tdP_before_inst=' + !foundInst);
+    }
+}
+// links: [area, a] — area (from document.write) comes before a (in instructions) in doc order
+r.push('links_len=' + document.links.length);
+r.push('link0=' + document.links[0].tagName);
+r.push('link1=' + document.links[1].tagName);
+// Identity with NodeIterator
+var allButWS = function(node) { return (node.nodeType == 3 && node.data.match(/^\s*$/)) ? 2 : 1; };
+var iter = document.createNodeIterator(document.body, 0x01 | 0x04 | 0x08 | 0x10 | 0x20, allButWS, true);
+var n, foundIterA = null;
+while ((n = iter.nextNode()) !== null) {
+    if (n.tagName === 'A') { foundIterA = n; break; }
+}
+r.push('iter_a_eq_link1=' + (foundIterA === document.links[1]));
+r.push('forms_named=' + (document.forms.form ? document.forms.form.tagName : 'null'));
+document.getElementById('diag').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        var match = System.Text.RegularExpressions.Regex.Match(result, @"id=""diag""[^>]*>([^<]+)<");
+        Assert.True(match.Success, "Diagnostic div not found");
+        var diag = match.Groups[1].Value;
+        Console.WriteLine("Phase D diag: " + diag);
+        // Area must be links[0], A must be links[1]
+        Assert.Contains("link0=AREA", diag);
+        Assert.Contains("link1=A", diag);
+        // NodeIterator's A must be === document.links[1]
+        Assert.Contains("iter_a_eq_link1=true", diag);
+        // p(td) must come before instructions in getElementsByTagName order
+        Assert.Contains("tdP_before_inst=true", diag);
+        // Named form access must work
+        Assert.Contains("forms_named=FORM", diag);
+    }
+
+    /// <summary>
+    /// Phase D regression: Full Acid3 score should be at least 97.
+    /// </summary>
+    [Fact]
+    public void PhaseD_Acid3_Score_At_Least_97()
+    {
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
+        Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
+        var html = File.ReadAllText(acid3Path);
+        var url = "http://acid3.acidtests.org/acid3.html";
+        var result = CaptureService.ExecuteScriptsWithDom(html, url);
+        var scoreMatch = System.Text.RegularExpressions.Regex.Match(result, @"id=""score""[^>]*>(\d+)<");
+        Assert.True(scoreMatch.Success, "Could not find score element in output");
+        var score = int.Parse(scoreMatch.Groups[1].Value);
+        Console.WriteLine($"ACID3_SCORE={score}");
+        Assert.True(score >= 97, $"Acid3 score: {score} (expected >= 97, Phase D should achieve 97+)");
+    }
 }

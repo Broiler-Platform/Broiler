@@ -511,6 +511,20 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Collects all descendants of <paramref name="parent"/> into <paramref name="result"/>
+    /// in depth-first pre-order (without skipping sub-document roots).
+    /// Used by <c>document.write()</c> to register parsed elements.
+    /// </summary>
+    private static void CollectAllDescendantsFlat(DomElement parent, List<DomElement> result)
+    {
+        foreach (var child in parent.Children)
+        {
+            result.Add(child);
+            CollectAllDescendantsFlat(child, result);
+        }
+    }
+
+    /// <summary>
     /// Collects descendant elements matching a tag name in tree order (depth-first).
     /// </summary>
     private static void CollectDescendantsByTag(DomElement root, string tagName, List<JSValue> results, DomBridge bridge)
