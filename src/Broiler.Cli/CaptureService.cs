@@ -196,51 +196,6 @@ public class CaptureService
         @"\s+",
         RegexOptions.Compiled);
 
-    /// <summary>
-    /// Matches an <c>&lt;iframe&gt;…&lt;/iframe&gt;</c> element, capturing the
-    /// tag attributes and any inline fallback content.  Used to strip the
-    /// fallback content that HtmlRenderer would otherwise render because it
-    /// cannot load the external <c>src</c> resource.
-    /// </summary>
-    private static readonly Regex IframeContentPattern = new(
-        @"<iframe(?<attrs>[^>]*)>[\s\S]*?</iframe>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    /// <summary>
-    /// Matches an <c>&lt;object&gt;…&lt;/object&gt;</c> element (including
-    /// nested objects) and captures the entire block.  Used to strip the
-    /// fallback content that HtmlRenderer renders when it cannot load the
-    /// external <c>data</c> resource.
-    /// </summary>
-    private static readonly Regex ObjectContentPattern = new(
-        @"<object(?<attrs>[^>]*)>[\s\S]*?</object>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    /// <summary>
-    /// Matches elements whose text content should be invisible according to
-    /// their CSS styling but that HtmlRenderer renders visibly because it
-    /// does not support the required compound selectors or CSS features.
-    /// Currently strips:
-    /// <list type="bullet">
-    ///   <item><description>
-    ///     <c>&lt;a id="linktest" class="pending"&gt;…&lt;/a&gt;</c> — CSS
-    ///     rule <c>#linktest.pending { color: white }</c> makes this invisible
-    ///     on white backgrounds, but HtmlRenderer does not match the compound
-    ///     <c>#id.class</c> selector.
-    ///   </description></item>
-    ///   <item><description>
-    ///     <c>&lt;div id=" "&gt;FAIL&lt;/div&gt;</c> — a test artifact div
-    ///     that only exists when the test score is below 100/100.
-    ///   </description></item>
-    /// </list>
-    /// </summary>
-    private static readonly Regex LinktestPattern = new(
-        @"<a\s[^>]*\bid=""linktest""[^>]*>[\s\S]*?</a>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    private static readonly Regex FailDivPattern = new(
-        @"<div\s+id="" "">FAIL</div>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
     /// Captures website content from the specified URL, processes it using
@@ -380,32 +335,10 @@ public class CaptureService
         // is present before rendering.
         html = ExecuteScriptsWithDom(html, options.Url);
 
-        // Strip <script> tags from the post-execution HTML — scripts have already
-        // been executed and their DOM modifications serialised.  Leaving them in
-        // is harmless for most pages (HtmlRenderer hides them via CSS) but
-        // removing them keeps the rendered HTML clean and avoids edge-cases where
-        // the content bleeds through.
-        html = StripScriptTags(html);
-
-        // Strip data-URI background images from CSS.  HtmlRenderer does not
-        // reliably parse the complex 'background' shorthand that combines
-        // url(), repeat, position and colour in one declaration, which can
-        // cause the image to tile across the page.  Since these images are
-        // decorative they can be safely removed for capture rendering.
-        html = StripCssDataUriBackgrounds(html);
-
-        // Strip fallback content from <iframe> and <object> elements.
-        // HtmlRenderer cannot load external resources referenced by these
-        // elements, so it renders the inline fallback content instead.
-        // For Acid3 (and similar test pages) this causes "FAIL" text and
-        // other hidden content to bleed through.
-        html = StripIframeContent(html);
-        html = StripObjectContent(html);
-
-        // Strip test-harness elements whose CSS-hidden text leaks through
-        // because HtmlRenderer does not match the compound selectors
-        // (e.g. #linktest.pending { color: white }) that would hide them.
-        html = StripHiddenTestArtifacts(html);
+        // Apply the shared post-processing pipeline (strip scripts,
+        // data-URI backgrounds, iframe/object fallback content, and
+        // hidden test artifacts) so that HtmlRenderer produces clean output.
+        html = HtmlPostProcessor.Process(html);
 
         var format = options.ImageFormat == ImageFormat.Jpeg
             ? SKEncodedImageFormat.Jpeg
@@ -686,116 +619,52 @@ public class CaptureService
     private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
 
     /// <summary>
-    /// Removes all <c>&lt;script&gt;…&lt;/script&gt;</c> blocks from the HTML.
-    /// Called after scripts have been executed so the resulting HTML only
-    /// contains the visual content for rendering.
+    /// Removes all <c>&lt;script&gt;</c> tags from the HTML.
+    /// Delegates to <see cref="HtmlPostProcessor.StripScriptTags"/>.
     /// </summary>
     internal static string StripScriptTags(string html)
     {
-        return AnyScriptPattern.Replace(html, string.Empty);
+        return HtmlPostProcessor.StripScriptTags(html);
     }
 
     /// <summary>
-    /// Regex matching a CSS <c>background</c> (or <c>background-image</c>)
-    /// declaration that contains a <c>data:</c> URI.  The entire declaration
-    /// (up to and including the trailing semicolon) is captured so it can be
-    /// removed before rendering.
-    /// </summary>
-    private static readonly Regex CssDataUriBgPattern = new(
-        @"background(?:-image)?\s*:[^;]*url\s*\(\s*[""']?data:[^)]+\)[^;]*;",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    /// <summary>
     /// Strips CSS <c>background</c> declarations that reference
-    /// <c>data:</c> URI images.  HtmlRenderer does not reliably parse
-    /// the complex <c>background</c> shorthand when it contains a URL,
-    /// repeat mode, position and colour all in one value, which can
-    /// cause the image to tile and obscure page content.
+    /// <c>data:</c> URI images.
+    /// Delegates to <see cref="HtmlPostProcessor.StripCssDataUriBackgrounds"/>.
     /// </summary>
     internal static string StripCssDataUriBackgrounds(string html)
     {
-        return CssDataUriBgPattern.Replace(html, string.Empty);
+        return HtmlPostProcessor.StripCssDataUriBackgrounds(html);
     }
 
     /// <summary>
     /// Replaces the fallback content of every <c>&lt;iframe&gt;</c> element
-    /// with an empty body.  HtmlRenderer cannot load external resources
-    /// referenced by <c>src</c>, so it renders the inline fallback content
-    /// instead — causing hidden text (e.g. "FAIL") to bleed through.
+    /// with an empty body.
+    /// Delegates to <see cref="HtmlPostProcessor.StripIframeContent"/>.
     /// </summary>
     internal static string StripIframeContent(string html)
     {
-        return IframeContentPattern.Replace(html, m =>
-            $"<iframe{m.Groups["attrs"].Value}></iframe>");
+        return HtmlPostProcessor.StripIframeContent(html);
     }
 
     /// <summary>
     /// Replaces the fallback content of every <c>&lt;object&gt;</c> element
-    /// with an empty body.  HtmlRenderer cannot load external data resources,
-    /// so it renders the inline fallback content (which may include "FAIL"
-    /// text or nested objects) instead.
+    /// with an empty body.
+    /// Delegates to <see cref="HtmlPostProcessor.StripObjectContent"/>.
     /// </summary>
     internal static string StripObjectContent(string html)
     {
-        // Object elements may be nested; we collapse from the inside out
-        // by applying the pattern repeatedly until no nested objects remain.
-        string result = html;
-        string previous;
-        do
-        {
-            previous = result;
-            result = ObjectContentPattern.Replace(result, m =>
-                $"<object{m.Groups["attrs"].Value}></object>");
-        } while (result != previous);
-        return result;
+        return HtmlPostProcessor.StripObjectContent(html);
     }
 
     /// <summary>
     /// Strips test-harness elements whose text content should be invisible
-    /// according to CSS but that HtmlRenderer renders visibly because it
-    /// does not fully support the required compound selectors.  See the
-    /// <see cref="LinktestPattern"/> and <see cref="FailDivPattern"/>
-    /// field docs for details.
+    /// according to CSS but that HtmlRenderer renders visibly.
+    /// Delegates to <see cref="HtmlPostProcessor.StripHiddenTestArtifacts"/>.
     /// </summary>
     internal static string StripHiddenTestArtifacts(string html)
     {
-        // Remove the visible text from the linktest anchor (keep the element
-        // so DOM structure is preserved, just empty its body).
-        html = LinktestPattern.Replace(html, m =>
-        {
-            // Reconstruct opening tag by finding the closing ">" that ends
-            // the opening <a …> tag.  We skip over '>' characters that appear
-            // inside quoted attribute values to avoid truncating the tag.
-            var full = m.Value;
-            int tagEnd = -1;
-            bool inQuote = false;
-            char quoteChar = '\0';
-            for (int i = 0; i < full.Length; i++)
-            {
-                char c = full[i];
-                if (inQuote)
-                {
-                    if (c == quoteChar) inQuote = false;
-                }
-                else if (c == '"' || c == '\'')
-                {
-                    inQuote = true;
-                    quoteChar = c;
-                }
-                else if (c == '>')
-                {
-                    tagEnd = i;
-                    break;
-                }
-            }
-            if (tagEnd < 0) return full;
-            return full[..(tagEnd + 1)] + "</a>";
-        });
-
-        // Remove the <div id=" ">FAIL</div> test artifact entirely.
-        html = FailDivPattern.Replace(html, string.Empty);
-
-        return html;
+        return HtmlPostProcessor.StripHiddenTestArtifacts(html);
     }
 
     /// <summary>

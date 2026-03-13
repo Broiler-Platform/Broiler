@@ -131,12 +131,23 @@ public partial class MainWindow : Window
             var (normalisedUrl, content) = await _pipeline.LoadPageAsync(url);
             UrlTextBox.Text = normalisedUrl;
 
-            // Render the original HTML, then execute any inline scripts
-            // and re-render with the post-execution DOM if scripts modified it.
-            HtmlPanel.Text = content.Html;
+            // Render the original HTML (post-processed to strip elements
+            // that HtmlRenderer cannot handle), then execute any inline
+            // scripts and re-render with the post-execution DOM if scripts
+            // modified it.
+            HtmlPanel.Text = HtmlPostProcessor.Process(content.Html);
             var updatedHtml = _pipeline.ExecuteScripts(content);
             if (updatedHtml != null)
                 HtmlPanel.Text = updatedHtml;
+
+            // Scroll to fragment anchor if the URL contains one (e.g. "#top"
+            // for Acid2).  This mirrors the CLI's RenderAtAnchor behaviour.
+            if (Uri.TryCreate(normalisedUrl, UriKind.Absolute, out var uri)
+                && !string.IsNullOrEmpty(uri.Fragment) && uri.Fragment.Length > 1)
+            {
+                var elementId = uri.Fragment[1..];
+                HtmlPanel.ScrollToElement(elementId);
+            }
 
             StatusText.Text = "Done";
         }
