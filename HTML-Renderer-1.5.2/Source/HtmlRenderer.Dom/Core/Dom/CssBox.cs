@@ -260,8 +260,13 @@ internal class CssBox : CssBoxProperties, IDisposable
                         // whitespace run as one word (no wrapping allowed).
                         if (WhiteSpace == CssConstants.PreWrap)
                         {
+                            // Cache " " string to avoid per-char allocation
+                            const string singleSpace = " ";
                             for (int i = startIdx; i < endIdx; i++)
-                                Words.Add(new CssRectWord(this, _text.Slice(i, 1).ToString(), false, false));
+                            {
+                                var ch = _text.Slice(i, 1).ToString();
+                                Words.Add(new CssRectWord(this, ch == " " ? singleSpace : ch, false, false));
+                            }
                         }
                         else
                         {
@@ -715,6 +720,10 @@ internal class CssBox : CssBoxProperties, IDisposable
                             // specified, position from the bottom padding edge.
                             double cssBottom = CssValueParser.ParseLength(Bottom, cbPadHeight, GetEmHeight());
                             double boxHeight = ActualBottom - Location.Y;
+                            // boxHeight may be zero when the box position was
+                            // just initialised and children have not yet been
+                            // laid out.  Fall back to Size.Height which reflects
+                            // any explicit CSS height already applied.
                             if (boxHeight <= 0) boxHeight = Size.Height;
                             newY = (float)(cbPadTop + cbPadHeight - cssBottom - ActualMarginBottom - boxHeight);
                         }
