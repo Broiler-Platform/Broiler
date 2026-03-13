@@ -530,7 +530,7 @@ public class CaptureService
     /// guaranteed order. All pending timers and rAF callbacks are flushed
     /// before serialisation.
     /// </summary>
-    internal static string ExecuteScriptsWithDom(string html, string url)
+    internal static string ExecuteScriptsWithDom(string html, string url, string? localResourceBasePath = null)
     {
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
@@ -582,6 +582,10 @@ public class CaptureService
         using var context = new JSContext();
         var bridge = new DomBridge();
         bridge.Attach(context, html, url);
+
+        // Set local base path for sub-resource resolution (e.g. iframe src)
+        if (!string.IsNullOrEmpty(localResourceBasePath))
+            bridge.SetLocalBasePath(localResourceBasePath);
 
         // Execute regular and async scripts in document order.
         // Track the corresponding <script> DOM element index so that

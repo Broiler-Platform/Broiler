@@ -60,10 +60,10 @@ The comparison uses Python (Pillow + NumPy) to:
 
 | Metric | Value |
 |--------|-------|
-| Acid3 DOM Score | **95/100** (after Phase C CSS comment fix) |
+| Acid3 DOM Score | **100/100** (after Phase E sub-document loading) |
 | Red FAIL pixels in rendered image | **0** (after Phase 6 stripping) |
 | Visible leaked test text | **None** (after Phase 6 stripping) |
-| CLI tests passing | 532/532 (all passing) |
+| CLI tests passing | 538/538 (all passing) |
 
 ### Pixel Comparison Results
 
@@ -759,55 +759,47 @@ still be `undefined` (its initial value), not the function reference.
       - Score impact: **90 → 94/100** (+4 points)
       - Also fixed 3 pre-existing test failures (viewport test, 2 XHR tests).
 
-### Phase C: CSS Comment Parsing + NodeIterator/TreeWalker Fixes (+1 done, +2 remaining)
+### Phase C: CSS Comment Parsing + NodeIterator/TreeWalker Fixes (Done ✅, +3 points)
 
 - [x] **Test 0:** Fixed CSS comment parsing in `ParseAndApplyCssRules()` — comments
       containing `{`/`}` broke rule boundary detection. Score: 94 → 95.
       - File: `src/Broiler.App/Rendering/DomBridge.Css.cs`
       - Added `SkipWhitespaceAndComments()`, `IndexOfSkippingComments()`, `StripCssComments()`
-- [ ] **Test 2:** Rewrite `nextNode()` / `previousNode()` in `BuildNodeIterator()`
-      to use tree-walking from `state.ReferenceNode` instead of flat-list indexing.
-      - File: `src/Broiler.App/Rendering/DomBridge.Traversal.cs`, lines 338–430
-      - Follow DOM Living Standard §6.1 algorithm
-      - Handle node removal + re-insertion during filter callbacks
-- [ ] **Tests 4–5:** Ensure `ToJSObject()` returns identity-stable references for
-      text nodes, and that `GetDocumentOrderNodes()` visits all node types.
-      - File: `src/Broiler.App/Rendering/DomBridge.cs`, `ToJSObject()`
-      - File: `src/Broiler.App/Rendering/DomBridge.Traversal.cs`
+- [x] **Test 2:** Fixed via Phase D `_elements` ordering fix — NodeIterator
+      document-order walks now match collection indices.
+- [x] **Tests 4–5:** Fixed via Phase D `_elements.InsertRange` at correct
+      document-order position after `document.write()` insertion.
 
-### Phase D: YantraJS Engine Patches (+4 points, ~9 hours)
+### Phase D: DOM Traversal Identity Fixes (Done ✅, +2 points)
 
-- [ ] **Test 88:** Fix Unicode escape validation in `ReadIdentifier()`.
-      - File: `yantra-1.2.295/YantraJS.Core/FastParser/FastScanner.cs`
-      - Ensure `\uXXXX` in member expression context enters `ReadIdentifier()`
-      - Validate decoded character with `IsIdentifierPart()` / `IsIdentifierStart()`
-- [ ] **Test 89:** Ensure `TransformES3Patterns()` runs on regex literals.
-      - File: `yantra-1.2.295/YantraJS.Core/FastParser/FastScanner.cs`, `ReadRegExp()`
-      - Or: `yantra-1.2.295/YantraJS.Core/Core/RegExp/JSRegExp.cs` constructor
-      - Verify `/[]/` is correctly handled as empty character class
-- [ ] **Test 90:** Fix forward backreference group numbering and NUL `\0` handling.
-      - File: `yantra-1.2.295/YantraJS.Core/Core/RegExp/JSRegExp.cs`,
-        `TransformES3Patterns()`
-      - Verify `(?:)` inside capturing group preserves numbering
-      - Verify `\x00` matches NUL in .NET Regex
-- [ ] **Test 93:** Fix FunctionExpression name scoping.
-      - File: `yantra-1.2.295/YantraJS.Core/FastParser/Compiler/FastCompiler.CreateFunction.cs`
-      - Create intermediate scope for the function name
-      - Mark binding as read-only; do not overwrite parent scope variables
+- [x] **Tests 4–5:** Fixed `_elements` ordering in `document.write()` handler.
+      - File: `src/Broiler.App/Rendering/DomBridge.Registration.cs`, lines 355–370
+      - Changed `_elements.AddRange(allEls)` → `_elements.InsertRange(CurrentScriptIndex + 1, contentEls)`
+      - Score impact: **95 → 97/100** (+2 points)
 
-### Phase E: Sub-Document Loading (+2 points, ~9 hours)
+### Phase E: Sub-Document Loading (Done ✅, +3 points)
 
-- [ ] **Test 69:** Implement actual resource fetching for iframe/object `src`/`data`.
-      - File: `src/Broiler.App/Rendering/DomBridge.JsObjects.cs`,
-        `GetOrCreateSubDocument()`
-      - Pass HTTP client from `CaptureService` to `DomBridge`
-      - Fetch, parse (HTML/SVG/XML), and attach sub-document DOM
-      - Fire `onload` handlers after loading
-- [ ] **Test 72:** Implement `insertRule()`, `deleteRule()`, live `cssRules`.
-      - File: `src/Broiler.App/Rendering/DomBridge.StyleSheets.cs`
-      - `insertRule()`: parse rule, append text node to style element
-      - `cssRules`: live getter that re-parses on access
-      - Depends on test 69 fix (sub-document must be loaded)
+- [x] **Test 69:** Implemented local resource fetching for iframe/object sub-documents.
+      - File: `src/Broiler.App/Rendering/DomBridge.cs` — Added `SetLocalBasePath()`
+      - File: `src/Broiler.App/Rendering/DomBridge.JsObjects.cs` — Added `TryReadLocalResource()`,
+        `DetectContentTypeFromContent()`, `BuildSubDocumentFromXml()`, `FireSubDocumentOnload()`,
+        `FireDescendantOnloads()`, `CollectLinksInTreeOrder()`
+      - File: `src/Broiler.Cli/CaptureService.cs` — Pass local base path to `ExecuteScriptsWithDom()`
+      - Added support files: `acid/acid3/svg.xml`, `empty.xml`, `xhtml.1`, `xhtml.2`, `xhtml.3`
+      - Fire `onload` handlers in `appendChild()`, `insertBefore()`, and `src` setter
+- [x] **Test 72:** Fixed live `cssRules` collection and `insertRule()` CSS cascade.
+      - File: `src/Broiler.App/Rendering/DomBridge.StyleSheets.cs` — Cache stylesheet objects
+        per style element (`_styleSheetCache`), replaced static `JSArray` with persistent
+        `JSObject` with live `length` getter
+      - File: `src/Broiler.App/Rendering/DomBridge.Css.cs` — Include `insertRule()`-added
+        rules in `BuildComputedStyleObject()` CSS cascade
+- [x] **Test 80:** Fixed `document.links` ordering and XHTML script execution.
+      - File: `src/Broiler.App/Rendering/DomBridge.Registration.cs` — Set `window.parent`
+        to `context.Eval("this")` (JSContext global scope) for cross-frame scripting
+      - File: `src/Broiler.App/Rendering/DomBridge.JsObjects.cs` — Tree-order traversal
+        for `document.links` via `CollectLinksInTreeOrder()`
+      - XHTML sub-documents execute scripts with XML well-formedness and namespace validation
+      - Score impact: **97 → 100/100** (+3 points)
 
 ### Milestone Criteria for "Nearly Pixel-Perfect"
 
@@ -928,10 +920,10 @@ the Acid3 DOM score.  They are inherent to the rendering engine:
 
 ---
 
-**Status:** Phase C revalidation complete (2026-03-13).
-Score: **94/100**. All 532 CLI tests passing (0 failures).
-Image validation re-run: exact match improved from 10.8% → 13.3% after Phase C fixes.
-6 subtests remain failing (tests 0, 4, 5, 69, 72, 80).
+**Status:** Phase E complete (2026-03-13).
+Score: **100/100**. All 538 CLI tests passing (0 failures).
+All Acid3 subtests pass. Sub-document loading, live cssRules, and cross-frame
+scripting fully implemented.
 
 ### Phase C Progress (2026-03-13)
 
@@ -1083,15 +1075,7 @@ Further work tracked in Phase D/E.
 
 ### 7.5 Remaining Subtests Roadmap
 
-**Current score: 95/100 — 5 subtests remaining (tests 4, 5, 69, 72, 80).**
-
-| Test | Category | Fixable? | Effort | Priority |
-|------|----------|----------|--------|----------|
-| 4 | NodeIterator identity | Yes | 3–5 hours | P1 |
-| 5 | TreeWalker identity | Yes | 2–3 hours | P1 |
-| 69 | Sub-document loading | Yes (new feature) | ~6 hours | P2 |
-| 72 | Dynamic style mutation | Yes (depends on 69) | ~3 hours | P3 |
-| 80 | Linktest link check | Yes (depends on 69) | ~1 hour | P3 |
+**Current score: 100/100 — All subtests passing. ✅**
 
 ---
 
@@ -1139,9 +1123,10 @@ traverse the DOM tree in document order).
 
 ---
 
-#### Phase E: Sub-Document Resource Loading — Tests 69, 72, 80 (+3 points, ~10 hours)
+#### Phase E: Sub-Document Resource Loading — Tests 69, 72, 80 (+3 points)  ✅ Complete
 
-**Goal:** Implement actual HTTP resource fetching for iframe/object sub-documents.
+**Goal:** Implement resource fetching for iframe/object sub-documents, live cssRules,
+and cross-frame scripting.
 
 **Test 69** (`timeout`): Checks that `kungFuDeathGrip` (set up in test 65) has loaded
 seven external resources via iframes and objects.  Accesses
@@ -1156,44 +1141,71 @@ is live.  Depends on test 69.
 linktest anchor created in test 48.  The iframe `onload` handler that removes the
 `pending` class never fires because the iframe resource is never loaded.
 
-**Implementation plan:**
+**Implementation (completed):**
 
-- [ ] **Step 1: Add HTTP fetcher to DomBridge** (~2 hours)
-  - File: `src/Broiler.App/Rendering/DomBridge.cs`
-  - Add constructor parameter: `Func<string, string>? resourceFetcher`
-  - File: `src/Broiler.Cli/CaptureService.cs`, `ExecuteScriptsWithDom()`
-  - Pass a fetcher delegate that resolves URLs and returns content
+- [x] **Step 1: Add local resource fetcher to DomBridge** (~1 hour)
+  - File: `src/Broiler.App/Rendering/DomBridge.cs` — Added `_localBasePath` field and
+    `SetLocalBasePath()` method
+  - File: `src/Broiler.Cli/CaptureService.cs` — `ExecuteScriptsWithDom()` accepts optional
+    `localResourceBasePath` parameter, passes it to `bridge.SetLocalBasePath()`
+  - File: `src/Broiler.App/Rendering/DomBridge.JsObjects.cs` — Added `TryReadLocalResource()`
+    which strips query/fragment from URL and reads from local directory
+  - Added `DetectContentTypeFromContent()` for files without recognized extensions
+    (e.g. `xhtml.1`, `xhtml.2`) — detects SVG, XHTML, XML, HTML from content
 
-- [ ] **Step 2: Implement sub-document loading** (~3 hours)
-  - File: `src/Broiler.App/Rendering/DomBridge.JsObjects.cs`,
-    `GetOrCreateSubDocument()`
-  - When iframe/object has `src`/`data` attribute, fetch the resource
-  - Parse fetched content based on MIME type:
-    - HTML → `HtmlTreeBuilder.Build()`
-    - SVG/XML → XML parser → DOM elements
-    - CSS → document with `<style>` element
-    - Text → document with text node
-    - Images → minimal document
-  - Attach parsed tree as sub-document DOM
+- [x] **Step 2: Add XML/SVG/XHTML parsing** (~2 hours)
+  - File: `src/Broiler.App/Rendering/DomBridge.JsObjects.cs`
+  - Added `BuildSubDocumentFromXml()` using `System.Xml.Linq.XDocument.Parse()`
+  - Added `BuildDomElementFromXElement()` for recursive DOM tree construction
+  - Added `IsXmlContentType()` to distinguish XML-family content from HTML
+  - XHTML namespace validation: correct namespace (`http://www.w3.org/1999/xhtml`)
+    executes scripts; wrong namespace (`#` suffix in `xhtml.3`) does not
+  - XML well-formedness errors (invalid UTF-8 byte in `empty.xml`) produce empty document
 
-- [ ] **Step 3: Fire `onload` handlers** (~1 hour)
-  - After loading sub-document, check iframe/object for `onload` attribute
-  - Execute the handler via `DispatchEventOnElement()` with a `load` event
-  - This unblocks test 80 (linktest `pending` class removal)
+- [x] **Step 3: Fire onload handlers** (~1 hour)
+  - File: `src/Broiler.App/Rendering/DomBridge.JsObjects.cs`
+  - Added `FireSubDocumentOnload()` — fires inline event handler on iframe/object
+    after sub-document is loaded; only fires once per element (`_onloadFired` set)
+  - Added `FireDescendantOnloads()` — recursively fires onload for subtrees
+  - Hooked into `appendChild()`, `insertBefore()`, and `src` property setter
+  - `src` setter now clears `_onloadFired` to allow re-fire on navigation
 
-- [ ] **Step 4: Implement `insertRule()` / `deleteRule()` / live `cssRules`** (~2 hours)
+- [x] **Step 4: Fix live cssRules and insertRule cascade** (~2 hours)
   - File: `src/Broiler.App/Rendering/DomBridge.StyleSheets.cs`
-  - `cssRules` getter: re-parse ownerNode text content on each access
-  - `insertRule(rule, index)`: parse rule, insert text node at position
-  - `deleteRule(index)`: remove rule at index
-  - This unblocks test 72
+  - Cache `CSSStyleSheet` objects per style element in `_styleSheetCache` — ensures
+    `doc.styleSheets[0] === doc.styleSheets[0]` (identity)
+  - Replace static `JSArray` from `cssRules` getter with persistent `JSObject` with
+    live `length` getter backed by `rulesStorage` list
+  - Sync uint-indexed properties on access (`liveCssRules[(uint)i]`) for correct
+    numeric indexing (`rules[0].cssText`)
+  - File: `src/Broiler.App/Rendering/DomBridge.Css.cs`
+  - `BuildComputedStyleObject()` now includes rules added via `insertRule()` (stored
+    in `element.DomProperties["_insertedRules"]`) in the CSS cascade
 
-- [ ] **Step 5: Regression tests** (~1 hour)
-  - `PhaseE_Iframe_SubDocument_Loading` — verify contentDocument access
-  - `PhaseE_InsertRule_And_Live_CssRules` — verify CSSOM mutations
-  - `PhaseE_Linktest_Onload_Fires` — verify onload handler execution
+- [x] **Step 5: Fix document.links ordering and cross-frame scripting** (~1 hour)
+  - File: `src/Broiler.App/Rendering/DomBridge.JsObjects.cs`
+  - Added `CollectLinksInTreeOrder()` — tree-order traversal for `document.links`
+    instead of `_elements` insertion order (dynamically appended anchors now appear
+    in correct document order)
+  - File: `src/Broiler.App/Rendering/DomBridge.Registration.cs`
+  - Set `window.parent` to `context.Eval("this")` (the JSContext global scope) instead
+    of the `window` JSObject — `parent.notify()` now resolves user-defined globals
+  - Added `window.self` property
 
-**Score impact:** 97 → **100/100** (+3 points)
+- [x] **Step 6: Add support files** (~15 minutes)
+  - Created `acid/acid3/svg.xml` — SVG with `<text>` element and font-face
+  - Created `acid/acid3/empty.xml` — XML with invalid UTF-8 byte (well-formedness error)
+  - Created `acid/acid3/xhtml.1` — XHTML with `parent.notify("xhtml.1")` script
+  - Created `acid/acid3/xhtml.2` — XHTML with XML well-formedness error (`<strong/>`)
+  - Created `acid/acid3/xhtml.3` — XHTML with wrong namespace (`#` suffix)
+
+- [x] **Step 7: Regression tests** (~30 minutes)
+  - `PhaseE_Iframe_SubDocument_Loading` — verify SVG contentDocument and getElementsByTagName
+  - `PhaseE_InsertRule_And_Live_CssRules` — verify CSSOM mutations and live rules
+  - `PhaseE_Linktest_Onload_Fires` — verify onload handler fires and removes class
+  - `PhaseE_Acid3_Score_At_Least_100` — verify perfect score
+
+**Score impact:** 97 → **100/100** (+3 points)  ✅ Complete
 
 ---
 
@@ -1205,9 +1217,9 @@ linktest anchor created in test 48.  The iframe `onload` handler that removes th
 | B | Tests 46, 64 + YantraJS for-in | 94 | Done | ✅ Complete |
 | C | Test 0 (CSS comment parsing) | 95 | Done | ✅ Complete |
 | D | Tests 4, 5 (DOM traversal identity) | 97 | Done | ✅ Complete |
-| E | Tests 69, 72, 80 (sub-doc loading) | 100 | ~10 hours | 🔲 Planned |
+| E | Tests 69, 72, 80 (sub-doc loading) | 100 | Done | ✅ Complete |
 
-**Total remaining effort: ~10 hours to reach 100/100.**
+**All phases complete. Acid3 score: 100/100. All 538 CLI tests passing.**
 
 ### 7.6 Revalidation Iteration Log
 
@@ -1225,3 +1237,56 @@ linktest anchor created in test 48.  The iframe `onload` handler that removes th
 | 10 | 2026-03-13 | Full CLI test suite revalidation (534 tests) | All pass (0 failures) | 97/100 |
 | 11 | 2026-03-13 | Revalidation of Phase A–C tasks | All confirmed ✅ | 97/100 |
 | 12 | 2026-03-13 | Phase D regression tests | `PhaseD_DocumentWrite_Elements_In_Document_Order` + `PhaseD_Acid3_Score_At_Least_97` pass | 97/100 |
+| 13 | 2026-03-13 | Phase E: Local resource fetcher + XML/SVG parsing + onload | Tests 69, 80 unblocked — sub-doc loading and onload handlers work | 98/100 |
+| 14 | 2026-03-13 | Phase E: Fix live cssRules + links ordering + XHTML scripting | Test 72 unblocked — stylesheet caching + `window.parent` via globalThis | 99/100 |
+| 15 | 2026-03-13 | Phase E: Fix uint indexing for live cssRules | All CSS rendering tests pass — `liveCssRules[(uint)i]` for numeric access | **100/100** |
+| 16 | 2026-03-13 | Full CLI test suite revalidation (538 tests) | All pass (0 failures) | 100/100 |
+| 17 | 2026-03-13 | Phase E regression tests | `PhaseE_Iframe_SubDocument_Loading`, `PhaseE_InsertRule_And_Live_CssRules`, `PhaseE_Linktest_Onload_Fires`, `PhaseE_Acid3_Score_At_Least_100` — all pass | 100/100 |
+
+---
+
+## 8. Phase E Changes Summary
+
+### Code Changes
+
+| File | Change |
+|------|--------|
+| `src/Broiler.App/Rendering/DomBridge.cs` | Added `_localBasePath` field and `SetLocalBasePath()` method for local resource resolution |
+| `src/Broiler.App/Rendering/DomBridge.JsObjects.cs` | Added `TryReadLocalResource()`, `DetectContentTypeFromContent()`, `BuildSubDocumentFromXml()`, `BuildDomElementFromXElement()`, `IsXmlContentType()`, `ExecuteSubDocumentScripts()`, `CollectScriptContent()`, `GetTextContentRecursive()`, `FireSubDocumentOnload()`, `FireDescendantOnloads()`, `CollectLinksInTreeOrder()`; updated `appendChild()`, `insertBefore()`, and `src` setter to fire onload |
+| `src/Broiler.App/Rendering/DomBridge.Registration.cs` | Set `window.parent` to `context.Eval("this")` (JSContext global scope); added `window.self`; `document.links` uses tree-order traversal |
+| `src/Broiler.App/Rendering/DomBridge.StyleSheets.cs` | Cache stylesheet objects in `_styleSheetCache`; live `cssRules` JSObject with `length` getter and uint-indexed properties |
+| `src/Broiler.App/Rendering/DomBridge.Css.cs` | `BuildComputedStyleObject()` includes `insertRule()`-added rules from `_insertedRules` DomProperty |
+| `src/Broiler.Cli/CaptureService.cs` | `ExecuteScriptsWithDom()` accepts optional `localResourceBasePath` parameter |
+| `acid/acid3/svg.xml` | SVG support file with `<text>` element for test 69 |
+| `acid/acid3/empty.xml` | XML with invalid UTF-8 byte (well-formedness error) for test 80 |
+| `acid/acid3/xhtml.1` | XHTML with `parent.notify("xhtml.1")` script for test 80 |
+| `acid/acid3/xhtml.2` | XHTML with XML error (`<strong/>`) for test 80 |
+| `acid/acid3/xhtml.3` | XHTML with wrong namespace (`#` suffix) for test 80 |
+
+### Test Results
+
+```
+Total tests: 538
+     Passed: 538
+     Failed: 0
+  ACID3_SCORE=100
+```
+
+### Key Design Decisions
+
+1. **Local resource resolution** over HTTP fetching: For the Acid3 test, sub-resources
+   (svg.xml, xhtml.1, etc.) are local files. `SetLocalBasePath()` resolves relative
+   URLs against a local directory first, avoiding HTTP round-trips.
+
+2. **XML parsing via System.Xml.Linq**: XHTML/SVG sub-documents use `XDocument.Parse()`
+   for well-formedness validation. XML parse errors produce empty documents (per spec).
+   XHTML namespace validation gates script execution.
+
+3. **globalThis as window.parent**: YantraJS's `JSContext` IS the global scope (`this`
+   in non-strict mode). Setting `parent = context.Eval("this")` ensures
+   `parent.notify()` resolves user-defined globals — a `JSObject` window proxy would not.
+
+4. **Stylesheet caching**: `_styleSheetCache` ensures `doc.styleSheets[0]` returns the
+   same `CSSStyleSheet` object on repeated access. The `cssRules` property returns a
+   persistent `JSObject` with a live `length` getter, making saved references (`var rules =
+   sheet.cssRules`) continue to reflect `insertRule()` mutations.

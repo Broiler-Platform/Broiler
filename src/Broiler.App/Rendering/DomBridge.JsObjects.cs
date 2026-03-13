@@ -689,6 +689,7 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // insertBefore(newChild, refChild)
+        var bridgeForInsert = this;
         obj.FastAddValue(
             (KeyString)"insertBefore",
             new JSFunction((in Arguments a) =>
@@ -707,6 +708,14 @@ public sealed partial class DomBridge
                     newEl.Parent?.Children.Remove(newEl);
                     newEl.Parent = element;
                     element.Children.Add(newEl);
+
+                    // Fire onload for iframe/object children after DOM insertion
+                    var ntag = newEl.TagName?.ToLowerInvariant();
+                    if (ntag == "iframe" || ntag == "object")
+                        bridgeForInsert.FireSubDocumentOnload(newEl);
+                    else
+                        bridgeForInsert.FireDescendantOnloads(newEl);
+
                     return a[0];
                 }
 
@@ -724,6 +733,14 @@ public sealed partial class DomBridge
                 // indices if newEl was a sibling of refEl within this same parent.
                 idx = element.Children.IndexOf(refEl);
                 element.Children.Insert(idx, newEl);
+
+                // Fire onload for iframe/object children after DOM insertion
+                var newTag = newEl.TagName?.ToLowerInvariant();
+                if (newTag == "iframe" || newTag == "object")
+                    bridgeForInsert.FireSubDocumentOnload(newEl);
+                else
+                    bridgeForInsert.FireDescendantOnloads(newEl);
+
                 return a[0];
             }, "insertBefore", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -812,6 +829,7 @@ public sealed partial class DomBridge
         // -- DOM manipulation methods --
 
         // appendChild(child)
+        var bridgeForAppend = this;
         obj.FastAddValue(
             (KeyString)"appendChild",
             new JSFunction((in Arguments a) =>
@@ -830,6 +848,14 @@ public sealed partial class DomBridge
                 childEl.Parent?.Children.Remove(childEl);
                 childEl.Parent = element;
                 element.Children.Add(childEl);
+
+                // Fire onload for iframe/object children after DOM insertion
+                var childTag = childEl.TagName?.ToLowerInvariant();
+                if (childTag == "iframe" || childTag == "object")
+                    bridgeForAppend.FireSubDocumentOnload(childEl);
+                else
+                    bridgeForAppend.FireDescendantOnloads(childEl);
+
                 return a[0];
             }, "appendChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1383,6 +1409,7 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             // src property (read/write) — for iframe elements
+            var bridgeForSrc = this;
             obj.FastAddProperty(
                 (KeyString)"src",
                 new JSFunction((in Arguments _) =>
@@ -1396,6 +1423,9 @@ public sealed partial class DomBridge
                     element.Attributes["src"] = a.Length > 0 ? a[0].ToString() : string.Empty;
                     // Invalidate cached sub-document when src changes
                     _subDocumentCache.Remove(element);
+                    _onloadFired.Remove(element);
+                    // Fire onload for the new resource
+                    bridgeForSrc.FireSubDocumentOnload(element);
                     return JSUndefined.Value;
                 }, "set src"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -2278,6 +2308,63 @@ public sealed partial class DomBridge
     // ── Phase 6: Sub-document cache ──────────────────────────────────────────
     private readonly Dictionary<DomElement, JSObject> _subDocumentCache = [];
     private readonly HashSet<DomElement> _objectLoadFailures = [];
+    private readonly HashSet<DomElement> _onloadFired = [];
+
+    /// <summary>
+    /// Fires the onload event handler on an iframe or object element after its
+    /// sub-document has been loaded. The handler is only fired once per element.
+    /// Handles both property-based handlers (element.onload = function) and
+    /// attribute-based handlers (setAttribute("onload", code)).
+    /// </summary>
+    private void FireSubDocumentOnload(DomElement element)
+    {
+        if (_jsContext == null) return;
+        if (_onloadFired.Contains(element)) return;
+
+        var tag = element.TagName?.ToLowerInvariant();
+        if (tag != "iframe" && tag != "object") return;
+
+        var resourceUrl = GetSubResourceUrl(element);
+        if (string.IsNullOrWhiteSpace(resourceUrl)) return;
+
+        // Ensure the sub-document is loaded (this triggers the fetch if needed)
+        GetOrCreateSubDocument(element);
+
+        _onloadFired.Add(element);
+
+        // Fire the onload handler
+        try
+        {
+            if (element.InlineEventHandlers.TryGetValue("load", out var handler) && handler is JSFunction fn)
+            {
+                var evt = new JSObject();
+                evt.FastAddValue((KeyString)"type", new JSString("load"), JSPropertyAttributes.EnumerableConfigurableValue);
+                fn.InvokeFunction(new Arguments(fn, evt));
+            }
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.FireSubDocumentOnload",
+                $"onload handler error for <{tag}>: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Recursively fires onload for all iframe/object descendants of an element.
+    /// Called when a subtree containing iframes/objects is added to the document.
+    /// </summary>
+    private void FireDescendantOnloads(DomElement element)
+    {
+        foreach (var child in element.Children)
+        {
+            var childTag = child.TagName?.ToLowerInvariant();
+            if (childTag == "iframe" || childTag == "object")
+            {
+                FireSubDocumentOnload(child);
+            }
+            FireDescendantOnloads(child);
+        }
+    }
 
     /// <summary>
     /// Returns <c>true</c> if the resource for the given <c>&lt;object&gt;</c> element
@@ -2324,11 +2411,16 @@ public sealed partial class DomBridge
             var (fetchedContent, contentType) = TryFetchSubResource(resourceUrl);
 
             if (!string.IsNullOrEmpty(fetchedContent) &&
+                IsXmlContentType(contentType))
+            {
+                // XML/SVG/XHTML content → parse with XML parser
+                docRoot = BuildSubDocumentFromXml(fetchedContent, contentType, containerElement);
+            }
+            else if (!string.IsNullOrEmpty(fetchedContent) &&
                 (contentType.Contains("html", StringComparison.OrdinalIgnoreCase) ||
-                 contentType.Contains("xml", StringComparison.OrdinalIgnoreCase) ||
                  string.IsNullOrEmpty(contentType)))
             {
-                // HTML/XML content → parse and build full DOM
+                // HTML content → parse with HTML parser
                 docRoot = BuildSubDocumentFromHtml(fetchedContent, containerElement);
             }
             else if (!string.IsNullOrEmpty(fetchedContent) &&
@@ -2349,6 +2441,16 @@ public sealed partial class DomBridge
         _subDocumentCache[containerElement] = doc;
         return doc;
     }
+
+    /// <summary>
+    /// Returns true if the content type indicates XML-family content
+    /// (application/xml, text/xml, image/svg+xml, application/xhtml+xml).
+    /// </summary>
+    private static bool IsXmlContentType(string contentType) =>
+        string.Equals(contentType, "application/xml", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(contentType, "text/xml", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(contentType, "image/svg+xml", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(contentType, "application/xhtml+xml", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Creates a minimal empty sub-document structure (html > head + body).
@@ -2464,6 +2566,14 @@ public sealed partial class DomBridge
         // Detect content type from extension for non-HTML resources
         var extensionMime = GetMimeTypeForExtension(resourceUrl);
 
+        // Try local base path first (before URL resolution and HTTP fetch)
+        if (!string.IsNullOrEmpty(_localBasePath))
+        {
+            var localResult = TryReadLocalResource(resourceUrl, extensionMime);
+            if (localResult.content != null || localResult.contentType != string.Empty)
+                return localResult;
+        }
+
         // Resolve relative URL against page URL
         string resolvedUrl;
         if (Uri.TryCreate(resourceUrl, UriKind.Absolute, out _))
@@ -2542,6 +2652,95 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Attempts to read a resource from the local base path directory.
+    /// Strips query strings from the filename. Detects content type from content
+    /// when extension-based detection returns a generic type (e.g. for XHTML files
+    /// served without a recognized extension).
+    /// </summary>
+    private (string? content, string contentType) TryReadLocalResource(string resourceUrl, string extensionMime)
+    {
+        if (string.IsNullOrEmpty(_localBasePath))
+            return (null, string.Empty);
+
+        // Strip query string and fragment from the URL to get the filename
+        var filename = resourceUrl;
+        var qIdx = filename.IndexOf('?');
+        if (qIdx >= 0) filename = filename.Substring(0, qIdx);
+        var hIdx = filename.IndexOf('#');
+        if (hIdx >= 0) filename = filename.Substring(0, hIdx);
+
+        // Only handle relative URLs (no scheme)
+        if (filename.Contains("://")) return (null, string.Empty);
+
+        var localPath = System.IO.Path.Combine(_localBasePath, filename);
+        if (!System.IO.File.Exists(localPath))
+            return (null, string.Empty);
+
+        // For binary content types (images, fonts, etc.) return null content with MIME type
+        if (extensionMime.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ||
+            extensionMime.StartsWith("font/", StringComparison.OrdinalIgnoreCase) ||
+            extensionMime.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) ||
+            extensionMime.StartsWith("video/", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(extensionMime, "application/pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            return (null, extensionMime);
+        }
+
+        try
+        {
+            var content = System.IO.File.ReadAllText(localPath);
+
+            // Detect content type from content when extension is generic
+            var detectedMime = extensionMime;
+            if (string.Equals(detectedMime, "application/octet-stream", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrEmpty(detectedMime))
+            {
+                detectedMime = DetectContentTypeFromContent(content, filename);
+            }
+
+            return (content, detectedMime);
+        }
+        catch
+        {
+            return (null, string.Empty);
+        }
+    }
+
+    /// <summary>
+    /// Detects the MIME type of text content based on its initial bytes/structure.
+    /// Used for files without a recognized extension (e.g. xhtml.1, xhtml.2).
+    /// </summary>
+    private static string DetectContentTypeFromContent(string content, string filename)
+    {
+        if (string.IsNullOrEmpty(content))
+            return "text/plain";
+
+        var trimmed = content.TrimStart();
+
+        // SVG detection
+        if (trimmed.StartsWith("<svg", StringComparison.OrdinalIgnoreCase) ||
+            (trimmed.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) && trimmed.Contains("<svg", StringComparison.OrdinalIgnoreCase)))
+            return "image/svg+xml";
+
+        // XHTML detection (has xmlns on root html element)
+        if (trimmed.Contains("xmlns=\"http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase))
+            return "application/xhtml+xml";
+
+        // Generic XML detection
+        if (trimmed.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) ||
+            (trimmed.StartsWith("<") && !trimmed.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase) &&
+             !trimmed.StartsWith("<html", StringComparison.OrdinalIgnoreCase)))
+            return "application/xml";
+
+        // HTML detection
+        if (trimmed.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("<html", StringComparison.OrdinalIgnoreCase))
+            return "text/html";
+
+        return "text/plain";
+    }
+
+    /// <summary>
     /// Builds a sub-document tree from fetched HTML content.
     /// </summary>
     private DomElement BuildSubDocumentFromHtml(string html, DomElement containerElement)
@@ -2584,6 +2783,165 @@ public sealed partial class DomBridge
             _elements.Add(element);
         foreach (var child in element.Children)
             AddElementsRecursive(child);
+    }
+
+    /// <summary>
+    /// Builds a sub-document tree from XML/SVG/XHTML content using an XML parser.
+    /// For XHTML with valid namespace, also executes embedded scripts.
+    /// XML well-formedness errors result in an empty document.
+    /// </summary>
+    private DomElement BuildSubDocumentFromXml(string xmlContent, string contentType, DomElement containerElement)
+    {
+        var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+        docRoot.Parent = containerElement;
+
+        try
+        {
+            // Strip XML processing instructions before parsing (XDocument doesn't need them)
+            var cleanXml = xmlContent;
+            while (cleanXml.TrimStart().StartsWith("<?xml-stylesheet", StringComparison.OrdinalIgnoreCase))
+            {
+                var piEnd = cleanXml.IndexOf("?>", StringComparison.Ordinal);
+                if (piEnd >= 0) cleanXml = cleanXml.Substring(piEnd + 2).TrimStart();
+                else break;
+            }
+
+            var xdoc = System.Xml.Linq.XDocument.Parse(cleanXml);
+            if (xdoc.Root == null)
+            {
+                containerElement.Children.Insert(0, docRoot);
+                _elements.Add(docRoot);
+                return docRoot;
+            }
+
+            // Check XHTML namespace validity
+            var rootNs = xdoc.Root.Name.NamespaceName;
+            var isXhtml = string.Equals(contentType, "application/xhtml+xml", StringComparison.OrdinalIgnoreCase);
+            var hasCorrectXhtmlNs = string.Equals(rootNs, "http://www.w3.org/1999/xhtml", StringComparison.Ordinal);
+
+            if (isXhtml && !hasCorrectXhtmlNs)
+            {
+                // Wrong XHTML namespace — create empty doc, don't execute scripts
+                var emptyDoc = BuildEmptySubDocument(containerElement);
+                // Remove the docRoot we already created since BuildEmptySubDocument creates its own
+                return emptyDoc;
+            }
+
+            // Build DOM tree from XML
+            var rootEl = BuildDomElementFromXElement(xdoc.Root);
+            rootEl.Parent = docRoot;
+            docRoot.Children.Add(rootEl);
+
+            containerElement.Children.Insert(0, docRoot);
+            _elements.Add(docRoot);
+            _elements.Add(rootEl);
+
+            // Execute scripts in XHTML documents with correct namespace
+            if (isXhtml && hasCorrectXhtmlNs)
+            {
+                ExecuteSubDocumentScripts(docRoot);
+            }
+        }
+        catch (System.Xml.XmlException)
+        {
+            // XML well-formedness error — return empty document, don't execute scripts
+            containerElement.Children.Insert(0, docRoot);
+            _elements.Add(docRoot);
+        }
+
+        return docRoot;
+    }
+
+    /// <summary>
+    /// Recursively builds a DomElement tree from an XElement.
+    /// </summary>
+    private DomElement BuildDomElementFromXElement(System.Xml.Linq.XElement xe)
+    {
+        var tagName = xe.Name.LocalName.ToLowerInvariant();
+        var el = new DomElement(tagName, null, null, string.Empty);
+
+        foreach (var attr in xe.Attributes())
+        {
+            if (!attr.IsNamespaceDeclaration)
+                el.Attributes[attr.Name.LocalName] = attr.Value;
+        }
+
+        foreach (var child in xe.Nodes())
+        {
+            if (child is System.Xml.Linq.XElement childXe)
+            {
+                var childEl = BuildDomElementFromXElement(childXe);
+                childEl.Parent = el;
+                el.Children.Add(childEl);
+                _elements.Add(childEl);
+            }
+            else if (child is System.Xml.Linq.XText childText)
+            {
+                var textNode = new DomElement("#text", null, null, string.Empty, isTextNode: true);
+                textNode.TextContent = childText.Value;
+                textNode.Parent = el;
+                el.Children.Add(textNode);
+                _elements.Add(textNode);
+            }
+        }
+
+        return el;
+    }
+
+    /// <summary>
+    /// Finds and executes script elements within a sub-document tree.
+    /// Scripts call parent.notify() etc. in the main JS context.
+    /// </summary>
+    private void ExecuteSubDocumentScripts(DomElement docRoot)
+    {
+        if (_jsContext == null) return;
+
+        var scripts = new List<string>();
+        CollectScriptContent(docRoot, scripts);
+
+        foreach (var scriptCode in scripts)
+        {
+            try
+            {
+                _jsContext.Eval(scriptCode);
+            }
+            catch (Exception ex)
+            {
+                RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ExecuteSubDocumentScripts",
+                    $"Sub-document script error: {ex.Message}", ex);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Recursively collects text content from script elements.
+    /// </summary>
+    private static void CollectScriptContent(DomElement element, List<string> scripts)
+    {
+        if (string.Equals(element.TagName, "script", StringComparison.OrdinalIgnoreCase))
+        {
+            var text = GetTextContentRecursive(element);
+            if (!string.IsNullOrWhiteSpace(text))
+                scripts.Add(text);
+            return;
+        }
+
+        foreach (var child in element.Children)
+            CollectScriptContent(child, scripts);
+    }
+
+    /// <summary>
+    /// Gets the concatenated text content of an element and all its descendants.
+    /// </summary>
+    private static string GetTextContentRecursive(DomElement element)
+    {
+        if (element.IsTextNode)
+            return element.TextContent ?? string.Empty;
+
+        var sb = new StringBuilder();
+        foreach (var child in element.Children)
+            sb.Append(GetTextContentRecursive(child));
+        return sb.ToString();
     }
 
     /// <summary>
@@ -3317,6 +3675,25 @@ public sealed partial class DomBridge
             if (!child.IsTextNode && string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase))
                 results.Add(ToJSObject(child));
             CollectByTagName(child, tag, results);
+        }
+    }
+
+    /// <summary>
+    /// Collects all <c>&lt;a&gt;</c> and <c>&lt;area&gt;</c> elements with an
+    /// <c>href</c> attribute in document tree order.
+    /// </summary>
+    private void CollectLinksInTreeOrder(DomElement root, List<JSValue> results)
+    {
+        foreach (var child in root.Children)
+        {
+            if (!child.IsTextNode &&
+                (string.Equals(child.TagName, "a", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(child.TagName, "area", StringComparison.OrdinalIgnoreCase)) &&
+                child.Attributes.ContainsKey("href"))
+            {
+                results.Add(ToJSObject(child));
+            }
+            CollectLinksInTreeOrder(child, results);
         }
     }
 
