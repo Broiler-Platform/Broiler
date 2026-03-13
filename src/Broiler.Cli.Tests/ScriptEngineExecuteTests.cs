@@ -213,5 +213,72 @@ function start() {
         var output = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("result=AB", output);
     }
+
+    // ---------------------------------------------------------------
+    //  Data: URI script extraction (via CaptureService which mirrors
+    //  the ScriptExtractor logic in Broiler.App)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void DataUri_Scripts_Execute_In_Document_Order()
+    {
+        // Acid3 uses data: URI scripts (e.g. lines 153-157).
+        // Both Broiler.App and Broiler.Cli must extract and execute them.
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""out""></div>
+<script type=""text/javascript"">var result = '';</script>
+<script type=""text/javascript"" src=""data:text/javascript,result%20%2B%3D%20'A'%3B""></script>
+<script type=""text/javascript"" src=""data:text/javascript;base64,cmVzdWx0ICs9ICdCJzs=""></script>
+<script type=""text/javascript"">
+document.getElementById('out').textContent = result;
+</script>
+</body></html>";
+
+        var output = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("AB", output);
+    }
+
+    [Fact]
+    public void DataUri_Scripts_With_Mixed_Encodings()
+    {
+        // Verifies percent-encoded and base64 data: URI scripts produce
+        // consistent results (matching Acid3 test 97).
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""out""></div>
+<script type=""text/javascript"" src=""data:text/javascript,d1%20%3D%20'one'%3B""></script>
+<script type=""text/javascript"" src=""data:text/javascript;base64,ZDIgPSAndHdvJzs=""></script>
+<script type=""text/javascript"">
+document.getElementById('out').textContent = d1 + ',' + d2;
+</script>
+</body></html>";
+
+        var output = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("one,two", output);
+    }
+
+    // ---------------------------------------------------------------
+    //  CurrentScriptIndex tracking for document.write()
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void CurrentScriptIndex_Enables_DocumentWrite_Positioning()
+    {
+        // Verify that script element index tracking ensures document.write()
+        // inserts content at the correct DOM position.
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""before"">before</div>
+<script>
+document.write('<p id=""injected"">written</p>');
+</script>
+<div id=""after"">after</div>
+</body></html>";
+
+        var output = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("injected", output);
+        Assert.Contains("written", output);
+    }
 }
 

@@ -78,8 +78,19 @@ public sealed class ScriptEngine : IScriptEngine
         else
             bridge.Attach(context, html);
 
+        // Track the corresponding <script> DOM element index so that
+        // document.write() can insert content at the correct position.
+        var scriptElements = new List<int>();
+        for (int idx = 0; idx < bridge.Elements.Count; idx++)
+        {
+            if (string.Equals(bridge.Elements[idx].TagName, "script", StringComparison.OrdinalIgnoreCase))
+                scriptElements.Add(idx);
+        }
+
         for (var i = 0; i < scripts.Count; i++)
         {
+            if (i < scriptElements.Count)
+                bridge.CurrentScriptIndex = scriptElements[i];
             try
             {
                 var source = PrepareSource(scripts[i]);
@@ -97,6 +108,7 @@ public sealed class ScriptEngine : IScriptEngine
                 RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Script inline-{i} failed: {ex.Message}", ex);
             }
         }
+        bridge.CurrentScriptIndex = -1;
 
         // Fire body onload event after all scripts have executed
         // (simulates end-of-parsing / window load in browsers).
