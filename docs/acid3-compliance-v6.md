@@ -632,7 +632,7 @@ handling.  The `TransformES3Patterns()` converts `\0` alone to `\x00`, but
    ```csharp
    var rx = new Regex("(1)\\x00(2)");
    Assert.False(rx.IsMatch("12"));
-   Assert.True(rx.IsMatch("1\02"));
+   Assert.True(rx.IsMatch("1\x002"));
    ```
 
 3. **Debugging step:** Add unit test that runs the exact Acid3 test case
