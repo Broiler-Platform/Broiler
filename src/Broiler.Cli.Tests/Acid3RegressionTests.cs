@@ -2480,62 +2480,83 @@ document.getElementById('result').textContent = r.join('|');
     }
 
     /// <summary>
-    /// Diagnostic: Run actual acid3.html with test 4 and 5 failure capture.
+    /// Phase D regression: document.write elements must be registered in
+    /// document order so that getElementsByTagName, document.links, etc.
+    /// return elements in the same order as DOM tree traversal (NodeIterator).
     /// </summary>
     [Fact]
-    public void DiagPhaseD_NodeIterator_Acid3_Structure_Trace()
+    public void PhaseD_DocumentWrite_Elements_In_Document_Order()
+    {
+        // map/area is inserted BEFORE instructions by document.write()
+        // So document.links should be: [area, a] (area first in doc order)
+        var html = @"<!DOCTYPE html><html><head><title>T</title></head><body>
+<p id=""result""><span id=""score"">0</span></p>
+<script>document.write('<map name=""""><area href="""" shape=""rect"" coords=""2,2,4,4"" alt=""x""><form action="""" name=""form""><input type=HIDDEN><\/form><table><tr><td><p><\/table><\/map>');</script>
+<p id=""instructions"">Text <a href=""reference.html"">link</a>.</p>
+<div id=""diag""></div>
+<script>
+var r = [];
+// p elements: result, p(in td), instructions — document.write's p(td) must come BEFORE instructions
+var ps = document.getElementsByTagName('p');
+r.push('p_count=' + ps.length);
+var foundTdP = false;
+var foundInst = false;
+for (var pi = 0; pi < ps.length; pi++) {
+    if (ps[pi].id === 'instructions') foundInst = true;
+    if (!ps[pi].id && ps[pi].parentNode && ps[pi].parentNode.tagName === 'TD') {
+        foundTdP = true;
+        // This p(td) must come BEFORE instructions in the list
+        r.push('tdP_before_inst=' + !foundInst);
+    }
+}
+// links: [area, a] — area (from document.write) comes before a (in instructions) in doc order
+r.push('links_len=' + document.links.length);
+r.push('link0=' + document.links[0].tagName);
+r.push('link1=' + document.links[1].tagName);
+// Identity with NodeIterator
+var allButWS = function(node) { return (node.nodeType == 3 && node.data.match(/^\s*$/)) ? 2 : 1; };
+var iter = document.createNodeIterator(document.body, 0x01 | 0x04 | 0x08 | 0x10 | 0x20, allButWS, true);
+var n, foundIterA = null;
+while ((n = iter.nextNode()) !== null) {
+    if (n.tagName === 'A') { foundIterA = n; break; }
+}
+r.push('iter_a_eq_link1=' + (foundIterA === document.links[1]));
+r.push('forms_named=' + (document.forms.form ? document.forms.form.tagName : 'null'));
+document.getElementById('diag').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        var match = System.Text.RegularExpressions.Regex.Match(result, @"id=""diag""[^>]*>([^<]+)<");
+        Assert.True(match.Success, "Diagnostic div not found");
+        var diag = match.Groups[1].Value;
+        Console.WriteLine("Phase D diag: " + diag);
+        // Area must be links[0], A must be links[1]
+        Assert.Contains("link0=AREA", diag);
+        Assert.Contains("link1=A", diag);
+        // NodeIterator's A must be === document.links[1]
+        Assert.Contains("iter_a_eq_link1=true", diag);
+        // p(td) must come before instructions in getElementsByTagName order
+        Assert.Contains("tdP_before_inst=true", diag);
+        // Named form access must work
+        Assert.Contains("forms_named=FORM", diag);
+    }
+
+    /// <summary>
+    /// Phase D regression: Full Acid3 score should be at least 97.
+    /// </summary>
+    [Fact]
+    public void PhaseD_Acid3_Score_At_Least_97()
     {
         var acid3Path = Path.GetFullPath(Path.Combine(
             AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
         Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
         var html = File.ReadAllText(acid3Path);
-        
-        // Inject error capture: patch fail() to log which test failed and why
-        // Insert right after the assertEquals function definition
-        var patch = @"
-  var _testFailures = [];
-  var _origFail = fail;
-  fail = function(message) { _testFailures.push(message); _origFail(message); };
-";
-        html = html.Replace("var kungFuDeathGrip = null;", patch + "  var kungFuDeathGrip = null;");
-        
-        // Inject DOM dump before test 4 runs, and capture test 4/5 errors
-        // We'll patch test 4 to also dump the full body walk
-        // Insert a dump script before </body>
-        var dumpScript = @"
-<script type=""text/javascript"">
-var _diagDiv = document.createElement('div');
-_diagDiv.id = '_diag';
-var msgs = [];
-for (var fi = 0; fi < _testFailures.length; fi++) {
-    msgs.push(_testFailures[fi].substring(0, 200));
-}
-_diagDiv.textContent = msgs.join('|||');
-document.body.appendChild(_diagDiv);
-</script>";
-        html = html.Replace("</body>", dumpScript + "\n</body>");
-        
         var url = "http://acid3.acidtests.org/acid3.html";
         var result = CaptureService.ExecuteScriptsWithDom(html, url);
-        
-        // Extract score
         var scoreMatch = System.Text.RegularExpressions.Regex.Match(result, @"id=""score""[^>]*>(\d+)<");
-        var score = scoreMatch.Success ? int.Parse(scoreMatch.Groups[1].Value) : -1;
+        Assert.True(scoreMatch.Success, "Could not find score element in output");
+        var score = int.Parse(scoreMatch.Groups[1].Value);
         Console.WriteLine($"ACID3_SCORE={score}");
-        
-        // Extract failures
-        var diagMatch = System.Text.RegularExpressions.Regex.Match(result, @"id=""_diag""[^>]*>([^<]*)<");
-        if (diagMatch.Success && !string.IsNullOrEmpty(diagMatch.Groups[1].Value))
-        {
-            Console.WriteLine("=== TEST FAILURES ===");
-            foreach (var f in diagMatch.Groups[1].Value.Split("|||"))
-                Console.WriteLine("  " + System.Net.WebUtility.HtmlDecode(f));
-        }
-        else
-        {
-            Console.WriteLine("No failure messages captured (or diag div not found)");
-        }
-        
-        Assert.True(score >= 95, $"Score {score} should be >= 95");
+        Assert.True(score >= 97, $"Acid3 score: {score} (expected >= 97, Phase D should achieve 97+)");
     }
 }
