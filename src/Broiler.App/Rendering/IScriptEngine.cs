@@ -17,9 +17,10 @@ public interface IScriptEngine
     /// Execute the supplied <paramref name="scripts"/> in a fresh context
     /// with a <c>document</c> object derived from <paramref name="html"/>,
     /// enabling basic DOM interaction via the <see cref="DomBridge"/>.
-    /// Returns <c>true</c> when all scripts executed without error.
+    /// Returns the serialised post-execution HTML, or <c>null</c> when
+    /// there are no scripts to execute.
     /// </summary>
-    bool Execute(IReadOnlyList<string> scripts, string html);
+    string? Execute(IReadOnlyList<string> scripts, string html);
 
     /// <summary>
     /// Execute scripts and return a detailed <see cref="ScriptExecutionResult"/>

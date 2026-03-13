@@ -29,8 +29,10 @@ public sealed class RenderingPipeline(
     /// Execute the scripts contained in <paramref name="content"/> with DOM
     /// interaction support.  A <c>document</c> object derived from the page
     /// HTML is made available to the scripts via the <see cref="DomBridge"/>.
+    /// Returns the serialised post-execution HTML, or <c>null</c> when
+    /// there are no scripts.
     /// </summary>
-    public bool ExecuteScripts(PageContent content) => scriptEngine.Execute(content.Scripts, content.Html);
+    public string? ExecuteScripts(PageContent content) => scriptEngine.Execute(content.Scripts, content.Html);
 
     public void Dispose() => pageLoader.Dispose();
 }

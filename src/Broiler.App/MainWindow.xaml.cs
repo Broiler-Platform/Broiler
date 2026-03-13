@@ -131,9 +131,12 @@ public partial class MainWindow : Window
             var (normalisedUrl, content) = await _pipeline.LoadPageAsync(url);
             UrlTextBox.Text = normalisedUrl;
 
-            // Render the HTML, then execute any inline scripts
+            // Render the original HTML, then execute any inline scripts
+            // and re-render with the post-execution DOM if scripts modified it.
             HtmlPanel.Text = content.Html;
-            _pipeline.ExecuteScripts(content);
+            var updatedHtml = _pipeline.ExecuteScripts(content);
+            if (updatedHtml != null)
+                HtmlPanel.Text = updatedHtml;
 
             StatusText.Text = "Done";
         }
