@@ -600,7 +600,7 @@ dotnet build Broiler.slnx
 dotnet test HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests \
   --filter "Category=Differential" --verbosity normal
 
-# 3. Run full test suite (63 tests: 18 Acid2 + 45 other)
+# 3. Run full test suite (includes 18 Acid2 differential tests)
 dotnet test HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests
 ```
 

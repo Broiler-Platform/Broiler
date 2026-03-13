@@ -95,7 +95,7 @@ else
     echo "--- Step 2: Rendering Acid2 with Chromium (Playwright) ---"
 
     if command -v npx &>/dev/null; then
-        PLAYWRIGHT_SCRIPT=$(mktemp /tmp/acid2-playwright-XXXXXX.js)
+        PLAYWRIGHT_SCRIPT=$(mktemp "${TMPDIR:-/tmp}/acid2-playwright-XXXXXX.js")
         cat > "$PLAYWRIGHT_SCRIPT" << 'JSEOF'
 const { chromium } = require('playwright');
 const path = require('path');
