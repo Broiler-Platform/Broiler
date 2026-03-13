@@ -1933,6 +1933,53 @@ document.getElementById('result').textContent = r.join('|');
     /// Test 46: Viewport-aware media queries — verify that setting the iframe
     /// style changes the viewport for media query evaluation in the sub-document.
     /// </summary>
+
+    [Fact]
+    public void PhaseB_ForIn_Main_Document()
+    {
+        // Simplest possible for...in test
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var r = '';
+var obj = {a:1, b:2};
+for (var k in obj) { r += k; }
+document.getElementById('result').textContent = r;
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        // for...in on plain objects should work
+        Assert.Contains("ab", result);
+    }
+
+    [Fact]
+    public void PhaseB_ForIn_SubDocument()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<iframe src=""about:blank"" id=""f""></iframe>
+<script>
+var doc = document.getElementById('f').contentDocument;
+for (var i2 = doc.documentElement.childNodes.length-1; i2 >= 0; i2 -= 1)
+    doc.documentElement.removeChild(doc.documentElement.childNodes[i2]);
+doc.documentElement.appendChild(doc.createElement('body'));
+var r = [];
+var names = ['a', 'b', 'c', 'd'];
+for (var i in names) {
+    var p = doc.createElement('p');
+    p.id = names[i];
+    doc.body.appendChild(p);
+    r.push(names[i]);
+}
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://test/test.html");
+        Assert.Contains("a|b|c|d", result);
+    }
+
     [Fact]
     public void PhaseC_Media_Queries_Viewport_Dimensions()
     {
@@ -1961,7 +2008,7 @@ else {
     doc.getElementsByTagName('head')[0].appendChild(style);
 
     var names = ['y1', 'y2', 'y3', 'y4'];
-    for (var idx in names) {
+    for (var idx = 0; idx < names.length; idx++) {
         var p = doc.createElement('p'); p.id = names[idx]; doc.body.appendChild(p);
     }
     var check = function(c) {

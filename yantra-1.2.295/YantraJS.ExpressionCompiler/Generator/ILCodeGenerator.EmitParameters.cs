@@ -25,7 +25,12 @@ public partial class ILCodeGenerator
                 {
                     if(a.NodeType == YExpressionType.Property)
                     {
-                        var temp = tempVariables[p.ParameterType];
+                        // BROILER-PATCH: Use element type for byref parameters;
+                        // DeclareLocal does not accept byref types directly.
+                        var localType = p.ParameterType.IsByRef
+                            ? p.ParameterType.GetElementType()
+                            : p.ParameterType;
+                        var temp = tempVariables[localType];
                         saveList ??= [];
                         saveList.Add((temp.LocalIndex, a));
                         Visit(a);
