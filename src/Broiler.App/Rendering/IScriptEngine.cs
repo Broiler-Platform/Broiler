@@ -23,6 +23,18 @@ public interface IScriptEngine
     string? Execute(IReadOnlyList<string> scripts, string html);
 
     /// <summary>
+    /// Execute the supplied <paramref name="scripts"/> in a fresh context
+    /// with a <c>document</c> object derived from <paramref name="html"/>
+    /// and the page <paramref name="url"/> available via <c>window.location</c>.
+    /// After script execution, fires the body <c>onload</c> event and
+    /// flushes pending timers so that <c>setTimeout</c>-chained test
+    /// harnesses (e.g. Acid3) run to completion.
+    /// Returns the serialised post-execution HTML, or <c>null</c> when
+    /// there are no scripts to execute.
+    /// </summary>
+    string? Execute(IReadOnlyList<string> scripts, string html, string? url);
+
+    /// <summary>
     /// Execute scripts and return a detailed <see cref="ScriptExecutionResult"/>
     /// that includes per-script error messages and stack traces.
     /// </summary>

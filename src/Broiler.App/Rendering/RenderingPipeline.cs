@@ -22,17 +22,20 @@ public sealed class RenderingPipeline(
     {
         var (normalisedUrl, html) = await pageLoader.FetchAsync(url);
         var scripts = scriptExtractor.Extract(html);
-        return (normalisedUrl, new PageContent(html, scripts));
+        return (normalisedUrl, new PageContent(html, scripts, normalisedUrl));
     }
 
     /// <summary>
     /// Execute the scripts contained in <paramref name="content"/> with DOM
     /// interaction support.  A <c>document</c> object derived from the page
     /// HTML is made available to the scripts via the <see cref="DomBridge"/>.
+    /// The page URL (when available) is set on <c>window.location</c>.
+    /// After scripts execute, the body <c>onload</c> event fires and
+    /// pending timers are flushed.
     /// Returns the serialised post-execution HTML, or <c>null</c> when
     /// there are no scripts.
     /// </summary>
-    public string? ExecuteScripts(PageContent content) => scriptEngine.Execute(content.Scripts, content.Html);
+    public string? ExecuteScripts(PageContent content) => scriptEngine.Execute(content.Scripts, content.Html, content.Url);
 
     public void Dispose() => pageLoader.Dispose();
 }
