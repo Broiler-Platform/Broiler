@@ -23,7 +23,10 @@ public sealed class PageLoader(HttpClient httpClient) : IPageLoader
         if (url.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
         {
             var uri = new Uri(url);
-            var html = await File.ReadAllTextAsync(uri.LocalPath);
+            var localPath = uri.LocalPath;
+            if (!File.Exists(localPath))
+                throw new FileNotFoundException($"Local file not found: {localPath}", localPath);
+            var html = await File.ReadAllTextAsync(localPath);
             return (url, html);
         }
 

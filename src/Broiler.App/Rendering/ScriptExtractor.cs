@@ -128,7 +128,7 @@ public sealed class ScriptExtractor : IScriptExtractor
                 var bytes = Convert.FromBase64String(decoded);
                 return Encoding.UTF8.GetString(bytes);
             }
-            catch
+            catch (FormatException)
             {
                 return string.Empty;
             }
