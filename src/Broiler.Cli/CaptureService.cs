@@ -759,9 +759,31 @@ public class CaptureService
         // so DOM structure is preserved, just empty its body).
         html = LinktestPattern.Replace(html, m =>
         {
-            // Reconstruct opening tag by finding the closing ">".
+            // Reconstruct opening tag by finding the closing ">" that ends
+            // the opening <a …> tag.  We skip over '>' characters that appear
+            // inside quoted attribute values to avoid truncating the tag.
             var full = m.Value;
-            var tagEnd = full.IndexOf('>');
+            int tagEnd = -1;
+            bool inQuote = false;
+            char quoteChar = '\0';
+            for (int i = 0; i < full.Length; i++)
+            {
+                char c = full[i];
+                if (inQuote)
+                {
+                    if (c == quoteChar) inQuote = false;
+                }
+                else if (c == '"' || c == '\'')
+                {
+                    inQuote = true;
+                    quoteChar = c;
+                }
+                else if (c == '>')
+                {
+                    tagEnd = i;
+                    break;
+                }
+            }
             if (tagEnd < 0) return full;
             return full[..(tagEnd + 1)] + "</a>";
         });
