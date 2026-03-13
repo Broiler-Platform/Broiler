@@ -136,13 +136,7 @@ public sealed partial class DomBridge
             for (var i = 0; i < rulesStorage.Count; i++)
             {
                 var ruleObj = BuildCssRuleObject(rulesStorage[i]);
-                liveCssRules.FastAddValue((KeyString)i.ToString(), ruleObj, JSPropertyAttributes.EnumerableConfigurableValue);
-            }
-            // Remove stale indices beyond current count
-            for (var i = rulesStorage.Count; i < rulesStorage.Count + 50; i++)
-            {
-                var key = (KeyString)i.ToString();
-                liveCssRules.Delete(key);
+                liveCssRules[(uint)i] = ruleObj;
             }
         }
 
