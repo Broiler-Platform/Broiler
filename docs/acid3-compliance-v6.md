@@ -759,8 +759,12 @@ still be `undefined` (its initial value), not the function reference.
       - Score impact: **90 → 94/100** (+4 points)
       - Also fixed 3 pre-existing test failures (viewport test, 2 XHR tests).
 
-### Phase C: NodeIterator/TreeWalker Fixes (+3 points, ~5 hours)
+### Phase C: CSS Comment Parsing + NodeIterator/TreeWalker Fixes (+1 done, +2 remaining)
 
+- [x] **Test 0:** Fixed CSS comment parsing in `ParseAndApplyCssRules()` — comments
+      containing `{`/`}` broke rule boundary detection. Score: 94 → 95.
+      - File: `src/Broiler.App/Rendering/DomBridge.Css.cs`
+      - Added `SkipWhitespaceAndComments()`, `IndexOfSkippingComments()`, `StripCssComments()`
 - [ ] **Test 2:** Rewrite `nextNode()` / `previousNode()` in `BuildNodeIterator()`
       to use tree-walking from `state.ReferenceNode` instead of flat-list indexing.
       - File: `src/Broiler.App/Rendering/DomBridge.Traversal.cs`, lines 338–430
@@ -1077,21 +1081,132 @@ Further work tracked in Phase D/E.
 
 **Score change:** No — score remains **94/100**.
 
-### 7.5 Remaining Subtests Analysis
+### 7.5 Remaining Subtests Roadmap
 
-| Test | Category | Fixable? | Effort | Notes |
-|------|----------|----------|--------|-------|
-| 0 | CSS `:last-child` | Needs investigation | 2–3 hours | Unit tests pass; full harness context differs |
-| 4 | NodeIterator identity | Needs investigation | 3–5 hours | DOM tree structure differences |
-| 5 | TreeWalker identity | Needs investigation | 3–5 hours | Same root cause as test 4 |
-| 69 | Sub-document loading | New feature | ~6 hours | Requires HTTP client in DomBridge |
-| 72 | Dynamic style mutation | Depends on 69 | ~3 hours | Prerequisite: test 69 |
-| 80 | Linktest link check | Depends on 69 | ~1 hour | Prerequisite: test 69 |
+**Current score: 95/100 — 5 subtests remaining (tests 4, 5, 69, 72, 80).**
 
-**Summary:** 3 of 6 remaining tests (69, 72, 80) depend on implementing external
-sub-document resource fetching — a significant new feature (~6 hours).  The other 3
-tests (0, 4, 5) require investigating DOM tree structure differences between Broiler's
-HTML parser and Chromium's parser.
+| Test | Category | Fixable? | Effort | Priority |
+|------|----------|----------|--------|----------|
+| 4 | NodeIterator identity | Yes | 3–5 hours | P1 |
+| 5 | TreeWalker identity | Yes | 2–3 hours | P1 |
+| 69 | Sub-document loading | Yes (new feature) | ~6 hours | P2 |
+| 72 | Dynamic style mutation | Yes (depends on 69) | ~3 hours | P3 |
+| 80 | Linktest link check | Yes (depends on 69) | ~1 hour | P3 |
+
+---
+
+#### Phase D: DOM Traversal Identity Fixes — Tests 4 & 5 (+2 points, ~6 hours)
+
+**Goal:** Fix `===` identity checks in NodeIterator/TreeWalker document-order walks.
+
+**Test 4** (`expectation 36 failed`): `createNodeIterator` with whitespace filter walks
+`document.body` forward/backward.  Each step asserts `===` identity against expected DOM
+nodes (e.g. `document.forms.form.elements[0]`).  Currently passes expectations 1–35,
+fails at 36.
+
+**Test 5** (`expectation 14 failed`): Same pattern with `TreeWalker` using `FILTER_SKIP`.
+Currently passes expectations 1–13, fails at 14.
+
+**Root cause:** The NodeIterator/TreeWalker tree-walk visits nodes in a slightly different
+order than the browser because Broiler's HTML parser produces extra implicit elements
+(e.g., implicit `<tbody>` in tables, whitespace text node merging differences).
+
+**Implementation plan:**
+
+- [ ] **Step 1: Audit DOM tree structure** (~1 hour)
+  - Dump the full document-order node list from Broiler's DOM tree for acid3.html
+  - Compare against the expected sequence from the Acid3 test assertions (lines 377–456)
+  - Identify where the divergence starts at expectation 36
+
+- [ ] **Step 2: Fix text node identity stability** (~1 hour)
+  - File: `src/Broiler.App/Rendering/DomBridge.cs`, `ToJSObject()` (line 17)
+  - Ensure text nodes are cached in `_jsObjectCache` using reference equality
+  - Verify no code path creates duplicate `DomElement` instances for the same text node
+
+- [ ] **Step 3: Fix document-order traversal** (~2 hours)
+  - File: `src/Broiler.App/Rendering/DomBridge.Traversal.cs`, `CollectDescendants()`
+  - Verify the traversal visits all node types (elements + text) in document order
+  - Verify implicit parser-generated nodes (e.g., `<tbody>`) match browser behavior
+  - File: `src/Broiler.App/Rendering/HtmlTreeBuilder.cs`
+  - Audit implicit element insertion (tables, forms) to match HTML5 spec
+
+- [ ] **Step 4: Regression tests** (~1 hour)
+  - `PhaseD_NodeIterator_Full_Tree_Identity` — mirror test 4's exact assertion sequence
+  - `PhaseD_TreeWalker_Full_Tree_Identity` — mirror test 5's exact assertion sequence
+
+**Score impact:** 95 → **97/100** (+2 points)
+
+---
+
+#### Phase E: Sub-Document Resource Loading — Tests 69, 72, 80 (+3 points, ~10 hours)
+
+**Goal:** Implement actual HTTP resource fetching for iframe/object sub-documents.
+
+**Test 69** (`timeout`): Checks that `kungFuDeathGrip` (set up in test 65) has loaded
+seven external resources via iframes and objects.  Accesses
+`kungFuDeathGrip.firstChild.contentDocument` and calls `getElementsByTagName('text')`
+to find an SVG `<text>` element.
+
+**Test 72** (`insertRule failed`): In a sub-document loaded via iframe, modifies a
+`<style>` element's text content and checks that `insertRule()` works and `cssRules`
+is live.  Depends on test 69.
+
+**Test 80** (`linktest link couldn't be found`): Checks `document.links[1]` for the
+linktest anchor created in test 48.  The iframe `onload` handler that removes the
+`pending` class never fires because the iframe resource is never loaded.
+
+**Implementation plan:**
+
+- [ ] **Step 1: Add HTTP fetcher to DomBridge** (~2 hours)
+  - File: `src/Broiler.App/Rendering/DomBridge.cs`
+  - Add constructor parameter: `Func<string, string>? resourceFetcher`
+  - File: `src/Broiler.Cli/CaptureService.cs`, `ExecuteScriptsWithDom()`
+  - Pass a fetcher delegate that resolves URLs and returns content
+
+- [ ] **Step 2: Implement sub-document loading** (~3 hours)
+  - File: `src/Broiler.App/Rendering/DomBridge.JsObjects.cs`,
+    `GetOrCreateSubDocument()`
+  - When iframe/object has `src`/`data` attribute, fetch the resource
+  - Parse fetched content based on MIME type:
+    - HTML → `HtmlTreeBuilder.Build()`
+    - SVG/XML → XML parser → DOM elements
+    - CSS → document with `<style>` element
+    - Text → document with text node
+    - Images → minimal document
+  - Attach parsed tree as sub-document DOM
+
+- [ ] **Step 3: Fire `onload` handlers** (~1 hour)
+  - After loading sub-document, check iframe/object for `onload` attribute
+  - Execute the handler via `DispatchEventOnElement()` with a `load` event
+  - This unblocks test 80 (linktest `pending` class removal)
+
+- [ ] **Step 4: Implement `insertRule()` / `deleteRule()` / live `cssRules`** (~2 hours)
+  - File: `src/Broiler.App/Rendering/DomBridge.StyleSheets.cs`
+  - `cssRules` getter: re-parse ownerNode text content on each access
+  - `insertRule(rule, index)`: parse rule, insert text node at position
+  - `deleteRule(index)`: remove rule at index
+  - This unblocks test 72
+
+- [ ] **Step 5: Regression tests** (~1 hour)
+  - `PhaseE_Iframe_SubDocument_Loading` — verify contentDocument access
+  - `PhaseE_InsertRule_And_Live_CssRules` — verify CSSOM mutations
+  - `PhaseE_Linktest_Onload_Fires` — verify onload handler execution
+
+**Score impact:** 97 → **100/100** (+3 points)
+
+---
+
+#### Milestone Summary
+
+| Phase | Tests Fixed | Score | Effort | Status |
+|-------|-----------|-------|--------|--------|
+| A | Visual fixes (stripping) | 90 | Done | ✅ Complete |
+| B | Tests 46, 64 + YantraJS for-in | 94 | Done | ✅ Complete |
+| C | Test 0 (CSS comment parsing) | 95 | Done | ✅ Complete |
+| D | Tests 4, 5 (DOM traversal identity) | 97 | ~6 hours | 🔲 Planned |
+| E | Tests 69, 72, 80 (sub-doc loading) | 100 | ~10 hours | 🔲 Planned |
+
+**Total remaining effort: ~16 hours to reach 100/100.**
 
 ### 7.6 Revalidation Iteration Log
 
@@ -1104,3 +1219,4 @@ HTML parser and Chromium's parser.
 | 5 | 2026-03-13 | Fresh image render + pixel comparison | Improved: 10.8% → 13.3% exact match | 94/100 |
 | 6 | 2026-03-13 | Test 0 fix investigation | Unit tests pass; full harness needs investigation | 94/100 |
 | 7 | 2026-03-13 | Test 4 identity investigation | Root cause identified; no quick fix | 94/100 |
+| 8 | 2026-03-13 | CSS comment parsing fix (`ParseAndApplyCssRules`) | Test 0 passes — `#instructions:last-child` rule now parsed correctly | **95/100** |
