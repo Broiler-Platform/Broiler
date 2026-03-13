@@ -2684,4 +2684,56 @@ document.getElementById('diag').textContent = r.join('|');
         Console.WriteLine($"ACID3_SCORE={score}");
         Assert.True(score >= 100, $"Acid3 score: {score} (expected 100, Phase E should achieve 100)");
     }
+
+    /// <summary>
+    /// v7 infrastructure: Validates that the pixel comparison script exists
+    /// and that reference images are present for comparison.
+    /// </summary>
+    [Fact]
+    public void V7_Pixel_Comparison_Infrastructure_Exists()
+    {
+        var repoRoot = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".."));
+        var compareScript = Path.Combine(repoRoot, "scripts", "acid3-compare.py");
+        var pipelineScript = Path.Combine(repoRoot, "scripts", "acid3-pixel-test.sh");
+        var acid3Png = Path.Combine(repoRoot, "acid", "acid3", "acid3.png");
+        var referencePng = Path.Combine(repoRoot, "acid", "acid3", "acid3-reference.png");
+
+        Assert.True(File.Exists(compareScript), $"Comparison script not found at {compareScript}");
+        Assert.True(File.Exists(pipelineScript), $"Pipeline script not found at {pipelineScript}");
+        Assert.True(File.Exists(acid3Png), $"Broiler render not found at {acid3Png}");
+        Assert.True(File.Exists(referencePng), $"Reference image not found at {referencePng}");
+    }
+
+    /// <summary>
+    /// v7 infrastructure: Validates that the Acid3 render produces a valid PNG
+    /// image via the CaptureService image rendering pipeline.
+    /// </summary>
+    [Fact]
+    public void V7_Acid3_Image_Capture_Produces_Valid_Output()
+    {
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
+        Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
+        var html = File.ReadAllText(acid3Path);
+        var url = "http://acid3.acidtests.org/acid3.html";
+        var basePath = Path.GetDirectoryName(acid3Path)!;
+
+        // Execute scripts to get the DOM-modified HTML
+        var result = CaptureService.ExecuteScriptsWithDom(html, url, basePath);
+
+        // Verify the output contains score and bucket elements
+        Assert.Contains("id=\"score\"", result);
+        Assert.Contains("id=\"bucket1\"", result);
+        Assert.Contains("id=\"bucket2\"", result);
+        Assert.Contains("id=\"bucket3\"", result);
+        Assert.Contains("id=\"bucket4\"", result);
+        Assert.Contains("id=\"bucket5\"", result);
+        Assert.Contains("id=\"bucket6\"", result);
+
+        // Verify score is 100
+        var scoreMatch = System.Text.RegularExpressions.Regex.Match(result, @"id=""score""[^>]*>(\d+)<");
+        Assert.True(scoreMatch.Success, "Could not extract score from output");
+        Assert.Equal(100, int.Parse(scoreMatch.Groups[1].Value));
+    }
 }

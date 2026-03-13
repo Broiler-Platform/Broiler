@@ -67,3 +67,6 @@ node_modules/
 package*.json
 *.log
 capture.png
+
+# Pixel comparison generated reports
+acid3-report.txt
