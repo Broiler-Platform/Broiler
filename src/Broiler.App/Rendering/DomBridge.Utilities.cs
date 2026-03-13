@@ -501,6 +501,10 @@ public sealed partial class DomBridge
     {
         foreach (var child in root.Children)
         {
+            // Skip sub-document roots — they are separate document trees
+            // and must not be traversed as part of the parent document.
+            if (string.Equals(child.TagName, "#subdoc-root", StringComparison.Ordinal))
+                continue;
             result.Add(child);
             CollectDescendants(child, result);
         }

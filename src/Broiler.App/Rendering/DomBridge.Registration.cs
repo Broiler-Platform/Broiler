@@ -597,7 +597,7 @@ public sealed partial class DomBridge
             }, "insertBefore", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // document.forms — collection of all <form> elements
+        // document.forms — collection of all <form> elements with named access
         document.FastAddProperty(
             (KeyString)"forms",
             new JSFunction((in Arguments _) =>
@@ -608,7 +608,18 @@ public sealed partial class DomBridge
                     if (string.Equals(el.TagName, "form", StringComparison.OrdinalIgnoreCase))
                         results.Add(ToJSObject(el));
                 }
-                return new JSArray(results);
+                var arr = new JSArray(results);
+                // Add named access: forms with a 'name' attribute can be
+                // accessed as properties of the collection.
+                foreach (var el in _elements)
+                {
+                    if (string.Equals(el.TagName, "form", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (el.Attributes.TryGetValue("name", out var formName) && !string.IsNullOrEmpty(formName))
+                            arr.FastAddValue((KeyString)formName, ToJSObject(el), JSPropertyAttributes.EnumerableConfigurableValue);
+                    }
+                }
+                return arr;
             }, "get forms"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);

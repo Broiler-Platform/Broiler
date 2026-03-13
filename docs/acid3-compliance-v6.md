@@ -918,7 +918,30 @@ the Acid3 DOM score.  They are inherent to the rendering engine:
 
 ---
 
-**Status:** Phase B complete — `for...in` IL generation bug fixed in YantraJS.
-Score increased from 90/100 to **94/100** (+4 points). All 532 CLI tests passing
-(0 failures). 6 subtests remain failing (reduced from 10). Phase C–E implementation
-plans documented above with detailed root-cause analysis.
+**Status:** Phase C in progress — HTML parser head/body separation and sub-document traversal fixes applied.
+Score remains at **94/100** (test 4 progressed from expectation 2 → 26; test 5 from 4 → 14).
+All 532 CLI tests passing (0 failures). 6 subtests remain failing (tests 0, 4, 5, 69, 72, 80).
+
+### Phase C Progress (2026-03-13)
+
+**Fixes applied:**
+1. **HtmlTreeBuilder head/body separation** (`HtmlTreeBuilder.cs`): Added `script` and
+   `noscript` to `HeadMetadataElements` set so `<script>` tags before explicit `<body>`
+   are correctly placed in `<head>`. Comments and text nodes before `<body>` also route
+   to `<head>`. Non-head elements implicitly trigger body mode (`bodyOpened = true`).
+2. **Sub-document traversal isolation** (`DomBridge.Utilities.cs`): `CollectDescendants()`
+   now skips `#subdoc-root` children, preventing NodeIterator/TreeWalker from walking
+   into iframe sub-documents created by `getTestDocument()`.
+3. **Named form access** (`DomBridge.Registration.cs`): `document.forms` collection now
+   supports named access (e.g. `document.forms.form`) by adding form `name` attributes
+   as properties on the returned array.
+
+**Remaining failing subtests:**
+| Test | Error | Root Cause |
+|------|-------|------------|
+| 0 | `getComputedStyle().whiteSpace` returns 'normal' instead of 'pre-wrap' | CSS `:last-child` style recomputation not triggered after removeChild |
+| 4 | `document.forms.form.elements[0]` identity check (expectation 26) | Form named access works but `elements[0]` identity needs further investigation |
+| 5 | TreeWalker identity (expectation 14) | TreeWalker child traversal enters sub-document content; needs same fix as NodeIterator |
+| 69 | Retry timeout | External iframe resource loading not supported |
+| 72 | `insertRule` doesn't take effect | Depends on test 69 sub-document loading |
+| 80 | Linktest link not found | Depends on test 69 external resource loading |

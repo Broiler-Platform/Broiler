@@ -25,7 +25,7 @@ public sealed class HtmlTreeBuilder
     // explicit <body> tag (WHATWG "in head" insertion mode).
     private static readonly HashSet<string> HeadMetadataElements = new(StringComparer.OrdinalIgnoreCase)
     {
-        "style", "link", "meta", "base"
+        "style", "link", "meta", "base", "script", "noscript"
     };
 
     // Elements that auto-close a current <p>.
@@ -135,9 +135,9 @@ public sealed class HtmlTreeBuilder
                         break;
                     }
 
-                    // Metadata elements (<style>, <link>, <meta>, <base>) that
-                    // appear before an explicit <body> tag are placed in <head>
-                    // per the WHATWG "in head" insertion mode.
+                    // Metadata elements (<style>, <link>, <meta>, <base>, <script>,
+                    // <noscript>) that appear before an explicit <body> tag are
+                    // placed in <head> per the WHATWG "in head" insertion mode.
                     if (!bodyOpened && HeadMetadataElements.Contains(tag))
                     {
                         var metaEl = CreateElement(token);
@@ -147,6 +147,13 @@ public sealed class HtmlTreeBuilder
                             openElements.Push(metaEl);
                         break;
                     }
+
+                    // Any non-head element before an explicit <body> tag implicitly
+                    // closes the "in head" insertion mode and switches to body.
+                    // This prevents subsequent head-eligible elements (e.g. <script>
+                    // after <span>) from being misplaced into <head>.
+                    if (!bodyOpened)
+                        bodyOpened = true;
 
                     AutoCloseCurrent(openElements, tag);
 
@@ -240,6 +247,11 @@ public sealed class HtmlTreeBuilder
 
                     var parent = openElements.Count > 0 ? openElements.Peek() : body;
 
+                    // Text nodes before the explicit <body> tag belong in <head>
+                    // per the WHATWG "in head" insertion mode.
+                    if (!bodyOpened && ReferenceEquals(parent, body))
+                        parent = head;
+
                     // Foster parenting for text nodes inside table scope.
                     // Per HTML spec, only non-whitespace text is foster-parented;
                     // whitespace text nodes are kept in the table element.
@@ -256,7 +268,14 @@ public sealed class HtmlTreeBuilder
                 {
                     var commentNode = new DomElement("#comment", null, null, string.Empty, isTextNode: false);
                     commentNode.TextContent = token.Data ?? string.Empty;
-                    var commentParent = openElements.Count > 0 ? openElements.Peek() : body;
+                    // Comments before the explicit <body> tag belong in <head>
+                    // per the WHATWG "in head" insertion mode.
+                    DomElement commentParent;
+                    if (!bodyOpened && openElements.Count > 0 &&
+                        ReferenceEquals(openElements.Peek(), body))
+                        commentParent = head;
+                    else
+                        commentParent = openElements.Count > 0 ? openElements.Peek() : body;
                     AppendChild(commentParent, commentNode);
                     allElements.Add(commentNode);
                     break;
