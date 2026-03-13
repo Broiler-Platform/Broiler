@@ -115,7 +115,7 @@ const path = require('path');
     console.log('Reference render saved to: ' + outputPath);
 })();
 JSEOF
-        npx playwright install chromium 2>/dev/null || true
+        npx playwright install chromium 2>&1 || echo "  ⚠ Playwright Chromium installation had warnings (non-fatal)"
         node "$PLAYWRIGHT_SCRIPT" "$ACID3_DIR/acid3.html" "$REFERENCE_OUTPUT" 2>/dev/null && {
             echo "  ✓ Chromium reference saved to: $REFERENCE_OUTPUT"
             rm -f "$PLAYWRIGHT_SCRIPT"

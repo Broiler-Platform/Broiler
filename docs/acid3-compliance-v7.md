@@ -14,7 +14,7 @@
 All 100 Acid3 subtests pass. Achieved via Phases A–E in v6 (see
 [acid3-compliance-v6.md](acid3-compliance-v6.md) for details).
 
-### CLI Tests: **538/538 passing** (0 failures)
+### CLI Tests: **540/540 passing** (0 failures)
 
 ### Pixel Comparison Summary
 
@@ -364,7 +364,7 @@ python3 scripts/acid3-compare.py <broiler.png> <reference.png> --output-dir <dir
 | Significant differences (>25) | 85.7% | <20% |
 | Score area mean diff | 110.9 | <30 |
 | Bucket area mean diff | 73.0 | <25 |
-| CLI tests passing | 538/538 | 538+ |
+| CLI tests passing | 540/540 | 540+ |
 | Red FAIL pixels | 0 | 0 |
 
 ---
