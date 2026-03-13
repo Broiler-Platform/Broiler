@@ -352,9 +352,22 @@ public sealed partial class DomBridge
                                     mainBody.Children.Add(child);
                                 }
                             }
-                            // Register ALL parsed elements (including deeply nested ones)
-                            // so getElementById, querySelector, etc. can find them
-                            _elements.AddRange(allEls);
+                            // Register the content elements (excluding wrapper html/body
+                            // from the fragment parse) in document order so that
+                            // getElementsByTagName, document.links, etc. return
+                            // elements in the correct order relative to the rest of
+                            // the document.
+                            var contentEls = new List<DomElement>();
+                            var topChildren = new List<DomElement>(bodyEl.Children);
+                            foreach (var tc in topChildren)
+                            {
+                                contentEls.Add(tc);
+                                CollectAllDescendantsFlat(tc, contentEls);
+                            }
+                            if (CurrentScriptIndex >= 0 && CurrentScriptIndex < _elements.Count)
+                                _elements.InsertRange(CurrentScriptIndex + 1, contentEls);
+                            else
+                                _elements.AddRange(contentEls);
                         }
                     }
                     return JSUndefined.Value;

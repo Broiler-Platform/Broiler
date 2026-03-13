@@ -2478,4 +2478,64 @@ document.getElementById('result').textContent = r.join('|');
         // No linktest text should remain
         Assert.DoesNotContain("YOU SHOULD NOT SEE THIS AT ALL", result);
     }
+
+    /// <summary>
+    /// Diagnostic: Run actual acid3.html with test 4 and 5 failure capture.
+    /// </summary>
+    [Fact]
+    public void DiagPhaseD_NodeIterator_Acid3_Structure_Trace()
+    {
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
+        Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
+        var html = File.ReadAllText(acid3Path);
+        
+        // Inject error capture: patch fail() to log which test failed and why
+        // Insert right after the assertEquals function definition
+        var patch = @"
+  var _testFailures = [];
+  var _origFail = fail;
+  fail = function(message) { _testFailures.push(message); _origFail(message); };
+";
+        html = html.Replace("var kungFuDeathGrip = null;", patch + "  var kungFuDeathGrip = null;");
+        
+        // Inject DOM dump before test 4 runs, and capture test 4/5 errors
+        // We'll patch test 4 to also dump the full body walk
+        // Insert a dump script before </body>
+        var dumpScript = @"
+<script type=""text/javascript"">
+var _diagDiv = document.createElement('div');
+_diagDiv.id = '_diag';
+var msgs = [];
+for (var fi = 0; fi < _testFailures.length; fi++) {
+    msgs.push(_testFailures[fi].substring(0, 200));
+}
+_diagDiv.textContent = msgs.join('|||');
+document.body.appendChild(_diagDiv);
+</script>";
+        html = html.Replace("</body>", dumpScript + "\n</body>");
+        
+        var url = "http://acid3.acidtests.org/acid3.html";
+        var result = CaptureService.ExecuteScriptsWithDom(html, url);
+        
+        // Extract score
+        var scoreMatch = System.Text.RegularExpressions.Regex.Match(result, @"id=""score""[^>]*>(\d+)<");
+        var score = scoreMatch.Success ? int.Parse(scoreMatch.Groups[1].Value) : -1;
+        Console.WriteLine($"ACID3_SCORE={score}");
+        
+        // Extract failures
+        var diagMatch = System.Text.RegularExpressions.Regex.Match(result, @"id=""_diag""[^>]*>([^<]*)<");
+        if (diagMatch.Success && !string.IsNullOrEmpty(diagMatch.Groups[1].Value))
+        {
+            Console.WriteLine("=== TEST FAILURES ===");
+            foreach (var f in diagMatch.Groups[1].Value.Split("|||"))
+                Console.WriteLine("  " + System.Net.WebUtility.HtmlDecode(f));
+        }
+        else
+        {
+            Console.WriteLine("No failure messages captured (or diag div not found)");
+        }
+        
+        Assert.True(score >= 95, $"Score {score} should be >= 95");
+    }
 }
