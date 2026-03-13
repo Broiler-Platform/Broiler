@@ -60,13 +60,23 @@ public sealed class ScriptEngine : IScriptEngine
     /// <inheritdoc />
     public string? Execute(IReadOnlyList<string> scripts, string html)
     {
+        return Execute(scripts, html, url: null);
+    }
+
+    /// <inheritdoc />
+    public string? Execute(IReadOnlyList<string> scripts, string html, string? url)
+    {
         if (scripts.Count == 0)
             return null;
 
         using var context = new JSContext();
         RegisterRuntimeExtensions(context);
         var bridge = new DomBridge();
-        bridge.Attach(context, html);
+
+        if (!string.IsNullOrEmpty(url))
+            bridge.Attach(context, html, url);
+        else
+            bridge.Attach(context, html);
 
         for (var i = 0; i < scripts.Count; i++)
         {
@@ -87,6 +97,17 @@ public sealed class ScriptEngine : IScriptEngine
                 RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Script inline-{i} failed: {ex.Message}", ex);
             }
         }
+
+        // Fire body onload event after all scripts have executed
+        // (simulates end-of-parsing / window load in browsers).
+        // This is critical for test harnesses like Acid3 that bootstrap
+        // the test runner via <body onload="update()">.
+        bridge.FireWindowLoadEvent();
+
+        // Flush all pending timers and rAF callbacks so that
+        // setTimeout-chained test harnesses run to completion.
+        bridge.FlushTimers();
+
         MicroTasks.Drain();
         return bridge.SerializeToHtml();
     }
