@@ -696,7 +696,9 @@ internal static class CssLayoutEngine
                 case CssConstants.Middle:
                     // CSS 2.1 §10.8.1: Align the vertical midpoint of the box
                     // with the baseline plus half the x-height of the parent.
-                    if (lineBox.Rectangles.ContainsKey(box))
+                    // x-height ≈ 0.5 × font height for Latin fonts; half of
+                    // that is 0.25 × font height.
+                    if (lineBox.Rectangles.ContainsKey(box) && baseline > Single.MinValue)
                     {
                         double boxHeight = lineBox.Rectangles[box].Height;
                         double parentFontHeight = box.ParentBox?.ActualFont.Height ?? 0;
