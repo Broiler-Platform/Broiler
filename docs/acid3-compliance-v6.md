@@ -60,7 +60,7 @@ The comparison uses Python (Pillow + NumPy) to:
 
 | Metric | Value |
 |--------|-------|
-| Acid3 DOM Score | **94/100** (after Phase B for-in fix) |
+| Acid3 DOM Score | **95/100** (after Phase C CSS comment fix) |
 | Red FAIL pixels in rendered image | **0** (after Phase 6 stripping) |
 | Visible leaked test text | **None** (after Phase 6 stripping) |
 | CLI tests passing | 532/532 (all passing) |
