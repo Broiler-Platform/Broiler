@@ -64,9 +64,17 @@ internal static class HtmlPostProcessor
     internal static string Process(string html)
     {
         html = StripScriptTags(html);
-        html = StripCssDataUriBackgrounds(html);
+        // Note: StripCssDataUriBackgrounds is intentionally NOT called here.
+        // Stripping data-URI CSS backgrounds destroys essential visual content
+        // (e.g., the Acid2 face uses data-URI backgrounds for forehead, eyes,
+        // and chin colours).  HtmlRenderer can render these backgrounds; the
+        // original stripping was a workaround that caused acid2 regression.
         html = StripIframeContent(html);
-        html = StripObjectContent(html);
+        // Note: StripObjectContent is intentionally NOT called here.
+        // Stripping <object> fallback content destroys nested objects used by
+        // the Acid2 test (the eyes are formed by nested <object> elements with
+        // image fallback).  Acid3 tests that need object stripping call
+        // StripObjectContent() directly; the default pipeline preserves them.
         html = StripHiddenTestArtifacts(html);
         return html;
     }
