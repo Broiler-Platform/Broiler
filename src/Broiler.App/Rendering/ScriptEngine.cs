@@ -58,17 +58,16 @@ public sealed class ScriptEngine : IScriptEngine
     }
 
     /// <inheritdoc />
-    public bool Execute(IReadOnlyList<string> scripts, string html)
+    public string? Execute(IReadOnlyList<string> scripts, string html)
     {
         if (scripts.Count == 0)
-            return true;
+            return null;
 
         using var context = new JSContext();
         RegisterRuntimeExtensions(context);
         var bridge = new DomBridge();
         bridge.Attach(context, html);
 
-        var allSucceeded = true;
         for (var i = 0; i < scripts.Count; i++)
         {
             try
@@ -86,11 +85,10 @@ public sealed class ScriptEngine : IScriptEngine
             catch (Exception ex)
             {
                 RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Script inline-{i} failed: {ex.Message}", ex);
-                allSucceeded = false;
             }
         }
         MicroTasks.Drain();
-        return allSucceeded;
+        return bridge.SerializeToHtml();
     }
 
     /// <inheritdoc />
