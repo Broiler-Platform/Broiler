@@ -31,6 +31,7 @@
     <Compile Include="..\Broiler.App\Rendering\CssBoxModel.cs" Link="CssBoxModel.cs" />
     <Compile Include="..\Broiler.App\Rendering\ImagePipeline.cs" Link="ImagePipeline.cs" />
     <Compile Include="..\Broiler.App\Rendering\CssTextProperties.cs" Link="CssTextProperties.cs" />
+    <Compile Include="..\Broiler.App\Rendering\HtmlPostProcessor.cs" Link="HtmlPostProcessor.cs" />
   </ItemGroup>
 
 

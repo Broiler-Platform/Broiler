@@ -32,10 +32,19 @@ public sealed class RenderingPipeline(
     /// The page URL (when available) is set on <c>window.location</c>.
     /// After scripts execute, the body <c>onload</c> event fires and
     /// pending timers are flushed.
-    /// Returns the serialised post-execution HTML, or <c>null</c> when
-    /// there are no scripts.
+    /// The serialised post-execution HTML is then sanitised (script tags,
+    /// data-URI backgrounds, iframe/object fallback content, and hidden
+    /// test artifacts are stripped) so that HtmlRenderer displays the same
+    /// result as the CLI image-capture path.
+    /// Returns the sanitised HTML, or <c>null</c> when there are no scripts.
     /// </summary>
-    public string? ExecuteScripts(PageContent content) => scriptEngine.Execute(content.Scripts, content.Html, content.Url);
+    public string? ExecuteScripts(PageContent content)
+    {
+        var html = scriptEngine.Execute(content.Scripts, content.Html, content.Url);
+        if (html != null)
+            html = HtmlPostProcessor.Process(html);
+        return html;
+    }
 
     public void Dispose() => pageLoader.Dispose();
 }

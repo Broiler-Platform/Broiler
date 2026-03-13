@@ -164,7 +164,7 @@ public class HtmlControl : Control
             context.PushTransform(new TranslateTransform(xTrans, yTrans));
         }
 
-        context.PushClip(new RectangleGeometry(new Rect(Padding.Left + BorderThickness.Left, Padding.Top + BorderThickness.Top, htmlWidth, (int)htmlHeight)));
+        context.PushClip(new RectangleGeometry(new Rect(Padding.Left + BorderThickness.Left, Padding.Top + BorderThickness.Top, htmlWidth, htmlHeight)));
         _htmlContainer.Location = new Point(Padding.Left + BorderThickness.Left, Padding.Top + BorderThickness.Top);
         _htmlContainer.PerformPaint(context, new Rect(Padding.Left + BorderThickness.Left, Padding.Top + BorderThickness.Top, htmlWidth, htmlHeight));
         context.Pop();
