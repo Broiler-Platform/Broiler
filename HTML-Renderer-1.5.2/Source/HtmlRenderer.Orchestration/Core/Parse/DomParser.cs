@@ -108,21 +108,10 @@ internal sealed class DomParser
                 {
                     var classes = box.HtmlTag.TryGetAttribute("class");
                     var idPrefix = "#" + id;
-                    var startIdx = 0;
-                    var classList = new List<string>();
-
-                    while (startIdx < classes.Length)
-                    {
-                        while (startIdx < classes.Length && classes[startIdx] == ' ')
-                            startIdx++;
-                        if (startIdx >= classes.Length)
-                            break;
-                        var endIdx = classes.IndexOf(' ', startIdx);
-                        if (endIdx < 0)
-                            endIdx = classes.Length;
-                        classList.Add("." + classes.Substring(startIdx, endIdx - startIdx));
-                        startIdx = endIdx + 1;
-                    }
+                    var classWords = classes.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    var classList = new List<string>(classWords.Length);
+                    foreach (var w in classWords)
+                        classList.Add("." + w);
 
                     foreach (var cls in classList)
                     {
@@ -130,6 +119,10 @@ internal sealed class DomParser
                         AssignCssBlocks(box, cssData, box.HtmlTag.Name + idPrefix + cls);
                     }
 
+                    // Try all 2-class permutations — mirrors the existing
+                    // compound class logic in AssignClassCssBlocks which
+                    // handles order-independent matching (CSS selectors
+                    // #id.a.b and #id.b.a are equivalent).
                     if (classList.Count >= 2)
                     {
                         for (int i = 0; i < classList.Count; i++)

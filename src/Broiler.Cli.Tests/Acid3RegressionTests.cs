@@ -2841,7 +2841,10 @@ document.getElementById('result').textContent = cs.color;
 </body></html>";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
-        // getComputedStyle should return the hsla value, not red
+        // Broiler's DomBridge stores CSS values as authored strings, so
+        // getComputedStyle returns the literal hsla() declaration rather
+        // than a normalised rgb() form.  Verify the cascade picked the
+        // second declaration (hsla black) over the first (red).
         Assert.Contains("hsla(0, 0%, 0%, 1.0)", result);
     }
 }
