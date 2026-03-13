@@ -35,6 +35,15 @@ public interface IScriptEngine
     string? Execute(IReadOnlyList<string> scripts, string html, string? url);
 
     /// <summary>
+    /// Execute regular <paramref name="scripts"/> followed by
+    /// <paramref name="deferredScripts"/> (simulating end-of-parsing
+    /// for <c>defer</c> script tags).  Otherwise identical to the
+    /// three-argument <see cref="Execute(IReadOnlyList{string}, string, string?)"/>
+    /// overload.
+    /// </summary>
+    string? Execute(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url);
+
+    /// <summary>
     /// Execute scripts and return a detailed <see cref="ScriptExecutionResult"/>
     /// that includes per-script error messages and stack traces.
     /// </summary>

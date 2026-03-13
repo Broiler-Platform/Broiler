@@ -66,7 +66,13 @@ public sealed class ScriptEngine : IScriptEngine
     /// <inheritdoc />
     public string? Execute(IReadOnlyList<string> scripts, string html, string? url)
     {
-        if (scripts.Count == 0)
+        return Execute(scripts, (IReadOnlyList<string>)[], html, url);
+    }
+
+    /// <inheritdoc />
+    public string? Execute(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url)
+    {
+        if (scripts.Count == 0 && deferredScripts.Count == 0)
             return null;
 
         using var context = new JSContext();
@@ -109,6 +115,21 @@ public sealed class ScriptEngine : IScriptEngine
             }
         }
         bridge.CurrentScriptIndex = -1;
+
+        // Execute deferred scripts after all regular scripts
+        // (simulates end-of-parsing for <script defer> tags).
+        foreach (var script in deferredScripts)
+        {
+            try
+            {
+                var source = PrepareSource(script);
+                context.Eval(source);
+            }
+            catch (Exception ex)
+            {
+                RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Deferred script failed: {ex.Message}", ex);
+            }
+        }
 
         // Fire body onload event after all scripts have executed
         // (simulates end-of-parsing / window load in browsers).
