@@ -2552,11 +2552,136 @@ document.getElementById('diag').textContent = r.join('|');
         Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
         var html = File.ReadAllText(acid3Path);
         var url = "http://acid3.acidtests.org/acid3.html";
-        var result = CaptureService.ExecuteScriptsWithDom(html, url);
+        var basePath = Path.GetDirectoryName(acid3Path)!;
+        var result = CaptureService.ExecuteScriptsWithDom(html, url, basePath);
         var scoreMatch = System.Text.RegularExpressions.Regex.Match(result, @"id=""score""[^>]*>(\d+)<");
         Assert.True(scoreMatch.Success, "Could not find score element in output");
         var score = int.Parse(scoreMatch.Groups[1].Value);
         Console.WriteLine($"ACID3_SCORE={score}");
         Assert.True(score >= 97, $"Acid3 score: {score} (expected >= 97, Phase D should achieve 97+)");
+    }
+
+    // ── Phase E: Sub-Document Resource Loading ────────────────────────────────
+
+    /// <summary>
+    /// Phase E: Verify that iframe contentDocument is accessible and SVG
+    /// elements can be found via getElementsByTagName after loading svg.xml.
+    /// </summary>
+    [Fact]
+    public void PhaseE_Iframe_SubDocument_Loading()
+    {
+        var html = @"
+        <html><body>
+        <script>
+            var result = '';
+            var iframe = document.createElement('iframe');
+            iframe.src = 'svg.xml';
+            iframe.onload = function() { result += 'loaded;'; };
+            document.body.appendChild(iframe);
+            var doc = iframe.contentDocument;
+            if (doc) {
+                result += 'doc_ok;';
+                var texts = doc.getElementsByTagName('text');
+                if (texts && texts.length > 0) result += 'text_found;';
+            }
+            document.title = result;
+        </script>
+        </body></html>";
+        var acid3Dir = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3"));
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://example.com/test.html", acid3Dir);
+        Assert.Contains("loaded;", result);
+        Assert.Contains("doc_ok;", result);
+        Assert.Contains("text_found;", result);
+    }
+
+    /// <summary>
+    /// Phase E: Verify that insertRule works with live cssRules on a sub-document
+    /// (test 72 prerequisite).
+    /// </summary>
+    [Fact]
+    public void PhaseE_InsertRule_And_Live_CssRules()
+    {
+        var html = @"
+        <html><body>
+        <script>
+            var result = '';
+            var iframe = document.createElement('iframe');
+            iframe.src = 'empty.html';
+            document.body.appendChild(iframe);
+            var doc = iframe.contentDocument;
+            if (doc) {
+                doc.open();
+                doc.write('<!DOCTYPE HTML><head><title></title><style type=""text/css"">img { height: 10px; }</style><body><p><img src=""data:image/gif;base64,R0lGODlhAQABAID/AMDAwAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=="" alt="""">');
+                doc.close();
+                if (doc.styleSheets && doc.styleSheets[0]) {
+                    result += 'sheet_ok;';
+                    var rules = doc.styleSheets[0].cssRules;
+                    if (rules) result += 'rules_ok;';
+                    doc.styleSheets[0].insertRule('img { height: 40px; }', 1);
+                    if (doc.styleSheets[0].cssRules.length === 2) result += 'insert_ok;';
+                    if (rules.length === 2) result += 'live_ok;';
+                }
+            }
+            document.title = result;
+        </script>
+        </body></html>";
+        var acid3Dir = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3"));
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://example.com/test.html", acid3Dir);
+        Assert.Contains("sheet_ok;", result);
+        Assert.Contains("rules_ok;", result);
+        Assert.Contains("insert_ok;", result);
+    }
+
+    /// <summary>
+    /// Phase E: Verify that iframe onload handler fires and can modify DOM.
+    /// </summary>
+    [Fact]
+    public void PhaseE_Linktest_Onload_Fires()
+    {
+        var html = @"
+        <html><body>
+        <script>
+            var result = '';
+            var a = document.createElement('a');
+            a.setAttribute('id', 'linktest');
+            a.setAttribute('class', 'pending');
+            document.body.appendChild(a);
+
+            var iframe = document.createElement('iframe');
+            iframe.setAttribute('onload', ""document.getElementById('linktest').removeAttribute('class')"");
+            iframe.src = 'empty.html';
+            document.body.appendChild(iframe);
+
+            if (!document.getElementById('linktest').hasAttribute('class'))
+                result += 'class_removed;';
+            document.title = result;
+        </script>
+        </body></html>";
+        var acid3Dir = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3"));
+        var result = CaptureService.ExecuteScriptsWithDom(html, "http://example.com/test.html", acid3Dir);
+        Assert.Contains("class_removed;", result);
+    }
+
+    /// <summary>
+    /// Phase E regression: Full Acid3 score should be at least 100.
+    /// </summary>
+    [Fact]
+    public void PhaseE_Acid3_Score_At_Least_100()
+    {
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
+        Assert.True(File.Exists(acid3Path), $"Acid3 test file not found at {acid3Path}");
+        var html = File.ReadAllText(acid3Path);
+        var url = "http://acid3.acidtests.org/acid3.html";
+        var basePath = Path.GetDirectoryName(acid3Path)!;
+        var result = CaptureService.ExecuteScriptsWithDom(html, url, basePath);
+        var scoreMatch = System.Text.RegularExpressions.Regex.Match(result, @"id=""score""[^>]*>(\d+)<");
+        Assert.True(scoreMatch.Success, "Could not find score element in output");
+        var score = int.Parse(scoreMatch.Groups[1].Value);
+        Console.WriteLine($"ACID3_SCORE={score}");
+        Assert.True(score >= 100, $"Acid3 score: {score} (expected 100, Phase E should achieve 100)");
     }
 }

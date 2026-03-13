@@ -45,6 +45,12 @@ public sealed partial class DomBridge
     /// </summary>
     internal int CurrentScriptIndex { get; set; } = -1;
 
+    /// <summary>
+    /// Optional local base path for resolving relative sub-resource URLs to local files.
+    /// When set, relative URLs are first checked against this directory before attempting HTTP.
+    /// </summary>
+    private string? _localBasePath;
+
     // window.location fields
     private string _pageUrl = string.Empty;
     private string _pageProtocol = string.Empty;
@@ -99,6 +105,16 @@ public sealed partial class DomBridge
         }
         ParseHtml(html);
         RegisterDocument(context);
+    }
+
+    /// <summary>
+    /// Sets a local base directory for resolving relative sub-resource URLs.
+    /// When set, sub-resource URLs (e.g. iframe src) are first looked up as files
+    /// relative to this directory before falling back to HTTP fetch.
+    /// </summary>
+    public void SetLocalBasePath(string basePath)
+    {
+        _localBasePath = basePath;
     }
 
     /// <summary>

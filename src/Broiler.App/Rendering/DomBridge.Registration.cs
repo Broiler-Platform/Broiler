@@ -1357,6 +1357,19 @@ public sealed partial class DomBridge
 
         context["window"] = window;
 
+        // window.parent — refers to the parent window (self for top-level)
+        window.FastAddValue(
+            (KeyString)"parent",
+            window,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        context["parent"] = window;
+
+        // window.self — refers to this window
+        window.FastAddValue(
+            (KeyString)"self",
+            window,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // document.defaultView — returns the window object
         document.FastAddValue(
             (KeyString)"defaultView",
