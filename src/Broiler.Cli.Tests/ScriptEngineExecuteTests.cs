@@ -280,5 +280,196 @@ document.write('<p id=""injected"">written</p>');
         Assert.Contains("injected", output);
         Assert.Contains("written", output);
     }
+
+    // ---------------------------------------------------------------
+    //  ScriptExtractor.ExtractAll — deferred and external scripts
+    //  (aligns Broiler.App pipeline with CLI's ExecuteScriptsWithDom)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void ExtractAll_Separates_Deferred_Scripts()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<script>var a = 1;</script>
+<script defer>var b = 2;</script>
+<script>var c = 3;</script>
+</body></html>";
+
+        var extractor = new ScriptExtractor();
+        var result = extractor.ExtractAll(html);
+
+        Assert.Equal(2, result.Scripts.Count);
+        Assert.Contains("var a = 1;", result.Scripts);
+        Assert.Contains("var c = 3;", result.Scripts);
+
+        Assert.Single(result.DeferredScripts);
+        Assert.Contains("var b = 2;", result.DeferredScripts);
+    }
+
+    [Fact]
+    public void ExtractAll_No_Scripts_Returns_Empty_Lists()
+    {
+        var html = @"<!DOCTYPE html><html><body><p>Hello</p></body></html>";
+
+        var extractor = new ScriptExtractor();
+        var result = extractor.ExtractAll(html);
+
+        Assert.Empty(result.Scripts);
+        Assert.Empty(result.DeferredScripts);
+    }
+
+    [Fact]
+    public void ExtractAll_DataUri_Scripts_Decoded()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<script src=""data:text/javascript,var%20x%20%3D%201%3B""></script>
+</body></html>";
+
+        var extractor = new ScriptExtractor();
+        var result = extractor.ExtractAll(html);
+
+        Assert.Single(result.Scripts);
+        Assert.Equal("var x = 1;", result.Scripts[0]);
+        Assert.Empty(result.DeferredScripts);
+    }
+
+    [Fact]
+    public void ExtractAll_Deferred_DataUri_Script()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<script defer src=""data:text/javascript,var%20x%20%3D%201%3B""></script>
+</body></html>";
+
+        var extractor = new ScriptExtractor();
+        var result = extractor.ExtractAll(html);
+
+        Assert.Empty(result.Scripts);
+        Assert.Single(result.DeferredScripts);
+        Assert.Equal("var x = 1;", result.DeferredScripts[0]);
+    }
+
+    [Fact]
+    public void ExtractAll_External_File_Script()
+    {
+        // Create a temporary script file
+        var tmpDir = Path.Combine(Path.GetTempPath(), "broiler-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmpDir);
+        try
+        {
+            var scriptPath = Path.Combine(tmpDir, "ext.js");
+            File.WriteAllText(scriptPath, "var ext = 'loaded';");
+            var scriptUrl = new Uri(scriptPath).AbsoluteUri;
+
+            var html = $@"<!DOCTYPE html>
+<html><body>
+<script src=""{scriptUrl}""></script>
+</body></html>";
+
+            var extractor = new ScriptExtractor();
+            var result = extractor.ExtractAll(html, "file:///page.html");
+
+            Assert.Single(result.Scripts);
+            Assert.Equal("var ext = 'loaded';", result.Scripts[0]);
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+    [Fact]
+    public void ScriptEngine_Execute_With_Deferred_Scripts()
+    {
+        // Validate that ScriptEngine executes deferred scripts
+        // after regular scripts, matching CLI's ExecuteScriptsWithDom.
+        var engine = new ScriptEngine();
+
+        var scripts = new List<string> { "var result = 'A';" };
+        var deferred = new List<string> { "result += 'B';" };
+
+        var html = @"<!DOCTYPE html>
+<html><body><div id=""out""></div>
+<script>var result = 'A';</script>
+<script defer>result += 'B';</script>
+</body></html>";
+
+        var output = engine.Execute(scripts, deferred, html, "file:///test.html");
+
+        Assert.NotNull(output);
+        // The DOM-bridge execution won't directly reflect the simple
+        // variable assignment, but should produce valid serialised HTML.
+        Assert.Contains("<html", output);
+    }
+
+    [Fact]
+    public void ScriptEngine_Execute_DeferredOnly_Returns_Html()
+    {
+        // When there are only deferred scripts (no regular scripts),
+        // the engine should still execute them.
+        var engine = new ScriptEngine();
+
+        var scripts = new List<string>();
+        var deferred = new List<string>
+        {
+            @"var p = document.createElement('p');
+              p.textContent = 'deferred-ok';
+              document.body.appendChild(p);"
+        };
+
+        var html = @"<!DOCTYPE html>
+<html><body></body></html>";
+
+        var output = engine.Execute(scripts, deferred, html, "file:///test.html");
+
+        Assert.NotNull(output);
+        Assert.Contains("deferred-ok", output);
+    }
+
+    [Fact]
+    public void ScriptExtractor_FetchExternalScript_FileUrl()
+    {
+        var tmpDir = Path.Combine(Path.GetTempPath(), "broiler-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tmpDir);
+        try
+        {
+            var scriptPath = Path.Combine(tmpDir, "test.js");
+            File.WriteAllText(scriptPath, "alert('hello');");
+            var fileUrl = new Uri(scriptPath).AbsoluteUri;
+
+            var result = ScriptExtractor.FetchExternalScript(fileUrl, null);
+            Assert.Equal("alert('hello');", result);
+        }
+        finally
+        {
+            Directory.Delete(tmpDir, true);
+        }
+    }
+
+    [Fact]
+    public void ScriptExtractor_FetchExternalScript_NonExistent_Returns_Null()
+    {
+        var result = ScriptExtractor.FetchExternalScript("file:///nonexistent/script.js", null);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void PageContent_DeferredScripts_Default_Empty()
+    {
+        var content = new PageContent("html", new List<string>(), "url");
+        Assert.NotNull(content.DeferredScripts);
+        Assert.Empty(content.DeferredScripts);
+    }
+
+    [Fact]
+    public void PageContent_DeferredScripts_Stored()
+    {
+        var deferred = new List<string> { "console.log('deferred');" };
+        var content = new PageContent("html", new List<string>(), "url", deferred);
+        Assert.Single(content.DeferredScripts);
+        Assert.Equal("console.log('deferred');", content.DeferredScripts[0]);
+    }
 }
 

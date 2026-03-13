@@ -146,6 +146,14 @@ public partial class MainWindow : Window
                 && !string.IsNullOrEmpty(uri.Fragment) && uri.Fragment.Length > 1)
             {
                 var elementId = uri.Fragment[1..];
+                // Force a synchronous layout pass so that element positions
+                // are computed before we try to scroll.  Setting HtmlPanel.Text
+                // only parses the HTML and calls InvalidateMeasure(); the
+                // actual layout (MeasureOverride → PerformHtmlLayout) has not
+                // yet run because we are still on the UI thread.  Without this
+                // call GetElementRectangle returns zero coordinates, causing
+                // ScrollToElement to silently do nothing.
+                HtmlPanel.UpdateLayout();
                 HtmlPanel.ScrollToElement(elementId);
             }
 

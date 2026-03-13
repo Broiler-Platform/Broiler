@@ -32,6 +32,15 @@
     <Compile Include="..\Broiler.App\Rendering\ImagePipeline.cs" Link="ImagePipeline.cs" />
     <Compile Include="..\Broiler.App\Rendering\CssTextProperties.cs" Link="CssTextProperties.cs" />
     <Compile Include="..\Broiler.App\Rendering\HtmlPostProcessor.cs" Link="HtmlPostProcessor.cs" />
+    <Compile Include="..\Broiler.App\Rendering\IScriptExtractor.cs" Link="IScriptExtractor.cs" />
+    <Compile Include="..\Broiler.App\Rendering\ScriptExtractor.cs" Link="ScriptExtractor.cs" />
+    <Compile Include="..\Broiler.App\Rendering\PageContent.cs" Link="PageContent.cs" />
+    <Compile Include="..\Broiler.App\Rendering\IScriptEngine.cs" Link="IScriptEngine.cs" />
+    <Compile Include="..\Broiler.App\Rendering\ScriptEngine.cs" Link="ScriptEngine.cs" />
+    <Compile Include="..\Broiler.App\Rendering\ContentSecurityPolicy.cs" Link="ContentSecurityPolicy.cs" />
+    <Compile Include="..\Broiler.App\Rendering\MicroTaskQueue.cs" Link="MicroTaskQueue.cs" />
+    <Compile Include="..\Broiler.App\Rendering\ScriptExecutionResult.cs" Link="ScriptExecutionResult.cs" />
+    <Compile Include="..\Broiler.App\Rendering\ScriptProfilingHook.cs" Link="ScriptProfilingHook.cs" />
   </ItemGroup>
 
 

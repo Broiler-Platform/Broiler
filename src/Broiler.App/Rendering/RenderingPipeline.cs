@@ -17,12 +17,14 @@ public sealed class RenderingPipeline(
     /// Load a page from <paramref name="url"/>, extract inline scripts,
     /// and return a <see cref="PageContent"/> ready for rendering.
     /// The normalised URL (with scheme) is included in the result tuple.
+    /// Uses <see cref="IScriptExtractor.ExtractAll"/> so that deferred and
+    /// external scripts are also captured, matching the CLI's behaviour.
     /// </summary>
     public async Task<(string NormalisedUrl, PageContent Content)> LoadPageAsync(string url)
     {
         var (normalisedUrl, html) = await pageLoader.FetchAsync(url);
-        var scripts = scriptExtractor.Extract(html);
-        return (normalisedUrl, new PageContent(html, scripts, normalisedUrl));
+        var result = scriptExtractor.ExtractAll(html, normalisedUrl);
+        return (normalisedUrl, new PageContent(html, result.Scripts, normalisedUrl, result.DeferredScripts));
     }
 
     /// <summary>
@@ -40,7 +42,7 @@ public sealed class RenderingPipeline(
     /// </summary>
     public string? ExecuteScripts(PageContent content)
     {
-        var html = scriptEngine.Execute(content.Scripts, content.Html, content.Url);
+        var html = scriptEngine.Execute(content.Scripts, content.DeferredScripts, content.Html, content.Url);
         if (html != null)
             html = HtmlPostProcessor.Process(html);
         return html;
