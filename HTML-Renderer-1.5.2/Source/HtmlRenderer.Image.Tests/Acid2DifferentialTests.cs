@@ -41,8 +41,10 @@ public class Acid2DifferentialTests : IDisposable
     /// pixel (R/G/B &lt; 250).  The full-image match is inflated by the
     /// large white background so this metric focuses on the rendered face.
     /// v6: Raised from 0.85 → 0.88 to lock in v5 improvements (current ≥89%).
+    /// v6.2: Confirmed at 89.20% via HtmlContainer path.  CLI path achieves
+    /// 92.56% after regression fix but HtmlContainer path unchanged.
     /// </summary>
-    private const double MinContentMatchRatio = 0.88;
+    private const double MinContentMatchRatio = 0.89;
 
     private static readonly DeterministicRenderConfig Config = new()
     {
@@ -329,10 +331,8 @@ public class Acid2DifferentialTests : IDisposable
     /// match threshold.  This guards against regressions in margin:auto centering,
     /// pseudo-element border rendering, and the diamond rasterisation.
     /// v6: Raised from 90% → 93% to lock in margin:auto and pseudo-element fixes.
-    /// v6.1 audit: Pixel-level analysis confirmed the diamond layout is correct
-    /// (black pixel positions match exactly).  The 93% threshold is at the
-    /// practical maximum — the remaining ~7% gap is inherent anti-aliasing
-    /// differences between SkiaSharp and Chromium at border edges.
+    /// v6.2: Confirmed at 93.23% via HtmlContainer path.  CLI path achieves
+    /// 99.61% after regression fix due to hidden-artifact stripping.
     /// </summary>
     [Fact]
     public void Acid2Top_NoseRegion_MeetsMinimumThreshold()
@@ -661,6 +661,192 @@ public class Acid2DifferentialTests : IDisposable
         Assert.True(childCount == 1,
             $"Expected .nose > div to have 1 child (diamond div), but found {childCount}. " +
             "An erroneous ::after pseudo-element may have been generated.");
+    }
+
+    // ─────────────────── v6.2 Detailed Region Tests ───────────────────
+
+    /// <summary>
+    /// Verifies the nose diamond area (x=132–180, y=176–200) achieves a high
+    /// match.  This is the inner diamond formed by CSS border triangles on
+    /// ::before/::after pseudo-elements.  Validates that black pixel positions
+    /// and counts are identical between Broiler and Chromium.
+    /// v6.2: New test for critical region tracking (issue roadmap item 6).
+    /// </summary>
+    [Fact]
+    public void Acid2Top_NoseDiamond_InnerArea_MeetsMinimumThreshold()
+    {
+        using var actual = RenderAtAnchorTop(_acid2Html);
+        using var baseline = SKBitmap.Decode(_referencePath);
+        Assert.NotNull(baseline);
+
+        int tolerance = Config.ColorTolerance;
+        int totalContent = 0, matchContent = 0;
+
+        // Diamond area: rows 176–200, columns 132–180
+        for (int y = 176; y <= 200; y++)
+        {
+            for (int x = 132; x <= 180; x++)
+            {
+                var a = actual.GetPixel(x, y);
+                var r = baseline.GetPixel(x, y);
+
+                bool isContent = a.Red < 250 || a.Green < 250 || a.Blue < 250
+                              || r.Red < 250 || r.Green < 250 || r.Blue < 250;
+
+                if (isContent)
+                {
+                    totalContent++;
+                    if (Math.Abs(a.Red - r.Red) <= tolerance
+                     && Math.Abs(a.Green - r.Green) <= tolerance
+                     && Math.Abs(a.Blue - r.Blue) <= tolerance)
+                        matchContent++;
+                }
+            }
+        }
+
+        double diamondMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
+
+        Assert.True(
+            diamondMatch >= 0.85,
+            $"Acid2 #top nose diamond inner area match {diamondMatch:P2} is below minimum 85.00%. " +
+            $"Matching content pixels: {matchContent}/{totalContent}");
+    }
+
+    /// <summary>
+    /// Verifies the eyes black border outlines match at a high level.
+    /// Specifically checks the left eye area (x=100–140, y=80–120) for
+    /// border rendering accuracy.
+    /// v6.2: New test for critical region tracking (issue roadmap item 6).
+    /// </summary>
+    [Fact]
+    public void Acid2Top_EyesBorder_LeftEye_MeetsMinimumThreshold()
+    {
+        using var actual = RenderAtAnchorTop(_acid2Html);
+        using var baseline = SKBitmap.Decode(_referencePath);
+        Assert.NotNull(baseline);
+
+        int tolerance = Config.ColorTolerance;
+        int totalContent = 0, matchContent = 0;
+
+        for (int y = 80; y <= 120; y++)
+        {
+            for (int x = 100; x <= 140; x++)
+            {
+                var a = actual.GetPixel(x, y);
+                var r = baseline.GetPixel(x, y);
+
+                bool isContent = a.Red < 250 || a.Green < 250 || a.Blue < 250
+                              || r.Red < 250 || r.Green < 250 || r.Blue < 250;
+
+                if (isContent)
+                {
+                    totalContent++;
+                    if (Math.Abs(a.Red - r.Red) <= tolerance
+                     && Math.Abs(a.Green - r.Green) <= tolerance
+                     && Math.Abs(a.Blue - r.Blue) <= tolerance)
+                        matchContent++;
+                }
+            }
+        }
+
+        double eyeMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
+
+        Assert.True(
+            eyeMatch >= 0.90,
+            $"Acid2 #top left eye border match {eyeMatch:P2} is below minimum 90.00%. " +
+            $"Matching content pixels: {matchContent}/{totalContent}");
+    }
+
+    /// <summary>
+    /// Verifies the mouth/smile area border anti-aliasing.  The smile region
+    /// (rows 220–250) should have near-perfect match since it uses solid black
+    /// borders without angled edges.
+    /// v6.2: New test for critical region tracking (issue roadmap item 6).
+    /// </summary>
+    [Fact]
+    public void Acid2Top_MouthBorder_AntiAliasing_MeetsMinimumThreshold()
+    {
+        using var actual = RenderAtAnchorTop(_acid2Html);
+        using var baseline = SKBitmap.Decode(_referencePath);
+        Assert.NotNull(baseline);
+
+        int tolerance = Config.ColorTolerance;
+        int totalContent = 0, matchContent = 0;
+
+        // Mouth inner area (rows 220–250, columns 60–240)
+        for (int y = 220; y <= 250; y++)
+        {
+            for (int x = 60; x <= 240; x++)
+            {
+                var a = actual.GetPixel(x, y);
+                var r = baseline.GetPixel(x, y);
+
+                bool isContent = a.Red < 250 || a.Green < 250 || a.Blue < 250
+                              || r.Red < 250 || r.Green < 250 || r.Blue < 250;
+
+                if (isContent)
+                {
+                    totalContent++;
+                    if (Math.Abs(a.Red - r.Red) <= tolerance
+                     && Math.Abs(a.Green - r.Green) <= tolerance
+                     && Math.Abs(a.Blue - r.Blue) <= tolerance)
+                        matchContent++;
+                }
+            }
+        }
+
+        double mouthMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
+
+        Assert.True(
+            mouthMatch >= 0.98,
+            $"Acid2 #top mouth border AA match {mouthMatch:P2} is below minimum 98.00%. " +
+            $"Matching content pixels: {matchContent}/{totalContent}");
+    }
+
+    /// <summary>
+    /// Verifies that the face outline borders (left and right edges of the face)
+    /// render with consistent anti-aliasing.  Tests the border rendering at
+    /// x=84–96 (left edge) across the nose/smile area (y=130–260).
+    /// v6.2: New test for critical region tracking (issue roadmap item 6).
+    /// </summary>
+    [Fact]
+    public void Acid2Top_FaceOutline_LeftBorder_MeetsMinimumThreshold()
+    {
+        using var actual = RenderAtAnchorTop(_acid2Html);
+        using var baseline = SKBitmap.Decode(_referencePath);
+        Assert.NotNull(baseline);
+
+        int tolerance = Config.ColorTolerance;
+        int totalContent = 0, matchContent = 0;
+
+        // Left face border area (x=84–96, y=130–260)
+        for (int y = 130; y <= 260; y++)
+        {
+            for (int x = 84; x <= 96; x++)
+            {
+                var a = actual.GetPixel(x, y);
+                var r = baseline.GetPixel(x, y);
+
+                bool isContent = a.Red < 250 || a.Green < 250 || a.Blue < 250
+                              || r.Red < 250 || r.Green < 250 || r.Blue < 250;
+
+                if (isContent)
+                {
+                    totalContent++;
+                    if (Math.Abs(a.Red - r.Red) <= tolerance
+                     && Math.Abs(a.Green - r.Green) <= tolerance
+                     && Math.Abs(a.Blue - r.Blue) <= tolerance)
+                        matchContent++;
+                }
+            }
+        }
+
+        double borderMatch = totalContent > 0 ? (double)matchContent / totalContent : 0;
+
+        Assert.True(
+            borderMatch >= 0.85,
+            $"Acid2 #top left face border match {borderMatch:P2} is below minimum 85.00%. " +
+            $"Matching content pixels: {matchContent}/{totalContent}");
     }
 
     private static TheArtOfDev.HtmlRenderer.Core.Dom.CssBox? FindBoxByClass(
