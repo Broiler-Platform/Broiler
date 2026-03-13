@@ -377,7 +377,7 @@ public sealed partial class DomBridge
         int pos = 0;
         while (pos < cssText.Length)
         {
-            SkipWhitespace(cssText, ref pos);
+            SkipWhitespaceAndComments(cssText, ref pos);
             if (pos >= cssText.Length) break;
 
             if (cssText[pos] == '@')
@@ -386,21 +386,31 @@ public sealed partial class DomBridge
                 if (cssText.Length > pos + 6 && cssText.Substring(pos, 6).Equals("@media", StringComparison.OrdinalIgnoreCase))
                 {
                     pos += 6;
-                    SkipWhitespace(cssText, ref pos);
+                    SkipWhitespaceAndComments(cssText, ref pos);
                     // Extract media query up to '{'
-                    int braceStart = cssText.IndexOf('{', pos);
+                    int braceStart = IndexOfSkippingComments(cssText, '{', pos);
                     if (braceStart < 0) break;
-                    var mediaQuery = cssText[pos..braceStart].Trim();
+                    var mediaQuery = StripCssComments(cssText[pos..braceStart]).Trim();
                     pos = braceStart + 1;
 
-                    // Find matching closing brace
+                    // Find matching closing brace (skip comments inside)
                     int depth = 1;
                     int blockStart = pos;
                     while (pos < cssText.Length && depth > 0)
                     {
-                        if (cssText[pos] == '{') depth++;
-                        else if (cssText[pos] == '}') depth--;
-                        if (depth > 0) pos++;
+                        if (pos + 1 < cssText.Length && cssText[pos] == '/' && cssText[pos + 1] == '*')
+                        {
+                            pos += 2;
+                            while (pos + 1 < cssText.Length && !(cssText[pos] == '*' && cssText[pos + 1] == '/'))
+                                pos++;
+                            if (pos + 1 < cssText.Length) pos += 2;
+                        }
+                        else
+                        {
+                            if (cssText[pos] == '{') depth++;
+                            else if (cssText[pos] == '}') depth--;
+                            if (depth > 0) pos++;
+                        }
                     }
                     if (pos > blockStart)
                     {
@@ -413,17 +423,27 @@ public sealed partial class DomBridge
                 else
                 {
                     // Skip other @-rules (but don't fail on them)
-                    int braceIdx = cssText.IndexOf('{', pos);
-                    int semiIdx = cssText.IndexOf(';', pos);
+                    int braceIdx = IndexOfSkippingComments(cssText, '{', pos);
+                    int semiIdx = IndexOfSkippingComments(cssText, ';', pos);
                     if (braceIdx >= 0 && (semiIdx < 0 || braceIdx < semiIdx))
                     {
                         pos = braceIdx + 1;
                         int d = 1;
                         while (pos < cssText.Length && d > 0)
                         {
-                            if (cssText[pos] == '{') d++;
-                            else if (cssText[pos] == '}') d--;
-                            pos++;
+                            if (pos + 1 < cssText.Length && cssText[pos] == '/' && cssText[pos + 1] == '*')
+                            {
+                                pos += 2;
+                                while (pos + 1 < cssText.Length && !(cssText[pos] == '*' && cssText[pos + 1] == '/'))
+                                    pos++;
+                                if (pos + 1 < cssText.Length) pos += 2;
+                            }
+                            else
+                            {
+                                if (cssText[pos] == '{') d++;
+                                else if (cssText[pos] == '}') d--;
+                                pos++;
+                            }
                         }
                     }
                     else if (semiIdx >= 0)
@@ -439,9 +459,9 @@ public sealed partial class DomBridge
             }
 
             // Regular rule: selector { declarations }
-            int ruleOpenBrace = cssText.IndexOf('{', pos);
+            int ruleOpenBrace = IndexOfSkippingComments(cssText, '{', pos);
             if (ruleOpenBrace < 0) break;
-            var selectorText = cssText[pos..ruleOpenBrace].Trim();
+            var selectorText = StripCssComments(cssText[pos..ruleOpenBrace]).Trim();
             pos = ruleOpenBrace + 1;
             int ruleCloseBrace = cssText.IndexOf('}', pos);
             if (ruleCloseBrace < 0) break;
@@ -501,6 +521,104 @@ public sealed partial class DomBridge
     private static void SkipWhitespace(string text, ref int pos)
     {
         while (pos < text.Length && char.IsWhiteSpace(text[pos])) pos++;
+    }
+
+    /// <summary>
+    /// Skips whitespace and CSS comments (<c>/* ... */</c>).
+    /// </summary>
+    private static void SkipWhitespaceAndComments(string text, ref int pos)
+    {
+        while (pos < text.Length)
+        {
+            if (char.IsWhiteSpace(text[pos]))
+            {
+                pos++;
+            }
+            else if (pos + 1 < text.Length && text[pos] == '/' && text[pos + 1] == '*')
+            {
+                // Skip /* ... */ comment
+                pos += 2;
+                while (pos + 1 < text.Length)
+                {
+                    if (text[pos] == '*' && text[pos + 1] == '/')
+                    {
+                        pos += 2;
+                        break;
+                    }
+                    pos++;
+                }
+                // Handle unterminated comment
+                if (pos >= text.Length) break;
+            }
+            else
+            {
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Finds the first occurrence of <paramref name="ch"/> starting at <paramref name="startPos"/>,
+    /// skipping over CSS comments (<c>/* ... */</c>).
+    /// </summary>
+    private static int IndexOfSkippingComments(string text, char ch, int startPos)
+    {
+        int i = startPos;
+        while (i < text.Length)
+        {
+            if (i + 1 < text.Length && text[i] == '/' && text[i + 1] == '*')
+            {
+                // Skip comment
+                i += 2;
+                while (i + 1 < text.Length)
+                {
+                    if (text[i] == '*' && text[i + 1] == '/')
+                    {
+                        i += 2;
+                        break;
+                    }
+                    i++;
+                }
+            }
+            else if (text[i] == ch)
+            {
+                return i;
+            }
+            else
+            {
+                i++;
+            }
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Strips CSS comments (<c>/* ... */</c>) from a string.
+    /// </summary>
+    private static string StripCssComments(string text)
+    {
+        int commentStart = text.IndexOf("/*", StringComparison.Ordinal);
+        if (commentStart < 0) return text;
+
+        var sb = new StringBuilder(text.Length);
+        int pos = 0;
+        while (pos < text.Length)
+        {
+            int start = text.IndexOf("/*", pos, StringComparison.Ordinal);
+            if (start < 0)
+            {
+                sb.Append(text, pos, text.Length - pos);
+                break;
+            }
+            sb.Append(text, pos, start - pos);
+            int end = text.IndexOf("*/", start + 2, StringComparison.Ordinal);
+            if (end < 0)
+            {
+                break; // Unterminated comment — discard rest
+            }
+            pos = end + 2;
+        }
+        return sb.ToString();
     }
 
     /// <summary>
