@@ -3678,6 +3678,25 @@ public sealed partial class DomBridge
         }
     }
 
+    /// <summary>
+    /// Collects all <c>&lt;a&gt;</c> and <c>&lt;area&gt;</c> elements with an
+    /// <c>href</c> attribute in document tree order.
+    /// </summary>
+    private void CollectLinksInTreeOrder(DomElement root, List<JSValue> results)
+    {
+        foreach (var child in root.Children)
+        {
+            if (!child.IsTextNode &&
+                (string.Equals(child.TagName, "a", StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(child.TagName, "area", StringComparison.OrdinalIgnoreCase)) &&
+                child.Attributes.ContainsKey("href"))
+            {
+                results.Add(ToJSObject(child));
+            }
+            CollectLinksInTreeOrder(child, results);
+        }
+    }
+
     /// <summary>Collects all elements matching a predicate in a sub-tree.</summary>
     private void CollectMatching(DomElement root, Func<DomElement, bool> predicate, List<JSValue> results)
     {

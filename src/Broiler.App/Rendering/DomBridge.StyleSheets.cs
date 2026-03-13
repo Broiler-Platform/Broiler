@@ -13,6 +13,9 @@ namespace Broiler.App.Rendering;
 /// </summary>
 public sealed partial class DomBridge
 {
+    /// <summary>Cache for stylesheet objects, keyed by the owning style element.</summary>
+    private readonly Dictionary<DomElement, JSObject> _styleSheetCache = [];
+
     private JSArray BuildStyleSheetsCollection(DomElement docRoot)
     {
         var styleEls = new List<DomElement>();
@@ -41,9 +44,14 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// Builds a CSSStyleSheet JSObject for a style element.
+    /// Cached per style element to ensure identity (the same object is returned
+    /// each time, making cssRules a live collection per the CSSOM spec).
     /// </summary>
     private JSObject BuildStyleSheetObject(DomElement styleElement)
     {
+        if (_styleSheetCache.TryGetValue(styleElement, out var cached))
+            return cached;
+
         var sheet = new JSObject();
 
         // ownerNode
@@ -76,49 +84,75 @@ public sealed partial class DomBridge
         // Track last known text content to detect changes
         var lastTextHash = string.Empty;
 
-        // cssRules — live collection that combines text-based and inserted rules
+        // Ensure rulesStorage is up-to-date with text content and inserted rules
+        void EnsureRulesUpToDate()
+        {
+            if (skipRebuild) return;
+
+            var currentText = CollectStyleElementText(styleElement);
+            var currentHash = currentText ?? string.Empty;
+
+            if (currentHash != lastTextHash)
+            {
+                rulesStorage.Clear();
+                if (!string.IsNullOrWhiteSpace(currentText))
+                {
+                    foreach (var rule in ParseCssRuleStrings(currentText))
+                        rulesStorage.Add(rule);
+                }
+                lastTextHash = currentHash;
+
+                // Re-insert any programmatically added rules
+                if (styleElement.DomProperties.TryGetValue("_insertedRules", out var inserted) && inserted is List<(int Index, string Rule)> insertedRules)
+                {
+                    foreach (var (idx, rule) in insertedRules.OrderBy(r => r.Index))
+                    {
+                        if (idx <= rulesStorage.Count)
+                            rulesStorage.Insert(idx, rule);
+                        else
+                            rulesStorage.Add(rule);
+                    }
+                }
+            }
+        }
+
+        // Live cssRules object — single instance that always reflects current state
+        var liveCssRules = new JSObject();
+        // length is a live getter that always reflects the current rule count
+        liveCssRules.FastAddProperty(
+            (KeyString)"length",
+            new JSFunction((in Arguments _) =>
+            {
+                EnsureRulesUpToDate();
+                return new JSNumber(rulesStorage.Count);
+            }, "get length"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // Syncs indexed properties on the live cssRules object with rulesStorage
+        void SyncLiveCssRulesIndices()
+        {
+            EnsureRulesUpToDate();
+            for (var i = 0; i < rulesStorage.Count; i++)
+            {
+                var ruleObj = BuildCssRuleObject(rulesStorage[i]);
+                liveCssRules.FastAddValue((KeyString)i.ToString(), ruleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+            }
+            // Remove stale indices beyond current count
+            for (var i = rulesStorage.Count; i < rulesStorage.Count + 50; i++)
+            {
+                var key = (KeyString)i.ToString();
+                liveCssRules.Delete(key);
+            }
+        }
+
+        // cssRules — returns the live collection, syncing indices on access
         sheet.FastAddProperty(
             (KeyString)"cssRules",
             new JSFunction((in Arguments _) =>
             {
-                if (!skipRebuild)
-                {
-                    // Re-read text-based rules from the style element
-                    var currentText = CollectStyleElementText(styleElement);
-                    var currentHash = currentText ?? string.Empty;
-
-                    // Only rebuild from text if text content changed
-                    if (currentHash != lastTextHash)
-                    {
-                        rulesStorage.Clear();
-                        if (!string.IsNullOrWhiteSpace(currentText))
-                        {
-                            foreach (var rule in ParseCssRuleStrings(currentText))
-                                rulesStorage.Add(rule);
-                        }
-                        lastTextHash = currentHash;
-
-                        // Re-insert any programmatically added rules
-                        if (styleElement.DomProperties.TryGetValue("_insertedRules", out var inserted) && inserted is List<(int Index, string Rule)> insertedRules)
-                        {
-                            foreach (var (idx, rule) in insertedRules.OrderBy(r => r.Index))
-                            {
-                                if (idx <= rulesStorage.Count)
-                                    rulesStorage.Insert(idx, rule);
-                                else
-                                    rulesStorage.Add(rule);
-                            }
-                        }
-                    }
-                }
-
-                var arr = new JSArray();
-                foreach (var rule in rulesStorage)
-                {
-                    var ruleObj = BuildCssRuleObject(rule);
-                    arr.Add(ruleObj);
-                }
-                return arr;
+                SyncLiveCssRulesIndices();
+                return liveCssRules;
             }, "get cssRules"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -164,6 +198,7 @@ public sealed partial class DomBridge
             }, "deleteRule", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        _styleSheetCache[styleElement] = sheet;
         return sheet;
     }
 

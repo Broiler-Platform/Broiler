@@ -670,18 +670,14 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.links — collection of all <a> and <area> elements with href
+        // Uses tree-order traversal instead of _elements insertion order
+        // to correctly reflect dynamically appended elements.
         document.FastAddProperty(
             (KeyString)"links",
             new JSFunction((in Arguments _) =>
             {
                 var results = new List<JSValue>();
-                foreach (var el in _elements)
-                {
-                    if ((string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) ||
-                         string.Equals(el.TagName, "area", StringComparison.OrdinalIgnoreCase)) &&
-                        el.Attributes.ContainsKey("href"))
-                        results.Add(ToJSObject(el));
-                }
+                CollectLinksInTreeOrder(DocumentElement, results);
                 return new JSArray(results);
             }, "get links"),
             null,
@@ -1357,12 +1353,14 @@ public sealed partial class DomBridge
 
         context["window"] = window;
 
-        // window.parent — refers to the parent window (self for top-level)
+        // window.parent — uses the JSContext global scope so that parent.X()
+        // resolves user-defined globals (e.g. parent.notify() from sub-documents).
+        var globalThis = context.Eval("this");
         window.FastAddValue(
             (KeyString)"parent",
-            window,
+            globalThis,
             JSPropertyAttributes.EnumerableConfigurableValue);
-        context["parent"] = window;
+        context["parent"] = globalThis;
 
         // window.self — refers to this window
         window.FastAddValue(

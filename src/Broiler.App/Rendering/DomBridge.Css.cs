@@ -293,6 +293,14 @@ public sealed partial class DomBridge
                 if (cssText.Length == 0 && styleEl.TextContent != null)
                     cssText.Append(styleEl.TextContent);
 
+                // Include rules added via insertRule() (stored in DomProperties)
+                if (styleEl.DomProperties.TryGetValue("_insertedRules", out var insertedObj) &&
+                    insertedObj is List<(int Index, string Rule)> insertedRules)
+                {
+                    foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))
+                        cssText.Append(' ').Append(rule);
+                }
+
                 ParseAndApplyCssRules(cssText.ToString(), element, computed, computedSpecificity, vpWidth, vpHeight);
             }
 
