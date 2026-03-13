@@ -2367,4 +2367,68 @@ document.getElementById('result').textContent = r.join('|');
         Assert.True(unexpectedFails == 0,
             $"Found {unexpectedFails} unexpected visible FAIL text occurrences after stripping");
     }
+
+    /// <summary>
+    /// Verifies that StripHiddenTestArtifacts removes the linktest anchor
+    /// text content while preserving the element structure.
+    /// </summary>
+    [Fact]
+    public void StripHiddenTestArtifacts_Removes_Linktest_Text()
+    {
+        var html = @"<html><body>
+<a id=""linktest"" class=""pending"" href=""test.html"">YOU SHOULD NOT SEE THIS AT ALL</a>
+<p id=""score"">OK</p>
+</body></html>";
+        var result = CaptureService.StripHiddenTestArtifacts(html);
+        Assert.DoesNotContain("YOU SHOULD NOT SEE THIS AT ALL", result);
+        Assert.Contains("id=\"linktest\"", result);
+        Assert.Contains("id=\"score\"", result);
+        Assert.Contains("</a>", result);
+    }
+
+    /// <summary>
+    /// Verifies that StripHiddenTestArtifacts removes the FAIL div
+    /// test artifact (div with id=" ").
+    /// </summary>
+    [Fact]
+    public void StripHiddenTestArtifacts_Removes_Fail_Div()
+    {
+        var html = @"<html><body>
+<p id=""score"">OK</p>
+<div id="" "">FAIL</div></body></html>";
+        var result = CaptureService.StripHiddenTestArtifacts(html);
+        Assert.DoesNotContain("FAIL", result);
+        Assert.DoesNotContain("id=\" \"", result);
+        Assert.Contains("id=\"score\"", result);
+    }
+
+    /// <summary>
+    /// Validates that the full stripping pipeline (including Phase 6 fixes)
+    /// produces zero visible FAIL text and no linktest leakage.
+    /// </summary>
+    [Fact]
+    public void Acid3_Phase6_No_Visible_Fail_Or_Linktest_After_Full_Pipeline()
+    {
+        var acid3Path = Path.GetFullPath(Path.Combine(
+            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..",
+            "acid", "acid3", "acid3.html"));
+        var html = File.ReadAllText(acid3Path);
+        var url = "http://acid3.acidtests.org/acid3.html";
+        var result = CaptureService.ExecuteScriptsWithDom(html, url);
+
+        // Apply the full stripping pipeline as CaptureImageAsync
+        result = CaptureService.StripScriptTags(result);
+        result = CaptureService.StripIframeContent(result);
+        result = CaptureService.StripObjectContent(result);
+        result = CaptureService.StripHiddenTestArtifacts(result);
+
+        // No FAIL text should remain anywhere
+        var failMatches = System.Text.RegularExpressions.Regex.Matches(
+            result, @">FAIL<");
+        Assert.True(failMatches.Count == 0,
+            $"Found {failMatches.Count} FAIL text occurrence(s) after full pipeline");
+
+        // No linktest text should remain
+        Assert.DoesNotContain("YOU SHOULD NOT SEE THIS AT ALL", result);
+    }
 }

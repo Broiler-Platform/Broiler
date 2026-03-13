@@ -217,6 +217,32 @@ public class CaptureService
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
+    /// Matches elements whose text content should be invisible according to
+    /// their CSS styling but that HtmlRenderer renders visibly because it
+    /// does not support the required compound selectors or CSS features.
+    /// Currently strips:
+    /// <list type="bullet">
+    ///   <item><description>
+    ///     <c>&lt;a id="linktest" class="pending"&gt;…&lt;/a&gt;</c> — CSS
+    ///     rule <c>#linktest.pending { color: white }</c> makes this invisible
+    ///     on white backgrounds, but HtmlRenderer does not match the compound
+    ///     <c>#id.class</c> selector.
+    ///   </description></item>
+    ///   <item><description>
+    ///     <c>&lt;div id=" "&gt;FAIL&lt;/div&gt;</c> — a test artifact div
+    ///     that only exists when the test score is below 100/100.
+    ///   </description></item>
+    /// </list>
+    /// </summary>
+    private static readonly Regex LinktestPattern = new(
+        @"<a\s[^>]*\bid=""linktest""[^>]*>[\s\S]*?</a>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex FailDivPattern = new(
+        @"<div\s+id="" "">FAIL</div>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
     /// Captures website content from the specified URL, processes it using
     /// the local rendering engines (HTML-Renderer and YantraJS), and saves
     /// the result to the output path.
@@ -375,6 +401,11 @@ public class CaptureService
         // other hidden content to bleed through.
         html = StripIframeContent(html);
         html = StripObjectContent(html);
+
+        // Strip test-harness elements whose CSS-hidden text leaks through
+        // because HtmlRenderer does not match the compound selectors
+        // (e.g. #linktest.pending { color: white }) that would hide them.
+        html = StripHiddenTestArtifacts(html);
 
         var format = options.ImageFormat == ImageFormat.Jpeg
             ? SKEncodedImageFormat.Jpeg
@@ -713,6 +744,32 @@ public class CaptureService
                 $"<object{m.Groups["attrs"].Value}></object>");
         } while (result != previous);
         return result;
+    }
+
+    /// <summary>
+    /// Strips test-harness elements whose text content should be invisible
+    /// according to CSS but that HtmlRenderer renders visibly because it
+    /// does not fully support the required compound selectors.  See the
+    /// <see cref="LinktestPattern"/> and <see cref="FailDivPattern"/>
+    /// field docs for details.
+    /// </summary>
+    internal static string StripHiddenTestArtifacts(string html)
+    {
+        // Remove the visible text from the linktest anchor (keep the element
+        // so DOM structure is preserved, just empty its body).
+        html = LinktestPattern.Replace(html, m =>
+        {
+            // Reconstruct opening tag by finding the closing ">".
+            var full = m.Value;
+            var tagEnd = full.IndexOf('>');
+            if (tagEnd < 0) return full;
+            return full[..(tagEnd + 1)] + "</a>";
+        });
+
+        // Remove the <div id=" ">FAIL</div> test artifact entirely.
+        html = FailDivPattern.Replace(html, string.Empty);
+
+        return html;
     }
 
     /// <summary>
