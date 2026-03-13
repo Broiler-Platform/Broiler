@@ -59,6 +59,12 @@ public sealed class ScriptExtractor : IScriptExtractor
         @"\s+",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Shared <see cref="HttpClient"/> for fetching external scripts.
+    /// A static singleton is intentional — Microsoft recommends reusing
+    /// <see cref="HttpClient"/> instances to benefit from connection pooling
+    /// and avoid socket exhaustion.
+    /// </summary>
     private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
 
     /// <inheritdoc />
@@ -249,11 +255,13 @@ public sealed class ScriptExtractor : IScriptExtractor
                 return File.Exists(path) ? File.ReadAllText(path) : null;
             }
 
-            using var response = SharedHttpClient.GetAsync(resolvedUrl).GetAwaiter().GetResult();
-            if (!response.IsSuccessStatusCode)
-                return null;
-
-            return response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            // Synchronous HTTP fetch.  ConfigureAwait(false) prevents
+            // deadlocks when the caller is on a UI dispatcher.
+            var content = SharedHttpClient.GetStringAsync(resolvedUrl)
+                .ConfigureAwait(false)
+                .GetAwaiter()
+                .GetResult();
+            return content;
         }
         catch (Exception ex)
         {
