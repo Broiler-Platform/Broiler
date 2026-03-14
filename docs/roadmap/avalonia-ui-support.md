@@ -147,7 +147,7 @@ Port `HtmlControl` / `HtmlPanel` to an Avalonia `Control`. Key differences:
 
 Create `src/Broiler.Avalonia/` targeting `net8.0` (no `-windows` TFM):
 
-- Port `MainWindow.xaml` to Avalonia AXAML.
+- Port `MainWindow.xaml` to Avalonia `.axaml`.
 - Replace `DispatcherTimer` (WPF) with `Avalonia.Threading.DispatcherTimer`.
 - Reference `HtmlRenderer.Avalonia` instead of `HtmlRenderer.WPF`.
 - Share rendering pipeline code using the same `<Compile Include>` link
@@ -184,12 +184,12 @@ Port `DevConsolePanel.xaml` / `.xaml.cs` to Avalonia:
 
 | Area | Risk | Mitigation |
 |------|------|------------|
-| **System.Drawing.Common** | `HtmlRenderer.Adapters` depends on `System.Drawing.Common` for `RColor`, `RSize`, `RPoint`. On non-Windows platforms, `System.Drawing.Common` has limited support (deprecated on Linux/macOS in .NET 7+). | Replace `System.Drawing` types with HtmlRenderer's own `Primitives` types or Avalonia equivalents where needed. `HtmlRenderer.Primitives` already defines `RColor`, `RSize`, `RPoint`, `RRect`. |
+| **System.Drawing.Common** | `HtmlRenderer.Adapters` depends on `System.Drawing.Common` for `Color`, `SizeF`, `PointF`, `RectangleF`. On non-Windows platforms, `System.Drawing.Common` has limited support (deprecated on Linux/macOS in .NET 7+). | Introduce platform-neutral primitive types or use Avalonia's built-in `Color`, `Size`, `Point`, `Rect` in the Avalonia adapter layer. Where `System.Drawing` types cross the adapter boundary, add conversion helpers. |
 | **Font metrics** | WPF and Avalonia may produce different text measurements for the same font, leading to layout differences. | Establish reference images per platform; accept minor pixel-level variance in cross-platform tests. |
 | **Clipboard / context menu** | WPF clipboard and context menu helpers are Windows-specific. | Avalonia provides its own clipboard and context menu APIs. Implement Avalonia-specific versions. |
 | **DispatcherTimer behaviour** | WPF `DispatcherTimer` with `DispatcherPriority.Render` may have slightly different timing semantics than Avalonia's `DispatcherTimer`. | Verify animation frame-stepping (InteractiveSession) works correctly under Avalonia's dispatcher. |
 | **Image formats** | WPF uses `BitmapSource` / `BitmapImage`; Avalonia uses `Avalonia.Media.Imaging.Bitmap`. | Implement `ImageAdapter` around Avalonia's bitmap types. Support the same HTTP-based image loading in `ImageDownloader`. |
-| **XAML dialect** | WPF XAML and Avalonia AXAML are similar but not identical (namespace URIs, attached properties, styling syntax differ). | Port XAML manually; do not attempt automated conversion. |
+| **XAML dialect** | WPF XAML and Avalonia `.axaml` are similar but not identical (namespace URIs, attached properties, styling syntax differ). | Port XAML manually; do not attempt automated conversion. |
 
 ---
 
@@ -262,7 +262,7 @@ cross-platform CI.
 
 | Skill | Required For | Priority |
 |-------|-------------|----------|
-| AvaloniaUI development (AXAML, controls, styling) | Application shell and DevConsole port | High |
+| AvaloniaUI development (`.axaml`, controls, styling) | Application shell and DevConsole port | High |
 | Avalonia `DrawingContext` / custom rendering | HtmlRenderer adapter layer | High |
 | Cross-platform .NET (runtime differences, font handling) | CI and testing on Linux/macOS | Medium |
 | WPF knowledge (existing codebase familiarity) | Understanding current implementation for porting | Medium |
