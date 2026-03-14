@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Net;
 using System.Text;
 using System.Drawing;
 
@@ -117,17 +116,6 @@ internal static class CommonUtils
         catch (Exception ex)
         {
             Debug.WriteLine($"[HtmlRenderer] CommonUtils.TryGetFileInfo failed for path '{path}': {ex.Message}");
-        }
-
-        return null;
-    }
-
-    public static string GetResponseContentType(WebClient client)
-    {
-        foreach (string header in client.ResponseHeaders)
-        {
-            if (header.Equals("Content-Type", StringComparison.InvariantCultureIgnoreCase))
-                return client.ResponseHeaders[header];
         }
 
         return null;
