@@ -48,5 +48,21 @@ public sealed class RenderingPipeline(
         return html;
     }
 
+    /// <summary>
+    /// Starts an interactive script-execution session for
+    /// <paramref name="content"/>.  Scripts and deferred scripts execute
+    /// immediately but pending timer / rAF callbacks are <b>not</b> flushed.
+    /// The returned <see cref="InteractiveSession"/> lets the caller step
+    /// through callbacks one batch at a time, re-rendering after each step
+    /// to display animations interactively.
+    /// Returns <c>null</c> when the page has no scripts.
+    /// The caller must dispose the session when finished.
+    /// </summary>
+    public InteractiveSession? ExecuteScriptsInteractive(PageContent content)
+    {
+        return scriptEngine.ExecuteInteractive(
+            content.Scripts, content.DeferredScripts, content.Html, content.Url);
+    }
+
     public void Dispose() => pageLoader.Dispose();
 }

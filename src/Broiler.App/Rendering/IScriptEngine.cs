@@ -72,4 +72,16 @@ public interface IScriptEngine
     /// <c>Promise</c> callbacks.
     /// </summary>
     MicroTaskQueue MicroTasks { get; }
+
+    /// <summary>
+    /// Starts an interactive execution session. Scripts and deferred
+    /// scripts execute immediately, the <c>load</c> event fires, but
+    /// pending timers are <b>not</b> flushed. The returned
+    /// <see cref="InteractiveSession"/> allows the caller to step
+    /// through timer callbacks one batch at a time, enabling
+    /// intermediate visual states to be rendered (e.g. animations).
+    /// Returns <c>null</c> when there are no scripts to execute.
+    /// The caller must dispose the session when finished.
+    /// </summary>
+    InteractiveSession? ExecuteInteractive(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url);
 }

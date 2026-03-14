@@ -41,6 +41,7 @@
     <Compile Include="..\Broiler.App\Rendering\MicroTaskQueue.cs" Link="MicroTaskQueue.cs" />
     <Compile Include="..\Broiler.App\Rendering\ScriptExecutionResult.cs" Link="ScriptExecutionResult.cs" />
     <Compile Include="..\Broiler.App\Rendering\ScriptProfilingHook.cs" Link="ScriptProfilingHook.cs" />
+    <Compile Include="..\Broiler.App\Rendering\InteractiveSession.cs" Link="InteractiveSession.cs" />
   </ItemGroup>
 
 

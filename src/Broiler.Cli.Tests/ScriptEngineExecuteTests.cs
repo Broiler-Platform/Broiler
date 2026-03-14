@@ -471,5 +471,200 @@ document.write('<p id=""injected"">written</p>');
         Assert.Single(content.DeferredScripts);
         Assert.Equal("console.log('deferred');", content.DeferredScripts[0]);
     }
+
+    // ---------------------------------------------------------------
+    //  DomBridge.HasPendingTimers and FlushTimerStep
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void DomBridge_HasPendingTimers_False_When_No_Timers()
+    {
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>");
+        Assert.False(bridge.HasPendingTimers);
+    }
+
+    [Fact]
+    public void DomBridge_HasPendingTimers_True_After_SetTimeout()
+    {
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>");
+        context.Eval("setTimeout(function() {}, 0);");
+        Assert.True(bridge.HasPendingTimers);
+    }
+
+    [Fact]
+    public void DomBridge_FlushTimerStep_Executes_One_Batch()
+    {
+        var html = "<html><body><div id='out'></div></body></html>";
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html);
+
+        // Queue two chained timeouts:
+        //   First timeout writes "step1" and queues another for "step2"
+        context.Eval(@"
+            setTimeout(function() {
+                document.getElementById('out').textContent = 'step1';
+                setTimeout(function() {
+                    document.getElementById('out').textContent = 'step2';
+                }, 0);
+            }, 0);
+        ");
+
+        Assert.True(bridge.HasPendingTimers);
+
+        // First step executes the first timeout (sets "step1", queues "step2")
+        Assert.True(bridge.FlushTimerStep());
+        var html1 = bridge.SerializeToHtml();
+        Assert.Contains("step1", html1);
+
+        // Second step executes the second timeout (sets "step2")
+        Assert.True(bridge.HasPendingTimers);
+        Assert.True(bridge.FlushTimerStep());
+        var html2 = bridge.SerializeToHtml();
+        Assert.Contains("step2", html2);
+
+        // No more pending timers
+        Assert.False(bridge.HasPendingTimers);
+    }
+
+    [Fact]
+    public void DomBridge_FlushTimerStep_Returns_False_When_Empty()
+    {
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>");
+        Assert.False(bridge.FlushTimerStep());
+    }
+
+    // ---------------------------------------------------------------
+    //  InteractiveSession
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void InteractiveSession_Step_Returns_Intermediate_Html()
+    {
+        var engine = new ScriptEngine();
+        var html = "<html><body><div id='out'>init</div></body></html>";
+        var scripts = new List<string>
+        {
+            @"
+            setTimeout(function() {
+                document.getElementById('out').textContent = 'frame1';
+                setTimeout(function() {
+                    document.getElementById('out').textContent = 'frame2';
+                }, 0);
+            }, 0);
+            "
+        };
+
+        var session = engine.ExecuteInteractive(scripts, (IReadOnlyList<string>)[], html, null);
+        Assert.NotNull(session);
+        Assert.True(session.HasPendingWork);
+
+        // Step 1: executes first timeout → "frame1"
+        var step1Html = session.Step();
+        Assert.NotNull(step1Html);
+        Assert.Contains("frame1", step1Html);
+
+        // Step 2: executes second timeout → "frame2"
+        Assert.True(session.HasPendingWork);
+        var step2Html = session.Step();
+        Assert.NotNull(step2Html);
+        Assert.Contains("frame2", step2Html);
+
+        Assert.False(session.HasPendingWork);
+        session.Dispose();
+    }
+
+    [Fact]
+    public void InteractiveSession_Returns_Null_When_No_Scripts()
+    {
+        var engine = new ScriptEngine();
+        var session = engine.ExecuteInteractive(
+            (IReadOnlyList<string>)[], (IReadOnlyList<string>)[], "<html></html>", null);
+        Assert.Null(session);
+    }
+
+    [Fact]
+    public void InteractiveSession_Complete_Flushes_All_Timers()
+    {
+        var engine = new ScriptEngine();
+        var html = "<html><body><div id='out'>init</div></body></html>";
+        var scripts = new List<string>
+        {
+            @"
+            setTimeout(function() {
+                document.getElementById('out').textContent = 'step1';
+                setTimeout(function() {
+                    document.getElementById('out').textContent = 'final';
+                }, 0);
+            }, 0);
+            "
+        };
+
+        var session = engine.ExecuteInteractive(scripts, (IReadOnlyList<string>)[], html, null);
+        Assert.NotNull(session);
+
+        // Complete() flushes everything at once
+        var finalHtml = session.Complete();
+        Assert.Contains("final", finalHtml);
+        Assert.False(session.HasPendingWork);
+        session.Dispose();
+    }
+
+    [Fact]
+    public void InteractiveSession_CurrentHtml_Does_Not_Execute_Timers()
+    {
+        var engine = new ScriptEngine();
+        var html = "<html><body><div id='out'>init</div></body></html>";
+        var scripts = new List<string>
+        {
+            @"
+            setTimeout(function() {
+                document.getElementById('out').textContent = 'changed';
+            }, 0);
+            "
+        };
+
+        var session = engine.ExecuteInteractive(scripts, (IReadOnlyList<string>)[], html, null);
+        Assert.NotNull(session);
+
+        // CurrentHtml() should NOT execute timers
+        var currentHtml = session.CurrentHtml();
+        Assert.Contains("init", currentHtml);
+        Assert.DoesNotContain("changed", currentHtml);
+
+        // Timer is still pending
+        Assert.True(session.HasPendingWork);
+        session.Dispose();
+    }
+
+    [Fact]
+    public void InteractiveSession_RAF_Callbacks_Stepped()
+    {
+        var engine = new ScriptEngine();
+        var html = "<html><body><div id='out'>init</div></body></html>";
+        var scripts = new List<string>
+        {
+            @"
+            requestAnimationFrame(function() {
+                document.getElementById('out').textContent = 'animated';
+            });
+            "
+        };
+
+        var session = engine.ExecuteInteractive(scripts, (IReadOnlyList<string>)[], html, null);
+        Assert.NotNull(session);
+        Assert.True(session.HasPendingWork);
+
+        var stepHtml = session.Step();
+        Assert.NotNull(stepHtml);
+        Assert.Contains("animated", stepHtml);
+        session.Dispose();
+    }
 }
 
