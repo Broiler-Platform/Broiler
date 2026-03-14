@@ -1,0 +1,54 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:htmlRenderer="clr-namespace:TheArtOfDev.HtmlRenderer.Avalonia;assembly=HtmlRenderer.Avalonia"
+        xmlns:devConsole="clr-namespace:Broiler.Avalonia.DevConsole"
+        x:Class="Broiler.Avalonia.MainWindow"
+        Title="Broiler" Height="720" Width="1280"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="0"/>  <!-- Console row -->
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Navigation Bar -->
+        <Border Grid.Row="0" Background="#F0F0F0" BorderBrush="#CCCCCC"
+                BorderThickness="0,0,0,1" Padding="4">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Margin="0,0,4,0">
+                    <Button x:Name="BackButton" Content="◀" Width="32" Height="28" Margin="2"
+                            Click="BackButton_Click" ToolTip.Tip="Back"/>
+                    <Button x:Name="ForwardButton" Content="▶" Width="32" Height="28" Margin="2"
+                            Click="ForwardButton_Click" ToolTip.Tip="Forward"/>
+                    <Button x:Name="RefreshButton" Content="⟳" Width="32" Height="28" Margin="2"
+                            Click="RefreshButton_Click" ToolTip.Tip="Refresh"/>
+                </StackPanel>
+                <Button x:Name="GoButton" DockPanel.Dock="Right" Content="Go" Width="48" Height="28" Margin="4,0,0,0"
+                        Click="GoButton_Click"/>
+                <TextBox x:Name="UrlTextBox" Height="28" VerticalContentAlignment="Center" Padding="4,0"
+                         KeyDown="UrlTextBox_KeyDown"/>
+            </DockPanel>
+        </Border>
+
+        <!-- HTML Rendering Area -->
+        <htmlRenderer:HtmlPanel x:Name="HtmlPanel" Grid.Row="1"
+                                AvoidImagesLateLoading="True"
+                                AvoidAsyncImagesLoading="True"/>
+
+        <!-- Console Splitter (only visible when console is open) -->
+        <GridSplitter x:Name="ConsoleSplitter" Grid.Row="2" Height="4" Background="#3E3E3E"
+                      IsVisible="False"/>
+
+        <!-- Developer Console Panel -->
+        <devConsole:DevConsolePanel x:Name="DevConsole" Grid.Row="3"
+                                    IsVisible="False"/>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="4" Background="#F0F0F0" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Padding="4,2">
+            <TextBlock x:Name="StatusText" Text="Ready" FontSize="12"/>
+        </Border>
+    </Grid>
+</Window>

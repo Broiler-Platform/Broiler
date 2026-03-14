@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Broiler" />
+    <InternalsVisibleTo Include="Broiler.Avalonia" />
     <InternalsVisibleTo Include="Broiler.DevConsole.Tests" />
   </ItemGroup>
 

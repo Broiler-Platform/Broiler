@@ -215,17 +215,17 @@ HTML/CSS rendering.
 **Objective**: Port the Broiler application shell to Avalonia with navigation
 and script execution.
 
-- [ ] Create `src/Broiler.Avalonia/` project targeting `net8.0`.
-- [ ] Port `MainWindow.axaml` with navigation bar (Back, Forward, Refresh, URL
+- [x] Create `src/Broiler.Avalonia/` project targeting `net8.0`.
+- [x] Port `MainWindow.axaml` with navigation bar (Back, Forward, Refresh, URL
       bar, Go).
-- [ ] Implement `HtmlPanel` Avalonia control with scroll support.
-- [ ] Link rendering pipeline files (`RenderingPipeline`, `DomBridge`,
+- [x] Implement `HtmlPanel` Avalonia control with scroll support.
+- [x] Link rendering pipeline files (`RenderingPipeline`, `DomBridge`,
       `ScriptEngine`, etc.) via `<Compile Include>`.
-- [ ] Implement `DispatcherTimer`-based animation frame stepping.
-- [ ] Verify basic page loading and JavaScript execution.
-- [ ] Port `DevConsolePanel` to Avalonia (log viewer, DOM inspector, JS
+- [x] Implement `DispatcherTimer`-based animation frame stepping.
+- [x] Verify basic page loading and JavaScript execution.
+- [x] Port `DevConsolePanel` to Avalonia (log viewer, DOM inspector, JS
       console).
-- [ ] Add application entry point (`Program.cs` / `App.axaml`).
+- [x] Add application entry point (`Program.cs` / `App.axaml`).
 
 ### Phase 3 – Feature Parity & Testing
 
