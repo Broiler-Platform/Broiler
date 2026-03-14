@@ -1,0 +1,32 @@
+using Avalonia;
+using Avalonia.Media;
+using Color = System.Drawing.Color;
+using PointF = System.Drawing.PointF;
+using SizeF = System.Drawing.SizeF;
+using RectangleF = System.Drawing.RectangleF;
+
+namespace TheArtOfDev.HtmlRenderer.Avalonia.Utilities;
+
+internal static class Utils
+{
+    public static PointF Convert(Point p) => new((float)p.X, (float)p.Y);
+
+    public static Point[] Convert(PointF[] points)
+    {
+        Point[] myPoints = new Point[points.Length];
+        for (int i = 0; i < points.Length; i++)
+            myPoints[i] = Convert(points[i]);
+        return myPoints;
+    }
+
+    public static Point Convert(PointF p) => new(p.X, p.Y);
+    public static Point ConvertRound(PointF p) => new((int)p.X, (int)p.Y);
+    public static SizeF Convert(Size s) => new((float)s.Width, (float)s.Height);
+    public static Size Convert(SizeF s) => new(s.Width, s.Height);
+    public static Size ConvertRound(SizeF s) => new((int)s.Width, (int)s.Height);
+    public static RectangleF Convert(Rect r) => new((float)r.X, (float)r.Y, (float)r.Width, (float)r.Height);
+    public static Rect Convert(RectangleF r) => new(r.X, r.Y, r.Width, r.Height);
+    public static Rect ConvertRound(RectangleF r) => new((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height);
+    public static Color Convert(global::Avalonia.Media.Color c) => Color.FromArgb(c.A, c.R, c.G, c.B);
+    public static global::Avalonia.Media.Color Convert(Color c) => global::Avalonia.Media.Color.FromArgb(c.A, c.R, c.G, c.B);
+}
