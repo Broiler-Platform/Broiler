@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net;
+using System.Net.Http;
 using TheArtOfDev.HtmlRenderer.Core.Entities;
 using TheArtOfDev.HtmlRenderer.Core.Utils;
 
@@ -118,10 +118,16 @@ internal sealed class StylesheetLoadHandler : IStylesheetLoader
         return string.Empty;
     }
 
+    private static readonly HttpClient SharedHttpClient = new();
+
     private string LoadStylesheetFromUri(Uri uri)
     {
-        using var client = new WebClient();
-        var stylesheet = client.DownloadString(uri);
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        using var response = SharedHttpClient.Send(request);
+        response.EnsureSuccessStatusCode();
+        using var stream = response.Content.ReadAsStream();
+        using var reader = new StreamReader(stream);
+        var stylesheet = reader.ReadToEnd();
 
         try
         {
