@@ -22,6 +22,7 @@
     <Project Path="src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj" />
     <Project Path="src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj" />
     <Project Path="src/Broiler.DevSite/Broiler.DevSite.csproj" />
+    <Project Path="src/Broiler.Avalonia/Broiler.Avalonia.csproj" />
   </Folder>
   <Folder Name="/yantra-1.2.295/">
     <Project Path="yantra-1.2.295/YantraJS.Core/YantraJS.Core.csproj" />
