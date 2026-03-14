@@ -94,6 +94,13 @@ development site to aid rendering investigation, debugging, and testing.
 See the [Dev Console & Site Roadmap](docs/roadmap/dev-console-and-site.md)
 for details.
 
+### AvaloniaUI Support
+
+A roadmap for integrating AvaloniaUI to enable cross-platform desktop rendering
+on Windows, macOS, and Linux.
+See the [AvaloniaUI Support Roadmap](docs/roadmap/avalonia-ui-support.md) for
+details.
+
 ### CLI Website Capture Tool
 
 A cross-platform command-line tool for capturing website screenshots.
