@@ -561,7 +561,7 @@ document.write('<p id=""injected"">written</p>');
             "
         };
 
-        var session = engine.ExecuteInteractive(scripts, (IReadOnlyList<string>)[], html, null);
+        var session = engine.ExecuteInteractive(scripts, Array.Empty<string>(), html, null);
         Assert.NotNull(session);
         Assert.True(session.HasPendingWork);
 
@@ -585,7 +585,7 @@ document.write('<p id=""injected"">written</p>');
     {
         var engine = new ScriptEngine();
         var session = engine.ExecuteInteractive(
-            (IReadOnlyList<string>)[], (IReadOnlyList<string>)[], "<html></html>", null);
+            Array.Empty<string>(), Array.Empty<string>(), "<html></html>", null);
         Assert.Null(session);
     }
 
@@ -606,7 +606,7 @@ document.write('<p id=""injected"">written</p>');
             "
         };
 
-        var session = engine.ExecuteInteractive(scripts, (IReadOnlyList<string>)[], html, null);
+        var session = engine.ExecuteInteractive(scripts, Array.Empty<string>(), html, null);
         Assert.NotNull(session);
 
         // Complete() flushes everything at once
@@ -630,7 +630,7 @@ document.write('<p id=""injected"">written</p>');
             "
         };
 
-        var session = engine.ExecuteInteractive(scripts, (IReadOnlyList<string>)[], html, null);
+        var session = engine.ExecuteInteractive(scripts, Array.Empty<string>(), html, null);
         Assert.NotNull(session);
 
         // CurrentHtml() should NOT execute timers
@@ -657,7 +657,7 @@ document.write('<p id=""injected"">written</p>');
             "
         };
 
-        var session = engine.ExecuteInteractive(scripts, (IReadOnlyList<string>)[], html, null);
+        var session = engine.ExecuteInteractive(scripts, Array.Empty<string>(), html, null);
         Assert.NotNull(session);
         Assert.True(session.HasPendingWork);
 

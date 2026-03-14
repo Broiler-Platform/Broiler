@@ -66,7 +66,7 @@ public sealed class ScriptEngine : IScriptEngine
     /// <inheritdoc />
     public string? Execute(IReadOnlyList<string> scripts, string html, string? url)
     {
-        return Execute(scripts, (IReadOnlyList<string>)[], html, url);
+        return Execute(scripts, Array.Empty<string>(), html, url);
     }
 
     /// <inheritdoc />
