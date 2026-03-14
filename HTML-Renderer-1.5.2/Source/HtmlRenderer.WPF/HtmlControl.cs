@@ -16,6 +16,7 @@ public class HtmlControl : Control
     protected Point _lastScrollOffset;
 
     public static readonly DependencyProperty AvoidImagesLateLoadingProperty = DependencyProperty.Register("AvoidImagesLateLoading", typeof(bool), typeof(HtmlControl), new PropertyMetadata(false, OnDependencyProperty_valueChanged));
+    public static readonly DependencyProperty AvoidAsyncImagesLoadingProperty = DependencyProperty.Register("AvoidAsyncImagesLoading", typeof(bool), typeof(HtmlControl), new PropertyMetadata(false, OnDependencyProperty_valueChanged));
     public static readonly DependencyProperty IsSelectionEnabledProperty = DependencyProperty.Register("IsSelectionEnabled", typeof(bool), typeof(HtmlControl), new PropertyMetadata(true, OnDependencyProperty_valueChanged));
     public static readonly DependencyProperty IsContextMenuEnabledProperty = DependencyProperty.Register("IsContextMenuEnabled", typeof(bool), typeof(HtmlControl), new PropertyMetadata(true, OnDependencyProperty_valueChanged));
     public static readonly DependencyProperty BaseStylesheetProperty = DependencyProperty.Register("BaseStylesheet", typeof(string), typeof(HtmlControl), new PropertyMetadata(null, OnDependencyProperty_valueChanged));
@@ -77,6 +78,14 @@ public class HtmlControl : Control
     {
         get { return (bool)GetValue(AvoidImagesLateLoadingProperty); }
         set { SetValue(AvoidImagesLateLoadingProperty, value); }
+    }
+
+    [Category("Behavior")]
+    [Description("If asynchronous image loading should be avoided (forces synchronous loading)")]
+    public bool AvoidAsyncImagesLoading
+    {
+        get { return (bool)GetValue(AvoidAsyncImagesLoadingProperty); }
+        set { SetValue(AvoidAsyncImagesLoadingProperty, value); }
     }
 
     [Category("Behavior")]
@@ -265,6 +274,10 @@ public class HtmlControl : Control
         if (e.Property == AvoidImagesLateLoadingProperty)
         {
             htmlContainer.AvoidImagesLateLoading = (bool)e.NewValue;
+        }
+        else if (e.Property == AvoidAsyncImagesLoadingProperty)
+        {
+            htmlContainer.AvoidAsyncImagesLoading = (bool)e.NewValue;
         }
         else if (e.Property == IsSelectionEnabledProperty)
         {

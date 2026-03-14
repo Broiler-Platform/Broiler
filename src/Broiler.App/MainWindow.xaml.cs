@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Broiler.App.Rendering;
 using TheArtOfDev.HtmlRenderer.Core.Entities;
 using TheArtOfDev.HtmlRenderer.WPF;
@@ -21,6 +22,15 @@ public partial class MainWindow : Window
     private readonly RenderingPipeline _pipeline;
     private bool _consoleVisible;
 
+    /// <summary>
+    /// Active interactive rendering session.  When non-null, a
+    /// <see cref="DispatcherTimer"/> steps through pending timer and rAF
+    /// callbacks one batch at a time, re-rendering the panel after each
+    /// step so that animations are displayed interactively.
+    /// </summary>
+    private InteractiveSession? _activeSession;
+    private DispatcherTimer? _renderTimer;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -34,6 +44,7 @@ public partial class MainWindow : Window
 
         Closed += (_, _) =>
         {
+            StopInteractiveRendering();
             _pipeline.Dispose();
             DevConsole.Dispose();
         };
@@ -117,6 +128,9 @@ public partial class MainWindow : Window
         UrlTextBox.Text = url;
         UpdateNavigationButtons();
 
+        // Stop any in-progress interactive rendering from a previous page.
+        StopInteractiveRendering();
+
         if (url == "about:blank")
         {
             HtmlPanel.Text = GetWelcomePage();
@@ -132,13 +146,37 @@ public partial class MainWindow : Window
             UrlTextBox.Text = normalisedUrl;
 
             // Render the original HTML (post-processed to strip elements
-            // that HtmlRenderer cannot handle), then execute any inline
-            // scripts and re-render with the post-execution DOM if scripts
-            // modified it.
+            // that HtmlRenderer cannot handle).
             HtmlPanel.Text = HtmlPostProcessor.Process(content.Html);
-            var updatedHtml = _pipeline.ExecuteScripts(content);
-            if (updatedHtml != null)
-                HtmlPanel.Text = updatedHtml;
+
+            // Start an interactive session so that timer / rAF callbacks
+            // are stepped through one batch at a time, allowing animations
+            // to be displayed in real-time instead of jumping to the final
+            // frame.
+            _activeSession = _pipeline.ExecuteScriptsInteractive(content);
+            if (_activeSession != null)
+            {
+                // Render the post-script initial state (before any timers).
+                HtmlPanel.Text = HtmlPostProcessor.Process(_activeSession.CurrentHtml());
+
+                if (_activeSession.HasPendingWork)
+                {
+                    // Step through remaining callbacks at ~60 fps.
+                    _renderTimer = new DispatcherTimer(DispatcherPriority.Render)
+                    {
+                        Interval = TimeSpan.FromMilliseconds(16)
+                    };
+                    _renderTimer.Tick += OnRenderTimerTick;
+                    _renderTimer.Start();
+                    StatusText.Text = "Rendering…";
+                }
+                else
+                {
+                    // No pending work – clean up immediately.
+                    _activeSession.Dispose();
+                    _activeSession = null;
+                }
+            }
 
             // Scroll to fragment anchor if the URL contains one (e.g. "#top"
             // for Acid2).  This mirrors the CLI's RenderAtAnchor behaviour.
@@ -157,12 +195,57 @@ public partial class MainWindow : Window
                 HtmlPanel.ScrollToElement(elementId);
             }
 
-            StatusText.Text = "Done";
+            if (_activeSession == null)
+                StatusText.Text = "Done";
         }
         catch (Exception ex)
         {
             HtmlPanel.Text = $"<html><body><h1>Error</h1><p>{ex.Message}</p></body></html>";
             StatusText.Text = "Error loading page";
+        }
+    }
+
+    /// <summary>
+    /// DispatcherTimer callback that steps through one batch of pending
+    /// timer / rAF callbacks and re-renders the panel.
+    /// </summary>
+    private void OnRenderTimerTick(object? sender, EventArgs e)
+    {
+        if (_activeSession == null || !_activeSession.HasPendingWork)
+        {
+            StopInteractiveRendering();
+            StatusText.Text = "Done";
+            return;
+        }
+
+        var html = _activeSession.Step();
+        if (html != null)
+            HtmlPanel.Text = HtmlPostProcessor.Process(html);
+
+        // If there's no more work after this step, stop the timer.
+        if (!_activeSession.HasPendingWork)
+        {
+            StopInteractiveRendering();
+            StatusText.Text = "Done";
+        }
+    }
+
+    /// <summary>
+    /// Stops the interactive render loop and disposes the session.
+    /// </summary>
+    private void StopInteractiveRendering()
+    {
+        if (_renderTimer != null)
+        {
+            _renderTimer.Stop();
+            _renderTimer.Tick -= OnRenderTimerTick;
+            _renderTimer = null;
+        }
+
+        if (_activeSession != null)
+        {
+            _activeSession.Dispose();
+            _activeSession = null;
         }
     }
 

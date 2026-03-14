@@ -66,7 +66,7 @@ public sealed class ScriptEngine : IScriptEngine
     /// <inheritdoc />
     public string? Execute(IReadOnlyList<string> scripts, string html, string? url)
     {
-        return Execute(scripts, (IReadOnlyList<string>)[], html, url);
+        return Execute(scripts, Array.Empty<string>(), html, url);
     }
 
     /// <inheritdoc />
@@ -143,6 +143,67 @@ public sealed class ScriptEngine : IScriptEngine
 
         MicroTasks.Drain();
         return bridge.SerializeToHtml();
+    }
+
+    /// <inheritdoc />
+    public InteractiveSession? ExecuteInteractive(IReadOnlyList<string> scripts, IReadOnlyList<string> deferredScripts, string html, string? url)
+    {
+        if (scripts.Count == 0 && deferredScripts.Count == 0)
+            return null;
+
+        // The JSContext is NOT disposed here – ownership transfers to the
+        // InteractiveSession which will dispose it when the caller is done.
+        var context = new JSContext();
+        RegisterRuntimeExtensions(context);
+        var bridge = new DomBridge();
+
+        if (!string.IsNullOrEmpty(url))
+            bridge.Attach(context, html, url);
+        else
+            bridge.Attach(context, html);
+
+        // Track the corresponding <script> DOM element index so that
+        // document.write() can insert content at the correct position.
+        var scriptElements = new List<int>();
+        for (int idx = 0; idx < bridge.Elements.Count; idx++)
+        {
+            if (string.Equals(bridge.Elements[idx].TagName, "script", StringComparison.OrdinalIgnoreCase))
+                scriptElements.Add(idx);
+        }
+
+        for (var i = 0; i < scripts.Count; i++)
+        {
+            if (i < scriptElements.Count)
+                bridge.CurrentScriptIndex = scriptElements[i];
+            try
+            {
+                var source = PrepareSource(scripts[i]);
+                context.Eval(source);
+            }
+            catch (Exception ex)
+            {
+                RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.ExecuteInteractive", $"Script inline-{i} failed: {ex.Message}", ex);
+            }
+        }
+        bridge.CurrentScriptIndex = -1;
+
+        foreach (var script in deferredScripts)
+        {
+            try
+            {
+                var source = PrepareSource(script);
+                context.Eval(source);
+            }
+            catch (Exception ex)
+            {
+                RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.ExecuteInteractive", $"Deferred script failed: {ex.Message}", ex);
+            }
+        }
+
+        bridge.FireWindowLoadEvent();
+        MicroTasks.Drain();
+
+        return new InteractiveSession(context, bridge, MicroTasks);
     }
 
     /// <inheritdoc />

@@ -35,6 +35,8 @@
 
         <!-- HTML Rendering Area -->
         <htmlRenderer:HtmlPanel x:Name="HtmlPanel" Grid.Row="1"
+                                AvoidImagesLateLoading="True"
+                                AvoidAsyncImagesLoading="True"
                                 LinkClicked="HtmlPanel_LinkClicked"/>
 
         <!-- Console Splitter (only visible when console is open) -->

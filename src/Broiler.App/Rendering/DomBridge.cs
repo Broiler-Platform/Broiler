@@ -130,59 +130,82 @@ public sealed partial class DomBridge
         const int maxIterations = 1000;
         for (var iteration = 0; iteration < maxIterations; iteration++)
         {
-            var pending = new List<(int Id, JSFunction Fn)>();
-
-            // Collect timeout callbacks
-            foreach (var kv in _timeoutCallbacks)
-            {
-                if (!_clearedTimerIds.Contains(kv.Key))
-                    pending.Add((kv.Key, kv.Value));
-            }
-            _timeoutCallbacks.Clear();
-
-            // Collect interval callbacks (execute once per flush, keep registered)
-            var intervalSnapshot = new List<(int Id, JSFunction Fn)>();
-            foreach (var kv in _intervalCallbacks)
-            {
-                if (!_clearedTimerIds.Contains(kv.Key))
-                    intervalSnapshot.Add((kv.Key, kv.Value));
-            }
-
-            // Collect rAF callbacks
-            var rafSnapshot = new List<(int Id, JSFunction Fn)>();
-            foreach (var kv in _rafCallbacks)
-                rafSnapshot.Add((kv.Key, kv.Value));
-            _rafCallbacks.Clear();
-
-            if (pending.Count == 0 && intervalSnapshot.Count == 0 && rafSnapshot.Count == 0)
+            if (!FlushTimerStep())
                 break;
-
-            // Execute timeout callbacks
-            foreach (var (id, fn) in pending)
-            {
-                if (_clearedTimerIds.Contains(id)) continue;
-                try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-                catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimers", $"setTimeout callback error: {ex.Message}", ex); }
-            }
-
-            // Execute interval callbacks (one tick per flush)
-            foreach (var (id, fn) in intervalSnapshot)
-            {
-                if (_clearedTimerIds.Contains(id)) continue;
-                try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
-                catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimers", $"setInterval callback error: {ex.Message}", ex); }
-            }
-
-            // Execute rAF callbacks
-            foreach (var (id, fn) in rafSnapshot)
-            {
-                try { fn.InvokeFunction(new Arguments(JSUndefined.Value, new JSNumber(0))); }
-                catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimers", $"rAF callback error: {ex.Message}", ex); }
-            }
         }
 
         // Clear all processed timer IDs after flush loop completes
         _clearedTimerIds.Clear();
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when there are queued <c>setTimeout</c>,
+    /// <c>setInterval</c>, or <c>requestAnimationFrame</c> callbacks
+    /// waiting to execute.
+    /// </summary>
+    public bool HasPendingTimers =>
+        _timeoutCallbacks.Count > 0 || _intervalCallbacks.Count > 0 || _rafCallbacks.Count > 0;
+
+    /// <summary>
+    /// Executes one batch of pending timer and animation-frame callbacks.
+    /// Returns <c>true</c> if callbacks were executed (more may be pending);
+    /// <c>false</c> if there was nothing to run.
+    /// Used by interactive rendering to step through animations one frame at
+    /// a time so that intermediate visual states are displayed.
+    /// </summary>
+    public bool FlushTimerStep()
+    {
+        var pending = new List<(int Id, JSFunction Fn)>();
+
+        // Collect timeout callbacks
+        foreach (var kv in _timeoutCallbacks)
+        {
+            if (!_clearedTimerIds.Contains(kv.Key))
+                pending.Add((kv.Key, kv.Value));
+        }
+        _timeoutCallbacks.Clear();
+
+        // Collect interval callbacks (execute once per step, keep registered)
+        var intervalSnapshot = new List<(int Id, JSFunction Fn)>();
+        foreach (var kv in _intervalCallbacks)
+        {
+            if (!_clearedTimerIds.Contains(kv.Key))
+                intervalSnapshot.Add((kv.Key, kv.Value));
+        }
+
+        // Collect rAF callbacks
+        var rafSnapshot = new List<(int Id, JSFunction Fn)>();
+        foreach (var kv in _rafCallbacks)
+            rafSnapshot.Add((kv.Key, kv.Value));
+        _rafCallbacks.Clear();
+
+        if (pending.Count == 0 && intervalSnapshot.Count == 0 && rafSnapshot.Count == 0)
+            return false;
+
+        // Execute timeout callbacks
+        foreach (var (id, fn) in pending)
+        {
+            if (_clearedTimerIds.Contains(id)) continue;
+            try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
+            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"setTimeout callback error: {ex.Message}", ex); }
+        }
+
+        // Execute interval callbacks (one tick per step)
+        foreach (var (id, fn) in intervalSnapshot)
+        {
+            if (_clearedTimerIds.Contains(id)) continue;
+            try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
+            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"setInterval callback error: {ex.Message}", ex); }
+        }
+
+        // Execute rAF callbacks
+        foreach (var (id, fn) in rafSnapshot)
+        {
+            try { fn.InvokeFunction(new Arguments(JSUndefined.Value, new JSNumber(0))); }
+            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"rAF callback error: {ex.Message}", ex); }
+        }
+
+        return true;
     }
 
     /// <summary>
