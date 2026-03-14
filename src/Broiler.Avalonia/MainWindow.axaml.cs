@@ -265,7 +265,7 @@ public partial class MainWindow : Window
         _consoleVisible = !_consoleVisible;
 
         // Access the ConsoleRow RowDefinition by index (row 3 in the main grid)
-        var mainGrid = (global::Avalonia.Controls.Grid)Content!;
+        var mainGrid = (Grid)Content!;
         var consoleRow = mainGrid.RowDefinitions[3];
 
         if (_consoleVisible)

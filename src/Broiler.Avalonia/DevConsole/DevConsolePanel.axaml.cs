@@ -161,7 +161,7 @@ public partial class DevConsolePanel : UserControl, IDisposable
         if (!string.IsNullOrEmpty(node.Id))
             label += $"#{node.Id}";
         if (!string.IsNullOrEmpty(node.CssClass))
-            label += $".{node.CssClass.Replace(' ', '.')}";
+            label += $".{string.Join('.', node.CssClass.Split(' ', StringSplitOptions.RemoveEmptyEntries))}";
         label += $"  ({node.Display})";
 
         var item = new TreeViewItem

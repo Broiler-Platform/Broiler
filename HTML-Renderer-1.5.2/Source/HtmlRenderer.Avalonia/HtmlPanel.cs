@@ -285,7 +285,9 @@ public class HtmlPanel : HtmlControl
     private void UpdateScrollOffsets()
     {
         var newScrollOffset = new Point(-_horizontalScrollBar.Value, -_verticalScrollBar.Value);
-        if (newScrollOffset.Equals(_htmlContainer.ScrollOffset))
+        // Values come from ScrollBar.Value (not computed floats), so exact
+        // comparison is safe here (matches the WPF HtmlPanel pattern).
+        if (newScrollOffset == _htmlContainer.ScrollOffset)
             return;
 
         _htmlContainer.ScrollOffset = newScrollOffset;
