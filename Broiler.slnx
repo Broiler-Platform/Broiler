@@ -4,7 +4,6 @@
     <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/HtmlRenderer.Image.Tests.csproj" />
     <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Image/HtmlRenderer.Image.csproj" />
     <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.WPF/HtmlRenderer.WPF.csproj" />
-    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Avalonia/HtmlRenderer.Avalonia.csproj" />
     <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer/HtmlRenderer.csproj" />
     <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Primitives/HtmlRenderer.Primitives.csproj" />
     <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Utils/HtmlRenderer.Utils.csproj" />
@@ -22,7 +21,6 @@
     <Project Path="src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj" />
     <Project Path="src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj" />
     <Project Path="src/Broiler.DevSite/Broiler.DevSite.csproj" />
-    <Project Path="src/Broiler.Avalonia/Broiler.Avalonia.csproj" />
   </Folder>
   <Folder Name="/yantra-1.2.295/">
     <Project Path="yantra-1.2.295/YantraJS.Core/YantraJS.Core.csproj" />

@@ -2,7 +2,7 @@
   "profiles": {
     "Broiler.Cli": {
       "commandName": "Project",
-      "commandLineArgs": "--capture-image http://acid2.acidtests.org#top --output cpature.png --full-page"
+      "commandLineArgs": "--capture-image \"file:///D:\\Broiler\\acid\\acid3\\acid3.html\" --output cpature.png --width 800 --height 600"
     }
   }
 }
