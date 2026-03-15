@@ -44,11 +44,10 @@
     <Compile Include="..\Broiler.App\Rendering\InteractiveSession.cs" Link="InteractiveSession.cs" />
   </ItemGroup>
 
-
   <ItemGroup>
-    <ProjectReference Include="..\..\HTML-Renderer-1.5.2\Source\HtmlRenderer\HtmlRenderer.csproj" />
-    <ProjectReference Include="..\..\HTML-Renderer-1.5.2\Source\HtmlRenderer.Image\HtmlRenderer.Image.csproj" />
-    <ProjectReference Include="..\..\yantra-1.2.295\YantraJS.Core\YantraJS.Core.csproj" />
+    <ProjectReference Include="..\..\Broiler.HTML\Source\HtmlRenderer.Image\HtmlRenderer.Image.csproj" />
+    <ProjectReference Include="..\..\Broiler.HTML\Source\HtmlRenderer\HtmlRenderer.csproj" />
+    <ProjectReference Include="..\..\Broiler.JavaScript\YantraJS.Core\YantraJS.Core.csproj" />
   </ItemGroup>
 
 </Project>

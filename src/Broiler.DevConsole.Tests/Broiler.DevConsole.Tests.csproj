@@ -16,8 +16,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Broiler.HTML\Source\HtmlRenderer.Dom\HtmlRenderer.Dom.csproj" />
     <ProjectReference Include="..\Broiler.DevConsole\Broiler.DevConsole.csproj" />
-    <ProjectReference Include="..\..\HTML-Renderer-1.5.2\Source\HtmlRenderer.Dom\HtmlRenderer.Dom.csproj" />
   </ItemGroup>
 
   <ItemGroup>

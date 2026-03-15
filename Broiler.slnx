@@ -22,10 +22,10 @@
     <Project Path="src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj" />
     <Project Path="src/Broiler.DevSite/Broiler.DevSite.csproj" />
   </Folder>
-  <Folder Name="/yantra-1.2.295/">
-    <Project Path="yantra-1.2.295/YantraJS.Core/YantraJS.Core.csproj" />
-    <Project Path="yantra-1.2.295/YantraJS.ExpressionCompiler/YantraJS.ExpressionCompiler.csproj" />
-    <Project Path="yantra-1.2.295/YantraJS.JSClassGenerator/YantraJS.JSClassGenerator.csproj" />
-    <Project Path="yantra-1.2.295/YantraJS.Core.Tests/YantraJS.Core.Tests.csproj" />
+  <Folder Name="/Broiler.JavaScript/">
+    <Project Path="Broiler.JavaScript/YantraJS.Core/YantraJS.Core.csproj" />
+    <Project Path="Broiler.JavaScript/YantraJS.ExpressionCompiler/YantraJS.ExpressionCompiler.csproj" />
+    <Project Path="Broiler.JavaScript/YantraJS.JSClassGenerator/YantraJS.JSClassGenerator.csproj" />
+    <Project Path="Broiler.JavaScript/YantraJS.Core.Tests/YantraJS.Core.Tests.csproj" />
   </Folder>
 </Solution>
