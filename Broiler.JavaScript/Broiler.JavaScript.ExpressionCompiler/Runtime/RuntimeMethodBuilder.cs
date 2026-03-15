@@ -26,7 +26,7 @@ public class RuntimeMethodBuilder(IMethodRepository methods) : IMethodBuilder
         return YExpression.Call(
             repository, 
             create,
-            closures == null ? YExpression.Null : (YExpression)YExpression.NewArray(typeof(Box), closures),
+            closures == null ? YExpression.Null : YExpression.NewArray(typeof(Box), closures),
             YExpression.Constant(id));
     }
 }

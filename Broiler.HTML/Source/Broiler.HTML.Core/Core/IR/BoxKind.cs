@@ -5,7 +5,6 @@ namespace Broiler.HTML.Core.Core.IR;
 /// during style resolution. Layout code uses this enum instead of checking
 /// tag names directly, decoupling layout from the DOM.
 /// </summary>
-/// <remarks>Phase 2: replaces <c>tag.Name == HtmlConstants.Img</c> checks in layout.</remarks>
 public enum BoxKind
 {
     /// <summary>Default value for anonymous boxes or unknown elements.</summary>

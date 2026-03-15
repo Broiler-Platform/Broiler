@@ -89,7 +89,7 @@ public sealed partial class DomBridge
                     node = node.Parent;
                     if (node == null) break;
                     var result = ApplyFilter(node, whatToShow, filterFn);
-                    if (result == 1) { currentNode = node; return (JSValue)ToJSObject(node); } // ACCEPT
+                    if (result == 1) { currentNode = node; return ToJSObject(node); } // ACCEPT
                 }
                 return JSNull.Value;
             }, "parentNode", 0),
@@ -144,14 +144,14 @@ public sealed partial class DomBridge
                     {
                         node = node.Children[0];
                         var result = ApplyFilter(node, whatToShow, filterFn);
-                        if (result == 1) { currentNode = node; return (JSValue)ToJSObject(node); }
+                        if (result == 1) { currentNode = node; return ToJSObject(node); }
                         if (result == 2) // REJECT — skip subtree
                         {
                             // Move to next sibling or ancestor's sibling
                             node = GetNextSkippingChildren(node, root);
                             if (node == null) return JSNull.Value;
                             var r2 = ApplyFilter(node, whatToShow, filterFn);
-                            if (r2 == 1) { currentNode = node; return (JSValue)ToJSObject(node); }
+                            if (r2 == 1) { currentNode = node; return ToJSObject(node); }
                             continue;
                         }
                         // SKIP — descend into children
@@ -161,13 +161,13 @@ public sealed partial class DomBridge
                     node = GetNextSkippingChildren(node, root);
                     if (node == null) return JSNull.Value;
                     var r = ApplyFilter(node, whatToShow, filterFn);
-                    if (r == 1) { currentNode = node; return (JSValue)ToJSObject(node); }
+                    if (r == 1) { currentNode = node; return ToJSObject(node); }
                     if (r == 2) // REJECT — skip subtree
                     {
                         node = GetNextSkippingChildren(node, root);
                         if (node == null) return JSNull.Value;
                         var r3 = ApplyFilter(node, whatToShow, filterFn);
-                        if (r3 == 1) { currentNode = node; return (JSValue)ToJSObject(node); }
+                        if (r3 == 1) { currentNode = node; return ToJSObject(node); }
                         continue;
                     }
                     // SKIP — continue loop
@@ -195,13 +195,13 @@ public sealed partial class DomBridge
                             while (node.Children.Count > 0)
                                 node = node.Children[^1];
                             var result = ApplyFilter(node, whatToShow, filterFn);
-                            if (result == 1) { currentNode = node; return (JSValue)ToJSObject(node); }
+                            if (result == 1) { currentNode = node; return ToJSObject(node); }
                             continue;
                         }
                         // Move to parent
                         node = node.Parent;
                         var r = ApplyFilter(node, whatToShow, filterFn);
-                        if (r == 1) { currentNode = node; return (JSValue)ToJSObject(node); }
+                        if (r == 1) { currentNode = node; return ToJSObject(node); }
                         if (ReferenceEquals(node, root)) return JSNull.Value;
                         continue;
                     }
@@ -324,7 +324,7 @@ public sealed partial class DomBridge
 
         iter.FastAddProperty(
             (KeyString)"referenceNode",
-            new JSFunction((in Arguments a) => state.ReferenceNode != null ? (JSValue)ToJSObject(state.ReferenceNode) : JSNull.Value, "get referenceNode"),
+            new JSFunction((in Arguments a) => state.ReferenceNode != null ? ToJSObject(state.ReferenceNode) : JSNull.Value, "get referenceNode"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -361,7 +361,7 @@ public sealed partial class DomBridge
                         // Update last known index to where the node is now (or was)
                         var newIdx = allNodes.IndexOf(candidateNode);
                         state.LastKnownIndex = newIdx >= 0 ? newIdx : i;
-                        return (JSValue)ToJSObject(candidateNode);
+                        return ToJSObject(candidateNode);
                     }
                     // After filter, the node may have been removed — adjust i if needed
                     var nowIdx = allNodes.IndexOf(candidateNode);
@@ -408,7 +408,7 @@ public sealed partial class DomBridge
                         state.PointerBeforeReferenceNode = true;
                         var newIdx = allNodes.IndexOf(candidateNode);
                         state.LastKnownIndex = newIdx >= 0 ? newIdx : i;
-                        return (JSValue)ToJSObject(candidateNode);
+                        return ToJSObject(candidateNode);
                     }
                     // After filter, re-sync position in case list shifted
                     var nowIdx = allNodes.IndexOf(candidateNode);
@@ -537,7 +537,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var ancestor = FindCommonAncestor(state.StartContainer, state.EndContainer);
-                return ancestor != null ? (JSValue)ToJSObject(ancestor) : JSNull.Value;
+                return ancestor != null ? ToJSObject(ancestor) : JSNull.Value;
             }, "get commonAncestorContainer"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);

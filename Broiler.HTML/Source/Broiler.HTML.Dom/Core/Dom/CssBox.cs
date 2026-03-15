@@ -132,11 +132,8 @@ internal class CssBox : CssBoxProperties, IDisposable
         var box = ParentBox;
         while (box != null)
         {
-            if (box.Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed
-                || box.ParentBox == null)
-            {
+            if (box.Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed || box.ParentBox == null)
                 return box;
-            }
 
             box = box.ParentBox;
         }
@@ -153,31 +150,12 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     internal bool HeightPercentageResolvesToAuto()
     {
-        return Height.Contains('%')
-            && (ContainingBlock.Height == CssConstants.Auto
-                || string.IsNullOrEmpty(ContainingBlock.Height));
+        return Height.Contains('%') && (ContainingBlock.Height == CssConstants.Auto || string.IsNullOrEmpty(ContainingBlock.Height));
     }
 
     public HtmlTag HtmlTag { get; }
 
     public bool IsImage => Words.Count == 1 && Words[0].IsImage;
-
-    public bool IsSpaceOrEmpty
-    {
-        get
-        {
-            if ((Words.Count != 0 || Boxes.Count != 0) && (Words.Count != 1 || !Words[0].IsSpaces))
-            {
-                foreach (CssRect word in Words)
-                {
-                    if (!word.IsSpaces)
-                        return false;
-                }
-            }
-
-            return true;
-        }
-    }
 
     public ReadOnlyMemory<char> Text
     {
@@ -190,7 +168,6 @@ internal class CssBox : CssBoxProperties, IDisposable
     }
 
     internal List<CssLineBox> LineBoxes { get; } = [];
-    internal List<CssLineBox> ParentLineBoxes { get; } = [];
     internal Dictionary<CssLineBox, RectangleF> Rectangles { get; } = [];
     internal List<CssRect> Words { get; } = [];
     internal CssRect FirstWord => Words[0];
@@ -245,67 +222,67 @@ internal class CssBox : CssBoxProperties, IDisposable
             while (startIdx < textSpan.Length && textSpan[startIdx] == '\r')
                 startIdx++;
 
-            if (startIdx < textSpan.Length)
-            {
-                var endIdx = startIdx;
+            if (startIdx >= textSpan.Length)
+                continue;
 
-                while (endIdx < textSpan.Length && char.IsWhiteSpace(textSpan[endIdx]) && textSpan[endIdx] != '\n')
+            var endIdx = startIdx;
+
+            while (endIdx < textSpan.Length && char.IsWhiteSpace(textSpan[endIdx]) && textSpan[endIdx] != '\n')
+                endIdx++;
+
+            if (endIdx > startIdx)
+            {
+                if (preserveSpaces)
+                {
+                    // CSS2.1 §16.6: For pre-wrap, emit each space as a
+                    // separate word so the layout engine can break lines
+                    // at any space position.  For pre, emit the entire
+                    // whitespace run as one word (no wrapping allowed).
+                    if (WhiteSpace == CssConstants.PreWrap)
+                    {
+                        // Cache " " string to avoid per-char allocation
+                        const string singleSpace = " ";
+                        for (int i = startIdx; i < endIdx; i++)
+                        {
+                            var ch = _text.Slice(i, 1).ToString();
+                            Words.Add(new CssRectWord(this, ch == " " ? singleSpace : ch, false, false));
+                        }
+                    }
+                    else
+                    {
+                        Words.Add(new CssRectWord(this, HtmlUtils.DecodeHtml(_text.Slice(startIdx, endIdx - startIdx).ToString()), false, false));
+                    }
+                }
+            }
+            else
+            {
+                endIdx = startIdx;
+
+                while (endIdx < textSpan.Length && !char.IsWhiteSpace(textSpan[endIdx]) && textSpan[endIdx] != '-' && WordBreak != CssConstants.BreakAll && !CommonUtils.IsAsianCharecter(textSpan[endIdx]))
+                    endIdx++;
+
+                if (endIdx < textSpan.Length && (textSpan[endIdx] == '-' || WordBreak == CssConstants.BreakAll || CommonUtils.IsAsianCharecter(textSpan[endIdx])))
                     endIdx++;
 
                 if (endIdx > startIdx)
                 {
-                    if (preserveSpaces)
-                    {
-                        // CSS2.1 §16.6: For pre-wrap, emit each space as a
-                        // separate word so the layout engine can break lines
-                        // at any space position.  For pre, emit the entire
-                        // whitespace run as one word (no wrapping allowed).
-                        if (WhiteSpace == CssConstants.PreWrap)
-                        {
-                            // Cache " " string to avoid per-char allocation
-                            const string singleSpace = " ";
-                            for (int i = startIdx; i < endIdx; i++)
-                            {
-                                var ch = _text.Slice(i, 1).ToString();
-                                Words.Add(new CssRectWord(this, ch == " " ? singleSpace : ch, false, false));
-                            }
-                        }
-                        else
-                        {
-                            Words.Add(new CssRectWord(this, HtmlUtils.DecodeHtml(_text.Slice(startIdx, endIdx - startIdx).ToString()), false, false));
-                        }
-                    }
+                    var hasSpaceBefore = !preserveSpaces && startIdx > 0 && Words.Count == 0 && char.IsWhiteSpace(textSpan[startIdx - 1]);
+                    var hasSpaceAfter = !preserveSpaces && endIdx < textSpan.Length && char.IsWhiteSpace(textSpan[endIdx]);
+
+                    Words.Add(new CssRectWord(this, HtmlUtils.DecodeHtml(_text.Slice(startIdx, endIdx - startIdx).ToString()), hasSpaceBefore, hasSpaceAfter));
                 }
-                else
-                {
-                    endIdx = startIdx;
-
-                    while (endIdx < textSpan.Length && !char.IsWhiteSpace(textSpan[endIdx]) && textSpan[endIdx] != '-' && WordBreak != CssConstants.BreakAll && !CommonUtils.IsAsianCharecter(textSpan[endIdx]))
-                        endIdx++;
-
-                    if (endIdx < textSpan.Length && (textSpan[endIdx] == '-' || WordBreak == CssConstants.BreakAll || CommonUtils.IsAsianCharecter(textSpan[endIdx])))
-                        endIdx++;
-
-                    if (endIdx > startIdx)
-                    {
-                        var hasSpaceBefore = !preserveSpaces && startIdx > 0 && Words.Count == 0 && char.IsWhiteSpace(textSpan[startIdx - 1]);
-                        var hasSpaceAfter = !preserveSpaces && endIdx < textSpan.Length && char.IsWhiteSpace(textSpan[endIdx]);
-
-                        Words.Add(new CssRectWord(this, HtmlUtils.DecodeHtml(_text.Slice(startIdx, endIdx - startIdx).ToString()), hasSpaceBefore, hasSpaceAfter));
-                    }
-                }
-
-                // create new-line word so it will effect the layout
-                if (endIdx < textSpan.Length && textSpan[endIdx] == '\n')
-                {
-                    endIdx++;
-
-                    if (respoctNewline)
-                        Words.Add(new CssRectWord(this, "\n", false, false));
-                }
-
-                startIdx = endIdx;
             }
+
+            // create new-line word so it will effect the layout
+            if (endIdx < textSpan.Length && textSpan[endIdx] == '\n')
+            {
+                endIdx++;
+
+                if (respoctNewline)
+                    Words.Add(new CssRectWord(this, "\n", false, false));
+            }
+
+            startIdx = endIdx;
         }
     }
 
@@ -375,7 +352,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                         if (remainingSpace >= 0)
                         {
                             string halfMargin = (remainingSpace / 2).ToString("F4",
-                                System.Globalization.CultureInfo.InvariantCulture) + "px";
+                                CultureInfo.InvariantCulture) + "px";
                             MarginLeft = halfMargin;
                             MarginRight = halfMargin;
                         }
@@ -390,14 +367,14 @@ internal class CssBox : CssBoxProperties, IDisposable
                         double rightMargin = ActualMarginRight;
                         double leftMargin = Math.Max(0, remainingSpace - rightMargin);
                         MarginLeft = leftMargin.ToString("F4",
-                            System.Globalization.CultureInfo.InvariantCulture) + "px";
+                            CultureInfo.InvariantCulture) + "px";
                     }
                     else if (MarginRight == CssConstants.Auto)
                     {
                         double leftMargin = ActualMarginLeft;
                         double rightMargin = Math.Max(0, remainingSpace - leftMargin);
                         MarginRight = rightMargin.ToString("F4",
-                            System.Globalization.CultureInfo.InvariantCulture) + "px";
+                            CultureInfo.InvariantCulture) + "px";
                     }
                 }
 
@@ -514,7 +491,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                     // when computing the next sibling's position.
                     double flowPrevBottom = flowPrev?.ActualBottom ?? 0;
                     if (flowPrev is CssBox flowPrevBox && flowPrevBox.Position == CssConstants.Relative)
-                        flowPrevBottom -= GetRelativeOffsetY(flowPrevBox);
+                        flowPrevBottom -= CssBoxHelper.GetRelativeOffsetY(flowPrevBox);
 
                     double top = (flowPrev == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + MarginTopCollapse(flowPrev) + flowPrevBottom;
 
@@ -531,7 +508,7 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                         // Collect all preceding floats in the BFC, including
                         // those nested inside non-BFC siblings (CSS2.1 §9.5.1).
-                        var precedingFloats = CollectPrecedingFloatsInBfc(this);
+                        var precedingFloats = CssBoxHelper.CollectPrecedingFloatsInBfc(this);
 
                         // CSS2.1 §9.5.1 rule 6: The outer top of a floating
                         // box may not be higher than the outer top of any
@@ -653,7 +630,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                             if (flowPrev != null)
                             {
                                 double prevMarginBottom = (flowPrev is CssBox fpb)
-                                    ? GetEffectiveMarginBottom(fpb)
+                                    ? CssBoxHelper.GetEffectiveMarginBottom(fpb)
                                     : flowPrev.ActualMarginBottom;
                                 uncollapsedTop = flowPrevBottom
                                     + prevMarginBottom
@@ -898,29 +875,29 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     protected void LoadBackgroundImageIfNeeded()
     {
-        if (BackgroundImage != CssConstants.None && _imageLoadHandler == null)
+        if (BackgroundImage == CssConstants.None || _imageLoadHandler != null)
+            return;
+
+        _imageLoadHandler = ContainerInt.CreateImageLoadHandler(OnImageLoadComplete);
+
+        // CSS background-image stores the value with a url() wrapper
+        // (e.g. "url(data:image/png;base64,...)").  Strip the wrapper
+        // so ImageLoadHandler.LoadImage can detect data: URIs via its
+        // src.StartsWith("data:image") check (§14.2.1).
+        var src = BackgroundImage;
+        if (src.StartsWith("url(", StringComparison.OrdinalIgnoreCase) && src.EndsWith(")"))
         {
-            _imageLoadHandler = ContainerInt.CreateImageLoadHandler(OnImageLoadComplete);
-
-            // CSS background-image stores the value with a url() wrapper
-            // (e.g. "url(data:image/png;base64,...)").  Strip the wrapper
-            // so ImageLoadHandler.LoadImage can detect data: URIs via its
-            // src.StartsWith("data:image") check (§14.2.1).
-            var src = BackgroundImage;
-            if (src.StartsWith("url(", StringComparison.OrdinalIgnoreCase) && src.EndsWith(")"))
+            src = src.Substring(4, src.Length - 5).Trim();
+            // Remove optional quotes around the URL
+            if (src.Length >= 2 &&
+                ((src[0] == '\'' && src[^1] == '\'') ||
+                 (src[0] == '"' && src[^1] == '"')))
             {
-                src = src.Substring(4, src.Length - 5).Trim();
-                // Remove optional quotes around the URL
-                if (src.Length >= 2 &&
-                    ((src[0] == '\'' && src[^1] == '\'') ||
-                     (src[0] == '"' && src[^1] == '"')))
-                {
-                    src = src[1..^1];
-                }
+                src = src[1..^1];
             }
-
-            _imageLoadHandler.LoadImage(src, HtmlTag != null ? HtmlTag.Attributes : null);
         }
+
+        _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes);
     }
 
     internal virtual void MeasureWordsSize(RGraphics g)
@@ -929,7 +906,6 @@ internal class CssBox : CssBoxProperties, IDisposable
             return;
 
         LoadBackgroundImageIfNeeded();
-
         MeasureWordSpacing(g);
 
         if (Words.Count > 0)
@@ -1131,8 +1107,6 @@ internal class CssBox : CssBoxProperties, IDisposable
         return maxLineWidth;
     }
 
-    internal bool HasJustInlineSiblings() => ParentBox != null && DomUtils.ContainsInlinesOnly(ParentBox);
-
     internal new void InheritStyle(CssBox box = null, bool everything = false) => base.InheritStyle(box ?? ParentBox, everything);
 
     protected double MarginTopCollapse(CssBoxProperties prevSibling)
@@ -1146,11 +1120,11 @@ internal class CssBox : CssBoxProperties, IDisposable
             // own top and bottom margins — and its children's margins —
             // collapse through.  The resulting collapsed margin participates
             // in collapsing with this element's top margin.
-            if (prevSibling is CssBox prevBox && IsEmptyCollapsible(prevBox))
+            if (prevSibling is CssBox prevBox && CssBoxHelper.IsEmptyCollapsible(prevBox))
             {
                 double maxPos = Math.Max(ActualMarginTop, 0);
                 double maxNeg = Math.Min(ActualMarginTop, 0);
-                CollectEmptyBoxMargins(prevBox, ref maxPos, ref maxNeg);
+                CssBoxHelper.CollectEmptyBoxMargins(prevBox, ref maxPos, ref maxNeg);
                 double collapsed = maxPos + maxNeg; // maxNeg <= 0
                 // Subtract the portion of the collapsed margin already
                 // consumed when positioning the empty box itself (its
@@ -1169,7 +1143,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                 // parent has no bottom border/padding and auto height
                 // (CSS 2.1 §8.3.1 parent-child bottom-margin collapse).
                 double prevMb = (prevSibling is CssBox prevSibBox)
-                    ? GetPropagatedMarginBottom(prevSibBox)
+                    ? CssBoxHelper.GetPropagatedMarginBottom(prevSibBox)
                     : prevSibling.ActualMarginBottom;
                 double maxPos = Math.Max(
                     Math.Max(prevMb, 0),
@@ -1263,9 +1237,7 @@ internal class CssBox : CssBoxProperties, IDisposable
         foreach (var child in Boxes)
         {
             if (!isBfc && child.Float != CssConstants.None)
-            {
                 continue;
-            }
 
             // CSS2.1 §9.4.3: Relative positioning is visual-only and
             // does not affect the flow position used for auto-height
@@ -1273,96 +1245,12 @@ internal class CssBox : CssBoxProperties, IDisposable
             // measures the child's normal-flow bottom.
             double childBottom = child.ActualBottom;
             if (child.Position == CssConstants.Relative)
-                childBottom -= GetRelativeOffsetY(child);
+                childBottom -= CssBoxHelper.GetRelativeOffsetY(child);
 
             maxChildBottom = Math.Max(maxChildBottom, childBottom);
         }
 
         return Math.Max(ActualBottom, maxChildBottom + margin + ActualPaddingBottom + ActualBorderBottomWidth);
-    }
-
-    /// <summary>
-    /// Computes the vertical offset applied by <c>position: relative</c>.
-    /// CSS2.1 §9.4.3: <c>top</c> takes precedence over <c>bottom</c>.
-    /// Returns 0 if the element is not relatively positioned or has no offset.
-    /// </summary>
-    private static double GetRelativeOffsetY(CssBoxProperties box)
-    {
-        bool hasTop = box.Top != null && box.Top != CssConstants.Auto;
-        bool hasBottom = box.Bottom != null && box.Bottom != CssConstants.Auto;
-
-        if (hasTop)
-            return CssValueParser.ParseLength(box.Top, box.Size.Height, box.GetEmHeight());
-        if (hasBottom)
-            return -CssValueParser.ParseLength(box.Bottom, box.Size.Height, box.GetEmHeight());
-        return 0;
-    }
-
-    /// <summary>
-    /// Collects all float boxes in the same block formatting context that
-    /// precede <paramref name="box"/> in the DOM tree. This includes floats
-    /// nested inside non-BFC siblings (e.g., floated <c>li</c> elements
-    /// inside a non-floated <c>ul</c>) and floats that are siblings of
-    /// ancestor elements when those ancestors do not establish a new BFC
-    /// (CSS2.1 §9.4.1).
-    /// </summary>
-    private static List<CssBox> CollectPrecedingFloatsInBfc(CssBox box)
-    {
-        var result = new List<CssBox>();
-        if (box.ParentBox == null) return result;
-
-        // Collect preceding sibling floats (and their non-BFC subtrees).
-        foreach (var sibling in box.ParentBox.Boxes)
-        {
-            if (sibling == box) break;
-            CollectFloatsInSubtree(sibling, result);
-        }
-
-        // Walk up ancestor chain: collect floats from each ancestor's
-        // preceding siblings while the ancestor does not establish a BFC.
-        var current = box.ParentBox;
-        while (current != null && current.ParentBox != null)
-        {
-            if (EstablishesBfc(current))
-                break;
-
-            foreach (var sibling in current.ParentBox.Boxes)
-            {
-                if (sibling == current) break;
-                CollectFloatsInSubtree(sibling, result);
-            }
-
-            current = current.ParentBox;
-        }
-
-        return result;
-    }
-
-    /// <summary>
-    /// Returns <c>true</c> if <paramref name="box"/> establishes a new
-    /// block formatting context (CSS2.1 §9.4.1).
-    /// </summary>
-    private static bool EstablishesBfc(CssBox box)
-    {
-        return box.Float != CssConstants.None
-            || box.Display == CssConstants.InlineBlock
-            || box.Display == CssConstants.TableCell
-            || box.Position == CssConstants.Absolute
-            || box.Position == CssConstants.Fixed
-            || (box.Overflow != null && box.Overflow != CssConstants.Visible);
-    }
-
-    private static void CollectFloatsInSubtree(CssBox root, List<CssBox> result)
-    {
-        if (root.Float != CssConstants.None && root.Display != CssConstants.None)
-        {
-            result.Add(root);
-            // Float establishes a new BFC – don't recurse into descendants.
-            return;
-        }
-
-        foreach (var child in root.Boxes)
-            CollectFloatsInSubtree(child, result);
     }
 
     internal void OffsetTop(double amount)
@@ -1442,139 +1330,6 @@ internal class CssBox : CssBoxProperties, IDisposable
         var top = CssValueParser.ParseLength(Y, ContainerInt.PageSize.Height, GetEmHeight(), null);
 
         return new PointF((float)left, (float)top);
-    }
-
-    /// <summary>
-    /// CSS2.1 §8.3.1: Returns <c>true</c> if a box is "empty" — its own
-    /// top and bottom margins are adjoining and collapse through.
-    /// Conditions: min-height is zero, no top/bottom borders or padding,
-    /// height is 0 or auto (or percentage that resolves to auto), no line
-    /// boxes, and all in-flow children's margins also collapse.
-    /// </summary>
-    private static bool IsEmptyCollapsible(CssBox box)
-    {
-        if (box.ActualBorderTopWidth > 0.1 || box.ActualBorderBottomWidth > 0.1)
-            return false;
-        if (box.ActualPaddingTop > 0.1 || box.ActualPaddingBottom > 0.1)
-            return false;
-
-        // Check if height resolves to zero/auto
-        if (box.Height != CssConstants.Auto && !string.IsNullOrEmpty(box.Height))
-        {
-            bool resolvedToAuto = box.Height.Contains('%')
-                && (box.ContainingBlock.Height == CssConstants.Auto
-                    || string.IsNullOrEmpty(box.ContainingBlock.Height));
-            if (!resolvedToAuto)
-            {
-                double h = CssValueParser.ParseLength(box.Height, box.Size.Height, box.GetEmHeight());
-                if (h > 0.1)
-                    return false;
-            }
-        }
-
-        // Zero content height — ActualBottom should equal Location.Y
-        // (tolerance 0.5 accounts for sub-pixel rounding in layout)
-        if (Math.Abs(box.ActualBottom - box.Location.Y) > 0.5)
-            return false;
-
-        // Must not contain any line boxes (inline content)
-        if (box.LineBoxes.Count > 0)
-            return false;
-
-        return true;
-    }
-
-    /// <summary>
-    /// Collects the maximum positive and minimum negative margins from an
-    /// empty collapsible box and all its in-flow children (recursively for
-    /// children that are also empty and collapsible).
-    /// </summary>
-    private static void CollectEmptyBoxMargins(CssBox box, ref double maxPos, ref double maxNeg)
-    {
-        maxPos = Math.Max(maxPos, Math.Max(box.ActualMarginTop, 0));
-        maxPos = Math.Max(maxPos, Math.Max(box.ActualMarginBottom, 0));
-        maxNeg = Math.Min(maxNeg, Math.Min(box.ActualMarginTop, 0));
-        maxNeg = Math.Min(maxNeg, Math.Min(box.ActualMarginBottom, 0));
-
-        foreach (var child in box.Boxes)
-        {
-            if (child.Float != CssConstants.None
-                || child.Position == CssConstants.Absolute
-                || child.Position == CssConstants.Fixed)
-                continue;
-
-            maxPos = Math.Max(maxPos, Math.Max(child.ActualMarginTop, 0));
-            maxPos = Math.Max(maxPos, Math.Max(child.ActualMarginBottom, 0));
-            maxNeg = Math.Min(maxNeg, Math.Min(child.ActualMarginTop, 0));
-            maxNeg = Math.Min(maxNeg, Math.Min(child.ActualMarginBottom, 0));
-
-            if (IsEmptyCollapsible(child))
-                CollectEmptyBoxMargins(child, ref maxPos, ref maxNeg);
-        }
-    }
-
-    /// <summary>
-    /// Returns the effective bottom margin for a box, accounting for margins
-    /// that collapse through the box when it is "empty" per CSS2.1 §8.3.1.
-    /// For non-empty boxes returns <see cref="CssBoxProperties.ActualMarginBottom"/>.
-    /// </summary>
-    private static double GetEffectiveMarginBottom(CssBox box)
-    {
-        if (!IsEmptyCollapsible(box))
-            return box.ActualMarginBottom;
-
-        double maxPos = 0, maxNeg = 0;
-        CollectEmptyBoxMargins(box, ref maxPos, ref maxNeg);
-        double collapsed = maxPos + maxNeg;
-        return collapsed - box.CollapsedMarginTop;
-    }
-
-    /// <summary>
-    /// Returns the effective bottom margin for a box, accounting for
-    /// parent-child bottom-margin collapse (CSS 2.1 §8.3.1).
-    /// When a box has no bottom border, no bottom padding, and auto height,
-    /// the last in-flow block-level child's bottom margin collapses with
-    /// the box's own bottom margin.  This is applied recursively.
-    /// </summary>
-    private static double GetPropagatedMarginBottom(CssBox box)
-    {
-        double mb = box.ActualMarginBottom;
-
-        if (box.ActualBorderBottomWidth > 0.1 || box.ActualPaddingBottom > 0.1)
-            return mb;
-
-        if (box.Height != CssConstants.Auto && !string.IsNullOrEmpty(box.Height))
-        {
-            bool resolvedToAuto = box.Height.Contains('%')
-                && (box.ContainingBlock.Height == CssConstants.Auto
-                    || string.IsNullOrEmpty(box.ContainingBlock.Height));
-            if (!resolvedToAuto)
-                return mb;
-        }
-
-        // Find last in-flow block-level child (CSS 2.1 §8.3.1).
-        CssBox? lastInFlow = null;
-        foreach (var child in box.Boxes)
-        {
-            if (child.Float != CssConstants.None
-                || child.Position == CssConstants.Absolute
-                || child.Position == CssConstants.Fixed)
-                continue;
-            if (child.Display == CssConstants.Inline
-                || child.Display == CssConstants.InlineBlock)
-                continue;
-            lastInFlow = child;
-        }
-
-        if (lastInFlow == null)
-            return mb;
-
-        double childMb = GetPropagatedMarginBottom(lastInFlow);
-
-        // Collapse: max(positives,0) + min(negatives,0)
-        double maxPos = Math.Max(Math.Max(mb, 0), Math.Max(childMb, 0));
-        double minNeg = Math.Min(Math.Min(mb, 0), Math.Min(childMb, 0));
-        return maxPos + minNeg;
     }
 
     public override string ToString()

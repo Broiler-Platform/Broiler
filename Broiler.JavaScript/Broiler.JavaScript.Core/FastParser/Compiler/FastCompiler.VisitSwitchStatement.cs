@@ -191,7 +191,7 @@ partial class FastCompiler
                         else
                         {
                             @case.Tests = @case.Tests.ConvertToJSValue(scope);
-                            equalsMethod = ExpHelper.JSValueBuilder.StaticEquals;
+                            equalsMethod = JSValueBuilder.StaticEquals;
                         }
                     }
 

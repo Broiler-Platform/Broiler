@@ -168,8 +168,8 @@ public class ClrInteropTests : IDisposable
     [Fact]
     public void GetClrType_ReturnsSameInstanceForSameType()
     {
-        var a = JSContext.ClrInterop.GetClrType(typeof(System.Guid));
-        var b = JSContext.ClrInterop.GetClrType(typeof(System.Guid));
+        var a = JSContext.ClrInterop.GetClrType(typeof(Guid));
+        var b = JSContext.ClrInterop.GetClrType(typeof(Guid));
         Assert.Same(a, b);
     }
 

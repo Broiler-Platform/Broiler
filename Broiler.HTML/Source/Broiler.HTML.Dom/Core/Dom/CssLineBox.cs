@@ -20,18 +20,6 @@ internal sealed class CssLineBox
     public List<CssRect> Words { get; }
     public CssBox OwnerBox { get; }
     public Dictionary<CssBox, RectangleF> Rectangles { get; }
-    public double LineHeight
-    {
-        get
-        {
-            double height = 0;
-
-            foreach (var rect in Rectangles)
-                height = Math.Max(height, rect.Value.Height);
-
-            return height;
-        }
-    }
 
     public double LineBottom
     {
@@ -148,17 +136,6 @@ internal sealed class CssLineBox
             if (!word.IsImage)
                 word.Top = newtop;
         }
-    }
-
-    public bool IsLastSelectedWord(CssRect word)
-    {
-        for (int i = 0; i < Words.Count - 1; i++)
-        {
-            if (Words[i] == word)
-                return !Words[i + 1].Selected;
-        }
-
-        return true;
     }
 
     public override string ToString()

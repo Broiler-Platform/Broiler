@@ -136,17 +136,17 @@ public partial class JSDecimal : JSPrimitive
 
     public override JSValue Negate() => new JSDecimal(-value);
 
-    public override JSValue BitwiseAnd(JSValue value) => throw JSDecimal.CannotMix();
+    public override JSValue BitwiseAnd(JSValue value) => throw CannotMix();
 
-    public override JSValue BitwiseOr(JSValue value) => throw JSDecimal.CannotMix();
+    public override JSValue BitwiseOr(JSValue value) => throw CannotMix();
 
-    public override JSValue BitwiseXor(JSValue value) => throw JSDecimal.CannotMix();
+    public override JSValue BitwiseXor(JSValue value) => throw CannotMix();
 
-    public override JSValue LeftShift(JSValue value) => throw JSDecimal.CannotMix();
+    public override JSValue LeftShift(JSValue value) => throw CannotMix();
 
-    public override JSValue RightShift(JSValue value) => throw JSDecimal.CannotMix();
+    public override JSValue RightShift(JSValue value) => throw CannotMix();
 
-    public override JSValue UnsignedRightShift(JSValue value) => throw JSDecimal.CannotMix();
+    public override JSValue UnsignedRightShift(JSValue value) => throw CannotMix();
 
     public override JSValue Multiply(JSValue value) => new JSDecimal(this.value * value.AsDecimalOnly());
 

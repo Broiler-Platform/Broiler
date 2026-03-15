@@ -8,10 +8,6 @@ namespace Broiler.HTML.Core.Core.IR;
 /// Flat, ordered list of drawing primitives.
 /// Produced by paint; consumed by raster. No DOM/style references.
 /// </summary>
-/// <remarks>
-/// Phase 1: Type definitions only. Not yet populated by the rendering pipeline.
-/// Phase 3: Populated by <c>PaintWalker</c> from a <see cref="Fragment"/> tree.
-/// </remarks>
 public sealed class DisplayList
 {
     public IReadOnlyList<DisplayItem> Items { get; init; } = [];
@@ -20,7 +16,6 @@ public sealed class DisplayList
     /// Serialises this display list to deterministic, indented JSON.
     /// Coordinates are rounded to 2 decimal places; platform-specific handles are excluded.
     /// </summary>
-    /// <remarks>Phase 4 convenience method – wraps <see cref="DisplayListJsonDumper"/>.</remarks>
     public string ToJson() => DisplayListJsonDumper.ToJson(this);
 }
 

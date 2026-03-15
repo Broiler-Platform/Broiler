@@ -12,51 +12,6 @@ namespace Broiler.HTML.Image;
 public static class PixelDiffRunner
 {
     /// <summary>
-    /// Renders <paramref name="html"/> at the settings specified in <paramref name="config"/>
-    /// and returns the resulting bitmap. The caller owns the returned bitmap.
-    /// </summary>
-    public static SKBitmap RenderDeterministic(string html, DeterministicRenderConfig? config = null)
-    {
-        config ??= DeterministicRenderConfig.Default;
-        return HtmlRender.RenderToImage(html, config.ViewportWidth, config.ViewportHeight, SKColors.White);
-    }
-
-    /// <summary>
-    /// Renders <paramref name="html"/> deterministically and provides access to the
-    /// <see cref="Fragment"/> tree and <see cref="DisplayList"/> for failure classification.
-    /// The caller owns the returned bitmap.
-    /// </summary>
-    public static SKBitmap RenderDeterministic(
-        string html,
-        DeterministicRenderConfig? config,
-        out Fragment? fragmentTree,
-        out DisplayList? displayList)
-    {
-        config ??= DeterministicRenderConfig.Default;
-        int w = config.ViewportWidth;
-        int h = config.ViewportHeight;
-
-        var bitmap = new SKBitmap(w, h, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bitmap);
-        canvas.Clear(SKColors.White);
-
-        using var container = new HtmlContainer();
-        container.AvoidAsyncImagesLoading = true;
-        container.AvoidImagesLateLoading = true;
-        container.MaxSize = new SizeF(w, h);
-        container.SetHtml(html);
-
-        var clip = new RectangleF(0, 0, w, h);
-        container.PerformLayout(canvas, clip);
-        container.PerformPaint(canvas, clip);
-
-        fragmentTree = container.LatestFragmentTree;
-        displayList = container.HtmlContainerInt.LatestDisplayList;
-
-        return bitmap;
-    }
-
-    /// <summary>
     /// Compares two bitmaps per-pixel and returns a <see cref="PixelDiffResult"/>
     /// including a diff image highlighting changed pixels.
     /// </summary>
@@ -157,34 +112,5 @@ public static class PixelDiffRunner
             IsMatch = false,
             Mismatches = mismatches
         };
-    }
-
-    /// <summary>
-    /// Classifies the root cause of a pixel regression by comparing
-    /// Fragment trees and DisplayLists between actual and baseline renders.
-    /// </summary>
-    public static FailureClassification ClassifyFailure(
-        string html,
-        string? baselineFragmentJson,
-        string? baselineDisplayListJson,
-        DeterministicRenderConfig? config = null)
-    {
-        config ??= DeterministicRenderConfig.Default;
-
-        using var rendered = RenderDeterministic(html, config, out var fragment, out var displayList);
-
-        string? actualFragmentJson = fragment != null ? FragmentJsonDumper.ToJson(fragment) : null;
-        string? actualDisplayListJson = displayList?.ToJson();
-
-        // Fragment tree changed → layout diff
-        if (!string.Equals(actualFragmentJson, baselineFragmentJson, StringComparison.Ordinal))
-            return FailureClassification.LayoutDiff;
-
-        // DisplayList changed → paint diff
-        if (!string.Equals(actualDisplayListJson, baselineDisplayListJson, StringComparison.Ordinal))
-            return FailureClassification.PaintDiff;
-
-        // Neither changed → pure raster diff
-        return FailureClassification.RasterDiff;
     }
 }

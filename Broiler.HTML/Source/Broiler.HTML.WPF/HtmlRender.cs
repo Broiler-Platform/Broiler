@@ -3,7 +3,6 @@ using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.CSS.Core;
 using Broiler.HTML.Orchestration.Core;
 using Broiler.HTML.WPF.Adapters;
-using Broiler.HTML.WPF.Utilities;
 using System;
 using System.Windows;
 using System.Windows.Media;
@@ -135,12 +134,12 @@ public static class HtmlRender
     {
         // use desktop created graphics to measure the HTML
         using var mg = new GraphicsAdapter();
-        var sizeInt = HtmlRendererUtils.MeasureHtmlByRestrictions(mg, htmlContainer.HtmlContainerInt, Broiler.HTML.WPF.Utilities.Utils.Convert(minSize), Broiler.HTML.WPF.Utilities.Utils.Convert(maxSize));
+        var sizeInt = HtmlRendererUtils.MeasureHtmlByRestrictions(mg, htmlContainer.HtmlContainerInt, Utilities.Utils.Convert(minSize), Utilities.Utils.Convert(maxSize));
         
         if (maxSize.Width < 1 && sizeInt.Width > 4096)
             sizeInt.Width = 4096;
         
-        return Broiler.HTML.WPF.Utilities.Utils.ConvertRound(sizeInt);
+        return Utilities.Utils.ConvertRound(sizeInt);
     }
 
     private static Size RenderClip(DrawingContext g, string html, Point location, Size maxSize, CssData cssData, EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad, EventHandler<HtmlImageLoadEventArgs> imageLoad)

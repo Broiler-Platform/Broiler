@@ -26,25 +26,6 @@ public abstract class RGraphics : IDisposable
     public abstract void PushClip(RectangleF rect);
     public abstract void PushClipExclude(RectangleF rect);
 
-    public void SuspendClipping()
-    {
-        while (_clipStack.Count > 1)
-        {
-            var clip = GetClip();
-            _suspendedClips.Push(clip);
-            PopClip();
-        }
-    }
-
-    public void ResumeClipping()
-    {
-        while (_suspendedClips.Count > 0)
-        {
-            var clip = _suspendedClips.Pop();
-            PushClip(clip);
-        }
-    }
-
     public abstract Object SetAntiAliasSmoothingMode();
     public abstract void ReturnPreviousSmoothingMode(Object prevMode);
     public abstract RBrush GetTextureBrush(RImage image, RectangleF dstRect, PointF translateTransformLocation);

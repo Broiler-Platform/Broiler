@@ -247,7 +247,7 @@ public partial class JSRegExp: JSObject
             // $`	Inserts the portion of the string that precedes the matched substring.
             // $'	Inserts the portion of the string that follows the matched substring.
             // $n or $nn	Where n or nn are decimal digits, inserts the nth parenthesized submatch string, provided the first argument was a RegExp object.
-            var replacementBuilder = new System.Text.StringBuilder();
+            var replacementBuilder = new StringBuilder();
             for (int i = 0; i < replaceText.Length; i++)
             {
                 char c = replaceText[i];

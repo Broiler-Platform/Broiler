@@ -1,5 +1,4 @@
 ﻿using System;
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -7,6 +6,7 @@ using Broiler.HTML.CSS.Core.Parse;
 using Broiler.HTML.Utils.Core.Utils;
 
 namespace Broiler.HTML.Dom.Core.Dom;
+
 
 internal static class CssBoxHelper
 {
@@ -269,8 +269,7 @@ internal static class CssBoxHelper
     /// new BFC, so their descendant floats are excluded from clearance
     /// calculations outside.
     /// </summary>
-    private static void CollectMaxFloatBottom(CssBox box, ref double maxBottom,
-        ref List<(string tag, double bottom)> considered)
+    private static void CollectMaxFloatBottom(CssBox box, ref double maxBottom, ref List<(string tag, double bottom)> considered)
     {
         if (box.Float != CssConstants.None)
         {
@@ -302,16 +301,220 @@ internal static class CssBoxHelper
             CollectMaxFloatBottom(child, ref maxBottom, ref considered);
     }
 
-    public static bool IsRectVisible(RectangleF rect, RectangleF clip)
+    /// <summary>
+    /// Returns the effective bottom margin for a box, accounting for
+    /// parent-child bottom-margin collapse (CSS 2.1 §8.3.1).
+    /// When a box has no bottom border, no bottom padding, and auto height,
+    /// the last in-flow block-level child's bottom margin collapses with
+    /// the box's own bottom margin.  This is applied recursively.
+    /// </summary>
+    internal static double GetPropagatedMarginBottom(CssBox box)
     {
-        rect.X -= 2;
-        rect.Width += 2;
+        double mb = box.ActualMarginBottom;
 
-        clip.Intersect(rect);
+        if (box.ActualBorderBottomWidth > 0.1 || box.ActualPaddingBottom > 0.1)
+            return mb;
 
-        if (clip != RectangleF.Empty)
-            return true;
+        if (box.Height != CssConstants.Auto && !string.IsNullOrEmpty(box.Height))
+        {
+            bool resolvedToAuto = box.Height.Contains('%')
+                && (box.ContainingBlock.Height == CssConstants.Auto
+                    || string.IsNullOrEmpty(box.ContainingBlock.Height));
+            if (!resolvedToAuto)
+                return mb;
+        }
 
-        return false;
+        // Find last in-flow block-level child (CSS 2.1 §8.3.1).
+        CssBox? lastInFlow = null;
+        foreach (var child in box.Boxes)
+        {
+            if (child.Float != CssConstants.None
+                || child.Position == CssConstants.Absolute
+                || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.Inline
+                || child.Display == CssConstants.InlineBlock)
+                continue;
+            lastInFlow = child;
+        }
+
+        if (lastInFlow == null)
+            return mb;
+
+        double childMb = GetPropagatedMarginBottom(lastInFlow);
+
+        // Collapse: max(positives,0) + min(negatives,0)
+        double maxPos = Math.Max(Math.Max(mb, 0), Math.Max(childMb, 0));
+        double minNeg = Math.Min(Math.Min(mb, 0), Math.Min(childMb, 0));
+        return maxPos + minNeg;
+    }
+
+    /// <summary>
+    /// Computes the vertical offset applied by <c>position: relative</c>.
+    /// CSS2.1 §9.4.3: <c>top</c> takes precedence over <c>bottom</c>.
+    /// Returns 0 if the element is not relatively positioned or has no offset.
+    /// </summary>
+    internal static double GetRelativeOffsetY(CssBoxProperties box)
+    {
+        bool hasTop = box.Top != null && box.Top != CssConstants.Auto;
+        bool hasBottom = box.Bottom != null && box.Bottom != CssConstants.Auto;
+
+        if (hasTop)
+            return CssValueParser.ParseLength(box.Top, box.Size.Height, box.GetEmHeight());
+        if (hasBottom)
+            return -CssValueParser.ParseLength(box.Bottom, box.Size.Height, box.GetEmHeight());
+        return 0;
+    }
+
+    /// <summary>
+    /// Collects all float boxes in the same block formatting context that
+    /// precede <paramref name="box"/> in the DOM tree. This includes floats
+    /// nested inside non-BFC siblings (e.g., floated <c>li</c> elements
+    /// inside a non-floated <c>ul</c>) and floats that are siblings of
+    /// ancestor elements when those ancestors do not establish a new BFC
+    /// (CSS2.1 §9.4.1).
+    /// </summary>
+    internal static List<CssBox> CollectPrecedingFloatsInBfc(CssBox box)
+    {
+        var result = new List<CssBox>();
+        if (box.ParentBox == null) return result;
+
+        // Collect preceding sibling floats (and their non-BFC subtrees).
+        foreach (var sibling in box.ParentBox.Boxes)
+        {
+            if (sibling == box) break;
+            CollectFloatsInSubtree(sibling, result);
+        }
+
+        // Walk up ancestor chain: collect floats from each ancestor's
+        // preceding siblings while the ancestor does not establish a BFC.
+        var current = box.ParentBox;
+        while (current != null && current.ParentBox != null)
+        {
+            if (EstablishesBfc(current))
+                break;
+
+            foreach (var sibling in current.ParentBox.Boxes)
+            {
+                if (sibling == current) break;
+                CollectFloatsInSubtree(sibling, result);
+            }
+
+            current = current.ParentBox;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> if <paramref name="box"/> establishes a new
+    /// block formatting context (CSS2.1 §9.4.1).
+    /// </summary>
+    private static bool EstablishesBfc(CssBox box)
+    {
+        return box.Float != CssConstants.None
+            || box.Display == CssConstants.InlineBlock
+            || box.Display == CssConstants.TableCell
+            || box.Position == CssConstants.Absolute
+            || box.Position == CssConstants.Fixed
+            || (box.Overflow != null && box.Overflow != CssConstants.Visible);
+    }
+
+    private static void CollectFloatsInSubtree(CssBox root, List<CssBox> result)
+    {
+        if (root.Float != CssConstants.None && root.Display != CssConstants.None)
+        {
+            result.Add(root);
+            // Float establishes a new BFC – don't recurse into descendants.
+            return;
+        }
+
+        foreach (var child in root.Boxes)
+            CollectFloatsInSubtree(child, result);
+    }
+
+    /// <summary>
+    /// CSS2.1 §8.3.1: Returns <c>true</c> if a box is "empty" — its own
+    /// top and bottom margins are adjoining and collapse through.
+    /// Conditions: min-height is zero, no top/bottom borders or padding,
+    /// height is 0 or auto (or percentage that resolves to auto), no line
+    /// boxes, and all in-flow children's margins also collapse.
+    /// </summary>
+    internal static bool IsEmptyCollapsible(CssBox box)
+    {
+        if (box.ActualBorderTopWidth > 0.1 || box.ActualBorderBottomWidth > 0.1)
+            return false;
+        if (box.ActualPaddingTop > 0.1 || box.ActualPaddingBottom > 0.1)
+            return false;
+
+        // Check if height resolves to zero/auto
+        if (box.Height != CssConstants.Auto && !string.IsNullOrEmpty(box.Height))
+        {
+            bool resolvedToAuto = box.Height.Contains('%')
+                && (box.ContainingBlock.Height == CssConstants.Auto
+                    || string.IsNullOrEmpty(box.ContainingBlock.Height));
+            if (!resolvedToAuto)
+            {
+                double h = CssValueParser.ParseLength(box.Height, box.Size.Height, box.GetEmHeight());
+                if (h > 0.1)
+                    return false;
+            }
+        }
+
+        // Zero content height — ActualBottom should equal Location.Y
+        // (tolerance 0.5 accounts for sub-pixel rounding in layout)
+        if (Math.Abs(box.ActualBottom - box.Location.Y) > 0.5)
+            return false;
+
+        // Must not contain any line boxes (inline content)
+        if (box.LineBoxes.Count > 0)
+            return false;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Collects the maximum positive and minimum negative margins from an
+    /// empty collapsible box and all its in-flow children (recursively for
+    /// children that are also empty and collapsible).
+    /// </summary>
+    internal static void CollectEmptyBoxMargins(CssBox box, ref double maxPos, ref double maxNeg)
+    {
+        maxPos = Math.Max(maxPos, Math.Max(box.ActualMarginTop, 0));
+        maxPos = Math.Max(maxPos, Math.Max(box.ActualMarginBottom, 0));
+        maxNeg = Math.Min(maxNeg, Math.Min(box.ActualMarginTop, 0));
+        maxNeg = Math.Min(maxNeg, Math.Min(box.ActualMarginBottom, 0));
+
+        foreach (var child in box.Boxes)
+        {
+            if (child.Float != CssConstants.None
+                || child.Position == CssConstants.Absolute
+                || child.Position == CssConstants.Fixed)
+                continue;
+
+            maxPos = Math.Max(maxPos, Math.Max(child.ActualMarginTop, 0));
+            maxPos = Math.Max(maxPos, Math.Max(child.ActualMarginBottom, 0));
+            maxNeg = Math.Min(maxNeg, Math.Min(child.ActualMarginTop, 0));
+            maxNeg = Math.Min(maxNeg, Math.Min(child.ActualMarginBottom, 0));
+
+            if (IsEmptyCollapsible(child))
+                CollectEmptyBoxMargins(child, ref maxPos, ref maxNeg);
+        }
+    }
+
+    /// <summary>
+    /// Returns the effective bottom margin for a box, accounting for margins
+    /// that collapse through the box when it is "empty" per CSS2.1 §8.3.1.
+    /// For non-empty boxes returns <see cref="CssBoxProperties.ActualMarginBottom"/>.
+    /// </summary>
+    internal static double GetEffectiveMarginBottom(CssBox box)
+    {
+        if (!IsEmptyCollapsible(box))
+            return box.ActualMarginBottom;
+
+        double maxPos = 0, maxNeg = 0;
+        CollectEmptyBoxMargins(box, ref maxPos, ref maxNeg);
+        double collapsed = maxPos + maxNeg;
+        return collapsed - box.CollapsedMarginTop;
     }
 }

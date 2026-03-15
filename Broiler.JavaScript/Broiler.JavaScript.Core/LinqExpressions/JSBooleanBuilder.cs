@@ -24,12 +24,12 @@ public class JSBooleanBuilder
     //    return Expression.Field(target, _Value);
     //}
 
-    public static Expression NewFromCLRBoolean(Expression target) => Expression.Condition(target, JSBooleanBuilder.True, JSBooleanBuilder.False);
+    public static Expression NewFromCLRBoolean(Expression target) => Expression.Condition(target, True, False);
 
 
     public static Expression Not(Expression value) => Expression.Condition(
             JSValueBuilder.BooleanValue(value),
-            JSBooleanBuilder.False,
-            JSBooleanBuilder.True
+            False,
+            True
             );
 }

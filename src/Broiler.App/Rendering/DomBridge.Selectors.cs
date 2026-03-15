@@ -111,7 +111,7 @@ public sealed partial class DomBridge
         selector = NormalizeImpliedDescendantStar(selector);
 
         var parts = new List<(char, string)>();
-        var current = new System.Text.StringBuilder();
+        var current = new StringBuilder();
         char pendingCombinator = '\0';
         int depth = 0;
         int bracketDepth = 0;
@@ -311,15 +311,15 @@ public sealed partial class DomBridge
             }
         }
 
-        if (tagFilter != null && !string.Equals(el.TagName, tagFilter, System.StringComparison.OrdinalIgnoreCase)) return false;
-        if (idFilter != null && !string.Equals(el.Id, idFilter, System.StringComparison.Ordinal)) return false;
+        if (tagFilter != null && !string.Equals(el.TagName, tagFilter, StringComparison.OrdinalIgnoreCase)) return false;
+        if (idFilter != null && !string.Equals(el.Id, idFilter, StringComparison.Ordinal)) return false;
 
         if (classFilters.Count > 0)
         {
             // Split class names on ASCII whitespace: space, tab, LF, CR, form-feed (per HTML spec)
-            var elementClasses = new System.Collections.Generic.HashSet<string>(
-                (el.ClassName ?? string.Empty).Split(AsciiWhitespace, System.StringSplitOptions.RemoveEmptyEntries),
-                System.StringComparer.Ordinal);
+            var elementClasses = new HashSet<string>(
+                (el.ClassName ?? string.Empty).Split(AsciiWhitespace, StringSplitOptions.RemoveEmptyEntries),
+                StringComparer.Ordinal);
             foreach (var cls in classFilters)
                 if (!elementClasses.Contains(cls)) return false;
         }
@@ -369,7 +369,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static string StripPseudoElements(string compound)
     {
-        var idx = compound.IndexOf("::", System.StringComparison.Ordinal);
+        var idx = compound.IndexOf("::", StringComparison.Ordinal);
         if (idx >= 0)
             return compound[..idx];
         return compound;
@@ -515,7 +515,7 @@ public sealed partial class DomBridge
         foreach (var child in el.Parent.Children)
         {
             if (child.IsTextNode) continue;
-            if (string.Equals(child.TagName, el.TagName, System.StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(child.TagName, el.TagName, StringComparison.OrdinalIgnoreCase))
                 return ReferenceEquals(child, el);
         }
         return false;

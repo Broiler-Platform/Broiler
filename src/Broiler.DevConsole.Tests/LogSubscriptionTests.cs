@@ -18,7 +18,7 @@ public class LogSubscriptionTests : IDisposable
     public void Subscription_Receives_Entries()
     {
         var entries = new List<RenderLogEntry>();
-        using var sub = new LogSubscription(e => entries.Add(e));
+        using var sub = new LogSubscription(entries.Add);
 
         RenderLogger.Log(LogCategory.JavaScript, LogLevel.Info, "ctx", "msg1");
         RenderLogger.Log(LogCategory.HtmlRenderer, LogLevel.Warning, "ctx2", "msg2");
@@ -32,7 +32,7 @@ public class LogSubscriptionTests : IDisposable
     public void Subscription_Respects_Minimum_Level()
     {
         var entries = new List<RenderLogEntry>();
-        using var sub = new LogSubscription(e => entries.Add(e), LogLevel.Warning);
+        using var sub = new LogSubscription(entries.Add, LogLevel.Warning);
 
         RenderLogger.LogDebug(LogCategory.JavaScript, "ctx", "debug msg");
         RenderLogger.Log(LogCategory.JavaScript, LogLevel.Info, "ctx", "info msg");
@@ -48,7 +48,7 @@ public class LogSubscriptionTests : IDisposable
     public void Dispose_Stops_Receiving_Entries()
     {
         var entries = new List<RenderLogEntry>();
-        var sub = new LogSubscription(e => entries.Add(e));
+        var sub = new LogSubscription(entries.Add);
 
         RenderLogger.Log(LogCategory.JavaScript, LogLevel.Info, "ctx", "before");
         sub.Dispose();

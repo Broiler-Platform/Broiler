@@ -37,7 +37,7 @@ public partial class JSDate
                     value = date;
                     return;
                 }
-                value = date.ToOffset(JSDate.Local);
+                value = date.ToOffset(Local);
                 return;
             }
             date = DateParser.Parse(dateString.ToString());
@@ -55,7 +55,7 @@ public partial class JSDate
         try
         {
             year = year >= 0 && year < 100 ? year + 1900 : year;
-            date = new DateTimeOffset(year, 1, 1, 0, 0, 0, 0, JSDate.Local);
+            date = new DateTimeOffset(year, 1, 1, 0, 0, 0, 0, Local);
             date = date.AddMilliseconds(millis);
             date = date.AddSeconds(seconds);
             date = date.AddMinutes(minutes);
@@ -544,7 +544,7 @@ public partial class JSDate
             return JSNumber.NaN;
         try
         {
-            value = DateTimeOffset.FromUnixTimeMilliseconds((long)_time).ToOffset(JSDate.Local);
+            value = DateTimeOffset.FromUnixTimeMilliseconds((long)_time).ToOffset(Local);
         }
         catch (ArgumentOutOfRangeException) {
             value = DateTimeOffset.MinValue;
@@ -782,9 +782,9 @@ public partial class JSDate
     internal JSValue ToDateString(in Arguments a)
     {
         
-        if (value == JSDate.InvalidDate)
+        if (value == InvalidDate)
             return new JSString("Invalid Date");
-        var date =  value.ToLocalTime().ToString("ddd MMM dd yyyy", System.Globalization.DateTimeFormatInfo.InvariantInfo);
+        var date =  value.ToLocalTime().ToString("ddd MMM dd yyyy", DateTimeFormatInfo.InvariantInfo);
 
         return new JSString(date);
         
@@ -794,9 +794,9 @@ public partial class JSDate
     internal JSValue ToISOString(in Arguments a)
     {
         
-        if (value == JSDate.InvalidDate)
+        if (value == InvalidDate)
             return new JSString("Invalid Date");
-        var date = value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", System.Globalization.DateTimeFormatInfo.InvariantInfo);
+        var date = value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", DateTimeFormatInfo.InvariantInfo);
 
         return new JSString(date);
 
@@ -807,9 +807,9 @@ public partial class JSDate
     internal JSValue ToJSON(in Arguments a)
     {
         
-        if (value == JSDate.InvalidDate)
+        if (value == InvalidDate)
             return JSNull.Value;
-        var date = value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", System.Globalization.DateTimeFormatInfo.InvariantInfo);
+        var date = value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", DateTimeFormatInfo.InvariantInfo);
 
         return new JSString(date);
 
@@ -820,13 +820,13 @@ public partial class JSDate
     internal JSValue ToLocaleDateString(in Arguments a)
     {
         
-        if (value == JSDate.InvalidDate)
+        if (value == InvalidDate)
             return new JSString("Invalid Date");
         var (locale, format) = a.Get2();
         string date = null;
         if (locale.IsNullOrUndefined)
         {
-            date = value.ToString("D", System.Globalization.DateTimeFormatInfo.CurrentInfo);
+            date = value.ToString("D", DateTimeFormatInfo.CurrentInfo);
         }
         else {
             var culture = CultureInfo.GetCultureInfo(locale.ToString());
@@ -855,13 +855,13 @@ public partial class JSDate
     internal JSValue ToLocaleString(in Arguments a)
     {
         
-        if (value == JSDate.InvalidDate)
+        if (value == InvalidDate)
             return new JSString("Invalid Date");
         var (locale, format) = a.Get2();
         string date = null;
         if (locale.IsNullOrUndefined)
         {
-            date = value.ToString("F", System.Globalization.DateTimeFormatInfo.CurrentInfo);
+            date = value.ToString("F", DateTimeFormatInfo.CurrentInfo);
         }
         else
         {
@@ -892,13 +892,13 @@ public partial class JSDate
     internal JSValue ToLocaleTimeString(in Arguments a)
     {
         
-        if (value == JSDate.InvalidDate)
+        if (value == InvalidDate)
             return new JSString("Invalid Date");
         var (locale, format) = a.Get2();
         string date = null;
         if (locale.IsNullOrUndefined)
         {
-            date = value.ToString("T", System.Globalization.DateTimeFormatInfo.CurrentInfo);
+            date = value.ToString("T", DateTimeFormatInfo.CurrentInfo);
         }
         else
         {
@@ -929,10 +929,10 @@ public partial class JSDate
     internal new JSValue ToString(in Arguments a)
     {
         
-        if (value == JSDate.InvalidDate)
+        if (value == InvalidDate)
             return new JSString("Invalid Date");
         var date = value.
-                   ToString("ddd MMM dd yyyy HH:mm:ss ", System.Globalization.DateTimeFormatInfo.InvariantInfo) +
+                   ToString("ddd MMM dd yyyy HH:mm:ss ", DateTimeFormatInfo.InvariantInfo) +
                    ToTimeZoneString();
 
         return new JSString(date);
@@ -945,11 +945,11 @@ public partial class JSDate
     internal JSValue ToTimeString(in Arguments a)
     {
         
-        if (value == JSDate.InvalidDate)
+        if (value == InvalidDate)
             return new JSString("Invalid Date");
         // DateTimeFormatInfo.CurrentInfo.LongTimePattern
         var date = value.
-                   ToString("HH:mm:ss ", System.Globalization.DateTimeFormatInfo.InvariantInfo) +
+                   ToString("HH:mm:ss ", DateTimeFormatInfo.InvariantInfo) +
                    ToTimeZoneString();
 
         return new JSString(date);
@@ -963,11 +963,11 @@ public partial class JSDate
     internal JSValue ToUTCString(in Arguments a)
     {
         
-        if (value == JSDate.InvalidDate)
+        if (value == InvalidDate)
             return new JSString("Invalid Date");
         var date = value.ToUniversalTime().
-                   ToString("ddd, dd MMM yyyy HH:mm:ss 'GMT'", 
-                   System.Globalization.DateTimeFormatInfo.InvariantInfo);
+                   ToString("ddd, dd MMM yyyy HH:mm:ss 'GMT'",
+                   DateTimeFormatInfo.InvariantInfo);
 
         return new JSString(date);
 

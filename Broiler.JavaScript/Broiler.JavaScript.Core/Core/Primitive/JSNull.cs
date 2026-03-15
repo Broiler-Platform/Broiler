@@ -46,8 +46,8 @@ public sealed class JSNull : JSValue
         {
 #if DEBUG
             var st = new System.Diagnostics.StackTrace(true);
-            System.Console.Error.WriteLine($"[JSNull] Cannot get property {name} of null");
-            System.Console.Error.WriteLine(st.ToString());
+            Console.Error.WriteLine($"[JSNull] Cannot get property {name} of null");
+            Console.Error.WriteLine(st.ToString());
 #endif
             throw JSContext.Current.NewTypeError($"Cannot get property {name} of null");
         }
@@ -101,7 +101,7 @@ public sealed class JSNull : JSValue
         return false;
     }
 
-    public override bool StrictEquals(JSValue value) => Object.ReferenceEquals(this, value);
+    public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
     public override JSValue CreateInstance(in Arguments a) => throw JSContext.Current.NewTypeError("cannot create instance of null");
 

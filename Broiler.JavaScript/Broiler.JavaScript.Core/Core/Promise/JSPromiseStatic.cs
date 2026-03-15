@@ -52,20 +52,20 @@ public partial class JSPromise
             var result = callbackfn.InvokeFunction(callArgs);
             if (result is JSPromise)
                 return result;
-            return new JSPromise(result, JSPromise.PromiseState.Resolved);
+            return new JSPromise(result, PromiseState.Resolved);
         }
         catch (JSException ex)
         {
-            return new JSPromise(ex.Error ?? JSError.From(ex), JSPromise.PromiseState.Rejected);
+            return new JSPromise(ex.Error ?? JSError.From(ex), PromiseState.Rejected);
         }
         catch (Exception ex)
         {
-            return new JSPromise(JSError.From(ex), JSPromise.PromiseState.Rejected);
+            return new JSPromise(JSError.From(ex), PromiseState.Rejected);
         }
     }
 
     [JSExport("resolve")]
-    public static JSValue Resolve(in Arguments a) => new JSPromise(a.Get1(), JSPromise.PromiseState.Resolved);
+    public static JSValue Resolve(in Arguments a) => new JSPromise(a.Get1(), PromiseState.Resolved);
 
     [JSExport("reject")]
     public static JSValue Reject(in Arguments a)
@@ -75,7 +75,7 @@ public partial class JSPromise
         {
             throw JSContext.Current.NewTypeError($"Failure reason must be provided for rejected promise");
         }
-        return new JSPromise(reason, JSPromise.PromiseState.Rejected);
+        return new JSPromise(reason, PromiseState.Rejected);
     }
 
 

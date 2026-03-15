@@ -102,7 +102,7 @@ public class FastList<T>: IList<T>, IDisposable
             return false;
         foreach(var i in items)
         {
-            if (Object.Equals(i, item))
+            if (Equals(i, item))
                 return true;
         }
         return false;
@@ -193,7 +193,7 @@ public class FastList<T>: IList<T>, IDisposable
         foreach (var e in items)
         {
             i++;
-            if (Object.Equals(e, item))
+            if (Equals(e, item))
                 return i;
         }
         return -1;

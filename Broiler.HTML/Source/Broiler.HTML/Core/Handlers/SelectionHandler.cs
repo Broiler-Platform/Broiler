@@ -1,7 +1,6 @@
 using System;
 using System.Drawing;
 using Broiler.HTML.Adapters;
-using Broiler.HTML.Core.Core;
 using Broiler.HTML.Dom.Core.Dom;
 using Broiler.HTML.Orchestration.Core;
 using Broiler.HTML.Core.Core.Entities;
@@ -9,7 +8,7 @@ using Broiler.HTML.Dom.Core.Utils;
 
 namespace Broiler.HTML.Core.Handlers;
 
-internal sealed class SelectionHandler : Core.ISelectionHandler, Dom.Core.Dom.ISelectionHandler
+internal sealed class SelectionHandler : Core.ISelectionHandler, ISelectionHandler
 {
     private readonly CssBox _root;
     private readonly HtmlContainerInt _htmlContainer;
@@ -160,7 +159,6 @@ internal sealed class SelectionHandler : Core.ISelectionHandler, Dom.Core.Dom.IS
         {
             if (_mouseDownOnSelectedWord)
             {
-                // make sure not to start drag-drop on click but when it actually moves as it fucks mouse-up
                 if ((DateTime.Now - _lastMouseDown).TotalMilliseconds > 200)
                     StartDragDrop(parent);
             }
@@ -172,7 +170,6 @@ internal sealed class SelectionHandler : Core.ISelectionHandler, Dom.Core.Dom.IS
         }
         else
         {
-            // Handle mouse hover over the html to change the cursor depending if hovering word, link of other.
             var link = DomUtils.GetLinkBox(_root, loc);
             if (link != null)
             {
@@ -226,7 +223,6 @@ internal sealed class SelectionHandler : Core.ISelectionHandler, Dom.Core.Dom.IS
 
     public void ClearSelection()
     {
-        // clear drag and drop
         _dragDropData = null;
 
         ClearSelection(_root);
@@ -245,66 +241,60 @@ internal sealed class SelectionHandler : Core.ISelectionHandler, Dom.Core.Dom.IS
 
     private void HandleSelection(RControl control, PointF loc, bool allowPartialSelect)
     {
-        // get the line under the mouse or nearest from the top
         var lineBox = DomUtils.GetCssLineBox(_root, loc);
-        if (lineBox != null)
+        if (lineBox == null)
+            return;
+
+        var word = DomUtils.GetCssBoxWord(lineBox, loc);
+
+        if (word == null && lineBox.Words.Count > 0)
         {
-            // get the word under the mouse
-            var word = DomUtils.GetCssBoxWord(lineBox, loc);
-
-            // if no word found under the mouse use the last or the first word in the line
-            if (word == null && lineBox.Words.Count > 0)
+            if (loc.Y > lineBox.LineBottom)
             {
-                if (loc.Y > lineBox.LineBottom)
-                {
-                    // under the line
-                    word = lineBox.Words[lineBox.Words.Count - 1];
-                }
-                else if (loc.X < lineBox.Words[0].Left)
-                {
-                    // before the line
-                    word = lineBox.Words[0];
-                }
-                else if (loc.X > lineBox.Words[lineBox.Words.Count - 1].Right)
-                {
-                    // at the end of the line
-                    word = lineBox.Words[lineBox.Words.Count - 1];
-                }
+                word = lineBox.Words[lineBox.Words.Count - 1];
             }
-
-            // if there is matching word
-            if (word != null)
+            else if (loc.X < lineBox.Words[0].Left)
             {
-                if (_selectionStart == null)
-                {
-                    // on start set the selection start word
-                    _selectionStartPoint = loc;
-                    _selectionStart = word;
-                    if (allowPartialSelect)
-                        CalculateWordCharIndexAndOffset(control, word, loc, true);
-                }
-
-                // always set selection end word
-                _selectionEnd = word;
-                if (allowPartialSelect)
-                    CalculateWordCharIndexAndOffset(control, word, loc, false);
-
-                ClearSelection(_root);
-                if (CheckNonEmptySelection(loc, allowPartialSelect))
-                {
-                    CheckSelectionDirection();
-                    SelectWordsInRange(_root, _backwardSelection ? _selectionEnd : _selectionStart, _backwardSelection ? _selectionStart : _selectionEnd);
-                }
-                else
-                {
-                    _selectionEnd = null;
-                }
-
-                _cursorChanged = true;
-                control.SetCursorIBeam();
-                control.Invalidate();
+                word = lineBox.Words[0];
+            }
+            else if (loc.X > lineBox.Words[lineBox.Words.Count - 1].Right)
+            {
+                word = lineBox.Words[lineBox.Words.Count - 1];
             }
         }
+
+        if (word == null)
+            return;
+
+        if (_selectionStart == null)
+        {
+            _selectionStartPoint = loc;
+            _selectionStart = word;
+
+            if (allowPartialSelect)
+                CalculateWordCharIndexAndOffset(control, word, loc, true);
+        }
+
+        _selectionEnd = word;
+
+        if (allowPartialSelect)
+            CalculateWordCharIndexAndOffset(control, word, loc, false);
+
+        ClearSelection(_root);
+        
+        if (CheckNonEmptySelection(loc, allowPartialSelect))
+        {
+            CheckSelectionDirection();
+            SelectWordsInRange(_root, _backwardSelection ? _selectionEnd : _selectionStart, _backwardSelection ? _selectionStart : _selectionEnd);
+        }
+        else
+        {
+            _selectionEnd = null;
+        }
+
+        _cursorChanged = true;
+        control.SetCursorIBeam();
+        control.Invalidate();
     }
 
     private static void ClearSelection(CssBox box)
@@ -322,6 +312,7 @@ internal sealed class SelectionHandler : Core.ISelectionHandler, Dom.Core.Dom.IS
         {
             var html = DomUtils.GenerateHtml(_root, HtmlGenerationStyle.Inline, true);
             var plainText = DomUtils.GetSelectedPlainText(_root);
+
             _dragDropData = control.Adapter.GetClipboardDataObject(html, plainText);
         }
 
@@ -339,15 +330,12 @@ internal sealed class SelectionHandler : Core.ISelectionHandler, Dom.Core.Dom.IS
 
     private bool CheckNonEmptySelection(PointF loc, bool allowPartialSelect)
     {
-        // full word selection is never empty
         if (!allowPartialSelect)
             return true;
 
-        // if end selection location is near starting location then the selection is empty
         if (Math.Abs(_selectionStartPoint.X - loc.X) <= 1 && Math.Abs(_selectionStartPoint.Y - loc.Y) < 5)
             return false;
 
-        // selection is empty if on same word and same index
         return _selectionStart != _selectionEnd || _selectionStartIndex != _selectionEndIndex;
     }
 
@@ -364,13 +352,13 @@ internal sealed class SelectionHandler : Core.ISelectionHandler, Dom.Core.Dom.IS
             if (!inSelection && boxWord == selectionStart)
                 inSelection = true;
 
-            if (inSelection)
-            {
-                boxWord.Selection = this;
+            if (!inSelection)
+                continue;
 
-                if (selectionStart == selectionEnd || boxWord == selectionEnd)
-                    return true;
-            }
+            boxWord.Selection = this;
+
+            if (selectionStart == selectionEnd || boxWord == selectionEnd)
+                return true;
         }
 
         foreach (var childBox in box.Boxes)
@@ -406,19 +394,16 @@ internal sealed class SelectionHandler : Core.ISelectionHandler, Dom.Core.Dom.IS
         var offset = loc.X - word.Left;
         if (word.Text == null)
         {
-            // not a text word - set full selection
             selectionIndex = -1;
             selectionOffset = -1;
         }
         else if (offset > word.Width - word.OwnerBox.ActualWordSpacing || loc.Y > DomUtils.GetCssLineBoxByWord(word).LineBottom)
         {
-            // mouse under the line, to the right of the word - set to the end of the word
             selectionIndex = word.Text.Length;
             selectionOffset = word.Width;
         }
         else if (offset > 0)
         {
-            // calculate partial word selection
             var maxWidth = offset + (inclusive ? 0 : 1.5f * word.LeftGlyphPadding);
             control.MeasureString(word.Text, word.OwnerBox.ActualFont, maxWidth, out int charFit, out double charFitWidth);
 

@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace HtmlRenderer.Parse;
+namespace Broiler.HTML.CSS.Core.Parse;
 
 internal static partial class RegexParserHelper
 {

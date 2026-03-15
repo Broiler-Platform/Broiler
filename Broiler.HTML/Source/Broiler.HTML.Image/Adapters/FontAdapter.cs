@@ -12,7 +12,6 @@ internal sealed class FontAdapter : RFont
     private const double PtToCssPx = 96.0 / 72.0;
 
     private readonly double _size;
-    private readonly FontStyle _style;
     private double _height = -1;
     private double _underlineOffset = -1;
     private double _whitespaceWidth = -1;
@@ -21,7 +20,6 @@ internal sealed class FontAdapter : RFont
     {
         Typeface = typeface;
         _size = size;
-        _style = style;
         // Phase 10.2: Use grayscale anti-aliasing (Antialias) instead of
         // SubpixelAntialias.  The Chromium reference screenshot is a bitmap
         // where sub-pixel colour fringes have been composited away, so
@@ -75,11 +73,5 @@ internal sealed class FontAdapter : RFont
             _whitespaceWidth = graphics.MeasureString(" ", this).Width;
 
         return _whitespaceWidth;
-    }
-
-    internal void SetMetrics(double height, double underlineOffset)
-    {
-        _height = height;
-        _underlineOffset = underlineOffset;
     }
 }

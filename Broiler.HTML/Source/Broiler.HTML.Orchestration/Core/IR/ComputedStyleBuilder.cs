@@ -7,12 +7,6 @@ namespace Broiler.HTML.Orchestration.Core.IR;
 /// Creates a <see cref="ComputedStyle"/> snapshot from a <see cref="CssBoxProperties"/> instance.
 /// This factory captures the current lazy-parsed computed values.
 /// </summary>
-/// <remarks>
-/// Phase 1: Shadow data — existing code paths are unchanged.
-/// Phase 2: Extended to capture <see cref="ComputedStyle.Kind"/>,
-/// <see cref="ComputedStyle.ListStart"/>, <see cref="ComputedStyle.ListReversed"/>,
-/// and <see cref="ComputedStyle.ImageSource"/>.
-/// </remarks>
 internal static class ComputedStyleBuilder
 {
     /// <summary>

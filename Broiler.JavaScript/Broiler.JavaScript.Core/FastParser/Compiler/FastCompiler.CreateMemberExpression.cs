@@ -15,11 +15,11 @@ partial class FastCompiler
                 var id = property as AstIdentifier;
                 if (!computed)
                 {
-                    return ExpHelper.JSValueBuilder.Index(
+                    return JSValueBuilder.Index(
                         target,
                         KeyOfName(id.Name));
                 }
-                return ExpHelper.JSValueBuilder.Index(
+                return JSValueBuilder.Index(
                     target,
                     VisitIdentifier(id));
             case FastNodeType.Literal:
@@ -27,20 +27,20 @@ partial class FastCompiler
                 switch (l.TokenType)
                 {
                     case TokenTypes.True:
-                        return ExpHelper.JSValueBuilder.Index(
+                        return JSValueBuilder.Index(
                             target,
-                            (uint)1);
+                            1);
                     case TokenTypes.False:
-                        return ExpHelper.JSValueBuilder.Index(
+                        return JSValueBuilder.Index(
                             target,
-                            (uint)0);
+                            0);
                     case TokenTypes.String:
-                        return ExpHelper.JSValueBuilder.Index(
+                        return JSValueBuilder.Index(
                             target,
                                 KeyOfName(l.Start.CookedText));
                     case TokenTypes.Number:
                         if (l.NumericValue >= 0 && (l.NumericValue % 1 == 0))
-                            return ExpHelper.JSValueBuilder.Index(
+                            return JSValueBuilder.Index(
                                 target,
                                 (uint)l.NumericValue);
                         break;

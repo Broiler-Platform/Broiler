@@ -12,7 +12,6 @@ namespace Broiler.HTML.Core.Core.IR;
 /// (<see cref="Fragment.Style"/>, <c>FontHandle</c>, <c>ImageHandle</c>)
 /// are excluded.
 /// </summary>
-/// <remarks>Phase 2 deliverable – layout-level deterministic testing.</remarks>
 public static class FragmentJsonDumper
 {
     /// <summary>

@@ -26,7 +26,7 @@ public partial class JSInt8Array : JSTypedArray
     {
         if (index < 0 || index >= length)
             return JSUndefined.Value;
-        return new JSNumber((int)(sbyte)buffer.buffer[byteOffset + index]);
+        return new JSNumber((sbyte)buffer.buffer[byteOffset + index]);
     }
 
     internal protected override bool SetValue(uint index, JSValue value, JSValue receiver, bool throwError = true)

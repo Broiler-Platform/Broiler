@@ -5,7 +5,7 @@ namespace YantraJS.Core;
 
 internal class JSJsonParser(JsonParserReceiver r) : System.Text.Json.Serialization.JsonConverter<JSValue>
 {
-    public static JSValue Parse(string str, JsonParserReceiver r) => System.Text.Json.JsonSerializer.Deserialize<JSValue>(str, new System.Text.Json.JsonSerializerOptions
+    public static JSValue Parse(string str, JsonParserReceiver r) => JsonSerializer.Deserialize<JSValue>(str, new JsonSerializerOptions
     {
         Converters =
             {
@@ -19,7 +19,7 @@ internal class JSJsonParser(JsonParserReceiver r) : System.Text.Json.Serializati
     public static JSValue ParseWithSource(string str, JsonParserReceiverWithSource r)
     {
         var parser = new JSJsonParser(null) { reviverWithSource = r };
-        return System.Text.Json.JsonSerializer.Deserialize<JSValue>(str, new System.Text.Json.JsonSerializerOptions
+        return JsonSerializer.Deserialize<JSValue>(str, new JsonSerializerOptions
         {
             Converters = { parser }
         });

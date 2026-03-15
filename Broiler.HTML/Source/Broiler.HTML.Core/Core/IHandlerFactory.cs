@@ -5,12 +5,6 @@ namespace Broiler.HTML.Core.Core;
 /// Breaks the dependency between <c>HtmlContainerInt</c> (in Orchestration)
 /// and concrete handler constructors (in the façade).
 /// </summary>
-/// <remarks>
-/// See ADR-008, Phase 3 prerequisites, item 3.
-/// The <paramref name="root"/> parameter in <see cref="CreateSelectionHandler"/>
-/// is typed as <c>object</c> because the concrete type (<c>CssBox</c>) resides
-/// in HtmlRenderer.Dom, which HtmlRenderer.Core cannot reference.
-/// </remarks>
 internal interface IHandlerFactory
 {
     /// <summary>

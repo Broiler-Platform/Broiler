@@ -88,7 +88,7 @@ public sealed partial class DomBridge
     /// </summary>
     public void Attach(JSContext context, string html, string url)
     {
-        if (System.Uri.TryCreate(url, System.UriKind.Absolute, out var uri))
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
             _pageUrl = uri.ToString();
             _pageProtocol = uri.Scheme + ":";
@@ -268,12 +268,12 @@ public sealed partial class DomBridge
         @"<(?<tag>[a-zA-Z][a-zA-Z0-9]*)\b(?<attrs>[^>]*)\/?>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static readonly System.Collections.Generic.HashSet<string> SkippedTags = new(System.StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> SkippedTags = new(StringComparer.OrdinalIgnoreCase)
     {
         "html", "head", "body", "title"
     };
 
-    private static readonly System.Collections.Generic.HashSet<string> VoidTags = new(System.StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> VoidTags = new(StringComparer.OrdinalIgnoreCase)
     {
         "area", "base", "br", "col", "embed", "hr", "img", "input",
         "link", "meta", "param", "source", "track", "wbr"
@@ -350,7 +350,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static Dictionary<string, string> ParseAttributes(string attrs)
     {
-        var result = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var i = 0;
         while (i < attrs.Length)
         {
@@ -404,7 +404,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static Dictionary<string, string> ParseStyle(string styleValue)
     {
-        var result = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var declaration in styleValue.Split(';'))
         {
             var colonIdx = declaration.IndexOf(':');
@@ -494,7 +494,7 @@ public sealed partial class DomBridge
                     or "s-resize" or "se-resize" or "sw-resize" or "w-resize"
                     or "ew-resize" or "ns-resize" or "nesw-resize" or "nwse-resize"
                     or "col-resize" or "row-resize" or "all-scroll" or "zoom-in" or "zoom-out"
-                    || v.StartsWith("url(", System.StringComparison.Ordinal);
+                    || v.StartsWith("url(", StringComparison.Ordinal);
 
             case "list-style-type":
                 return v is "disc" or "circle" or "square" or "decimal"
@@ -536,7 +536,7 @@ public sealed partial class DomBridge
 
         foreach (var unit in units)
         {
-            if (v.EndsWith(unit, System.StringComparison.Ordinal) && v.Length > unit.Length)
+            if (v.EndsWith(unit, StringComparison.Ordinal) && v.Length > unit.Length)
             {
                 var numPart = v[..^unit.Length];
                 if (double.TryParse(numPart, System.Globalization.NumberStyles.Float,
@@ -572,10 +572,10 @@ public sealed class DomElement(
     public string InnerHtml { get; set; } = innerHtml;
 
     /// <summary>Parsed inline CSS style declarations, keyed case-insensitively by property name.</summary>
-    public Dictionary<string, string> Style { get; } = style ?? new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> Style { get; } = style ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>All HTML attributes of the element, keyed case-insensitively by attribute name.</summary>
-    public Dictionary<string, string> Attributes { get; } = attributes ?? new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> Attributes { get; } = attributes ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Parent element in the DOM tree.</summary>
     public DomElement? Parent { get; set; }
@@ -591,14 +591,14 @@ public sealed class DomElement(
 
     /// <summary>IDL-level properties that are NOT reflected as content attributes
     /// (e.g. input.value, option.defaultSelected). Keyed by property name.</summary>
-    public Dictionary<string, object?> DomProperties { get; } = new(System.StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, object?> DomProperties { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Registered event listeners keyed by event type (e.g. "click", "input", "submit").
     /// Each entry stores the listener and whether it was registered for the capture phase.</summary>
-    public Dictionary<string, List<(JSValue Listener, bool Capture)>> EventListeners { get; } = new(System.StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, List<(JSValue Listener, bool Capture)>> EventListeners { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Inline event handler properties keyed by event type (e.g. "click" for onclick).</summary>
-    public Dictionary<string, JSValue> InlineEventHandlers { get; } = new(System.StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, JSValue> InlineEventHandlers { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Namespace URI for elements created with createElementNS.</summary>
     public string? NamespaceURI { get; set; }
@@ -654,7 +654,7 @@ internal sealed class FormElementsCollection : JSObject
             foreach (var ctrl in controls)
             {
                 if (ctrl.Attributes.TryGetValue("name", out var name) &&
-                    string.Equals(name, prop, System.StringComparison.Ordinal))
+                    string.Equals(name, prop, StringComparison.Ordinal))
                     return _bridge.ToJSObject(ctrl);
             }
         }

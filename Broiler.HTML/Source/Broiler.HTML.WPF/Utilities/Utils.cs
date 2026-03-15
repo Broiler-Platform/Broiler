@@ -1,5 +1,4 @@
 using System.Windows;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Color = System.Drawing.Color;
 using PointF = System.Drawing.PointF;
@@ -11,14 +10,6 @@ namespace Broiler.HTML.WPF.Utilities;
 internal static class Utils
 {
     public static PointF Convert(Point p) => new((float)p.X, (float)p.Y);
-
-    public static Point[] Convert(PointF[] points)
-    {
-        Point[] myPoints = new Point[points.Length];
-        for (int i = 0; i < points.Length; i++)
-            myPoints[i] = Convert(points[i]);
-        return myPoints;
-    }
 
     public static Point Convert(PointF p) => new(p.X, p.Y);
     public static Point ConvertRound(PointF p) => new((int)p.X, (int)p.Y);

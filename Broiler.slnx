@@ -5,7 +5,6 @@
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Core/Broiler.HTML.Core.csproj" />
     <Project Path="Broiler.HTML/Source/Broiler.HTML.CSS/Broiler.HTML.CSS.csproj" />
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Dom/Broiler.HTML.Dom.csproj" />
-    <Project Path="Broiler.HTML/Source/Broiler.HTML.Image.Tests/Broiler.HTML.Image.Tests.csproj" />
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Image/Broiler.HTML.Image.csproj" />
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Orchestration/Broiler.HTML.Orchestration.csproj" />
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Primitives/Broiler.HTML.Primitives.csproj" />
@@ -16,16 +15,16 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Broiler.App/Broiler.App.csproj" />
-    <Project Path="src/Broiler.Cli/Broiler.Cli.csproj" />
-    <Project Path="src/Broiler.DevConsole/Broiler.DevConsole.csproj" />
-    <Project Path="src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj" />
     <Project Path="src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj" />
+    <Project Path="src/Broiler.Cli/Broiler.Cli.csproj" />
+    <Project Path="src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj" />
+    <Project Path="src/Broiler.DevConsole/Broiler.DevConsole.csproj" />
     <Project Path="src/Broiler.DevSite/Broiler.DevSite.csproj" />
   </Folder>
   <Folder Name="/Broiler.JavaScript/">
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core.Tests/Broiler.JavaScript.Core.Tests.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core/Broiler.JavaScript.Core.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.ExpressionCompiler/Broiler.JavaScript.ExpressionCompiler.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.JSClassGenerator/Broiler.JavaScript.JSClassGenerator.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core.Tests/Broiler.JavaScript.Core.Tests.csproj" />
   </Folder>
 </Solution>

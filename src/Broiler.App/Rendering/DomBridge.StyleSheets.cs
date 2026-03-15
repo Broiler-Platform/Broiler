@@ -199,7 +199,7 @@ public sealed partial class DomBridge
     /// <summary>Collects all text content from a style element's children.</summary>
     private static string CollectStyleElementText(DomElement styleElement)
     {
-        var sb = new System.Text.StringBuilder();
+        var sb = new StringBuilder();
         foreach (var child in styleElement.Children)
         {
             if (child.IsTextNode && child.TextContent != null)

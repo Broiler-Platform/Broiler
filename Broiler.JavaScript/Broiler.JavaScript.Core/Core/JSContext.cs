@@ -345,7 +345,7 @@ public partial class JSContext: JSObject, IDisposable
         var func = JSFunction.CreateClass(this, false);
         this[Names.Function] = func;
         FunctionPrototype = func.prototype;
-        Object = JSObject.CreateClass(this, false);
+        Object = CreateClass(this, false);
         this[Names.Object] = Object;
         ObjectPrototype = Object.prototype;
         ObjectPrototype.BasePrototypeObject = null;
@@ -405,7 +405,7 @@ public partial class JSContext: JSObject, IDisposable
         //{
         //    BasePrototypeObject = (Bootstrap.Create("console", typeof(JSConsole))).prototype
         //};
-        this[KeyStrings.console] = Clr.ClrProxy.From(new JSConsole(this));
+        this[KeyStrings.console] = ClrProxy.From(new JSConsole(this));
 
         this[KeyStrings.debug] = new JSFunction(Debug);
 

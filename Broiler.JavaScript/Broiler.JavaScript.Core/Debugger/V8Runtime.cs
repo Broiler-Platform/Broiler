@@ -13,9 +13,9 @@ public partial class V8Runtime(V8InspectorProtocol inspectorContext) : V8Protoco
         foreach (var entry in inspectorContext.Contexts)
         {
             var cid = entry.Key;
-            inspectorContext.Send(new V8Runtime.ExecutionContextCreated
+            inspectorContext.Send(new ExecutionContextCreated
             {
-                Context = new V8Runtime.ExecutionContextDescription
+                Context = new ExecutionContextDescription
                 {
                     Id = entry.Value.ID,
                     Name = cid.ToString(),

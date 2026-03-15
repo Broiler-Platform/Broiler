@@ -56,7 +56,7 @@ public partial class JSRegExp
             lastIndex = match.Index + match.Length;
         }
         var groups = match.Groups;
-        var c = (int)groups.Count;
+        var c = groups.Count;
         JSArray result = new((uint)c);
         for (int i = 0; i < c; i++)
         {
@@ -87,7 +87,7 @@ public partial class JSRegExp
                     hasNamedGroups = true;
                     var g = match.Groups[name];
                     namedGroups[name] = g.Success
-                        ? (JSValue)new JSString(g.Value)
+                        ? new JSString(g.Value)
                         : JSUndefined.Value;
                 }
             }

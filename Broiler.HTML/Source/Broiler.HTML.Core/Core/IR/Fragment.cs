@@ -7,10 +7,6 @@ namespace Broiler.HTML.Core.Core.IR;
 /// Immutable layout result for a single box/fragment.
 /// Produced by layout; consumed by paint.
 /// </summary>
-/// <remarks>
-/// Phase 1: This is a read-only snapshot built after layout completes by walking the CssBox tree.
-/// No existing code paths consume this yet.
-/// </remarks>
 public sealed class Fragment
 {
     /// <summary>Location in absolute coordinates.</summary>

@@ -86,18 +86,6 @@ public static class HtmlRender
         return data.ToArray();
     }
 
-    public static byte[] RenderToJpeg(string html, int width, int height,
-        int quality = 90,
-        SKColor backgroundColor = default,
-        CssData cssData = null,
-        EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null,
-        EventHandler<HtmlImageLoadEventArgs> imageLoad = null)
-    {
-        using var bitmap = RenderToImage(html, width, height, backgroundColor, cssData, stylesheetLoad, imageLoad);
-        using var data = bitmap.Encode(SKEncodedImageFormat.Jpeg, quality);
-        return data.ToArray();
-    }
-
     public static void RenderToFile(string html, int width, int height, string filePath,
         SKEncodedImageFormat format = SKEncodedImageFormat.Png,
         int quality = 90,

@@ -22,7 +22,7 @@ public static class RuntimeAssembly
 
         var c = new Closures(null, null, null, null);
 
-        return (object)method.CreateDelegate(exp.Type, c);
+        return method.CreateDelegate(exp.Type, c);
     }
 
     public static T Compile<T>(this YExpression<T> exp)

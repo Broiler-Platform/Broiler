@@ -113,13 +113,7 @@ public sealed class CssBlock
         return Equals((CssBlock)obj);
     }
 
-    public override int GetHashCode()
-    {
-        unchecked
-        {
-            return ((Class != null ? Class.GetHashCode() : 0) * 397) ^ (_properties != null ? _properties.GetHashCode() : 0);
-        }
-    }
+    public override int GetHashCode() => HashCode.Combine(Class.GetHashCode(), _properties.GetHashCode());
 
     public override string ToString()
     {

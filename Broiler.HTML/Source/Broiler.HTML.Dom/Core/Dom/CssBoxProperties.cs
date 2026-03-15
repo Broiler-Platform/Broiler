@@ -10,7 +10,6 @@ using System;
 using System.Drawing;
 using System.Globalization;
 using System.Text.RegularExpressions;
-using TheArtOfDev.HtmlRenderer.Core.Parse;
 
 namespace Broiler.HTML.Dom.Core.Dom;
 
@@ -46,14 +45,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
     #region Fields
 
-    /// <summary>
-    /// Gets or sets the location of the box
-    /// </summary>
     private PointF _location;
-
-    /// <summary>
-    /// Gets or sets the size of the box
-    /// </summary>
     private SizeF _size;
 
     private double _actualCornerNw = double.NaN;
@@ -465,8 +457,6 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string ListStyleImage { get; set; } = string.Empty;
     public string ListStyleType { get; set; } = "disc";
 
-    // --- Phase 2: element classification and DOM-attribute properties ---
-
     /// <summary>Semantic role of the element, set during style resolution from tag name.</summary>
     public BoxKind Kind { get; set; } = BoxKind.Anonymous;
 
@@ -666,11 +656,15 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
             {
                 if (MarginRight == CssConstants.Auto)
                     MarginRight = "0";
+
                 var actualMarginRight = CssValueParser.ParseLength(MarginRight, Size.Width, GetEmHeight());
+                
                 if (MarginLeft.EndsWith("%"))
                     return actualMarginRight;
+                
                 _actualMarginRight = actualMarginRight;
             }
+            
             return _actualMarginRight;
         }
     }
@@ -885,52 +879,50 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         }
     }
 
-    public RFont ActualParentFont => GetParent() == null ? ActualFont : GetParent().ActualFont;
-
     public RFont ActualFont
     {
         get
         {
-            if (_actualFont == null)
+            if (_actualFont != null)
+                return _actualFont;
+
+            if (string.IsNullOrEmpty(FontFamily))
+                FontFamily = CssConstants.DefaultFont;
+
+            if (string.IsNullOrEmpty(FontSize))
+                FontSize = CssConstants.FontSize.ToString(CultureInfo.InvariantCulture) + "pt";
+
+            FontStyle st = System.Drawing.FontStyle.Regular;
+
+            if (this.FontStyle == CssConstants.Italic || this.FontStyle == CssConstants.Oblique)
+                st |= System.Drawing.FontStyle.Italic;
+
+            if (FontWeight != CssConstants.Normal && FontWeight != CssConstants.Lighter && !string.IsNullOrEmpty(FontWeight) && FontWeight != CssConstants.Inherit)
+                st |= System.Drawing.FontStyle.Bold;
+
+            double parentSize = CssConstants.FontSize;
+
+            if (GetParent() != null)
+                parentSize = GetParent().ActualFont.Size;
+
+            var fsize = FontSize switch
             {
-                if (string.IsNullOrEmpty(FontFamily))
-                    FontFamily = CssConstants.DefaultFont;
+                CssConstants.Medium => CssConstants.FontSize,
+                CssConstants.XXSmall => CssConstants.FontSize - 4,
+                CssConstants.XSmall => CssConstants.FontSize - 3,
+                CssConstants.Small => CssConstants.FontSize - 2,
+                CssConstants.Large => CssConstants.FontSize + 2,
+                CssConstants.XLarge => CssConstants.FontSize + 3,
+                CssConstants.XXLarge => CssConstants.FontSize + 4,
+                CssConstants.Smaller => parentSize - 2,
+                CssConstants.Larger => parentSize + 2,
+                _ => CssValueParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
+            };
 
-                if (string.IsNullOrEmpty(FontSize))
-                    FontSize = CssConstants.FontSize.ToString(CultureInfo.InvariantCulture) + "pt";
+            if (fsize <= 0)
+                fsize = CssConstants.FontSize;
 
-                FontStyle st = System.Drawing.FontStyle.Regular;
-
-                if (this.FontStyle == CssConstants.Italic || this.FontStyle == CssConstants.Oblique)
-                    st |= System.Drawing.FontStyle.Italic;
-
-                if (FontWeight != CssConstants.Normal && FontWeight != CssConstants.Lighter && !string.IsNullOrEmpty(FontWeight) && FontWeight != CssConstants.Inherit)
-                    st |= System.Drawing.FontStyle.Bold;
-
-                double parentSize = CssConstants.FontSize;
-
-                if (GetParent() != null)
-                    parentSize = GetParent().ActualFont.Size;
-
-                var fsize = FontSize switch
-                {
-                    CssConstants.Medium => CssConstants.FontSize,
-                    CssConstants.XXSmall => CssConstants.FontSize - 4,
-                    CssConstants.XSmall => CssConstants.FontSize - 3,
-                    CssConstants.Small => CssConstants.FontSize - 2,
-                    CssConstants.Large => CssConstants.FontSize + 2,
-                    CssConstants.XLarge => CssConstants.FontSize + 3,
-                    CssConstants.XXLarge => CssConstants.FontSize + 4,
-                    CssConstants.Smaller => parentSize - 2,
-                    CssConstants.Larger => parentSize + 2,
-                    _ => CssValueParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
-                };
-
-                if (fsize <= 0)
-                    fsize = CssConstants.FontSize;
-
-                _actualFont = GetCachedFont(FontFamily, fsize, st);
-            }
+            _actualFont = GetCachedFont(FontFamily, fsize, st);
 
             return _actualFont;
         }

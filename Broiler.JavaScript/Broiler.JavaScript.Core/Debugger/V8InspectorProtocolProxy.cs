@@ -69,7 +69,7 @@ internal class V8InspectorProtocolProxy : V8InspectorProtocol
                 var r = await client.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
                 if (r.MessageType != System.Net.WebSockets.WebSocketMessageType.Text)
                     break;
-                sb.Append(System.Text.Encoding.UTF8.GetString(buffer,0, r.Count));
+                sb.Append(Encoding.UTF8.GetString(buffer,0, r.Count));
                 if (r.EndOfMessage)
                 {
                     var text = sb.ToString();
@@ -104,7 +104,7 @@ internal class V8InspectorProtocolProxy : V8InspectorProtocol
                 if (p != null)
                     await p;
                 // System.Diagnostics.Debug.WriteLine($"Sent {message}");
-                var bytes = System.Text.Encoding.UTF8.GetBytes(message);
+                var bytes = Encoding.UTF8.GetBytes(message);
                 var buffer = new ArraySegment<byte>(bytes);
                 await client.SendAsync(buffer, System.Net.WebSockets.WebSocketMessageType.Text, true, cancellationTokenSource.Token);
             });

@@ -33,12 +33,12 @@ public class JSTemplateStringBuilder
     public static Expression New(IEnumerable<Expression> select, int total)
     {
         var list = new Sequence<YElementInit>();
-        var newExp = NewLambdaExpression.NewExpression<JSTemplateString>(() => () => new JSTemplateString((int)0),
+        var newExp = NewLambdaExpression.NewExpression<JSTemplateString>(() => () => new JSTemplateString(0),
             Expression.Constant(total));
         // var newExp = Expression.New(_new, Expression.Constant(total));
         var en = select.GetEnumerator();
 
-        var addStringMethod = TypeQuery.QueryInstanceMethod<JSTemplateString>(() => (x) => x.Add((string)""));
+        var addStringMethod = TypeQuery.QueryInstanceMethod<JSTemplateString>(() => (x) => x.Add(""));
         var addValueMethod = TypeQuery.QueryInstanceMethod<JSTemplateString>(() => (x) => x.Add((JSValue)null));
 
         while (en.MoveNext())
@@ -47,10 +47,10 @@ public class JSTemplateStringBuilder
             if (current.NodeType == YExpressionType.Constant)
             {
                 // exp = Expression.Call(exp, _addQuasi, current);
-                list.Add(YExpression.ElementInit(addStringMethod, current));
+                list.Add(Expression.ElementInit(addStringMethod, current));
                 continue;
             }
-            list.Add(YExpression.ElementInit(addValueMethod, current));
+            list.Add(Expression.ElementInit(addValueMethod, current));
         }
         return Expression.ListInit(newExp, list)
             .CallExpression<JSTemplateString>(() => (x) => x.ToJSString());

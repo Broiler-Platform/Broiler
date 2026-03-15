@@ -36,7 +36,7 @@ internal sealed class ContextMenuAdapter : RContextMenu
     public override void Show(RControl parent, PointF location)
     {
         _contextMenu.PlacementTarget = ((ControlAdapter)parent).Control;
-        _contextMenu.PlacementRectangle = new Rect(Broiler.HTML.WPF.Utilities.Utils.ConvertRound(location), Size.Empty);
+        _contextMenu.PlacementRectangle = new Rect(Utilities.Utils.ConvertRound(location), Size.Empty);
         _contextMenu.IsOpen = true;
     }
 

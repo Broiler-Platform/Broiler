@@ -13,7 +13,7 @@ public partial class LinqConverter
     protected override YExpression VisitCall(MethodCallExpression node)
     {
         var target = Visit(node.Object);
-        var list = node.Arguments.Select(a => Visit(a)).ToArray();
+        var list = node.Arguments.Select(Visit).ToArray();
         return YExpression.Call(target, node.Method, list);
     }
 

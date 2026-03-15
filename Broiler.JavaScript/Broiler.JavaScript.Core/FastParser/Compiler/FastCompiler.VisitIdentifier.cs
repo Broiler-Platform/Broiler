@@ -22,6 +22,6 @@ partial class FastCompiler
         if (var != null)
             return var.Expression;
 
-        return ExpHelper.JSContextBuilder.Index(KeyOfName(identifier.Name));
+        return JSContextBuilder.Index(KeyOfName(identifier.Name));
     }
 }

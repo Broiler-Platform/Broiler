@@ -18,10 +18,10 @@ public class JSArrayBuilder
         type.GetConstructor([typeof(IElementEnumerator)]);
 
     public static MethodInfo _Add =
-        type.GetMethod(nameof(Core.JSArray.Add), [typeof(JSValue)]);
+        type.GetMethod(nameof(JSArray.Add), [typeof(JSValue)]);
 
     public static MethodInfo _AddRange =
-        type.GetMethod(nameof(Core.JSArray.AddRange), [typeof(JSValue)]);
+        type.GetMethod(nameof(JSArray.AddRange), [typeof(JSValue)]);
 
 
     public static Expression New()

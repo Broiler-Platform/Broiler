@@ -12,9 +12,6 @@ namespace Broiler.HTML.Core.Core;
 /// DOM types. Breaks the bidirectional dependency between <c>CssBox</c> and the
 /// concrete <c>HtmlContainerInt</c> class.
 /// </summary>
-/// <remarks>
-/// See ADR-007, section "Circular Dependencies Remaining (Future Work)", item 3.
-/// </remarks>
 internal interface IHtmlContainerInt
 {
     /// <summary>

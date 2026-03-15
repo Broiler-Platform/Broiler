@@ -173,8 +173,8 @@ public sealed partial class DomBridge
             var query = m.Groups["query"].Value.Trim();
             var content = m.Groups["content"].Value;
 
-            if (query.Contains("screen", System.StringComparison.OrdinalIgnoreCase) ||
-                query.Equals("all", System.StringComparison.OrdinalIgnoreCase))
+            if (query.Contains("screen", StringComparison.OrdinalIgnoreCase) ||
+                query.Equals("all", StringComparison.OrdinalIgnoreCase))
             {
                 ExtractRulesFromCss(content);
             }
@@ -216,7 +216,7 @@ public sealed partial class DomBridge
                     foreach (var kv in declarations)
                     {
                         if (!el.Attributes.TryGetValue("style", out var inlineStyle) ||
-                            !inlineStyle.Contains(kv.Key, System.StringComparison.OrdinalIgnoreCase))
+                            !inlineStyle.Contains(kv.Key, StringComparison.OrdinalIgnoreCase))
                         {
                             el.Style[kv.Key] = kv.Value;
                         }

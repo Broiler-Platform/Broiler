@@ -52,8 +52,6 @@ public sealed class HtmlContainer : IDisposable
     /// </summary>
     public Fragment? LatestFragmentTree => HtmlContainerInt.LatestFragmentTree;
 
-    public CssData CssData => HtmlContainerInt.CssData;
-
     public bool AvoidAsyncImagesLoading
     {
         get => HtmlContainerInt.AvoidAsyncImagesLoading;

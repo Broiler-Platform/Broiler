@@ -134,9 +134,9 @@ public class JSException: Exception
     {
 #if DEBUG
         var st = new System.Diagnostics.StackTrace(true);
-        System.Console.Error.WriteLine($"[JSException.Throw] {value}");
-        System.Console.Error.WriteLine($"  Function: {function}, File: {filePath}, Line: {line}");
-        System.Console.Error.WriteLine(st.ToString());
+        Console.Error.WriteLine($"[JSException.Throw] {value}");
+        Console.Error.WriteLine($"  Function: {function}, File: {filePath}, Line: {line}");
+        Console.Error.WriteLine(st.ToString());
 #endif
         throw value is JSError jse ? jse.Exception : new JSException(value);
     }

@@ -9,15 +9,8 @@ namespace Broiler.HTML.Core.Core;
 /// Breaks the dependency between <c>HtmlContainerInt</c> (in Orchestration)
 /// and the concrete <c>RAdapter</c> class (in the façade).
 /// </summary>
-/// <remarks>
-/// See ADR-008, Phase 3. Extends <see cref="IColorResolver"/> so the
-/// orchestrator can pass it directly to <c>CssParser</c>.
-/// </remarks>
 internal interface IAdapter : IColorResolver
 {
-    /// <summary>
-    /// The default CSS data for the platform.
-    /// </summary>
     CssData DefaultCssData { get; }
 
     /// <summary>

@@ -14,8 +14,8 @@ internal static class CallStackItemBuilder
         int nameLength,
         int line,
         int column) => NewLambdaExpression.NewExpression<CallStackItem>(() => () => new CallStackItem(
-                                    (JSContext)null,
-                                    (ScriptInfo)null, 0, 0, 0, 0),
+                                    null,
+                                    null, 0, 0, 0, 0),
             context,
             scriptInfo,
             YExpression.Constant(nameOffset),

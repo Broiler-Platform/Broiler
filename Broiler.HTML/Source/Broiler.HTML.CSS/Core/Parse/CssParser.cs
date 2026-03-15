@@ -1,15 +1,14 @@
 ﻿using System;
-using System;
 using System.Drawing;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.Core.Core;
-using TheArtOfDev.HtmlRenderer.Core.Parse;
 using Broiler.HTML.Utils.Core.Utils;
 
 namespace Broiler.HTML.CSS.Core.Parse;
+
 
 internal sealed class CssParser
 {
@@ -213,7 +212,6 @@ internal sealed class CssParser
 
         while ((atrule = RegexParserUtils.GetCssAtRules(stylesheet, ref startIdx)) != null)
         {
-            //Just process @media rules
             if (!atrule.StartsWith("@media", StringComparison.InvariantCultureIgnoreCase))
                 continue;
 
@@ -257,7 +255,7 @@ internal sealed class CssParser
 
     private void FeedStyleBlock(CssData cssData, string block, string media = "all")
     {
-        int startIdx = block.IndexOf("{", StringComparison.Ordinal);
+        int startIdx = block.IndexOf('{');
         int endIdx = startIdx > -1 ? FindUnescapedChar(block, '}', startIdx + 1) : -1;
 
         if (startIdx <= -1 || endIdx <= -1)
@@ -591,7 +589,7 @@ internal sealed class CssParser
         }
 
         // Tokenise the rest.
-        string[] tokens = remaining.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        string[] tokens = remaining.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
 
         foreach (var token in tokens)
         {
@@ -692,7 +690,7 @@ internal sealed class CssParser
         if (selector.IndexOf('[') < 0)
             return selector;
 
-        var sb = new System.Text.StringBuilder(selector.Length);
+        var sb = new StringBuilder(selector.Length);
         var addedClasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         int i = 0;
         while (i < selector.Length)
@@ -772,7 +770,7 @@ internal sealed class CssParser
     private static string DeduplicateClassParts(string selector)
     {
         // Split by whitespace/combinators to handle multi-part selectors
-        var sb = new System.Text.StringBuilder(selector.Length);
+        var sb = new StringBuilder(selector.Length);
         int i = 0;
         while (i < selector.Length)
         {
@@ -792,7 +790,7 @@ internal sealed class CssParser
             // Deduplicate dot-separated parts
             var parts = compound.Split('.');
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var deduped = new System.Text.StringBuilder();
+            var deduped = new StringBuilder();
             for (int p = 0; p < parts.Length; p++)
             {
                 if (p == 0 && string.IsNullOrEmpty(parts[p]))
@@ -1262,5 +1260,5 @@ internal sealed class CssParser
         return null;
     }
 
-    private string ParseBorderColor(string str, int idx, int length) => _valueParser.TryGetColor(str, idx, length, out Color color) ? str.Substring(idx, length) : null;
+    private string ParseBorderColor(string str, int idx, int length) => _valueParser.TryGetColor(str, idx, length, out _) ? str.Substring(idx, length) : null;
 }

@@ -630,7 +630,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
 
     public virtual IElementEnumerator GetAllKeys(bool showEnumerableOnly = true, bool inherited = true) => new ElementEnumerator();
 
-    internal virtual JSBoolean Is(JSValue value) => object.ReferenceEquals(this, value) ? JSBoolean.True : JSBoolean.False;
+    internal virtual JSBoolean Is(JSValue value) => ReferenceEquals(this, value) ? JSBoolean.True : JSBoolean.False;
 
 
     public virtual JSValue CreateInstance(in Arguments a) => throw JSContext.Current.NewTypeError($"Cannot create instance of {this}");

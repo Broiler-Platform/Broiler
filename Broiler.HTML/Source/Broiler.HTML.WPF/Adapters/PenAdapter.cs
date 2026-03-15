@@ -6,14 +6,9 @@ namespace Broiler.HTML.WPF.Adapters;
 
 internal sealed class PenAdapter(Brush brush) : RPen
 {
-    private double _width;
     private System.Windows.Media.DashStyle _dashStyle = DashStyles.Solid;
 
-    public override double Width
-    {
-        get { return _width; }
-        set { _width = value; }
-    }
+    public override double Width { get; set; }
 
     public override DashStyle DashStyle
     {
@@ -31,9 +26,5 @@ internal sealed class PenAdapter(Brush brush) : RPen
         }
     }
 
-    public Pen CreatePen()
-    {
-        var pen = new Pen(brush, _width) { DashStyle = _dashStyle };
-        return pen;
-    }
+    public Pen CreatePen() => new(brush, Width) { DashStyle = _dashStyle };
 }

@@ -43,12 +43,12 @@ public sealed class CssData
             bool merged = false;
             foreach (var block in list)
             {
-                if (block.EqualsSelector(cssBlock))
-                {
-                    merged = true;
-                    block.Merge(cssBlock);
-                    break;
-                }
+                if (!block.EqualsSelector(cssBlock))
+                    continue;
+
+                merged = true;
+                block.Merge(cssBlock);
+                break;
             }
 
             if (!merged)

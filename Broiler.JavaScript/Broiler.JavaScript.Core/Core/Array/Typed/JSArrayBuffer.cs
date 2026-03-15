@@ -48,11 +48,11 @@ public partial class JSArrayBuffer : JSObject
 
     public override double DoubleValue => Double.NaN;
 
-    public override bool Equals(JSValue value) => Object.ReferenceEquals(this, value);
+    public override bool Equals(JSValue value) => ReferenceEquals(this, value);
 
     public override JSValue InvokeFunction(in Arguments a) => throw JSContext.Current.NewTypeError($"{this} is not a function");
 
-    public override bool StrictEquals(JSValue value) => Object.ReferenceEquals(this, value);
+    public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
     // ---------------------------------------------------------------
     // §2.9  ArrayBuffer.prototype.byteLength (getter)
@@ -96,11 +96,11 @@ public partial class JSArrayBuffer : JSObject
             throw JSContext.Current.NewRangeError("Invalid ArrayBuffer length");
 
         var newBuffer = new byte[newLength];
-        System.Array.Copy(buffer, newBuffer, Math.Min(buffer.Length, newLength));
+        Array.Copy(buffer, newBuffer, Math.Min(buffer.Length, newLength));
 
         // Detach the source buffer.
         isDetached = true;
-        buffer = System.Array.Empty<byte>();
+        buffer = Array.Empty<byte>();
 
         return new JSArrayBuffer(newBuffer);
     }
@@ -143,7 +143,7 @@ public partial class JSArrayBuffer : JSObject
 
         int newLen = Math.Max(end - begin, 0);
         var newBuf = new byte[newLen];
-        System.Array.Copy(buffer, begin, newBuf, 0, newLen);
+        Array.Copy(buffer, begin, newBuf, 0, newLen);
         return new JSArrayBuffer(newBuf);
     }
 

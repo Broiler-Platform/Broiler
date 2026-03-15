@@ -1712,10 +1712,10 @@ document.getElementById('out').textContent = r.join('|');
 [Fact]
 public void Acid3_Phase4_Score_At_Least_81()
 {
-    var acid3Path = System.IO.Path.GetFullPath(System.IO.Path.Combine(
+    var acid3Path = Path.GetFullPath(Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "acid", "acid3", "acid3.html"));
-    var html = System.IO.File.ReadAllText(acid3Path);
-    var url = new System.Uri(acid3Path).AbsoluteUri;
+    var html = File.ReadAllText(acid3Path);
+    var url = new Uri(acid3Path).AbsoluteUri;
     var result = CaptureService.ExecuteScriptsWithDom(html, url);
 
     var scoreMatch = System.Text.RegularExpressions.Regex.Match(

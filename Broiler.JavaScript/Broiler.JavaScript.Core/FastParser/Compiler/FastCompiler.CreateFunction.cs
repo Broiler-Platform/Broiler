@@ -156,7 +156,7 @@ partial class FastCompiler
                         continue;
                     }
                     CreateAssignment(bodyInits, v.Identifier,
-                        ExpHelper.JSVariableBuilder.FromArgumentOptional(argumentElements, i, VisitExpression(v.Init)),
+                        JSVariableBuilder.FromArgumentOptional(argumentElements, i, VisitExpression(v.Init)),
                         true,
                         true);
                 }
@@ -181,7 +181,7 @@ partial class FastCompiler
                         JSExceptionBuilder.Throw("this cannot be null")
                         )));
                 }
-                sList.Add(Exp.Label(r, ExpHelper.JSUndefinedBuilder.Value));
+                sList.Add(Exp.Label(r, JSUndefinedBuilder.Value));
                 // sList.Add();
 
                 var block = Exp.Block(vList, sList);
@@ -289,7 +289,7 @@ partial class FastCompiler
                 if (fexprNameParam != null)
                 {
                     var isReadOnlyField = typeof(JSVariable).GetField("IsReadOnly",
-                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                        BindingFlags.Instance | BindingFlags.NonPublic);
                     var fexprVars = new Sequence<ParameterExpression>();
                     fexprVars.Add(fexprNameParam);
                     return Exp.Block(

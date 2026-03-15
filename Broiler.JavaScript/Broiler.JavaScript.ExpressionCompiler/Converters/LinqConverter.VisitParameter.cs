@@ -125,7 +125,7 @@ public partial class LinqConverter
     }
 
     protected override YExpression VisitMemberInit(MemberInitExpression node) => YExpression.MemberInit(Visit(node.NewExpression) as YNewExpression,
-            node.Bindings.Select(m => Visit(m)).ToArray());
+            node.Bindings.Select(Visit).ToArray());
 
     protected override YExpression VisitModulo(BinaryExpression node) => YExpression.Binary(Visit(node.Left), YOperator.Mod, Visit(node.Right));
 
@@ -161,7 +161,7 @@ public partial class LinqConverter
 
     protected override YExpression VisitOrElse(BinaryExpression node) => YExpression.OrElse(Visit(node.Left), Visit(node.Right));
 
-    protected override YExpression VisitParameter(ParameterExpression node) => parameters[node as ParameterExpression];
+    protected override YExpression VisitParameter(ParameterExpression node) => parameters[node];
 
     protected override YExpression VisitPostDecrementAssign(UnaryExpression node) => throw new NotImplementedException();
 

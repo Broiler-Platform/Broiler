@@ -1,7 +1,6 @@
 using System.Drawing;
 using System;
 using System.Collections.Generic;
-using Broiler.HTML.Orchestration.Core;
 using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.Core.Core.IR;
 using Broiler.HTML.Core.Core;
@@ -236,17 +235,17 @@ internal sealed class DomParser
         // match elements that have ALL specified classes.  Generate lookup
         // keys for all 2-class combinations so that rules stored under
         // compound keys are found.
-        if (classList.Count >= 2)
+        if (classList.Count < 2)
+            return;
+
+        for (int i = 0; i < classList.Count; i++)
         {
-            for (int i = 0; i < classList.Count; i++)
+            for (int j = 0; j < classList.Count; j++)
             {
-                for (int j = 0; j < classList.Count; j++)
-                {
-                    if (i == j) continue;
-                    var compound = classList[i] + classList[j];
-                    AssignCssBlocks(box, cssData, compound);
-                    AssignCssBlocks(box, cssData, box.HtmlTag.Name + compound);
-                }
+                if (i == j) continue;
+                var compound = classList[i] + classList[j];
+                AssignCssBlocks(box, cssData, compound);
+                AssignCssBlocks(box, cssData, box.HtmlTag.Name + compound);
             }
         }
     }

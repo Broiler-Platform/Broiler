@@ -8,9 +8,6 @@ namespace Broiler.HTML.Core.Core;
 /// Read-only view of the border-related CSS properties that drawing handlers require.
 /// Implemented by <c>CssBoxProperties</c> to decouple handlers from the DOM tree.
 /// </summary>
-/// <remarks>
-/// See ADR-007, section "Circular Dependencies Remaining (Future Work)", item 4.
-/// </remarks>
 internal interface IBorderRenderData
 {
     string BorderTopStyle { get; }

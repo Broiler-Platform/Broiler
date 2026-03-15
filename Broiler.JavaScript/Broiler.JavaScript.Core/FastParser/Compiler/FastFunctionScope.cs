@@ -387,7 +387,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
         // this.ScriptInfo = Expression.Parameter(typeof(ScriptInfo), $"{nameof(ScriptInfo)}{sID}");
         Loop = new LinkedStack<LoopScope>();
         TempVariables = [];
-        ReturnLabel = Expression.Label(typeof(YantraJS.Core.JSValue));
+        ReturnLabel = Expression.Label(typeof(JSValue));
     }
 
     public FastFunctionScope(

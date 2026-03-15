@@ -59,7 +59,7 @@ public class GeneratorRewriter(
 
         // setup jump table...
 
-        var @break = YExpression.Label("generatorEnd");
+        var @break = Expression.Label("generatorEnd");
 
         var jumpExp = gw.GenerateJumps(@break);
 
@@ -84,7 +84,7 @@ public class GeneratorRewriter(
                 inits,
 
                 jumpExp,
-                YExpression.Label(@break),
+                Expression.Label(@break),
                 innerBody,
                 Expression.Label(gw.generatorReturn, GeneratorStateBuilder.New(0))
                 );
@@ -116,11 +116,11 @@ public class GeneratorRewriter(
         return (vlist, Expression.Block(boxes));
     }
 
-    private Expression GenerateJumps(YLabelTarget @break)
+    private Expression GenerateJumps(LabelTarget @break)
     {
         if (jumps.Count == 0)
             return Expression.Empty;
-        var cases = new Sequence<YLabelTarget>();
+        var cases = new Sequence<LabelTarget>();
         var offset = 1;            
         jumps = new  Sequence<(LabelTarget label, int id)>(jumps.OrderBy(x => x.id));
         var en = jumps.GetFastEnumerator();
@@ -244,7 +244,7 @@ public class GeneratorRewriter(
         // we need to rewrite nested lambda to replace `this` or closures
         // with boxes...
 
-        var replaces = lifted.ToDictionary((x) => (YExpression)x.original, x => x.boxField);
+        var replaces = lifted.ToDictionary((x) => (Expression)x.original, x => x.boxField);
         var parameterReplacer = new ReplaceParameters(replaces);
 
         return parameterReplacer.Visit(yLambdaExpression);
@@ -304,7 +304,7 @@ public class GeneratorRewriter(
             tryList.AddExpression(ClrGeneratorV2Builder.BeginCatch(pe));
             tryList.AddExpression(Expression.Assign(Visit(@catch.Parameter), exception));
             tryList.AddExpression(Visit(@catch.Body));
-            tryList.AddExpression(YExpression.Empty);
+            tryList.AddExpression(Expression.Empty);
             tryList.AddExpression(Expression.Goto(hasFinally ? finallyLabel : endLabel));
         }
 

@@ -115,7 +115,7 @@ partial class JSDate {
     {
         // DateTime doesn't support years below year 1.
         if (year < 0)
-            return JSDate.InvalidDate;
+            return InvalidDate;
 
         // This step was missing from Jurrasic, add 1900 to year < 2000 to get full year. 
         if (0 <= year && year <= 99)
@@ -158,7 +158,7 @@ partial class JSDate {
             {
                 // One or more of the parameters was NaN or way too big or way too small.
                 // Return a sentinel invalid date.
-                return JSDate.InvalidDate;
+                return InvalidDate;
             }
         }
     }

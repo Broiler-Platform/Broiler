@@ -125,14 +125,11 @@ public class HtmlControl : Control
     [Browsable(false)]
     public virtual string SelectedHtml => _htmlContainer.SelectedHtml;
 
-    public virtual string GetHtml() => _htmlContainer != null ? _htmlContainer.GetHtml() : null;
+    public virtual string GetHtml() => _htmlContainer?.GetHtml();
 
     public virtual Rect? GetElementRectangle(string elementId) => _htmlContainer != null ? _htmlContainer.GetElementRectangle(elementId) : null;
 
-    public void ClearSelection()
-    {
-        _htmlContainer?.ClearSelection();
-    }
+    public void ClearSelection() => _htmlContainer?.ClearSelection();
 
     protected override void OnRender(DrawingContext context)
     {

@@ -154,7 +154,7 @@ internal static class UriHelper
                     }
 
                     // Decode the UTF-8 sequence.
-                    result.Append(System.Text.Encoding.UTF8.GetString(utf8Bytes, 0, utf8Bytes.Length));
+                    result.Append(Encoding.UTF8.GetString(utf8Bytes, 0, utf8Bytes.Length));
                 }
             }
             else

@@ -264,7 +264,7 @@ public partial class JSIteratorObject : JSObject
 
     internal static JSValue IteratorResult(JSValue value, bool done)
     {
-        return JSObject.NewWithProperties()
+        return NewWithProperties()
             .AddProperty(KeyStrings.value, value)
             .AddProperty(KeyStrings.done, done ? JSBoolean.True : JSBoolean.False);
     }

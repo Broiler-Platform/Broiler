@@ -154,7 +154,7 @@ public static class JSValueToClrConverter
         {
             return m.CreateDelegate<Func<JSValue, string, T>>();
         }
-        return (v,n) => GetAsOrThrow<T>(v, n);
+        return GetAsOrThrow<T>;
     }
 
     public static T ToFastClrValue<T>(this JSValue value)
@@ -175,11 +175,11 @@ public static class JSValueToClrConverter
         throw new JSException($"Failed to convert JSValue to {type.Name}");
     }
 
-    public static T GetAs<T>(JSValue value) => value.ConvertTo<T>(out T v1)
+    public static T GetAs<T>(JSValue value) => value.ConvertTo(out T v1)
                 ? v1
                 : default;
 
-    public static T GetAsOrThrow<T>(JSValue value, string error) => value.ConvertTo<T>(out T v1)
+    public static T GetAsOrThrow<T>(JSValue value, string error) => value.ConvertTo(out T v1)
                 ? v1
                 : throw new JSException(error);
 

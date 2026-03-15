@@ -26,8 +26,8 @@ internal static class ListOfExpressionsExtensions
 
 
     internal static Sequence<Expression> ConvertToInteger(
-        this IFastEnumerable<Expression> source, 
-        Core.FastParser.FastPool.Scope scope)
+        this IFastEnumerable<Expression> source,
+        FastPool.Scope scope)
     {
         var result = new Sequence<Expression>(source.Count);
         var se = source.GetFastEnumerator();
@@ -42,7 +42,7 @@ internal static class ListOfExpressionsExtensions
                     result.Add(exp);
                     continue;
                 case YExpressionType.DoubleConstant:
-                    result.Add(YExpression.Constant((int)(exp as YDoubleConstantExpression).Value));
+                    result.Add(Expression.Constant((int)(exp as YDoubleConstantExpression).Value));
                     continue;
             }
             if (!exp.IsConstant(out var ce))

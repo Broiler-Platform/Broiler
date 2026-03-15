@@ -90,23 +90,23 @@ public class JSModuleContext : JSContext
             string fullName = Path.Combine(folder, file);
             if (!file.StartsWith("."))
             {
-                if (System.IO.Directory.Exists(fullName))
+                if (Directory.Exists(fullName))
                 {
                     var pkgJson = fullName + "/package.json";
-                    if (System.IO.File.Exists(pkgJson))
+                    if (File.Exists(pkgJson))
                     {
-                        var json = System.IO.File.ReadAllText(pkgJson);
-                        var pkg = JsonObject.Parse(json) as JsonObject;
+                        var json = File.ReadAllText(pkgJson);
+                        var pkg = JsonNode.Parse(json) as JsonObject;
                         if (pkg.TryGetPropertyValue("main", out var token))
                         {
                             var v = token.GetValue<string>();
                             path = Path.Combine(fullName, v);
-                            if (System.IO.File.Exists(path))
+                            if (File.Exists(path))
                                 return true;
                             foreach (var ext in extensions)
                             {
                                 var np = path + ext;
-                                if (System.IO.File.Exists(np))
+                                if (File.Exists(np))
                                 {
                                     path = np;
                                     return true;
@@ -120,7 +120,7 @@ public class JSModuleContext : JSContext
                 }
             }
 
-            if (System.IO.File.Exists(fullName))
+            if (File.Exists(fullName))
             {
                 path = fullName;
                 return true;
@@ -184,7 +184,7 @@ public class JSModuleContext : JSContext
             SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
             return new DisposableAction(() =>
             {
-                System.Threading.SynchronizationContext.SetSynchronizationContext(null);
+                SynchronizationContext.SetSynchronizationContext(null);
             });
         }
 
@@ -235,7 +235,7 @@ public class JSModuleContext : JSContext
             if (!name.IsString)
                 throw NewTypeError("import method's parameter must be a string");
             var result = LoadModuleAsync(dirPath, name.StringValue);
-            return Clr.ClrProxy.Marshal(result);
+            return ClrProxy.Marshal(result);
         });
 
         newModule.Require = new JSFunction((in Arguments a) =>
@@ -308,14 +308,14 @@ public class JSModuleContext : JSContext
         m = moduleCache.GetOrCreate(fullPath, () =>
         {
             var newModule = new JSModule(this, fullPath);
-            var dirPath = System.IO.Path.GetDirectoryName(fullPath);
+            var dirPath = Path.GetDirectoryName(fullPath);
             newModule.Import = new JSFunction((in Arguments a) =>
             {
                 var name = a[0];
                 if (!name.IsString)
                     throw NewTypeError("import method's parameter must be a string");
                 var result = LoadModuleAsync(dirPath, name.StringValue);
-                return Clr.ClrProxy.Marshal(result);
+                return ClrProxy.Marshal(result);
             });
 
             newModule.Require = new JSFunction((in Arguments a) =>

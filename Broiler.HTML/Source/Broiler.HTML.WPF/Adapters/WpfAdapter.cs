@@ -71,10 +71,7 @@ internal sealed class WpfAdapter : RAdapter
             AddFontFamilyMapping(genericName, resolved);
     }
 
-    private static string? FirstAvailable(HashSet<string> systemFonts, params string[] candidates)
-    {
-        return Array.Find(candidates, c => systemFonts.Contains(c));
-    }
+    private static string? FirstAvailable(HashSet<string> systemFonts, params string[] candidates) => Array.Find(candidates, systemFonts.Contains);
 
     public static WpfAdapter Instance { get; } = new();
 
@@ -85,21 +82,17 @@ internal sealed class WpfAdapter : RAdapter
             return Color.Empty;
 
         var convertFromString = ColorConverter.ConvertFromString(colorName) ?? Colors.Black;
-        return Broiler.HTML.WPF.Utilities.Utils.Convert((System.Windows.Media.Color)convertFromString);
+        return Utilities.Utils.Convert((System.Windows.Media.Color)convertFromString);
     }
 
     protected override RPen CreatePen(Color color) => new PenAdapter(GetSolidColorBrush(color));
 
-    protected override RBrush CreateSolidBrush(Color color)
-    {
-        var solidBrush = GetSolidColorBrush(color);
-        return new BrushAdapter(solidBrush);
-    }
+    protected override RBrush CreateSolidBrush(Color color) => new BrushAdapter(GetSolidColorBrush(color));
 
     protected override RBrush CreateLinearGradientBrush(RectangleF rect, Color color1, Color color2, double angle)
     {
-        var startColor = angle <= 180 ? Broiler.HTML.WPF.Utilities.Utils.Convert(color1) : Broiler.HTML.WPF.Utilities.Utils.Convert(color2);
-        var endColor = angle <= 180 ? Broiler.HTML.WPF.Utilities.Utils.Convert(color2) : Broiler.HTML.WPF.Utilities.Utils.Convert(color1);
+        var startColor = angle <= 180 ? Utilities.Utils.Convert(color1) : Utilities.Utils.Convert(color2);
+        var endColor = angle <= 180 ? Utilities.Utils.Convert(color2) : Utilities.Utils.Convert(color1);
         angle = angle <= 180 ? angle : angle - 180;
 
         double x = angle < 135 ? Math.Max((angle - 45) / 90, 0) : 1;
@@ -141,17 +134,19 @@ internal sealed class WpfAdapter : RAdapter
 
     protected override void SaveToFileInt(RImage image, string name, string extension, RControl control = null)
     {
-        var saveDialog = new SaveFileDialog();
-        saveDialog.Filter = "Images|*.png;*.bmp;*.jpg;*.tif;*.gif;*.wmp;";
-        saveDialog.FileName = name;
-        saveDialog.DefaultExt = extension;
+        var saveDialog = new SaveFileDialog
+        {
+            Filter = "Images|*.png;*.bmp;*.jpg;*.tif;*.gif;*.wmp;",
+            FileName = name,
+            DefaultExt = extension
+        };
 
         var dialogResult = saveDialog.ShowDialog();
         
         if (!dialogResult.GetValueOrDefault())
             return;
 
-        var encoder = Broiler.HTML.WPF.Utilities.Utils.GetBitmapEncoder(Path.GetExtension(saveDialog.FileName));
+        var encoder = Utilities.Utils.GetBitmapEncoder(Path.GetExtension(saveDialog.FileName));
         encoder.Frames.Add(BitmapFrame.Create(((ImageAdapter)image).Image));
         using FileStream stream = new(saveDialog.FileName, FileMode.OpenOrCreate);
         encoder.Save(stream);
@@ -167,7 +162,7 @@ internal sealed class WpfAdapter : RAdapter
         else if (color.A < 1)
             solidBrush = Brushes.Transparent;
         else
-            solidBrush = new SolidColorBrush(Broiler.HTML.WPF.Utilities.Utils.Convert(color));
+            solidBrush = new SolidColorBrush(Utilities.Utils.Convert(color));
         return solidBrush;
     }
 

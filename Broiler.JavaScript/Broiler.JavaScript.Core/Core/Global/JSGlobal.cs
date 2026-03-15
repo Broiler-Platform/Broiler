@@ -199,7 +199,7 @@ public partial class JSGlobalStatic
             if (arrayBuffer.isDetached)
                 throw JSContext.Current.NewTypeError("structuredClone: cannot clone a detached ArrayBuffer");
             var newBuf = new byte[arrayBuffer.buffer.Length];
-            System.Array.Copy(arrayBuffer.buffer, newBuf, arrayBuffer.buffer.Length);
+            Array.Copy(arrayBuffer.buffer, newBuf, arrayBuffer.buffer.Length);
             var clone = new JSArrayBuffer(newBuf);
             seen[value] = clone;
             return clone;

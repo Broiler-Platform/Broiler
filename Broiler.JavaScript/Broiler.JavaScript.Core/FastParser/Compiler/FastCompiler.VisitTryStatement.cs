@@ -20,7 +20,7 @@ partial class FastCompiler
             var v = scope.CreateVariable(id.Name, newScope: true);
 
             var catchBlock = Exp.Block(v.Variable.AsSequence(),
-                Exp.Assign(v.Variable, ExpHelper.JSVariableBuilder.NewFromException(pe.Variable, id.Name.Value)),
+                Exp.Assign(v.Variable, JSVariableBuilder.NewFromException(pe.Variable, id.Name.Value)),
                 VisitStatement(cb));
             var cbExp = Exp.Catch(pe.Variable, catchBlock.ToJSValue());
 

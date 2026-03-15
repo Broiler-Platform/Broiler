@@ -1,8 +1,5 @@
 namespace Broiler.HTML.Dom.Core.Dom;
 
-/// <summary>
-/// Interface for selection handling on CSS rect words.
-/// </summary>
 internal interface ISelectionHandler
 {
     int GetSelectingStartIndex(CssRect word);

@@ -27,7 +27,7 @@ public class LexicalScopeBuilder
         Expression fileName,
         Expression function,
         int line,
-        int column) => NewLambdaExpression.NewExpression<CallStackItem>(() => () => new CallStackItem(null as JSContext, "", "", 0, 0)
+        int column) => NewLambdaExpression.NewExpression<CallStackItem>(() => () => new CallStackItem(null, "", "", 0, 0)
             , context
             , fileName
             , function
@@ -56,7 +56,7 @@ public class LexicalScopeBuilder
     //        );
     //}
 
-    public static Expression Pop(Expression exp, Expression context) => exp.CallExpression<CallStackItem>(() => (x) => x.Pop(null as JSContext), context);// return Expression.Call(exp, _Pop , context);
+    public static Expression Pop(Expression exp, Expression context) => exp.CallExpression<CallStackItem>(() => (x) => x.Pop(null), context);// return Expression.Call(exp, _Pop , context);
 
     //public static Expression SetPosition(Expression exp, int line, int column)
     //{

@@ -8,7 +8,7 @@ public static class HashExtensions
 
     public static string ComputeHash(this HashAlgorithm alg, string text) {
         var sb = new StringBuilder();
-        foreach(var b in System.Text.Encoding.UTF8.GetBytes(text))
+        foreach(var b in Encoding.UTF8.GetBytes(text))
         {
             sb.Append(b.ToString("x2"));
         }

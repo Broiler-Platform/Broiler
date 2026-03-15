@@ -32,7 +32,7 @@ public partial class JSString {
         //    at = 0;
 
         if (pos < 0 || pos >= text.Length)
-            return JSString.Empty;
+            return Empty;
       
         return new JSString(new string(text[pos], 1));
     }
@@ -70,7 +70,7 @@ public partial class JSString {
         si = Math.Min(Math.Max(si, 0), @this.Length);
         ei = Math.Min(Math.Max(ei, 0), @this.Length);
         if (ei <= si)
-            return JSString.Empty;
+            return Empty;
 
         return new JSString(@this.Substring(si, ei - si));
     }
@@ -93,8 +93,8 @@ public partial class JSString {
 
         var count = Math.Min(length, @this.Length - start);
         if (count <= 0)
-            return JSString.Empty;
-        return new JSString(@this.Substring((int)start, (int)count));
+            return Empty;
+        return new JSString(@this.Substring(start, count));
     }
 
     [JSPrototypeMethod]
@@ -400,7 +400,7 @@ public partial class JSString {
         int end = start + substr.Length;
 
         // Replace only the first match.
-        var result = new System.Text.StringBuilder(@this.Length + (replaceText.Length - substr.Length));
+        var result = new StringBuilder(@this.Length + (replaceText.Length - substr.Length));
         result.Append(@this, 0, start);
         result.Append(replaceText);
         result.Append(@this, end, @this.Length - end);
@@ -470,7 +470,7 @@ public partial class JSString {
         start = Math.Min(Math.Max(start, 0), @this.Length);
         end = Math.Min(Math.Max(end, 0), @this.Length);
         if (end <= start)
-                return JSString.Empty;
+                return Empty;
         var result = @this.Substring(start, end - start);
         return new JSString(result);
 
@@ -521,7 +521,7 @@ public partial class JSString {
         if (limitMax < splitStrings.Length)
         {
             var splitStrings2 = new string[limitMax];
-            System.Array.Copy(splitStrings, splitStrings2, (int)limitMax);
+            Array.Copy(splitStrings, splitStrings2, (int)limitMax);
             splitStrings = splitStrings2;
         }
 

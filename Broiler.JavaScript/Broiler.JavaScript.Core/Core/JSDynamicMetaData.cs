@@ -110,7 +110,7 @@ internal class JSDynamicMetaData : DynamicMetaObject
 
 
     internal JSDynamicMetaData(
-        System.Linq.Expressions.Expression parameter,
+        Expression parameter,
         JSValue value) : base(parameter, BindingRestrictions.Empty, value)
     {
 

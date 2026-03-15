@@ -99,10 +99,6 @@ public abstract class RAdapter : IColorResolver, IResourceFactory, IFontCreator,
 
     public void SaveToFile(RImage image, string name, string extension, RControl control = null) => SaveToFileInt(image, name, extension, control);
 
-    internal RFont CreateFont(string family, double size, FontStyle style) => CreateFontInt(family, size, style);
-
-    internal RFont CreateFont(RFontFamily family, double size, FontStyle style) => CreateFontInt(family, size, style);
-
     RFont IFontCreator.CreateFont(string family, double size, FontStyle style) => CreateFontInt(family, size, style);
 
     RFont IFontCreator.CreateFont(RFontFamily family, double size, FontStyle style) => CreateFontInt(family, size, style);

@@ -44,7 +44,7 @@ internal static class JSDateMath
     internal static long Day(double t) => (long)Math.Floor(t / MsPerDay);
 
     /// <summary>Milliseconds within the day.</summary>
-    internal static long TimeWithinDay(double t) => (long)FloorMod((long)t, MsPerDay);
+    internal static long TimeWithinDay(double t) => FloorMod((long)t, MsPerDay);
 
     /// <summary>Find the year containing the given timestamp.</summary>
     internal static long YearFromTime(double t)

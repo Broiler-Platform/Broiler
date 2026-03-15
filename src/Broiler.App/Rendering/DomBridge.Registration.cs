@@ -122,9 +122,9 @@ public sealed partial class DomBridge
                 var results = new List<JSValue>();
                 foreach (var el in _elements)
                 {
-                    var classes = new System.Collections.Generic.HashSet<string>(
+                    var classes = new HashSet<string>(
                         (el.ClassName ?? string.Empty).Split(' ').Where(s => s.Length > 0),
-                        System.StringComparer.Ordinal);
+                        StringComparer.Ordinal);
                     if (classes.Contains(className))
                         results.Add(ToJSObject(el));
                 }
@@ -502,7 +502,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments _) =>
             {
                 return _documentNode.Children.Count > 0
-                    ? (JSValue)ToJSObject(_documentNode.Children[0])
+                    ? ToJSObject(_documentNode.Children[0])
                     : JSNull.Value;
             }, "get firstChild"),
             null,
@@ -514,7 +514,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments _) =>
             {
                 return _documentNode.Children.Count > 0
-                    ? (JSValue)ToJSObject(_documentNode.Children[^1])
+                    ? ToJSObject(_documentNode.Children[^1])
                     : JSNull.Value;
             }, "get lastChild"),
             null,
@@ -1181,7 +1181,7 @@ public sealed partial class DomBridge
             {
                 var request = new HttpRequestMessage(new HttpMethod(method), fetchUrl);
                 if (requestBody != null)
-                    request.Content = new StringContent(requestBody, System.Text.Encoding.UTF8,
+                    request.Content = new StringContent(requestBody, Encoding.UTF8,
                         requestHeaders.TryGetValue("Content-Type", out var ct) ? ct : "text/plain");
                 foreach (var kv in requestHeaders)
                 {
@@ -1216,7 +1216,7 @@ public sealed partial class DomBridge
                 {
                     if (hArgs.Length == 0) return JSNull.Value;
                     var name = hArgs[0].ToString();
-                    return allHeaders.TryGetValue(name, out var val) ? (JSValue)new JSString(val) : JSNull.Value;
+                    return allHeaders.TryGetValue(name, out var val) ? new JSString(val) : JSNull.Value;
                 }, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
                 headersObj.FastAddValue((KeyString)"has", new JSFunction((in Arguments hArgs) =>
                 {

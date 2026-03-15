@@ -9,10 +9,6 @@ namespace Broiler.HTML.Orchestration.Core.IR;
 /// Walks a <see cref="Fragment"/> tree and produces a flat <see cref="DisplayList"/>
 /// of drawing primitives. This decouples paint from the DOM (<see cref="Dom.Core.Dom.CssBox"/>).
 /// </summary>
-/// <remarks>
-/// Phase 3: Standalone paint walker that reads only from <see cref="Fragment"/> and
-/// <see cref="ComputedStyle"/>. Replaces <c>CssBox.PaintImp()</c> for the new rendering path.
-/// </remarks>
 internal static class PaintWalker
 {
     /// <summary>Default selection highlight color (semi-transparent blue).</summary>
@@ -24,11 +20,6 @@ internal static class PaintWalker
     /// used by <c>CssRect.SelectedStartOffset</c> / <c>SelectedEndOffset</c>.
     /// </summary>
     private const double FullSelectionOffset = -1;
-
-    /// <summary>
-    /// Paints the given <see cref="Fragment"/> tree and returns a flat <see cref="DisplayList"/>.
-    /// </summary>
-    public static DisplayList Paint(Fragment root) => Paint(root, RectangleF.Empty);
 
     /// <summary>
     /// Paints the given <see cref="Fragment"/> tree and returns a flat <see cref="DisplayList"/>.
@@ -934,68 +925,74 @@ internal static class PaintWalker
             return;
 
         for (int i = startIndex; i < items.Count; i++)
-        {
             items[i] = OffsetItem(items[i], dx, dy);
-        }
     }
 
     internal static DisplayItem OffsetItem(DisplayItem item, float dx, float dy)
     {
         var ob = OffsetRect(item.Bounds, dx, dy);
-        switch (item)
+        return item switch
         {
-            case FillRectItem f:
-                return new FillRectItem { Bounds = ob, Color = f.Color };
-            case DrawBorderItem b:
-                return new DrawBorderItem
-                {
-                    Bounds = ob, Widths = b.Widths,
-                    TopColor = b.TopColor, RightColor = b.RightColor,
-                    BottomColor = b.BottomColor, LeftColor = b.LeftColor,
-                    Style = b.Style, TopStyle = b.TopStyle, RightStyle = b.RightStyle,
-                    BottomStyle = b.BottomStyle, LeftStyle = b.LeftStyle,
-                    CornerNw = b.CornerNw, CornerNe = b.CornerNe,
-                    CornerSe = b.CornerSe, CornerSw = b.CornerSw,
-                };
-            case DrawTextItem t:
-                return new DrawTextItem
-                {
-                    Bounds = ob, Text = t.Text, FontFamily = t.FontFamily,
-                    FontSize = t.FontSize, FontWeight = t.FontWeight,
-                    Color = t.Color, Origin = new PointF(t.Origin.X + dx, t.Origin.Y + dy),
-                    FontHandle = t.FontHandle, IsRtl = t.IsRtl,
-                };
-            case DrawImageItem img:
-                return new DrawImageItem
-                {
-                    Bounds = ob, ImageHandle = img.ImageHandle,
-                    SourceRect = img.SourceRect,
-                    DestRect = OffsetRect(img.DestRect, dx, dy),
-                };
-            case DrawTiledImageItem ti:
-                return new DrawTiledImageItem
-                {
-                    Bounds = ob, ImageHandle = ti.ImageHandle,
-                    SourceRect = ti.SourceRect,
-                    FillRect = OffsetRect(ti.FillRect, dx, dy),
-                    TileOrigin = new PointF(ti.TileOrigin.X + dx, ti.TileOrigin.Y + dy),
-                    Repeat = ti.Repeat,
-                };
-            case ClipItem c:
-                return new ClipItem { Bounds = ob, ClipRect = OffsetRect(c.ClipRect, dx, dy) };
-            case RestoreItem:
-                return new RestoreItem { Bounds = ob };
-            case DrawLineItem l:
-                return new DrawLineItem
-                {
-                    Bounds = ob,
-                    Start = new PointF(l.Start.X + dx, l.Start.Y + dy),
-                    End = new PointF(l.End.X + dx, l.End.Y + dy),
-                    Color = l.Color, Width = l.Width, DashStyle = l.DashStyle,
-                };
-            default:
-                return item;
-        }
+            FillRectItem f => new FillRectItem { Bounds = ob, Color = f.Color },
+            DrawBorderItem b => new DrawBorderItem
+            {
+                Bounds = ob,
+                Widths = b.Widths,
+                TopColor = b.TopColor,
+                RightColor = b.RightColor,
+                BottomColor = b.BottomColor,
+                LeftColor = b.LeftColor,
+                Style = b.Style,
+                TopStyle = b.TopStyle,
+                RightStyle = b.RightStyle,
+                BottomStyle = b.BottomStyle,
+                LeftStyle = b.LeftStyle,
+                CornerNw = b.CornerNw,
+                CornerNe = b.CornerNe,
+                CornerSe = b.CornerSe,
+                CornerSw = b.CornerSw,
+            },
+            DrawTextItem t => new DrawTextItem
+            {
+                Bounds = ob,
+                Text = t.Text,
+                FontFamily = t.FontFamily,
+                FontSize = t.FontSize,
+                FontWeight = t.FontWeight,
+                Color = t.Color,
+                Origin = new PointF(t.Origin.X + dx, t.Origin.Y + dy),
+                FontHandle = t.FontHandle,
+                IsRtl = t.IsRtl,
+            },
+            DrawImageItem img => new DrawImageItem
+            {
+                Bounds = ob,
+                ImageHandle = img.ImageHandle,
+                SourceRect = img.SourceRect,
+                DestRect = OffsetRect(img.DestRect, dx, dy),
+            },
+            DrawTiledImageItem ti => new DrawTiledImageItem
+            {
+                Bounds = ob,
+                ImageHandle = ti.ImageHandle,
+                SourceRect = ti.SourceRect,
+                FillRect = OffsetRect(ti.FillRect, dx, dy),
+                TileOrigin = new PointF(ti.TileOrigin.X + dx, ti.TileOrigin.Y + dy),
+                Repeat = ti.Repeat,
+            },
+            ClipItem c => new ClipItem { Bounds = ob, ClipRect = OffsetRect(c.ClipRect, dx, dy) },
+            RestoreItem => new RestoreItem { Bounds = ob },
+            DrawLineItem l => new DrawLineItem
+            {
+                Bounds = ob,
+                Start = new PointF(l.Start.X + dx, l.Start.Y + dy),
+                End = new PointF(l.End.X + dx, l.End.Y + dy),
+                Color = l.Color,
+                Width = l.Width,
+                DashStyle = l.DashStyle,
+            },
+            _ => item,
+        };
     }
 
     internal static RectangleF OffsetRect(RectangleF r, float dx, float dy)

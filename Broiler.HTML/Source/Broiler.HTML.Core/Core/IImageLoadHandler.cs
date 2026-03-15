@@ -10,9 +10,6 @@ namespace Broiler.HTML.Core.Core;
 /// Breaks the direct dependency between <c>CssBox</c> and the concrete
 /// <c>ImageLoadHandler</c> class.
 /// </summary>
-/// <remarks>
-/// See ADR-007, section "Circular Dependencies Remaining (Future Work)", item 4.
-/// </remarks>
 internal interface IImageLoadHandler : IDisposable
 {
     /// <summary>

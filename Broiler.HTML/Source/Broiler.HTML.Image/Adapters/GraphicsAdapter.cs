@@ -1,6 +1,5 @@
 using System.Drawing;
 using Broiler.HTML.Adapters.Adapters;
-using Broiler.HTML.Image.Utilities;
 using SkiaSharp;
 
 namespace Broiler.HTML.Image.Adapters;
@@ -17,14 +16,14 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
     {
         _clipStack.Push(rect);
         canvas.Save();
-        canvas.ClipRect(Broiler.HTML.Image.Utilities.Utils.Convert(rect));
+        canvas.ClipRect(Utilities.Utils.Convert(rect));
     }
 
     public override void PushClipExclude(RectangleF rect)
     {
         _clipStack.Push(_clipStack.Peek());
         canvas.Save();
-        canvas.ClipRect(Broiler.HTML.Image.Utilities.Utils.Convert(rect), SKClipOperation.Difference);
+        canvas.ClipRect(Utilities.Utils.Convert(rect), SKClipOperation.Difference);
     }
 
     public override object SetAntiAliasSmoothingMode() =>
@@ -68,7 +67,7 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
     {
         var fontAdapter = (FontAdapter)font;
         using var paint = new SKPaint();
-        paint.Color = Broiler.HTML.Image.Utilities.Utils.Convert(color);
+        paint.Color = Utilities.Utils.Convert(color);
         paint.IsAntialias = true;
 
         // Use the CSS px-sized render font for correct glyph dimensions.
@@ -106,13 +105,13 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
     public override void DrawImage(RImage image, RectangleF destRect, RectangleF srcRect)
     {
         var imgAdapter = (ImageAdapter)image;
-        canvas.DrawBitmap(imgAdapter.Bitmap, Broiler.HTML.Image.Utilities.Utils.Convert(srcRect), Broiler.HTML.Image.Utilities.Utils.Convert(destRect));
+        canvas.DrawBitmap(imgAdapter.Bitmap, Utilities.Utils.Convert(srcRect), Utilities.Utils.Convert(destRect));
     }
 
     public override void DrawImage(RImage image, RectangleF destRect)
     {
         var imgAdapter = (ImageAdapter)image;
-        canvas.DrawBitmap(imgAdapter.Bitmap, Broiler.HTML.Image.Utilities.Utils.Convert(destRect));
+        canvas.DrawBitmap(imgAdapter.Bitmap, Utilities.Utils.Convert(destRect));
     }
 
     public override void DrawPath(RPen pen, RGraphicsPath path) => canvas.DrawPath(((GraphicsPathAdapter)path).Path, ((PenAdapter)pen).Paint);
@@ -125,10 +124,10 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
             return;
 
         using var path = new SKPath();
-        path.MoveTo(Broiler.HTML.Image.Utilities.Utils.Convert(points[0]));
+        path.MoveTo(Utilities.Utils.Convert(points[0]));
 
         for (int i = 1; i < points.Length; i++)
-            path.LineTo(Broiler.HTML.Image.Utilities.Utils.Convert(points[i]));
+            path.LineTo(Utilities.Utils.Convert(points[i]));
 
         path.Close();
         canvas.DrawPath(path, ((BrushAdapter)brush).Paint);

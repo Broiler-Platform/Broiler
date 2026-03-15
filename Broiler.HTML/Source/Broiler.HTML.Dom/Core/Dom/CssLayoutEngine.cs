@@ -187,29 +187,6 @@ internal static class CssLayoutEngine
         {
             b.OffsetTop(dist);
         }
-
-        //float top = cell.ClientTop;
-        //float bottom = cell.ClientBottom;
-        //bool middle = cell.VerticalAlign == CssConstants.Middle;
-
-        //foreach (LineBox line in cell.LineBoxes)
-        //{
-        //    for (int i = 0; i < line.RelatedBoxes.Count; i++)
-        //    {
-
-        //        double diff = bottom - line.RelatedBoxes[i].Rectangles[line].Bottom;
-        //        if (middle) diff /= 2f;
-        //        RectangleF r = line.RelatedBoxes[i].Rectangles[line];
-        //        line.RelatedBoxes[i].Rectangles[line] = new RectangleF(r.X, r.Y + diff, r.Width, r.Height);
-
-        //    }
-
-        //    foreach (BoxWord word in line.Words)
-        //    {
-        //        double gap = word.Top - top;
-        //        word.Top = bottom - gap - word.Height;
-        //    }
-        //}
     }
 
 
@@ -583,7 +560,6 @@ internal static class CssLayoutEngine
                 ApplyJustifyAlignment(g, lineBox);
                 break;
             default:
-                ApplyLeftAlignment(g, lineBox);
                 break;
         }
     }
@@ -799,26 +775,6 @@ internal static class CssLayoutEngine
             RectangleF r = line.Rectangles[b];
             line.Rectangles[b] = new RectangleF((float)(r.X + diff), r.Y, r.Width, r.Height);
         }
-    }
-
-    private static void ApplyLeftAlignment(RGraphics g, CssLineBox line)
-    {
-        //No alignment needed.
-
-        //foreach (LineBoxRectangle r in line.Rectangles)
-        //{
-        //    double curx = r.Left + (r.Index == 0 ? r.OwnerBox.ActualPaddingLeft + r.OwnerBox.ActualBorderLeftWidth / 2 : 0);
-
-        //    if (r.SpaceBefore) curx += r.OwnerBox.ActualWordSpacing;
-
-        //    foreach (BoxWord word in r.Words)
-        //    {
-        //        word.Left = curx;
-        //        word.Top = r.Top;// +r.OwnerBox.ActualPaddingTop + r.OwnerBox.ActualBorderTopWidth / 2;
-
-        //        curx = word.Right + r.OwnerBox.ActualWordSpacing;
-        //    }
-        //}
     }
 
     /// <summary>

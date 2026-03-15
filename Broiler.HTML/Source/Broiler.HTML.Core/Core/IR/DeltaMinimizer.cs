@@ -7,7 +7,6 @@ namespace Broiler.HTML.Core.Core.IR;
 /// <summary>
 /// Basic delta-reduction minimizer for HTML documents. Removes child
 /// elements one at a time and keeps removals whose violation persists.
-/// Phase 3 deliverable.
 /// </summary>
 public static class DeltaMinimizer
 {
@@ -39,12 +38,13 @@ public static class DeltaMinimizer
             {
                 var (start, length) = children[i];
                 string candidate = current.Remove(start, length);
-                if (stillFails(candidate))
-                {
-                    current = candidate;
-                    madeProgress = true;
-                    break; // restart from fresh child list
-                }
+                
+                if (!stillFails(candidate))
+                    continue;
+                
+                current = candidate;
+                madeProgress = true;
+                break; // restart from fresh child list
             }
 
             if (!madeProgress)

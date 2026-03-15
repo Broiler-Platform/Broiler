@@ -40,7 +40,7 @@ public partial class JSGenerator : JSObject
     {
         done = true;
         this.value = JSUndefined.Value;
-        return JSObject.NewWithProperties()
+        return NewWithProperties()
                 .AddProperty(KeyStrings.value, value)
                 .AddProperty(KeyStrings.done, done ? JSBoolean.True : JSBoolean.False);
     }
@@ -55,7 +55,7 @@ public partial class JSGenerator : JSObject
         return value;
     }
 
-    public JSValue ValueObject => JSObject.NewWithProperties()
+    public JSValue ValueObject => NewWithProperties()
                 .AddProperty(KeyStrings.value, value)
                 .AddProperty(KeyStrings.done, done ? JSBoolean.True : JSBoolean.False);
 

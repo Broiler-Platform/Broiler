@@ -77,7 +77,7 @@ public partial class ClrProxy : JSObject
         {
             return (Func<TInput, JSValue>)method.CreateDelegate(typeof(Func<TInput, JSValue>));
         }
-        return (input) => ClrProxy.Marshal((object)input);
+        return (input) => Marshal(input);
     }
 
     public static JSValue Marshal(int value) => new JSNumber(value);
@@ -113,7 +113,7 @@ public partial class ClrProxy : JSObject
 
     public static JSValue Marshal<T>(Task<T> task) => task.ToPromise();
 
-    public static JSValue Marshal(IJavaScriptObject javaScriptObject) => ClrProxy.From(javaScriptObject);
+    public static JSValue Marshal(IJavaScriptObject javaScriptObject) => From(javaScriptObject);
 
     public static JSValue Marshal(IElementEnumerator en)
         => new JSGenerator(en, "Clr Iterator");
@@ -185,12 +185,12 @@ public partial class ClrProxy : JSObject
             case Task task:
                 return task.ToPromise();
             case IJavaScriptObject obj:
-                return ClrProxy.From(obj);
+                return From(obj);
             case IEnumerable<JSValue> en:
                 return new JSGenerator(new ClrEnumerableElementEnumerator(en), "Clr Iterator");
         }
 
-        return ClrProxy.From(value);
+        return From(value);
     }
 
     public override IEnumerable<(string Key, JSValue value)> Entries
@@ -226,7 +226,7 @@ public partial class ClrProxy : JSObject
 
     public override bool Equals(JSValue value)
     {
-        if (Object.ReferenceEquals(this, value))
+        if (ReferenceEquals(this, value))
             return true;
         if (value is  ClrProxy proxy)
         {
@@ -243,7 +243,7 @@ public partial class ClrProxy : JSObject
 
     public override bool StrictEquals(JSValue value)
     {
-        if (Object.ReferenceEquals(this, value))
+        if (ReferenceEquals(this, value))
             return true;
         switch(value)
         {

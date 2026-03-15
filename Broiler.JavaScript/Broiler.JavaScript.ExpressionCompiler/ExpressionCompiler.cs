@@ -173,7 +173,7 @@ public static class ExpressionCompiler
     {
 
         var derived = (type.Module as ModuleBuilder).DefineType(
-            ExpressionCompiler.GetUniqueName(lambdaExpression.Name.FullName ?? "Closures"),
+            GetUniqueName(lambdaExpression.Name.FullName ?? "Closures"),
             TypeAttributes.Public,
             typeof(Closures));
 

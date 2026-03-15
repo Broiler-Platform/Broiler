@@ -227,25 +227,18 @@ internal sealed class BordersDrawHandler : IBordersDrawHandler
     /// </summary>
     private static void FillBorderCorners(RGraphics g, IBorderRenderData box, RectangleF rect, bool isFirst, bool isLast)
     {
-        bool hasTop = IsBorderVisible(box.BorderTopStyle) && box.ActualBorderTopWidth > 0
-                      && box.BorderTopStyle == CssConstants.Solid;
-        bool hasRight = isLast && IsBorderVisible(box.BorderRightStyle) && box.ActualBorderRightWidth > 0
-                        && box.BorderRightStyle == CssConstants.Solid;
-        bool hasBottom = IsBorderVisible(box.BorderBottomStyle) && box.ActualBorderBottomWidth > 0
-                         && box.BorderBottomStyle == CssConstants.Solid;
-        bool hasLeft = isFirst && IsBorderVisible(box.BorderLeftStyle) && box.ActualBorderLeftWidth > 0
-                       && box.BorderLeftStyle == CssConstants.Solid;
+        bool hasTop = IsBorderVisible(box.BorderTopStyle) && box.ActualBorderTopWidth > 0 && box.BorderTopStyle == CssConstants.Solid;
+        bool hasRight = isLast && IsBorderVisible(box.BorderRightStyle) && box.ActualBorderRightWidth > 0 && box.BorderRightStyle == CssConstants.Solid;
+        bool hasBottom = IsBorderVisible(box.BorderBottomStyle) && box.ActualBorderBottomWidth > 0 && box.BorderBottomStyle == CssConstants.Solid;
+        bool hasLeft = isFirst && IsBorderVisible(box.BorderLeftStyle) && box.ActualBorderLeftWidth > 0 && box.BorderLeftStyle == CssConstants.Solid;
 
         // Top-left corner
         if (hasTop && hasLeft && box.ActualBorderTopColor == box.ActualBorderLeftColor)
-            g.DrawRectangle(g.GetSolidBrush(box.ActualBorderTopColor),
-                rect.Left, rect.Top,
-                (float)box.ActualBorderLeftWidth, (float)box.ActualBorderTopWidth);
+            g.DrawRectangle(g.GetSolidBrush(box.ActualBorderTopColor), rect.Left, rect.Top, (float)box.ActualBorderLeftWidth, (float)box.ActualBorderTopWidth);
 
         // Top-right corner
         if (hasTop && hasRight && box.ActualBorderTopColor == box.ActualBorderRightColor)
-            g.DrawRectangle(g.GetSolidBrush(box.ActualBorderTopColor),
-                (float)(rect.Right - box.ActualBorderRightWidth), rect.Top,
+            g.DrawRectangle(g.GetSolidBrush(box.ActualBorderTopColor), (float)(rect.Right - box.ActualBorderRightWidth), rect.Top, 
                 (float)box.ActualBorderRightWidth, (float)box.ActualBorderTopWidth);
 
         // Bottom-left corner

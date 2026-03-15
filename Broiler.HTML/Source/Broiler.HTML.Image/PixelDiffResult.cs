@@ -22,9 +22,6 @@ public readonly record struct PixelMismatch(
     byte ActualR, byte ActualG, byte ActualB, byte ActualA,
     byte BaselineR, byte BaselineG, byte BaselineB, byte BaselineA);
 
-/// <summary>
-/// Result of a per-pixel comparison between two images (Phase 5).
-/// </summary>
 public sealed class PixelDiffResult : IDisposable
 {
     /// <summary>
@@ -37,10 +34,8 @@ public sealed class PixelDiffResult : IDisposable
     /// <summary>Ratio of differing pixels (0.0 = identical, 1.0 = every pixel differs).</summary>
     public double DiffRatio { get; init; }
 
-    /// <summary>Number of pixels that differ.</summary>
     public int DiffPixelCount { get; init; }
 
-    /// <summary>Total number of pixels compared.</summary>
     public int TotalPixelCount { get; init; }
 
     /// <summary>
@@ -58,7 +53,7 @@ public sealed class PixelDiffResult : IDisposable
     /// Capped at <see cref="MaxMismatchEntries"/> to limit memory usage.
     /// Empty when images are identical or have different dimensions.
     /// </summary>
-    public IReadOnlyList<PixelMismatch> Mismatches { get; init; } = Array.Empty<PixelMismatch>();
+    public IReadOnlyList<PixelMismatch> Mismatches { get; init; } = [];
 
     public void Dispose() => DiffImage?.Dispose();
 }

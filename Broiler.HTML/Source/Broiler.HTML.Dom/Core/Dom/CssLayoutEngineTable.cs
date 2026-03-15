@@ -14,7 +14,6 @@ internal sealed class CssLayoutEngineTable
 {
     private readonly CssBox _tableBox;
 
-    private CssBox _caption;
     private CssBox _headerBox;
     private CssBox _footerBox;
 
@@ -123,7 +122,6 @@ internal sealed class CssLayoutEngineTable
             switch (box.Display)
             {
                 case CssConstants.TableCaption:
-                    _caption = box;
                     break;
                 case CssConstants.TableRow:
                     _bodyrows.Add(box);
@@ -299,22 +297,24 @@ internal sealed class CssLayoutEngineTable
 
                 for (int i = currow + 1; i < currow + rowspan; i++)
                 {
-                    if (rows.Count > i)
+                    if (rows.Count <= i)
+                        continue;
+
+                    int colcount = 0;
+                    for (int j = 0; j < rows[i].Boxes.Count; j++)
                     {
-                        int colcount = 0;
-                        for (int j = 0; j < rows[i].Boxes.Count; j++)
+                        if (colcount == realcol)
                         {
-                            if (colcount == realcol)
-                            {
-                                rows[i].Boxes.Insert(colcount, new CssSpacingBox(_tableBox, ref cell, currow));
-                                break;
-                            }
-                            colcount++;
-                            realcol -= GetColSpan(rows[i].Boxes[j]) - 1;
+                            rows[i].Boxes.Insert(colcount, new CssSpacingBox(_tableBox, ref cell, currow));
+                            break;
                         }
+
+                        colcount++;
+                        realcol -= GetColSpan(rows[i].Boxes[j]) - 1;
                     }
                 }
             }
+
             currow++;
         }
 
@@ -376,7 +376,7 @@ internal sealed class CssLayoutEngineTable
                         continue;
 
                     double len = CssValueParser.ParseLength(row.Boxes[i].Width, availCellSpace, row.Boxes[i].GetEmHeight());
-                    
+
                     if (len <= 0) //If some width specified
                         continue;
 
@@ -522,7 +522,7 @@ internal sealed class CssLayoutEngineTable
             return;
 
         widthSum = GetWidthSum();
-        
+
         if (maxWidth >= widthSum)
             return;
 
@@ -536,6 +536,7 @@ internal sealed class CssLayoutEngineTable
         // either min for all column is not enought and we need to lower it more resulting in clipping
         // or we now have extra space so we can give it to columns than need it
         widthSum = GetWidthSum();
+
         if (maxWidth < widthSum)
         {
             // lower the width of columns starting from the largest one until the max width is satisfied
@@ -896,8 +897,13 @@ internal sealed class CssLayoutEngineTable
 
                 for (int j = 0; j < colSpan; j++)
                 {
-                    minFullWidths[col + j] = Math.Max(minFullWidths[col + j], minWidth);
-                    maxFullWidths[col + j] = Math.Max(maxFullWidths[col + j], maxWidth);
+                    var colIndex = col + j;
+
+                    if (colIndex < minFullWidths.Length)
+                        minFullWidths[colIndex] = Math.Max(minFullWidths[colIndex], minWidth);
+
+                    if (colIndex < maxFullWidths.Length)
+                        maxFullWidths[colIndex] = Math.Max(maxFullWidths[colIndex], maxWidth);
                 }
             }
         }

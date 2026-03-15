@@ -144,7 +144,7 @@ public partial class JSObject : JSValue
 
     public override JSValue TypeOf() => JSConstants.Object;
 
-    public JSObject() : base((JSObject)null)
+    public JSObject() : base(null)
     {
         
     }
@@ -900,7 +900,7 @@ public partial class JSObject : JSValue
 
     public override bool Equals(JSValue value)
     {
-        if (Object.ReferenceEquals(this, value))
+        if (ReferenceEquals(this, value))
             return true;
         if (value is JSString str)
             if (str.value.Equals(ToString()))
@@ -914,7 +914,7 @@ public partial class JSObject : JSValue
 
     public override bool EqualsLiteral(string value) => ToString() == value;
 
-    public override bool StrictEquals(JSValue value) => Object.ReferenceEquals(this, value);
+    public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
     public override JSValue InvokeFunction(in Arguments a) => throw JSContext.Current.NewTypeError($"{this} is not a function");
 
@@ -932,7 +932,7 @@ public partial class JSObject : JSValue
 
     public override bool LessOrEqual(JSValue value)
     {
-        if (Object.ReferenceEquals(this, value))
+        if (ReferenceEquals(this, value))
             return true;
         switch (value)
         {
@@ -956,7 +956,7 @@ public partial class JSObject : JSValue
 
     public override bool GreaterOrEqual(JSValue value)
     {
-        if (Object.ReferenceEquals(this, value))
+        if (ReferenceEquals(this, value))
             return true;
         switch (value)
         {

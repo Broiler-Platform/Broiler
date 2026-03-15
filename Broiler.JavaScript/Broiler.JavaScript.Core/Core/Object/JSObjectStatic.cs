@@ -99,7 +99,7 @@ public partial class JSObject {
             throw JSContext.Current.NewTypeError("Object.defineProperty called on non-object");
         var pds = a1;
         if (pds.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSTypeError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
         if (!(pds is JSObject pdObject))
             return target;
         if (!target.IsExtensible())
@@ -233,7 +233,7 @@ public partial class JSObject {
     {
         var first = a.Get1();
         if (first.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSTypeError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
         if (!(first is JSObject jobj))
             return new JSArray();
         var en = jobj.GetAllKeys(true, false);
@@ -287,7 +287,7 @@ public partial class JSObject {
     {
         var first = a.Get1();
         if (first.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSTypeError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
         if (!(first is JSObject target))
             return new JSArray();
         var r = new JSArray();
@@ -318,7 +318,7 @@ public partial class JSObject {
     {
         var (first, name) = a.Get2();
         if (first.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSTypeError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
         if (!(first is JSObject jobj))
             return JSUndefined.Value;
         //var key = name.ToKey(false);
@@ -351,7 +351,7 @@ public partial class JSObject {
     {
         var first = a.Get1();
         if (first.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSTypeError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
         if (!(first is JSObject jobj))
             return new JSArray();
         var r = new JSObject();
@@ -376,7 +376,7 @@ public partial class JSObject {
     {
         var first = a.Get1();
         if (first.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSTypeError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
         if (!(first is JSObject jobj))
             return new JSArray();
         var r = new JSArray(jobj.GetAllKeys(false, false));
@@ -388,7 +388,7 @@ public partial class JSObject {
     {
         var first = a.Get1();
         if (first.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSTypeError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
         if (!(first is JSObject jobj))
             return new JSArray();
         ref var symbols = ref jobj.GetSymbols();

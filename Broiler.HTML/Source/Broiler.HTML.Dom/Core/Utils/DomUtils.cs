@@ -142,31 +142,6 @@ internal sealed class DomUtils
         return false;
     }
 
-    public static CssBox GetNextSibling(CssBox b)
-    {
-        CssBox sib = null;
-
-        if (b.ParentBox == null)
-            return sib;
-
-        var index = b.ParentBox.Boxes.IndexOf(b) + 1;
-
-        while (index <= b.ParentBox.Boxes.Count - 1)
-        {
-            var pSib = b.ParentBox.Boxes[index];
-
-            if (pSib.Display != CssConstants.None && pSib.Position != CssConstants.Absolute && pSib.Position != CssConstants.Fixed)
-            {
-                sib = pSib;
-                break;
-            }
-
-            index++;
-        }
-
-        return sib;
-    }
-
     public static string GetAttribute(CssBox box, string attribute)
     {
         string value = null;

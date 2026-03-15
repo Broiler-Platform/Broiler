@@ -30,35 +30,35 @@ public abstract class YExpression(YExpressionType nodeType, Type type)
 
     public static YILOffsetExpression ILOffset = new();
 
-    public static YExpression operator +(YExpression left, YExpression right) => YExpression.Binary(left, YOperator.Add, right);
-    public static YExpression operator -(YExpression left, YExpression right) => YExpression.Binary(left, YOperator.Subtract, right);
+    public static YExpression operator +(YExpression left, YExpression right) => Binary(left, YOperator.Add, right);
+    public static YExpression operator -(YExpression left, YExpression right) => Binary(left, YOperator.Subtract, right);
 
     public static YExpression Break(YLabelTarget @break) => new YGoToExpression(@break, null);
 
     public static YConditionalExpression IfThen(YExpression test, YExpression @true, YExpression? @false = null) => new(test, @true, @false);
 
-    public static YExpression operator +(YExpression left, object right) => YExpression.Binary(left, YOperator.Add, YExpression.Constant(right));
-    public static YExpression operator -(YExpression left, object right) => YExpression.Binary(left, YOperator.Subtract, YExpression.Constant(right));
+    public static YExpression operator +(YExpression left, object right) => Binary(left, YOperator.Add, Constant(right));
+    public static YExpression operator -(YExpression left, object right) => Binary(left, YOperator.Subtract, Constant(right));
 
-    public static YExpression operator +(YExpression left, int right) => YExpression.Binary(left, YOperator.Add, YExpression.Constant(right));
-    public static YExpression operator -(YExpression left, int right) => YExpression.Binary(left, YOperator.Subtract, YExpression.Constant(right));
-
-
-    public static YExpression operator >(YExpression left, YExpression right) => YExpression.Binary(left, YOperator.Greater, right);
-    public static YExpression operator <(YExpression left, YExpression right) => YExpression.Binary(left, YOperator.Less, right);
+    public static YExpression operator +(YExpression left, int right) => Binary(left, YOperator.Add, Constant(right));
+    public static YExpression operator -(YExpression left, int right) => Binary(left, YOperator.Subtract, Constant(right));
 
 
-    public static YExpression operator >=(YExpression left, object right) => YExpression.Binary(left, YOperator.GreaterOrEqual, Constant(right));
-    public static YExpression operator <=(YExpression left, object right) => YExpression.Binary(left, YOperator.LessOrEqual, YExpression.Constant(right));
+    public static YExpression operator >(YExpression left, YExpression right) => Binary(left, YOperator.Greater, right);
+    public static YExpression operator <(YExpression left, YExpression right) => Binary(left, YOperator.Less, right);
+
+
+    public static YExpression operator >=(YExpression left, object right) => Binary(left, YOperator.GreaterOrEqual, Constant(right));
+    public static YExpression operator <=(YExpression left, object right) => Binary(left, YOperator.LessOrEqual, Constant(right));
 
     public static YExpression Throw(YExpression yNewExpression, Type type) => new YThrowExpression(yNewExpression, type);
 
-    public static YExpression operator >(YExpression left, object right) => YExpression.Binary(left, YOperator.Greater, Constant(right));
-    public static YExpression operator <(YExpression left, object right) => YExpression.Binary(left, YOperator.Less, Constant(right));
+    public static YExpression operator >(YExpression left, object right) => Binary(left, YOperator.Greater, Constant(right));
+    public static YExpression operator <(YExpression left, object right) => Binary(left, YOperator.Less, Constant(right));
 
 
-    public static YExpression operator >=(YExpression left, YExpression right) => YExpression.Binary(left, YOperator.GreaterOrEqual, right);
-    public static YExpression operator <=(YExpression left, YExpression right) => YExpression.Binary(left, YOperator.LessOrEqual, right);
+    public static YExpression operator >=(YExpression left, YExpression right) => Binary(left, YOperator.GreaterOrEqual, right);
+    public static YExpression operator <=(YExpression left, YExpression right) => Binary(left, YOperator.LessOrEqual, right);
 
     public abstract void Print(IndentedTextWriter writer);
 
@@ -162,9 +162,9 @@ public abstract class YExpression(YExpressionType nodeType, Type type)
         var m = typeof(Math).GetMethod(nameof(Math.Pow));
         // return YExpression.Binary(Visit(node.Left), YOperator.Power, Visit(node.Right));
 
-        left = left.Type == typeof(double) ? left : YExpression.Convert(left, typeof(double));
-        right = right.Type == typeof(double) ? right : YExpression.Convert(right, typeof(double));
-        return YExpression.Call(null, m, left, right);
+        left = left.Type == typeof(double) ? left : Convert(left, typeof(double));
+        right = right.Type == typeof(double) ? right : Convert(right, typeof(double));
+        return Call(null, m, left, right);
     }
 
     public static YBoxExpression Box(YExpression target) => new(target);
@@ -291,22 +291,22 @@ public abstract class YExpression(YExpressionType nodeType, Type type)
 
 
     public static YBinaryExpression Equal(YExpression left, YExpression right)
-         => YExpression.Binary(left, YOperator.Equal, right);
+         => Binary(left, YOperator.Equal, right);
 
     internal static YNewExpression CallNew(
         ConstructorInfo constructor, params YExpression[] args) => new(constructor, args.AsSequence(), true);
 
     public static YBinaryExpression Or(YExpression left, YExpression right)
-        => YExpression.Binary(left, YOperator.BitwiseOr, right);
+        => Binary(left, YOperator.BitwiseOr, right);
 
     public static YBinaryExpression OrElse(YExpression left, YExpression right)
-        => YExpression.Binary(left, YOperator.BooleanOr, right);
+        => Binary(left, YOperator.BooleanOr, right);
 
     public static YBinaryExpression NotEqual(YExpression left, YExpression right)
-         => YExpression.Binary(left, YOperator.NotEqual, right);
+         => Binary(left, YOperator.NotEqual, right);
 
     public static YBinaryExpression Greater(YExpression left, YExpression right)
-         => YExpression.Binary(left, YOperator.Greater, right);
+         => Binary(left, YOperator.Greater, right);
 
 
     public static YJumpSwitchExpression JumpSwitch(YExpression target, IFastEnumerable<YLabelTarget> cases)
@@ -318,13 +318,13 @@ public abstract class YExpression(YExpressionType nodeType, Type type)
         in FunctionName name, YParameterExpression[] parameters) => new(type, name, body, null, parameters);
 
     public static YBinaryExpression GreaterOrEqual(YExpression left, YExpression right)
-         => YExpression.Binary(left, YOperator.GreaterOrEqual, right);
+         => Binary(left, YOperator.GreaterOrEqual, right);
 
     public static YBinaryExpression Less(YExpression left, YExpression right)
-         => YExpression.Binary(left, YOperator.Less, right);
+         => Binary(left, YOperator.Less, right);
 
     public static YBinaryExpression LessOrEqual(YExpression left, YExpression right)
-         => YExpression.Binary(left, YOperator.LessOrEqual, right);
+         => Binary(left, YOperator.LessOrEqual, right);
 
     public static YCallExpression Call(YExpression? target, MethodInfo method, IFastEnumerable<YExpression> args) => new(target, method, args);
 

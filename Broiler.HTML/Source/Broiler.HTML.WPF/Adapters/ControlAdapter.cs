@@ -19,7 +19,7 @@ internal sealed class ControlAdapter : RControl
 
     public Control Control { get; }
 
-    public override PointF MouseLocation => Broiler.HTML.WPF.Utilities.Utils.Convert(Control.PointFromScreen(Mouse.GetPosition(Control)));
+    public override PointF MouseLocation => Utilities.Utils.Convert(Control.PointFromScreen(Mouse.GetPosition(Control)));
 
     public override bool LeftMouseButton => Mouse.LeftButton == MouseButtonState.Pressed;
 

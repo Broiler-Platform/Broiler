@@ -8,13 +8,6 @@ namespace Broiler.HTML.Core.Core;
 /// Breaks the dependency between <c>HtmlContainerInt</c> (in Orchestration)
 /// and the concrete <c>SelectionHandler</c> class (in the façade).
 /// </summary>
-/// <remarks>
-/// See ADR-008, Phase 3 prerequisites, item 1.
-/// This is distinct from <c>Dom.ISelectionHandler</c> which handles
-/// word-level selection offsets for <c>CssRect</c>.
-/// The <c>parent</c> parameter is typed as <c>object</c> because the
-/// concrete type (<c>RControl</c>) resides in the façade assembly.
-/// </remarks>
 internal interface ISelectionHandler : IDisposable
 {
     void HandleMouseDown(object parent, PointF loc, bool isMouseInContainer);

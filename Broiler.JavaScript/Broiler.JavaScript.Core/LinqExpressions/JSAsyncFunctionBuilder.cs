@@ -8,6 +8,6 @@ namespace YantraJS.Core.LinqExpressions;
 public static class JSAsyncFunctionBuilder
 {
 
-    public static YExpression Create(YExpression fx) => NewLambdaExpression.StaticCallExpression<JSFunction>(() => () => JSAsyncFunction.Create((JSGeneratorFunctionV2)null), fx);
+    public static YExpression Create(YExpression fx) => NewLambdaExpression.StaticCallExpression<JSFunction>(() => () => JSAsyncFunction.Create(null), fx);
 
 }

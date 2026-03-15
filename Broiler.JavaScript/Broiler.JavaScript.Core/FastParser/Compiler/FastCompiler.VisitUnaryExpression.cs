@@ -9,11 +9,11 @@ namespace YantraJS.Core.FastParser.Compiler;
 partial class FastCompiler
 {
 
-    private Exp DoubleValue(Exp exp) => ExpHelper.JSValueBuilder.DoubleValue(exp);
+    private Exp DoubleValue(Exp exp) => JSValueBuilder.DoubleValue(exp);
 
-    private Exp DoubleValue(AstExpression exp) => ExpHelper.JSValueBuilder.DoubleValue(VisitExpression(exp));
+    private Exp DoubleValue(AstExpression exp) => JSValueBuilder.DoubleValue(VisitExpression(exp));
 
-    private Exp BooleanValue(AstExpression exp) => ExpHelper.JSValueBuilder.BooleanValue(VisitExpression(exp));
+    private Exp BooleanValue(AstExpression exp) => JSValueBuilder.BooleanValue(VisitExpression(exp));
 
     protected override Expression VisitUnaryExpression(AstUnaryExpression unaryExpression)
     {
@@ -22,7 +22,7 @@ partial class FastCompiler
         switch (unaryExpression.Operator)
         {
             case UnaryOperator.Plus:
-                return ExpHelper.JSNumberBuilder.New(Exp.UnaryPlus(DoubleValue(target)));
+                return JSNumberBuilder.New(Exp.UnaryPlus(DoubleValue(target)));
             case UnaryOperator.Minus:
                 if (target.Type == FastNodeType.Literal)
                 {
@@ -32,12 +32,12 @@ partial class FastCompiler
                     if (l.TokenType == TokenTypes.BigInt)
                         return JSBigIntBuilder.New("-" + l.StringValue);
                     if (l.TokenType == TokenTypes.String)
-                        return ExpHelper.JSNumberBuilder.New(Exp.Negate(DoubleValue(target)));
+                        return JSNumberBuilder.New(Exp.Negate(DoubleValue(target)));
                 }
                 // return ExpHelper.JSNumberBuilder.New(Exp.Negate(DoubleValue(target)));
                 return JSValueBuilder.Negate(Visit(target));
             case UnaryOperator.BitwiseNot:
-                return ExpHelper.JSNumberBuilder.New(Exp.OnesComplement(JSValueBuilder.IntValue(Visit(target))));
+                return JSNumberBuilder.New(Exp.OnesComplement(JSValueBuilder.IntValue(Visit(target))));
             case UnaryOperator.Negate:
                 return Exp.Condition(BooleanValue(target), JSBooleanBuilder.False, JSBooleanBuilder.True);
             case UnaryOperator.delete:
@@ -93,9 +93,9 @@ partial class FastCompiler
                             Exp.Null, Visit(target)), 
                         JSUndefinedBuilder.Value, 
                         JSUndefinedBuilder.Value);
-                return ExpHelper.JSUndefinedBuilder.Value;
+                return JSUndefinedBuilder.Value;
             case UnaryOperator.@typeof:
-                return ExpHelper.JSValueBuilder.TypeOf(VisitExpression(target));
+                return JSValueBuilder.TypeOf(VisitExpression(target));
             case UnaryOperator.Increment:
                 return InternalVisitUpdateExpression(unaryExpression);
             case UnaryOperator.Decrement:

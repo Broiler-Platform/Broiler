@@ -21,16 +21,20 @@ public class HtmlPanel : HtmlControl
 
     public HtmlPanel()
     {
-        _verticalScrollBar = new ScrollBar();
-        _verticalScrollBar.Orientation = Orientation.Vertical;
-        _verticalScrollBar.Width = 18;
+        _verticalScrollBar = new ScrollBar
+        {
+            Orientation = Orientation.Vertical,
+            Width = 18
+        };
         _verticalScrollBar.Scroll += OnScrollBarScroll;
         AddVisualChild(_verticalScrollBar);
         AddLogicalChild(_verticalScrollBar);
 
-        _horizontalScrollBar = new ScrollBar();
-        _horizontalScrollBar.Orientation = Orientation.Horizontal;
-        _horizontalScrollBar.Height = 18;
+        _horizontalScrollBar = new ScrollBar
+        {
+            Orientation = Orientation.Horizontal,
+            Height = 18
+        };
         _horizontalScrollBar.Scroll += OnScrollBarScroll;
         AddVisualChild(_horizontalScrollBar);
         AddLogicalChild(_horizontalScrollBar);
@@ -106,8 +110,8 @@ public class HtmlPanel : HtmlControl
         scrollHeight = scrollHeight > 1 ? scrollHeight : 1;
         var scrollWidth = HtmlWidth(bounds) + Padding.Left + Padding.Right;
         scrollWidth = scrollWidth > 1 ? scrollWidth : 1;
-        _verticalScrollBar.Arrange(new Rect(System.Math.Max(bounds.Width - _verticalScrollBar.Width - BorderThickness.Right, 0), BorderThickness.Top, _verticalScrollBar.Width, scrollHeight));
-        _horizontalScrollBar.Arrange(new Rect(BorderThickness.Left, System.Math.Max(bounds.Height - _horizontalScrollBar.Height - BorderThickness.Bottom, 0), scrollWidth, _horizontalScrollBar.Height));
+        _verticalScrollBar.Arrange(new Rect(Math.Max(bounds.Width - _verticalScrollBar.Width - BorderThickness.Right, 0), BorderThickness.Top, _verticalScrollBar.Width, scrollHeight));
+        _horizontalScrollBar.Arrange(new Rect(BorderThickness.Left, Math.Max(bounds.Height - _horizontalScrollBar.Height - BorderThickness.Bottom, 0), scrollWidth, _horizontalScrollBar.Height));
 
         if (_htmlContainer == null)
             return bounds;

@@ -88,7 +88,7 @@ public class JSContextBuilder
     //}
 
     private static PropertyInfo _Index =
-        type.IndexProperty(typeof(Core.KeyString));
+        type.IndexProperty(typeof(KeyString));
     public static Expression Index(Expression key) =>
         // return Current.CallExpression<JSContext, KeyString, JSValue>(() => (x, a) => x[a], key);
         // return Current.IndexExpression<JSContext, KeyString>()

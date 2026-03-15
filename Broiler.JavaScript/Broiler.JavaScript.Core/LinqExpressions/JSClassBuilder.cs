@@ -17,10 +17,10 @@ public static class JSClassBuilder
     //public static MethodInfo _AddConstructor =
     //    type.PublicMethod(nameof(JSClass.AddConstructor), typeof(JSFunction));
 
-    public static YElementInit AddConstructor(YExpression exp) =>
+    public static YElementInit AddConstructor(Expression exp) =>
         // return YExpression.ElementInit(_AddConstructor, exp);
-        YExpression.ElementInit(TypeQuery.QueryInstanceMethod<JSClass>(() =>
-            (x) => x.AddConstructor((JSFunction)null))
+        Expression.ElementInit(TypeQuery.QueryInstanceMethod<JSClass>(() =>
+            (x) => x.AddConstructor(null))
             , exp
         );
 
@@ -31,10 +31,10 @@ public static class JSClassBuilder
         string name,
         string code = "") => NewLambdaExpression.NewExpression<JSClass>(
             () => () => new JSClass(
-                (JSFunctionDelegate)null,
-                (JSFunction)null,
-                (string)null,
-                (string)null),
+                null,
+                null,
+                null,
+                null),
             constructor ?? Expression.Null,
             super ?? Expression.Null,
             Expression.Constant(name),

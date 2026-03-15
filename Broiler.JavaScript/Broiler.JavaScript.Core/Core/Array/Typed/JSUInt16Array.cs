@@ -27,7 +27,7 @@ public partial class JSUInt16Array : JSTypedArray
     {
         if (index < 0 || index >= length)
             return JSUndefined.Value;
-        return new JSNumber((int)BitConverter.ToUInt16(buffer.buffer, byteOffset + (int)index * 2));
+        return new JSNumber(BitConverter.ToUInt16(buffer.buffer, byteOffset + (int)index * 2));
     }
 
     internal protected override bool SetValue(uint index, JSValue value, JSValue receiver, bool throwError = true)

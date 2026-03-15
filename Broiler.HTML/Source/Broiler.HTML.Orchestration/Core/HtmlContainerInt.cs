@@ -225,7 +225,7 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
         ArgumentException.ThrowIfNullOrEmpty(elementId);
 
         var box = DomUtils.GetBoxById(Root, elementId.ToLower());
-        return box != null ? CommonUtils.GetFirstValueOrDefault(box.Rectangles, box.Bounds) : (RectangleF?)null;
+        return box != null ? CommonUtils.GetFirstValueOrDefault(box.Rectangles, box.Bounds) : null;
     }
 
     public void PerformLayout(RGraphics g)
@@ -377,27 +377,6 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
             var loc = OffsetByScroll(location);
             if (_selectionHandler != null && IsMouseInContainer(location))
                 _selectionHandler.HandleMouseMove(parent, loc);
-
-            /*
-            if( _hoverBoxes != null )
-            {
-                bool refresh = false;
-                foreach(var hoverBox in _hoverBoxes)
-                {
-                    foreach(var rect in hoverBox.Item1.Rectangles.Values)
-                    {
-                        if( rect.Contains(loc) )
-                        {
-                            //hoverBox.Item1.Color = "gold";
-                            refresh = true;
-                        }
-                    }
-                }
-
-                if(refresh)
-                    RequestRefresh(true);
-            }
-             */
         }
         catch (Exception ex)
         {
@@ -570,8 +549,6 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
 
         return href;
     }
-
-    internal ImageDownloader GetImageDownloader() => _imageDownloader;
 
     #region IHtmlContainerInt
 

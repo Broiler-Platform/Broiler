@@ -21,7 +21,7 @@ public static class YExpressionExtensions
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsConstant(this YExpression exp, out YConstantExpression c)
-        => Is<YConstantExpression>(exp, YExpressionType.Constant, out c);
+        => Is(exp, YExpressionType.Constant, out c);
 
     public static void PrintCSV<T>(this IndentedTextWriter writer, IEnumerable<T> items)
         where T: YExpression

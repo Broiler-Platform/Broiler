@@ -21,10 +21,10 @@ public static class JSPromiseExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static JSPromise ToTypedPromise<T>(this Task task) => new(Convert<T>((Task<T>)task));
+    public static JSPromise ToTypedPromise<T>(this Task task) => new(Convert((Task<T>)task));
 
 
-    public static JSPromise ToPromise<T>(this Task<T> task) => new(Convert<T>(task));
+    public static JSPromise ToPromise<T>(this Task<T> task) => new(Convert(task));
 
 
     [EditorBrowsable(EditorBrowsableState.Never)]

@@ -169,11 +169,11 @@ public partial class JSTypedArray: JSObject
     }
     public override bool BooleanValue => true;
     public override double DoubleValue => double.NaN;
-    public override bool Equals(JSValue value) => Object.ReferenceEquals(this, value);
+    public override bool Equals(JSValue value) => ReferenceEquals(this, value);
 
     public override JSValue InvokeFunction(in Arguments a) => throw JSContext.Current.NewTypeError($"{this} is not a function");
 
-    public override bool StrictEquals(JSValue value) => Object.ReferenceEquals(this, value);
+    public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
     public override string ToString()
     {

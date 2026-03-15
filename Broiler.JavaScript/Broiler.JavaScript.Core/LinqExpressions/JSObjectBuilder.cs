@@ -187,7 +187,7 @@ public class JSObjectBuilder
     public static Expression New() => Expression.New(_New);
 
 
-    public static Expression New(IFastEnumerable<YElementInit> elements) => YExpression.ListInit(Expression.New(_New), elements);
+    public static Expression New(IFastEnumerable<YElementInit> elements) => Expression.ListInit(Expression.New(_New), elements);
 
 
     public static Expression New(IList<ExpressionHolder> keyValues)
@@ -198,38 +198,38 @@ public class JSObjectBuilder
         {
             if (v.Spread)
             {
-                list.Add(YExpression.ElementInit(_FastAddRange, v.Value));
+                list.Add(Expression.ElementInit(_FastAddRange, v.Value));
                 continue;
             }
             if(v.Key.Type == typeof(uint))
             {
                 if(v.Value != null)
                 {
-                    list.Add(YExpression.ElementInit(_FastAddValueUInt, v.Key, v.Value, JSPropertyAttributesBuilder.EnumerableConfigurableValue ));
+                    list.Add(Expression.ElementInit(_FastAddValueUInt, v.Key, v.Value, JSPropertyAttributesBuilder.EnumerableConfigurableValue ));
                     continue;
                 }
-                list.Add(YExpression.ElementInit(_FastAddPropertyUInt, v.Key, v.Getter, v.Setter, JSPropertyAttributesBuilder.EnumerableConfigurableProperty));
+                list.Add(Expression.ElementInit(_FastAddPropertyUInt, v.Key, v.Getter, v.Setter, JSPropertyAttributesBuilder.EnumerableConfigurableProperty));
                 continue;
             }
             if(v.Key.Type == typeof(KeyString))
             {
                 if (v.Value != null)
                 {
-                    list.Add(YExpression.ElementInit(_FastAddValueKeyString, v.Key, v.Value, JSPropertyAttributesBuilder.EnumerableConfigurableValue));
+                    list.Add(Expression.ElementInit(_FastAddValueKeyString, v.Key, v.Value, JSPropertyAttributesBuilder.EnumerableConfigurableValue));
                     continue;
                 }
-                list.Add(YExpression.ElementInit(_FastAddPropertyKeyString, v.Key, v.Getter, v.Setter, JSPropertyAttributesBuilder.EnumerableConfigurableProperty));
+                list.Add(Expression.ElementInit(_FastAddPropertyKeyString, v.Key, v.Getter, v.Setter, JSPropertyAttributesBuilder.EnumerableConfigurableProperty));
                 continue;
             }
             if (v.Value != null)
             {
-                list.Add(YExpression.ElementInit(_FastAddValueKeyValue, v.Key, v.Value, JSPropertyAttributesBuilder.EnumerableConfigurableValue));
+                list.Add(Expression.ElementInit(_FastAddValueKeyValue, v.Key, v.Value, JSPropertyAttributesBuilder.EnumerableConfigurableValue));
                 continue;
             }
-            list.Add(YExpression.ElementInit(_FastAddPropertyValue, v.Key, v.Getter, v.Setter, JSPropertyAttributesBuilder.EnumerableConfigurableProperty));
+            list.Add(Expression.ElementInit(_FastAddPropertyValue, v.Key, v.Getter, v.Setter, JSPropertyAttributesBuilder.EnumerableConfigurableProperty));
         }
 
-        return YExpression.ListInit(YExpression.New(_New), list);
+        return Expression.ListInit(Expression.New(_New), list);
 
         // let the default be NewWithProperties
         //bool addProperties = false;

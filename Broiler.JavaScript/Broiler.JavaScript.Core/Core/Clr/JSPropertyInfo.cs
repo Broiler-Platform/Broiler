@@ -55,7 +55,7 @@ internal class JSPropertyInfo
         var indexParameter = Property.GetMethod.GetParameters()[0];
         Expression indexAccess = index.Type != indexParameter.ParameterType
             ? Expression.Convert(index, indexParameter.ParameterType)
-            : index as Expression;
+            : index;
         Expression indexExpression;
         Expression convertThis = Expression.TypeAs(@this, Property.DeclaringType);
         if (Property.DeclaringType.IsArray)
@@ -86,7 +86,7 @@ internal class JSPropertyInfo
         var indexParameter = Property.SetMethod.GetParameters()[0];
         Expression indexAccess = index.Type != indexParameter.ParameterType
             ? Expression.Convert(index, indexParameter.ParameterType)
-            : index as Expression;
+            : index;
         Expression indexExpression;
         Expression convertThis = Expression.TypeAs(@this, Property.DeclaringType);
         if (Property.DeclaringType.IsArray)

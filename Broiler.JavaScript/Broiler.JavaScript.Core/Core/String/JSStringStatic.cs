@@ -32,7 +32,7 @@ public partial class JSString
             var item = a.GetAt(i);
             var codePointDouble = item.DoubleValue;
             int codePoint = (int)codePointDouble;
-            if (codePoint < 0 || codePoint > 0x10FFFF || (double)codePoint != codePointDouble)
+            if (codePoint < 0 || codePoint > 0x10FFFF || codePoint != codePointDouble)
                 throw JSContext.Current.NewRangeError($"Invalid code point {codePointDouble}");
             if (codePoint <= 65535)
                 result.Append((char)codePoint);

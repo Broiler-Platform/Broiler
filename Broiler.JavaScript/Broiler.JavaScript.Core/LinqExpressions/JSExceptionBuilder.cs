@@ -23,7 +23,7 @@ public static class JSExceptionBuilder
     //    type.InternalMethod(nameof(JSException.From), typeof(Exception));
 
     public static Expression Throw(Expression value) => NewLambdaExpression.StaticCallExpression(
-            () => () => JSException.Throw((JSValue)null),
+            () => () => JSException.Throw(null),
         value);//return Expression.Call(null, _Throw, value);
 
     public static Expression ThrowSyntaxError(string value) => NewLambdaExpression.StaticCallExpression(

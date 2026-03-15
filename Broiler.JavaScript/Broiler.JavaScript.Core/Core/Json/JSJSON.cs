@@ -207,7 +207,7 @@ public partial class JSJSON: JSObject
             {
                 if (value.get == null)
                     continue;
-                jsValue = (value.get as JSFunction).f(new Arguments(target));
+                jsValue = value.get.f(new Arguments(target));
             } else
             {
                 jsValue = value.value;

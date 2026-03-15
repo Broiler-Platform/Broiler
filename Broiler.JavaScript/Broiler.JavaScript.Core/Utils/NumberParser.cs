@@ -17,7 +17,7 @@ internal static class NumberParser
     /// <returns> The result of parsing the string as a number. </returns>
     internal static double ParseFloat(string input)
     {
-        var reader = new System.IO.StringReader(input);
+        var reader = new StringReader(input);
 
         // Skip whitespace and line terminators.
         while (IsWhiteSpaceOrLineTerminator(reader.Peek()))
@@ -46,7 +46,7 @@ internal static class NumberParser
             return double.NaN;
 
         // Parse the number.
-        double result = NumberParser.ParseCore(reader, (char)firstChar, out ParseCoreStatus status, decimalOnly: true);
+        double result = ParseCore(reader, (char)firstChar, out ParseCoreStatus status, decimalOnly: true);
 
         // Handle various error cases.
         if (status == ParseCoreStatus.NoDigits)
@@ -142,7 +142,7 @@ internal static class NumberParser
             return double.NaN;
 
         // Parse the number.
-        double result = NumberParser.ParseCore(reader, (char)firstChar, out ParseCoreStatus status, allowES3Octal: false);
+        double result = ParseCore(reader, (char)firstChar, out ParseCoreStatus status, allowES3Octal: false);
 
         // Handle various error cases.
         switch (status)
@@ -386,7 +386,7 @@ internal static class NumberParser
         {
             // Combine desired1 and desired2 to produce an integer representing the final
             // result.
-            result = (double)((long)desired1 * integerPowersOfTen[Math.Max(totalDigits - 9, 0)] + desired2);
+            result = (long)desired1 * integerPowersOfTen[Math.Max(totalDigits - 9, 0)] + desired2;
         }
         else
         {
@@ -434,7 +434,7 @@ internal static class NumberParser
     /// <returns> The result of parsing the string as a integer. </returns>
     internal static double ParseInt(string input, int radix, bool allowOctal)
     {
-        var reader = new System.IO.StringReader(input);
+        var reader = new StringReader(input);
         int digitCount = 0;
 
         // Skip whitespace and line terminators.

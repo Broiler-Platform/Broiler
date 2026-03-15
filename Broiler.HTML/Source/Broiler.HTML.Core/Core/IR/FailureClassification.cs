@@ -1,7 +1,7 @@
 namespace Broiler.HTML.Core.Core.IR;
 
 /// <summary>
-/// Classifies the root cause of a pixel-regression failure (Phase 5).
+/// Classifies the root cause of a pixel-regression failure.
 /// Used only when a pixel test has already failed.
 /// </summary>
 public enum FailureClassification

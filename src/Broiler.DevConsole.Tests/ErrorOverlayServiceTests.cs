@@ -46,7 +46,7 @@ public class ErrorOverlayServiceTests : IDisposable
     {
         using var service = new ErrorOverlayService();
         var captured = new List<RenderErrorInfo>();
-        service.ErrorCaptured += e => captured.Add(e);
+        service.ErrorCaptured += captured.Add;
 
         RenderLogger.Log(LogCategory.JavaScript, LogLevel.Error, "Script", "fail");
 

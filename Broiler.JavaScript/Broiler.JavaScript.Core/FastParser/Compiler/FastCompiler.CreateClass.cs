@@ -186,8 +186,8 @@ partial class FastCompiler
             staticElements.Add(new YMemberElementInit(JSFunctionBuilder._prototype, prototypeElements));
         }
 
-        YExpression retVal = staticElements.Any() 
-            ? YExpression.MemberInit(_new, staticElements)
+        Expression retVal = staticElements.Any() 
+            ? Expression.MemberInit(_new, staticElements)
             : _new;
 
         stmts.Add(

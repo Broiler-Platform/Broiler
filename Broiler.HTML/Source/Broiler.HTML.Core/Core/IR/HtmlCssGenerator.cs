@@ -6,7 +6,7 @@ namespace Broiler.HTML.Core.Core.IR;
 /// <summary>
 /// Generates random but well-formed HTML/CSS documents targeting layout stress
 /// parameters: floats, clears, widths/heights, box model properties, display
-/// values, and nesting. Used by fuzz testing (Phase 3).
+/// values, and nesting. Used by fuzz testing.
 /// </summary>
 public sealed class HtmlCssGenerator
 {

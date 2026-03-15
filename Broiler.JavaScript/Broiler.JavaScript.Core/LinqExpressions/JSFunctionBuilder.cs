@@ -94,7 +94,7 @@ public class JSFunctionBuilder
 
     public static Expression New(Expression del, Expression name, Expression code, int length) => NewLambdaExpression.NewExpression<JSFunction>(
             () => () => new JSFunction(
-                (JSFunctionDelegate)null,
+                null,
                 "",
                 "",
                 0,

@@ -84,7 +84,7 @@ public partial class JSBoolean : JSPrimitive
 
     public override bool Equals(JSValue value)
     {
-        if (Object.ReferenceEquals(this, value))
+        if (ReferenceEquals(this, value))
             return true;
         if (!_value)
         {
@@ -110,7 +110,7 @@ public partial class JSBoolean : JSPrimitive
             ? value == "1"
             : value == "0";
 
-    public override bool StrictEquals(JSValue value) => Object.ReferenceEquals(this, value);
+    public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
     public override JSValue InvokeFunction(in Arguments a) => throw new NotImplementedException("boolean is not a function");
 

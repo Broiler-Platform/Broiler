@@ -294,8 +294,8 @@ public partial class JSFunction : JSObject
         })
         {
             // need to set prototypeChain...
-            prototypeChain = (fOriginal as JSFunction).prototypeChain,
-            prototype = (fOriginal as JSFunction).prototype,
+            prototypeChain = fOriginal.prototypeChain,
+            prototype = fOriginal.prototype,
             constructor = fOriginal.constructor
         };
         return fx;
@@ -334,7 +334,7 @@ public partial class JSFunction : JSObject
 
         var len = args.Length;
         if (len == 0) {
-            return new JSFunction(JSFunction.empty, "anonymous", "function anonymous() {\n\n}");
+            return new JSFunction(empty, "anonymous", "function anonymous() {\n\n}");
         }
             
         JSValue body = null;
@@ -359,7 +359,7 @@ public partial class JSFunction : JSObject
         var context = JSContext.Current;
         context.DispatchEvalEvent(ref bodyText, ref location);
 
-        var fx = new JSFunction(JSFunction.empty, "internal", bodyText);
+        var fx = new JSFunction(empty, "internal", bodyText);
 
 
         // parse and create method...

@@ -106,7 +106,7 @@ public class HttpClientMigrationTests
 
         var ctsField = downloaderType
             .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
-            .FirstOrDefault(f => f.FieldType == typeof(System.Threading.CancellationTokenSource));
+            .FirstOrDefault(f => f.FieldType == typeof(CancellationTokenSource));
 
         Assert.NotNull(ctsField);
     }

@@ -255,7 +255,7 @@ public struct StringMap<T>
                     last += Size;
                     if (last >= storage.Length)
                     {
-                        global::System.Array.Resize(ref storage, storage.Length * 2);
+                        System.Array.Resize(ref storage, storage.Length * 2);
                     }
                 }
             }
@@ -315,7 +315,7 @@ public struct StringMap<T>
                         last += Size;
                         if (last >= storage.Length)
                         {
-                            global::System.Array.Resize(ref storage, storage.Length + 16);
+                            System.Array.Resize(ref storage, storage.Length + 16);
                         }
                     }
                 }

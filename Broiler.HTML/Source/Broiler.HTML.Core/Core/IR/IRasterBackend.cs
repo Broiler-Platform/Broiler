@@ -4,9 +4,6 @@ namespace Broiler.HTML.Core.Core.IR;
 /// Draws a <see cref="DisplayList"/> to a platform surface.
 /// Implementations: SkiaRasterBackend, WpfRasterBackend.
 /// </summary>
-/// <remarks>
-/// Phase 1: Interface definition only. No implementations yet.
-/// </remarks>
 public interface IRasterBackend
 {
     /// <summary>

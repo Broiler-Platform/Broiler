@@ -36,7 +36,7 @@ public sealed partial class DomBridge
         obj.FastAddProperty(
             (KeyString)"id",
             new JSFunction((in Arguments a) =>
-                element.Id != null ? (JSValue)new JSString(element.Id) : JSNull.Value,
+                element.Id != null ? new JSString(element.Id) : JSNull.Value,
                 "get id"),
             new JSFunction((in Arguments a) =>
             {
@@ -57,7 +57,7 @@ public sealed partial class DomBridge
                 // but not yet synced to Attributes (e.g. parsed HTML elements).
                 if (element.Attributes.TryGetValue("class", out var cls))
                     return new JSString(cls);
-                return element.ClassName != null ? (JSValue)new JSString(element.ClassName) : new JSString(string.Empty);
+                return element.ClassName != null ? new JSString(element.ClassName) : new JSString(string.Empty);
             }, "get className"),
             new JSFunction((in Arguments a) =>
             {
@@ -73,7 +73,7 @@ public sealed partial class DomBridge
             (KeyString)"title",
             new JSFunction((in Arguments a) =>
                 element.Attributes.TryGetValue("title", out var t)
-                    ? (JSValue)new JSString(t)
+                    ? new JSString(t)
                     : new JSString(string.Empty),
                 "get title"),
             new JSFunction((in Arguments a) =>
@@ -101,7 +101,7 @@ public sealed partial class DomBridge
             {
                 // For text nodes, return the direct text content
                 if (element.IsTextNode)
-                    return element.TextContent != null ? (JSValue)new JSString(element.TextContent) : new JSString(string.Empty);
+                    return element.TextContent != null ? new JSString(element.TextContent) : new JSString(string.Empty);
                 // For element nodes with direct TextContent set (e.g., via JS setter)
                 if (element.TextContent != null && element.Children.Count == 0)
                     return new JSString(element.TextContent);
@@ -185,7 +185,7 @@ public sealed partial class DomBridge
                 if (a.Length == 0) return JSNull.Value;
                 var name = a[0].ToString();
                 return element.Attributes.TryGetValue(name, out var val)
-                    ? (JSValue)new JSString(val)
+                    ? new JSString(val)
                     : JSNull.Value;
             }, "getAttribute", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -196,7 +196,7 @@ public sealed partial class DomBridge
         obj.FastAddProperty(
             (KeyString)"parentNode",
             new JSFunction((in Arguments a) =>
-                element.Parent != null ? (JSValue)ToJSObject(element.Parent) : JSNull.Value,
+                element.Parent != null ? ToJSObject(element.Parent) : JSNull.Value,
                 "get parentNode"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -218,7 +218,7 @@ public sealed partial class DomBridge
         obj.FastAddProperty(
             (KeyString)"firstChild",
             new JSFunction((in Arguments a) =>
-                element.Children.Count > 0 ? (JSValue)ToJSObject(element.Children[0]) : JSNull.Value,
+                element.Children.Count > 0 ? ToJSObject(element.Children[0]) : JSNull.Value,
                 "get firstChild"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -227,7 +227,7 @@ public sealed partial class DomBridge
         obj.FastAddProperty(
             (KeyString)"lastChild",
             new JSFunction((in Arguments a) =>
-                element.Children.Count > 0 ? (JSValue)ToJSObject(element.Children[^1]) : JSNull.Value,
+                element.Children.Count > 0 ? ToJSObject(element.Children[^1]) : JSNull.Value,
                 "get lastChild"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -241,7 +241,7 @@ public sealed partial class DomBridge
                 var siblings = element.Parent.Children;
                 var idx = siblings.IndexOf(element);
                 return idx >= 0 && idx + 1 < siblings.Count
-                    ? (JSValue)ToJSObject(siblings[idx + 1])
+                    ? ToJSObject(siblings[idx + 1])
                     : JSNull.Value;
             }, "get nextSibling"),
             null,
@@ -256,7 +256,7 @@ public sealed partial class DomBridge
                 var siblings = element.Parent.Children;
                 var idx = siblings.IndexOf(element);
                 return idx > 0
-                    ? (JSValue)ToJSObject(siblings[idx - 1])
+                    ? ToJSObject(siblings[idx - 1])
                     : JSNull.Value;
             }, "get previousSibling"),
             null,
@@ -349,7 +349,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
-                    return element.TextContent != null ? (JSValue)new JSString(element.TextContent) : JSNull.Value;
+                    return element.TextContent != null ? new JSString(element.TextContent) : JSNull.Value;
                 return JSNull.Value;
             }, "get nodeValue"),
             new JSFunction((in Arguments a) =>
@@ -366,7 +366,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 if (element.IsTextNode || string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
-                    return element.TextContent != null ? (JSValue)new JSString(element.TextContent) : new JSString(string.Empty);
+                    return element.TextContent != null ? new JSString(element.TextContent) : new JSString(string.Empty);
                 return JSUndefined.Value;
             }, "get data"),
             new JSFunction((in Arguments a) =>
@@ -543,7 +543,7 @@ public sealed partial class DomBridge
                     _docRootToDocJSObject.TryGetValue(element.OwnerDocRoot, out var subDoc))
                     return subDoc;
                 // For main document elements, return the main document JSObject
-                return _documentJSObject ?? (JSValue)JSNull.Value;
+                return _documentJSObject ?? JSNull.Value;
             }, "get ownerDocument"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -555,7 +555,7 @@ public sealed partial class DomBridge
             {
                 if (element.Parent == null) return JSNull.Value;
                 if (element.Parent.IsTextNode) return JSNull.Value;
-                return (JSValue)ToJSObject(element.Parent);
+                return ToJSObject(element.Parent);
             }, "get parentElement"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -625,7 +625,7 @@ public sealed partial class DomBridge
                 var localName = a[1].ToString();
                 if (element.NsAttrMap.TryGetValue((ns, localName), out var qName) &&
                     element.Attributes.TryGetValue(qName, out var val))
-                    return (JSValue)new JSString(val);
+                    return new JSString(val);
                 return JSNull.Value;
             }, "getAttributeNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -776,7 +776,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var first = element.Children.FirstOrDefault(c => !c.IsTextNode);
-                return first != null ? (JSValue)ToJSObject(first) : JSNull.Value;
+                return first != null ? ToJSObject(first) : JSNull.Value;
             }, "get firstElementChild"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -787,7 +787,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var last = element.Children.LastOrDefault(c => !c.IsTextNode);
-                return last != null ? (JSValue)ToJSObject(last) : JSNull.Value;
+                return last != null ? ToJSObject(last) : JSNull.Value;
             }, "get lastElementChild"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -802,7 +802,7 @@ public sealed partial class DomBridge
                 var idx = siblings.IndexOf(element);
                 for (var i = idx + 1; i < siblings.Count; i++)
                 {
-                    if (!siblings[i].IsTextNode) return (JSValue)ToJSObject(siblings[i]);
+                    if (!siblings[i].IsTextNode) return ToJSObject(siblings[i]);
                 }
                 return JSNull.Value;
             }, "get nextElementSibling"),
@@ -819,7 +819,7 @@ public sealed partial class DomBridge
                 var idx = siblings.IndexOf(element);
                 for (var i = idx - 1; i >= 0; i--)
                 {
-                    if (!siblings[i].IsTextNode) return (JSValue)ToJSObject(siblings[i]);
+                    if (!siblings[i].IsTextNode) return ToJSObject(siblings[i]);
                 }
                 return JSNull.Value;
             }, "get previousElementSibling"),
@@ -1150,13 +1150,13 @@ public sealed partial class DomBridge
                 {
                     // Radio button mutual exclusion: uncheck others in same group
                     if (element.Attributes.TryGetValue("type", out var tp) &&
-                        string.Equals(tp, "radio", System.StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(tp, "radio", StringComparison.OrdinalIgnoreCase) &&
                         element.Attributes.TryGetValue("name", out var radioName) &&
                         !string.IsNullOrEmpty(radioName))
                     {
                         // Find the scope for radio group — form parent, or document root if not in a form
                         var scope = element.Parent;
-                        while (scope != null && !string.Equals(scope.TagName, "form", System.StringComparison.OrdinalIgnoreCase))
+                        while (scope != null && !string.Equals(scope.TagName, "form", StringComparison.OrdinalIgnoreCase))
                             scope = scope.Parent;
                         if (scope == null)
                         {
@@ -1264,7 +1264,7 @@ public sealed partial class DomBridge
             (KeyString)"submit",
             new JSFunction((in Arguments a) =>
             {
-                if (string.Equals(element.TagName, "form", System.StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(element.TagName, "form", StringComparison.OrdinalIgnoreCase))
                 {
                     // Fire submit event
                     var submitEvt = new JSObject();
@@ -1343,9 +1343,9 @@ public sealed partial class DomBridge
             {
                 if (a.Length == 0) return JSNull.Value;
                 var contextType = a[0].ToString();
-                if (!string.Equals(contextType, "2d", System.StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(contextType, "2d", StringComparison.OrdinalIgnoreCase))
                     return JSNull.Value;
-                if (!string.Equals(element.TagName, "canvas", System.StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(element.TagName, "canvas", StringComparison.OrdinalIgnoreCase))
                     return JSNull.Value;
 #if BROILER_CLI
                 return JSNull.Value; // Canvas 2D context not available in CLI mode
@@ -1356,7 +1356,7 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // contentWindow / contentDocument — for <iframe> elements with full sub-document DOM
-        if (string.Equals(element.TagName, "iframe", System.StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(element.TagName, "iframe", StringComparison.OrdinalIgnoreCase))
         {
             // Determine if iframe src points to a non-HTML resource (Content-Type check)
             var iframeSrcValue = element.Attributes.TryGetValue("src", out var srcVal) ? srcVal : string.Empty;
@@ -1415,7 +1415,7 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments _) =>
                 {
                     return element.Attributes.TryGetValue("src", out var s)
-                        ? (JSValue)new JSString(s)
+                        ? new JSString(s)
                         : new JSString(string.Empty);
                 }, "get src"),
                 new JSFunction((in Arguments a) =>
@@ -1436,7 +1436,7 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments _) =>
                 {
                     return element.Attributes.TryGetValue("sandbox", out var sandbox)
-                        ? (JSValue)new JSString(sandbox)
+                        ? new JSString(sandbox)
                         : new JSString(string.Empty);
                 }, "get sandbox"),
                 null,
@@ -1455,8 +1455,8 @@ public sealed partial class DomBridge
                 (KeyString)"caption",
                 new JSFunction((in Arguments _) =>
                 {
-                    var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", System.StringComparison.OrdinalIgnoreCase));
-                    return cap != null ? (JSValue)ToJSObject(cap) : JSNull.Value;
+                    var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
+                    return cap != null ? ToJSObject(cap) : JSNull.Value;
                 }, "get caption"),
                 new JSFunction((in Arguments a) => JSUndefined.Value, "set caption"), // setting to same value is no-op
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -1466,8 +1466,8 @@ public sealed partial class DomBridge
                 (KeyString)"tHead",
                 new JSFunction((in Arguments _) =>
                 {
-                    var th = element.Children.Find(c => string.Equals(c.TagName, "thead", System.StringComparison.OrdinalIgnoreCase));
-                    return th != null ? (JSValue)ToJSObject(th) : JSNull.Value;
+                    var th = element.Children.Find(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
+                    return th != null ? ToJSObject(th) : JSNull.Value;
                 }, "get tHead"),
                 new JSFunction((in Arguments a) => JSUndefined.Value, "set tHead"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -1477,8 +1477,8 @@ public sealed partial class DomBridge
                 (KeyString)"tFoot",
                 new JSFunction((in Arguments _) =>
                 {
-                    var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", System.StringComparison.OrdinalIgnoreCase));
-                    return tf != null ? (JSValue)ToJSObject(tf) : JSNull.Value;
+                    var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
+                    return tf != null ? ToJSObject(tf) : JSNull.Value;
                 }, "get tFoot"),
                 new JSFunction((in Arguments a) => JSUndefined.Value, "set tFoot"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -1490,7 +1490,7 @@ public sealed partial class DomBridge
                 {
                     var bodies = new List<JSValue>();
                     foreach (var c in element.Children)
-                        if (string.Equals(c.TagName, "tbody", System.StringComparison.OrdinalIgnoreCase))
+                        if (string.Equals(c.TagName, "tbody", StringComparison.OrdinalIgnoreCase))
                             bodies.Add(ToJSObject(c));
                     var arr = new JSArray(bodies);
                     arr.FastAddProperty(
@@ -1515,7 +1515,7 @@ public sealed partial class DomBridge
                 (KeyString)"createCaption",
                 new JSFunction((in Arguments _) =>
                 {
-                    var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", System.StringComparison.OrdinalIgnoreCase));
+                    var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
                     if (cap != null) return ToJSObject(cap);
                     cap = new DomElement("caption", null, null, string.Empty);
                     bridge._elements.Add(cap);
@@ -1530,7 +1530,7 @@ public sealed partial class DomBridge
                 (KeyString)"createTHead",
                 new JSFunction((in Arguments _) =>
                 {
-                    var th = element.Children.Find(c => string.Equals(c.TagName, "thead", System.StringComparison.OrdinalIgnoreCase));
+                    var th = element.Children.Find(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
                     if (th != null) return ToJSObject(th);
                     th = new DomElement("thead", null, null, string.Empty);
                     bridge._elements.Add(th);
@@ -1545,7 +1545,7 @@ public sealed partial class DomBridge
                 (KeyString)"createTFoot",
                 new JSFunction((in Arguments _) =>
                 {
-                    var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", System.StringComparison.OrdinalIgnoreCase));
+                    var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
                     if (tf != null) return ToJSObject(tf);
                     tf = new DomElement("tfoot", null, null, string.Empty);
                     bridge._elements.Add(tf);
@@ -1560,7 +1560,7 @@ public sealed partial class DomBridge
                 (KeyString)"deleteCaption",
                 new JSFunction((in Arguments _) =>
                 {
-                    var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", System.StringComparison.OrdinalIgnoreCase));
+                    var cap = element.Children.Find(c => string.Equals(c.TagName, "caption", StringComparison.OrdinalIgnoreCase));
                     if (cap != null) { cap.Parent = null; element.Children.Remove(cap); }
                     return JSUndefined.Value;
                 }, "deleteCaption", 0),
@@ -1571,7 +1571,7 @@ public sealed partial class DomBridge
                 (KeyString)"deleteTHead",
                 new JSFunction((in Arguments _) =>
                 {
-                    var th = element.Children.Find(c => string.Equals(c.TagName, "thead", System.StringComparison.OrdinalIgnoreCase));
+                    var th = element.Children.Find(c => string.Equals(c.TagName, "thead", StringComparison.OrdinalIgnoreCase));
                     if (th != null) { th.Parent = null; element.Children.Remove(th); }
                     return JSUndefined.Value;
                 }, "deleteTHead", 0),
@@ -1582,7 +1582,7 @@ public sealed partial class DomBridge
                 (KeyString)"deleteTFoot",
                 new JSFunction((in Arguments _) =>
                 {
-                    var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", System.StringComparison.OrdinalIgnoreCase));
+                    var tf = element.Children.Find(c => string.Equals(c.TagName, "tfoot", StringComparison.OrdinalIgnoreCase));
                     if (tf != null) { tf.Parent = null; element.Children.Remove(tf); }
                     return JSUndefined.Value;
                 }, "deleteTFoot", 0),
@@ -1628,7 +1628,7 @@ public sealed partial class DomBridge
                 {
                     var rows = new List<JSValue>();
                     foreach (var c in element.Children)
-                        if (string.Equals(c.TagName, "tr", System.StringComparison.OrdinalIgnoreCase))
+                        if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
                             rows.Add(ToJSObject(c));
                     var arr = new JSArray(rows);
                     arr.FastAddProperty(
@@ -1650,7 +1650,7 @@ public sealed partial class DomBridge
                     bridge._elements.Add(tr);
                     tr.Parent = element;
                     var trRows = element.Children.Where(c =>
-                        string.Equals(c.TagName, "tr", System.StringComparison.OrdinalIgnoreCase)).ToList();
+                        string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase)).ToList();
                     if (index < 0 || index >= trRows.Count)
                         element.Children.Add(tr);
                     else
@@ -1674,11 +1674,11 @@ public sealed partial class DomBridge
                 {
                     // Find parent table
                     var tableEl = element.Parent;
-                    if (tableEl != null && (string.Equals(tableEl.TagName, "thead", System.StringComparison.OrdinalIgnoreCase) ||
-                                            string.Equals(tableEl.TagName, "tbody", System.StringComparison.OrdinalIgnoreCase) ||
-                                            string.Equals(tableEl.TagName, "tfoot", System.StringComparison.OrdinalIgnoreCase)))
+                    if (tableEl != null && (string.Equals(tableEl.TagName, "thead", StringComparison.OrdinalIgnoreCase) ||
+                                            string.Equals(tableEl.TagName, "tbody", StringComparison.OrdinalIgnoreCase) ||
+                                            string.Equals(tableEl.TagName, "tfoot", StringComparison.OrdinalIgnoreCase)))
                         tableEl = tableEl.Parent;
-                    if (tableEl == null || !string.Equals(tableEl.TagName, "table", System.StringComparison.OrdinalIgnoreCase))
+                    if (tableEl == null || !string.Equals(tableEl.TagName, "table", StringComparison.OrdinalIgnoreCase))
                         return new JSNumber(-1);
                     var rows = CollectTableRows(tableEl);
                     return new JSNumber(rows.IndexOf(element));
@@ -1697,7 +1697,7 @@ public sealed partial class DomBridge
                     foreach (var c in section.Children)
                     {
                         if (ReferenceEquals(c, element)) return new JSNumber(idx);
-                        if (string.Equals(c.TagName, "tr", System.StringComparison.OrdinalIgnoreCase)) idx++;
+                        if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase)) idx++;
                     }
                     return new JSNumber(-1);
                 }, "get sectionRowIndex"),
@@ -1711,8 +1711,8 @@ public sealed partial class DomBridge
                 {
                     var cells = new List<JSValue>();
                     foreach (var c in element.Children)
-                        if (string.Equals(c.TagName, "td", System.StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(c.TagName, "th", System.StringComparison.OrdinalIgnoreCase))
+                        if (string.Equals(c.TagName, "td", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(c.TagName, "th", StringComparison.OrdinalIgnoreCase))
                             cells.Add(ToJSObject(c));
                     var arr = new JSArray(cells);
                     arr.FastAddProperty(
@@ -1751,7 +1751,7 @@ public sealed partial class DomBridge
                 (KeyString)"action",
                 new JSFunction((in Arguments _) =>
                     element.Attributes.TryGetValue("action", out var act)
-                        ? (JSValue)new JSString(act)
+                        ? new JSString(act)
                         : new JSString(string.Empty),
                     "get action"),
                 new JSFunction((in Arguments a) =>
@@ -1804,7 +1804,7 @@ public sealed partial class DomBridge
                 {
                     var opts = new List<JSValue>();
                     foreach (var c in element.Children)
-                        if (string.Equals(c.TagName, "option", System.StringComparison.OrdinalIgnoreCase))
+                        if (string.Equals(c.TagName, "option", StringComparison.OrdinalIgnoreCase))
                             opts.Add(ToJSObject(c));
                     var arr = new JSArray(opts);
                     arr.FastAddProperty(
@@ -1824,7 +1824,7 @@ public sealed partial class DomBridge
                     var idx = 0;
                     foreach (var c in element.Children)
                     {
-                        if (string.Equals(c.TagName, "option", System.StringComparison.OrdinalIgnoreCase))
+                        if (string.Equals(c.TagName, "option", StringComparison.OrdinalIgnoreCase))
                         {
                             if (c.Attributes.ContainsKey("selected") ||
                                 (c.DomProperties.TryGetValue("_defaultSelected", out var ds) && ds is true))
@@ -1863,7 +1863,7 @@ public sealed partial class DomBridge
                 (KeyString)"htmlFor",
                 new JSFunction((in Arguments _) =>
                     element.Attributes.TryGetValue("for", out var f)
-                        ? (JSValue)new JSString(f) : new JSString(string.Empty),
+                        ? new JSString(f) : new JSString(string.Empty),
                     "get htmlFor"),
                 new JSFunction((in Arguments a) =>
                 {
@@ -1880,7 +1880,7 @@ public sealed partial class DomBridge
                 (KeyString)"httpEquiv",
                 new JSFunction((in Arguments _) =>
                     element.Attributes.TryGetValue("http-equiv", out var he)
-                        ? (JSValue)new JSString(he) : new JSString(string.Empty),
+                        ? new JSString(he) : new JSString(string.Empty),
                     "get httpEquiv"),
                 new JSFunction((in Arguments a) =>
                 {
@@ -1919,7 +1919,7 @@ public sealed partial class DomBridge
                 (KeyString)"type",
                 new JSFunction((in Arguments _) =>
                     element.Attributes.TryGetValue("type", out var t)
-                        ? (JSValue)new JSString(t) : new JSString(string.Empty),
+                        ? new JSString(t) : new JSString(string.Empty),
                     "get type"),
                 new JSFunction((in Arguments a) =>
                 {
@@ -1988,7 +1988,7 @@ public sealed partial class DomBridge
                 obj.FastAddProperty(
                     (KeyString)captured,
                     new JSFunction((in Arguments _) =>
-                        element.Attributes.TryGetValue(captured, out var v) ? (JSValue)new JSString(v) : new JSString(string.Empty),
+                        element.Attributes.TryGetValue(captured, out var v) ? new JSString(v) : new JSString(string.Empty),
                         "get " + captured),
                     new JSFunction((in Arguments a) =>
                     {
@@ -3073,7 +3073,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments _) =>
             {
                 return docRoot.Children.Count > 0
-                    ? (JSValue)ToJSObject(docRoot.Children[0])
+                    ? ToJSObject(docRoot.Children[0])
                     : JSNull.Value;
             }, "get firstChild"),
             null,
@@ -3085,7 +3085,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments _) =>
             {
                 return docRoot.Children.Count > 0
-                    ? (JSValue)ToJSObject(docRoot.Children[^1])
+                    ? ToJSObject(docRoot.Children[^1])
                     : JSNull.Value;
             }, "get lastChild"),
             null,
@@ -3127,7 +3127,7 @@ public sealed partial class DomBridge
             {
                 var id = a.Length > 0 ? a[0].ToString() : string.Empty;
                 var found = FindInSubTree(docRoot, el => el.Id == id);
-                return found != null ? (JSValue)ToJSObject(found) : JSNull.Value;
+                return found != null ? ToJSObject(found) : JSNull.Value;
             }, "getElementById", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -3268,7 +3268,7 @@ public sealed partial class DomBridge
             {
                 var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
                 var found = FindInSubTree(docRoot, el => MatchesSelector(el, selector));
-                return found != null ? (JSValue)ToJSObject(found) : JSNull.Value;
+                return found != null ? ToJSObject(found) : JSNull.Value;
             }, "querySelector", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

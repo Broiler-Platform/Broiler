@@ -11,8 +11,5 @@ internal sealed class ImageAdapter(BitmapImage image) : RImage
 
     public override double Height => Image.PixelHeight;
 
-    public override void Dispose()
-    {
-        Image.StreamSource?.Dispose();
-    }
+    public override void Dispose() => Image.StreamSource?.Dispose();
 }

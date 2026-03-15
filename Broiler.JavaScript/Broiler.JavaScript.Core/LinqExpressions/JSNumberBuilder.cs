@@ -46,7 +46,7 @@ public class JSNumberBuilder
             exp = Expression.Convert(exp, typeof(double));
         }
         return Expression.TypeAs(
-            NewLambdaExpression.NewExpression<JSNumber>(() => () => new JSNumber((double)0), exp)
+            NewLambdaExpression.NewExpression<JSNumber>(() => () => new JSNumber(0), exp)
             , typeof(JSValue));
         // return  Expression.TypeAs(Expression.New(_NewDouble, exp), typeof(JSValue));
     }

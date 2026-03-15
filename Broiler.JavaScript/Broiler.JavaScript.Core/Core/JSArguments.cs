@@ -21,7 +21,7 @@ public class JSArguments: JSObject
         // arguments = args;
         ref var properties = ref GetOwnProperties(true);
         properties.Put(KeyStrings.length, new JSNumber(args.Length), JSPropertyAttributes.ConfigurableValue);
-        properties.Put(KeyStrings.callee, (JSFunctionDelegate)Callee, Callee, JSPropertyAttributes.Property);
+        properties.Put(KeyStrings.callee, Callee, Callee, JSPropertyAttributes.Property);
 
         ref var symbols = ref GetSymbols();
         symbols.Put(JSSymbol.iterator.Key) = JSProperty.Property(new JSFunction(Values), JSPropertyAttributes.ConfigurableValue);

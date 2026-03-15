@@ -13,7 +13,7 @@ public sealed partial class DomBridge
 {
     private static bool CheckElementValidity(DomElement element)
     {
-        if (string.Equals(element.TagName, "form", System.StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(element.TagName, "form", StringComparison.OrdinalIgnoreCase))
         {
             return ValidateFormChildren(element);
         }
@@ -22,9 +22,9 @@ public sealed partial class DomBridge
         if (!element.Attributes.ContainsKey("required")) return true;
 
         var tag = element.TagName;
-        if (string.Equals(tag, "input", System.StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(tag, "textarea", System.StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(tag, "select", System.StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(tag, "input", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(tag, "textarea", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(tag, "select", StringComparison.OrdinalIgnoreCase))
         {
             element.Attributes.TryGetValue("value", out var val);
             return !string.IsNullOrEmpty(val);
@@ -69,8 +69,8 @@ public sealed partial class DomBridge
 
         // Set up event object properties
         evt[(KeyString)"target"] = target == _documentNode
-            ? (_documentJSObject ?? (JSValue)JSNull.Value)
-            : (JSValue)ToJSObject(target);
+            ? (_documentJSObject ?? JSNull.Value)
+            : ToJSObject(target);
         evt[(KeyString)"eventPhase"] = new JSNumber(0);
         evt[(KeyString)"defaultPrevented"] = JSBoolean.False;
         evt.FastAddValue((KeyString)"stopPropagation",
@@ -89,8 +89,8 @@ public sealed partial class DomBridge
         {
             if (stopped) break;
             evt[(KeyString)"currentTarget"] = ancestor == _documentNode
-                ? (_documentJSObject ?? (JSValue)JSNull.Value)
-                : (JSValue)ToJSObject(ancestor);
+                ? (_documentJSObject ?? JSNull.Value)
+                : ToJSObject(ancestor);
             FireListeners(ancestor, eventType, evt, capturePhase: true, ref stopped, ref immediateStopped);
         }
 
@@ -99,8 +99,8 @@ public sealed partial class DomBridge
         {
             evt[(KeyString)"eventPhase"] = new JSNumber(2);
             evt[(KeyString)"currentTarget"] = target == _documentNode
-                ? (_documentJSObject ?? (JSValue)JSNull.Value)
-                : (JSValue)ToJSObject(target);
+                ? (_documentJSObject ?? JSNull.Value)
+                : ToJSObject(target);
             FireListeners(target, eventType, evt, capturePhase: null, ref stopped, ref immediateStopped);
         }
 
@@ -114,8 +114,8 @@ public sealed partial class DomBridge
             {
                 if (stopped) break;
                 evt[(KeyString)"currentTarget"] = path[i] == _documentNode
-                    ? (_documentJSObject ?? (JSValue)JSNull.Value)
-                    : (JSValue)ToJSObject(path[i]);
+                    ? (_documentJSObject ?? JSNull.Value)
+                    : ToJSObject(path[i]);
                 FireListeners(path[i], eventType, evt, capturePhase: false, ref stopped, ref immediateStopped);
             }
         }

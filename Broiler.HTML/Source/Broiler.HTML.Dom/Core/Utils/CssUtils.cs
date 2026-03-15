@@ -9,8 +9,6 @@ namespace Broiler.HTML.Dom.Core.Utils;
 
 internal static class CssUtils
 {
-    public static Color DefaultSelectionBackcolor { get; } = Color.FromArgb(0xa9, 0x33, 0x99, 0xFF);
-
     public static double WhiteSpace(RGraphics g, CssBoxProperties box)
     {
         double w = box.ActualFont.GetWhitespaceWidth(g);

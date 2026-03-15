@@ -342,7 +342,7 @@ public sealed partial class JSNumber : JSPrimitive
 
     public override bool Equals(JSValue value)
     {
-        if (object.ReferenceEquals(this, value))
+        if (ReferenceEquals(this, value))
         {
             if (double.IsNaN(this.value))
                 return false;
@@ -375,7 +375,7 @@ public sealed partial class JSNumber : JSPrimitive
     public override bool StrictEquals(JSValue value)
     {
         
-        if (object.ReferenceEquals(this, value)) {
+        if (ReferenceEquals(this, value)) {
             if (double.IsNaN(this.value))
                 return false;
             return true;
@@ -392,7 +392,7 @@ public sealed partial class JSNumber : JSPrimitive
 
     public override bool SameValueZero(JSValue value)
     {
-        if (object.ReferenceEquals(this, value))
+        if (ReferenceEquals(this, value))
         {
             return true;
         }

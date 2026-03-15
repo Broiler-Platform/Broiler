@@ -783,7 +783,7 @@ public class CaptureService
             {
                 if (a.Length == 0) return JSNull.Value;
                 var key = a[0]?.ToString() ?? string.Empty;
-                return store.TryGetValue(key, out var val) ? (JSValue)new JSString(val) : JSNull.Value;
+                return store.TryGetValue(key, out var val) ? new JSString(val) : JSNull.Value;
             }, "getItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -844,7 +844,7 @@ public class CaptureService
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 result.FastAddValue(
                     (KeyString)"media",
-                    a.Length > 0 ? (JSValue)new JSString(a[0]?.ToString() ?? string.Empty) : new JSString(string.Empty),
+                    a.Length > 0 ? new JSString(a[0]?.ToString() ?? string.Empty) : new JSString(string.Empty),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 return result;
             }, "matchMedia", 1),

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Text;
@@ -12,7 +11,6 @@ namespace Broiler.HTML.Core.Core.IR;
 /// decimal places for stability across runs. Platform-specific handles
 /// (<c>FontHandle</c>, <c>ImageHandle</c>) are excluded.
 /// </summary>
-/// <remarks>Phase 4 deliverable – paint-level deterministic testing.</remarks>
 public static class DisplayListJsonDumper
 {
     /// <summary>

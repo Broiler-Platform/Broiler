@@ -8,14 +8,14 @@ public static class YieldFinderHelper
     private static object yes = new();
     private static object no = new();
 
-    private static System.Runtime.CompilerServices.ConditionalWeakTable<YExpression, object>
+    private static System.Runtime.CompilerServices.ConditionalWeakTable<Exp, object>
         cache = [];
 
-    public static bool HasYield(this YExpression expression)
+    public static bool HasYield(this Exp expression)
     {
         if (cache.TryGetValue(expression, out var a))
         {
-            return System.Object.ReferenceEquals(a, yes);
+            return ReferenceEquals(a, yes);
         }
         var r = YieldFinder.HasYield(expression);
         cache.Add(expression, r ? yes : no);
@@ -26,7 +26,7 @@ public static class YieldFinderHelper
     public class YieldFinder : YExpressionMapVisitor
     {
 
-        public static bool HasYield(YExpression exp)
+        public static bool HasYield(Exp exp)
         {
             var yf = new YieldFinder();
             yf.Visit(exp);

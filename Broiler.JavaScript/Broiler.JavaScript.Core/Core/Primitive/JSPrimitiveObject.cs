@@ -71,7 +71,7 @@ public class JSPrimitiveObject: JSObject
 
     public override bool Equals(JSValue value)
     {
-        if (object.ReferenceEquals(this, value))
+        if (ReferenceEquals(this, value))
             return true;
         if (value is JSPrimitiveObject)
         {

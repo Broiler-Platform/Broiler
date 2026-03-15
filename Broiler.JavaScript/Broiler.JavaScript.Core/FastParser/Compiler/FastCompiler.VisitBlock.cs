@@ -12,7 +12,7 @@ partial class FastCompiler
         if (count == 0)
             return Expression.Empty;
 
-        var blockList = new Sequence<Expressions.YExpression>(count);
+        var blockList = new Sequence<Expression>(count);
         var hoistingScope = block.HoistingScope;
         var scope = this.scope.Push(new FastFunctionScope(this.scope.Top));
         //try

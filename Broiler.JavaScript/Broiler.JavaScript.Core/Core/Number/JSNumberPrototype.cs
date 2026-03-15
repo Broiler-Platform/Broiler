@@ -35,12 +35,12 @@ partial class JSNumber
         {
             if(a.Length == 0)
             {
-                return JSNumber.Zero;
+                return Zero;
             }
             return new JSNumber(a[0].DoubleValue);
         }
         if (a.Length == 0)
-            return new JSPrimitiveObject(JSNumber.Zero);
+            return new JSPrimitiveObject(Zero);
         return new JSPrimitiveObject(new JSNumber(a.Get1().DoubleValue));
     }
 
@@ -103,7 +103,7 @@ partial class JSNumber
             return new JSString(result);
 
         }
-        return new JSString(JSNumber.ToECMAString(value));
+        return new JSString(ToECMAString(value));
 
     }
 
@@ -120,7 +120,7 @@ partial class JSNumber
             return JSConstants.NegativeInfinity;
         // BROILER-PATCH: ECMAScript specifies that negative zero formats as
         // positive zero in toExponential (e.g., (-0).toExponential(4) === "0.0000e+0")
-        if (JSNumber.IsNegativeZero(nv))
+        if (IsNegativeZero(nv))
             nv = 0.0;
         if (a.Length > 0)
         {
@@ -304,7 +304,7 @@ partial class JSNumber
         }
 
 
-        return new JSString(n.value.ToString(formatting, System.Globalization.CultureInfo.CurrentCulture));
+        return new JSString(n.value.ToString(formatting, CultureInfo.CurrentCulture));
     }
 
     public static string DecimalToBase(double number, int radix)

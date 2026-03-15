@@ -50,7 +50,7 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     private static string? FirstAvailable(HashSet<string> systemFonts, params string[] candidates)
     {
-        return Array.Find(candidates, c => systemFonts.Contains(c));
+        return Array.Find(candidates, systemFonts.Contains);
     }
 
     public static SkiaImageAdapter Instance { get; } = new();

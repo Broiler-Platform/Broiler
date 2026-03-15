@@ -10,20 +10,13 @@ namespace Broiler.HTML.Orchestration.Core.IR;
 /// Walks a <see cref="CssBox"/> tree after layout and builds a read-only
 /// <see cref="Fragment"/> tree that snapshots the layout geometry.
 /// </summary>
-/// <remarks>
-/// Phase 1: Shadow data — the fragment tree is built in parallel with existing code
-/// but is not consumed by any rendering path yet.
-/// </remarks>
 internal static class FragmentTreeBuilder
 {
     /// <summary>
     /// Builds a <see cref="Fragment"/> tree from the given root <see cref="CssBox"/>.
     /// Should be called after <c>PerformLayout</c> has completed.
     /// </summary>
-    public static Fragment Build(CssBox root)
-    {
-        return BuildFragment(root);
-    }
+    public static Fragment Build(CssBox root) => BuildFragment(root);
 
     private static Fragment BuildFragment(CssBox box)
     {
@@ -31,18 +24,14 @@ internal static class FragmentTreeBuilder
 
         var children = new List<Fragment>(box.Boxes.Count);
         foreach (var child in box.Boxes)
-        {
             children.Add(BuildFragment(child));
-        }
 
         List<LineFragment>? lines = null;
         if (box.LineBoxes.Count > 0)
         {
             lines = new List<LineFragment>(box.LineBoxes.Count);
             foreach (var lineBox in box.LineBoxes)
-            {
                 lines.Add(BuildLineFragment(lineBox));
-            }
         }
 
         // Phase 3: Capture background image handle for the new paint path
@@ -144,9 +133,7 @@ internal static class FragmentTreeBuilder
         }
 
         if (lineBox.Rectangles.Count == 0)
-        {
             minX = minY = maxR = maxB = 0;
-        }
 
         return new LineFragment
         {
@@ -186,9 +173,9 @@ internal static class FragmentTreeBuilder
     /// </summary>
     private static int GetStackLevel(CssBox box)
     {
-        if (box.ZIndex != null && box.ZIndex != CssConstants.Auto
-            && int.TryParse(box.ZIndex, out int z))
+        if (box.ZIndex != null && box.ZIndex != CssConstants.Auto && int.TryParse(box.ZIndex, out int z))
             return z;
+
         return 0;
     }
 }

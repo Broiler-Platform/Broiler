@@ -17,19 +17,19 @@ partial class FastCompiler
             {
                 if (item == null)
                 {
-                    list.Add(YExpression.ElementInit(JSArrayBuilder._Add, [Expression.Null]));
+                    list.Add(Expression.ElementInit(JSArrayBuilder._Add, [Expression.Null]));
                     // _new = JSArrayBuilder.Add(_new, Expression.Null);
                     continue;
                 }
                 if (item.Type == FastNodeType.SpreadElement)
                 {
                     var i = (item as AstSpreadElement).Argument;
-                    list.Add(YExpression.ElementInit(JSArrayBuilder._AddRange, [Visit(i)]));
+                    list.Add(Expression.ElementInit(JSArrayBuilder._AddRange, [Visit(i)]));
                     //_new = JSArrayBuilder.AddRange(_new, Visit(i));
                     continue;
                 }
                 // _new = JSArrayBuilder.Add(_new, Visit(item));
-                list.Add(YExpression.ElementInit(JSArrayBuilder._Add, [Visit(item)]));
+                list.Add(Expression.ElementInit(JSArrayBuilder._Add, [Visit(item)]));
             }
 
             if (list.Count > 0)

@@ -22,12 +22,12 @@ partial class FastCompiler
                 var  id = mp as AstIdentifier;
                 if (!memberExpression.Computed)
                 {
-                    return ExpHelper.JSValueBuilder.Index(
+                    return JSValueBuilder.Index(
                         target,
                         super,
                         KeyOfName(id.Name), memberExpression.Coalesce);
                 }
-                return ExpHelper.JSValueBuilder.Index(
+                return JSValueBuilder.Index(
                     target,
                     super,
                     VisitIdentifier(id), memberExpression.Coalesce);
@@ -36,12 +36,12 @@ partial class FastCompiler
                 switch (l.TokenType)
                 {
                     case TokenTypes.True:
-                        return ExpHelper.JSValueBuilder.Index(
+                        return JSValueBuilder.Index(
                         target,
                         super,
                         KeyOfName(l.StringValue), memberExpression.Coalesce);
                     case TokenTypes.False:
-                        return ExpHelper.JSValueBuilder.Index(
+                        return JSValueBuilder.Index(
                         target,
                         super,
                         KeyOfName(l.StringValue), memberExpression.Coalesce);
@@ -49,12 +49,12 @@ partial class FastCompiler
                         var text = l.StringValue;
                         if(Utils.NumberParser.TryCoerceToUInt32(text, out var d))
                         {
-                            return ExpHelper.JSValueBuilder.Index(
+                            return JSValueBuilder.Index(
                                 target,
                                 super,
                                 d, memberExpression.Coalesce);
                         }
-                        return ExpHelper.JSValueBuilder.Index(
+                        return JSValueBuilder.Index(
                         target,
                         super,
                         KeyOfName(text), memberExpression.Coalesce);
@@ -62,12 +62,12 @@ partial class FastCompiler
                         var number = l.NumericValue;
                         if (number >= 0 && number < uint.MaxValue && (number % 1) == 0)
                         {
-                            return ExpHelper.JSValueBuilder.Index(
+                            return JSValueBuilder.Index(
                                 target,
                                 super,
                                 (uint)l.NumericValue, memberExpression.Coalesce);
                         }
-                        return ExpHelper.JSValueBuilder.Index(
+                        return JSValueBuilder.Index(
                         target,
                         super,
                         KeyOfName(l.NumericValue.ToString()), memberExpression.Coalesce);

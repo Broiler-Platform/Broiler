@@ -125,7 +125,7 @@ partial class FastCompiler
         }
 
         if (elements.Any()) {
-            var r = ExpHelper.JSObjectBuilder.New(elements);
+            var r = JSObjectBuilder.New(elements);
             return r;
         }
         return JSObjectBuilder.New();

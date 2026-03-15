@@ -93,11 +93,11 @@ public class BinaryOperation: SwitchExpression
             case TokenTypes.Assign:
                 return Assign(left, right);
             case TokenTypes.AssignAdd:
-                return Assign(left, ExpHelper.JSValueBuilder.Add(left, right));
+                return Assign(left, JSValueBuilder.Add(left, right));
         }
 
-        var leftDouble = ExpHelper.JSValueBuilder.DoubleValue(left);
-        var rightDouble = ExpHelper.JSValueBuilder.DoubleValue(right);
+        var leftDouble = JSValueBuilder.DoubleValue(left);
+        var rightDouble = JSValueBuilder.DoubleValue(right);
 
         var leftInt = JSValueBuilder.IntValue(left);
         var rightInt = JSValueBuilder.IntValue(right);
@@ -110,27 +110,27 @@ public class BinaryOperation: SwitchExpression
         switch (assignmentOperator)
         {
             case TokenTypes.AssignSubtract:
-                return Assign(left, ExpHelper.JSNumberBuilder.New(Expression.Subtract(leftDouble, rightDouble)));
+                return Assign(left, JSNumberBuilder.New(Expression.Subtract(leftDouble, rightDouble)));
             case TokenTypes.AssignMultiply:
-                return Assign(left, ExpHelper.JSNumberBuilder.New(Expression.Multiply(leftDouble, rightDouble)));
+                return Assign(left, JSNumberBuilder.New(Expression.Multiply(leftDouble, rightDouble)));
             case TokenTypes.AssignDivide:
-                return Assign(left, ExpHelper.JSNumberBuilder.New(Expression.Divide(leftDouble, rightDouble)));
+                return Assign(left, JSNumberBuilder.New(Expression.Divide(leftDouble, rightDouble)));
             case TokenTypes.AssignMod:
-                return Assign(left, ExpHelper.JSNumberBuilder.New(Expression.Modulo(leftDouble, rightDouble)));
+                return Assign(left, JSNumberBuilder.New(Expression.Modulo(leftDouble, rightDouble)));
             case TokenTypes.AssignBitwideAnd:
-                return Assign(left, ExpHelper.JSNumberBuilder.New(Expression.And(leftInt, rightInt)));
+                return Assign(left, JSNumberBuilder.New(Expression.And(leftInt, rightInt)));
             case TokenTypes.AssignBitwideOr:
-                return Assign(left, ExpHelper.JSNumberBuilder.New(Expression.Or(leftInt, rightInt)));
+                return Assign(left, JSNumberBuilder.New(Expression.Or(leftInt, rightInt)));
             case TokenTypes.AssignXor:
-                return Assign(left, ExpHelper.JSNumberBuilder.New(Expression.ExclusiveOr(leftInt, rightInt)));
+                return Assign(left, JSNumberBuilder.New(Expression.ExclusiveOr(leftInt, rightInt)));
             case TokenTypes.AssignLeftShift:
-                return Assign(left, ExpHelper.JSNumberBuilder.New(Expression.LeftShift(leftInt, rightInt)));
+                return Assign(left, JSNumberBuilder.New(Expression.LeftShift(leftInt, rightInt)));
             case TokenTypes.AssignRightShift:
-                return Assign(left, ExpHelper.JSNumberBuilder.New(Expression.RightShift(leftInt,Expression.And( rightInt, oneF))));
+                return Assign(left, JSNumberBuilder.New(Expression.RightShift(leftInt,Expression.And( rightInt, oneF))));
             case TokenTypes.AssignUnsignedRightShift:
-                return Assign(left, ExpHelper.JSNumberBuilder.New(Expression.RightShift(leftInt, rightInt)));
+                return Assign(left, JSNumberBuilder.New(Expression.RightShift(leftInt, rightInt)));
             case TokenTypes.AssignPower:
-                return Assign(left, ExpHelper.JSNumberBuilder.New(Expression.Power(leftDouble, rightDouble)));
+                return Assign(left, JSNumberBuilder.New(Expression.Power(leftDouble, rightDouble)));
             case TokenTypes.AssignCoalesce:
                 return Assign(left, JSValueBuilder.Coalesce(left, right));
         }
@@ -138,7 +138,7 @@ public class BinaryOperation: SwitchExpression
         throw new NotSupportedException();
     }
 
-    private static Expression Assign(Expression left, Expression right) => ExpHelper.JSValueExtensionsBuilder.Assign(left, right);
+    private static Expression Assign(Expression left, Expression right) => JSValueExtensionsBuilder.Assign(left, right);
 
     #region Add
 
@@ -222,21 +222,21 @@ public class BinaryOperation: SwitchExpression
         switch (op)
         {
             case TokenTypes.Equal:
-                return ExpHelper.JSValueBuilder.Equals(left, right);
+                return JSValueBuilder.Equals(left, right);
             case TokenTypes.NotEqual:
-                return ExpHelper.JSValueBuilder.NotEquals(left, right);
+                return JSValueBuilder.NotEquals(left, right);
             case TokenTypes.StrictlyEqual:
-                return ExpHelper.JSValueBuilder.StrictEquals(left, right);
+                return JSValueBuilder.StrictEquals(left, right);
             case TokenTypes.StrictlyNotEqual:
-                return ExpHelper.JSValueBuilder.NotStrictEquals(left, right);
+                return JSValueBuilder.NotStrictEquals(left, right);
 
 
             case TokenTypes.InstanceOf:
-                return ExpHelper.JSValueExtensionsBuilder.InstanceOf(left, right);
+                return JSValueExtensionsBuilder.InstanceOf(left, right);
             case TokenTypes.In:
-                return ExpHelper.JSValueExtensionsBuilder.IsIn(left, right);
+                return JSValueExtensionsBuilder.IsIn(left, right);
             case TokenTypes.Plus:
-                return ExpHelper.JSValueBuilder.Add(left, right);
+                return JSValueBuilder.Add(left, right);
             case TokenTypes.Minus:
                 // return ExpHelper.JSNumberBuilder.New(Expression.Subtract(leftDouble, rightDouble));
                 return left.CallExpression<JSValue, JSValue, JSValue>(() => (a,b) => a.Subtract(b), right);
@@ -250,13 +250,13 @@ public class BinaryOperation: SwitchExpression
                 // return ExpHelper.JSNumberBuilder.New(Expression.Modulo(leftDouble, rightDouble));
                 return left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.Modulo(b), right);
             case TokenTypes.Greater:
-                return ExpHelper.JSValueBuilder.Greater(left, right);
+                return JSValueBuilder.Greater(left, right);
             case TokenTypes.GreaterOrEqual:
-                return ExpHelper.JSValueBuilder.GreaterOrEqual(left, right);
+                return JSValueBuilder.GreaterOrEqual(left, right);
             case TokenTypes.Less:
-                return ExpHelper.JSValueBuilder.Less(left, right);
+                return JSValueBuilder.Less(left, right);
             case TokenTypes.LessOrEqual:
-                return ExpHelper.JSValueBuilder.LessOrEqual(left, right);
+                return JSValueBuilder.LessOrEqual(left, right);
             case TokenTypes.BitwiseAnd:
                 // return ExpHelper.JSNumberBuilder.New(Expression.And(leftInt, rightInt));
                 return left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.BitwiseAnd(b), right);
@@ -278,14 +278,14 @@ public class BinaryOperation: SwitchExpression
                 //        JSValueBuilder.UIntValue(left) , rightInt));
                 return left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.UnsignedRightShift(b), right);
             case TokenTypes.BooleanAnd:
-                return ExpHelper.JSValueBuilder.LogicalAnd(left, right);
+                return JSValueBuilder.LogicalAnd(left, right);
             case TokenTypes.BooleanOr:
-                return ExpHelper.JSValueBuilder.LogicalOr(left, right);
+                return JSValueBuilder.LogicalOr(left, right);
             case TokenTypes.Power:
 
-                return ExpHelper.JSValueBuilder.Power(left, right);
+                return JSValueBuilder.Power(left, right);
             case TokenTypes.Coalesce:
-                return ExpHelper.JSValueExtensionsBuilder.Coalesce(left, right);
+                return JSValueExtensionsBuilder.Coalesce(left, right);
         }
         return null;
     }

@@ -8,6 +8,6 @@ public class YExpression<T>(in FunctionName name, YExpression body, YParameterEx
     {
         if (This != null)
             throw new InvalidOperationException();
-        return new YExpression<T1>(in Name, Body, YExpression.Parameter(type), Parameters, ReturnType);
+        return new YExpression<T1>(in Name, Body, Parameter(type), Parameters, ReturnType);
     }
 }

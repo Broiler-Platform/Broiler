@@ -14,7 +14,7 @@ public delegate Task<string> MessageProcessor(long id, JsonNode p);
 
 public abstract class V8InspectorProtocol : JSDebugger, IDisposable
 {
-    private static System.Text.Json.JsonSerializerOptions options =
+    private static JsonSerializerOptions options =
         new()
         {
             DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,

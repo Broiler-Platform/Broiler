@@ -34,7 +34,7 @@ public partial class JSInt32Array : JSTypedArray
     {
         if (index < 0 || index >= length)
             return false;
-        Array.Copy(BitConverter.GetBytes((Int32)value.IntValue), 0, buffer.buffer, byteOffset + index * 4, 4);
+        Array.Copy(BitConverter.GetBytes(value.IntValue), 0, buffer.buffer, byteOffset + index * 4, 4);
         return true;
     }
 

@@ -5,7 +5,7 @@ namespace Broiler.HTML.Core.Core.IR;
 /// <summary>
 /// Walks a <see cref="DisplayList"/> and checks structural paint
 /// invariants. Returns violations as plain strings — no test-framework
-/// dependency. Phase 4 deliverable.
+/// dependency.
 /// </summary>
 public static class PaintInvariantChecker
 {

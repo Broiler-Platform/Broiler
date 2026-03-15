@@ -13,7 +13,7 @@ using ParameterExpression = YantraJS.Expressions.YParameterExpression;
 
 namespace YantraJS.Core.FastParser.Compiler;
 
-public partial class FastCompiler : AstMapVisitor<YExpression>
+public partial class FastCompiler : AstMapVisitor<Expression>
 {
 
     private readonly FastPool pool;
@@ -27,7 +27,7 @@ public partial class FastCompiler : AstMapVisitor<YExpression>
 
     // private FastList<object> _innerFunctions;
 
-    private YParameterExpression scriptInfo;
+    private ParameterExpression scriptInfo;
 
     public YExpression<JSFunctionDelegate> Method { get; }
 
@@ -57,7 +57,7 @@ public partial class FastCompiler : AstMapVisitor<YExpression>
         var jScript = parser.ParseProgram();
         parserPool.Dispose();
 
-        using (var fx = scope.Push(new FastFunctionScope(pool, (AstFunctionExpression)null, isAsync: jScript.IsAsync))) {
+        using (var fx = scope.Push(new FastFunctionScope(pool, null, isAsync: jScript.IsAsync))) {
 
 
             // System.Console.WriteLine($"Parsing done...");
@@ -201,7 +201,7 @@ public partial class FastCompiler : AstMapVisitor<YExpression>
         return Exp.Continue(scope.Top.Loop.Top.Continue);
     }
 
-    protected override Expression VisitDebuggerStatement(AstDebuggerStatement debuggerStatement) => ExpHelper.JSDebuggerBuilder.RaiseBreak();
+    protected override Expression VisitDebuggerStatement(AstDebuggerStatement debuggerStatement) => JSDebuggerBuilder.RaiseBreak();
 
 
 
@@ -217,12 +217,12 @@ public partial class FastCompiler : AstMapVisitor<YExpression>
 
     protected override Expression VisitSpreadElement(AstSpreadElement spreadElement) => throw new NotImplementedException();
 
-    protected override Expression VisitThrowStatement(AstThrowStatement throwStatement) => ExpHelper.JSExceptionBuilder.Throw(VisitExpression(throwStatement.Argument));
+    protected override Expression VisitThrowStatement(AstThrowStatement throwStatement) => JSExceptionBuilder.Throw(VisitExpression(throwStatement.Argument));
 
     protected override Expression VisitYieldExpression(AstYieldExpression yieldExpression)
     {
         var target = VisitExpression(yieldExpression.Argument);
-        return YExpression.Yield(target, yieldExpression.Delegate);
+        return Expression.Yield(target, yieldExpression.Delegate);
 
     }
 }

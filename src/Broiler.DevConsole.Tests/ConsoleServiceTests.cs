@@ -161,7 +161,7 @@ public class ConsoleServiceTests : IDisposable
     {
         using var service = new ConsoleService();
         var received = new List<RenderLogEntry>();
-        service.EntryReceived += e => received.Add(e);
+        service.EntryReceived += received.Add;
 
         RenderLogger.Log(LogCategory.JavaScript, LogLevel.Info, "test", "event-test");
 

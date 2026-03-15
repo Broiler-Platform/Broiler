@@ -326,9 +326,9 @@ public sealed partial class DomBridge
         // 1. All tr children of thead elements (in tree order)
         foreach (var child in table.Children)
         {
-            if (string.Equals(child.TagName, "thead", System.StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(child.TagName, "thead", StringComparison.OrdinalIgnoreCase))
                 foreach (var c in child.Children)
-                    if (string.Equals(c.TagName, "tr", System.StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
                         rows.Add(c);
         }
         // 2. All tr children that are direct children of table, or children of tbody elements (in tree order)
@@ -339,15 +339,15 @@ public sealed partial class DomBridge
                 rows.Add(child);
             else if (ctag == "tbody")
                 foreach (var c in child.Children)
-                    if (string.Equals(c.TagName, "tr", System.StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
                         rows.Add(c);
         }
         // 3. All tr children of tfoot elements (in tree order)
         foreach (var child in table.Children)
         {
-            if (string.Equals(child.TagName, "tfoot", System.StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(child.TagName, "tfoot", StringComparison.OrdinalIgnoreCase))
                 foreach (var c in child.Children)
-                    if (string.Equals(c.TagName, "tr", System.StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(c.TagName, "tr", StringComparison.OrdinalIgnoreCase))
                         rows.Add(c);
         }
         return rows;
@@ -454,11 +454,11 @@ public sealed partial class DomBridge
         {
             if (!child.IsTextNode && !ReferenceEquals(child, except))
             {
-                if (string.Equals(child.TagName, "input", System.StringComparison.OrdinalIgnoreCase) &&
+                if (string.Equals(child.TagName, "input", StringComparison.OrdinalIgnoreCase) &&
                     child.Attributes.TryGetValue("type", out var st) &&
-                    string.Equals(st, "radio", System.StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(st, "radio", StringComparison.OrdinalIgnoreCase) &&
                     child.Attributes.TryGetValue("name", out var sn) &&
-                    string.Equals(sn, radioName, System.StringComparison.Ordinal))
+                    string.Equals(sn, radioName, StringComparison.Ordinal))
                 {
                     child.DomProperties["checked"] = false;
                 }
@@ -531,7 +531,7 @@ public sealed partial class DomBridge
     {
         foreach (var child in root.Children)
         {
-            if (string.Equals(child.TagName, tagName, System.StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(child.TagName, tagName, StringComparison.OrdinalIgnoreCase))
                 results.Add(bridge.ToJSObject(child));
             CollectDescendantsByTag(child, tagName, results, bridge);
         }
@@ -685,9 +685,9 @@ public sealed partial class DomBridge
             {
                 if (a.Length == 0) return JSBoolean.False;
                 var cls = a[0].ToString();
-                var classes = new System.Collections.Generic.HashSet<string>(
+                var classes = new HashSet<string>(
                     (element.ClassName ?? string.Empty).Split(' ').Where(s => s.Length > 0),
-                    System.StringComparer.Ordinal);
+                    StringComparer.Ordinal);
                 return classes.Contains(cls) ? JSBoolean.True : JSBoolean.False;
             }, "contains", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -699,7 +699,7 @@ public sealed partial class DomBridge
             {
                 var classes = (element.ClassName ?? string.Empty)
                     .Split(' ').Where(s => s.Length > 0).ToList();
-                var classSet = new System.Collections.Generic.HashSet<string>(classes, System.StringComparer.Ordinal);
+                var classSet = new HashSet<string>(classes, StringComparer.Ordinal);
                 for (var i = 0; i < a.Length; i++)
                 {
                     var cls = a[i].ToString();
@@ -716,7 +716,7 @@ public sealed partial class DomBridge
             (KeyString)"remove",
             new JSFunction((in Arguments a) =>
             {
-                var toRemove = new System.Collections.Generic.HashSet<string>(System.StringComparer.Ordinal);
+                var toRemove = new HashSet<string>(StringComparer.Ordinal);
                 for (var i = 0; i < a.Length; i++)
                     toRemove.Add(a[i].ToString());
                 var classes = (element.ClassName ?? string.Empty)
@@ -735,7 +735,7 @@ public sealed partial class DomBridge
                 var cls = a[0].ToString();
                 var classes = (element.ClassName ?? string.Empty)
                     .Split(' ').Where(s => s.Length > 0).ToList();
-                var classSet = new System.Collections.Generic.HashSet<string>(classes, System.StringComparer.Ordinal);
+                var classSet = new HashSet<string>(classes, StringComparer.Ordinal);
 
                 bool shouldAdd = a.Length >= 2 && !(a[1] is JSUndefined)
                     ? a[1].BooleanValue
@@ -777,7 +777,7 @@ public sealed partial class DomBridge
             {
                 if (a.Length == 0) return JSNull.Value;
                 var key = a[0].ToString();
-                return store.TryGetValue(key, out var val) ? (JSValue)new JSString(val) : JSNull.Value;
+                return store.TryGetValue(key, out var val) ? new JSString(val) : JSNull.Value;
             }, "getItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

@@ -12,7 +12,7 @@ public class JSClass: JSFunction
         JSFunction super ,
         string name = null,
         string code = null)
-        : base( fx ?? super.f ?? JSFunction.empty, name,code)
+        : base( fx ?? super.f ?? empty, name,code)
     {
         this.super = super;
         BasePrototypeObject = super;

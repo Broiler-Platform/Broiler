@@ -209,9 +209,9 @@ public partial class JSBigInt : JSPrimitive
             return bigint;
         }
 
-        var reminderBits = (long)bits % (long)8;
+        var reminderBits = bits % 8;
 
-        var length = (int)((long)bits / (long)8);
+        var length = (int)(bits / 8);
         if (reminderBits > 0)
         {
             length++;
@@ -282,9 +282,9 @@ public partial class JSBigInt : JSPrimitive
             return bigint;
         }
 
-        var reminderBits = (long)bits % (long)8;
+        var reminderBits = bits % 8;
 
-        var length = (int)((long)bits / (long)8);
+        var length = (int)(bits / 8);
         if (reminderBits > 0)
         {
             length++;

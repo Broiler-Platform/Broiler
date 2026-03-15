@@ -7,7 +7,7 @@ namespace YantraJS.Core.Objects;
 [JSClassGenerator("Math"), JSInternalObject]
 public partial class JSMath: JSObject
 {
-    static System.Random randomGenertor = new();
+    static Random randomGenertor = new();
 
     internal static double RandomNumber() => randomGenertor.NextDouble();
 
@@ -421,7 +421,7 @@ public partial class JSMath: JSObject
         var (first, second) = args.Get2();
         var d1 = first.IntValue;
         var d2 = second.IntValue;
-        var r = (int)(d1 * d2);
+        var r = d1 * d2;
         return new JSNumber(r);
 
     }

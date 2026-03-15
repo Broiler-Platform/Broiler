@@ -161,7 +161,7 @@ public partial class LinqConverter
                 var mie = exp as MemberInitExpression;
 
                 return YExpression.MemberInit(Visit(mie.NewExpression) as YNewExpression, 
-                    mie.Bindings.Select(m => Visit(m)).ToArray());
+                    mie.Bindings.Select(Visit).ToArray());
             case ExpressionType.Modulo:
                 be = exp as BinaryExpression;
                 return YExpression.Binary(Visit(be.Left), YOperator.Mod, Visit(be.Right));

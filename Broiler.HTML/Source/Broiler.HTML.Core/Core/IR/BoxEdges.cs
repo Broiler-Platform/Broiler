@@ -2,26 +2,14 @@ using System;
 
 namespace Broiler.HTML.Core.Core.IR;
 
-/// <summary>
-/// Immutable representation of top/right/bottom/left edge values (e.g. margin, border, padding).
-/// Part of the Intermediate Representation (IR) for the rendering pipeline.
-/// </summary>
-public sealed class BoxEdges
+public sealed class BoxEdges(double top, double right, double bottom, double left)
 {
     public static BoxEdges Zero { get; } = new(0, 0, 0, 0);
 
-    public double Top { get; }
-    public double Right { get; }
-    public double Bottom { get; }
-    public double Left { get; }
-
-    public BoxEdges(double top, double right, double bottom, double left)
-    {
-        Top = top;
-        Right = right;
-        Bottom = bottom;
-        Left = left;
-    }
+    public double Top { get; } = top;
+    public double Right { get; } = right;
+    public double Bottom { get; } = bottom;
+    public double Left { get; } = left;
 
     public override bool Equals(object? obj) =>
         obj is BoxEdges other &&

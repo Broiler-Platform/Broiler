@@ -11,11 +11,6 @@ namespace Broiler.HTML.Orchestration.Core.IR;
 /// onto an <see cref="RGraphics"/> surface. Bridges the new IR paint pipeline back to
 /// the existing platform adapters.
 /// </summary>
-/// <remarks>
-/// Phase 3: This backend allows the new <see cref="PaintWalker"/> display-list output
-/// to be rendered via the same <see cref="RGraphics"/> adapters used by the old paint path,
-/// enabling gradual migration without replacing platform-specific code.
-/// </remarks>
 internal sealed class RGraphicsRasterBackend : IRasterBackend
 {
     public static readonly RGraphicsRasterBackend Instance = new();
@@ -71,8 +66,7 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         // Rounding absolute coords shifts the fill by ~0.09 px in
         // viewport space, causing partial-coverage AA artifacts at
         // element edges (e.g. (231,231,231) vs (255,255,255)).
-        g.DrawRectangle(brush, item.Bounds.X, item.Bounds.Y,
-            item.Bounds.Width, item.Bounds.Height);
+        g.DrawRectangle(brush, item.Bounds.X, item.Bounds.Y, item.Bounds.Width, item.Bounds.Height);
     }
 
     private static void RenderDrawBorder(RGraphics g, DrawBorderItem item)
@@ -113,8 +107,7 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
             else
             {
                 var pen = CreateBorderPen(g, item.TopStyle, item.TopColor, widths.Top);
-                g.DrawLine(pen, Math.Ceiling(bounds.Left), bounds.Top + widths.Top / 2,
-                    bounds.Right - 1, bounds.Top + widths.Top / 2);
+                g.DrawLine(pen, Math.Ceiling(bounds.Left), bounds.Top + widths.Top / 2, bounds.Right - 1, bounds.Top + widths.Top / 2);
             }
         }
 
@@ -133,8 +126,7 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
             else
             {
                 var pen = CreateBorderPen(g, item.LeftStyle, item.LeftColor, widths.Left);
-                g.DrawLine(pen, bounds.Left + widths.Left / 2, Math.Ceiling(bounds.Top),
-                    bounds.Left + widths.Left / 2, Math.Floor(bounds.Bottom));
+                g.DrawLine(pen, bounds.Left + widths.Left / 2, Math.Ceiling(bounds.Top), bounds.Left + widths.Left / 2, Math.Floor(bounds.Bottom));
             }
         }
 
@@ -226,23 +218,20 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
             // Sub-pixel text positioning causes glyph rasterisation to differ
             // from Chromium's pixel-snapped baseline, producing per-glyph
             // anti-aliasing differences.
-            var origin = new PointF(
-                (float)Math.Round(item.Origin.X),
-                (float)Math.Round(item.Origin.Y));
-            g.DrawString(item.Text, font, item.Color, origin,
-                new SizeF(item.Bounds.Width, item.Bounds.Height), item.IsRtl);
+            var origin = new PointF((float)Math.Round(item.Origin.X), (float)Math.Round(item.Origin.Y));
+            g.DrawString(item.Text, font, item.Color, origin, new SizeF(item.Bounds.Width, item.Bounds.Height), item.IsRtl);
         }
     }
 
     private static void RenderDrawImage(RGraphics g, DrawImageItem item)
     {
-        if (item.ImageHandle is RImage image)
-        {
-            if (item.SourceRect != RectangleF.Empty)
-                g.DrawImage(image, item.DestRect, item.SourceRect);
-            else
-                g.DrawImage(image, item.DestRect);
-        }
+        if (item.ImageHandle is not RImage image)
+            return;
+
+        if (item.SourceRect != RectangleF.Empty)
+            g.DrawImage(image, item.DestRect, item.SourceRect);
+        else
+            g.DrawImage(image, item.DestRect);
     }
 
     private static void RenderDrawTiledImage(RGraphics g, DrawTiledImageItem item)
@@ -265,36 +254,35 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         switch (item.Repeat)
         {
             case "no-repeat":
-                g.DrawImage(image,
-                    new RectangleF(origin.X, origin.Y, srcRect.Width, srcRect.Height), srcRect);
+                g.DrawImage(image, new RectangleF(origin.X, origin.Y, srcRect.Width, srcRect.Height), srcRect);
                 break;
             case "repeat-x":
-            {
-                // Shift origin left to cover the fill area
-                float ox = origin.X;
-                while (ox > fill.X) ox -= srcRect.Width;
-                using var brush = g.GetTextureBrush(image, srcRect, new PointF(ox, origin.Y));
-                g.DrawRectangle(brush, fill.X, origin.Y, fill.Width, srcRect.Height);
-                break;
-            }
+                {
+                    // Shift origin left to cover the fill area
+                    float ox = origin.X;
+                    while (ox > fill.X) ox -= srcRect.Width;
+                    using var brush = g.GetTextureBrush(image, srcRect, new PointF(ox, origin.Y));
+                    g.DrawRectangle(brush, fill.X, origin.Y, fill.Width, srcRect.Height);
+                    break;
+                }
             case "repeat-y":
-            {
-                float oy = origin.Y;
-                while (oy > fill.Y) oy -= srcRect.Height;
-                using var brush = g.GetTextureBrush(image, srcRect, new PointF(origin.X, oy));
-                g.DrawRectangle(brush, origin.X, fill.Y, srcRect.Width, fill.Height);
-                break;
-            }
+                {
+                    float oy = origin.Y;
+                    while (oy > fill.Y) oy -= srcRect.Height;
+                    using var brush = g.GetTextureBrush(image, srcRect, new PointF(origin.X, oy));
+                    g.DrawRectangle(brush, origin.X, fill.Y, srcRect.Width, fill.Height);
+                    break;
+                }
             default: // "repeat"
-            {
-                float ox = origin.X;
-                while (ox > fill.X) ox -= srcRect.Width;
-                float oy = origin.Y;
-                while (oy > fill.Y) oy -= srcRect.Height;
-                using var brush = g.GetTextureBrush(image, srcRect, new PointF(ox, oy));
-                g.DrawRectangle(brush, fill.X, fill.Y, fill.Width, fill.Height);
-                break;
-            }
+                {
+                    float ox = origin.X;
+                    while (ox > fill.X) ox -= srcRect.Width;
+                    float oy = origin.Y;
+                    while (oy > fill.Y) oy -= srcRect.Height;
+                    using var brush = g.GetTextureBrush(image, srcRect, new PointF(ox, oy));
+                    g.DrawRectangle(brush, fill.X, fill.Y, fill.Width, fill.Height);
+                    break;
+                }
         }
 
         g.PopClip();
@@ -306,9 +294,9 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         pen.Width = item.Width;
         pen.DashStyle = item.DashStyle switch
         {
-            "dotted" => System.Drawing.Drawing2D.DashStyle.Dot,
-            "dashed" => System.Drawing.Drawing2D.DashStyle.Dash,
-            _ => System.Drawing.Drawing2D.DashStyle.Solid,
+            "dotted" => DashStyle.Dot,
+            "dashed" => DashStyle.Dash,
+            _ => DashStyle.Solid,
         };
         g.DrawLine(pen, item.Start.X, item.Start.Y, item.End.X, item.End.Y);
     }
@@ -319,15 +307,12 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         pen.Width = width;
         pen.DashStyle = style switch
         {
-            "dotted" => System.Drawing.Drawing2D.DashStyle.Dot,
-            "dashed" => System.Drawing.Drawing2D.DashStyle.Dash,
-            _ => System.Drawing.Drawing2D.DashStyle.Solid,
+            "dotted" => DashStyle.Dot,
+            "dashed" => DashStyle.Dash,
+            _ => DashStyle.Solid,
         };
         return pen;
     }
 
-    private static bool IsBorderStyleVisible(string style)
-    {
-        return !string.IsNullOrEmpty(style) && style != "none" && style != "hidden";
-    }
+    private static bool IsBorderStyleVisible(string style) => !string.IsNullOrEmpty(style) && style != "none" && style != "hidden";
 }

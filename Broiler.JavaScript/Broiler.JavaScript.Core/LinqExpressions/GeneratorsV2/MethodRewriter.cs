@@ -9,7 +9,7 @@ namespace YantraJS.Core.LinqExpressions.GeneratorsV2;
 public class MethodRewriter : YExpressionMapVisitor
 {
 
-    public static Expression Rewrite(YExpression exp)
+    public static Expression Rewrite(Expression exp)
     {
         var rw = new MethodRewriter();
         return rw.Visit(exp);
@@ -34,7 +34,7 @@ public class MethodRewriter : YExpressionMapVisitor
             right = BreakAssign(right as YAssignExpression);
             var bb = new YBlockBuilder();
             right = bb.ConvertToVariable(right);
-            bb.AddExpression(YExpression.Assign(Visit(yAssignExpression.Left), right));
+            bb.AddExpression(Expression.Assign(Visit(yAssignExpression.Left), right));
             return bb.Build();
         }
 
@@ -49,11 +49,11 @@ public class MethodRewriter : YExpressionMapVisitor
         {
             right = BreakAssign(right as YAssignExpression);
             right = bb.ConvertToVariable(Visit(right));
-            bb.AddExpression(YExpression.Assign(Visit(assign.Left), right));
+            bb.AddExpression(Expression.Assign(Visit(assign.Left), right));
             return bb.Build();
         }
         right = bb.ConvertToVariable(Visit(right));
-        bb.AddExpression(YExpression.Assign(Visit(assign.Left), right));
+        bb.AddExpression(Expression.Assign(Visit(assign.Left), right));
         return bb.Build();
     }
 
@@ -62,7 +62,7 @@ public class MethodRewriter : YExpressionMapVisitor
         if (node.HasYield())
         {
             var bb = new YBlockBuilder();
-            var args = new Sequence<YExpression>(node.args.Count);
+            var args = new Sequence<Expression>(node.args.Count);
             var ae = node.args.GetFastEnumerator();
             while(ae.MoveNext(out var item))
             {
@@ -169,7 +169,7 @@ public class MethodRewriter : YExpressionMapVisitor
         {
             var bb = new YBlockBuilder();
             test = bb.ConvertToVariable(Visit(test));
-            bb.AddExpression(YExpression.Condition(test, 
+            bb.AddExpression(Expression.Condition(test, 
                 Visit(yConditionalExpression.@true), 
                 Visit(yConditionalExpression.@false)));
             return bb.Build();
@@ -186,7 +186,7 @@ public class MethodRewriter : YExpressionMapVisitor
             var testArgs = bb.ConvertToVariables(node.TestArguments, this);
             var trueArgs = bb.ConvertToVariables(node.TrueArguments, this);
             var falseArgs = bb.ConvertToVariables(node.FalseArguments, this);
-            bb.AddExpression(YExpression.CoalesceCall(
+            bb.AddExpression(Expression.CoalesceCall(
                 target,
                 node.Test,
                 testArgs,
@@ -208,7 +208,7 @@ public class MethodRewriter : YExpressionMapVisitor
         {
             var bb = new YBlockBuilder();
             target = bb.ConvertToVariable(target);
-            bb.AddExpression(YExpression.Field(target, yFieldExpression.FieldInfo));
+            bb.AddExpression(Expression.Field(target, yFieldExpression.FieldInfo));
             return bb.Build();
         }
         return yFieldExpression;
@@ -223,7 +223,7 @@ public class MethodRewriter : YExpressionMapVisitor
         {
             var bb = new YBlockBuilder();
             target = bb.ConvertToVariable(Visit(target));
-            bb.AddExpression(YExpression.Property(target, yPropertyExpression.PropertyInfo));
+            bb.AddExpression(Expression.Property(target, yPropertyExpression.PropertyInfo));
             return bb.Build();
         }
         return yPropertyExpression;
@@ -241,7 +241,7 @@ public class MethodRewriter : YExpressionMapVisitor
                 target = bb.ConvertToVariable(target);
             }
 
-            var args = new Sequence<YExpression>(yIndexExpression.Arguments.Count);
+            var args = new Sequence<Expression>(yIndexExpression.Arguments.Count);
             var ae = yIndexExpression.Arguments.GetFastEnumerator();
             while(ae.MoveNext(out var item))
             {
@@ -249,7 +249,7 @@ public class MethodRewriter : YExpressionMapVisitor
                 args.Add(bb.ConvertToVariable(e));
             }
 
-            bb.AddExpression(YExpression.Index(target, yIndexExpression.Property, args));
+            bb.AddExpression(Expression.Index(target, yIndexExpression.Property, args));
             return bb.Build();
         }
         return yIndexExpression;
@@ -275,7 +275,7 @@ public class MethodRewriter : YExpressionMapVisitor
             {
                 index = bb.ConvertToVariable(index);
             }
-            bb.AddExpression(YExpression.ArrayIndex(target, index));
+            bb.AddExpression(Expression.ArrayIndex(target, index));
             return bb.Build();
         }
         return yArrayIndexExpression;
@@ -295,7 +295,7 @@ public class MethodRewriter : YExpressionMapVisitor
                 target = bb.ConvertToVariable(target);
             }
 
-            var args = new Sequence<YExpression>(node.Arguments.Count);
+            var args = new Sequence<Expression>(node.Arguments.Count);
             var ae = node.Arguments.GetFastEnumerator();
             while(ae.MoveNext(out var item))
             {

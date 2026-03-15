@@ -700,6 +700,6 @@ public class CompilerTests
     {
         var stream = new FastTokenStream("function { }");
         IParser parser = new FastParser.FastParser(stream);
-        Assert.ThrowsAny<Exception>(() => parser.ParseProgram());
+        Assert.ThrowsAny<Exception>(parser.ParseProgram);
     }
 }

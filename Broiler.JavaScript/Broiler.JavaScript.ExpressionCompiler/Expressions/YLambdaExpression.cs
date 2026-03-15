@@ -66,14 +66,14 @@ public class YLambdaExpression: YExpression
 
     internal void SetupAsClosure()
     {
-        This ??= YParameterExpression.Parameter(typeof(Closures), "this");
+        This ??= Parameter(typeof(Closures), "this");
     }
 
     internal YLambdaExpression WithThis(Type type)
     {
         if (This != null)
             throw new ArgumentOutOfRangeException();
-        var @this = YExpression.Parameter(type, "this");
+        var @this = Parameter(type, "this");
 
         return new YLambdaExpression(Type, Name, Body, @this, Parameters, ReturnType, Repository);
     }

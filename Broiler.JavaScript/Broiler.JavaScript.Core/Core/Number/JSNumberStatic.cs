@@ -59,7 +59,7 @@ public partial class JSNumber
             var v = n.value;
             if (!double.IsInfinity(v))
             {
-                if (Math.Floor(v) == v && v >= JSNumber.MinSafeInteger && v <= JSNumber.MaxSafeInteger)
+                if (Math.Floor(v) == v && v >= MinSafeInteger && v <= MaxSafeInteger)
                 
                     return JSBoolean.True;
             }
@@ -149,7 +149,7 @@ public partial class JSNumber
     public static JSValue ParseInt(in Arguments a)
     {
 
-        var nan = JSNumber.NaN;
+        var nan = NaN;
         if (a.Length > 0)
         {
             var p = a.Get1();

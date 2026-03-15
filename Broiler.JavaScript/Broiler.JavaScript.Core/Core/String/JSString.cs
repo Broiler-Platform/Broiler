@@ -211,7 +211,7 @@ public partial class JSString : JSPrimitive
 
     public override bool Equals(JSValue value)
     {
-        if (object.ReferenceEquals(this, value))
+        if (ReferenceEquals(this, value))
             return true;
         switch (value)
         {
@@ -283,7 +283,7 @@ public partial class JSString : JSPrimitive
 
     public override bool StrictEquals(JSValue value)
     {
-        if (object.ReferenceEquals(this, value))
+        if (ReferenceEquals(this, value))
             return true;
         if (value is JSString s)
             if (s.value.Equals(this.value))

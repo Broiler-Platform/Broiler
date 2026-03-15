@@ -912,10 +912,10 @@ public partial class JSArray
 
         // Fix the arguments so they are positive and within the bounds of the array.
         if (start < 0)
-            start = Math.Max((int)arrayLength + start, 0);
+            start = Math.Max(arrayLength + start, 0);
         else
-            start = Math.Min(start, (int)arrayLength);
-        deleteCount = Math.Min(Math.Max(deleteCount, 0), (int)arrayLength - start);
+            start = Math.Min(start, arrayLength);
+        deleteCount = Math.Min(Math.Max(deleteCount, 0), arrayLength - start);
 
         ref var elements = ref @this.GetElements();
 
@@ -937,7 +937,7 @@ public partial class JSArray
 
         // Move the trailing elements.
         int offset = itemsLength - deleteCount;
-        int newLength = (int)arrayLength + offset;
+        int newLength = arrayLength + offset;
         if (deleteCount > itemsLength)
         {
             for (int i = start + itemsLength; i < newLength; i++)

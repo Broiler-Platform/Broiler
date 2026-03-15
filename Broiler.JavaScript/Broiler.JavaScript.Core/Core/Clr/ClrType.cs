@@ -492,7 +492,7 @@ public class ClrType : JSFunction
             var v = a.GetAt(i);
             types[i] = (Type)v.ForceConvert(typeof(Type));
         }
-        return ClrType.From(Type.MakeGenericType(types));
+        return From(Type.MakeGenericType(types));
     }
 
     
