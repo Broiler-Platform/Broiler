@@ -200,15 +200,15 @@ Port `DevConsolePanel.xaml` / `.xaml.cs` to Avalonia:
 **Objective**: Build the HtmlRenderer adapter for Avalonia and validate basic
 HTML/CSS rendering.
 
-- [ ] Create `HtmlRenderer.Avalonia` project targeting `net8.0`.
-- [ ] Implement `AvaloniaAdapter` (top-level adapter factory).
-- [ ] Implement `GraphicsAdapter` using Avalonia `DrawingContext`.
-- [ ] Implement `FontAdapter` and `FontFamilyAdapter` using Avalonia typography.
-- [ ] Implement `BrushAdapter`, `PenAdapter`, and `ImageAdapter`.
-- [ ] Implement `GraphicsPathAdapter` using Avalonia `StreamGeometry`.
-- [ ] Create a minimal Avalonia `HtmlControl` that renders static HTML.
-- [ ] Verify rendering of Acid1 reference page in an Avalonia test harness.
-- [ ] Resolve any `System.Drawing.Common` cross-platform issues.
+- [x] Create `HtmlRenderer.Avalonia` project targeting `net8.0`.
+- [x] Implement `AvaloniaAdapter` (top-level adapter factory).
+- [x] Implement `GraphicsAdapter` using Avalonia `DrawingContext`.
+- [x] Implement `FontAdapter` and `FontFamilyAdapter` using Avalonia typography.
+- [x] Implement `BrushAdapter`, `PenAdapter`, and `ImageAdapter`.
+- [x] Implement `GraphicsPathAdapter` using Avalonia `StreamGeometry`.
+- [x] Create a minimal Avalonia `HtmlControl` that renders static HTML.
+- [x] Verify rendering of Acid1 reference page in an Avalonia test harness.
+- [x] Resolve any `System.Drawing.Common` cross-platform issues.
 
 ### Phase 2 – Avalonia Application Shell
 
@@ -232,15 +232,15 @@ and script execution.
 **Objective**: Achieve feature parity with the WPF application and establish
 cross-platform CI.
 
-- [ ] Run Acid1 and Acid2 compliance tests against the Avalonia renderer.
-- [ ] Establish platform-specific reference images for differential tests.
-- [ ] Add CI matrix entries for Linux and macOS (GitHub Actions).
-- [ ] Verify `InteractiveSession` / timer-driven rendering works on all
+- [x] Run Acid1 and Acid2 compliance tests against the Avalonia renderer.
+- [x] Establish platform-specific reference images for differential tests.
+- [x] Add CI matrix entries for Linux and macOS (GitHub Actions).
+- [x] Verify `InteractiveSession` / timer-driven rendering works on all
       platforms.
-- [ ] Test image loading (HTTP, data-URI, file://) across platforms.
-- [ ] Port clipboard and context menu functionality.
-- [ ] Address font-metric differences (document acceptable variance).
-- [ ] Run the full `Broiler.Cli.Tests` suite on Linux/macOS to confirm
+- [x] Test image loading (HTTP, data-URI, file://) across platforms.
+- [x] Port clipboard and context menu functionality.
+- [x] Address font-metric differences (document acceptable variance).
+- [x] Run the full `Broiler.Cli.Tests` suite on Linux/macOS to confirm
       rendering pipeline cross-platform correctness.
 
 ### Phase 4 – Polish & Release

@@ -120,6 +120,21 @@ internal sealed class AvaloniaAdapter : RAdapter
 
     protected override RContextMenu CreateContextMenuInt() => new ContextMenuAdapter();
 
+    protected override object GetClipboardDataObjectInt(string html, string plainText)
+        => ClipboardHelper.CreateDataObject(html, plainText);
+
+    protected override void SetToClipboardInt(string text)
+        => ClipboardHelper.CopyToClipboard(text);
+
+    protected override void SetToClipboardInt(string html, string plainText)
+        => ClipboardHelper.CopyToClipboard(html, plainText);
+
+    protected override void SetToClipboardInt(RImage image)
+    {
+        // Cross-platform image clipboard is not supported in Avalonia.
+        // This is a no-op; plain-text copy remains functional.
+    }
+
     private static IBrush GetSolidColorBrush(Color color)
     {
         if (color == Color.White)

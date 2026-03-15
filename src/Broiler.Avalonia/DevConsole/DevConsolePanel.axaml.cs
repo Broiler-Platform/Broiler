@@ -91,7 +91,11 @@ public partial class DevConsolePanel : UserControl, IDisposable
         return $"[{e.Timestamp:HH:mm:ss.fff}] [{e.Level}] [{e.Category}/{e.Context}] {e.Message}{ex}";
     }
 
-    private void LogFilter_Changed(object? sender, object e) => RefreshLogView();
+    private void LogLevelFilter_SelectionChanged(object? sender, SelectionChangedEventArgs e) => RefreshLogView();
+
+    private void LogCategoryFilter_SelectionChanged(object? sender, SelectionChangedEventArgs e) => RefreshLogView();
+
+    private void LogSearchBox_TextChanged(object? sender, TextChangedEventArgs e) => RefreshLogView();
 
     private void ClearLog_Click(object? sender, RoutedEventArgs e)
     {

@@ -1,40 +1,57 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using Avalonia.Controls;
 using TheArtOfDev.HtmlRenderer.Adapters;
 
 namespace TheArtOfDev.HtmlRenderer.Avalonia.Adapters;
 
 /// <summary>
-/// Minimal context menu adapter for Avalonia. Full implementation deferred to Phase 2.
+/// Context menu adapter for Avalonia using native <see cref="global::Avalonia.Controls.ContextMenu"/>.
 /// </summary>
 internal sealed class ContextMenuAdapter : RContextMenu
 {
-    private int _itemsCount;
+    private readonly List<object> _items = [];
 
-    public override int ItemsCount => _itemsCount;
+    public override int ItemsCount => _items.Count;
 
-    public override void AddDivider() => _itemsCount++;
+    public override void AddDivider() => _items.Add(new Separator());
 
     public override void AddItem(string text, bool enabled, EventHandler onClick)
     {
         ArgumentException.ThrowIfNullOrEmpty(text);
         ArgumentNullException.ThrowIfNull(onClick);
-        _itemsCount++;
+
+        var item = new MenuItem { Header = text, IsEnabled = enabled };
+        item.Click += (s, e) => onClick(s, e);
+        _items.Add(item);
     }
 
     public override void RemoveLastDivider()
     {
-        if (_itemsCount > 0)
-            _itemsCount--;
+        if (_items.Count > 0 && _items[^1] is Separator)
+            _items.RemoveAt(_items.Count - 1);
     }
 
     public override void Show(RControl parent, PointF location)
     {
-        // Full context menu implementation deferred to Phase 2.
+        if (_items.Count == 0)
+            return;
+
+        var control = ((ControlAdapter)parent).Control;
+
+        var menu = new global::Avalonia.Controls.ContextMenu();
+        foreach (var item in _items)
+            menu.Items.Add(item);
+
+        // Avalonia positions the context menu relative to the control
+        // automatically; opening it on the control is sufficient.
+        control.ContextMenu = menu;
+        menu.Open(control);
     }
 
     public override void Dispose()
     {
-        _itemsCount = 0;
+        _items.Clear();
     }
 }

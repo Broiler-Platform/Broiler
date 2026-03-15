@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # ── Cross-platform projects ──────────────────────────────
+
+      - name: Build HtmlRenderer.Avalonia
+        run: dotnet build HTML-Renderer-1.5.2/Source/HtmlRenderer.Avalonia/HtmlRenderer.Avalonia.csproj --configuration Release
+
+      - name: Build Broiler.Avalonia
+        run: dotnet build src/Broiler.Avalonia/Broiler.Avalonia.csproj --configuration Release
+
+      - name: Build Broiler.Cli
+        run: dotnet build src/Broiler.Cli/Broiler.Cli.csproj --configuration Release
+
+      - name: Run Broiler.Cli.Tests
+        run: dotnet test src/Broiler.Cli.Tests --configuration Release --logger "console;verbosity=minimal"
+
+      - name: Run Broiler.DevConsole.Tests
+        run: dotnet test src/Broiler.DevConsole.Tests --configuration Release --logger "console;verbosity=minimal"
+
+      - name: Run HtmlRenderer.Image.Tests
+        run: dotnet test HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests --configuration Release --logger "console;verbosity=minimal"
