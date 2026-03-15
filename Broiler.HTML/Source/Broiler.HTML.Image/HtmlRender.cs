@@ -1,12 +1,13 @@
 using System;
 using System.IO;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Core;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
-using TheArtOfDev.HtmlRenderer.Image.Adapters;
 using System.Drawing;
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.Orchestration.Core;
+using Broiler.HTML.Image.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.Image;
+namespace Broiler.HTML.Image;
 
 public static class HtmlRender
 {

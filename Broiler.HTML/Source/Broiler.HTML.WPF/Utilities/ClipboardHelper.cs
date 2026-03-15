@@ -2,7 +2,7 @@
 using System.Text;
 using System.Windows;
 
-namespace TheArtOfDev.HtmlRenderer.WPF.Utilities;
+namespace Broiler.HTML.WPF.Utilities;
 
 internal static class ClipboardHelper
 {

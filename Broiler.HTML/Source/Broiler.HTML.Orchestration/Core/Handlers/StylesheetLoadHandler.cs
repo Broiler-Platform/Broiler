@@ -1,11 +1,13 @@
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Orchestration.Core;
+using Broiler.HTML.Utils.Core.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Handlers;
+namespace Broiler.HTML.Orchestration.Core.Handlers;
 
 internal sealed class StylesheetLoadHandler : IStylesheetLoader
 {

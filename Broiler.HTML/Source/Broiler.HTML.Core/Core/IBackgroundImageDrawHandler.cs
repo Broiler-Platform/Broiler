@@ -1,7 +1,7 @@
-using TheArtOfDev.HtmlRenderer.Adapters;
 using System.Drawing;
+using Broiler.HTML.Adapters.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Core.Core;
 
 /// <summary>
 /// Read-only view of the background-image CSS properties that drawing handlers require.

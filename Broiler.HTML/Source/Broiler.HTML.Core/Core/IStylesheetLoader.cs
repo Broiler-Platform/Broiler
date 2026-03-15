@@ -1,7 +1,6 @@
 using System.Collections.Generic;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
 
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Core.Core;
 
 /// <summary>
 /// Interface for loading external stylesheets during DOM parsing.

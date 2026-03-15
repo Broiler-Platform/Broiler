@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Core.Parse;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
 using System.Drawing;
+using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.Core.Core.Dom;
+using Broiler.HTML.CSS.Core.Dom;
+using Broiler.HTML.CSS.Core.Parse;
+using Broiler.HTML.Dom.Core.Utils;
+using Broiler.HTML.Utils.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Dom;
+namespace Broiler.HTML.Dom.Core.Dom;
 
 internal static class CssLayoutEngine
 {

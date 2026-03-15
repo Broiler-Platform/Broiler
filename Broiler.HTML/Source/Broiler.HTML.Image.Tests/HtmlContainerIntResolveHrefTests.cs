@@ -1,8 +1,8 @@
-using TheArtOfDev.HtmlRenderer.Core;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Image.Adapters;
+using Broiler.HTML.Adapters;
+using Broiler.HTML.Orchestration.Core;
+using Broiler.HTML.Image.Adapters;
 
-namespace HtmlRenderer.Image.Tests;
+namespace Broiler.HTML.Image.Tests;
 
 public class HtmlContainerIntResolveHrefTests
 {

@@ -1,10 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
+using Broiler.HTML.Core.Core.IR;
+using Broiler.HTML.Image;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Core.IR;
-using TheArtOfDev.HtmlRenderer.Image;
 
 namespace Broiler.Cli;
 

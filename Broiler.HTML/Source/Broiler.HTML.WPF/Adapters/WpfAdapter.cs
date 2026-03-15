@@ -8,12 +8,13 @@ using System.Windows.Media.Imaging;
 using System.Diagnostics;
 using FontStyle = System.Drawing.FontStyle;
 using Color = System.Drawing.Color;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.WPF.Utilities;
 using Microsoft.Win32;
 using RectangleF = System.Drawing.RectangleF;
+using Broiler.HTML.Adapters;
+using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.WPF.Utilities;
 
-namespace TheArtOfDev.HtmlRenderer.WPF.Adapters;
+namespace Broiler.HTML.WPF.Adapters;
 
 internal sealed class WpfAdapter : RAdapter
 {
@@ -84,7 +85,7 @@ internal sealed class WpfAdapter : RAdapter
             return Color.Empty;
 
         var convertFromString = ColorConverter.ConvertFromString(colorName) ?? Colors.Black;
-        return Utils.Convert((System.Windows.Media.Color)convertFromString);
+        return Broiler.HTML.WPF.Utilities.Utils.Convert((System.Windows.Media.Color)convertFromString);
     }
 
     protected override RPen CreatePen(Color color) => new PenAdapter(GetSolidColorBrush(color));
@@ -97,8 +98,8 @@ internal sealed class WpfAdapter : RAdapter
 
     protected override RBrush CreateLinearGradientBrush(RectangleF rect, Color color1, Color color2, double angle)
     {
-        var startColor = angle <= 180 ? Utils.Convert(color1) : Utils.Convert(color2);
-        var endColor = angle <= 180 ? Utils.Convert(color2) : Utils.Convert(color1);
+        var startColor = angle <= 180 ? Broiler.HTML.WPF.Utilities.Utils.Convert(color1) : Broiler.HTML.WPF.Utilities.Utils.Convert(color2);
+        var endColor = angle <= 180 ? Broiler.HTML.WPF.Utilities.Utils.Convert(color2) : Broiler.HTML.WPF.Utilities.Utils.Convert(color1);
         angle = angle <= 180 ? angle : angle - 180;
 
         double x = angle < 135 ? Math.Max((angle - 45) / 90, 0) : 1;
@@ -150,7 +151,7 @@ internal sealed class WpfAdapter : RAdapter
         if (!dialogResult.GetValueOrDefault())
             return;
 
-        var encoder = Utils.GetBitmapEncoder(Path.GetExtension(saveDialog.FileName));
+        var encoder = Broiler.HTML.WPF.Utilities.Utils.GetBitmapEncoder(Path.GetExtension(saveDialog.FileName));
         encoder.Frames.Add(BitmapFrame.Create(((ImageAdapter)image).Image));
         using FileStream stream = new(saveDialog.FileName, FileMode.OpenOrCreate);
         encoder.Save(stream);
@@ -166,7 +167,7 @@ internal sealed class WpfAdapter : RAdapter
         else if (color.A < 1)
             solidBrush = Brushes.Transparent;
         else
-            solidBrush = new SolidColorBrush(Utils.Convert(color));
+            solidBrush = new SolidColorBrush(Broiler.HTML.WPF.Utilities.Utils.Convert(color));
         return solidBrush;
     }
 

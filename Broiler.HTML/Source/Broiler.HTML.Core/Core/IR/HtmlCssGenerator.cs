@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-namespace TheArtOfDev.HtmlRenderer.Core.IR;
+namespace Broiler.HTML.Core.Core.IR;
 
 /// <summary>
 /// Generates random but well-formed HTML/CSS documents targeting layout stress

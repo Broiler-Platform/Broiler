@@ -1,7 +1,7 @@
+using Broiler.HTML.Adapters.Adapters;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.Image.Adapters;
+namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class ImageAdapter(SKBitmap bitmap) : RImage
 {

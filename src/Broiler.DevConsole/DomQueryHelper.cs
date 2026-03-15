@@ -1,4 +1,4 @@
-using TheArtOfDev.HtmlRenderer.Core.Dom;
+using Broiler.HTML.Dom.Core.Dom;
 
 namespace Broiler.DevConsole;
 

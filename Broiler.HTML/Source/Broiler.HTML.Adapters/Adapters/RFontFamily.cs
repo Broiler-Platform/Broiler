@@ -1,4 +1,4 @@
-namespace TheArtOfDev.HtmlRenderer.Adapters;
+namespace Broiler.HTML.Adapters.Adapters;
 
 public abstract class RFontFamily
 {

@@ -1,4 +1,4 @@
-namespace TheArtOfDev.HtmlRenderer.Core.Utils;
+namespace Broiler.HTML.Utils.Core.Utils;
 
 /// <summary>
 /// Defines HTML strings

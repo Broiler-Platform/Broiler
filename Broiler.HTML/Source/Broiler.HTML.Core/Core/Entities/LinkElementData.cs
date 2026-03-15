@@ -1,4 +1,4 @@
-﻿namespace TheArtOfDev.HtmlRenderer.Core.Entities;
+﻿namespace Broiler.HTML.Core.Core.Entities;
 
 public sealed class LinkElementData<T>(string id, string href, T rectangle)
 {

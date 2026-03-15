@@ -1,6 +1,6 @@
 using System.Drawing;
 
-namespace TheArtOfDev.HtmlRenderer.Adapters;
+namespace Broiler.HTML.Adapters.Adapters;
 
 /// <summary>
 /// Interface for creating font instances without depending on the concrete

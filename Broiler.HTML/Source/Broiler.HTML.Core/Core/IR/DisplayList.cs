@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Text.Json.Serialization;
 
-namespace TheArtOfDev.HtmlRenderer.Core.IR;
+namespace Broiler.HTML.Core.Core.IR;
 
 /// <summary>
 /// Flat, ordered list of drawing primitives.

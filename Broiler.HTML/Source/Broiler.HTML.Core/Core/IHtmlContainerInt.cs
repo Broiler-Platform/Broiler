@@ -1,11 +1,11 @@
+using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Utils.Core.Utils;
 using System;
 using System.Drawing;
 using System.IO;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Core.Core;
 
 /// <summary>
 /// Interface abstracting the HTML container for use by <c>CssBox</c> and related

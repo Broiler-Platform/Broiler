@@ -1,7 +1,7 @@
 using System;
 using SkiaSharp;
 
-namespace TheArtOfDev.HtmlRenderer.Image;
+namespace Broiler.HTML.Image;
 
 public static class ImageComparer
 {

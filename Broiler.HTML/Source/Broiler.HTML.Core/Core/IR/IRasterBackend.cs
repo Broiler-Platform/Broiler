@@ -1,4 +1,4 @@
-namespace TheArtOfDev.HtmlRenderer.Core.IR;
+namespace Broiler.HTML.Core.Core.IR;
 
 /// <summary>
 /// Draws a <see cref="DisplayList"/> to a platform surface.

@@ -1,12 +1,12 @@
-﻿using System;
+﻿using Broiler.HTML.Orchestration.Core;
+using Broiler.HTML.WPF.Adapters;
+using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media;
-using TheArtOfDev.HtmlRenderer.Core;
-using TheArtOfDev.HtmlRenderer.WPF.Adapters;
 using SizeF = System.Drawing.SizeF;
 
-namespace TheArtOfDev.HtmlRenderer.WPF;
+namespace Broiler.HTML.WPF;
 
 public class HtmlLabel : HtmlControl
 {

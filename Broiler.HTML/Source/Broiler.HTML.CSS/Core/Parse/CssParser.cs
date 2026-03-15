@@ -4,10 +4,12 @@ using System.Drawing;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Core.Core;
+using TheArtOfDev.HtmlRenderer.Core.Parse;
+using Broiler.HTML.Utils.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Parse;
+namespace Broiler.HTML.CSS.Core.Parse;
 
 internal sealed class CssParser
 {

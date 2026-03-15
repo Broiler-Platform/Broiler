@@ -1,6 +1,6 @@
 using System.Drawing;
 
-namespace TheArtOfDev.HtmlRenderer.Adapters;
+namespace Broiler.HTML.Adapters.Adapters;
 
 /// <summary>
 /// Factory interface for creating rendering resource objects (pens, brushes).

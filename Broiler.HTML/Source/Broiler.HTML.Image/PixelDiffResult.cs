@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using SkiaSharp;
 
-namespace TheArtOfDev.HtmlRenderer.Image;
+namespace Broiler.HTML.Image;
 
 /// <summary>
 /// Records a single pixel-level colour mismatch between two rendered images.

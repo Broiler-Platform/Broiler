@@ -1,4 +1,4 @@
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Core.Core;
 
 /// <summary>
 /// Factory interface for creating handler instances in the orchestration layer.

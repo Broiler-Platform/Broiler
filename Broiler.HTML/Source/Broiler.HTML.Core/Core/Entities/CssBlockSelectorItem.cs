@@ -1,6 +1,6 @@
 using System;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Entities;
+namespace Broiler.HTML.Core.Core.Entities;
 
 public readonly struct CssBlockSelectorItem
 {

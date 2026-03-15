@@ -1,4 +1,4 @@
-namespace TheArtOfDev.HtmlRenderer.Adapters.Entities;
+namespace Broiler.HTML.Primitives.Adapters.Entities;
 
 public sealed class RKeyEvent(bool control, bool aKeyCode, bool cKeyCode)
 {

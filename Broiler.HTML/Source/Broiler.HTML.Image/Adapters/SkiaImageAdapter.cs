@@ -2,10 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using Broiler.HTML.Adapters;
+using Broiler.HTML.Adapters.Adapters;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.Image.Adapters;
+namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class SkiaImageAdapter : RAdapter
 {

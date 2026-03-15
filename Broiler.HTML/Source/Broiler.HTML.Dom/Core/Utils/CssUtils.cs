@@ -1,10 +1,11 @@
-﻿using System;
+﻿using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.CSS.Core.Parse;
+using Broiler.HTML.Dom.Core.Dom;
+using Broiler.HTML.Utils.Core.Utils;
+using System;
 using System.Drawing;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Core.Dom;
-using TheArtOfDev.HtmlRenderer.Core.Parse;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Utils;
+namespace Broiler.HTML.Dom.Core.Utils;
 
 internal static class CssUtils
 {

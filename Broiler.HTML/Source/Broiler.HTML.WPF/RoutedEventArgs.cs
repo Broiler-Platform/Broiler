@@ -1,7 +1,7 @@
 using System;
-﻿using System.Windows;
+using System.Windows;
 
-namespace TheArtOfDev.HtmlRenderer.WPF;
+namespace Broiler.HTML.WPF;
 
 public delegate void RoutedEventHandler<T>(object sender, RoutedEventArgs<T> args) where T : class;
 

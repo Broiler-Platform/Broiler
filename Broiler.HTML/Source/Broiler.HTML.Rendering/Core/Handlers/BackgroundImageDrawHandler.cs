@@ -1,8 +1,9 @@
-﻿using System;
+﻿using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.Core.Core;
+using System;
 using System.Drawing;
-using TheArtOfDev.HtmlRenderer.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Handlers;
+namespace Broiler.HTML.Rendering.Core.Handlers;
 
 internal sealed class BackgroundImageDrawHandler : IBackgroundImageDrawHandler
 {

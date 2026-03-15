@@ -1,14 +1,15 @@
 using System;
 using System.Collections.Generic;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Core;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
-using TheArtOfDev.HtmlRenderer.Core.IR;
-using TheArtOfDev.HtmlRenderer.Image.Adapters;
 using System.Drawing;
+using Broiler.HTML.Adapters;
+using Broiler.HTML.Orchestration.Core;
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Core.Core.IR;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.Image.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.Image;
+namespace Broiler.HTML.Image;
 
 public sealed class HtmlContainer : IDisposable
 {

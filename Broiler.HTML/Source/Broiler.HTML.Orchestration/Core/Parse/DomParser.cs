@@ -1,12 +1,18 @@
 using System.Drawing;
 using System;
 using System.Collections.Generic;
-using TheArtOfDev.HtmlRenderer.Core.Dom;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
-using TheArtOfDev.HtmlRenderer.Core.IR;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
+using Broiler.HTML.Orchestration.Core;
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Core.Core.IR;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.CSS.Core.Dom;
+using Broiler.HTML.CSS.Core.Parse;
+using Broiler.HTML.Dom.Core.Dom;
+using Broiler.HTML.Dom.Core.Parse;
+using Broiler.HTML.Dom.Core.Utils;
+using Broiler.HTML.Utils.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Parse;
+namespace Broiler.HTML.Orchestration.Core.Parse;
 
 internal sealed class DomParser
 {

@@ -1,9 +1,11 @@
-﻿using System;
+﻿using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.Core.Core.Dom;
+using Broiler.HTML.CSS.Core.Dom;
+using Broiler.HTML.Utils.Core.Utils;
 using System.Drawing;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Dom;
+namespace Broiler.HTML.Dom.Core.Dom;
 
 internal sealed class CssBoxImage : CssBox
 {

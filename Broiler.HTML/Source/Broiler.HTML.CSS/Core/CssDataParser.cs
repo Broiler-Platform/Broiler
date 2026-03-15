@@ -1,6 +1,7 @@
-using TheArtOfDev.HtmlRenderer.Core.Parse;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.CSS.Core.Parse;
 
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.CSS.Core;
 
 /// <summary>
 /// Factory methods for parsing CSS stylesheets into <see cref="CssData"/>.

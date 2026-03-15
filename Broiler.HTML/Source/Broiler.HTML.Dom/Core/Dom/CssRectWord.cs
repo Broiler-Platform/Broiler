@@ -1,4 +1,4 @@
-namespace TheArtOfDev.HtmlRenderer.Core.Dom;
+namespace Broiler.HTML.Dom.Core.Dom;
 
 internal sealed class CssRectWord(CssBox owner, string text, bool hasSpaceBefore, bool hasSpaceAfter) : CssRect(owner)
 {

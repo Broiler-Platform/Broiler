@@ -1,13 +1,13 @@
-﻿using System;
+﻿using Broiler.HTML.Core.Core;
+using Broiler.HTML.Core.Core.Entities;
+using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using TheArtOfDev.HtmlRenderer.Core;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
 
-namespace TheArtOfDev.HtmlRenderer.WPF;
+namespace Broiler.HTML.WPF;
 
 public class HtmlControl : Control
 {

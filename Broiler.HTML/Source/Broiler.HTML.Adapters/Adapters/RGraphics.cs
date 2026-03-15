@@ -2,7 +2,7 @@ using System.Drawing;
 using System;
 using System.Collections.Generic;
 
-namespace TheArtOfDev.HtmlRenderer.Adapters;
+namespace Broiler.HTML.Adapters.Adapters;
 
 public abstract class RGraphics : IDisposable
 {

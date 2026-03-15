@@ -1,9 +1,9 @@
 using System;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Adapters;
 using System.Drawing;
+using Broiler.HTML.Adapters.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.Image.Adapters;
+namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class GraphicsPathAdapter : RGraphicsPath
 {

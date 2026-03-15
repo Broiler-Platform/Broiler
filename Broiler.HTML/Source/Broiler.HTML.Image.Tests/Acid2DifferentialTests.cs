@@ -1,10 +1,11 @@
 using System.Drawing;
+using Broiler.HTML.Core.Core.IR;
+using Broiler.HTML.Dom.Core.Dom;
+using Broiler.HTML.Image;
+using Broiler.HTML.Image.Adapters;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Core.IR;
-using TheArtOfDev.HtmlRenderer.Image;
-using TheArtOfDev.HtmlRenderer.Image.Adapters;
 
-namespace HtmlRenderer.Image.Tests;
+namespace Broiler.HTML.Image.Tests;
 
 /// <summary>
 /// Differential tests that render the Acid2 test page at <c>#top</c> with
@@ -849,8 +850,8 @@ public class Acid2DifferentialTests : IDisposable
             $"Matching content pixels: {matchContent}/{totalContent}");
     }
 
-    private static TheArtOfDev.HtmlRenderer.Core.Dom.CssBox? FindBoxByClass(
-        TheArtOfDev.HtmlRenderer.Core.Dom.CssBox root, string className)
+    private static CssBox? FindBoxByClass(
+        CssBox root, string className)
     {
         if (root.HtmlTag?.TryGetAttribute("class") == className)
             return root;

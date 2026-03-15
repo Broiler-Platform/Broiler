@@ -1,11 +1,13 @@
+using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.CSS.Core;
+using Broiler.HTML.Rendering.Core.Handlers;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
-using TheArtOfDev.HtmlRenderer.Core;
-using TheArtOfDev.HtmlRenderer.Core.Handlers;
 
-namespace TheArtOfDev.HtmlRenderer.Adapters;
+namespace Broiler.HTML.Adapters;
 
 public abstract class RAdapter : IColorResolver, IResourceFactory, IFontCreator, IAdapter
 {

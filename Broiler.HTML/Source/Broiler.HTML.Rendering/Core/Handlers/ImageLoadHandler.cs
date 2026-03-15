@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
 using System.Drawing;
+using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.Utils.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Handlers;
+namespace Broiler.HTML.Rendering.Core.Handlers;
 
 internal sealed class ImageLoadHandler : IImageLoadHandler
 {

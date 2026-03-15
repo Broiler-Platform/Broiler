@@ -1,6 +1,6 @@
-using TheArtOfDev.HtmlRenderer.Core.Entities;
+using Broiler.HTML.Core.Core.Entities;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Dom;
+namespace Broiler.HTML.Dom.Core.Dom;
 
 internal sealed class HoverBoxBlock(CssBox cssBox, CssBlock cssBlock)
 {

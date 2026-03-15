@@ -4,7 +4,7 @@ using System.Drawing;
 using System.Globalization;
 using System.Text;
 
-namespace TheArtOfDev.HtmlRenderer.Core.IR;
+namespace Broiler.HTML.Core.Core.IR;
 
 /// <summary>
 /// Serialises a <see cref="DisplayList"/> to deterministic JSON for

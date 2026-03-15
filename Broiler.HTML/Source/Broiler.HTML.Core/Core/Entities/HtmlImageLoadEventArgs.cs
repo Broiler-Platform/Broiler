@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Entities;
+namespace Broiler.HTML.Core.Core.Entities;
 
 public delegate void HtmlImageLoadCallback(string path, Object image, RectangleF imageRectangle);
 

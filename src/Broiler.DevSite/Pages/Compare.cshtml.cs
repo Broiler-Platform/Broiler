@@ -1,8 +1,8 @@
 using Broiler.DevSite.Services;
+using Broiler.HTML.Image;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Image;
 
 namespace Broiler.DevSite.Pages;
 

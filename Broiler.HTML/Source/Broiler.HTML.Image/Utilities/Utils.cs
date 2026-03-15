@@ -1,7 +1,7 @@
 using System.Drawing;
 using SkiaSharp;
 
-namespace TheArtOfDev.HtmlRenderer.Image.Utilities;
+namespace Broiler.HTML.Image.Utilities;
 
 internal static class Utils
 {

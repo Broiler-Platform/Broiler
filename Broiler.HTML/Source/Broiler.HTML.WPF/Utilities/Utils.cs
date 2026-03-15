@@ -6,7 +6,7 @@ using PointF = System.Drawing.PointF;
 using SizeF = System.Drawing.SizeF;
 using RectangleF = System.Drawing.RectangleF;
 
-namespace TheArtOfDev.HtmlRenderer.WPF.Utilities;
+namespace Broiler.HTML.WPF.Utilities;
 
 internal static class Utils
 {

@@ -1,9 +1,9 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Broiler.App.Rendering;
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Image;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
-using TheArtOfDev.HtmlRenderer.Image;
 using YantraJS.Core;
 
 namespace Broiler.Cli;

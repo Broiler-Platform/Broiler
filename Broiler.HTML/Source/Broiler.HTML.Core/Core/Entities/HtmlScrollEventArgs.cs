@@ -1,7 +1,7 @@
 using System;
 using System.Drawing;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Entities;
+namespace Broiler.HTML.Core.Core.Entities;
 
 public sealed class HtmlScrollEventArgs(PointF location) : EventArgs
 {

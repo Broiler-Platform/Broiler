@@ -1,8 +1,8 @@
 using System.Drawing.Drawing2D;
+using Broiler.HTML.Adapters.Adapters;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.Image.Adapters;
+namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class PenAdapter(SKPaint paint) : RPen
 {

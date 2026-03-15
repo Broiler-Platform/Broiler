@@ -1,7 +1,7 @@
-﻿using System.Windows.Media;
-using TheArtOfDev.HtmlRenderer.Adapters;
+﻿using Broiler.HTML.Adapters.Adapters;
+using System.Windows.Media;
 
-namespace TheArtOfDev.HtmlRenderer.WPF.Adapters;
+namespace Broiler.HTML.WPF.Adapters;
 
 internal sealed class FontAdapter : RFont
 {

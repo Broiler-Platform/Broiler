@@ -1,13 +1,13 @@
+using Broiler.HTML.Core.Core.IR;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using TheArtOfDev.HtmlRenderer.Core.IR;
 
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Orchestration.Core.IR;
 
 /// <summary>
 /// Walks a <see cref="Fragment"/> tree and produces a flat <see cref="DisplayList"/>
-/// of drawing primitives. This decouples paint from the DOM (<see cref="Dom.CssBox"/>).
+/// of drawing primitives. This decouples paint from the DOM (<see cref="Dom.Core.Dom.CssBox"/>).
 /// </summary>
 /// <remarks>
 /// Phase 3: Standalone paint walker that reads only from <see cref="Fragment"/> and

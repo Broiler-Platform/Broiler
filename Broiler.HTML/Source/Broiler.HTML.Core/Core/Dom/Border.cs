@@ -1,4 +1,4 @@
-namespace TheArtOfDev.HtmlRenderer.Core.Dom;
+namespace Broiler.HTML.Core.Core.Dom;
 
 internal enum Border
 {

@@ -1,10 +1,9 @@
 using System.Drawing;
+using Broiler.HTML.Dom.Core.Dom;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Core.Dom;
-using TheArtOfDev.HtmlRenderer.Image;
 using Xunit;
 
-namespace HtmlRenderer.Image.Tests;
+namespace Broiler.HTML.Image.Tests;
 
 /// <summary>
 /// Regression tests for CSS 2.1 §8.3.1 margin collapsing and §9.4.3

@@ -1,8 +1,10 @@
+using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.Dom.Core.Dom;
+using Broiler.HTML.Utils.Core.Utils;
 using System.Drawing;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Core.Dom;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Utils;
+namespace Broiler.HTML.Dom.Core.Utils;
 
 internal static class RenderUtils
 {

@@ -1,10 +1,10 @@
+using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.Core.Core.IR;
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Core.IR;
 
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Orchestration.Core.IR;
 
 /// <summary>
 /// <see cref="IRasterBackend"/> implementation that replays a <see cref="DisplayList"/>

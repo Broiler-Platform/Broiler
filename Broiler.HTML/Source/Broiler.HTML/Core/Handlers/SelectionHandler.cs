@@ -1,13 +1,15 @@
 using System;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Core.Dom;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
 using System.Drawing;
+using Broiler.HTML.Adapters;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.Dom.Core.Dom;
+using Broiler.HTML.Orchestration.Core;
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Dom.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Handlers;
+namespace Broiler.HTML.Core.Handlers;
 
-internal sealed class SelectionHandler : ISelectionHandler, Dom.ISelectionHandler
+internal sealed class SelectionHandler : Core.ISelectionHandler, Dom.Core.Dom.ISelectionHandler
 {
     private readonly CssBox _root;
     private readonly HtmlContainerInt _htmlContainer;
@@ -41,22 +43,22 @@ internal sealed class SelectionHandler : ISelectionHandler, Dom.ISelectionHandle
 
     #region ISelectionHandler explicit implementation
 
-    void ISelectionHandler.HandleMouseDown(object parent, PointF loc, bool isMouseInContainer)
+    void Core.ISelectionHandler.HandleMouseDown(object parent, PointF loc, bool isMouseInContainer)
         => HandleMouseDown((RControl)parent, loc, isMouseInContainer);
 
-    bool ISelectionHandler.HandleMouseUp(object parent, bool leftMouseButton)
+    bool Core.ISelectionHandler.HandleMouseUp(object parent, bool leftMouseButton)
         => HandleMouseUp((RControl)parent, leftMouseButton);
 
-    void ISelectionHandler.HandleMouseMove(object parent, PointF loc)
+    void Core.ISelectionHandler.HandleMouseMove(object parent, PointF loc)
         => HandleMouseMove((RControl)parent, loc);
 
-    void ISelectionHandler.HandleMouseLeave(object parent)
+    void Core.ISelectionHandler.HandleMouseLeave(object parent)
         => HandleMouseLeave((RControl)parent);
 
-    void ISelectionHandler.SelectWord(object parent, PointF loc)
+    void Core.ISelectionHandler.SelectWord(object parent, PointF loc)
         => SelectWord((RControl)parent, loc);
 
-    void ISelectionHandler.SelectAll(object parent)
+    void Core.ISelectionHandler.SelectAll(object parent)
         => SelectAll((RControl)parent);
 
     #endregion

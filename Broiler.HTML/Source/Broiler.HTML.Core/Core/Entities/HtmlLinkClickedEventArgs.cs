@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Entities;
+namespace Broiler.HTML.Core.Core.Entities;
 
 public sealed class HtmlLinkClickedEventArgs(string link, Dictionary<string, string> attributes) : EventArgs
 {

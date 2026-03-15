@@ -1,7 +1,7 @@
-using TheArtOfDev.HtmlRenderer.Core.Dom;
-using TheArtOfDev.HtmlRenderer.Core.IR;
+using Broiler.HTML.Core.Core.IR;
+using Broiler.HTML.Dom.Core.Dom;
 
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Orchestration.Core.IR;
 
 /// <summary>
 /// Creates a <see cref="ComputedStyle"/> snapshot from a <see cref="CssBoxProperties"/> instance.

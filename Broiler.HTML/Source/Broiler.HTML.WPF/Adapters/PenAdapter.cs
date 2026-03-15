@@ -1,8 +1,8 @@
 ﻿using DashStyle = System.Drawing.Drawing2D.DashStyle;
 using System.Windows.Media;
-using TheArtOfDev.HtmlRenderer.Adapters;
+using Broiler.HTML.Adapters.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.WPF.Adapters;
+namespace Broiler.HTML.WPF.Adapters;
 
 internal sealed class PenAdapter(Brush brush) : RPen
 {

@@ -1,6 +1,6 @@
 using Broiler.App.Rendering;
 using Broiler.DevConsole;
-using TheArtOfDev.HtmlRenderer.Core.Dom;
+using Broiler.HTML.Dom.Core.Dom;
 
 namespace Broiler.DevConsole.Tests;
 

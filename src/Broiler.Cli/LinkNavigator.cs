@@ -1,6 +1,6 @@
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Image;
 using System.Drawing;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
-using TheArtOfDev.HtmlRenderer.Image;
 
 namespace Broiler.Cli;
 

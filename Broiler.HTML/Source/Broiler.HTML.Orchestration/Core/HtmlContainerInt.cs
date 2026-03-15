@@ -1,23 +1,28 @@
+using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Core.Core.IR;
+using Broiler.HTML.CSS.Core.Parse;
+using Broiler.HTML.Dom.Core.Dom;
+using Broiler.HTML.Dom.Core.Utils;
+using Broiler.HTML.Orchestration.Core.Handlers;
+using Broiler.HTML.Orchestration.Core.IR;
+using Broiler.HTML.Orchestration.Core.Parse;
+using Broiler.HTML.Primitives.Adapters.Entities;
+using Broiler.HTML.Rendering.Core.Handlers;
+using Broiler.HTML.Utils.Core.Utils;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Adapters.Entities;
-using TheArtOfDev.HtmlRenderer.Core.Dom;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
-using TheArtOfDev.HtmlRenderer.Core.Handlers;
-using TheArtOfDev.HtmlRenderer.Core.IR;
-using TheArtOfDev.HtmlRenderer.Core.Parse;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Orchestration.Core;
 
 public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
 {
     private List<HoverBoxBlock> _hoverBoxes;
-    private ISelectionHandler _selectionHandler;
+    private HTML.Core.Core.ISelectionHandler _selectionHandler;
     private ImageDownloader _imageDownloader;
     private CssData _cssData;
     private bool _loadComplete;

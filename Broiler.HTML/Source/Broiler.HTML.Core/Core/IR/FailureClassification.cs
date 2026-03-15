@@ -1,4 +1,4 @@
-namespace TheArtOfDev.HtmlRenderer.Core.IR;
+namespace Broiler.HTML.Core.Core.IR;
 
 /// <summary>
 /// Classifies the root cause of a pixel-regression failure (Phase 5).

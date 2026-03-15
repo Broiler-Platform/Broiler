@@ -1,11 +1,11 @@
+using Broiler.HTML.Adapters;
 using System;
 using System.Windows;
 using System.Windows.Controls;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.WPF.Utilities;
 using PointF = System.Drawing.PointF;
+using Broiler.HTML.WPF.Utilities;
 
-namespace TheArtOfDev.HtmlRenderer.WPF.Adapters;
+namespace Broiler.HTML.WPF.Adapters;
 
 internal sealed class ContextMenuAdapter : RContextMenu
 {
@@ -36,7 +36,7 @@ internal sealed class ContextMenuAdapter : RContextMenu
     public override void Show(RControl parent, PointF location)
     {
         _contextMenu.PlacementTarget = ((ControlAdapter)parent).Control;
-        _contextMenu.PlacementRectangle = new Rect(Utils.ConvertRound(location), Size.Empty);
+        _contextMenu.PlacementRectangle = new Rect(Broiler.HTML.WPF.Utilities.Utils.ConvertRound(location), Size.Empty);
         _contextMenu.IsOpen = true;
     }
 

@@ -1,8 +1,8 @@
 ﻿using System;
-using TheArtOfDev.HtmlRenderer.Adapters;
 using System.Drawing;
+using Broiler.HTML.Adapters.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Orchestration.Core;
 
 public static class HtmlRendererUtils
 {

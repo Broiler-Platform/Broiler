@@ -1,7 +1,7 @@
+using Broiler.HTML.Core.Core.Entities;
 using System.Drawing;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
 
-namespace HtmlRenderer.Image.Tests;
+namespace Broiler.HTML.Image.Tests;
 
 public class LinkElementDataTests
 {

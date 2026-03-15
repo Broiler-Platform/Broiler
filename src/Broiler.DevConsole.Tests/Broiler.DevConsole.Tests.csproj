@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Broiler.HTML\Source\HtmlRenderer.Dom\HtmlRenderer.Dom.csproj" />
+    <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Dom\Broiler.HTML.Dom.csproj" />
     <ProjectReference Include="..\Broiler.DevConsole\Broiler.DevConsole.csproj" />
   </ItemGroup>
 

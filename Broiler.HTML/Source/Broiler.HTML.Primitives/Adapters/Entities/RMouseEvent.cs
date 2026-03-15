@@ -1,4 +1,4 @@
-namespace TheArtOfDev.HtmlRenderer.Adapters.Entities;
+namespace Broiler.HTML.Primitives.Adapters.Entities;
 
 public sealed class RMouseEvent(bool leftButton)
 {

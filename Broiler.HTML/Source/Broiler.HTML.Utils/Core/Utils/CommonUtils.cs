@@ -6,7 +6,7 @@ using System.IO;
 using System.Text;
 using System.Drawing;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Utils;
+namespace Broiler.HTML.Utils.Core.Utils;
 
 internal delegate void ActionInt<in T>(T obj);
 internal delegate void ActionInt<in T1, in T2>(T1 arg1, T2 arg2);

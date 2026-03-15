@@ -1,12 +1,12 @@
+using Broiler.HTML.Adapters;
+using Broiler.HTML.Adapters.Adapters;
 using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.WPF.Utilities;
 using PointF = System.Drawing.PointF;
 
-namespace TheArtOfDev.HtmlRenderer.WPF.Adapters;
+namespace Broiler.HTML.WPF.Adapters;
 
 internal sealed class ControlAdapter : RControl
 {
@@ -19,7 +19,7 @@ internal sealed class ControlAdapter : RControl
 
     public Control Control { get; }
 
-    public override PointF MouseLocation => Utils.Convert(Control.PointFromScreen(Mouse.GetPosition(Control)));
+    public override PointF MouseLocation => Broiler.HTML.WPF.Utilities.Utils.Convert(Control.PointFromScreen(Mouse.GetPosition(Control)));
 
     public override bool LeftMouseButton => Mouse.LeftButton == MouseButtonState.Pressed;
 

@@ -1,4 +1,4 @@
-namespace TheArtOfDev.HtmlRenderer.Core.IR;
+namespace Broiler.HTML.Core.Core.IR;
 
 /// <summary>
 /// Configuration for deterministic pixel-regression rendering (Phase 5).

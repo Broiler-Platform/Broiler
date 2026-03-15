@@ -1,11 +1,12 @@
 using System.Drawing;
 using System;
 using System.Drawing.Drawing2D;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Core.Dom;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
+using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.Core.Core.Dom;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.Utils.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Handlers;
+namespace Broiler.HTML.Rendering.Core.Handlers;
 
 internal sealed class BordersDrawHandler : IBordersDrawHandler
 {

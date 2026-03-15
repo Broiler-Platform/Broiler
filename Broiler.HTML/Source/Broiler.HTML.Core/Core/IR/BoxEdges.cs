@@ -1,6 +1,6 @@
 using System;
 
-namespace TheArtOfDev.HtmlRenderer.Core.IR;
+namespace Broiler.HTML.Core.Core.IR;
 
 /// <summary>
 /// Immutable representation of top/right/bottom/left edge values (e.g. margin, border, padding).

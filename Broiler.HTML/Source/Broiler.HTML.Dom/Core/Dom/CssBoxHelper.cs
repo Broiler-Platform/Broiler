@@ -2,11 +2,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using TheArtOfDev.HtmlRenderer.Core.Parse;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
 using System.Drawing;
+using Broiler.HTML.CSS.Core.Parse;
+using Broiler.HTML.Utils.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Dom;
+namespace Broiler.HTML.Dom.Core.Dom;
 
 internal static class CssBoxHelper
 {

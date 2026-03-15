@@ -1,9 +1,10 @@
-﻿using System;
+﻿using Broiler.HTML.Dom.Core.Dom;
+using Broiler.HTML.Dom.Core.Utils;
+using Broiler.HTML.Utils.Core.Utils;
+using System;
 using System.Collections.Generic;
-using TheArtOfDev.HtmlRenderer.Core.Dom;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Parse;
+namespace Broiler.HTML.Dom.Core.Parse;
 
 internal static class HtmlParser
 {

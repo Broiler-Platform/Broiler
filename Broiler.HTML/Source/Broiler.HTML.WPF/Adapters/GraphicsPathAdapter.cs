@@ -1,8 +1,8 @@
-﻿using System.Windows;
+﻿using Broiler.HTML.Adapters.Adapters;
+using System.Windows;
 using System.Windows.Media;
-using TheArtOfDev.HtmlRenderer.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.WPF.Adapters;
+namespace Broiler.HTML.WPF.Adapters;
 
 internal sealed class GraphicsPathAdapter : RGraphicsPath
 {

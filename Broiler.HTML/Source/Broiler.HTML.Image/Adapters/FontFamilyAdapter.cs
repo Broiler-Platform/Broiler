@@ -1,6 +1,6 @@
-using TheArtOfDev.HtmlRenderer.Adapters;
+using Broiler.HTML.Adapters.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.Image.Adapters;
+namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class FontFamilyAdapter(string familyName) : RFontFamily
 {

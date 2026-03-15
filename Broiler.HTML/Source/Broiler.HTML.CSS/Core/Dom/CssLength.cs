@@ -1,9 +1,10 @@
+using Broiler.HTML.Core.Core.Dom;
+using Broiler.HTML.CSS.Core.Parse;
+using Broiler.HTML.Utils.Core.Utils;
 using System;
 using System.Globalization;
-using TheArtOfDev.HtmlRenderer.Core.Parse;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Dom;
+namespace Broiler.HTML.CSS.Core.Dom;
 
 internal sealed class CssLength
 {

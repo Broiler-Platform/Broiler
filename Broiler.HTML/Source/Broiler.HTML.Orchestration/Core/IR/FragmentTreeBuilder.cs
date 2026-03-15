@@ -1,10 +1,10 @@
+using Broiler.HTML.Core.Core.IR;
+using Broiler.HTML.Dom.Core.Dom;
+using Broiler.HTML.Utils.Core.Utils;
 using System.Collections.Generic;
 using System.Drawing;
-using TheArtOfDev.HtmlRenderer.Core.Dom;
-using TheArtOfDev.HtmlRenderer.Core.IR;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Orchestration.Core.IR;
 
 /// <summary>
 /// Walks a <see cref="CssBox"/> tree after layout and builds a read-only

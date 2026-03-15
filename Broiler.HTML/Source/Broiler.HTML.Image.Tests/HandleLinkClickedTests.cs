@@ -1,11 +1,10 @@
 using System.Drawing;
-using TheArtOfDev.HtmlRenderer.Core;
-using TheArtOfDev.HtmlRenderer.Core.Dom;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Image.Adapters;
+using Broiler.HTML.Adapters;
+using Broiler.HTML.Orchestration.Core;
+using Broiler.HTML.Image.Adapters;
+using Broiler.HTML.Dom.Core.Dom;
 
-namespace HtmlRenderer.Image.Tests;
+namespace Broiler.HTML.Image.Tests;
 
 public class HandleLinkClickedTests
 {

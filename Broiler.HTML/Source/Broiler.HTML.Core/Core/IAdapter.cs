@@ -1,9 +1,8 @@
+using Broiler.HTML.Adapters.Adapters;
 using System.Drawing;
 using System.IO;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
 
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Core.Core;
 
 /// <summary>
 /// Interface abstracting the platform adapter for use by the orchestration layer.

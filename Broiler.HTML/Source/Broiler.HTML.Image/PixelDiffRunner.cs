@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using Broiler.HTML.Core.Core.IR;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Core.IR;
 
-namespace TheArtOfDev.HtmlRenderer.Image;
+namespace Broiler.HTML.Image;
 
 /// <summary>
 /// Renders HTML deterministically and compares pixel output against baseline images (Phase 5).

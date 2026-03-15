@@ -1,13 +1,13 @@
 ﻿using System;
-using System;
 using System.Globalization;
 using System.IO;
 using System.Diagnostics;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Core.Dom;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
+using Broiler.HTML.Adapters;
+using Broiler.HTML.Orchestration.Core;
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Dom.Core.Dom;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Handlers;
+namespace Broiler.HTML.Core.Handlers;
 
 internal sealed class ContextMenuHandler : IDisposable
 {

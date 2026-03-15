@@ -1,9 +1,10 @@
 using System.Drawing;
 using System;
 using System.Globalization;
-using TheArtOfDev.HtmlRenderer.Core.Utils;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.Utils.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Parse;
+namespace Broiler.HTML.CSS.Core.Parse;
 
 internal sealed class CssValueParser
 {

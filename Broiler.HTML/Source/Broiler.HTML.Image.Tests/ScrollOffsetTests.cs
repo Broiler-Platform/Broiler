@@ -1,11 +1,10 @@
 using System.Drawing;
 using System.Linq;
+using Broiler.HTML.Core.Core.IR;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Core.IR;
-using TheArtOfDev.HtmlRenderer.Image;
 using Xunit;
 
-namespace HtmlRenderer.Tests;
+namespace Broiler.HTML.Image.Tests;
 
 public class ScrollOffsetTests
 {

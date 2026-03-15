@@ -1,19 +1,18 @@
-﻿using System;
+﻿using Broiler.HTML.Adapters;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Orchestration.Core;
+using Broiler.HTML.Primitives.Adapters.Entities;
+using Broiler.HTML.WPF.Adapters;
 using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using TheArtOfDev.HtmlRenderer.Adapters;
-using TheArtOfDev.HtmlRenderer.Adapters.Entities;
-using TheArtOfDev.HtmlRenderer.Core;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
-using TheArtOfDev.HtmlRenderer.WPF.Adapters;
-using TheArtOfDev.HtmlRenderer.WPF.Utilities;
 using SizeF = System.Drawing.SizeF;
 
-namespace TheArtOfDev.HtmlRenderer.WPF;
+namespace Broiler.HTML.WPF;
 
 public sealed class HtmlContainer : IDisposable
 {
@@ -95,26 +94,26 @@ public sealed class HtmlContainer : IDisposable
 
     public Point ScrollOffset
     {
-        get { return Utils.Convert(HtmlContainerInt.ScrollOffset); }
-        set { HtmlContainerInt.ScrollOffset = Utils.Convert(value); }
+        get { return Broiler.HTML.WPF.Utilities.Utils.Convert(HtmlContainerInt.ScrollOffset); }
+        set { HtmlContainerInt.ScrollOffset = Broiler.HTML.WPF.Utilities.Utils.Convert(value); }
     }
 
     public Point Location
     {
-        get { return Utils.Convert(HtmlContainerInt.Location); }
-        set { HtmlContainerInt.Location = Utils.Convert(value); }
+        get { return Broiler.HTML.WPF.Utilities.Utils.Convert(HtmlContainerInt.Location); }
+        set { HtmlContainerInt.Location = Broiler.HTML.WPF.Utilities.Utils.Convert(value); }
     }
 
     public Size MaxSize
     {
-        get { return Utils.Convert(HtmlContainerInt.MaxSize); }
-        set { HtmlContainerInt.MaxSize = Utils.Convert(value); }
+        get { return Broiler.HTML.WPF.Utilities.Utils.Convert(HtmlContainerInt.MaxSize); }
+        set { HtmlContainerInt.MaxSize = Broiler.HTML.WPF.Utilities.Utils.Convert(value); }
     }
 
     public Size ActualSize
     {
-        get { return Utils.Convert(HtmlContainerInt.ActualSize); }
-        internal set { HtmlContainerInt.ActualSize = Utils.Convert(value); }
+        get { return Broiler.HTML.WPF.Utilities.Utils.Convert(HtmlContainerInt.ActualSize); }
+        internal set { HtmlContainerInt.ActualSize = Broiler.HTML.WPF.Utilities.Utils.Convert(value); }
     }
 
     public string SelectedText => HtmlContainerInt.SelectedText;
@@ -126,24 +125,24 @@ public sealed class HtmlContainer : IDisposable
     public void SetHtml(string htmlSource, CssData baseCssData = null) => HtmlContainerInt.SetHtml(htmlSource, baseCssData);
     public void Clear() => HtmlContainerInt.Clear();
     public string GetHtml(HtmlGenerationStyle styleGen = HtmlGenerationStyle.Inline) => HtmlContainerInt.GetHtml(styleGen);
-    public string GetAttributeAt(Point location, string attribute) => HtmlContainerInt.GetAttributeAt(Utils.Convert(location), attribute);
+    public string GetAttributeAt(Point location, string attribute) => HtmlContainerInt.GetAttributeAt(Broiler.HTML.WPF.Utilities.Utils.Convert(location), attribute);
 
     public List<LinkElementData<Rect>> GetLinks()
     {
         var linkElements = new List<LinkElementData<Rect>>();
 
         foreach (var link in HtmlContainerInt.GetLinks())
-            linkElements.Add(new LinkElementData<Rect>(link.Id, link.Href, Utils.Convert(link.Rectangle)));
+            linkElements.Add(new LinkElementData<Rect>(link.Id, link.Href, Broiler.HTML.WPF.Utilities.Utils.Convert(link.Rectangle)));
 
         return linkElements;
     }
 
-    public string GetLinkAt(Point location) => HtmlContainerInt.GetLinkAt(Utils.Convert(location));
+    public string GetLinkAt(Point location) => HtmlContainerInt.GetLinkAt(Broiler.HTML.WPF.Utilities.Utils.Convert(location));
 
     public Rect? GetElementRectangle(string elementId)
     {
         var r = HtmlContainerInt.GetElementRectangle(elementId);
-        return r.HasValue ? Utils.Convert(r.Value) : (Rect?)null;
+        return r.HasValue ? Broiler.HTML.WPF.Utilities.Utils.Convert(r.Value) : (Rect?)null;
     }
 
     public void PerformLayout()
@@ -156,7 +155,7 @@ public sealed class HtmlContainer : IDisposable
     {
         ArgumentNullException.ThrowIfNull(g);
 
-        using var ig = new GraphicsAdapter(g, Utils.Convert(clip));
+        using var ig = new GraphicsAdapter(g, Broiler.HTML.WPF.Utilities.Utils.Convert(clip));
         HtmlContainerInt.PerformPaint(ig);
     }
 
@@ -165,7 +164,7 @@ public sealed class HtmlContainer : IDisposable
         ArgumentNullException.ThrowIfNull(parent);
         ArgumentNullException.ThrowIfNull(e);
 
-        HtmlContainerInt.HandleMouseDown(new ControlAdapter(parent), Utils.Convert(e.GetPosition(parent)));
+        HtmlContainerInt.HandleMouseDown(new ControlAdapter(parent), Broiler.HTML.WPF.Utilities.Utils.Convert(e.GetPosition(parent)));
     }
 
     public void HandleMouseUp(Control parent, MouseButtonEventArgs e)
@@ -174,7 +173,7 @@ public sealed class HtmlContainer : IDisposable
         ArgumentNullException.ThrowIfNull(e);
 
         var mouseEvent = new RMouseEvent(e.ChangedButton == MouseButton.Left);
-        HtmlContainerInt.HandleMouseUp(new ControlAdapter(parent), Utils.Convert(e.GetPosition(parent)), mouseEvent);
+        HtmlContainerInt.HandleMouseUp(new ControlAdapter(parent), Broiler.HTML.WPF.Utilities.Utils.Convert(e.GetPosition(parent)), mouseEvent);
     }
 
     public void HandleMouseDoubleClick(Control parent, MouseEventArgs e)
@@ -182,14 +181,14 @@ public sealed class HtmlContainer : IDisposable
         ArgumentNullException.ThrowIfNull(parent);
         ArgumentNullException.ThrowIfNull(e);
 
-        HtmlContainerInt.HandleMouseDoubleClick(new ControlAdapter(parent), Utils.Convert(e.GetPosition(parent)));
+        HtmlContainerInt.HandleMouseDoubleClick(new ControlAdapter(parent), Broiler.HTML.WPF.Utilities.Utils.Convert(e.GetPosition(parent)));
     }
 
     public void HandleMouseMove(Control parent, Point mousePos)
     {
         ArgumentNullException.ThrowIfNull(parent);
 
-        HtmlContainerInt.HandleMouseMove(new ControlAdapter(parent), Utils.Convert(mousePos));
+        HtmlContainerInt.HandleMouseMove(new ControlAdapter(parent), Broiler.HTML.WPF.Utilities.Utils.Convert(mousePos));
     }
 
     public void HandleMouseLeave(Control parent)

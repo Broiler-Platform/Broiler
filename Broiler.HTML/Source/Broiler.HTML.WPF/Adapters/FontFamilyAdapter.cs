@@ -1,10 +1,10 @@
-﻿using System.Globalization;
+﻿using Broiler.HTML.Adapters.Adapters;
+using System.Globalization;
 using System.Linq;
 using System.Windows.Markup;
 using System.Windows.Media;
-using TheArtOfDev.HtmlRenderer.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.WPF.Adapters;
+namespace Broiler.HTML.WPF.Adapters;
 
 internal sealed class FontFamilyAdapter(FontFamily fontFamily) : RFontFamily
 {

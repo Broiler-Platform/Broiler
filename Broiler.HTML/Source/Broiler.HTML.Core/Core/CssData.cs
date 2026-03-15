@@ -1,8 +1,8 @@
+using Broiler.HTML.Core.Core.Entities;
 using System;
 using System.Collections.Generic;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
 
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Core.Core;
 
 public sealed class CssData
 {

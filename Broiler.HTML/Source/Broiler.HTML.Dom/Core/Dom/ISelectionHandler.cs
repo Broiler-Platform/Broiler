@@ -1,4 +1,4 @@
-namespace TheArtOfDev.HtmlRenderer.Core.Dom;
+namespace Broiler.HTML.Dom.Core.Dom;
 
 /// <summary>
 /// Interface for selection handling on CSS rect words.

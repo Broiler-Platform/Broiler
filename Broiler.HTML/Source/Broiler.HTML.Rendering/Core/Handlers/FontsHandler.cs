@@ -1,9 +1,9 @@
+using Broiler.HTML.Adapters.Adapters;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using TheArtOfDev.HtmlRenderer.Adapters;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Handlers;
+namespace Broiler.HTML.Rendering.Core.Handlers;
 
 internal sealed class FontsHandler
 {

@@ -1,7 +1,8 @@
 using System;
 using System.Drawing;
 
-namespace TheArtOfDev.HtmlRenderer.Adapters;
+namespace Broiler.HTML.Adapters;
+
 
 public abstract class RContextMenu : IDisposable
 {

@@ -1,5 +1,5 @@
 using Broiler.App.Rendering;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
+using Broiler.HTML.Core.Core.Entities;
 using YantraJS.Core;
 
 namespace Broiler.Cli;

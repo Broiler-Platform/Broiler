@@ -1,7 +1,7 @@
 using System;
 using System.Drawing;
 
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Core.Core;
 
 /// <summary>
 /// Interface for selection handling at the container/orchestration level.

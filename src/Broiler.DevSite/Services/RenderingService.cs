@@ -1,6 +1,6 @@
 using System.Drawing;
+using Broiler.HTML.Image;
 using SkiaSharp;
-using TheArtOfDev.HtmlRenderer.Image;
 
 namespace Broiler.DevSite.Services;
 

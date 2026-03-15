@@ -1,6 +1,6 @@
 using System.Drawing.Drawing2D;
 
-namespace TheArtOfDev.HtmlRenderer.Adapters;
+namespace Broiler.HTML.Adapters.Adapters;
 
 public abstract class RPen
 {

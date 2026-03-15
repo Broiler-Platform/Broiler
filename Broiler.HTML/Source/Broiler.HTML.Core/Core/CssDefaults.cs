@@ -1,4 +1,4 @@
-namespace TheArtOfDev.HtmlRenderer.Core;
+namespace Broiler.HTML.Core.Core;
 
 internal static class CssDefaults
 {

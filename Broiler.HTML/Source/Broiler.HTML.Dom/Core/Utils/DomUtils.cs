@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using TheArtOfDev.HtmlRenderer.Core.Dom;
-using TheArtOfDev.HtmlRenderer.Core.Entities;
 using System.Drawing;
+using Broiler.HTML.Core.Core.Entities;
+using Broiler.HTML.Core.Core;
+using Broiler.HTML.Dom.Core.Dom;
+using Broiler.HTML.Utils.Core.Utils;
 
-namespace TheArtOfDev.HtmlRenderer.Core.Utils;
+namespace Broiler.HTML.Dom.Core.Utils;
 
 internal sealed class DomUtils
 {

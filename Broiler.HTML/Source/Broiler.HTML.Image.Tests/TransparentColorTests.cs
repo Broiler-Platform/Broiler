@@ -1,8 +1,7 @@
 using Xunit;
-using TheArtOfDev.HtmlRenderer.Image;
 using System.Drawing;
 
-namespace HtmlRenderer.Image.Tests;
+namespace Broiler.HTML.Image.Tests;
 
 /// <summary>
 /// Validates that the CSS 'transparent' keyword is handled correctly
