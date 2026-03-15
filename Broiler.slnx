@@ -1,18 +1,18 @@
 <Solution>
   <Folder Name="/Broiler.HTML/" />
   <Folder Name="/Broiler.HTML/Source/">
-    <Project Path="Broiler.HTML/Source/HtmlRenderer.Adapters/HtmlRenderer.Adapters.csproj" />
-    <Project Path="Broiler.HTML/Source/HtmlRenderer.Core/HtmlRenderer.Core.csproj" />
-    <Project Path="Broiler.HTML/Source/HtmlRenderer.CSS/HtmlRenderer.CSS.csproj" />
-    <Project Path="Broiler.HTML/Source/HtmlRenderer.Dom/HtmlRenderer.Dom.csproj" />
-    <Project Path="Broiler.HTML/Source/HtmlRenderer.Image.Tests/HtmlRenderer.Image.Tests.csproj" />
-    <Project Path="Broiler.HTML/Source/HtmlRenderer.Image/HtmlRenderer.Image.csproj" />
-    <Project Path="Broiler.HTML/Source/HtmlRenderer.Orchestration/HtmlRenderer.Orchestration.csproj" />
-    <Project Path="Broiler.HTML/Source/HtmlRenderer.Primitives/HtmlRenderer.Primitives.csproj" />
-    <Project Path="Broiler.HTML/Source/HtmlRenderer.Rendering/HtmlRenderer.Rendering.csproj" />
-    <Project Path="Broiler.HTML/Source/HtmlRenderer.Utils/HtmlRenderer.Utils.csproj" />
-    <Project Path="Broiler.HTML/Source/HtmlRenderer.WPF/HtmlRenderer.WPF.csproj" />
-    <Project Path="Broiler.HTML/Source/HtmlRenderer/HtmlRenderer.csproj" />
+    <Project Path="Broiler.HTML/Source/Broiler.HTML.Adapters/Broiler.HTML.Adapters.csproj" />
+    <Project Path="Broiler.HTML/Source/Broiler.HTML.Core/Broiler.HTML.Core.csproj" />
+    <Project Path="Broiler.HTML/Source/Broiler.HTML.CSS/Broiler.HTML.CSS.csproj" />
+    <Project Path="Broiler.HTML/Source/Broiler.HTML.Dom/Broiler.HTML.Dom.csproj" />
+    <Project Path="Broiler.HTML/Source/Broiler.HTML.Image.Tests/Broiler.HTML.Image.Tests.csproj" />
+    <Project Path="Broiler.HTML/Source/Broiler.HTML.Image/Broiler.HTML.Image.csproj" />
+    <Project Path="Broiler.HTML/Source/Broiler.HTML.Orchestration/Broiler.HTML.Orchestration.csproj" />
+    <Project Path="Broiler.HTML/Source/Broiler.HTML.Primitives/Broiler.HTML.Primitives.csproj" />
+    <Project Path="Broiler.HTML/Source/Broiler.HTML.Rendering/Broiler.HTML.Rendering.csproj" />
+    <Project Path="Broiler.HTML/Source/Broiler.HTML.Utils/Broiler.HTML.Utils.csproj" />
+    <Project Path="Broiler.HTML/Source/Broiler.HTML.WPF/Broiler.HTML.WPF.csproj" />
+    <Project Path="Broiler.HTML/Source/Broiler.HTML/Broiler.HTML.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Broiler.App/Broiler.App.csproj" />
@@ -23,9 +23,9 @@
     <Project Path="src/Broiler.DevSite/Broiler.DevSite.csproj" />
   </Folder>
   <Folder Name="/Broiler.JavaScript/">
-    <Project Path="Broiler.JavaScript/YantraJS.Core/YantraJS.Core.csproj" />
-    <Project Path="Broiler.JavaScript/YantraJS.ExpressionCompiler/YantraJS.ExpressionCompiler.csproj" />
-    <Project Path="Broiler.JavaScript/YantraJS.JSClassGenerator/YantraJS.JSClassGenerator.csproj" />
-    <Project Path="Broiler.JavaScript/YantraJS.Core.Tests/YantraJS.Core.Tests.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core/YantraJS.Core.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.ExpressionCompiler/YantraJS.ExpressionCompiler.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.JSClassGenerator/YantraJS.JSClassGenerator.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core.Tests/YantraJS.Core.Tests.csproj" />
   </Folder>
 </Solution>
