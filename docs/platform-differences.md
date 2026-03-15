@@ -12,7 +12,7 @@ It should be kept up-to-date as new discrepancies are discovered or resolved.
 |------|-------|
 | **Text measurement** | Avalonia uses Skia-based text shaping while WPF uses DirectWrite. Line heights and character widths may differ by 1–2 pixels at common sizes. |
 | **Generic family mapping** | Both adapters map CSS generic families (`sans-serif`, `serif`, `monospace`) to the first available system font. The resolved font may differ across OSes (e.g., "DejaVu Sans" on Linux vs "Arial" on Windows). |
-| **Acceptable variance** | Differential tests should allow a per-pixel colour tolerance of **5 RGB units** and an overall content-area match threshold of **≥ 89 %** when comparing across platforms. |
+| **Acceptable variance** | Differential tests should allow a per-pixel color tolerance of **5 RGB units** and an overall content-area match threshold of **≥ 89 %** when comparing across platforms. |
 
 ## Clipboard
 

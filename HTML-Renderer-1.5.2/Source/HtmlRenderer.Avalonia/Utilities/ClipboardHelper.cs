@@ -18,8 +18,11 @@ internal static class ClipboardHelper
     public static void CopyToClipboard(string plainText)
     {
         var clipboard = GetClipboard();
+        // The adapter API (RAdapter.SetToClipboardInt) is synchronous by
+        // design.  ConfigureAwait(false) avoids deadlocks by not trying
+        // to marshal back to the UI thread.
         clipboard?.SetTextAsync(plainText ?? string.Empty)
-            .GetAwaiter().GetResult();
+            .ConfigureAwait(false).GetAwaiter().GetResult();
     }
 
     /// <summary>

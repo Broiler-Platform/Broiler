@@ -44,8 +44,10 @@ internal sealed class ContextMenuAdapter : RContextMenu
         foreach (var item in _items)
             menu.Items.Add(item);
 
-        // Avalonia positions the context menu relative to the control
-        // automatically; opening it on the control is sufficient.
+        // Remove the menu from the control once it closes to avoid leaking
+        // items or interfering with subsequent right-clicks.
+        menu.Closed += (_, _) => control.ContextMenu = null;
+
         control.ContextMenu = menu;
         menu.Open(control);
     }
