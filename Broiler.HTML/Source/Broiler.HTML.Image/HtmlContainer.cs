@@ -82,7 +82,18 @@ public sealed class HtmlContainer : IDisposable
         set => HtmlContainerInt.Location = value;
     }
 
-    public void SetHtml(string htmlSource, CssData baseCssData = null) => HtmlContainerInt.SetHtml(htmlSource, baseCssData);
+    /// <summary>
+    /// Optional base URL used to resolve relative <c>href</c> values in links.
+    /// When set, relative paths (e.g. <c>./page.html</c>, <c>../section/index.html</c>)
+    /// are resolved against this URL before navigation.
+    /// </summary>
+    public string BaseUrl
+    {
+        get => HtmlContainerInt.BaseUrl;
+        set => HtmlContainerInt.BaseUrl = value;
+    }
+
+    public void SetHtml(string htmlSource, CssData baseCssData = null, string baseUrl = null) => HtmlContainerInt.SetHtml(htmlSource, baseCssData, baseUrl);
 
     public void PerformLayout(SKCanvas canvas, RectangleF clip)
     {

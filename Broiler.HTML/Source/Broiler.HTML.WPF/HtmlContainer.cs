@@ -118,7 +118,18 @@ public sealed class HtmlContainer : IDisposable
 
     public void ClearSelection() => HtmlContainerInt.ClearSelection();
 
-    public void SetHtml(string htmlSource, CssData baseCssData = null) => HtmlContainerInt.SetHtml(htmlSource, baseCssData);
+    /// <summary>
+    /// Optional base URL used to resolve relative <c>href</c> values in links.
+    /// When set, relative paths (e.g. <c>./page.html</c>, <c>../section/index.html</c>)
+    /// are resolved against this URL before navigation.
+    /// </summary>
+    public string BaseUrl
+    {
+        get { return HtmlContainerInt.BaseUrl; }
+        set { HtmlContainerInt.BaseUrl = value; }
+    }
+
+    public void SetHtml(string htmlSource, CssData baseCssData = null, string baseUrl = null) => HtmlContainerInt.SetHtml(htmlSource, baseCssData, baseUrl);
     public void Clear() => HtmlContainerInt.Clear();
     public string GetHtml(HtmlGenerationStyle styleGen = HtmlGenerationStyle.Inline) => HtmlContainerInt.GetHtml(styleGen);
     public string GetAttributeAt(Point location, string attribute) => HtmlContainerInt.GetAttributeAt(Utilities.Utils.Convert(location), attribute);

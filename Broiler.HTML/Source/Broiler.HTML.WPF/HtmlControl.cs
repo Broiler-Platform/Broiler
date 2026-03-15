@@ -20,6 +20,7 @@ public class HtmlControl : Control
     public static readonly DependencyProperty IsSelectionEnabledProperty = DependencyProperty.Register("IsSelectionEnabled", typeof(bool), typeof(HtmlControl), new PropertyMetadata(true, OnDependencyProperty_valueChanged));
     public static readonly DependencyProperty IsContextMenuEnabledProperty = DependencyProperty.Register("IsContextMenuEnabled", typeof(bool), typeof(HtmlControl), new PropertyMetadata(true, OnDependencyProperty_valueChanged));
     public static readonly DependencyProperty BaseStylesheetProperty = DependencyProperty.Register("BaseStylesheet", typeof(string), typeof(HtmlControl), new PropertyMetadata(null, OnDependencyProperty_valueChanged));
+    public static readonly DependencyProperty BaseUrlProperty = DependencyProperty.Register("BaseUrl", typeof(string), typeof(HtmlControl), new PropertyMetadata(null, OnDependencyProperty_valueChanged));
     public static readonly DependencyProperty TextProperty = DependencyProperty.Register("Text", typeof(string), typeof(HtmlControl), new PropertyMetadata(null, OnDependencyProperty_valueChanged));
 
     public static readonly RoutedEvent LoadCompleteEvent = EventManager.RegisterRoutedEvent("LoadComplete", RoutingStrategy.Bubble, typeof(RoutedEventHandler<EventArgs>), typeof(HtmlControl));
@@ -104,12 +105,20 @@ public class HtmlControl : Control
         set { SetValue(IsContextMenuEnabledProperty, value); }
     }
 
-    [Category("Appearance")]
+    [Category("Behavior")]
     [Description("Set base stylesheet to be used by html rendered in the control.")]
     public string BaseStylesheet
     {
         get { return (string)GetValue(BaseStylesheetProperty); }
         set { SetValue(BaseStylesheetProperty, value); }
+    }
+
+    [Category("Behavior")]
+    [Description("Optional base URL used to resolve relative href values in links.")]
+    public string BaseUrl
+    {
+        get { return (string)GetValue(BaseUrlProperty); }
+        set { SetValue(BaseUrlProperty, value); }
     }
 
     [Description("Sets the html of this control.")]
@@ -289,6 +298,10 @@ public class HtmlControl : Control
             var baseCssData = HtmlRender.ParseStyleSheet((string)e.NewValue);
             control._baseCssData = baseCssData;
             htmlContainer.SetHtml(control.Text, baseCssData);
+        }
+        else if (e.Property == BaseUrlProperty)
+        {
+            htmlContainer.BaseUrl = (string)e.NewValue;
         }
         else if (e.Property == TextProperty)
         {
