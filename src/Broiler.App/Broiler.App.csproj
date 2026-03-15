@@ -9,8 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Broiler.HTML\Source\HtmlRenderer.WPF\HtmlRenderer.WPF.csproj" />
-    <ProjectReference Include="..\..\Broiler.JavaScript\YantraJS.Core\YantraJS.Core.csproj" />
+    <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.WPF\Broiler.HTML.WPF.csproj" />
+    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
     <ProjectReference Include="..\Broiler.DevConsole\Broiler.DevConsole.csproj" />
   </ItemGroup>
 

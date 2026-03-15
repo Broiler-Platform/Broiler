@@ -1,12 +1,11 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("HtmlRenderer")]
-[assembly: InternalsVisibleTo("HtmlRenderer.Adapters")]
-[assembly: InternalsVisibleTo("HtmlRenderer.Core")]
-[assembly: InternalsVisibleTo("HtmlRenderer.CSS")]
-// Future modules (see ADR-007)
-[assembly: InternalsVisibleTo("HtmlRenderer.Dom")]
-[assembly: InternalsVisibleTo("HtmlRenderer.Rendering")]
-[assembly: InternalsVisibleTo("HtmlRenderer.Orchestration")]
-[assembly: InternalsVisibleTo("HtmlRenderer.Image")]
-[assembly: InternalsVisibleTo("HtmlRenderer.Image.Tests")]
+[assembly: InternalsVisibleTo("Broiler.HTML")]
+[assembly: InternalsVisibleTo("Broiler.HTML.Adapters")]
+[assembly: InternalsVisibleTo("Broiler.HTML.Core")]
+[assembly: InternalsVisibleTo("Broiler.HTML.CSS")]
+[assembly: InternalsVisibleTo("Broiler.HTML.Dom")]
+[assembly: InternalsVisibleTo("Broiler.HTML.Rendering")]
+[assembly: InternalsVisibleTo("Broiler.HTML.Orchestration")]
+[assembly: InternalsVisibleTo("Broiler.HTML.Image")]
+[assembly: InternalsVisibleTo("Broiler.HTML.Image.Tests")]

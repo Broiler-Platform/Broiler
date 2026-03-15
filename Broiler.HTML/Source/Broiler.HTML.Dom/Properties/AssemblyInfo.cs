@@ -1,12 +1,10 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("HtmlRenderer")]
-[assembly: InternalsVisibleTo("HtmlRenderer.Orchestration")]
-[assembly: InternalsVisibleTo("HtmlRenderer.Image")]
-[assembly: InternalsVisibleTo("HtmlRenderer.Image.Tests")]
-[assembly: InternalsVisibleTo("HtmlRenderer.WPF")]
-[assembly: InternalsVisibleTo("HtmlRenderer.Avalonia")]
+[assembly: InternalsVisibleTo("Broiler.HTML")]
+[assembly: InternalsVisibleTo("Broiler.HTML.Orchestration")]
+[assembly: InternalsVisibleTo("Broiler.HTML.Image")]
+[assembly: InternalsVisibleTo("Broiler.HTML.Image.Tests")]
+[assembly: InternalsVisibleTo("Broiler.HTML.WPF")]
 [assembly: InternalsVisibleTo("Broiler")]
-[assembly: InternalsVisibleTo("Broiler.Avalonia")]
 [assembly: InternalsVisibleTo("Broiler.DevConsole")]
 [assembly: InternalsVisibleTo("Broiler.DevConsole.Tests")]

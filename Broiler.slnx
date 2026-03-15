@@ -23,9 +23,9 @@
     <Project Path="src/Broiler.DevSite/Broiler.DevSite.csproj" />
   </Folder>
   <Folder Name="/Broiler.JavaScript/">
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core/YantraJS.Core.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.ExpressionCompiler/YantraJS.ExpressionCompiler.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.JSClassGenerator/YantraJS.JSClassGenerator.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core.Tests/YantraJS.Core.Tests.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core/Broiler.JavaScript.Core.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.ExpressionCompiler/Broiler.JavaScript.ExpressionCompiler.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.JSClassGenerator/Broiler.JavaScript.JSClassGenerator.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core.Tests/Broiler.JavaScript.Core.Tests.csproj" />
   </Folder>
 </Solution>
