@@ -105,7 +105,7 @@ public class HtmlControl : Control
         set { SetValue(IsContextMenuEnabledProperty, value); }
     }
 
-    [Category("Behavior")]
+    [Category("Appearance")]
     [Description("Set base stylesheet to be used by html rendered in the control.")]
     public string BaseStylesheet
     {
