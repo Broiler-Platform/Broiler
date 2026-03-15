@@ -145,9 +145,12 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
     internal CssBox Root { get; private set; }
     internal Color SelectionForeColor { get; set; }
     internal Color SelectionBackColor { get; set; }
-    public void SetHtml(string htmlSource, CssData baseCssData = null)
+    public void SetHtml(string htmlSource, CssData baseCssData = null, string baseUrl = null)
     {
         Clear();
+
+        if (baseUrl != null)
+            BaseUrl = baseUrl;
 
         if (string.IsNullOrEmpty(htmlSource))
             return;
