@@ -1,18 +1,18 @@
 <Solution>
-  <Folder Name="/HTML-Renderer-1.5.2/" />
-  <Folder Name="/HTML-Renderer-1.5.2/Source/">
-    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Image.Tests/HtmlRenderer.Image.Tests.csproj" />
-    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Image/HtmlRenderer.Image.csproj" />
-    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.WPF/HtmlRenderer.WPF.csproj" />
-    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer/HtmlRenderer.csproj" />
-    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Primitives/HtmlRenderer.Primitives.csproj" />
-    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Utils/HtmlRenderer.Utils.csproj" />
-    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Core/HtmlRenderer.Core.csproj" />
-    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.CSS/HtmlRenderer.CSS.csproj" />
-    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Adapters/HtmlRenderer.Adapters.csproj" />
-    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Rendering/HtmlRenderer.Rendering.csproj" />
-    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Dom/HtmlRenderer.Dom.csproj" />
-    <Project Path="HTML-Renderer-1.5.2/Source/HtmlRenderer.Orchestration/HtmlRenderer.Orchestration.csproj" />
+  <Folder Name="/Broiler.HTML/" />
+  <Folder Name="/Broiler.HTML/Source/">
+    <Project Path="Broiler.HTML/Source/HtmlRenderer.Adapters/HtmlRenderer.Adapters.csproj" />
+    <Project Path="Broiler.HTML/Source/HtmlRenderer.Core/HtmlRenderer.Core.csproj" />
+    <Project Path="Broiler.HTML/Source/HtmlRenderer.CSS/HtmlRenderer.CSS.csproj" />
+    <Project Path="Broiler.HTML/Source/HtmlRenderer.Dom/HtmlRenderer.Dom.csproj" />
+    <Project Path="Broiler.HTML/Source/HtmlRenderer.Image.Tests/HtmlRenderer.Image.Tests.csproj" />
+    <Project Path="Broiler.HTML/Source/HtmlRenderer.Image/HtmlRenderer.Image.csproj" />
+    <Project Path="Broiler.HTML/Source/HtmlRenderer.Orchestration/HtmlRenderer.Orchestration.csproj" />
+    <Project Path="Broiler.HTML/Source/HtmlRenderer.Primitives/HtmlRenderer.Primitives.csproj" />
+    <Project Path="Broiler.HTML/Source/HtmlRenderer.Rendering/HtmlRenderer.Rendering.csproj" />
+    <Project Path="Broiler.HTML/Source/HtmlRenderer.Utils/HtmlRenderer.Utils.csproj" />
+    <Project Path="Broiler.HTML/Source/HtmlRenderer.WPF/HtmlRenderer.WPF.csproj" />
+    <Project Path="Broiler.HTML/Source/HtmlRenderer/HtmlRenderer.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Broiler.App/Broiler.App.csproj" />
