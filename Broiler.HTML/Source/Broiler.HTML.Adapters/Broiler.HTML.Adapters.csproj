@@ -2,7 +2,6 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <OutputType>Library</OutputType>
-    <RootNamespace>TheArtOfDev.HtmlRenderer</RootNamespace>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
   <ItemGroup>
@@ -14,7 +13,7 @@
     <PackageReference Include="System.Drawing.Common" Version="8.0.12" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\HtmlRenderer.Primitives\HtmlRenderer.Primitives.csproj" />
-    <ProjectReference Include="..\HtmlRenderer.Utils\HtmlRenderer.Utils.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.Primitives\Broiler.HTML.Primitives.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.Utils\Broiler.HTML.Utils.csproj" />
   </ItemGroup>
 </Project>

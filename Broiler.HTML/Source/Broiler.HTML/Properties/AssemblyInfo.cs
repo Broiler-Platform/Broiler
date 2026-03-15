@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("HtmlRenderer.Image")]
-[assembly: InternalsVisibleTo("HtmlRenderer.Image.Tests")]
-[assembly: InternalsVisibleTo("HtmlRenderer.WPF")]
-[assembly: InternalsVisibleTo("HtmlRenderer.Avalonia")]
+[assembly: InternalsVisibleTo("Broiler.HTML.Image")]
+[assembly: InternalsVisibleTo("Broiler.HTML.Image.Tests")]
+[assembly: InternalsVisibleTo("Broiler.HTML.WPF")]

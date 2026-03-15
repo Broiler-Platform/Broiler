@@ -2,22 +2,11 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <OutputType>Library</OutputType>
-    <RootNamespace>TheArtOfDev.HtmlRenderer</RootNamespace>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-  </PropertyGroup>
-  <!-- NuGet Package Properties -->
-  <PropertyGroup>
-    <PackageId>HtmlRenderer.Primitives</PackageId>
-    <Title>HTML Renderer Primitives</Title>
-    <PackageTags>html render renderer primitives entities</PackageTags>
-    <Description>Primitive value types and entities for the HTML Renderer library.
-Contains foundational types such as RPoint, RRect, RSize, and related enumerations used across all HTML Renderer modules.</Description>
-    <Summary>Primitive value types for the HTML Renderer library.</Summary>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

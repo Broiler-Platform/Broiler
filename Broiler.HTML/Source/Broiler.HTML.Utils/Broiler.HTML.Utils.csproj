@@ -2,25 +2,14 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <OutputType>Library</OutputType>
-    <RootNamespace>TheArtOfDev.HtmlRenderer</RootNamespace>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
-  <!-- NuGet Package Properties -->
-  <PropertyGroup>
-    <PackageId>HtmlRenderer.Utils</PackageId>
-    <Title>HTML Renderer Utilities</Title>
-    <PackageTags>html render renderer utils utilities</PackageTags>
-    <Description>Shared utility classes for the HTML Renderer library.
-Contains pure helper functions, constants, and foundational utilities used across all HTML Renderer modules.</Description>
-    <Summary>Shared utility classes for the HTML Renderer library.</Summary>
-  </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\HtmlRenderer.Primitives\HtmlRenderer.Primitives.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.Primitives\Broiler.HTML.Primitives.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

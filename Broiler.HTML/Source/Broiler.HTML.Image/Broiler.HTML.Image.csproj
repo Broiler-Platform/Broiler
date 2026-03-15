@@ -2,35 +2,16 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <OutputType>Library</OutputType>
-    <RootNamespace>TheArtOfDev.HtmlRenderer.Image</RootNamespace>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
-  </PropertyGroup>
-  <PropertyGroup>
-    <PackageId>HtmlRenderer.Image</PackageId>
-    <Title>HTML Renderer for Image Generation</Title>
-    <PackageTags>html render renderer draw image png jpeg cross-platform</PackageTags>
-    <Description>Cross-platform (Windows/Linux/macOS), 100% managed (C#), High performance HTML Rendering library for image generation.
-
-Render HTML content to images (PNG, JPEG, etc.) programmatically using SkiaSharp as the rendering backend.
-
-Features:
----
-* Render HTML to PNG, JPEG, and other image formats.
-* Cross-platform support via SkiaSharp.
-* Full HTML 4.01 and CSS level 2 specifications support.
-* Support separating CSS from HTML by loading stylesheet code separately.
-* High performance and low memory footprint.</Description>
-    <Summary>Cross-platform HTML to image rendering library using SkiaSharp.</Summary>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\SharedAssemblyInfo.cs">
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\HtmlRenderer\HtmlRenderer.csproj" />
+    <ProjectReference Include="..\Broiler.HTML\Broiler.HTML.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="SkiaSharp" Version="3.119.2" />

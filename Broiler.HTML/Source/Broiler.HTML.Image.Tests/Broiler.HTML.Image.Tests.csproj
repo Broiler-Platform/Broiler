@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\HtmlRenderer.Image\HtmlRenderer.Image.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.Image\Broiler.HTML.Image.csproj" />
   </ItemGroup>
 
   <ItemGroup>

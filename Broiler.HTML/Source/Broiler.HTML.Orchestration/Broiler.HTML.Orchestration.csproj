@@ -2,7 +2,6 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <OutputType>Library</OutputType>
-    <RootNamespace>TheArtOfDev.HtmlRenderer</RootNamespace>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
   <ItemGroup>
@@ -11,12 +10,12 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\HtmlRenderer.Primitives\HtmlRenderer.Primitives.csproj" />
-    <ProjectReference Include="..\HtmlRenderer.Utils\HtmlRenderer.Utils.csproj" />
-    <ProjectReference Include="..\HtmlRenderer.Adapters\HtmlRenderer.Adapters.csproj" />
-    <ProjectReference Include="..\HtmlRenderer.Core\HtmlRenderer.Core.csproj" />
-    <ProjectReference Include="..\HtmlRenderer.CSS\HtmlRenderer.CSS.csproj" />
-    <ProjectReference Include="..\HtmlRenderer.Rendering\HtmlRenderer.Rendering.csproj" />
-    <ProjectReference Include="..\HtmlRenderer.Dom\HtmlRenderer.Dom.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.Primitives\Broiler.HTML.Primitives.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.Utils\Broiler.HTML.Utils.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.Adapters\Broiler.HTML.Adapters.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.Core\Broiler.HTML.Core.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.CSS\Broiler.HTML.CSS.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.Rendering\Broiler.HTML.Rendering.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.Dom\Broiler.HTML.Dom.csproj" />
   </ItemGroup>
 </Project>

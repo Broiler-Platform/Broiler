@@ -2,34 +2,9 @@
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <OutputType>Library</OutputType>
-    <RootNamespace>TheArtOfDev.HtmlRenderer.WPF</RootNamespace>
     <UseWPF>true</UseWPF>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
-  </PropertyGroup>
-  <!-- NuGet Package Properties -->
-  <PropertyGroup>
-    <PackageId>HtmlRenderer.WPF</PackageId>
-    <Title>HTML Renderer for WPF</Title>
-    <PackageTags>html render renderer draw control WPF</PackageTags>
-    <Description>Multipurpose (UI Controls / Image generation), 100% managed (C#), High performance HTML Rendering library for WPF.
-
-HTML UI in .NET WPF applications using controls or static rendering.
-
-Features and Benefits:
----
-* Controls: HtmlPanel, HtmlLabel.
-* Create images from HTML snippets.
-* 100% managed code and no external dependencies, no ActiveX, no MSHTML.
-* Extensive HTML 4.01 and CSS level 2 specifications support.
-* Support separating CSS from HTML by loading stylesheet code separately.
-* Support text selection, copy-paste and context menu.
-* Handles "real world" malformed HTML, it doesn't have to be XHTML.
-* Supports .NET 3.0 or higher including Client Profile.
-* Lightweight, only two DLLs (~300K).
-* High performance and low memory footprint.
-* Extendable and configurable.</Description>
-    <Summary>Multipurpose (UI Controls / Image generation), 100% managed (C#), High performance HTML Rendering library for WPF.</Summary>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <OutputPath>bin\Release.WPF\</OutputPath>
@@ -38,9 +13,9 @@ Features and Benefits:
     <AppDesigner Include="Properties\" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\HtmlRenderer\HtmlRenderer.csproj" />
-    <ProjectReference Include="..\HtmlRenderer.Core\HtmlRenderer.Core.csproj" />
-    <ProjectReference Include="..\HtmlRenderer.CSS\HtmlRenderer.CSS.csproj" />
+    <ProjectReference Include="..\Broiler.HTML\Broiler.HTML.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.Core\Broiler.HTML.Core.csproj" />
+    <ProjectReference Include="..\Broiler.HTML.CSS\Broiler.HTML.CSS.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\SharedAssemblyInfo.cs">
