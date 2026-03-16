@@ -81,9 +81,9 @@ public class ConsoleServiceTests : IDisposable
     [Fact]
     public void BuildBoxTree_Creates_Correct_Structure()
     {
-        var root = new CssBox(null, new HtmlTag("div", false));
-        var child = new CssBox(root, new HtmlTag("p", false));
-        _ = new CssBox(child, new HtmlTag("span", false));
+        var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
+        var child = new CssBox(root, new HtmlTag("p", false), new Uri("/"));
+        _ = new CssBox(child, new HtmlTag("span", false), new Uri("/"));
 
         var tree = ConsoleService.BuildBoxTree(root);
 
@@ -105,7 +105,7 @@ public class ConsoleServiceTests : IDisposable
             ["id"] = "main",
             ["class"] = "container wide",
         });
-        var root = new CssBox(null, tag);
+        var root = new CssBox(null, tag, new Uri("/"));
 
         var tree = ConsoleService.BuildBoxTree(root);
 
@@ -116,7 +116,7 @@ public class ConsoleServiceTests : IDisposable
     [Fact]
     public void BuildBoxTree_Handles_Anonymous_Box()
     {
-        var root = new CssBox(null, null!);
+        var root = new CssBox(null, null!, new Uri("/"));
         var tree = ConsoleService.BuildBoxTree(root);
 
         Assert.Equal("anon", tree.Tag);
@@ -126,7 +126,7 @@ public class ConsoleServiceTests : IDisposable
     [Fact]
     public void GetComputedStyles_Returns_Grouped_Properties()
     {
-        var root = new CssBox(null, new HtmlTag("div", false));
+        var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
 
         var styles = ConsoleService.GetComputedStyles(root);
 
@@ -146,7 +146,7 @@ public class ConsoleServiceTests : IDisposable
     [Fact]
     public void GetBoxModel_Returns_Zero_For_Uncomputed_Box()
     {
-        var root = new CssBox(null, new HtmlTag("div", false));
+        var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
 
         var model = ConsoleService.GetBoxModel(root);
 

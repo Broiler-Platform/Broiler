@@ -10,13 +10,13 @@ namespace Broiler.HTML.Dom.Core.Dom;
 
 internal static class CssBoxHelper
 {
-    public static CssBox CreateBox(HtmlTag tag, CssBox parent = null)
+    public static CssBox CreateBox(HtmlTag tag, Uri baseUrl, CssBox parent = null)
     {
         ArgumentNullException.ThrowIfNull(tag);
 
         if (tag.Name == HtmlConstants.Img)
         {
-            return new CssBoxImage(parent, tag);
+            return new CssBoxImage(parent, tag, baseUrl);
         }
         else if (tag.Name.Equals("object", StringComparison.OrdinalIgnoreCase) &&
                  tag.TryGetAttribute("data") is { } data &&
@@ -24,27 +24,27 @@ internal static class CssBoxHelper
         {
             // <object data="data:image/..."> — treat as a replaced image element.
             // Any nested fallback content will be removed by CorrectObjectBoxes.
-            return new CssBoxImage(parent, tag);
+            return new CssBoxImage(parent, tag, baseUrl);
         }
         else if (tag.Name == HtmlConstants.Iframe)
         {
-            return new CssBox(parent, tag);
+            return new CssBox(parent, tag, baseUrl);
         }
         else if (tag.Name == HtmlConstants.Hr)
         {
-            return new CssBoxHr(parent, tag);
+            return new CssBoxHr(parent, tag, baseUrl);
         }
         else
         {
-            return new CssBox(parent, tag);
+            return new CssBox(parent, tag, baseUrl);
         }
     }
 
-    public static CssBox CreateBox(CssBox parent, HtmlTag tag = null, CssBox before = null)
+    public static CssBox CreateBox(CssBox parent, Uri baseUrl, HtmlTag tag = null, CssBox before = null)
     {
         ArgumentNullException.ThrowIfNull(parent);
 
-        var newBox = new CssBox(parent, tag);
+        var newBox = new CssBox(parent, tag, baseUrl);
         newBox.InheritStyle();
 
         if (before != null)
@@ -53,13 +53,13 @@ internal static class CssBoxHelper
         return newBox;
     }
 
-    public static CssBox CreateBlock() => new(null, null) { Display = CssConstants.Block };
+    public static CssBox CreateBlock(Uri baseUrl) => new(null, null, baseUrl) { Display = CssConstants.Block };
 
-    public static CssBox CreateBlock(CssBox parent, HtmlTag tag = null, CssBox before = null)
+    public static CssBox CreateBlock(CssBox parent, Uri baseUrl, HtmlTag tag = null, CssBox before = null)
     {
         ArgumentNullException.ThrowIfNull(parent);
 
-        var newBox = CreateBox(parent, tag, before);
+        var newBox = CreateBox(parent, baseUrl, tag, before);
         newBox.Display = CssConstants.Block;
 
         return newBox;

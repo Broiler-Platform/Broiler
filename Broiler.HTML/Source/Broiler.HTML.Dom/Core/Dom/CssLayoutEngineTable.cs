@@ -65,7 +65,7 @@ internal sealed class CssLayoutEngineTable
         return (columns + 1) * GetHorizontalSpacing(tableBox);
     }
 
-    public static void PerformLayout(RGraphics g, CssBox tableBox)
+    public static void PerformLayout(RGraphics g, CssBox tableBox, Uri baseUrl)
     {
         ArgumentNullException.ThrowIfNull(g);
         ArgumentNullException.ThrowIfNull(tableBox);
@@ -73,7 +73,7 @@ internal sealed class CssLayoutEngineTable
         try
         {
             var table = new CssLayoutEngineTable(tableBox);
-            table.Layout(g);
+            table.Layout(g, baseUrl);
         }
         catch (Exception ex)
         {
@@ -82,15 +82,15 @@ internal sealed class CssLayoutEngineTable
     }
 
 
-    private void Layout(RGraphics g)
+    private void Layout(RGraphics g, Uri baseUrl)
     {
         MeasureWords(_tableBox, g);
 
         // get the table boxes into the proper fields
-        AssignBoxKinds();
+        AssignBoxKinds(baseUrl);
 
         // Insert EmptyBoxes for vertical cell spanning. 
-        InsertEmptyBoxes();
+        InsertEmptyBoxes(baseUrl);
 
         // Determine Row and Column Count, and ColumnWidths
         var availCellSpace = CalculateCountAndWidth();
@@ -110,12 +110,12 @@ internal sealed class CssLayoutEngineTable
         LayoutCells(g);
     }
 
-    private void AssignBoxKinds()
+    private void AssignBoxKinds(Uri baseUrl)
     {
         // CSS2.1 §17.2.1: Generate anonymous table-row boxes for table-cell
         // children that are direct children of the table without an
         // intermediate table-row wrapper.
-        GenerateAnonymousTableRows();
+        GenerateAnonymousTableRows(baseUrl);
 
         foreach (var box in _tableBox.Boxes)
         {
@@ -189,7 +189,7 @@ internal sealed class CssLayoutEngineTable
     /// anonymous row, children that are not table-cell are additionally wrapped
     /// in anonymous table-cell boxes.
     /// </summary>
-    private void GenerateAnonymousTableRows()
+    private void GenerateAnonymousTableRows(Uri baseUrl)
     {
         bool needsWrapping = false;
         foreach (var box in _tableBox.Boxes)
@@ -217,7 +217,7 @@ internal sealed class CssLayoutEngineTable
             {
                 if (pendingNonRow != null)
                 {
-                    FlushAnonymousRow(pendingNonRow);
+                    FlushAnonymousRow(pendingNonRow, baseUrl);
                     pendingNonRow = null;
                 }
 
@@ -231,7 +231,7 @@ internal sealed class CssLayoutEngineTable
         }
 
         if (pendingNonRow != null)
-            FlushAnonymousRow(pendingNonRow);
+            FlushAnonymousRow(pendingNonRow, baseUrl);
     }
 
     /// <summary>
@@ -254,11 +254,11 @@ internal sealed class CssLayoutEngineTable
     /// it, and appends the row to the table.  Children that are not table-cell
     /// are additionally wrapped in anonymous table-cell boxes (CSS2.1 §17.2.1).
     /// </summary>
-    private void FlushAnonymousRow(List<CssBox> children)
+    private void FlushAnonymousRow(List<CssBox> children, Uri baseUrl)
     {
         // Create the anonymous row. The CssBox(parent, tag) constructor
         // automatically adds the new box to parent.Boxes.
-        var anonRow = new CssBox(_tableBox, null) { Display = CssConstants.TableRow };
+        var anonRow = new CssBox(_tableBox, null, baseUrl) { Display = CssConstants.TableRow };
         foreach (var child in children)
         {
             if (child.Display == CssConstants.TableCell)
@@ -273,13 +273,13 @@ internal sealed class CssLayoutEngineTable
                 // CSS2.1 §17.2.1: Wrap non-cell children in an anonymous
                 // table-cell box.  The CssBox constructor automatically adds
                 // the anonymous cell to anonRow.Boxes.
-                var anonCell = new CssBox(anonRow, null) { Display = CssConstants.TableCell };
+                var anonCell = new CssBox(anonRow, null, baseUrl) { Display = CssConstants.TableCell };
                 child.ParentBox = anonCell;
             }
         }
     }
 
-    private void InsertEmptyBoxes()
+    private void InsertEmptyBoxes(Uri baseUrl)
     {
         if (_tableBox._tableFixed)
             return;
@@ -305,7 +305,7 @@ internal sealed class CssLayoutEngineTable
                     {
                         if (colcount == realcol)
                         {
-                            rows[i].Boxes.Insert(colcount, new CssSpacingBox(_tableBox, ref cell, currow));
+                            rows[i].Boxes.Insert(colcount, new CssSpacingBox(_tableBox, ref cell, currow, baseUrl));
                             break;
                         }
 

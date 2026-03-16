@@ -29,7 +29,7 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     internal object LoadedBackgroundImage => _imageLoadHandler?.Image;
 
-    public CssBox(CssBox parentBox, HtmlTag tag)
+    public CssBox(CssBox parentBox, HtmlTag tag, Uri baseUrl)
     {
         if (parentBox != null)
         {
@@ -38,6 +38,7 @@ internal class CssBox : CssBoxProperties, IDisposable
         }
 
         HtmlTag = tag;
+        BaseUrl = baseUrl;
     }
 
     /// <summary>
@@ -175,6 +176,8 @@ internal class CssBox : CssBoxProperties, IDisposable
     internal CssLineBox FirstHostingLineBox { get; set; }
 
     internal CssLineBox LastHostingLineBox { get; set; }
+
+    internal Uri BaseUrl { get; set; }
 
     public void PerformLayout(RGraphics g)
     {
@@ -729,7 +732,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             //If we're talking about a table here..
             if (Display == CssConstants.Table || Display == CssConstants.InlineTable)
             {
-                CssLayoutEngineTable.PerformLayout(g, this);
+                CssLayoutEngineTable.PerformLayout(g, this, BaseUrl);
             }
             else
             {
@@ -897,7 +900,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
         }
 
-        _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes);
+        _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl);
     }
 
     internal virtual void MeasureWordsSize(RGraphics g)
@@ -989,7 +992,7 @@ internal class CssBox : CssBoxProperties, IDisposable
 
         if (_listItemBox == null)
         {
-            _listItemBox = new CssBox(null, null);
+            _listItemBox = new CssBox(null, null, BaseUrl);
             _listItemBox.InheritStyle(this);
             _listItemBox.Display = CssConstants.Inline;
             _listItemBox._htmlContainer = ContainerInt;

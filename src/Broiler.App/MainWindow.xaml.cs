@@ -105,6 +105,7 @@ public partial class MainWindow : Window
         }
 
         NavigateTo(link);
+        e.Handled = true;
     }
 
     /// <summary>
@@ -147,6 +148,7 @@ public partial class MainWindow : Window
 
             // Render the original HTML (post-processed to strip elements
             // that HtmlRenderer cannot handle).
+            HtmlPanel.BaseUrl = normalisedUrl;
             HtmlPanel.Text = HtmlPostProcessor.Process(content.Html);
 
             // Start an interactive session so that timer / rAF callbacks

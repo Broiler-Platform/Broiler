@@ -25,5 +25,5 @@ internal interface IImageLoadHandler : IDisposable
     /// <summary>
     /// Initiates image loading from the specified source.
     /// </summary>
-    void LoadImage(string src, Dictionary<string, string> attributes);
+    void LoadImage(string src, Dictionary<string, string> attributes, Uri baseUrl);
 }

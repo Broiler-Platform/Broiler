@@ -27,9 +27,9 @@ internal sealed class DomParser
         _stylesheetLoader = stylesheetLoader;
     }
 
-    public CssBox GenerateCssTree(string html, HtmlContainerInt htmlContainer, ref CssData cssData)
+    public CssBox GenerateCssTree(string html, HtmlContainerInt htmlContainer, ref CssData cssData, Uri baseUrl)
     {
-        var root = HtmlParser.ParseDocument(html);
+        var root = HtmlParser.ParseDocument(html, baseUrl);
         if (root == null)
             return root;
 
@@ -37,17 +37,17 @@ internal sealed class DomParser
 
         bool cssDataChanged = false;
         CascadeParseStyles(root, htmlContainer, ref cssData, ref cssDataChanged);
-        CascadeApplyStyles(root, cssData);
+        CascadeApplyStyles(root, cssData, baseUrl);
         SetTextSelectionStyle(htmlContainer, cssData);
         CorrectTextBoxes(root);
-        CorrectImgBoxes(root);
+        CorrectImgBoxes(root, baseUrl);
         CorrectObjectBoxes(root);
 
         bool followingBlock = true;
         CorrectLineBreaksBlocks(root, ref followingBlock);
-        CorrectInlineBoxesParent(root);
-        CorrectBlockInsideInline(root);
-        CorrectInlineBoxesParent(root);
+        CorrectInlineBoxesParent(root, baseUrl);
+        CorrectBlockInsideInline(root, baseUrl);
+        CorrectInlineBoxesParent(root, baseUrl);
 
         return root;
     }
@@ -84,7 +84,7 @@ internal sealed class DomParser
     }
 
 
-    private void CascadeApplyStyles(CssBox box, CssData cssData)
+    private void CascadeApplyStyles(CssBox box, CssData cssData, Uri baseUrl)
     {
         box.InheritStyle();
 
@@ -176,13 +176,13 @@ internal sealed class DomParser
         }
 
         foreach (var childBox in box.Boxes)
-            CascadeApplyStyles(childBox, cssData);
+            CascadeApplyStyles(childBox, cssData, baseUrl);
 
         // CSS2.1 §12.1: Generate ::before and ::after pseudo-element boxes
         // after child style cascading to avoid modifying the child list
         // during iteration.
         if (box.HtmlTag != null)
-            ApplyPseudoElementBoxes(box, cssData);
+            ApplyPseudoElementBoxes(box, cssData, baseUrl);
     }
 
     private void SetTextSelectionStyle(HtmlContainerInt htmlContainer, CssData cssData)
@@ -450,15 +450,15 @@ internal sealed class DomParser
     /// Creates <c>::before</c> and <c>::after</c> pseudo-element child
     /// boxes when the CSS data contains matching pseudo-element blocks.
     /// </summary>
-    private static void ApplyPseudoElementBoxes(CssBox box, CssData cssData)
+    private static void ApplyPseudoElementBoxes(CssBox box, CssData cssData, Uri baseUrl)
     {
         var beforeBlock = FindPseudoElementBlock(box, cssData, "::before");
         if (beforeBlock != null)
-            CreatePseudoElementBox(box, beforeBlock, isBefore: true);
+            CreatePseudoElementBox(box, beforeBlock, isBefore: true, baseUrl);
 
         var afterBlock = FindPseudoElementBlock(box, cssData, "::after");
         if (afterBlock != null)
-            CreatePseudoElementBox(box, afterBlock, isBefore: false);
+            CreatePseudoElementBox(box, afterBlock, isBefore: false, baseUrl);
     }
 
     /// <summary>
@@ -528,7 +528,7 @@ internal sealed class DomParser
     /// For <c>::before</c>, the box is inserted as the first child;
     /// for <c>::after</c>, it is appended as the last child.
     /// </summary>
-    private static void CreatePseudoElementBox(CssBox parentBox, CssBlock block, bool isBefore)
+    private static void CreatePseudoElementBox(CssBox parentBox, CssBlock block, bool isBefore, Uri baseUrl)
     {
         // Determine content value — skip generation for "none" and "normal".
         string contentValue = null;
@@ -543,11 +543,11 @@ internal sealed class DomParser
         if (isBefore && parentBox.Boxes.Count > 0)
         {
             var firstChild = parentBox.Boxes[0];
-            pseudoBox = CssBoxHelper.CreateBox(parentBox, before: firstChild);
+            pseudoBox = CssBoxHelper.CreateBox(parentBox, before: firstChild, baseUrl: baseUrl);
         }
         else
         {
-            pseudoBox = CssBoxHelper.CreateBox(parentBox);
+            pseudoBox = CssBoxHelper.CreateBox(parentBox, baseUrl);
         }
 
         // Apply pseudo-element CSS declarations.
@@ -828,21 +828,21 @@ internal sealed class DomParser
         }
     }
 
-    private static void CorrectImgBoxes(CssBox box)
+    private static void CorrectImgBoxes(CssBox box, Uri baseUrl)
     {
         for (int i = box.Boxes.Count - 1; i >= 0; i--)
         {
             var childBox = box.Boxes[i];
             if (childBox is CssBoxImage && childBox.Display == CssConstants.Block)
             {
-                var block = CssBoxHelper.CreateBlock(childBox.ParentBox, null, childBox);
+                var block = CssBoxHelper.CreateBlock(childBox.ParentBox, baseUrl, null, childBox);
                 childBox.ParentBox = block;
                 childBox.Display = CssConstants.Inline;
             }
             else
             {
                 // recursive
-                CorrectImgBoxes(childBox);
+                CorrectImgBoxes(childBox, baseUrl);
             }
         }
     }
@@ -917,19 +917,19 @@ internal sealed class DomParser
         } while (brBox != null);
     }
 
-    private static void CorrectBlockInsideInline(CssBox box)
+    private static void CorrectBlockInsideInline(CssBox box, Uri baseUrl)
     {
         try
         {
             if (DomUtils.ContainsInlinesOnly(box) && !ContainsInlinesOnlyDeep(box))
             {
-                var tempRightBox = CorrectBlockInsideInlineImp(box);
+                var tempRightBox = CorrectBlockInsideInlineImp(box, baseUrl);
                 while (tempRightBox != null)
                 {
                     // loop on the created temp right box for the fixed box until no more need (optimization remove recursion)
                     CssBox newTempRightBox = null;
                     if (DomUtils.ContainsInlinesOnly(tempRightBox) && !ContainsInlinesOnlyDeep(tempRightBox))
-                        newTempRightBox = CorrectBlockInsideInlineImp(tempRightBox);
+                        newTempRightBox = CorrectBlockInsideInlineImp(tempRightBox, baseUrl);
 
                     tempRightBox.ParentBox.SetAllBoxes(tempRightBox);
                     tempRightBox.ParentBox = null;
@@ -940,7 +940,7 @@ internal sealed class DomParser
             if (!DomUtils.ContainsInlinesOnly(box))
             {
                 foreach (var childBox in box.Boxes)
-                    CorrectBlockInsideInline(childBox);
+                    CorrectBlockInsideInline(childBox, baseUrl);
             }
         }
         catch (Exception ex)
@@ -953,14 +953,14 @@ internal sealed class DomParser
     /// Rearrange the DOM of the box to have block box with boxes before the inner block box and after.
     /// </summary>
     /// <param name="box">the box that has the problem</param>
-    private static CssBox CorrectBlockInsideInlineImp(CssBox box)
+    private static CssBox CorrectBlockInsideInlineImp(CssBox box, Uri baseUrl)
     {
         if (box.Display == CssConstants.Inline)
             box.Display = CssConstants.Block;
 
         if (box.Boxes.Count > 1 || box.Boxes[0].Boxes.Count > 1)
         {
-            var leftBlock = CssBoxHelper.CreateBlock(box);
+            var leftBlock = CssBoxHelper.CreateBlock(box, baseUrl);
 
             while (ContainsInlinesOnlyDeep(box.Boxes[0]))
                 box.Boxes[0].ParentBox = leftBlock;
@@ -969,7 +969,7 @@ internal sealed class DomParser
             var splitBox = box.Boxes[1];
             splitBox.ParentBox = null;
 
-            CorrectBlockSplitBadBox(box, splitBox, leftBlock);
+            CorrectBlockSplitBadBox(box, splitBox, leftBlock, baseUrl);
 
             // remove block that did not get any inner elements
             if (leftBlock.Boxes.Count < 1)
@@ -979,7 +979,7 @@ internal sealed class DomParser
             if (box.Boxes.Count > minBoxes)
             {
                 // create temp box to handle the tail elements and then get them back so no deep hierarchy is created
-                var tempRightBox = CssBoxHelper.CreateBox(box, null, box.Boxes[minBoxes]);
+                var tempRightBox = CssBoxHelper.CreateBox(box, baseUrl, null, box.Boxes[minBoxes]);
                 while (box.Boxes.Count > minBoxes + 1)
                     box.Boxes[minBoxes + 1].ParentBox = tempRightBox;
 
@@ -994,7 +994,7 @@ internal sealed class DomParser
         return null;
     }
 
-    private static void CorrectBlockSplitBadBox(CssBox parentBox, CssBox badBox, CssBox leftBlock)
+    private static void CorrectBlockSplitBadBox(CssBox parentBox, CssBox badBox, CssBox leftBlock, Uri baseUrl)
     {
         CssBox leftbox = null;
         while (badBox.Boxes[0].IsInline && ContainsInlinesOnlyDeep(badBox.Boxes[0]))
@@ -1002,7 +1002,7 @@ internal sealed class DomParser
             if (leftbox == null)
             {
                 // if there is no elements in the left box there is no reason to keep it
-                leftbox = CssBoxHelper.CreateBox(leftBlock, badBox.HtmlTag);
+                leftbox = CssBoxHelper.CreateBox(leftBlock, baseUrl, badBox.HtmlTag);
                 leftbox.InheritStyle(badBox, true);
             }
             badBox.Boxes[0].ParentBox = leftbox;
@@ -1011,7 +1011,7 @@ internal sealed class DomParser
         var splitBox = badBox.Boxes[0];
         if (!ContainsInlinesOnlyDeep(splitBox))
         {
-            CorrectBlockSplitBadBox(parentBox, splitBox, leftBlock);
+            CorrectBlockSplitBadBox(parentBox, splitBox, leftBlock, baseUrl);
             splitBox.ParentBox = null;
         }
         else
@@ -1024,7 +1024,7 @@ internal sealed class DomParser
             CssBox rightBox;
             if (splitBox.ParentBox != null || parentBox.Boxes.Count < 3)
             {
-                rightBox = CssBoxHelper.CreateBox(parentBox, badBox.HtmlTag);
+                rightBox = CssBoxHelper.CreateBox(parentBox, baseUrl, badBox.HtmlTag);
                 rightBox.InheritStyle(badBox, true);
 
                 if (parentBox.Boxes.Count > 2)
@@ -1048,7 +1048,7 @@ internal sealed class DomParser
         }
     }
 
-    private static void CorrectInlineBoxesParent(CssBox box)
+    private static void CorrectInlineBoxesParent(CssBox box, Uri baseUrl)
     {
         if (ContainsVariantBoxes(box))
         {
@@ -1056,7 +1056,7 @@ internal sealed class DomParser
             {
                 if (box.Boxes[i].IsInline)
                 {
-                    var newbox = CssBoxHelper.CreateBlock(box, null, box.Boxes[i++]);
+                    var newbox = CssBoxHelper.CreateBlock(box, baseUrl, null, box.Boxes[i++]);
                     while (i < box.Boxes.Count && box.Boxes[i].IsInline)
                         box.Boxes[i].ParentBox = newbox;
                 }
@@ -1066,7 +1066,7 @@ internal sealed class DomParser
         if (!DomUtils.ContainsInlinesOnly(box))
         {
             foreach (var childBox in box.Boxes)
-                CorrectInlineBoxesParent(childBox);
+                CorrectInlineBoxesParent(childBox, baseUrl);
         }
     }
 

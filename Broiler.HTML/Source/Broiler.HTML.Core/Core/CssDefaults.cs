@@ -67,7 +67,8 @@ internal static class CssDefaults
         ol ul ul, 
         ul ol ul        { list-style-type: square }
         u, ins          { text-decoration: underline }
-        br:before       { content: ""\A"" }
+        /*br:before       { content: ""\A"" }*/
+        br:before       { content: """" }
         :before, :after { white-space: pre-line }
         center          { text-align: center }
         :link, :visited { text-decoration: underline }

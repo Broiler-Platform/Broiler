@@ -3,6 +3,7 @@ using Broiler.HTML.Core.Core;
 using Broiler.HTML.Core.Core.Dom;
 using Broiler.HTML.CSS.Core.Dom;
 using Broiler.HTML.Utils.Core.Utils;
+using System;
 using System.Drawing;
 
 namespace Broiler.HTML.Dom.Core.Dom;
@@ -13,10 +14,11 @@ internal sealed class CssBoxImage : CssBox
     private IImageLoadHandler _imageLoadHandler;
     private bool _imageLoadingComplete;
 
-    public CssBoxImage(CssBox parent, HtmlTag tag) : base(parent, tag)
+    public CssBoxImage(CssBox parent, HtmlTag tag, Uri baseUrl) : base(parent, tag, baseUrl)
     {
         _imageWord = new CssRectImage(this);
         Words.Add(_imageWord);
+
     }
 
     public RImage Image => _imageWord.Image;
@@ -35,14 +37,14 @@ internal sealed class CssBoxImage : CssBox
                 _imageLoadHandler = ContainerInt.CreateImageLoadHandler(OnLoadImageComplete);
 
                 if (Content != null && Content != CssConstants.Normal)
-                    _imageLoadHandler.LoadImage(Content, HtmlTag?.Attributes);
+                    _imageLoadHandler.LoadImage(Content, HtmlTag?.Attributes, base.BaseUrl);
                 else
                 {
                     var src = GetAttribute("src");
                     // <object data="..."> fallback: use 'data' attribute when 'src' is absent
                     if (string.IsNullOrEmpty(src))
                         src = GetAttribute("data");
-                    _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes);
+                    _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, base.BaseUrl);
                 }
             }
 

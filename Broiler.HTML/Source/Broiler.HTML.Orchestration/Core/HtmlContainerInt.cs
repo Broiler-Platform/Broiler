@@ -159,7 +159,7 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
         _cssData = baseCssData ?? Adapter.DefaultCssData;
 
         DomParser parser = new(CssParser, new StylesheetLoadHandler(this));
-        Root = parser.GenerateCssTree(htmlSource, this, ref _cssData);
+        Root = parser.GenerateCssTree(htmlSource, this, ref _cssData, new Uri(baseUrl ?? "/", UriKind.RelativeOrAbsolute));
 
         if (Root == null)
             return;
@@ -519,6 +519,7 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
             var href = ResolveHref(link.HrefLink);
             var nfo = new ProcessStartInfo(href) { UseShellExecute = true };
             Process.Start(nfo);
+
         }
     }
 

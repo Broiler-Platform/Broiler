@@ -6,8 +6,8 @@ namespace Broiler.HTML.Dom.Core.Dom;
 
 internal sealed class CssSpacingBox : CssBox
 {
-    public CssSpacingBox(CssBox tableBox, ref CssBox extendedBox, int startRow)
-        : base(tableBox, new HtmlTag("none", false, new Dictionary<string, string> { { "colspan", "1" } }))
+    public CssSpacingBox(CssBox tableBox, ref CssBox extendedBox, int startRow, Uri baseUrl)
+        : base(tableBox, new HtmlTag("none", false, new Dictionary<string, string> { { "colspan", "1" } }), baseUrl)
     {
         ExtendedBox = extendedBox;
         Display = CssConstants.None;

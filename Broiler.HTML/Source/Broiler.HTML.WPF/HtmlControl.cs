@@ -237,6 +237,9 @@ public class HtmlControl : Control
     {
         RoutedEventArgs newEventArgs = new RoutedEventArgs<HtmlLinkClickedEventArgs>(LinkClickedEvent, this, e);
         RaiseEvent(newEventArgs);
+
+        if (newEventArgs.Handled)
+            e.Handled = true;
     }
 
     protected virtual void OnRenderError(HtmlRenderErrorEventArgs e)
@@ -306,7 +309,7 @@ public class HtmlControl : Control
         else if (e.Property == TextProperty)
         {
             htmlContainer.ScrollOffset = new Point(0, 0);
-            htmlContainer.SetHtml((string)e.NewValue, control._baseCssData);
+            htmlContainer.SetHtml((string)e.NewValue, control._baseCssData, htmlContainer.BaseUrl);
             control.InvalidateMeasure();
             control.InvalidateVisual();
             control.InvokeMouseMove();

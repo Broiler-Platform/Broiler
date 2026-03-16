@@ -21,9 +21,9 @@ internal static class HtmlParser
         "p", "pre", "section", "summary", "table", "ul"
     };
 
-    public static CssBox ParseDocument(string source)
+    public static CssBox ParseDocument(string source, Uri baseUrl)
     {
-        var root = CssBoxHelper.CreateBlock();
+        var root = CssBoxHelper.CreateBlock(baseUrl);
         var curBox = root;
 
         int endIdx = 0;
@@ -35,7 +35,7 @@ internal static class HtmlParser
             if (tagIdx >= 0 && tagIdx < source.Length)
             {
                 // add the html text as anon css box to the structure
-                AddTextBox(source, startIdx, tagIdx, ref curBox);
+                AddTextBox(source, startIdx, tagIdx, ref curBox, baseUrl);
 
                 if (source[tagIdx + 1] == '!')
                 {
@@ -55,14 +55,14 @@ internal static class HtmlParser
                 else
                 {
                     // parse element tag to css box structure
-                    endIdx = ParseHtmlTag(source, tagIdx, ref curBox) + 1;
+                    endIdx = ParseHtmlTag(source, tagIdx, ref curBox, baseUrl) + 1;
 
                     if (curBox.HtmlTag != null && curBox.HtmlTag.Name.Equals(HtmlConstants.Style, StringComparison.OrdinalIgnoreCase))
                     {
                         var endIdxS = endIdx;
                         endIdx = source.IndexOf("</style>", endIdx, StringComparison.OrdinalIgnoreCase);
                         if (endIdx > -1)
-                            AddTextBox(source, endIdxS, endIdx, ref curBox);
+                            AddTextBox(source, endIdxS, endIdx, ref curBox, baseUrl);
                     }
                 }
             }
@@ -77,7 +77,7 @@ internal static class HtmlParser
             var endText = source.AsMemory(endIdx, source.Length - endIdx);
             if (!endText.Span.IsWhiteSpace())
             {
-                var abox = CssBoxHelper.CreateBox(root);
+                var abox = CssBoxHelper.CreateBox(root, baseUrl);
                 abox.Text = endText;
             }
         }
@@ -85,16 +85,16 @@ internal static class HtmlParser
         return root;
     }
 
-    private static void AddTextBox(string source, int startIdx, int tagIdx, ref CssBox curBox)
+    private static void AddTextBox(string source, int startIdx, int tagIdx, ref CssBox curBox, Uri baseUrl)
     {
         if (tagIdx <= startIdx)
             return;
 
-        var abox = CssBoxHelper.CreateBox(curBox);
+        var abox = CssBoxHelper.CreateBox(curBox, baseUrl);
         abox.Text = source.AsMemory(startIdx, tagIdx - startIdx);
     }
 
-    private static int ParseHtmlTag(string source, int tagIdx, ref CssBox curBox)
+    private static int ParseHtmlTag(string source, int tagIdx, ref CssBox curBox, Uri baseUrl)
     {
         var endIdx = source.IndexOf('>', tagIdx + 1);
         if (endIdx <= 0)
@@ -128,12 +128,12 @@ internal static class HtmlParser
             if (isSingle)
             {
                 // the current box is not changed
-                CssBoxHelper.CreateBox(tag, curBox);
+                CssBoxHelper.CreateBox(tag, baseUrl, curBox);
             }
             else
             {
                 // go one level down, make the new box the current box
-                curBox = CssBoxHelper.CreateBox(tag, curBox);
+                curBox = CssBoxHelper.CreateBox(tag, baseUrl, curBox);
             }
         }
         else

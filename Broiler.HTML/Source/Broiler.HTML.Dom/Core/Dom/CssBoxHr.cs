@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 using Broiler.HTML.Adapters.Adapters;
 using Broiler.HTML.CSS.Core.Parse;
 using Broiler.HTML.Dom.Core.Utils;
@@ -8,7 +9,7 @@ namespace Broiler.HTML.Dom.Core.Dom;
 
 internal sealed class CssBoxHr : CssBox
 {
-    public CssBoxHr(CssBox parent, HtmlTag tag) : base(parent, tag) => Display = CssConstants.Block;
+    public CssBoxHr(CssBox parent, HtmlTag tag, Uri baseUrl) : base(parent, tag, baseUrl) => Display = CssConstants.Block;
 
     protected override void PerformLayoutImp(RGraphics g)
     {

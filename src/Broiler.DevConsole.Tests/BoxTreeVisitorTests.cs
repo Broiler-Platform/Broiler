@@ -7,10 +7,10 @@ public class BoxTreeVisitorTests
     [Fact]
     public void Walk_Visits_All_Boxes()
     {
-        var root = new CssBox(null, new HtmlTag("div", false));
-        var child1 = new CssBox(root, new HtmlTag("p", false));
-        var child2 = new CssBox(root, new HtmlTag("span", false));
-        var grandchild = new CssBox(child1, new HtmlTag("a", false));
+        var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
+        var child1 = new CssBox(root, new HtmlTag("p", false), new Uri("/"));
+        var child2 = new CssBox(root, new HtmlTag("span", false), new Uri("/"));
+        var grandchild = new CssBox(child1, new HtmlTag("a", false), new Uri("/"));
 
         var visited = new List<(CssBox box, int depth)>();
         var visitor = new TestVisitor(visited);
@@ -26,10 +26,10 @@ public class BoxTreeVisitorTests
     [Fact]
     public void Walk_Skips_Subtree_When_Visitor_Returns_False()
     {
-        var root = new CssBox(null, new HtmlTag("div", false));
-        var child1 = new CssBox(root, new HtmlTag("p", false));
-        var grandchild = new CssBox(child1, new HtmlTag("a", false));
-        var child2 = new CssBox(root, new HtmlTag("span", false));
+        var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
+        var child1 = new CssBox(root, new HtmlTag("p", false), new Uri("/"));
+        var grandchild = new CssBox(child1, new HtmlTag("a", false), new Uri("/"));
+        var child2 = new CssBox(root, new HtmlTag("span", false), new Uri("/"));
 
         var visited = new List<(CssBox box, int depth)>();
         // Skip child1's subtree
@@ -45,10 +45,10 @@ public class BoxTreeVisitorTests
     [Fact]
     public void Flatten_Returns_All_Boxes_Depth_First()
     {
-        var root = new CssBox(null, new HtmlTag("div", false));
-        var child1 = new CssBox(root, new HtmlTag("p", false));
-        var grandchild = new CssBox(child1, new HtmlTag("a", false));
-        var child2 = new CssBox(root, new HtmlTag("span", false));
+        var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
+        var child1 = new CssBox(root, new HtmlTag("p", false), new Uri("/"));
+        var grandchild = new CssBox(child1, new HtmlTag("a", false), new Uri("/"));
+        var child2 = new CssBox(root, new HtmlTag("span", false), new Uri("/"));
 
         var flat = BoxTreeVisitor.Flatten(root);
 
@@ -62,7 +62,7 @@ public class BoxTreeVisitorTests
     [Fact]
     public void Flatten_Single_Box_Returns_One()
     {
-        var root = new CssBox(null, new HtmlTag("div", false));
+        var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
         var flat = BoxTreeVisitor.Flatten(root);
         Assert.Single(flat);
     }

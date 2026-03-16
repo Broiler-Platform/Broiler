@@ -15,7 +15,6 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
 {
     public static readonly RGraphicsRasterBackend Instance = new();
 
-    /// <inheritdoc />
     public void Render(DisplayList list, object surface)
     {
         if (surface is not RGraphics g)

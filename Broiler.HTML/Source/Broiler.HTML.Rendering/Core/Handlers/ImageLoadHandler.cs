@@ -33,11 +33,11 @@ internal sealed class ImageLoadHandler : IImageLoadHandler
     public RImage Image { get; private set; }
     public RectangleF Rectangle => _imageRectangle;
 
-    public void LoadImage(string src, Dictionary<string, string> attributes)
+    public void LoadImage(string src, Dictionary<string, string> attributes, Uri baseUrl)
     {
         try
         {
-            var args = new HtmlImageLoadEventArgs(src, attributes, OnHtmlImageLoadEventCallback);
+            var args = new HtmlImageLoadEventArgs(src, attributes, OnHtmlImageLoadEventCallback, baseUrl);
             _htmlContainer.RaiseHtmlImageLoadEvent(args);
             _asyncCallback = !_htmlContainer.AvoidAsyncImagesLoading;
 
@@ -51,7 +51,7 @@ internal sealed class ImageLoadHandler : IImageLoadHandler
                     }
                     else
                     {
-                        SetImageFromPath(src);
+                        SetImageFromPath(src, baseUrl);
                     }
                 }
                 else
@@ -74,7 +74,7 @@ internal sealed class ImageLoadHandler : IImageLoadHandler
     }
 
 
-    private void OnHtmlImageLoadEventCallback(string path, object image, RectangleF imageRectangle)
+    private void OnHtmlImageLoadEventCallback(string path, object image, RectangleF imageRectangle, Uri baseUrl)
     {
         if (_disposed)
             return;
@@ -88,7 +88,7 @@ internal sealed class ImageLoadHandler : IImageLoadHandler
         }
         else if (!string.IsNullOrEmpty(path))
         {
-            SetImageFromPath(path);
+            SetImageFromPath(path, baseUrl);
         }
         else
         {
@@ -135,9 +135,12 @@ internal sealed class ImageLoadHandler : IImageLoadHandler
         return _htmlContainer.ImageFromStream(new MemoryStream(imageData));
     }
 
-    private void SetImageFromPath(string path)
+    private void SetImageFromPath(string path, Uri baseUrl)
     {
         var uri = CommonUtils.TryGetUri(path);
+
+        if (uri.IsAbsoluteUri == false)
+            uri = new Uri(baseUrl, uri);
 
         if (uri != null && uri.IsAbsoluteUri && uri.Scheme != "file")
         {
