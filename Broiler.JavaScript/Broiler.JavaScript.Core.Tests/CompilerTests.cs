@@ -1,8 +1,8 @@
 using Broiler.JavaScript.Ast;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.FastParser;
 using Broiler.JavaScript.Core.FastParser.Compiler;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.Parser;
 
 namespace Broiler.JavaScript.Core.Tests;
 
@@ -674,7 +674,7 @@ public class CompilerTests
     public void IParser_FastParser_Implements_IParser()
     {
         var stream = new FastTokenStream("1 + 2;");
-        var parser = new Broiler.JavaScript.Core.FastParser.FastParser(stream);
+        var parser = new Broiler.JavaScript.Parser.FastParser(stream);
         Assert.IsAssignableFrom<IParser>(parser);
     }
 
@@ -682,7 +682,7 @@ public class CompilerTests
     public void IParser_ParseProgram_Via_Interface()
     {
         var stream = new FastTokenStream("var x = 42;");
-        IParser parser = new Broiler.JavaScript.Core.FastParser.FastParser(stream);
+        IParser parser = new Broiler.JavaScript.Parser.FastParser(stream);
         var program = parser.ParseProgram();
         Assert.NotNull(program);
         Assert.Equal(FastNodeType.Program, program.Type);
@@ -692,7 +692,7 @@ public class CompilerTests
     public void IParser_ParseProgram_EmptySource()
     {
         var stream = new FastTokenStream("");
-        IParser parser = new Broiler.JavaScript.Core.FastParser.FastParser(stream);
+        IParser parser = new Broiler.JavaScript.Parser.FastParser(stream);
         var program = parser.ParseProgram();
         Assert.NotNull(program);
         Assert.Equal(0, program.Statements.Count);
@@ -702,7 +702,7 @@ public class CompilerTests
     public void IParser_InvalidSyntax_Throws()
     {
         var stream = new FastTokenStream("function { }");
-        IParser parser = new Broiler.JavaScript.Core.FastParser.FastParser(stream);
+        IParser parser = new Broiler.JavaScript.Parser.FastParser(stream);
         Assert.ThrowsAny<Exception>(parser.ParseProgram);
     }
 }

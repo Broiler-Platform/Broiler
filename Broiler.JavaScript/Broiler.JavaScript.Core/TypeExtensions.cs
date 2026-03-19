@@ -6,7 +6,6 @@ using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.FastParser.Parser;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;

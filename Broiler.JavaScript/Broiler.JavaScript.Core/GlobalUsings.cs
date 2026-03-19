@@ -3,3 +3,4 @@
 // downstream projects can continue to use the old namespace-qualified
 // names without modification.
 global using Broiler.JavaScript.Ast;
+global using Broiler.JavaScript.Parser;

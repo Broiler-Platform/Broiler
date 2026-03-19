@@ -26,6 +26,7 @@
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core.Tests/Broiler.JavaScript.Core.Tests.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core/Broiler.JavaScript.Core.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.ExpressionCompiler/Broiler.JavaScript.ExpressionCompiler.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Parser/Broiler.JavaScript.Parser.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.JSClassGenerator/Broiler.JavaScript.JSClassGenerator.csproj" />
   </Folder>
 </Solution>
