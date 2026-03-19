@@ -3,7 +3,7 @@ using Broiler.JavaScript.ExpressionCompiler.Core;
 using System;
 namespace Broiler.JavaScript.Ast;
 
-internal static class ExpressionPatternExtensions
+public static class ExpressionPatternExtensions
 {
     public static AstExpression ToPattern(this AstExpression exp)
     {

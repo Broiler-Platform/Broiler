@@ -7,7 +7,6 @@ using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YP
 using Broiler.JavaScript.Core.Core.Class;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.FastParser.Ast;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.Core.Core.Function;

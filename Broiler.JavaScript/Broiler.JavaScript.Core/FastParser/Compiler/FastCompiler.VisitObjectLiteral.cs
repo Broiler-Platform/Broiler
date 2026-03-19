@@ -2,7 +2,6 @@
 
 using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Broiler.JavaScript.Core.FastParser.Ast;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;

@@ -1,5 +1,5 @@
+using Broiler.JavaScript.Ast;
 using Broiler.JavaScript.Core.FastParser;
-using Broiler.JavaScript.Core.FastParser.Ast;
 
 namespace Broiler.JavaScript.Core.Tests;
 

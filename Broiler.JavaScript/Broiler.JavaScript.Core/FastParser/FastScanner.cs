@@ -1202,12 +1202,18 @@ public class FastScanner
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public FastToken Commit(TokenTypes type, bool number)
+        public FastToken Commit(TokenTypes type, bool parseNumber)
         {
             var cp = scanner.position;
             var start = scanner.Text.Offset + position;
             var location = scanner.Location;
-            var token = new FastToken(type, scanner.Text.Source, null, null, start, cp - start, this.start, location, number);
+            double number = 0;
+            if (parseNumber)
+            {
+                var span = new StringSpan(scanner.Text.Source, start, cp - start);
+                number = Broiler.JavaScript.Core.Utils.NumberParser.CoerceToNumber(span);
+            }
+            var token = new FastToken(type, scanner.Text.Source, null, null, start, cp - start, this.start, location, number: number);
             scanner = null;
             return token;
         }
@@ -1248,7 +1254,57 @@ public class FastScanner
             var cp = scanner.position;
             var start = scanner.Text.Offset + position;
             var location = scanner.Location;
-            var token = new FastToken(TokenTypes.Identifier, scanner.Text.Source, null, null, start, cp - start, this.start, location, false, keywords);
+
+            var span = new StringSpan(scanner.Text.Source, start, cp - start);
+            bool isKw = keywords.IsKeyword(span, out var k);
+            var tokenType = TokenTypes.Identifier;
+            var keyword = k;
+            var contextualKeyword = FastKeywords.none;
+
+            if (isKw)
+            {
+                switch (k)
+                {
+                    case FastKeywords.instanceof:
+                        isKw = false;
+                        keyword = FastKeywords.none;
+                        tokenType = TokenTypes.InstanceOf;
+                        break;
+                    case FastKeywords.@in:
+                        isKw = false;
+                        keyword = FastKeywords.none;
+                        tokenType = TokenTypes.In;
+                        break;
+                    case FastKeywords.@null:
+                        isKw = false;
+                        tokenType = TokenTypes.Null;
+                        keyword = FastKeywords.none;
+                        break;
+                    case FastKeywords.@true:
+                        isKw = false;
+                        tokenType = TokenTypes.True;
+                        keyword = FastKeywords.none;
+                        break;
+                    case FastKeywords.@false:
+                        isKw = false;
+                        tokenType = TokenTypes.False;
+                        keyword = FastKeywords.none;
+                        break;
+                    case FastKeywords.get:
+                    case FastKeywords.set:
+                    case FastKeywords.of:
+                    case FastKeywords.constructor:
+                    case FastKeywords.from:
+                    case FastKeywords.@as:
+                        isKw = false;
+                        tokenType = TokenTypes.Identifier;
+                        contextualKeyword = k;
+                        keyword = FastKeywords.none;
+                        break;
+                }
+            }
+
+            var token = new FastToken(tokenType, scanner.Text.Source, null, null, start, cp - start, this.start, location, isKeyword: isKw, keyword: keyword, contextualKeyword: contextualKeyword);
             scanner = null;
             return token;
         }

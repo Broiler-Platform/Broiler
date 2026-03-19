@@ -210,7 +210,7 @@ public readonly struct StringSpan : IEquatable<StringSpan>, IEquatable<string>, 
         return new string(d);
     }
 
-    internal bool IsNullOrWhiteSpace() => Source == null || string.IsNullOrWhiteSpace(Value);
+    public bool IsNullOrWhiteSpace() => Source == null || string.IsNullOrWhiteSpace(Value);
 
     public bool IsEmpty => Length == 0;
 

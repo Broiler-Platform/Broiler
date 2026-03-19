@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core.Storage;
-using Broiler.JavaScript.Core.FastParser.Ast;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 
 namespace Broiler.JavaScript.Core.FastParser.Parser;
