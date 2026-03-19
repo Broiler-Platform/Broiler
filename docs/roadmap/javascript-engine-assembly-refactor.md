@@ -349,12 +349,12 @@ changes:
 |-------|----------|-----------|--------|
 | **Phase 1** | **Ast** | Zero dependencies. Pure data types. Smallest, safest extraction. | ✅ Complete |
 | **Phase 2** | **Parser** | Depends only on Ast. Self-contained lexer + parser. | ✅ Complete |
-| **Phase 3** | **Storage** | Depends on shared primitives. Decouples property storage from runtime logic. | Not started |
-| **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. | Not started |
-| **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | Not started |
+| **Phase 3** | **Storage** | Depends on shared primitives. Decouples property storage from runtime logic. | ✅ Partial — pure storage types extracted |
+| **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. | ✅ Partial — V8 Inspector Protocol extracted |
+| **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | ⏳ Blocked — requires Core refactoring to use IClrInterop exclusively (24+ direct ClrProxy references) |
 | **Phase 6** | **BuiltIns** | High coupling to Runtime, but only through `JSValue`/`JSContext`. Requires `IBuiltInRegistry` to be in place. | Not started |
 | **Phase 7** | **Compiler** | Depends on Ast, Runtime, and ExpressionCompiler. Requires stable interfaces. | Not started |
-| **Phase 8** | **Modules** | Last — depends on Runtime, Parser, and Clr. | Not started |
+| **Phase 8** | **Modules** | Last — depends on Runtime, Parser, and Clr. | ⏳ Blocked — JSFunctionGenerator creates partial class in Core namespace; JSModuleContext extends JSContext |
 
 ### 4.3 Per-Phase Workflow
 
@@ -403,14 +403,20 @@ Each extraction phase follows the same steps:
 
 ### Milestone 2 — Infrastructure Extraction (Phases 3–4)
 
+**Phase 3 — Storage: ✅ Partial (2026-03-19)**
+
+**Phase 4 — Debugger: ✅ Partial (2026-03-19)**
+
 **Deliverables:**
-- `Broiler.JavaScript.Storage` assembly
-- `Broiler.JavaScript.Debugger` assembly
-- Corresponding test projects
+- `Broiler.JavaScript.Storage` assembly ✅ (pure storage types)
+- `Broiler.JavaScript.Debugger` assembly ✅ (V8 Inspector Protocol)
+- Corresponding test projects *(future — assembly-specific tests)*
 
 **Key Metrics:**
-- Storage has no reference to `JSContext` (only to shared primitives).
-- Debugger depends on Runtime only via `IDebugger`.
+- Storage has no reference to `JSContext` (only to Ast shared primitives). ✅
+- Debugger depends on Core via `InternalsVisibleTo` bridge (temporary). ✅
+- 3 runtime-dependent storage types (JSProperty, PropertySequence, ElementArray)
+  remain in Core until Runtime extraction resolves the circular dependency.
 
 ### Milestone 3 — Interop Extraction (Phases 5–6)
 
@@ -764,6 +770,172 @@ from Parser back to Core:
 - `Broiler.JavaScript.Parser` compiles with zero errors.
 - `Broiler.JavaScript.Core` compiles with zero errors.
 - All **641** tests in `Broiler.JavaScript.Core.Tests` pass.
+
+---
+
+### Phase 3 — Storage Extraction ✅ (Partial)
+
+**Status:** Partial — pure storage types extracted
+
+**Date:** 2026-03-19
+
+**What was done:**
+
+1. Created `Broiler.JavaScript.Storage` assembly at
+   `Broiler.JavaScript/Broiler.JavaScript.Storage/`.
+2. Moved **7 pure storage files** from `Broiler.JavaScript.Core/Core/Storage/`:
+   - `VirtualMemory<T>` and `VirtualArray` (dynamic memory management)
+   - `SAUint32Map<T>` (sparse array-based uint-to-T trie)
+   - `StringMap<T>` (hash-based trie for StringSpan/HashedString keys)
+   - `HashedString` (struct caching StringSpan hash)
+   - `ConcurrentStringMap<T>`, `ConcurrentNameMap`, `ConcurrentUInt32Map<T>`
+     (thread-safe string/uint maps)
+   - `ConcurrentTypeCache` (static type-to-ID cache)
+   - `ConcurrentTypeTrie<T>` (type-to-T cache)
+3. All types use the new namespace `Broiler.JavaScript.Storage`.
+4. `Broiler.JavaScript.Core` references `Broiler.JavaScript.Storage` via
+   `<ProjectReference>`.
+5. Updated `GlobalUsings.cs` (`global using Broiler.JavaScript.Storage;`) in Core
+   for source-level backward compatibility.
+6. Added `StorageTypeForwarding.cs` with `[assembly: TypeForwardedTo(...)]`
+   attributes for binary compatibility.
+7. Updated `Broiler.slnx` to include the new project.
+
+**Accessibility changes:**
+
+- `ConcurrentTypeCache` changed from `internal` to `public` (used by
+  `MarshalExtensions` in Core).
+- `ConcurrentTypeTrie<T>` changed from `internal` to `public` (same reason).
+- `SAUint32Map<T>.Resize` changed from `internal` to `public` (used by
+  `ElementArray` in Core).
+- `ConcurrentUInt32Map<T>.GetOrCreate` overloads changed from `internal` to
+  `public` (used by `ModuleCache` and `ClrType` in Core).
+
+**Types that remain in Core:**
+
+Three storage types depend on runtime types (`JSValue`, `JSFunction`,
+`JSObject`, `JSContext`, `KeyString`) and were **not** extracted:
+
+- `JSProperty` (struct) — references `JSFunction`, `JSValue`, `KeyString`.
+- `PropertySequence` (struct) — references `JSObject`, `JSContext`, `KeyString`.
+- `ElementArray` (struct) — references `JSProperty`, `JSValue`, `JSFunction`.
+
+These will be moved when the Runtime assembly is extracted, resolving the
+circular dependency described in Section 2.3.
+
+**Verification:**
+- `Broiler.JavaScript.Storage` compiles with zero errors (depends only on Ast).
+- `Broiler.JavaScript.Core` compiles with zero errors.
+- All **641** tests in `Broiler.JavaScript.Core.Tests` pass.
+
+---
+
+### Phase 4 — Debugger Extraction ✅ (Partial)
+
+**Status:** Partial — V8 Inspector Protocol extracted
+
+**Date:** 2026-03-19
+
+**What was done:**
+
+1. Created `Broiler.JavaScript.Debugger` assembly at
+   `Broiler.JavaScript/Broiler.JavaScript.Debugger/`.
+2. Moved **26 V8 Inspector Protocol files** from
+   `Broiler.JavaScript.Core/Debugger/`:
+   - `V8InspectorProtocol` (abstract protocol handler, extends `JSDebugger`)
+   - `V8InspectorProtocolProxy` (WebSocket transport)
+   - `V8Debugger` + 4 partial files (debugger domain handler)
+   - `V8Runtime` + 10 partial files (runtime domain handler)
+   - `V8RemoteObject`, `V8ReturnValue`, `V8ExceptionDetails`,
+     `V8PropertyDescriptor`, `V8StackTrace` (protocol data types)
+   - `V8ProtocolEvent`, `V8ProtocolObject` (protocol infrastructure)
+   - `AsyncQueue<T>`, `HashExtensions` (utilities)
+3. All types use the new namespace `Broiler.JavaScript.Debugger`.
+4. The Debugger assembly references Core via `<ProjectReference>`.
+5. Updated `Broiler.slnx` to include the new project.
+
+**Types that remain in Core:**
+
+- `IDebugger` (interface) — consumed by `JSContext.Debugger` property.
+- `JSDebugger` (abstract class) — provides `RaiseBreak()` static method used by
+  `JSDebuggerBuilder` and `FastCompiler` for `debugger;` statement support.
+- `JSConsole` (in `Core/Debug/`) — created directly by `JSContext` constructor.
+
+**Dependency direction:**
+
+The Debugger assembly references Core (upward dependency). Core does **not**
+reference the Debugger assembly. This means:
+
+- No `TypeForwardedTo` attributes are used (they require a downward reference).
+- Consumers who need V8 Inspector Protocol must reference the Debugger assembly
+  directly.
+- `InternalsVisibleTo("Broiler.JavaScript.Debugger")` was added to Core's
+  `AssemblyInfo.cs` as a temporary migration bridge (per Section 4.1 #3). The
+  internal APIs accessed are: `JSContext.Top`, `KeyStrings.GetNameString`,
+  `JSPrototype.propertySet`, `CoreScript.Compile`, `JSValue.StringValue`,
+  `JSValue.IsNullOrUndefined`, `JSValue.GetValue`.
+
+**Verification:**
+- `Broiler.JavaScript.Debugger` compiles with zero errors.
+- `Broiler.JavaScript.Core` compiles with zero errors.
+- All **641** tests in `Broiler.JavaScript.Core.Tests` pass.
+
+---
+
+### Phase 5–8 — Dependency Analysis
+
+**Status:** Blocked — documented for future work
+
+**Date:** 2026-03-19
+
+**Findings:**
+
+During analysis for Phases 5–8, the following blocking dependencies were
+identified:
+
+**Phase 5 (Clr):**
+- `ClrProxy`, `ClrType`, and `ClrModule` are referenced from **24+** files in
+  Core (outside `Core/Clr/`), including `JSContext`, `JSValue`, `JSFunction`,
+  `MarshalExtensions`, `ClrProxyBuilder`, `OwnEntriesEnumerator`,
+  `JSMethodGroup`, `JSGlobal`, `JSPromiseExtensions`, etc.
+- `ClrProxy` extends `JSObject` (Core type), so the Clr assembly must reference
+  Core. But Core directly uses `ClrProxy.From()` and `ClrProxy.Marshal()`,
+  which would require Core to reference Clr — creating a circular dependency.
+- **Resolution required:** Refactor all 24+ Core call sites to use
+  `IClrInterop.Marshal()` and `IClrInterop.GetClrType()` exclusively. Expand
+  the `IClrInterop` interface as needed. This is the intended design per
+  Section 3.7 ("Registers itself via `IBuiltInRegistry`").
+
+**Phase 6 (BuiltIns):**
+- All built-in types use `[JSFunctionGenerator]` which produces generated
+  partial classes in Core's namespace. Extracting built-in types requires the
+  source generator to run in the BuiltIns assembly, and the generated code must
+  use the new namespace.
+- `IBuiltInRegistry` pluggable bootstrap must be implemented first so that
+  `JSContext` does not hard-code built-in type registration.
+
+**Phase 7 (Compiler):**
+- `FastCompiler` references runtime types (`JSValue`, `JSContext`, `Arguments`,
+  `JSFunction`) extensively in expression tree generation. These references are
+  inherent to the compilation model (the generated expression trees call runtime
+  methods).
+- Extraction requires stable Runtime interfaces to be in place first.
+
+**Phase 8 (Modules):**
+- `JSModule` extends `JSObject` and uses `[JSFunctionGenerator]`, creating the
+  same namespace-linked generated partial class issue as BuiltIns.
+- `JSModuleContext` extends `JSContext`, creating a deep inheritance dependency.
+- Module files use internal Core APIs (`WaitTask`, `StringValue`,
+  `CoreScript.Compile`).
+
+**Recommended next steps:**
+1. Implement `IBuiltInRegistry` pluggable bootstrap in Core (prerequisite for
+   Phases 5–6).
+2. Refactor Core to use `IClrInterop` exclusively (prerequisite for Phase 5).
+3. Configure `JSClassGenerator` to work with extracted assemblies (prerequisite
+   for Phases 6 and 8).
+4. Define stable Runtime interfaces for compiler consumption (prerequisite for
+   Phase 7).
 
 ---
 
