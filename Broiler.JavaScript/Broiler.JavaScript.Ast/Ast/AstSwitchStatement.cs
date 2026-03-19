@@ -1,0 +1,9 @@
+﻿using Broiler.JavaScript.ExpressionCompiler.Core;
+
+namespace Broiler.JavaScript.Ast;
+
+public class AstSwitchStatement(FastToken start, FastToken end, AstExpression target, IFastEnumerable<AstCase> astCases) : AstStatement(start, FastNodeType.SwitchStatement, end)
+{
+    public readonly AstExpression Target = target;
+    public readonly IFastEnumerable<AstCase> Cases = astCases;
+}
