@@ -1,6 +1,5 @@
 ﻿#nullable enable
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.FastParser.Ast;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using System;

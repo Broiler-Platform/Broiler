@@ -345,16 +345,16 @@ integration.
 Assemblies are extracted in order of increasing coupling to minimize cascading
 changes:
 
-| Phase | Assembly | Rationale |
-|-------|----------|-----------|
-| **Phase 1** | **Ast** | Zero dependencies. Pure data types. Smallest, safest extraction. |
-| **Phase 2** | **Parser** | Depends only on Ast. Self-contained lexer + parser. |
-| **Phase 3** | **Storage** | Depends on shared primitives. Decouples property storage from runtime logic. |
-| **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. |
-| **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. |
-| **Phase 6** | **BuiltIns** | High coupling to Runtime, but only through `JSValue`/`JSContext`. Requires `IBuiltInRegistry` to be in place. |
-| **Phase 7** | **Compiler** | Depends on Ast, Runtime, and ExpressionCompiler. Requires stable interfaces. |
-| **Phase 8** | **Modules** | Last — depends on Runtime, Parser, and Clr. |
+| Phase | Assembly | Rationale | Status |
+|-------|----------|-----------|--------|
+| **Phase 1** | **Ast** | Zero dependencies. Pure data types. Smallest, safest extraction. | ✅ Complete |
+| **Phase 2** | **Parser** | Depends only on Ast. Self-contained lexer + parser. | Not started |
+| **Phase 3** | **Storage** | Depends on shared primitives. Decouples property storage from runtime logic. | Not started |
+| **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. | Not started |
+| **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | Not started |
+| **Phase 6** | **BuiltIns** | High coupling to Runtime, but only through `JSValue`/`JSContext`. Requires `IBuiltInRegistry` to be in place. | Not started |
+| **Phase 7** | **Compiler** | Depends on Ast, Runtime, and ExpressionCompiler. Requires stable interfaces. | Not started |
+| **Phase 8** | **Modules** | Last — depends on Runtime, Parser, and Clr. | Not started |
 
 ### 4.3 Per-Phase Workflow
 
@@ -385,15 +385,20 @@ Each extraction phase follows the same steps:
 
 ### Milestone 1 — Foundation (Phases 1–2)
 
+**Phase 1 — Ast: ✅ Complete (2026-03-19)**
+
 **Deliverables:**
-- `Broiler.JavaScript.Ast` assembly with all AST node types
-- `Broiler.JavaScript.Parser` assembly with lexer and parser
-- `Broiler.JavaScript.Parser.Tests` project
-- All existing tests pass
+- `Broiler.JavaScript.Ast` assembly with all AST node types ✅
+- `Broiler.JavaScript.Parser` assembly with lexer and parser *(Phase 2 — not
+  yet started)*
+- `Broiler.JavaScript.Parser.Tests` project *(Phase 2)*
+- All existing tests pass ✅
 
 **Key Metrics:**
+- Ast compiles with **zero** references to Runtime types. ✅
+- `Broiler.JavaScript.Core` references Ast but not vice versa. ✅
 - Parser compiles and passes tests with **zero** references to Runtime types.
-- `Broiler.JavaScript.Core` references Parser and Ast but not vice versa.
+  *(Phase 2)*
 
 ### Milestone 2 — Infrastructure Extraction (Phases 3–4)
 
@@ -590,6 +595,97 @@ The refactor is complete when:
 5. No `InternalsVisibleTo` entries remain as migration bridges.
 6. The CI pipeline (`.github/workflows/ci.yml`) builds and tests all new
    assemblies on Linux, macOS, and Windows.
+
+---
+
+## 9. Implementation Log
+
+### Phase 1 — Ast Extraction ✅
+
+**Status:** Complete
+
+**Date:** 2026-03-19
+
+**What was done:**
+
+1. Created `Broiler.JavaScript.Ast` assembly at
+   `Broiler.JavaScript/Broiler.JavaScript.Ast/`.
+2. Moved **53 AST node files** from `Broiler.JavaScript.Core/FastParser/Ast/`
+   into `Broiler.JavaScript.Ast/Ast/`.
+3. Moved shared primitive types into the assembly root:
+   - `FastNodeType` (enum)
+   - `SpanLocation` (struct)
+   - `TokenTypes` (enum + extension)
+   - `FastKeywords` (enum)
+   - `StringSpan` (struct — extracted from the original file, leaving `KeyValue`
+     in Core)
+   - `StringSpanReader`
+   - `FastToken` (refactored — see below)
+   - `FastParseException`
+   - `ArraySpan<T>` (generic collection span)
+   - `UnaryOperator` (enum)
+   - `AstCase` (struct, used by `AstSwitchStatement`)
+4. All types use the new namespace `Broiler.JavaScript.Ast`.
+5. `Broiler.JavaScript.Core` references `Broiler.JavaScript.Ast` via
+   `<ProjectReference>`.
+6. Added `GlobalUsings.cs` (`global using Broiler.JavaScript.Ast;`) in Core for
+   source-level backward compatibility.
+7. Added `AstTypeForwarding.cs` with `[assembly: TypeForwardedTo(...)]`
+   attributes for binary compatibility.
+8. Updated `Broiler.slnx` to include the new project.
+
+**FastToken refactoring (decision point):**
+
+The original `FastToken` constructor contained two runtime dependencies:
+- `NumberParser.CoerceToNumber(Span)` for numeric literal parsing.
+- `FastKeywordMap.IsKeyword(Span)` for keyword identification and token-type
+  reclassification (e.g., `instanceof` → `TokenTypes.InstanceOf`).
+
+These dependencies prevented `FastToken` from being a pure data type in the Ast
+assembly. The constructor was refactored to accept pre-computed values
+(`double number`, `bool isKeyword`, `FastKeywords keyword`,
+`FastKeywords contextualKeyword`). The number parsing and keyword classification
+logic was moved to `FastScanner` (the lexer), which is the correct
+responsibility boundary — the scanner produces tokens, the tokens store
+results.
+
+**StringSpan extraction (decision point):**
+
+The original `StringSpan.cs` in Core contained both the `StringSpan` struct and
+an unrelated `KeyValue` struct that depends on `JSValue` (a runtime type).
+These were separated: `StringSpan` moved to Ast, `KeyValue` remains in Core.
+`StringSpan.GetHashCode()` uses `UnsafeGetHashCode` from
+`Broiler.JavaScript.ExpressionCompiler`, so the Ast assembly references
+ExpressionCompiler (which has no dependencies on Core, avoiding circular
+references).
+
+**Additional types moved (deviation from plan):**
+
+The original plan listed only `AstNode` types, `FastNodeType`, `SpanLocation`,
+and `StringSpan` for the Ast assembly. During implementation, the following
+types were also moved because AST nodes depend on them directly:
+
+- `FastToken` — stored by every `AstNode` for source location tracking.
+- `TokenTypes` — used by `AstLiteral` and `AstBinaryExpression`.
+- `FastKeywords` — stored in `FastToken` fields.
+- `FastParseException` — thrown during parsing, references AST types.
+- `ArraySpan<T>` — generic collection used alongside AST nodes.
+- `UnaryOperator` — enum used by `AstUnaryExpression`.
+- `AstCase` — struct used by `AstSwitchStatement`.
+
+This is consistent with the document's dependency matrix (Section 2.3), which
+states Ast has no dependencies. Moving these types into Ast ensures the
+assembly remains self-contained (its only reference is ExpressionCompiler for
+`IFastEnumerable<T>`, `Sequence<T>`, and `UnsafeGetHashCode`).
+
+**Verification:**
+- `Broiler.JavaScript.Ast` compiles with zero errors.
+- `Broiler.JavaScript.Core` compiles with zero errors.
+- All **641** tests in `Broiler.JavaScript.Core.Tests` pass.
+- All **592** tests in `Broiler.Cli.Tests` pass (7 pre-existing failures in
+  `HttpClientMigrationTests` are unrelated — they reference old
+  `HtmlRenderer.*.dll` assembly names).
+- Downstream consumers (`Broiler.Cli`, `Broiler.App`) build successfully.
 
 ---
 

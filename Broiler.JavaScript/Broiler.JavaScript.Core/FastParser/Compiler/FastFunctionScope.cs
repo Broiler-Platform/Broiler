@@ -9,7 +9,6 @@ using Broiler.JavaScript.Core.CodeGen;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.FastParser.Ast;
 using Broiler.JavaScript.Core.FastParser.Parser;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using Broiler.JavaScript.Core.LinqExpressions;

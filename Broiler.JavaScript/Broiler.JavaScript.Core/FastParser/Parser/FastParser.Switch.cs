@@ -1,14 +1,8 @@
-﻿using Broiler.JavaScript.Core.FastParser.Ast;
+
 using Broiler.JavaScript.ExpressionCompiler.Core;
 
 namespace Broiler.JavaScript.Core.FastParser;
 
-
-public readonly struct AstCase(AstExpression test, IFastEnumerable<AstStatement> last)
-{
-    public readonly AstExpression Test = test;
-    public readonly IFastEnumerable<AstStatement> Statements = last;
-}
 
 partial class FastParser
 {

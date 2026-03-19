@@ -22,6 +22,7 @@
     <Project Path="src/Broiler.DevSite/Broiler.DevSite.csproj" />
   </Folder>
   <Folder Name="/Broiler.JavaScript/">
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Ast/Broiler.JavaScript.Ast.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core.Tests/Broiler.JavaScript.Core.Tests.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core/Broiler.JavaScript.Core.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.ExpressionCompiler/Broiler.JavaScript.ExpressionCompiler.csproj" />

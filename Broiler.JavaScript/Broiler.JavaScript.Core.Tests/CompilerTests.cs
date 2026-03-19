@@ -1,3 +1,4 @@
+using Broiler.JavaScript.Ast;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.FastParser;
 using Broiler.JavaScript.Core.FastParser.Compiler;

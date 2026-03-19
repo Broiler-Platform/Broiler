@@ -1,4 +1,4 @@
-﻿using Broiler.JavaScript.Core.FastParser.Ast;
+
 using System.Runtime.CompilerServices;
 
 namespace Broiler.JavaScript.Core.FastParser;
