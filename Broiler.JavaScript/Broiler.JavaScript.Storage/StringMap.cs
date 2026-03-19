@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core.Core.Storage;
+namespace Broiler.JavaScript.Storage;
 
 /// <summary>
 /// Mapping of uint to uint

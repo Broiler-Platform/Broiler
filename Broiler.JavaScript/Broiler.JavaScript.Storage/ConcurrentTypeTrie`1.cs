@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace Broiler.JavaScript.Core.Core.Storage;
+namespace Broiler.JavaScript.Storage;
 
-internal class ConcurrentTypeTrie<T>(Func<Type, T> factory)
+public class ConcurrentTypeTrie<T>(Func<Type, T> factory)
 {
     readonly ConcurrentUInt32Map<T> cache = ConcurrentUInt32Map<T>.Create();
 

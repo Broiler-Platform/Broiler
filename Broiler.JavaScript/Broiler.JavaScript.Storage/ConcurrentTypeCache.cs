@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Threading;
 
-namespace Broiler.JavaScript.Core.Core.Storage;
+namespace Broiler.JavaScript.Storage;
 
-internal static class ConcurrentTypeCache
+public static class ConcurrentTypeCache
 {
     private static int nextId = 0;
     private static readonly ConcurrentStringMap<uint> cache = ConcurrentStringMap<uint>.Create();

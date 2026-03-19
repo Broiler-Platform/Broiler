@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Threading;
 
-namespace Broiler.JavaScript.Core.Core.Storage;
+namespace Broiler.JavaScript.Storage;
 
 public class ConcurrentNameMap
 {
@@ -131,7 +131,7 @@ public class ConcurrentUInt32Map<T>
         return r;
     }
 
-    internal T GetOrCreate<TP>(uint key, Func<TP, T> value, in TP p)
+    public T GetOrCreate<TP>(uint key, Func<TP, T> value, in TP p)
     {
         try
         {
@@ -160,7 +160,7 @@ public class ConcurrentUInt32Map<T>
         }
     }
 
-    internal T GetOrCreate(uint key, Func<T> value)
+    public T GetOrCreate(uint key, Func<T> value)
     {
         try
         {

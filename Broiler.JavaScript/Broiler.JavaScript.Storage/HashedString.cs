@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Broiler.JavaScript.Core.Core.Storage;
+namespace Broiler.JavaScript.Storage;
 
 public readonly struct HashedString : IEquatable<HashedString>, IComparable<HashedString>
 {

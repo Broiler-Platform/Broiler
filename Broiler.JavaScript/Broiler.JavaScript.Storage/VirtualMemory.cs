@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel;
 
-namespace Broiler.JavaScript.Core.Core.Storage;
+namespace Broiler.JavaScript.Storage;
 
 public struct VirtualMemory<T>
 {

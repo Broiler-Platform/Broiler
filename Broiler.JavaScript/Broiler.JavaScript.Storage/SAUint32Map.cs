@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core.Core.Storage;
+namespace Broiler.JavaScript.Storage;
 
 
 public struct SAUint32Map<T>
@@ -254,7 +254,7 @@ public struct SAUint32Map<T>
         return ref Empty;
     }
 
-    internal void Resize(int size)
+    public void Resize(int size)
     {
         if (size < 0)
             return;
