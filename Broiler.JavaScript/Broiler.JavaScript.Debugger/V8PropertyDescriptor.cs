@@ -3,7 +3,7 @@ using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Extensions;
 using System;
 
-namespace Broiler.JavaScript.Core.Debugger;
+namespace Broiler.JavaScript.Debugger;
 
 public class V8PropertyDescriptor
 {

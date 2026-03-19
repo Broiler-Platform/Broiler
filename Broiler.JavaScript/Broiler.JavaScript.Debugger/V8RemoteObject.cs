@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Error;
 
-namespace Broiler.JavaScript.Core.Debugger;
+namespace Broiler.JavaScript.Debugger;
 
 public class V8RemoteObject
 {

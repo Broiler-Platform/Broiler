@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace Broiler.JavaScript.Core.Debugger;
+namespace Broiler.JavaScript.Debugger;
 
 
 public partial class V8Runtime(V8InspectorProtocol inspectorContext) : V8ProtocolObject(inspectorContext)

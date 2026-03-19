@@ -4,7 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace Broiler.JavaScript.Core.Debugger;
+namespace Broiler.JavaScript.Debugger;
 
 public class AsyncQueue<T>: IDisposable
 {

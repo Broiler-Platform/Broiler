@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Broiler.JavaScript.Core.Debugger;
+namespace Broiler.JavaScript.Debugger;
 
 
 public partial class V8Runtime

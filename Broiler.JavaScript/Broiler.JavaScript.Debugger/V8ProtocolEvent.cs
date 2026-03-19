@@ -1,4 +1,4 @@
-﻿namespace Broiler.JavaScript.Core.Debugger;
+﻿namespace Broiler.JavaScript.Debugger;
 
 public abstract class V8ProtocolEvent
 {

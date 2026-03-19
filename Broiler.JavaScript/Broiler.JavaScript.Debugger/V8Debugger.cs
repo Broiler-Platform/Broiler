@@ -1,4 +1,4 @@
-﻿namespace Broiler.JavaScript.Core.Debugger;
+﻿namespace Broiler.JavaScript.Debugger;
 
 public partial class V8Debugger(V8InspectorProtocol inspectorContext) : V8ProtocolObject(inspectorContext)
 {

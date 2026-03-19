@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using System;
 
-namespace Broiler.JavaScript.Core.Debugger;
+namespace Broiler.JavaScript.Debugger;
 
 public class V8ReturnValue
 {

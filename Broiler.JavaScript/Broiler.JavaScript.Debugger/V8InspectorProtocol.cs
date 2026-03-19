@@ -11,7 +11,7 @@ using System.Text.Json.Serialization;
 using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.ExpressionCompiler;
 
-namespace Broiler.JavaScript.Core.Debugger;
+namespace Broiler.JavaScript.Debugger;
 
 public delegate Task<string> MessageProcessor(long id, JsonNode p);
 
