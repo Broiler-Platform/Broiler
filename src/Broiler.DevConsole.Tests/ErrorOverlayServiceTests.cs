@@ -1,5 +1,4 @@
 using Broiler.App.Rendering;
-using Broiler.DevConsole;
 
 namespace Broiler.DevConsole.Tests;
 

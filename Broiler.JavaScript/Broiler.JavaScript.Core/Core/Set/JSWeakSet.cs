@@ -1,14 +1,14 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Storage;
+using System;
 using Yantra.Core;
-using YantraJS.Core.Clr;
-using YantraJS.Core.Core.Storage;
 
 namespace YantraJS.Core.Set;
 
 [JSClassGenerator("WeakSet")]
 public partial class JSWeakSet : JSObject
 {
-
     private StringMap<WeakReference<WeakValue>> index;
 
     public JSWeakSet(in Arguments a) : base(JSContext.NewTargetPrototype)
@@ -28,10 +28,9 @@ public partial class JSWeakSet : JSObject
         lock (this)
         {
             if (!index.TryGetValue(key, out var w))
-            {
                 index.Put(key) = new(new (key, a, Unregister));
-            }
         }
+
         return a;
     }
 
@@ -46,9 +45,8 @@ public partial class JSWeakSet : JSObject
             if (index.TryRemove(key, out var w))
             {
                 if (w.TryGetTarget(out var target))
-                {
                     GC.SuppressFinalize(target);
-                }
+
                 return JSBoolean.True;
             }
         }
@@ -65,9 +63,7 @@ public partial class JSWeakSet : JSObject
             if (index.TryGetValue(key, out var v))
             {
                 if (v.TryGetTarget(out var target))
-                {
                     return JSBoolean.True;
-                }
             }
         }
 

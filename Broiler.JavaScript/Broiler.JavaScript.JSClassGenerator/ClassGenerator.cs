@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace YantraJS.JSClassGenerator;
+namespace Broiler.JavaScript.JSClassGenerator;
 
 internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
 {
@@ -41,13 +41,13 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
             sb = sb.AppendLine("using System.Collections.Generic;")
                 .AppendLine("using System.Runtime.CompilerServices;")
                 .AppendLine("using System.Text;")
-                .AppendLine("using YantraJS.Core.Clr;")
-                .AppendLine("using YantraJS.Extensions;");
+                .AppendLine("using Broiler.JavaScript.Core.Clr;")
+                .AppendLine("using Broiler.JavaScript.Extensions;");
 
             var ns = type.ContainingNamespace.ToString();
-            if (ns != "YantraJS.Core")
+            if (ns != "Broiler.JavaScript.Core")
             {
-                sb = sb.AppendLine("using YantraJS.Core;");
+                sb = sb.AppendLine("using Broiler.JavaScript.Core;");
             }
 
             sb = sb.AppendLine($"namespace {ns} {{ ");
@@ -154,20 +154,6 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
                     {
                         sb = sb.AppendLine($"prototype.SetPrototypeOf(@base.prototype);");
                     }
-                }
-            } else
-            {
-                if (className != "Object")
-                {
-                    // insert in list..
-                    
-
-                    //sb.AppendLine($" var @base = context[KeyStrings.Object] as JSFunction;");
-                    //sb = sb.AppendLine($"@class.SetPrototypeOf(@base);");
-                    //if (!type.InternalClass)
-                    //{
-                    //    sb = sb.AppendLine($"prototype.SetPrototypeOf(@base.prototype);");
-                    //}
                 }
             }
 

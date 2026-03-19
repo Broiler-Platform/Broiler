@@ -1,8 +1,9 @@
 ﻿#nullable enable
+using Broiler.JavaScript.Core;
 using System;
 using System.Text;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Extensions;
 
 public static class StringSpanExtensions
 {

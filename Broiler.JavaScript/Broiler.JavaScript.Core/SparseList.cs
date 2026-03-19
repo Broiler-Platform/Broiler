@@ -3,33 +3,15 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-namespace YantraJS.Core;
-
-public class SparseStack<T>
-{
-    private SparseList<T> list = [];
-
-    public void Push(T item) => list.Add(item);
-
-    public int Count => list.Count;
-
-    public T Pop()
-    {
-        if (list.Count == 0)
-            throw new IndexOutOfRangeException();
-        return list.RemoveLast();
-    }
-
-    public T Peek => list[list.Count - 1];
-}
+namespace Broiler.JavaScript.Core;
 
 /// <summary>
 /// Difference between List and SparseList, each item is not stored in continuous array,
 /// instead it is stored as an Array of Array. Making growth easier.
 /// </summary>
 /// <typeparam name="T"></typeparam>
-public class SparseList<T> : IList<T> {
-
+public class SparseList<T> : IList<T>
+{
     private T[][] pages;
     private const int pageSize = 8;
 
@@ -39,25 +21,23 @@ public class SparseList<T> : IList<T> {
 
     public T this[int index]
     {
-        get {
+        get
+        {
             if (index >= Count)
-            {
                 throw new ArgumentOutOfRangeException($"Item does not exist at {index}");
-            }
+
             if (!TryGetValue(index, out var item))
-            {
                 throw new ArgumentOutOfRangeException($"Item does not exist at {index}");
-            }
+
             return item;
         }
-        set {
+        set
+        {
             SetValue(index, in value);
         }
     }
 
     public SparseList(int capacity = 0) => Resize(capacity);
-
-    // private static Page defaultItem;
 
     private bool TryGetValue(int index, out T value)
     {
@@ -66,21 +46,23 @@ public class SparseList<T> : IList<T> {
             value = default;
             return false;
         }
+
         var page = GetPage(index, false);
-        if (page == null) {
+        if (page == null)
+        {
             value = default;
             return false;
         }
+
         value = page[index & 0x7];
         return true;
     }
 
-    private void SetValue(int index,in T item)
+    private void SetValue(int index, in T item)
     {
-        if(index >= Count)
-        {
+        if (index >= Count)
             throw new IndexOutOfRangeException();
-        }
+
         var page = GetPage(index, true);
         page[index & 0x7] = item;
     }
@@ -95,38 +77,36 @@ public class SparseList<T> : IList<T> {
         else
         {
             if (pages == null)
-            {
                 return null;
-            }
         }
+
         int page = index >> 3;
         var items = pages[page];
-        if(items == null && create)
-        {
+        if (items == null && create)
             return pages[page] = new T[pageSize];
-        }
+
         return items;
     }
 
     private void Resize(int capacity)
     {
         if (capacity == 0)
-        {
             return;
-        }
 
         capacity = ((capacity >> 5) + 1) << 5;
 
         // int requiredPageLength = (capacity / pageSize) + 1;
         // int pageLength = ((requiredPageLength / 4) + 1) * 4;
         int pageLength = capacity / pageSize;
-        if(pages == null)
+        if (pages == null)
         {
             pages = new T[pageLength][];
-        } else
+        }
+        else
         {
             if (pageLength <= pages.Length)
                 return;
+
             Array.Resize(ref pages, pageLength);
         }
     }
@@ -135,20 +115,24 @@ public class SparseList<T> : IList<T> {
     {
         if (pages == null)
             return -1;
+
         for (int i = 0; i < pages.Length; i++)
         {
             ref var page = ref pages[i];
             var index = i << 3;
+
             for (int j = 0; j < 7; j++)
             {
                 if (index >= Count)
                     return -1;
-                if (Equals(page[j],item)) {
+
+                if (Equals(page[j], item))
                     return index;
-                }
+
                 index++;
             }
         }
+
         return -1;
     }
 
@@ -157,30 +141,28 @@ public class SparseList<T> : IList<T> {
         if (index >= Count)
         {
             Count = index + 1;
-        } else
+        }
+        else
         {
             Count++;
-            // move..
             MoveRight(index);
         }
+
         var location = GetPage(index, true);
         location[index & 7] = item;
     }
 
     private void MoveRight(int index)
     {
-        for (int i = Count - 1 ; i > index; i--)
-        {
-            this[i] = this[i-1];
-        }
+        for (int i = Count - 1; i > index; i--)
+            this[i] = this[i - 1];
     }
 
     private void MoveLeft(int index)
     {
         for (int i = index; i < Count - 1; i++)
-        {
             this[i] = this[i + 1];
-        }
+
         this[Count - 1] = default;
     }
 
@@ -188,8 +170,8 @@ public class SparseList<T> : IList<T> {
     public void RemoveAt(int index)
     {
         // move items up...
-        if (index >= Count)
-            throw new ArgumentOutOfRangeException();
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, Count);
+
         MoveLeft(index);
         Count--;
     }
@@ -199,8 +181,10 @@ public class SparseList<T> : IList<T> {
         var index = Count - 1;
         var page = GetPage(index);
         var item = page[index & 0x7];
+
         page[index & 0x7] = default;
         Count--;
+
         return item;
     }
 
@@ -208,10 +192,8 @@ public class SparseList<T> : IList<T> {
 
     public void AddRange(IEnumerable<T> items)
     {
-        foreach(var item in items)
-        {
+        foreach (var item in items)
             Insert(Count, item);
-        }
     }
 
     public void Clear()
@@ -219,13 +201,12 @@ public class SparseList<T> : IList<T> {
         Count = 0;
         if (pages == null)
             return;
+
         for (int i = 0; i < pages.Length; i++)
         {
             var page = pages[i];
             for (int j = 0; j < pageSize; j++)
-            {
                 page[j] = default;
-            }
         }
     }
 
@@ -235,29 +216,30 @@ public class SparseList<T> : IList<T> {
     {
         if (array.Length - arrayIndex < Count)
             throw new ArgumentOutOfRangeException();
+
         var index = arrayIndex;
-        foreach(var item in this)
-        {
+        foreach (var item in this)
             array[index++] = item;
-        }
     }
 
     public bool Remove(T item)
     {
         if (pages == null)
             return false;
+
         int index = IndexOf(item);
         if (index == -1)
             return false;
+
         MoveLeft(index);
         Count--;
+
         return true;
     }
 
     public SparseEnumerator GetEnumerator() => new(pages, Count);
 
     IEnumerator<T> IEnumerable<T>.GetEnumerator() => GetEnumerator();
-
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
@@ -276,16 +258,10 @@ public class SparseList<T> : IList<T> {
 
         readonly object IEnumerator.Current => Current;
 
-        public readonly void Dispose()
-        {
-            
-        }
+        public readonly void Dispose() { }
 
         public bool MoveNext() => (++index) < length;
 
-        public readonly void Reset()
-        {
-            
-        }
+        public readonly void Reset() { }
     }
 }

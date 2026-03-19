@@ -1,12 +1,12 @@
-﻿using YantraJS.Extensions;
+﻿using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Core.Extensions;
+using YantraJS.Core;
 
-namespace YantraJS.Core.Core;
-
+namespace Broiler.JavaScript.Core.Core;
 
 
 public class JSPrototype
 {
-
     internal class JSPropertySet
     {
         internal SAUint32Map<(JSProperty property, JSPrototype owner)> properties;
@@ -16,6 +16,7 @@ public class JSPrototype
         internal Sequence<KeyString> stringKeys = [];
         internal Sequence<uint> uintKeys = [];
     }
+
     internal JSPropertySet propertySet;
     public readonly JSObject @object;
     private bool dirty = true;
@@ -24,25 +25,26 @@ public class JSPrototype
     internal JSPrototype(JSObject @object)
     {
         this.@object = @object;
-
         Build();
     }
 
     private void Build()
     {
-        
         if (!dirty)
             return;
+
         var ps = new JSPropertySet();
         lock (this)
         {
             if (!dirty)
                 return;
+
             ps.properties = new SAUint32Map<(JSProperty, JSPrototype)>();
             ps.elements = new SAUint32Map<(JSProperty, JSPrototype)>();
             ps.symbols = new SAUint32Map<(JSProperty, JSPrototype)>();
 
             Build(ps, this);
+
             dirty = false;
             propertySet = ps;
         }
@@ -56,9 +58,7 @@ public class JSPrototype
 
         var @base = @object.prototypeChain;
         if (@base != null && @base != this)
-        {
             Build(ps, @base);
-        }
 
         // if it is registered, remove it first
         @object.PropertyChanged -= @object_PropertyChanged;
@@ -66,9 +66,10 @@ public class JSPrototype
         @object.PropertyChanged += @object_PropertyChanged;
         ref var objectProperties = ref @object.GetOwnProperties(false);
         var ve = objectProperties.GetEnumerator(false);
-        while(ve.MoveNext(out var key, out var value)){
+        
+        while(ve.MoveNext(out var key, out var value))
             ps.properties.Put(key.Key) = (value.ToNotReadOnly(),target);
-        }
+        
 
         ref var objectElements = ref @object.GetElements(false);
         if (!objectElements.IsNull)
@@ -76,9 +77,7 @@ public class JSPrototype
             foreach(var e in objectElements.AllValues())
             {
                 if (!e.Value.IsEmpty)
-                {
                     ps.elements.Put(e.Key) = (e.Value.ToNotReadOnly(), target);
-                }
             }
         }
 
@@ -88,9 +87,7 @@ public class JSPrototype
             foreach(var e in objectSymbols.AllValues())
             {
                 if (!e.Value.IsEmpty)
-                {
                     ps.symbols.Put(e.Key) = (e.Value.ToNotReadOnly(), target);
-                }
             }
         }
     }
@@ -102,7 +99,8 @@ public class JSPrototype
     internal JSProperty GetInternalProperty(in KeyString name)
     {
         Build();
-        var (p, owner) = propertySet.properties[name.Key];
+        
+        var (p, _) = propertySet.properties[name.Key];
         return p;
     }
 
@@ -122,15 +120,16 @@ public class JSPrototype
     {
         Build();
         var (p, _) = propertySet.properties[key.Key];
+        
         if(p.IsValue)
         {
             if (p.get != null)
                 return p.get.f;
         }
+        
         if (p.IsProperty)
-        {
             return p.get.f;
-        }
+        
         return null;
     }
 
@@ -142,6 +141,7 @@ public class JSPrototype
             ref var elements = ref @object.GetElements(false);
             return elements.TryRemove(i, out p);
         }
+
         p = JSProperty.Empty;
         return false;
     }

@@ -1,14 +1,13 @@
+using Broiler.JavaScript.Core.Enumerators;
 using System;
 using System.Globalization;
+using YantraJS.Core;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Primitive;
 
 public sealed class JSNull : JSValue
 {
-    private JSNull(): base(null)
-    {
-
-    }
+    private JSNull() : base(null) { }
 
     public override JSValue TypeOf() => JSConstants.Object;
 
@@ -26,19 +25,15 @@ public sealed class JSNull : JSValue
 
     public override int IntValue => 0;
 
-    //public override bool IsNull => true;
-
-    //internal override bool IsNullOrUndefined => true; 
-
     public override JSValue Negate() => JSNumber.NegativeZero;
 
     internal override PropertyKey ToKey(bool create = false) => KeyStrings.@null;
 
     public override bool Equals(object obj) => obj is JSNull;
 
-    public override JSValue Delete(in KeyString key) => throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+    public override JSValue Delete(in KeyString key) => throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
 
-    public override JSValue Delete(uint key) => throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+    public override JSValue Delete(uint key) => throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
 
     public override JSValue this[KeyString name]
     {
@@ -49,46 +44,22 @@ public sealed class JSNull : JSValue
             Console.Error.WriteLine($"[JSNull] Cannot get property {name} of null");
             Console.Error.WriteLine(st.ToString());
 #endif
-            throw JSContext.Current.NewTypeError($"Cannot get property {name} of null");
+            throw JSContext.NewTypeError($"Cannot get property {name} of null");
         }
-        set => throw JSContext.Current.NewTypeError($"Cannot set property {name} of null");
+        set => throw JSContext.NewTypeError($"Cannot set property {name} of null");
     }
 
     public override JSValue this[uint key]
     {
-        get => throw JSContext.Current.NewTypeError($"Cannot get property {key} of null");
-        set => throw JSContext.Current.NewTypeError($"Cannot get property {key} of null");
+        get => throw JSContext.NewTypeError($"Cannot get property {key} of null");
+        set => throw JSContext.NewTypeError($"Cannot get property {key} of null");
     }
 
-    internal override JSFunctionDelegate GetMethod(in KeyString key) => throw JSContext.Current.NewTypeError($"Cannot get property {key} of null");
+    internal override JSFunctionDelegate GetMethod(in KeyString key) => throw JSContext.NewTypeError($"Cannot get property {key} of null");
 
 
-    public override IElementEnumerator GetElementEnumerator() => throw JSContext.Current.NewTypeError("null is not iterable");
+    public override IElementEnumerator GetElementEnumerator() => throw JSContext.NewTypeError("null is not iterable");
 
-
-    //public override JSValue AddValue(JSValue value)
-    //{
-    //    switch(value)
-    //    {
-    //        case JSUndefined un:
-    //            return JSNumber.NaN;
-    //        case JSNull @null:
-    //            return JSNumber.Zero;
-    //        case JSNumber n:
-    //            return n;
-    //    }
-    //    return new JSString("null" + value.ToString());
-    //}
-
-    //public override JSValue AddValue(double value)
-    //{
-    //    return new JSNumber(value);
-    //}
-
-    //public override JSValue AddValue(string value)
-    //{
-    //    return new JSString("null" + value);
-    //}
 
     public override int GetHashCode() => 0;
 
@@ -96,14 +67,16 @@ public sealed class JSNull : JSValue
     {
         if (value.IsNull)
             return true;
+
         if (value.IsUndefined)
             return true;
+
         return false;
     }
 
     public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
-    public override JSValue CreateInstance(in Arguments a) => throw JSContext.Current.NewTypeError("cannot create instance of null");
+    public override JSValue CreateInstance(in Arguments a) => throw JSContext.NewTypeError("cannot create instance of null");
 
     public override JSValue InvokeFunction(in Arguments a) => throw new NotImplementedException("null is not a function");
 
@@ -114,6 +87,7 @@ public sealed class JSNull : JSValue
             value = this;
             return true;
         }
+
         value = null;
         return !type.IsValueType;
     }

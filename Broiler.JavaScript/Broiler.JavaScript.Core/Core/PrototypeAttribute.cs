@@ -1,16 +1,8 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core.Storage;
+using System;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core;
 
-
-[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-public class JSRuntimeAttribute(Type staticType, Type prototype) : Attribute
-{
-    public readonly Type StaticType = staticType;
-    public readonly Type Prototype = prototype;
-
-    public bool PreventConstructorInvoke { get; set; }
-}
 
 public enum MemberType: int
 {
@@ -21,16 +13,6 @@ public enum MemberType: int
     StaticMethod = 0xF1,
     StaticGet = 0xF2,
     StaticSet = 0xF4
-}
-
-[AttributeUsage(AttributeTargets.Method , AllowMultiple = false, Inherited = false)]
-
-public class ConstructorAttribute: PrototypeAttribute
-{
-    public ConstructorAttribute(): base(null, JSPropertyAttributes.Empty, MemberType.Constructor)
-    {
-
-    }
 }
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
@@ -51,19 +33,13 @@ public class SymbolAttribute(string name) : Attribute
 public class PrototypeAttribute: Attribute
 {
     public readonly KeyString Name;
-
     public readonly MemberType MemberType;
-
     public readonly JSPropertyAttributes Attributes;
-
     public readonly bool IsSymbol;
 
     public int Length { get; set; }
-
     public bool IsStatic => ((int)MemberType & 0xF0) > 0;
-
     public bool IsMethod => ((int)MemberType & 0x1) > 0;
-
     public bool IsGetProperty => ((int)MemberType & 0x2) > 0;
     public bool IsSetProperty => ((int)MemberType & 0x4) > 0;
 

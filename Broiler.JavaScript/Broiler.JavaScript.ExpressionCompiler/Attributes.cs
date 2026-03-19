@@ -1,7 +1,7 @@
 ﻿#nullable enable
 using System;
 
-namespace Yantra.Core;
+namespace YantraJS;
 
 public class JSInternalObjectAttribute: Attribute
 {

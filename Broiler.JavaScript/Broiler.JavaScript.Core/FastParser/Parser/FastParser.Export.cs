@@ -1,8 +1,10 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+
+namespace YantraJS.Core.FastParser;
 
 partial class FastParser
 {
-
     public AstLiteral ExpectStringLiteral()
     {
         var token = stream.Expect(TokenTypes.String);
@@ -22,43 +24,56 @@ partial class FastParser
                     stream.Consume();
                     if (!Expression(out var argument))
                         throw stream.Unexpected();
+
                     statement = new AstExportStatement(start, argument, true);
                     return true;
+
                 case FastKeywords.function:
                     if (!FunctionExpression(out var f))
                         throw stream.Unexpected();
+
                     var fn = f as AstFunctionExpression;
                     if (fn.Id == null)
                         throw new FastParseException(f.Start, "exported function must have a name");
+
                     statement = new AstExportStatement(start, fn);
                     return true;
+
                 case FastKeywords.@class:
                     if (!ClassExpression(out var @class))
                         throw stream.Unexpected();
+
                     var c = @class as AstClassExpression;
                     if (c.Identifier == null)
                         throw new FastParseException(c.Start, "exported class must have a name");
+
                     statement = new AstExportStatement(start, c);
                     return true;
+
                 case FastKeywords.var:
                     if (!VariableDeclaration(out var stmt))
                         throw stream.Unexpected();
+
                     statement = new AstExportStatement(start, stmt);
                     return true;
+
                 case FastKeywords.let:
                     if (!VariableDeclaration(out stmt, FastVariableKind.Let))
                         throw stream.Unexpected();
+
                     statement = new AstExportStatement(start, stmt);
                     return true;
+
                 case FastKeywords.@const:
                     if (!VariableDeclaration(out stmt, FastVariableKind.Const))
                         throw stream.Unexpected();
+
                     statement = new AstExportStatement(start, stmt);
                     return true;
             }
         }
 
-        if(stream.CheckAndConsume(TokenTypes.Multiply))
+        if (stream.CheckAndConsume(TokenTypes.Multiply))
         {
             stream.ExpectContextualKeyword(FastKeywords.from);
 
@@ -67,17 +82,17 @@ partial class FastParser
             return true;
         }
 
-        if(AssignmentLeftPattern(out var declaration, FastVariableKind.Var, true))
+        if (AssignmentLeftPattern(out var declaration, FastVariableKind.Var, true))
         {
             stream.ExpectContextualKeyword(FastKeywords.from);
 
             var literal = ExpectStringLiteral();
             var vd = VariableDeclarator.From(declaration);
-            statement = new AstExportStatement(start, new AstVariableDeclaration(token, literal.End,
-                vd));
+            statement = new AstExportStatement(start, new AstVariableDeclaration(token, literal.End, vd));
+            
             return true;
         }
+
         throw stream.Unexpected();
     }
-
 }

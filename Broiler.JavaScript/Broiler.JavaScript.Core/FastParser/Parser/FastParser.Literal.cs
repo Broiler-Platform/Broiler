@@ -1,11 +1,11 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
 
+namespace YantraJS.Core.FastParser;
 
 
 partial class FastParser
 {
-
-
     bool Literal(out AstExpression node)
     {
         var token = stream.Current;
@@ -23,17 +23,19 @@ partial class FastParser
                 node = new AstLiteral(token.Type, token);
                 return true;
         }
+
         node = null;
         return false;
     }
 
     bool StringLiteral(out AstExpression node)
     {
-        if(stream.CheckAndConsume(TokenTypes.String, out var token))
+        if (stream.CheckAndConsume(TokenTypes.String, out var token))
         {
             node = new AstLiteral(TokenTypes.String, token);
             return true;
         }
+
         node = default;
         return false;
     }
@@ -45,8 +47,8 @@ partial class FastParser
             node = new AstLiteral(TokenTypes.Number, token);
             return true;
         }
+
         node = default;
         return false;
     }
-
 }

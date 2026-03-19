@@ -1,3 +1,6 @@
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -737,7 +740,7 @@ public sealed partial class DomBridge
                     .Split(' ').Where(s => s.Length > 0).ToList();
                 var classSet = new HashSet<string>(classes, StringComparer.Ordinal);
 
-                bool shouldAdd = a.Length >= 2 && !(a[1] is JSUndefined)
+                bool shouldAdd = a.Length >= 2 && a[1] is not JSUndefined
                     ? a[1].BooleanValue
                     : !classSet.Contains(cls);
 

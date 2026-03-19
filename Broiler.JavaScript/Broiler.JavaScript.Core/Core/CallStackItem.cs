@@ -1,13 +1,14 @@
 ﻿using System.Runtime.CompilerServices;
-using YantraJS.Core.CodeGen;
 using System.ComponentModel;
-using YantraJS.Core.Core;
+using Broiler.JavaScript.Core.CodeGen;
+using YantraJS.Core;
+using Broiler.JavaScript.Core.Extensions;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core;
 
 public class CallStackItem
 {
-    private static StringSpan Inline = "inline";
+    private static readonly StringSpan Inline = "inline";
 
     internal CallStackItem(string fileName, in StringSpan function, int line, int column)
     {
@@ -18,27 +19,21 @@ public class CallStackItem
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public CallStackItem(
-        JSContext context, 
-        ScriptInfo scriptInfo, 
-        int nameOffset,
-        int nameLength,
-        int line,
-        int column)
+    public CallStackItem(JSContext context, ScriptInfo scriptInfo, int nameOffset, int nameLength, int line, int column)
     {
         context = context ?? JSContext.Current;
         context.EnsureSufficientExecutionStack();
         this.context = context;
         var ctx = context.CurrentNewTarget;
+
         if (ctx != null)
         {
             NewTarget = ctx;
             context.CurrentNewTarget = null;
         }
+
         FileName = scriptInfo.FileName;
-        Function = (nameLength>0) 
-            ? scriptInfo.Code.ToStringSpan(nameOffset, nameLength)
-            : Inline;
+        Function = (nameLength > 0) ? scriptInfo.Code.ToStringSpan(nameOffset, nameLength) : Inline;
         Line = line;
         Column = column;
         Parent = context.Top;
@@ -69,7 +64,6 @@ public class CallStackItem
 
     public void Update() => System.Diagnostics.Debug.WriteLine($"{Function} at {Line}, {Column}");
 
-    // [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Step(int line, int column)
     {
         context.Top = this;

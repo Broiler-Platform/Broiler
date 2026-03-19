@@ -1,27 +1,21 @@
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Array.Typed;
+using Broiler.JavaScript.Core.Core.Clr;
 using System;
 using Yantra.Core;
-using YantraJS.Core.Clr;
 
 namespace YantraJS.Core.Typed;
 
 [JSClassGenerator("Float16Array"), JSBaseClass("TypedArray")]
 public partial class JSFloat16Array : JSTypedArray
 {
-
     [JSExport("BYTES_PER_ELEMENT")]
     internal static readonly int BYTES_PER_ELENENT = 2;
 
-
     [JSExport(Length = 3)]
-    public JSFloat16Array(in Arguments a)
-        : base(new TypedArrayParameters(a, BYTES_PER_ELENENT))
-    {
-    }
+    public JSFloat16Array(in Arguments a) : base(new TypedArrayParameters(a, BYTES_PER_ELENENT)) { }
 
-    private JSFloat16Array(TypedArrayParameters a) : base(a)
-    {
-
-    }
+    private JSFloat16Array(TypedArrayParameters a) : base(a) { }
 
     protected internal override JSValue GetValue(uint index, JSValue receiver, bool throwError = true)
     {

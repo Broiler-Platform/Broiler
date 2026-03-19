@@ -1,36 +1,23 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
+using System;
 using YantraJS.Core;
 
-namespace YantraJS.Utils;
+namespace Broiler.JavaScript.Core.Utils;
 
 public class TypeConverter
 {
-
-    public static JSValue FromBasic(object value)
+    public static JSValue FromBasic(object value) => value switch
     {
-        switch(value)
-        {
-            case null:
-                return JSNull.Value;
-            case JSValue jv:
-                return jv;
-            case bool b1:
-                return b1 ? JSBoolean.True : JSBoolean.False;
-            case uint ui1:
-                return new JSNumber(ui1);
-            case int i1:
-                return new JSNumber(i1);
-            case float f1:
-                return new JSNumber(f1);
-            case double d1:
-                return new JSNumber(d1);
-            case decimal d2:
-                return new JSNumber((double)d2);
-            case string str:
-                return new JSString(str);
-        }
-
-        throw new NotSupportedException();
-    }
-
+        null => JSNull.Value,
+        JSValue jv => jv,
+        bool b1 => b1 ? JSBoolean.True : JSBoolean.False,
+        uint ui1 => new JSNumber(ui1),
+        int i1 => new JSNumber(i1),
+        float f1 => new JSNumber(f1),
+        double d1 => new JSNumber(d1),
+        decimal d2 => new JSNumber((double)d2),
+        string str => new JSString(str),
+        _ => throw new NotSupportedException(),
+    };
 }

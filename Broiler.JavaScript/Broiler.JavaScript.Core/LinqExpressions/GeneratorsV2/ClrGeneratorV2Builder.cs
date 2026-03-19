@@ -3,36 +3,22 @@ using System.Reflection;
 using Expression = YantraJS.Expressions.YExpression;
 using ParameterExpression = YantraJS.Expressions.YParameterExpression;
 
-namespace YantraJS.Core.LinqExpressions.GeneratorsV2;
+namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 
 public class ClrGeneratorV2Builder
 {
-    private static Type type = typeof(ClrGeneratorV2);
+    private static readonly Type type = typeof(ClrGeneratorV2);
 
-    private static MethodInfo _throw = type.PublicMethod(nameof(ClrGeneratorV2.Throw), typeof(int));
-    private static MethodInfo _beginCatch = type.PublicMethod(nameof(ClrGeneratorV2.BeginCatch));
-    private static MethodInfo _beginFinally = type.PublicMethod(nameof(ClrGeneratorV2.BeginFinally));
-
-    private static MethodInfo _push = type.PublicMethod(
-        nameof(ClrGeneratorV2.PushTry),
-        typeof(int),
-        typeof(int),
-        typeof(int));
-
-    private static MethodInfo _pop = type.PublicMethod(
-        nameof(ClrGeneratorV2.Pop));
+    private static readonly MethodInfo _throw = type.PublicMethod(nameof(ClrGeneratorV2.Throw), typeof(int));
+    private static readonly MethodInfo _beginCatch = type.PublicMethod(nameof(ClrGeneratorV2.BeginCatch));
+    private static readonly MethodInfo _beginFinally = type.PublicMethod(nameof(ClrGeneratorV2.BeginFinally));
+    private static readonly MethodInfo _push = type.PublicMethod(nameof(ClrGeneratorV2.PushTry), typeof(int), typeof(int), typeof(int));
+    private static readonly MethodInfo _pop = type.PublicMethod(nameof(ClrGeneratorV2.Pop));
+    private static readonly MethodInfo _GetVariable = type.GetMethod("GetVariable");
+    private static readonly MethodInfo _InitVariables = type.GetMethod("InitVariables");
 
 
-    private static MethodInfo _GetVariable
-        = type.GetMethod("GetVariable");
-    private static MethodInfo _InitVariables
-        = type.GetMethod("InitVariables");
-
-
-    public static Expression Push(Expression exp, int c, int f, int e) => Expression.Call(exp, _push,
-            Expression.Constant(c),
-            Expression.Constant(f),
-            Expression.Constant(e));
+    public static Expression Push(Expression exp, int c, int f, int e) => Expression.Call(exp, _push, Expression.Constant(c), Expression.Constant(f), Expression.Constant(e));
 
     internal static Expression GetVariable(ParameterExpression pe, int id, Type type) => Expression.Call(pe, _GetVariable.MakeGenericMethod(type), Expression.Constant(id));
 

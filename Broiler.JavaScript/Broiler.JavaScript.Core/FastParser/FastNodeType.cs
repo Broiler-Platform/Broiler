@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿namespace Broiler.JavaScript.Core.FastParser;
 
 public enum FastNodeType
 {
@@ -9,8 +9,6 @@ public enum FastNodeType
     VariableDeclaration,
     ExpressionStatement,
     FunctionExpression,
-    // AssignmentPattern,
-    // VariableReference,
     Identifier,
     ObjectPattern,
     SpreadElement,

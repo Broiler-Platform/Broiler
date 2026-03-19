@@ -1,7 +1,7 @@
 ﻿using System;
 using YantraJS.Expressions;
 
-namespace YantraJS;
+namespace YantraJS.ClosureSeparator;
 
 public class BoxParamter
 {

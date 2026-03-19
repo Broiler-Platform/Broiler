@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace YantraJS.Core.Core.Storage;
+namespace Broiler.JavaScript.Core.Core.Storage;
 
 public readonly struct HashedString : IEquatable<HashedString>, IComparable<HashedString>
 {

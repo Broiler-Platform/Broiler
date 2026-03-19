@@ -1,8 +1,8 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using System;
 using System.Text;
-using YantraJS.Core;
 
-namespace YantraJS.Utils;
+namespace Broiler.JavaScript.Core.Utils;
 
 internal static class UriHelper
 {
@@ -20,8 +20,10 @@ internal static class UriHelper
             char c = characters[i];
             if (c >= 128)
                 throw new ArgumentException(nameof(characters));
+            
             result[c] = true;
         }
+        
         return result;
     }
 
@@ -42,10 +44,13 @@ internal static class UriHelper
     {
         if (start + length > input.Length)
             return -1;
+
         int result = 0;
+        
         for (int i = start; i < start + length; i++)
         {
             result *= 0x10;
+
             char c = input[i];
             if (c >= '0' && c <= '9')
                 result += c - '0';
@@ -56,6 +61,7 @@ internal static class UriHelper
             else
                 return -1;
         }
+
         return result;
     }
 
@@ -70,7 +76,6 @@ internal static class UriHelper
     /// <returns> A copy of the given string with the escape sequences decoded. </returns>
     internal static string DecodeURI(string input)
     {
-
         if (decodeURIComponentReservedSet == null)
         {
             var lookupTable = CreateCharacterSetLookupTable(";/?:@&=+$,#");
@@ -91,7 +96,8 @@ internal static class UriHelper
                 // Decode the %XX encoding.
                 int utf8Byte = ParseHexNumber(input, i + 1, 2);
                 if (utf8Byte < 0)
-                    throw JSContext.Current.NewURIError( "URI malformed");
+                    throw JSContext.NewURIError( "URI malformed");
+                
                 i += 2;
 
                 // If the high bit is not set, then this is a single byte ASCII character.
@@ -101,7 +107,7 @@ internal static class UriHelper
                     if (reservedSet[utf8Byte] == true)
                     {
                         // Leave the escape sequence as is.
-                        result.Append(input.Substring(i - 2, 3));
+                        result.Append(input.AsSpan(i - 2, 3));
                     }
                     else
                     {
@@ -114,7 +120,7 @@ internal static class UriHelper
 
                     // Check for an invalid UTF-8 start value.
                     if (utf8Byte == 0xc0 || utf8Byte == 0xc1)
-                        throw JSContext.Current.NewURIError( "URI malformed");
+                        throw JSContext.NewURIError( "URI malformed");
 
                     // Count the number of high bits set (this is the number of bytes required for the character).
                     int utf8ByteCount = 1;
@@ -125,8 +131,9 @@ internal static class UriHelper
                         else
                             break;
                     }
+
                     if (utf8ByteCount < 2 || utf8ByteCount > 4)
-                        throw JSContext.Current.NewURIError( "URI malformed");
+                        throw JSContext.NewURIError( "URI malformed");
 
                     // Read the additional bytes.
                     byte[] utf8Bytes = new byte[utf8ByteCount];
@@ -135,16 +142,16 @@ internal static class UriHelper
                     {
                         // An additional escape sequence is expected.
                         if (i >= input.Length - 1 || input[++i] != '%')
-                            throw JSContext.Current.NewURIError( "URI malformed");
+                            throw JSContext.NewURIError( "URI malformed");
 
                         // Decode the %XX encoding.
                         utf8Byte = ParseHexNumber(input, i + 1, 2);
                         if (utf8Byte < 0)
-                            throw JSContext.Current.NewURIError( "URI malformed");
+                            throw JSContext.NewURIError( "URI malformed");
 
                         // Top two bits must be 10 (i.e. byte must be 10XXXXXX in binary).
                         if ((utf8Byte & 0xC0) != 0x80)
-                            throw JSContext.Current.NewURIError( "URI malformed");
+                            throw JSContext.NewURIError( "URI malformed");
 
                         // Store the byte.
                         utf8Bytes[j] = (byte)utf8Byte;
@@ -160,6 +167,7 @@ internal static class UriHelper
             else
                 result.Append(c);
         }
+
         return result.ToString();
     }
 }

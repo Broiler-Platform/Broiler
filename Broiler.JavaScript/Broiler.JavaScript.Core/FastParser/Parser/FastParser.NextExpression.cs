@@ -1,17 +1,16 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+
+namespace YantraJS.Core.FastParser;
 
 
 partial class FastParser
 {
-
-
-
-    public AstExpression Combine(AstExpression left,
-        TokenTypes type,
-        AstExpression right, TokenTypes next = TokenTypes.SemiColon)
+    public AstExpression Combine(AstExpression left, TokenTypes type, AstExpression right, TokenTypes next = TokenTypes.SemiColon)
     {
         if (right == null)
             return left;
+
         switch (type)
         {
             case TokenTypes.SemiColon:
@@ -21,17 +20,23 @@ partial class FastParser
             case TokenTypes.CurlyBracketEnd:
             case TokenTypes.LineTerminator:
                 return left;
+
             case TokenTypes.QuestionMark:
                 if (next != TokenTypes.Colon)
                     throw stream.Unexpected();
+
                 if (!Expression(out var @false))
                     throw stream.Unexpected();
+
                 return new AstConditionalExpression(left, right, @false);
         }
+
         if (type == TokenTypes.Dot)
             return new AstMemberExpression(left, right);
+
         if (type == TokenTypes.QuestionDot)
             return new AstMemberExpression(left, right, false, true);
+
         return new AstBinaryExpression(left, type, right);
     }
 
@@ -62,12 +67,9 @@ partial class FastParser
     /// <param name="node"></param>
     /// <param name="type"></param>
     /// <returns></returns>
-    bool NextExpression(
-        ref AstExpression previous, ref TokenTypes previousType,
-        out AstExpression node, out TokenTypes type, int depth = 0)
+    bool NextExpression(ref AstExpression previous, ref TokenTypes previousType, out AstExpression node, out TokenTypes type, int depth = 0)
     {
-
-        switch(previousType)
+        switch (previousType)
         {
             /**
              * Following are single expression terminators
@@ -88,11 +90,13 @@ partial class FastParser
                 node = null;
                 type = TokenTypes.SemiColon;
                 return true;
+
             case TokenTypes.In:
                 if (!considerInOfAsOperators)
                 {
                     node = null;
                     type = TokenTypes.SemiColon;
+
                     return true;
                 }
                 break;
@@ -102,16 +106,8 @@ partial class FastParser
 
         AstExpression right;
 
-        //if (previous.End.LineTerminator)
-        //{
-        //    node = null;
-        //    type = TokenTypes.SemiColon;
-        //    return true;
-        //}
-
         switch (previousType)
         {
-
             // Associate right...
             case TokenTypes.Assign:
             case TokenTypes.AssignAdd:
@@ -132,35 +128,38 @@ partial class FastParser
 
                 // left must be converted to asssignable...
                 if (previous.Type == FastNodeType.ArrayExpression || previous.Type == FastNodeType.ObjectLiteral)
-                {
                     previous = previous.ToPattern();
-                }
 
                 previous = Combine(previous, previousType, right);
+
                 node = null;
                 type = TokenTypes.SemiColon;
+
                 return true;
 
             case TokenTypes.QuestionMark:
                 stream.CheckAndConsume(previousType);
                 if (!Expression(out var @true))
                     throw stream.Unexpected();
+
                 stream.Expect(TokenTypes.Colon);
                 if (!Expression(out var @false))
                     throw stream.Unexpected();
+
                 previous = new AstConditionalExpression(previous, @true, @false);
                 previousType = stream.Current.Type;
+
                 if (stream.Previous.Type == TokenTypes.SemiColon)
                 {
                     node = null;
                     type = TokenTypes.SemiColon;
                     return true;
                 }
+
                 return NextExpression(ref previous, ref previousType, out node, out type, depth + 1);
         }
 
         stream.CheckAndConsume(previousType);
-
         stream.SkipNewLines();
 
         if (!SinglePrefixPostfixExpression(out node, out var x, out var b))
@@ -170,6 +169,7 @@ partial class FastParser
                 type = TokenTypes.SemiColon;
                 return true;
             }
+
             type = TokenTypes.None;
             return false;
         }
@@ -178,13 +178,14 @@ partial class FastParser
 
         var begin = stream.Current;
         type = begin.Type;
-        if(node.End.Type == TokenTypes.SemiColon)
+
+        if (node.End.Type == TokenTypes.SemiColon)
         {
             type = TokenTypes.SemiColon;
             return true;
         }
 
-        if(m.LinesSkipped && !type.IsOperator())
+        if (m.LinesSkipped && !type.IsOperator())
         {
             type = TokenTypes.SemiColon;
             return true;
@@ -192,7 +193,6 @@ partial class FastParser
 
         switch (type)
         {
-
             case TokenTypes.Comma:
             case TokenTypes.LineTerminator:
             case TokenTypes.SemiColon:
@@ -205,9 +205,9 @@ partial class FastParser
                 // node = null;
                 type = TokenTypes.SemiColon;
                 return true;
+
             case TokenTypes.TemplateEnd:
                 return true;
-
 
             // associate right...
             case TokenTypes.Assign:
@@ -223,8 +223,7 @@ partial class FastParser
             case TokenTypes.AssignSubtract:
             case TokenTypes.AssignUnsignedRightShift:
             case TokenTypes.AssignXor:
-                throw new FastParseException(begin, 
-                    $"Invalid left hand side assignemnt at {begin.Start}");
+                throw new FastParseException(begin, $"Invalid left hand side assignemnt at {begin.Start}");
 
             case TokenTypes.QuestionMark:
 
@@ -237,10 +236,13 @@ partial class FastParser
                     previous = Combine(previous, previousType, node);
                     if (!Expression(out var @true))
                         throw stream.Unexpected();
+
                     stream.Expect(TokenTypes.Colon);
                     if (!Expression(out var @false))
                         throw stream.Unexpected();
+
                     previous = new AstConditionalExpression(previous, @true, @false);
+                    
                     // end of expression ??
                     // previousType = stream.Current.Type;
                     // return NextExpression(ref previous, ref previousType, out node, out type);
@@ -277,7 +279,7 @@ partial class FastParser
 
                 // check type first as it may be in
                 // recent memory accessed...
-                if(type == TokenTypes.In)
+                if (type == TokenTypes.In)
                 {
                     if (!considerInOfAsOperators)
                     {
@@ -293,77 +295,60 @@ partial class FastParser
                     {
                         if (!NextExpression(ref node, ref type, out right, out TokenTypes rightType, depth + 1))
                             break;
+
                         if (type == TokenTypes.SemiColon)
                             return true;
+
                         node = Combine(node, type, right);
                         type = rightType;
+
                         if (type == TokenTypes.SemiColon)
                             break;
+
                         continue;
                     }
+                    
                     previous = Combine(previous, previousType, node);
                     previousType = type;
+                    
                     if (!NextExpression(ref previous, ref previousType, out node, out type, depth + 1))
                         break;
+                    
                     if (type == TokenTypes.SemiColon)
                         return true;
                 } while (true);
+
                 return true;
+            
             default:
                 return false;
         }
     }
 
-    bool Precedes(TokenTypes left, TokenTypes right)
+    static bool Precedes(TokenTypes left, TokenTypes right)
     {
-        int CalculatePrecedence(TokenTypes token)
+        static int CalculatePrecedence(TokenTypes token)
         {
-            switch (token) {
-                case TokenTypes.Mod:
-                case TokenTypes.Divide:
-                case TokenTypes.Multiply:
-                    return 1;
-                case TokenTypes.Plus:
-                case TokenTypes.Minus:
-                    return 2;
-                case TokenTypes.LeftShift:
-                case TokenTypes.RightShift:
-                case TokenTypes.UnsignedRightShift:
-                    return 3;
-                case TokenTypes.Less:
-                case TokenTypes.LessOrEqual:
-                case TokenTypes.Greater:
-                case TokenTypes.GreaterOrEqual:
-                case TokenTypes.In:
-                case TokenTypes.InstanceOf:
-                    return 4;
-                case TokenTypes.Equal:
-                case TokenTypes.NotEqual:
-                case TokenTypes.StrictlyEqual:
-                case TokenTypes.StrictlyNotEqual:
-                    return 5;
-                case TokenTypes.Coalesce:
-                    return 6;
-                case TokenTypes.BitwiseAnd:
-                    return 7;
-                case TokenTypes.Xor:
-                    return 8;
-                case TokenTypes.BitwiseOr:
-                    return 9;
-                case TokenTypes.BooleanAnd:
-                    return 10;
-                case TokenTypes.BooleanOr:
-                    return 11;
-            }
-
-            return int.MaxValue;
+            return token switch
+            {
+                TokenTypes.Mod or TokenTypes.Divide or TokenTypes.Multiply => 1,
+                TokenTypes.Plus or TokenTypes.Minus => 2,
+                TokenTypes.LeftShift or TokenTypes.RightShift or TokenTypes.UnsignedRightShift => 3,
+                TokenTypes.Less or TokenTypes.LessOrEqual or TokenTypes.Greater or TokenTypes.GreaterOrEqual or TokenTypes.In or TokenTypes.InstanceOf => 4,
+                TokenTypes.Equal or TokenTypes.NotEqual or TokenTypes.StrictlyEqual or TokenTypes.StrictlyNotEqual => 5,
+                TokenTypes.Coalesce => 6,
+                TokenTypes.BitwiseAnd => 7,
+                TokenTypes.Xor => 8,
+                TokenTypes.BitwiseOr => 9,
+                TokenTypes.BooleanAnd => 10,
+                TokenTypes.BooleanOr => 11,
+                _ => int.MaxValue,
+            };
         }
 
-        if (left != TokenTypes.SemiColon && left != TokenTypes.EOF) {
+        if (left != TokenTypes.SemiColon && left != TokenTypes.EOF)
             return CalculatePrecedence(left) < CalculatePrecedence(right);
-        }
+
         return false;
     }
-
-    
 }

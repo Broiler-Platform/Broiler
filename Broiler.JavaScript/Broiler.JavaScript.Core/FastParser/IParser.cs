@@ -1,4 +1,6 @@
-namespace YantraJS.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+
+namespace Broiler.JavaScript.Core.FastParser;
 
 /// <summary>
 /// Defines the contract for a JavaScript parser that produces an AST.

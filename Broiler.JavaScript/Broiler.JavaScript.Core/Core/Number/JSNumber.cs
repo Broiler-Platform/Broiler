@@ -1,22 +1,21 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Utils;
+using System;
 using System.Globalization;
 using Yantra.Core;
-using YantraJS.Core.Clr;
-using YantraJS.Core.Core.Primitive;
-using YantraJS.Utils;
 
 namespace YantraJS.Core;
 
-// [JSRuntime(typeof(JSNumberStatic), typeof(JSNumberPrototype))]
 [JSBaseClass("Object")]
 [JSFunctionGenerator("Number")]
 public sealed partial class JSNumber : JSPrimitive
 {
-
     internal readonly double value;
 
-
     private static readonly long positiveZeroBits = BitConverter.DoubleToInt64Bits(0.0);
+
     /// <summary>
     /// Determines if the given number is positive zero.
     /// </summary>
@@ -64,7 +63,6 @@ public sealed partial class JSNumber : JSPrimitive
     //Javascript considers double.Epsilon as MIN_VALUE and not .Net double.MinValue
     [JSExport("MIN_VALUE")]
     public static readonly double MinValue = double.Epsilon;
-    
 
     public override bool IsNumber => true;
 
@@ -75,29 +73,28 @@ public sealed partial class JSNumber : JSPrimitive
     internal override PropertyKey ToKey(bool create = false)
     {
         var n = value;
+
         if (double.IsNaN(n))
             return KeyStrings.NaN;
+
         if (n == 0)
             return 0;
+
         if (n > 0 && ((uint)n) == n)
             return (uint)n;
+
         if (!create)
         {
             if (KeyStrings.TryGet(n.ToString(), out var k))
                 return k;
+
             return KeyStrings.undefined;
         }
+
         return KeyStrings.GetOrCreate(n.ToString());
     }
 
-    public JSNumber(double value) : base() =>
-        //if (value > 0 && value < double.Epsilon)
-        //{
-        //    value = 0;
-        //}
-        this.value = value;
-
-    // public override int IntValue => (int)((long)value << 32) >> 32;
+    public JSNumber(double value) : base() => this.value = value;
 
     public override double DoubleValue => value;
 
@@ -107,79 +104,89 @@ public sealed partial class JSNumber : JSPrimitive
 
     public override bool ConvertTo(Type type, out object value)
     {
-        if(type == typeof(double))
+        if (type == typeof(double))
         {
             value = this.value;
             return true;
         }
+
         if (type == typeof(float))
         {
             value = this.value;
             return true;
         }
-        if (type == typeof(int)) {
-            // value = (int)((long)this.value << 32) >> 32;
+
+        if (type == typeof(int))
+        {
             value = (int)this.value;
             return true;
         }
+
         if (type == typeof(long))
         {
             value = (long)this.value;
             return true;
         }
+
         if (type == typeof(ulong))
         {
             value = (ulong)this.value;
             return true;
         }
+
         if (type == typeof(bool))
         {
             value = this.value != 0;
             return true;
         }
+
         if (type == typeof(short))
         {
             value = (short)this.value;
             return true;
         }
+
         if (type == typeof(uint))
         {
             value = (uint)this.value;
             return true;
         }
+
         if (type == typeof(ushort))
         {
             value = (ushort)this.value;
             return true;
         }
+
         if (type == typeof(byte))
         {
             value = (byte)this.value;
             return true;
         }
+
         if (type == typeof(sbyte))
         {
             value = (sbyte)this.value;
             return true;
         }
+
         if (type == typeof(object))
         {
             value = this.value;
             return true;
         }
+
         if (type.IsAssignableFrom(typeof(JSNumber)))
         {
             value = this;
             return true;
         }
+
         value = null;
         return false;
     }
 
-    public override string ToString()
-    {
-        return ToECMAString(value);
-    }
+    public override string ToString() => ToECMAString(value);
 
     /// <summary>
     /// ECMAScript-compliant Number::toString(x) per ECMA-262 § 6.1.6.1.20.
@@ -191,12 +198,16 @@ public sealed partial class JSNumber : JSPrimitive
     {
         if (double.IsNaN(value))
             return "NaN";
+
         if (double.IsPositiveInfinity(value))
             return "Infinity";
+
         if (double.IsNegativeInfinity(value))
             return "-Infinity";
+
         if (value == 0.0)
             return "0";
+
         if (value < 0)
             return "-" + ToECMAString(-value);
 
@@ -213,7 +224,7 @@ public sealed partial class JSNumber : JSPrimitive
         if (eIdx >= 0)
         {
             intMantissa = repr.Substring(0, eIdx);
-            exp = int.Parse(repr.Substring(eIdx + 1), CultureInfo.InvariantCulture);
+            exp = int.Parse(repr.AsSpan(eIdx + 1), CultureInfo.InvariantCulture);
         }
         else
         {
@@ -224,7 +235,7 @@ public sealed partial class JSNumber : JSPrimitive
         if (dotIdx >= 0)
         {
             int fracLen = intMantissa.Length - dotIdx - 1;
-            intMantissa = intMantissa.Substring(0, dotIdx) + intMantissa.Substring(dotIdx + 1);
+            intMantissa = string.Concat(intMantissa.AsSpan(0, dotIdx), intMantissa.AsSpan(dotIdx + 1));
             exp -= fracLen;
         }
 
@@ -278,55 +289,22 @@ public sealed partial class JSNumber : JSPrimitive
     public override JSValue AddValue(JSValue value)
     {
         value = value.IsObject ? value.ValueOf() : value;
+
         if (value is JSPrimitiveObject po)
             value = po.value;
+
         if (value is JSString @string)
             return new JSString(ToECMAString(this.value) + @string.ToString());
-        if(value is JSObject @object)
+
+        if (value is JSObject @object)
             return new JSString(ToECMAString(this.value) + @object.StringValue);
+
         return new JSNumber(this.value + value.DoubleValue);
     }
 
     public override JSValue AddValue(double value) => new JSNumber(this.value + value);
 
     public override JSValue AddValue(string value) => new JSString(ToECMAString(this.value) + value);
-
-
-    //public override JSValue AddValue(JSValue value)
-    //{
-    //    switch(value)
-    //    {
-    //        case JSUndefined u:
-    //            return JSNumber.NaN;
-    //        case JSNull n:
-    //            return this;
-    //        case JSNumber n1:
-    //            var v = n1.value;
-    //            if (double.IsNaN(v)
-    //                || double.IsPositiveInfinity(v)
-    //                || double.IsNegativeInfinity(v))
-    //            {
-    //                return n1;
-    //            }
-    //            return this.AddValue(v);
-    //    }
-    //    return new JSString(this.value.ToString() + value.ToString());
-    //}
-
-    //public override JSValue AddValue(double value)
-    //{
-    //    var v = this.value;
-    //    if (double.IsNaN(v)
-    //        || double.IsPositiveInfinity(v)
-    //        || double.IsNegativeInfinity(v))
-    //        return this;
-    //    return new JSNumber(v + value);
-    //}
-
-    //public override JSValue AddValue(string value)
-    //{
-    //    return new JSString(this.value.ToString() + value);
-    //}
 
     public override int GetHashCode() => (int)value;
     public override bool Equals(object obj)
@@ -335,8 +313,10 @@ public sealed partial class JSNumber : JSPrimitive
         {
             if (double.IsNaN(value) || double.IsNaN(n.value))
                 return false;
+
             return value == n.value;
         }
+
         return base.Equals(obj);
     }
 
@@ -346,63 +326,76 @@ public sealed partial class JSNumber : JSPrimitive
         {
             if (double.IsNaN(this.value))
                 return false;
+
             return true;
         }
+
         switch (value)
         {
             case JSNumber number:
                 if (double.IsNaN(this.value) || double.IsNaN(number.value))
                     return false;
-                if(this.value == number.value)
+                if (this.value == number.value)
                     return true;
                 return false;
+
             case JSString @string
                 when this.value == @string.DoubleValue:
                 return true;
+
             case JSNull _
                 when this.value == 0D:
                 return true;
+
             case JSBoolean boolean
                 when this.value == (boolean._value ? 1D : 0D):
                 return true;
         }
+
         // Added for this TC ExpressionTests.cs Assert.AreEqual(true, Evaluate("2 == [2]"));
         if (ToString() == value.ToString())
             return true;
+
         return false;
     }
 
     public override bool StrictEquals(JSValue value)
     {
-        
-        if (ReferenceEquals(this, value)) {
+
+        if (ReferenceEquals(this, value))
+        {
             if (double.IsNaN(this.value))
                 return false;
+
             return true;
         }
+
         if (value is JSNumber n)
         {
             if (double.IsNaN(this.value) || double.IsNaN(n.value))
                 return false;
+
             if (this.value == n.value)
                 return true;
         }
+
         return false;
     }
 
     public override bool SameValueZero(JSValue value)
     {
         if (ReferenceEquals(this, value))
-        {
             return true;
-        }
+
         if (value is JSNumber n)
         {
             if (double.IsNaN(this.value) && double.IsNaN(n.value))
                 return true;
+
             if (this.value == n.value)
                 return true;
         }
+
         return false;
     }
 
@@ -412,24 +405,22 @@ public sealed partial class JSNumber : JSPrimitive
 
     public override bool StrictEqualsLiteral(double value) => this.value == value;
 
-    public override JSValue InvokeFunction(in Arguments a) => throw JSContext.Current.NewTypeError($"{value} is not a function");
+    public override JSValue InvokeFunction(in Arguments a) => throw JSContext.NewTypeError($"{value} is not a function");
 
     internal override JSBoolean Is(JSValue value)
     {
-        if(value is JSNumber number)
+        if (value is JSNumber number)
         {
             if (this.value == 0 || number.value == 0)
-            {
-                return BitConverter.DoubleToInt64Bits(this.value) == BitConverter.DoubleToInt64Bits(number.value)
-                    ? JSBoolean.True
-                    : JSBoolean.False;
-            } 
-            
+                return BitConverter.DoubleToInt64Bits(this.value) == BitConverter.DoubleToInt64Bits(number.value) ? JSBoolean.True : JSBoolean.False;
+
             if (double.IsNaN(this.value))
                 return double.IsNaN(number.value) ? JSBoolean.True : JSBoolean.False;
+
             if (this.value == number.value)
                 return JSBoolean.True;
         }
+
         return JSBoolean.False;
     }
 }

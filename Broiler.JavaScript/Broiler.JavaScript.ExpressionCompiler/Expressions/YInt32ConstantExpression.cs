@@ -47,27 +47,27 @@ public class YInt32ConstantExpression(int value) : YExpression(YExpressionType.I
 
     internal static YInt32ConstantExpression For(int value)
     {
-        switch (value)
+        return value switch
         {
-            case -1: return MinusOne;
-            case 0: return _0;
-            case 1: return _1;
-            case 2: return _2;
-            case 3: return _3;
-            case 4: return _4;
-            case 5: return _5;
-            case 6: return _6;
-            case 7: return _7;
-            case 8: return _8;
-            case 16: return _16;
-            case 32: return _32;
-            case 64: return _64;
-            case 128: return _128;
-            case 256: return _256;
-            case 512: return _512;
-            case 1024: return _1024;
-        }
-        return new YInt32ConstantExpression(value);
+            -1 => MinusOne,
+            0 => _0,
+            1 => _1,
+            2 => _2,
+            3 => _3,
+            4 => _4,
+            5 => _5,
+            6 => _6,
+            7 => _7,
+            8 => _8,
+            16 => _16,
+            32 => _32,
+            64 => _64,
+            128 => _128,
+            256 => _256,
+            512 => _512,
+            1024 => _1024,
+            _ => new YInt32ConstantExpression(value),
+        };
     }
 }
 
@@ -111,26 +111,26 @@ public class YUInt32ConstantExpression(uint value) : YExpression(YExpressionType
 
     internal static YUInt32ConstantExpression For(uint value)
     {
-        switch (value)
+        return value switch
         {
-            case 0: return _0;
-            case 1: return _1;
-            case 2: return _2;
-            case 3: return _3;
-            case 4: return _4;
-            case 5: return _5;
-            case 6: return _6;
-            case 7: return _7;
-            case 8: return _8;
-            case 16: return _16;
-            case 32: return _32;
-            case 64: return _64;
-            case 128: return _128;
-            case 256: return _256;
-            case 512: return _512;
-            case 1024: return _1024;
-        }
-        return new YUInt32ConstantExpression(value);
+            0 => _0,
+            1 => _1,
+            2 => _2,
+            3 => _3,
+            4 => _4,
+            5 => _5,
+            6 => _6,
+            7 => _7,
+            8 => _8,
+            16 => _16,
+            32 => _32,
+            64 => _64,
+            128 => _128,
+            256 => _256,
+            512 => _512,
+            1024 => _1024,
+            _ => new YUInt32ConstantExpression(value),
+        };
     }
 }
 

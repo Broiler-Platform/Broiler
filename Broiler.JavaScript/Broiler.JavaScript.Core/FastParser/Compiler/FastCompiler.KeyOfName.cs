@@ -1,5 +1,5 @@
-﻿using YantraJS.Core.LinqExpressions;
-using YantraJS.ExpHelper;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.LinqExpressions;
 using Expression = YantraJS.Expressions.YExpression;
 
 namespace YantraJS.Core.FastParser.Compiler;

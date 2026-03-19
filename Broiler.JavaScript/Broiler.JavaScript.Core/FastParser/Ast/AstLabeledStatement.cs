@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstLabeledStatement(FastToken id, AstStatement statement) : AstStatement(id, FastNodeType.LabeledStatement, statement.End)
 {

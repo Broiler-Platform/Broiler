@@ -24,7 +24,7 @@ public partial class ILCodeGenerator
     private readonly TextWriter? expressionWriter;
 
     private readonly Dictionary<YParameterExpression,(Type type, int localIndex)> uninitialized
-        = new(ReferenceEqualityComparer.Instance);
+        = new(Core.ReferenceEqualityComparer.Instance);
 
     public Sequence<ILDebugInfo> SequencePoints { get; }
         = [];
@@ -66,18 +66,7 @@ public partial class ILCodeGenerator
 
     internal void Emit(YLambdaExpression exp)
     {
-        
-
-        // var f = new FlattenVisitor();
         var body = exp.Body;
-
-        //writer.WriteLine("Original");
-        //body.Print(writer);
-
-        //body = f.Visit(body);
-
-        //writer.WriteLine("Flatten");
-        
 
         short i = 0;
         if(exp.This != null)
@@ -186,15 +175,8 @@ public partial class ILCodeGenerator
 
     }
 
-    private YExpression ReWriteTryCatch(YExpression body)
+    private static YExpression ReWriteTryCatch(YExpression body)
     {
-        //switch (body.NodeType)
-        //{
-        //    case YExpressionType.Block:
-        //    case YExpressionType.Assign:
-        //        var l = YExpression.Label("ReturnLabel", body.Type);
-        //        return YExpression.Block(YExpression.Return(l, body), YExpression.Label(l, YExpression.Null));
-        //}
         if (body.NodeType != YExpressionType.TryCatchFinally)
         {
             return body;

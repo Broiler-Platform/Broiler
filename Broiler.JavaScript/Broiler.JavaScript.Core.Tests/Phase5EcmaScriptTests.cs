@@ -1,6 +1,6 @@
-using System.Threading;
+using Broiler.JavaScript.Core.Core;
 
-namespace YantraJS.Core.Tests;
+namespace Broiler.JavaScript.Core.Tests;
 
 /// <summary>
 /// ECMAScript conformance tests for Phase 5 — Hardening and Known Limitations:

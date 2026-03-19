@@ -1,12 +1,15 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using System;
 using System.Threading;
 using Yantra.Core;
 using YantraJS.Core.BigInt;
-using YantraJS.Core.Clr;
-using YantraJS.Core.Core.Intl;
 using YantraJS.Core.Set;
 using YantraJS.Core.Typed;
-using YantraJS.Utils;
+using System.Collections.Generic;
+using Broiler.JavaScript.Core.Core.Intl;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Utils;
+using Broiler.JavaScript.Core;
 
 namespace YantraJS.Core;
 
@@ -40,10 +43,13 @@ public partial class JSGlobalStatic
     public static JSValue Eval(in Arguments a)
     {
         var f = a.Get1();
+
         if (!f.IsString)
             return f;
+
         var text = (f as JSString).value;
         string location = null;
+
         JSContext.Current.DispatchEvalEvent(ref text, ref location);
         return CoreScript.Evaluate(text, null);
     }
@@ -53,7 +59,6 @@ public partial class JSGlobalStatic
     {
         var f = a.Get1().ToString();
         return new JSString(Uri.EscapeUriString(f));
-
     }
 
     [JSExport("encodeURIComponent", Length = 1)]
@@ -82,21 +87,23 @@ public partial class JSGlobalStatic
     {
         var @this = a.This;
         var fx = a.Get1();
-        if (!(fx is JSFunction f))
-            throw JSContext.Current.NewTypeError("Argument is not a function");
-        //AsyncPump.Run(() => {
-        //    f.f(new Arguments(@this));
-        //    return Task.CompletedTask;
-        //});
+
+        if (fx is not JSFunction f)
+            throw JSContext.NewTypeError("Argument is not a function");
+
         var c = JSContext.Current;
-        SynchronizationContext.Current.Post((_1) => { 
-            try {
+        SynchronizationContext.Current.Post((_1) =>
+        {
+            try
+            {
                 f.f(new Arguments(_1 as JSValue));
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 c.ReportError(ex);
             }
         }, @this);
+
         return JSUndefined.Value;
     }
 
@@ -105,10 +112,13 @@ public partial class JSGlobalStatic
     {
         var @this = a.This;
         var (fx, timeout) = a.Get2();
-        if (!(fx is JSFunction f))
-            throw JSContext.Current.NewTypeError("Argument is not a function");
+
+        if (fx is not JSFunction f)
+            throw JSContext.NewTypeError("Argument is not a function");
+
         var delay = timeout.IsUndefined ? 0 : timeout.IntValue;
         var key = JSContext.Current.SetInterval(delay, f, a);
+
         return new JSBigInt(key);
     }
 
@@ -126,10 +136,13 @@ public partial class JSGlobalStatic
         var context = JSContext.Current;
         var (fx, timeout) = a.Get2();
         var current = JSContext.Current;
-        if (!(fx is JSFunction f))
-            throw current.NewTypeError("Argument is not a function");
+
+        if (fx is not JSFunction f)
+            throw JSContext.NewTypeError("Argument is not a function");
+
         var delay = timeout.IsUndefined ? 0 : timeout.IntValue;
         var key = context.PostTimeout(delay, f, a);
+
         return new JSBigInt(key);
     }
 
@@ -138,6 +151,7 @@ public partial class JSGlobalStatic
     {
         var n = a.Get1().BigIntValue;
         var context = JSContext.Current;
+
         context.ClearTimeout(n);
         return JSUndefined.Value;
     }
@@ -152,26 +166,25 @@ public partial class JSGlobalStatic
     public static JSValue StructuredClone(in Arguments a)
     {
         var value = a.Get1();
-        var seen = new System.Collections.Generic.Dictionary<JSValue, JSValue>(
-            System.Collections.Generic.ReferenceEqualityComparer.Instance);
+        var seen = new Dictionary<JSValue, JSValue>(System.Collections.Generic.ReferenceEqualityComparer.Instance);
         return StructuredCloneValue(value, seen);
     }
 
-    private static JSValue StructuredCloneValue(
-        JSValue value,
-        System.Collections.Generic.Dictionary<JSValue, JSValue> seen)
+    private static JSValue StructuredCloneValue(JSValue value, Dictionary<JSValue, JSValue> seen)
     {
         // Primitives are returned as-is.
         if (value == null || value.IsNullOrUndefined)
             return value;
+
         if (value is JSNumber || value is JSString || value is JSBoolean)
             return value;
+
         if (value is JSBigInt)
             return value;
 
         // Functions cannot be cloned.
         if (value is JSFunction)
-            throw JSContext.Current.NewTypeError("structuredClone: function values cannot be cloned");
+            throw JSContext.NewTypeError("structuredClone: function values cannot be cloned");
 
         // Check for circular references.
         if (seen.TryGetValue(value, out var existing))
@@ -197,9 +210,11 @@ public partial class JSGlobalStatic
         if (value is JSArrayBuffer arrayBuffer)
         {
             if (arrayBuffer.isDetached)
-                throw JSContext.Current.NewTypeError("structuredClone: cannot clone a detached ArrayBuffer");
+                throw JSContext.NewTypeError("structuredClone: cannot clone a detached ArrayBuffer");
+
             var newBuf = new byte[arrayBuffer.buffer.Length];
             Array.Copy(arrayBuffer.buffer, newBuf, arrayBuffer.buffer.Length);
+
             var clone = new JSArrayBuffer(newBuf);
             seen[value] = clone;
             return clone;
@@ -210,12 +225,14 @@ public partial class JSGlobalStatic
         {
             var clone = new JSMap(Arguments.Empty);
             seen[value] = clone;
+
             foreach (var entry in map.GetEntries())
             {
                 var clonedKey = StructuredCloneValue(entry[0], seen);
                 var clonedVal = StructuredCloneValue(entry[1], seen);
                 clone.Set(clonedKey, clonedVal);
             }
+
             return clone;
         }
 
@@ -224,18 +241,17 @@ public partial class JSGlobalStatic
         {
             var clone = new JSSet(Arguments.Empty);
             seen[value] = clone;
+
             foreach (var item in set.Keys())
-            {
                 clone.Add(StructuredCloneValue(item, seen));
-            }
+
             return clone;
         }
 
         // Error
         if (value is JSError error)
         {
-            var clone = new JSError(new Arguments(
-                JSUndefined.Value, new JSString(error.Message)));
+            var clone = new JSError(new Arguments(JSUndefined.Value, new JSString(error.Message)));
             seen[value] = clone;
             return clone;
         }
@@ -246,12 +262,15 @@ public partial class JSGlobalStatic
             var clone = new JSArray();
             seen[value] = clone;
             var en = arr.GetElementEnumerator();
+            
             while (en.MoveNext(out var hasValue, out var item, out var _))
             {
                 if (!hasValue)
                     continue;
+
                 clone.Add(StructuredCloneValue(item, seen));
             }
+
             return clone;
         }
 
@@ -261,20 +280,22 @@ public partial class JSGlobalStatic
             var clone = new JSObject();
             seen[value] = clone;
             var pen = obj.GetOwnProperties().GetEnumerator();
+
             while (pen.MoveNext(out var key, out var prop))
             {
                 if (prop.IsEmpty || !prop.IsEnumerable)
                     continue;
+
                 if (!prop.IsValue)
                     continue;
+
                 clone[key.Value] = StructuredCloneValue(prop.value, seen);
             }
+
             return clone;
         }
 
         // Fallback: return value as-is for unknown types.
         return value;
     }
-
-
 }

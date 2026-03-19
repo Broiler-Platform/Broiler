@@ -1,32 +1,26 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core.Promise;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using YantraJS.Core;
 using YantraJS.Core.Core.Error;
 
-namespace YantraJS.Core.Core.Disposable;
+namespace Broiler.JavaScript.Core.Core.Disposable;
 
-public class JSDisposableStack: IDisposable, IAsyncDisposable
+public class JSDisposableStack : IDisposable, IAsyncDisposable
 {
-
     public bool Disposed { get; private set; }
-
     public bool isAsync { get; private set; }
-
     public JSValue Error { get; private set; }
+    private Stack<(JSValue value, bool async)> stack = new();
 
-    private Stack<(JSValue value,bool async)> stack = new();
-
-    public JSDisposableStack()
-    {
-    
-    }
+    public JSDisposableStack() { }
 
     public void AddDisposableResource(JSValue value, bool async = false)
     {
-        if(value.IsNullOrUndefined)
-        {
+        if (value.IsNullOrUndefined)
             return;
-        }
+
         isAsync |= async;
         stack.Push((value, async));
     }
@@ -38,31 +32,32 @@ public class JSDisposableStack: IDisposable, IAsyncDisposable
             ((IDisposable)this).Dispose();
             return JSUndefined.Value;
         }
+
         var task = DisposeAsync();
         return task.ToPromise();
     }
 
     void IDisposable.Dispose()
     {
-        while(stack.Count > 0) {
+        while (stack.Count > 0)
+        {
             var (v, a) = stack.Pop();
-            if(a)
-            {
-                throw JSContext.Current.NewTypeError("Async resource must not be disposed synchronously.");
-            }
+
+            if (a)
+                throw JSContext.NewTypeError("Async resource must not be disposed synchronously.");
+
             try
             {
                 v.InvokeMethod(JSSymbol.dispose);
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 Error = new JSSuppressedError(JSError.From(ex), Error);
             }
         }
 
         if (Error != null)
-        {
             JSException.Throw(Error);
-        }
     }
 
     private async Task DisposeAsync()
@@ -89,10 +84,7 @@ public class JSDisposableStack: IDisposable, IAsyncDisposable
         }
 
         if (Error != null)
-        {
             JSException.Throw(Error);
-        }
-
     }
 
     async ValueTask IAsyncDisposable.DisposeAsync() => await DisposeAsync();

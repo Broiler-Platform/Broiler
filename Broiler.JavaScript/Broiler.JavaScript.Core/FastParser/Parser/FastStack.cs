@@ -1,10 +1,10 @@
 ﻿using System;
 
-namespace YantraJS.Core.FastParser;
+namespace Broiler.JavaScript.Core.FastParser.Parser;
 
 public readonly struct FastStack<T>(FastPool pool)
 {
-    private readonly FastList<T> list = new FastList<T>(pool);
+    private readonly FastList<T> list = new(pool);
 
     public void Push(T item) => list.Add(item);
 
@@ -13,8 +13,10 @@ public readonly struct FastStack<T>(FastPool pool)
         var last = list.Count-1;
         if (last < 0)
             throw new IndexOutOfRangeException();
+
         var item = list[last];
         list.RemoveAt(last);
+
         return item;
     }
 

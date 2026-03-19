@@ -1,57 +1,59 @@
 ﻿#nullable enable
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
 using System;
-namespace YantraJS.Core.FastParser;
+using YantraJS.Core;
+namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 internal static class ExpressionPatternExtensions
 {
-
     public static AstExpression ToPattern(this AstExpression exp)
     {
         switch (exp.Type)
         {
-            case FastNodeType.SpreadElement: 
+            case FastNodeType.SpreadElement:
                 var spe = exp as AstSpreadElement;
-                if (spe!.Argument.Type  != FastNodeType.Identifier)
-                {
+                if (spe!.Argument.Type != FastNodeType.Identifier)
                     throw new FastParseException(exp.Start, $"Invalid spread pattern at {exp.Start.Start}");
-                }
+
                 return spe;
-            case FastNodeType.ObjectLiteral: 
+
+            case FastNodeType.ObjectLiteral:
                 var l = exp as AstObjectLiteral;
                 return LiteralToPattern(l!);
-            case FastNodeType.ArrayExpression: 
+
+            case FastNodeType.ArrayExpression:
                 var ae = exp as AstArrayExpression;
                 return ArrayToPattern(ae!);
+
             case FastNodeType.Identifier:
             case FastNodeType.ArrayPattern:
             case FastNodeType.ObjectPattern:
                 return exp;
+
             case FastNodeType.BinaryExpression:
                 var be = (exp as AstBinaryExpression)!;
                 if (be.Operator == TokenTypes.Assign)
-                {
                     return new AstBinaryExpression(be.Left.ToPattern(), be.Operator, be.Right);
-                }
+
                 break;
 
         }
-        throw new FastParseException(exp.Start,
-            $"Invalid pattern of {exp.Type} at {exp.Start.Start}");
+
+        throw new FastParseException(exp.Start, $"Invalid pattern of {exp.Type} at {exp.Start.Start}");
 
         static AstExpression ArrayToPattern(AstArrayExpression array)
         {
             var pl = new Sequence<AstExpression>(array.Elements.Count);
             var e = array.Elements.GetFastEnumerator();
-            while(e.MoveNext(out var item))
-            {
+            while (e.MoveNext(out var item))
                 pl.Add(item.ToPattern());
-            }
+
             return new AstArrayPattern(array.Start, array.End, pl);
         }
 
         static AstExpression LiteralToPattern(AstObjectLiteral literal)
         {
-
             var pl = new Sequence<ObjectProperty>(literal.Properties.Count);
             var e = literal.Properties.GetFastEnumerator();
             while (e.MoveNext(out var px))
@@ -63,6 +65,7 @@ internal static class ExpressionPatternExtensions
                         var spe = (px as AstSpreadElement)!;
                         property = new ObjectProperty(null, spe.Argument, null, true);
                         break;
+
                     case FastNodeType.ClassProperty:
                         var p = (px as AstClassProperty)!;
                         if (p.Kind == AstPropertyKind.Data)
@@ -80,15 +83,15 @@ internal static class ExpressionPatternExtensions
                             property = new ObjectProperty(p.Key, init, null, false, p.Computed);
                         }
                         break;
+
                     default:
                         throw new NotSupportedException();
                 }
-                // pl.Add(property);
             }
+
             return new AstObjectPattern(literal.Start, literal.End, pl);
         }
     }
-
 }
 
 public readonly struct VariableDeclarator
@@ -116,16 +119,20 @@ public readonly struct VariableDeclarator
     {
         if (Init == null)
             return Identifier.ToString();
+
         return $"{Identifier} = {Init}";
     }
 
-    private static void Fill(Sequence<VariableDeclarator> args, AstExpression exp) {
-        if(exp.Type == FastNodeType.SequenceExpression && exp is AstSequenceExpression se) {
+    private static void Fill(Sequence<VariableDeclarator> args, AstExpression exp)
+    {
+        if (exp.Type == FastNodeType.SequenceExpression && exp is AstSequenceExpression se)
+        {
             var e = se.Expressions.GetFastEnumerator();
-            while(e.MoveNext(out var item)) {
+            while (e.MoveNext(out var item))
                 args.Add(new VariableDeclarator(item.ToPattern()));
-            }
-        } else {
+        }
+        else
+        {
             args.Add(new VariableDeclarator(exp.ToPattern()));
         }
     }
@@ -134,19 +141,18 @@ public readonly struct VariableDeclarator
     {
         if (node.Type == FastNodeType.EmptyExpression)
             return Sequence<VariableDeclarator>.Empty;
+
         var list = new Sequence<VariableDeclarator>();
         Fill(list, node);
         return list;
     }
 
-
     public static Sequence<VariableDeclarator> From(in ArraySpan<AstExpression> nodes)
     {
         var r = new Sequence<VariableDeclarator>(nodes.Length);
         for (int i = 0; i < nodes.Length; i++)
-        {
             r.Add(new VariableDeclarator(nodes[i].ToPattern()));
-        }
+
         return r;
     }
 }

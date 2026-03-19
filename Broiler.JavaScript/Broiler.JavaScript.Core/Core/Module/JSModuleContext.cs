@@ -1,4 +1,5 @@
-﻿using Microsoft.Threading;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Promise;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -7,14 +8,12 @@ using System.Text;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
-using YantraJS.Core.Clr;
+using YantraJS.Core;
 using YantraJS.Utils;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Module;
 
-public delegate Task JSModuleDelegate(
-    JSModule module
-);
+public delegate Task JSModuleDelegate(JSModule module);
 
 /// <summary>
 /// Enables Modules, both CommonJS and ES Modules
@@ -24,26 +23,24 @@ public class JSModuleContext : JSContext
     internal readonly JSObject ModulePrototype;
     internal readonly JSFunction Module;
 
-    public JSModuleContext(SynchronizationContext ctx = null, bool enableClrIntegration = true) :
-        base(ctx ?? new SynchronizationContext())
+    public JSModuleContext(SynchronizationContext ctx = null, bool enableClrIntegration = true) : base(ctx ?? new SynchronizationContext())
     {
         // this.CreateSharedObject(KeyStrings.assert, typeof(JSAssert), true);
         this[KeyStrings.assert] = JSAssert.CreateClass(this, false);
-
 
         Module = JSModule.CreateClass(this, false); // this.Create<JSModule>(KeyStrings.Module, null, false);
         ModulePrototype = Module.prototype;
 
         if (enableClrIntegration)
             moduleCache[ModuleCache.clr] = new JSModule(this, ClrModule.Default, "clr");
-        moduleCache[ModuleCache.module] = new JSModule(this, Module, "module");
 
+        moduleCache[ModuleCache.module] = new JSModule(this, Module, "module");
 
         this[KeyStrings.globalThis] = this;
         this[KeyStrings.global] = this;
     }
 
-    
+
     /// <summary>
     /// Pass Exports as Module with unique name
     /// After register module can get in script
@@ -62,10 +59,6 @@ public class JSModuleContext : JSContext
         var n = name.ToString();
         moduleCache.GetOrCreate(name.Value, () => new JSModule(this, exports, n));
     }
-    
-    
-    
-   
 
     /// <summary>
     /// Modules are isolated by Context and are identified by Id.
@@ -73,8 +66,7 @@ public class JSModuleContext : JSContext
     /// Specially in server environment with multiple context, module names
     /// are identified by unique id present in ModuleName.
     /// </summary>
-    readonly ModuleCache moduleCache
-        = ModuleCache.Create();
+    readonly ModuleCache moduleCache = ModuleCache.Create();
 
     [Browsable(false)]
     public IEnumerable<JSModule> All => moduleCache.All;
@@ -93,16 +85,20 @@ public class JSModuleContext : JSContext
                 if (Directory.Exists(fullName))
                 {
                     var pkgJson = fullName + "/package.json";
+
                     if (File.Exists(pkgJson))
                     {
                         var json = File.ReadAllText(pkgJson);
                         var pkg = JsonNode.Parse(json) as JsonObject;
+
                         if (pkg.TryGetPropertyValue("main", out var token))
                         {
                             var v = token.GetValue<string>();
                             path = Path.Combine(fullName, v);
+
                             if (File.Exists(path))
                                 return true;
+
                             foreach (var ext in extensions)
                             {
                                 var np = path + ext;
@@ -114,7 +110,6 @@ public class JSModuleContext : JSContext
                             }
 
                             throw new FileNotFoundException(path);
-                            // return true;
                         }
                     }
                 }
@@ -136,8 +131,10 @@ public class JSModuleContext : JSContext
             {
                 if (Exists(dirPath, relativePath, out var path))
                     return path;
+
                 if (Exists(dirPath, relativePath + ext, out path))
                     return path;
+
                 continue;
             }
 
@@ -145,8 +142,10 @@ public class JSModuleContext : JSContext
             {
                 if (Exists(folder, relativePath, out var path))
                     return path;
+
                 if (Exists(folder, relativePath + ext, out path))
                     return path;
+
                 if (Exists(folder, relativePath + "/index" + ext, out path))
                     return path;
 
@@ -164,7 +163,8 @@ public class JSModuleContext : JSContext
             var np = new string[paths.Length + 2];
             np[0] = CurrentPath;
             np[1] = CurrentPath + "/node_modules";
-            Array.Copy(paths, 0, np, 2, paths.Length);
+
+            System.Array.Copy(paths, 0, np, 2, paths.Length);
             paths = np;
         }
 
@@ -177,15 +177,12 @@ public class JSModuleContext : JSContext
         ];
     }
 
-    private IDisposable CreateSynchronizationContext()
+    private static IDisposable CreateSynchronizationContext()
     {
         if (SynchronizationContext.Current == null)
         {
             SynchronizationContext.SetSynchronizationContext(new SynchronizationContext());
-            return new DisposableAction(() =>
-            {
-                SynchronizationContext.SetSynchronizationContext(null);
-            });
+            return new DisposableAction(() => { SynchronizationContext.SetSynchronizationContext(null); });
         }
 
         return DisposableAction.Empty;
@@ -194,20 +191,19 @@ public class JSModuleContext : JSContext
     public async Task<JSValue> RunAsync(string folder, string relativeFile, string[] paths = null)
     {
         using var sc = CreateSynchronizationContext();
+
         CurrentPath = folder;
         UpdatePaths(paths);
-        var filePath = Resolve(folder,
-            relativeFile.StartsWith(".") ? relativeFile : ("./" + relativeFile));
-        if (filePath == null)
-            throw new FileNotFoundException($"{relativeFile} not found");
+
+        var filePath = Resolve(folder, relativeFile.StartsWith(".") ? relativeFile : ("./" + relativeFile)) ?? throw new FileNotFoundException($"{relativeFile} not found");
         var r = await LoadModuleAsync(null, filePath);
         var w = WaitTask;
         if (w != null)
             await w;
+
         return r;
     }
-    
-    
+
     /// <summary>
     /// Run JavaScript module from string
     /// </summary>
@@ -217,23 +213,23 @@ public class JSModuleContext : JSContext
     /// <param name="uniqueModuleID">Module ID if you want get this module later (in <see cref="ImportModule"/> or import in js)</param>
     /// <returns>Module as JSObject</returns>
     /// <exception cref="JSException"></exception>
-    public async Task<JSValue> RunScriptAsync(
-        string script,
-        string moduleFolder,
-        string[] paths = null,
-        string uniqueModuleID = null)
+    public async Task<JSValue> RunScriptAsync(string script, string moduleFolder, string[] paths = null, string uniqueModuleID = null)
     {
         using var sc = CreateSynchronizationContext();
+
         CurrentPath = moduleFolder;
         UpdatePaths(paths);
         uniqueModuleID ??= Guid.NewGuid().ToString("N") + ".js";
+
         var newModule = new JSModule(this, uniqueModuleID, script);
         var dirPath = moduleFolder;
+
         newModule.Import = new JSFunction((in Arguments a) =>
         {
             var name = a[0];
             if (!name.IsString)
                 throw NewTypeError("import method's parameter must be a string");
+
             var result = LoadModuleAsync(dirPath, name.StringValue);
             return ClrProxy.Marshal(result);
         });
@@ -243,48 +239,44 @@ public class JSModuleContext : JSContext
             var name = a[0];
             if (!name.IsString)
                 throw NewTypeError("require method's parameter must be a string");
+
             var result = LoadModuleAsync(dirPath, name.StringValue);
             return AsyncPump.Run(() => result);
         });
+
         newModule.Compile = new JSFunction((in Arguments a) =>
         {
             var task = CompileModuleAsync(newModule);
             return ClrProxy.Marshal(task);
         });
+
         await newModule.InitAsync();
         return newModule.Exports;
     }
 
-    public async static Task<JSValue> RunExportsAsync(
-        string folder,
-        string relativeFile,
-        string exportedFunctionName,
-        Arguments a,
-        string[] paths = null
-    )
+    public async static Task<JSValue> RunExportsAsync(string folder, string relativeFile, string exportedFunctionName, Arguments a, string[] paths = null)
     {
-        using (var m = new JSModuleContext())
-        {
-            m.CurrentPath = folder;
-            m.UpdatePaths(paths);
-            var filePath = m.Resolve(folder,
-                relativeFile.StartsWith(".") ? relativeFile : ("./" + relativeFile));
-            if (filePath == null)
-                throw new FileNotFoundException($"{filePath} not found");
-            var main = await m.LoadModuleAsync(m.CurrentPath, filePath);
-            var exported = main[exportedFunctionName];
-            if (exported.IsUndefined)
-                throw new KeyNotFoundException($"{exportedFunctionName} not found on the module");
-            var rv = exported.InvokeFunction(a);
-            if (rv is JSPromise promise)
-            {
-                return await promise.Task;
-            }
+        using var m = new JSModuleContext();
+        m.CurrentPath = folder;
+        m.UpdatePaths(paths);
 
-            if (m.WaitTask != null)
-                await m.WaitTask;
-            return rv;
-        }
+        var filePath = m.Resolve(folder, relativeFile.StartsWith(".") ? relativeFile : ("./" + relativeFile));
+        if (filePath == null)
+            throw new FileNotFoundException($"{filePath} not found");
+        
+        var main = await m.LoadModuleAsync(m.CurrentPath, filePath);
+        var exported = main[exportedFunctionName];
+        if (exported.IsUndefined)
+            throw new KeyNotFoundException($"{exportedFunctionName} not found on the module");
+        
+        var rv = exported.InvokeFunction(a);
+        if (rv is JSPromise promise)
+            return await promise.Task;
+
+        if (m.WaitTask != null)
+            await m.WaitTask;
+
+        return rv;
     }
 
     public string CurrentPath { get; set; }
@@ -297,23 +289,21 @@ public class JSModuleContext : JSContext
 
         // fetch system modules 
         if (moduleCache.TryGetValue(relativePath, out var m))
-        {
             return m.Exports;
-        }
 
         // resolve full name..
-        var fullPath = Resolve(currentPath, relativePath);
-        if (fullPath == null)
-            throw NewTypeError($"{relativePath} module not found");
+        var fullPath = Resolve(currentPath, relativePath) ?? throw NewTypeError($"{relativePath} module not found");
         m = moduleCache.GetOrCreate(fullPath, () =>
         {
             var newModule = new JSModule(this, fullPath);
             var dirPath = Path.GetDirectoryName(fullPath);
+
             newModule.Import = new JSFunction((in Arguments a) =>
             {
                 var name = a[0];
                 if (!name.IsString)
                     throw NewTypeError("import method's parameter must be a string");
+
                 var result = LoadModuleAsync(dirPath, name.StringValue);
                 return ClrProxy.Marshal(result);
             });
@@ -323,54 +313,26 @@ public class JSModuleContext : JSContext
                 var name = a[0];
                 if (!name.IsString)
                     throw NewTypeError("require method's parameter must be a string");
+
                 var result = LoadModuleAsync(dirPath, name.StringValue);
                 return AsyncPump.Run(() => result);
             });
+
             newModule.Compile = new JSFunction((in Arguments a) =>
             {
                 var task = CompileModuleAsync(newModule);
                 return ClrProxy.Marshal(task);
             });
+
             return newModule;
         });
+
         await m.InitAsync();
         return m.Exports;
     }
 
-    // DONT WORK
-    // internal protected virtual async Task CompileModuleFromStringAsync(string code, string modulename, JSModule module)
-    // {
-    //     Console.WriteLine($"{DateTime.Now} - Compiling module from code {modulename}");
-    //     // if this is a json file... then pad with module.exports = 
-    //     
-    //
-    //     // var factory = FastEval(code, filePath);
-    //     var factory = CoreScript.Compile(code, module.filePath, new string[] { 
-    //         "exports",
-    //         "require",
-    //         "module",
-    //         "import",
-    //         "__fileame",
-    //         "__dirname"
-    //     });
-    //
-    //     var result = factory(new Arguments(module, new JSValue[] { 
-    //         module.Exports,
-    //         module.Require,
-    //         module,
-    //         module.Import,
-    //         module.Id,
-    //         new JSString(module.dirPath)
-    //     })) as JSPromise;
-    //     if (result != null)
-    //     {
-    //         await result.Task;
-    //     }
-    // }
-
     internal protected virtual async Task CompileModuleAsync(JSModule module)
     {
-
         // Console.WriteLine($"{DateTime.Now} - Compiling module {module.filePath}");
         var filePath = module.filePath;
 
@@ -384,13 +346,7 @@ public class JSModuleContext : JSContext
         var code = module.Code;
 
         if (filePath.EndsWith(".json"))
-        {
             code = $"module.exports = {code};";
-        }
-        // else
-        // {
-        //     code = @$"(async function({{module, import, exports, require, filePath: __filename, dirPath: __dirname}}) {{ return (\r\n{code}\r\n); }})";
-        // }
 
         // var factory = FastEval(code, filePath);
         var factory = CoreScript.Compile(code, module.filePath,
@@ -403,7 +359,7 @@ public class JSModuleContext : JSContext
             "__dirname"
         ], codeCache: CodeCache);
 
-        var result = factory(new Arguments(module,
+        if (factory(new Arguments(module,
         [
             module.Exports,
             module.Require,
@@ -411,8 +367,7 @@ public class JSModuleContext : JSContext
             module.Import,
             module.Id,
             new JSString(module.dirPath)
-        ])) as JSPromise;
-        if (result != null)
+        ])) is JSPromise result)
         {
             await result.Task;
         }

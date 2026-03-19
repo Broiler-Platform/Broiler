@@ -1,11 +1,8 @@
 ﻿using System;
 using System.Globalization;
 
-namespace YantraJS.Utils;
+namespace Broiler.JavaScript.Core.Utils;
 
-/// <summary>
-/// 
-/// </summary>
 public static class DateParser
 {
     internal static readonly string[] DefaultFormats = [
@@ -38,8 +35,6 @@ public static class DateParser
         "yyyy/M/dTH:m:s.FFFK",
         "yyyy-M-dTH:m:sK", 
          "yyyy/M/dTH:m:sK",
-        // "yyyy-M-dTH:mK", //commented for this TC assert(isNaN(Date.parse('1970-01-01T5:34'))); & assert(isNaN(Date.parse('1970-01-01T05:3')))
-        // "yyyy/M/dTH:mK",
          "yyyy-M-d H:m:s.FFFK",
          "yyyy/M/d H:m:s.FFFK",
          "yyyy-M-d H:m:sK",
@@ -53,35 +48,29 @@ public static class DateParser
         "yyyyK",
         "THH:mm:ss.FFFK",
         "THH:mm:ssK",
-        // "THH:mmK", // Commented for TC - assert(isNaN(Date.parse('T12:34Z')));
         "THHK",
-        // new formats added from DateTests.cs of Jurrasic
-        // "yyyy-MM-dTH:m",
-        //"yyyy/M/dTH:m",
         "yyyyTH:m"
 
     ];
 
-    internal static DateTimeOffset Parse(string text) {
-        // DateTimeOffset result;
-        if (!DateTimeOffset.TryParseExact(text, DefaultFormats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var result))
-        {
-            if (!DateTimeOffset.TryParseExact(text, SecondaryFormatsUTC, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out result))
-            {
-                if (!DateTimeOffset.TryParseExact(text, SecondaryFormats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out result))
-                {
-                    if (!DateTimeOffset.TryParse(text, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal, out result))
-                    {
-                        if (!DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out result))
-                        {
-                            // unrecognized dates should return NaN (15.9.4.2)
-                            return DateTimeOffset.MinValue;
-                        }
-                    }
-                }
-            }
-        }
+    internal static DateTimeOffset Parse(string text)
+    {
+        if (DateTimeOffset.TryParseExact(text, DefaultFormats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var result))
+            return result;
+
+        if (DateTimeOffset.TryParseExact(text, SecondaryFormatsUTC, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out result))
+            return result;
+
+        if (DateTimeOffset.TryParseExact(text, SecondaryFormats, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out result))
+            return result;
+
+        if (DateTimeOffset.TryParse(text, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal, out result))
+            return result;
+
+        if (!DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out result))
+            // unrecognized dates should return NaN (15.9.4.2)
+            return DateTimeOffset.MinValue;
+
         return result;
     }
-
 }

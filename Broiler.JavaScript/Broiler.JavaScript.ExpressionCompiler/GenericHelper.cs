@@ -10,10 +10,6 @@ public static class Generic
         where T : Delegate => (T)m.CreateDelegate(typeof(T));
 
     private static T CreateTypedDelegate<T>(
-        this MethodInfo method)
-        where T : Delegate => (T)method.CreateDelegate(typeof(T));
-
-    private static T CreateTypedDelegate<T>(
         this MethodInfo method, params Type[] types)
         where T : Delegate
     {

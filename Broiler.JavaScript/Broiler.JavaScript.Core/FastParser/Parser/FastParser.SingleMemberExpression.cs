@@ -1,4 +1,7 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+
+namespace YantraJS.Core.FastParser;
 
 
 partial class FastParser
@@ -18,6 +21,7 @@ partial class FastParser
     {
         node = null;
         var current = stream.Current;
+
         if (current.Keyword == FastKeywords.@new)
         {
             // next must be .target...
@@ -26,6 +30,7 @@ partial class FastParser
 
             stream.Consume();
             stream.Consume();
+
             if (!stream.CheckAndConsume(TokenTypes.Identifier, out var id))
                 throw stream.Unexpected();
 
@@ -36,22 +41,20 @@ partial class FastParser
             return false;
         }
 
-
         FastToken begin;
         FastToken token;
 
-        while (true) {
-
+        while (true)
+        {
             var m = stream.SkipNewLines();
 
             begin = stream.Current;
             token = begin;
-            switch (token.Type) {
 
+            switch (token.Type)
+            {
                 case TokenTypes.TemplateBegin:
                     var template = Template();
-                    //node = new AstCallExpression(node,
-                    //    ArraySpan<AstExpression>.From(new AstTaggedTemplateExpression(node, template.Parts)));
                     node = new AstTaggedTemplateExpression(node, template.Parts);
                     continue;
 
@@ -62,6 +65,7 @@ partial class FastParser
                         throw stream.Unexpected();
                     node = node.Member(index, true, token.Type == TokenTypes.OptionalIndex);
                     continue;
+
                 case TokenTypes.BracketStart:
                 case TokenTypes.OptionalCall:
                     stream.Consume();
@@ -75,10 +79,12 @@ partial class FastParser
                     else
                         node = new AstCallExpression(node, arguments, token.Type == TokenTypes.OptionalCall);
                     continue;
+
                 case TokenTypes.QuestionDot:
                 case TokenTypes.Dot:
                     stream.Consume();
                     stream.SkipNewLines();
+
                     var next = stream.Current;
                     switch (next.Type)
                     {
@@ -90,7 +96,7 @@ partial class FastParser
                         case TokenTypes.False:
                             stream.Consume();
                             node = node.Member(
-                                new AstIdentifier(next.AsString()), 
+                                new AstIdentifier(next.AsString()),
                                 false,
                                 token.Type == TokenTypes.QuestionDot);
                             break;
@@ -98,18 +104,17 @@ partial class FastParser
                             throw stream.Unexpected();
                     }
                     continue;
+
                 default:
                     m.Undo();
                     break;
             }
+
             break;
         }
 
         if (asNew)
-        {
             node = new AstNewExpression(token, node, Sequence<AstExpression>.Empty);
-        }
-
 
         return true;
 

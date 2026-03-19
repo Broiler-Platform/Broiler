@@ -1,4 +1,5 @@
 using Broiler.App.Rendering;
+using Broiler.JavaScript.Core.Core;
 using YantraJS.Core;
 
 namespace Broiler.Cli.Tests;

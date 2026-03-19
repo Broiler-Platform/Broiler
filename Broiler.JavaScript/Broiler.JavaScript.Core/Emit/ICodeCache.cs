@@ -1,19 +1,12 @@
-﻿#if !WEBATOMS
-// using FastExpressionCompiler;
-#endif
-using YantraJS.Core;
+﻿using Broiler.JavaScript.Core.Core;
 using YantraJS.Expressions;
 
-
-namespace YantraJS.Emit;
+namespace Broiler.JavaScript.Core.Emit;
 
 
 public delegate YExpression<JSFunctionDelegate> JSCodeCompiler();
 
 public interface ICodeCache
 {
-
     JSFunctionDelegate GetOrCreate(in JSCode code);
-
-
 }

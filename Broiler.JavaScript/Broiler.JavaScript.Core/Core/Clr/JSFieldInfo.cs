@@ -1,11 +1,11 @@
 ﻿using Expression = YantraJS.Expressions.YExpression;
 using System.Reflection;
-using YantraJS.ExpHelper;
-using YantraJS.LinqExpressions;
 using YantraJS.Runtime;
-using YantraJS.Core.Clr;
+using YantraJS.Core;
+using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.Core.Utils;
 
-namespace YantraJS.Core.Core.Clr;
+namespace Broiler.JavaScript.Core.Core.Clr;
 
 internal readonly struct JSFieldInfo
 {
@@ -29,17 +29,13 @@ internal readonly struct JSFieldInfo
         return new JSFunction(() =>
         {
             var args = Expression.Parameter(typeof(Arguments).MakeByRefType());
-            Expression convertedThis = field.IsStatic
-                ? null
-                : JSValueToClrConverter.Get(ArgumentsBuilder.This(args), field.DeclaringType, "this");
-            var body =
-                ClrProxyBuilder.Marshal(
-                    Expression.Field(
-                        convertedThis, field));
+            Expression convertedThis = field.IsStatic ? null : JSValueToClrConverter.Get(ArgumentsBuilder.This(args), field.DeclaringType, "this");
+
+            var body = ClrProxyBuilder.Marshal(Expression.Field(convertedThis, field));
             var lambda = Expression.Lambda<JSFunctionDelegate>(name, body, args);
+
             return lambda.Compile();
         }, name);
-
     }
 
     public JSFunction GenerateFieldSetter()
@@ -50,13 +46,9 @@ internal readonly struct JSFieldInfo
         {
             var args = Expression.Parameter(typeof(Arguments).MakeByRefType());
             var a1 = ArgumentsBuilder.Get1(args);
-            var convert = field.IsStatic
-                ? null
-                : JSValueToClrConverter.Get(ArgumentsBuilder.This(args), field.DeclaringType, "this");
+            var convert = field.IsStatic ? null : JSValueToClrConverter.Get(ArgumentsBuilder.This(args), field.DeclaringType, "this");
 
             var clrArg1 = JSValueToClrConverter.Get(a1, field.FieldType, "value");
-
-
             var fieldExp = Expression.Field(convert, field);
 
             // todo
@@ -65,6 +57,7 @@ internal readonly struct JSFieldInfo
 
             var body = assign;
             var lambda = Expression.Lambda<JSFunctionDelegate>(name, body, args);
+
             return lambda.Compile();
         }, name);
     }

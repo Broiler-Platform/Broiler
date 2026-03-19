@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstIdentifier : AstExpression
 {
@@ -8,7 +8,5 @@ public class AstIdentifier : AstExpression
 
     public AstIdentifier(FastToken token, string id) : base(token, FastNodeType.Identifier, token) => Name = id;
 
-
     public override string ToString() => Name.Value;
-
 }

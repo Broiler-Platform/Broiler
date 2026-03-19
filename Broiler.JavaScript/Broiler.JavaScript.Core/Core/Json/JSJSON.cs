@@ -1,10 +1,14 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Json;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Storage;
+using System;
 using System.CodeDom.Compiler;
 using System.IO;
 using System.Runtime.CompilerServices;
 using Yantra.Core;
-using YantraJS.Core.Clr;
-using YantraJS.Core.Core.Storage;
 
 namespace YantraJS.Core;
 
@@ -16,53 +20,43 @@ public delegate JSValue JsonParserReceiver((string key, JSValue value) property)
 public delegate JSValue JsonParserReceiverWithSource((string key, JSValue value, string source) property);
 
 [JSClassGenerator("JSON"), JSInternalObject]
-public partial class JSJSON: JSObject
+public partial class JSJSON : JSObject
 {
     [JSExport]
     public static JSValue Parse(in Arguments a)
     {
         var (text, receiver) = a.Get2();
 
-        if (receiver is JSFunction function)
-        {
-            var t = a.This;
-            // ES2026 §4.7 — reviver receives (key, value, context) where
-            // context = { source: rawSourceText } for primitive values.
-            JsonParserReceiverWithSource rws = (p) =>
-            {
-                var context = new JSObject();
-                if (p.source != null)
-                    context["source"] = new JSString(p.source);
-                return function.f(new Arguments(t, new JSString(p.key), p.value, context));
-            };
-            var parsed = JSJsonParser.ParseWithSource(text.ToString(), rws) ?? JSNull.Value;
+        if (receiver is not JSFunction function)
+            return JSJsonParser.Parse(text.ToString(), null) ?? JSNull.Value;
 
-            // Apply reviver to root value (key = "").
-            // For bare primitives, the source is the entire text.
-            string rootSource = null;
-            if (parsed is JSNumber || parsed is JSString || parsed == JSBoolean.True
-                || parsed == JSBoolean.False || parsed == JSNull.Value)
-            {
-                rootSource = text.ToString();
-            }
-            var rootCtx = new JSObject();
-            if (rootSource != null)
-                rootCtx["source"] = new JSString(rootSource);
-            parsed = function.f(new Arguments(t, new JSString(""), parsed, rootCtx));
-            return parsed ?? JSNull.Value;
+        var t = a.This;
+        // ES2026 §4.7 — reviver receives (key, value, context) where
+        // context = { source: rawSourceText } for primitive values.
+        JSValue rws((string key, JSValue value, string source) p)
+        {
+            var context = new JSObject();
+            if (p.source != null)
+                context["source"] = new JSString(p.source);
+            return function.f(new Arguments(t, new JSString(p.key), p.value, context));
         }
 
-        return JSJsonParser.Parse(text.ToString(), null) ?? JSNull.Value;
+        var parsed = JSJsonParser.ParseWithSource(text.ToString(), rws) ?? JSNull.Value;
+
+        // Apply reviver to root value (key = "").
+        // For bare primitives, the source is the entire text.
+        string rootSource = null;
+        if (parsed is JSNumber || parsed is JSString || parsed == JSBoolean.True || parsed == JSBoolean.False || parsed == JSNull.Value)
+            rootSource = text.ToString();
+
+        var rootCtx = new JSObject();
+        if (rootSource != null)
+            rootCtx["source"] = new JSString(rootSource);
+
+        parsed = function.f(new Arguments(t, new JSString(""), parsed, rootCtx));
+        return parsed ?? JSNull.Value;
 
     }
-
-    //private static JsonSerializerOptions options;
-
-    //private static JSValue Parse(string text)
-    //{
-    //    var e = text.
-    //}
-
 
     [JSExport]
     public static JSValue Stringify(in Arguments a)
@@ -70,8 +64,9 @@ public partial class JSJSON: JSObject
         var (f, r, pi) = a.Get3();
         if (f.IsUndefined)
             return f;
+
         TextWriter sb = new StringWriter();
-        Func<(JSValue target, JSValue key, JSValue value),JSValue> replacer = null;
+        Func<(JSValue target, JSValue key, JSValue value), JSValue> replacer = null;
         string indent = null;
 
         // build replacer...
@@ -82,7 +77,8 @@ public partial class JSJSON: JSObject
                 if (pi is JSNumber jn)
                 {
                     indent = new string(' ', pi.IntValue);
-                } else if (pi is JSString js)
+                }
+                else if (pi is JSString js)
                 {
                     indent = js.ToString();
                 }
@@ -90,35 +86,38 @@ public partial class JSJSON: JSObject
 
             if (r is JSFunction rf)
             {
-                replacer = (item) =>
-                 rf.f(new Arguments(item.target, item.key, item.value));
-            } else if (r is JSArray ra)
+                replacer = (item) => rf.f(new Arguments(item.target, item.key, item.value));
+            }
+            else if (r is JSArray ra)
             {
-
                 StringMap<int> map = new();
-                
+
                 replacer = (item) =>
                 {
                     var en = ra.GetElementEnumerator();
-                    while(en.MoveNext(out var hasValue, out var ri, out var index))
+                    while (en.MoveNext(out var hasValue, out var ri, out var index))
                     {
                         map.Put(ri.ToString()) = 1;
                     }
+
                     if (map.TryGetValue(item.key.ToString(), out var a1))
                         return item.value;
+
                     return JSUndefined.Value;
                 };
             }
         }
+
         if (indent != null)
         {
             var writer = new IndentedTextWriter(sb, indent);
             Stringify(writer, f, replacer, writer);
-        } else
+        }
+        else
         {
             Stringify(sb, f, replacer, null);
         }
-        
+
         return new JSString(sb.ToString());
     }
 
@@ -129,86 +128,93 @@ public partial class JSJSON: JSObject
         return sb.ToString();
     }
 
-    private static void Stringify(
-        TextWriter sb, 
-        JSValue target, 
-        Func<(JSValue, JSValue, JSValue), JSValue> replacer,
-        IndentedTextWriter indent)
+    private static void Stringify(TextWriter sb, JSValue target, Func<(JSValue, JSValue, JSValue), JSValue> replacer, IndentedTextWriter indent)
     {
         if (target == null || target.IsNullOrUndefined)
         {
             sb.Write("null");
             return;
         }
+
         if (target == JSBoolean.True)
         {
             sb.Write("true");
             return;
         }
+
         if (target == JSBoolean.False)
         {
             sb.Write("false");
             return;
         }
-        switch (target) {
+
+        switch (target)
+        {
             case JSNumber n:
                 sb.Write(n.value.ToString());
                 return;
+
             case JSString str:
                 QuoteString(str.value, sb);
                 return;
+
             case JSFunction _:
                 return;
+
             case JSArray a:
                 sb.Write('[');
                 if (indent != null)
-                {
                     indent.Indent++;
-                }
+
                 bool f = true;
                 var ae = a.GetElementEnumerator();
-                while(ae.MoveNext(out var hasValue, out var item, out var index))
+
+                while (ae.MoveNext(out var hasValue, out var item, out var index))
                 {
                     if (!f)
-                    {
                         sb.Write(',');
-                    }
+
                     f = false;
                     if (indent != null)
-                    {
                         sb.WriteLine();
-                    }
+
                     Stringify(sb, ToJson(item), replacer, indent);
                 }
+
                 if (indent != null)
                 {
                     sb.WriteLine();
                     indent.Indent--;
                 }
+
                 sb.Write(']');
                 return;
         }
 
         sb.Write('{');
+
         if (indent != null)
-        {
             indent.Indent++;
-        }
+
         bool first = true;
         // the only left type is JSObject...
         var obj = target as JSObject;
         var pen = obj.GetOwnProperties().GetEnumerator();
-        while(pen.MoveNext(out var key, out var value))
+
+        while (pen.MoveNext(out var key, out var value))
         {
             if (value.IsEmpty || !value.IsEnumerable)
                 continue;
+
             JSValue jsValue;
             if (!value.IsValue)
             {
                 if (value.get == null)
                     continue;
+
                 jsValue = value.get.f(new Arguments(target));
-            } else
+            }
+            else
             {
                 jsValue = value.value;
             }
@@ -221,33 +227,28 @@ public partial class JSJSON: JSObject
             // check replacer...
             if (replacer != null)
             {
-                jsValue = replacer(
-                    (target,
-                    KeyStrings.GetJSString(value.key), jsValue));
+                jsValue = replacer((target, KeyStrings.GetJSString(value.key), jsValue));
                 if (jsValue.IsUndefined)
                     continue;
             }
 
             // write indention here...
             if (!first)
-            {
                 sb.Write(',');
-            }
+
             first = false;
             if (indent != null)
-            {
                 sb.WriteLine();
-            }
 
             QuoteString(key.Value, sb);
             sb.Write(':');
             if (indent != null)
-            {
                 sb.Write(' ');
-            }
+
             Stringify(sb, jsValue, replacer, indent);
 
         }
+
         if (indent != null)
         {
             sb.WriteLine();
@@ -260,11 +261,13 @@ public partial class JSJSON: JSObject
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static JSValue ToJson(JSValue value)
     {
-        if (!(value is JSObject jobj))
+        if (value is not JSObject jobj)
             return value;
+
         var p = jobj.GetMethod(KeyStrings.toJSON);
         if (p == null)
             return value;
+
         return p(new Arguments(value));
     }
 
@@ -285,6 +288,7 @@ public partial class JSJSON: JSObject
         for (int i = 0; i < input.Length; i++)
         {
             char c = input[i];
+
             if (c == '\\' || c == '\"' || c < 0x20)
             {
                 containsUnsafeCharacters = true;
@@ -301,7 +305,7 @@ public partial class JSJSON: JSObject
         {
             // The string contains escape characters - fall back to the slower code path.
             var en = input.GetEnumerator();
-            while(en.MoveNext(out  var c))
+            while (en.MoveNext(out var c))
             {
                 switch (c)
                 {
@@ -338,6 +342,7 @@ public partial class JSJSON: JSObject
                 }
             }
         }
+
         result.Write('\"');
     }
 }

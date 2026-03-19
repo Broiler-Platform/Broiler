@@ -16,34 +16,6 @@ public class YBlockBuilder
 
     public void AddVariable(YParameterExpression pe) => variables.Add(pe);
 
-    private YParameterExpression AddVariable(YParameterExpression pe, YExpression init)
-    {
-        // break init if it is block..
-        if(init.NodeType == YExpressionType.Block)
-        {
-            var block = init as YBlockExpression;
-            variables.AddRange(block.FlattenVariables);
-            foreach(var (e, last) in block.FlattenExpressions)
-            {
-                if (last)
-                {
-                    if(e.NodeType == YExpressionType.Parameter)
-                    {
-                        AddExpression(e);
-                        return e as YParameterExpression;
-                    }
-                    variables.Add(pe);
-                    AddExpression(YExpression.Assign(pe, e));
-                    return pe;
-                }
-                AddExpression(e);
-            }
-        }
-        variables.Add(pe);
-        AddExpression(YExpression.Assign(pe, init));
-        return pe;
-    }
-
     public Sequence<YExpression> ConvertToVariables(IFastEnumerable<YExpression> inputs, YExpressionMapVisitor visitor)
     {
         var newInputs = new Sequence<YExpression>(inputs.Count);

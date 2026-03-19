@@ -1,7 +1,9 @@
-﻿using System.Collections;
+﻿using Broiler.JavaScript.Core.Core.Storage;
+using System.Collections;
 using System.Collections.Generic;
+using YantraJS.Core.Generator;
 
-namespace YantraJS.Core.Generator;
+namespace Broiler.JavaScript.Core.Core.Generator;
 
 public struct JSGeneratorEnumerator(JSGenerator g) : IEnumerator<(uint Key, JSProperty Value)>
 {
@@ -11,20 +13,15 @@ public struct JSGeneratorEnumerator(JSGenerator g) : IEnumerator<(uint Key, JSPr
 
     readonly object IEnumerator.Current => Current;
 
-    public readonly void Dispose()
-    {
-
-    }
+    public readonly void Dispose() { }
 
     public bool MoveNext()
     {
         g.Next();
         index++;
+
         return !g.done;
     }
 
-    public readonly void Reset()
-    {
-
-    }
+    public readonly void Reset() { }
 }

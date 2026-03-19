@@ -1,6 +1,8 @@
-﻿using YantraJS.Extensions;
+﻿using Broiler.JavaScript.Core.Enumerators;
+using Broiler.JavaScript.Core.Extensions;
+using YantraJS.Core;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Primitive;
 
 /// <summary>
 /// JSPrimitive class does not hold prototype, prototype is only resolved from

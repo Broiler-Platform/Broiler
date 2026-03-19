@@ -1,6 +1,7 @@
-﻿using YantraJS.ExpHelper;
+﻿using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+using Broiler.JavaScript.Core.LinqExpressions;
 using YantraJS.Expressions;
-using Exp = YantraJS.Expressions.YExpression;
 using Expression = YantraJS.Expressions.YExpression;
 
 namespace YantraJS.Core.FastParser.Compiler;
@@ -11,39 +12,28 @@ partial class FastCompiler
     {
         var e = arrayExpression.Elements.GetFastEnumerator();
         var list = new Sequence<YElementInit>();
-        //try
-        //{
-            while (e.MoveNext(out var item))
+
+        while (e.MoveNext(out var item))
+        {
+            if (item == null)
             {
-                if (item == null)
-                {
-                    list.Add(Expression.ElementInit(JSArrayBuilder._Add, [Expression.Null]));
-                    // _new = JSArrayBuilder.Add(_new, Expression.Null);
-                    continue;
-                }
-                if (item.Type == FastNodeType.SpreadElement)
-                {
-                    var i = (item as AstSpreadElement).Argument;
-                    list.Add(Expression.ElementInit(JSArrayBuilder._AddRange, [Visit(i)]));
-                    //_new = JSArrayBuilder.AddRange(_new, Visit(i));
-                    continue;
-                }
-                // _new = JSArrayBuilder.Add(_new, Visit(item));
-                list.Add(Expression.ElementInit(JSArrayBuilder._Add, [Visit(item)]));
+                list.Add(Expression.ElementInit(JSArrayBuilder._Add, [Expression.Null]));
+                continue;
             }
 
-            if (list.Count > 0)
+            if (item.Type == FastNodeType.SpreadElement)
             {
-                // var r = list.Release();
-                // list.Dispose();
-                return Expression.ListInit(Expression.New(JSArrayBuilder._New), list);
+                var i = (item as AstSpreadElement).Argument;
+                list.Add(Expression.ElementInit(JSArrayBuilder._AddRange, [Visit(i)]));
+                continue;
             }
 
-            // list.Dispose();
-            return Expression.New(JSArrayBuilder._New);
-        //} finally
-        //{
-        //    list.Dispose();
-        //}
+            list.Add(Expression.ElementInit(JSArrayBuilder._Add, [Visit(item)]));
+        }
+
+        if (list.Count > 0)
+            return Expression.ListInit(Expression.New(JSArrayBuilder._New), list);
+
+        return Expression.New(JSArrayBuilder._New);
     }
 }

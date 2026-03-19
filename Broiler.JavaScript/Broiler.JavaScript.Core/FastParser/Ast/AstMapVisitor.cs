@@ -1,7 +1,6 @@
 ﻿using System;
-using YantraJS.Core.FastParser;
 
-namespace YantraJS.Utils;
+namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public abstract class AstMapVisitor<T>
 {
@@ -9,119 +8,58 @@ public abstract class AstMapVisitor<T>
 
     public bool Debug { get; set; } = true;
 
-    public T Visit(AstNode node) { 
-    //    if(node.IsStatement)
-    //    {
-    //        return VisitStatement(node as AstStatement);
-    //    }
-    //    return VisitExpression(node as AstExpression);
-    //}
-
-    //protected virtual T VisitStatement(AstStatement node)
-    //{
-    //    return InternalVisit(node);
-    //}
-
-    //protected virtual T VisitExpression(AstExpression node)
-    //{
-    //    return InternalVisit(node);
-    //}
-
-    //private T InternalVisit(AstNode node)
-    //{
+    public T Visit(AstNode node) {
+        
         if (node == null)
             return default;
-        switch (node.Type)
+
+        return node.Type switch
         {
-            case FastNodeType.ArrayPattern:
-					return VisitArrayPattern(node as AstArrayPattern);
-            case FastNodeType.Block:
-					return VisitBlock(node as AstBlock);
-            case FastNodeType.Program:
-					return VisitProgram(node as AstProgram);
-            case FastNodeType.BreakStatement:
-					return VisitBreakStatement(node as AstBreakStatement);
-            case FastNodeType.BinaryExpression:
-					return VisitBinaryExpression(node as AstBinaryExpression);
-            case FastNodeType.VariableDeclaration:
-					return VisitVariableDeclaration(node as AstVariableDeclaration);
-            case FastNodeType.ExpressionStatement:
-					return VisitExpressionStatement(node as AstExpressionStatement);
-            case FastNodeType.FunctionExpression:
-					return VisitFunctionExpression(node as AstFunctionExpression);
-            case FastNodeType.Identifier:
-					return VisitIdentifier(node as AstIdentifier);
-            case FastNodeType.ObjectPattern:
-					return VisitObjectPattern(node as AstObjectPattern);
-            case FastNodeType.SpreadElement:
-					return VisitSpreadElement(node as AstSpreadElement);
-            case FastNodeType.IfStatement:
-					return VisitIfStatement(node as AstIfStatement);
-            case FastNodeType.WhileStatement:
-					return VisitWhileStatement(node as AstWhileStatement);
-            case FastNodeType.DoWhileStatement:
-					return VisitDoWhileStatement(node as AstDoWhileStatement);
-            case FastNodeType.SequenceExpression:
-					return VisitSequenceExpression(node as AstSequenceExpression);
-            case FastNodeType.ForStatement:
-					return VisitForStatement(node as AstForStatement);
-            case FastNodeType.ForInStatement:
-					return VisitForInStatement(node as AstForInStatement);
-            case FastNodeType.ForOfStatement:
-					return VisitForOfStatement(node as AstForOfStatement);
-            case FastNodeType.ContinueStatement:
-					return VisitContinueStatement(node as AstContinueStatement);
-            case FastNodeType.ThrowStatement:
-					return VisitThrowStatement(node as AstThrowStatement);
-            case FastNodeType.TryStatement:
-					return VisitTryStatement(node as AstTryStatement);
-            case FastNodeType.DebuggerStatement:
-					return VisitDebuggerStatement(node as AstDebuggerStatement);
-            case FastNodeType.LabeledStatement:
-					return VisitLabeledStatement(node as AstLabeledStatement);
-            case FastNodeType.Literal:
-					return VisitLiteral(node as AstLiteral);
-            case FastNodeType.MemberExpression:
-					return VisitMemberExpression(node as AstMemberExpression);
-            case FastNodeType.ClassStatement:
-					return VisitClassStatement(node as AstClassExpression);
-            case FastNodeType.SwitchStatement:
-					return VisitSwitchStatement(node as AstSwitchStatement);
-            case FastNodeType.EmptyExpression:
-					return VisitEmptyExpression(node as AstEmptyExpression);
-            case FastNodeType.ArrayExpression:
-					return VisitArrayExpression(node as AstArrayExpression);
-            case FastNodeType.ObjectLiteral:
-					return VisitObjectLiteral(node as AstObjectLiteral);
-            case FastNodeType.TemplateExpression:
-					return VisitTemplateExpression(node as AstTemplateExpression);
-            case FastNodeType.UnaryExpression:
-					return VisitUnaryExpression(node as AstUnaryExpression);
-            case FastNodeType.CallExpression:
-					return VisitCallExpression(node as AstCallExpression);
-            case FastNodeType.ConditionalExpression:
-					return VisitConditionalExpression(node as AstConditionalExpression);
-            case FastNodeType.YieldExpression:
-					return VisitYieldExpression(node as AstYieldExpression);
-            case FastNodeType.ClassProperty:
-					return VisitClassProperty(node as AstClassProperty);
-            case FastNodeType.ReturnStatement:
-					return VisitReturnStatement(node as AstReturnStatement);
-            case FastNodeType.NewExpression:
-					return VisitNewExpression(node as AstNewExpression);
-            case FastNodeType.ImportStatement:
-                return VisitImportStatement(node as AstImportStatement);
-            case FastNodeType.ExportStatement:
-                return VisitExportStatement(node as AstExportStatement);
-            case FastNodeType.Meta:
-                return VisitMeta(node as AstMeta);
-            case FastNodeType.TaggedTemplateExpression:
-                return VisitTaggedTemplateExpression(node as AstTaggedTemplateExpression);
-            case FastNodeType.AwaitExpression:
-                return VisitAwaitExpression(node as AstAwaitExpression);
-            default:
-                throw new NotImplementedException($"No implementation for {node.Type}");
-        }
+            FastNodeType.ArrayPattern => VisitArrayPattern(node as AstArrayPattern),
+            FastNodeType.Block => VisitBlock(node as AstBlock),
+            FastNodeType.Program => VisitProgram(node as AstProgram),
+            FastNodeType.BreakStatement => VisitBreakStatement(node as AstBreakStatement),
+            FastNodeType.BinaryExpression => VisitBinaryExpression(node as AstBinaryExpression),
+            FastNodeType.VariableDeclaration => VisitVariableDeclaration(node as AstVariableDeclaration),
+            FastNodeType.ExpressionStatement => VisitExpressionStatement(node as AstExpressionStatement),
+            FastNodeType.FunctionExpression => VisitFunctionExpression(node as AstFunctionExpression),
+            FastNodeType.Identifier => VisitIdentifier(node as AstIdentifier),
+            FastNodeType.ObjectPattern => VisitObjectPattern(node as AstObjectPattern),
+            FastNodeType.SpreadElement => VisitSpreadElement(node as AstSpreadElement),
+            FastNodeType.IfStatement => VisitIfStatement(node as AstIfStatement),
+            FastNodeType.WhileStatement => VisitWhileStatement(node as AstWhileStatement),
+            FastNodeType.DoWhileStatement => VisitDoWhileStatement(node as AstDoWhileStatement),
+            FastNodeType.SequenceExpression => VisitSequenceExpression(node as AstSequenceExpression),
+            FastNodeType.ForStatement => VisitForStatement(node as AstForStatement),
+            FastNodeType.ForInStatement => VisitForInStatement(node as AstForInStatement),
+            FastNodeType.ForOfStatement => VisitForOfStatement(node as AstForOfStatement),
+            FastNodeType.ContinueStatement => VisitContinueStatement(node as AstContinueStatement),
+            FastNodeType.ThrowStatement => VisitThrowStatement(node as AstThrowStatement),
+            FastNodeType.TryStatement => VisitTryStatement(node as AstTryStatement),
+            FastNodeType.DebuggerStatement => VisitDebuggerStatement(node as AstDebuggerStatement),
+            FastNodeType.LabeledStatement => VisitLabeledStatement(node as AstLabeledStatement),
+            FastNodeType.Literal => VisitLiteral(node as AstLiteral),
+            FastNodeType.MemberExpression => VisitMemberExpression(node as AstMemberExpression),
+            FastNodeType.ClassStatement => VisitClassStatement(node as AstClassExpression),
+            FastNodeType.SwitchStatement => VisitSwitchStatement(node as AstSwitchStatement),
+            FastNodeType.EmptyExpression => VisitEmptyExpression(node as AstEmptyExpression),
+            FastNodeType.ArrayExpression => VisitArrayExpression(node as AstArrayExpression),
+            FastNodeType.ObjectLiteral => VisitObjectLiteral(node as AstObjectLiteral),
+            FastNodeType.TemplateExpression => VisitTemplateExpression(node as AstTemplateExpression),
+            FastNodeType.UnaryExpression => VisitUnaryExpression(node as AstUnaryExpression),
+            FastNodeType.CallExpression => VisitCallExpression(node as AstCallExpression),
+            FastNodeType.ConditionalExpression => VisitConditionalExpression(node as AstConditionalExpression),
+            FastNodeType.YieldExpression => VisitYieldExpression(node as AstYieldExpression),
+            FastNodeType.ClassProperty => VisitClassProperty(node as AstClassProperty),
+            FastNodeType.ReturnStatement => VisitReturnStatement(node as AstReturnStatement),
+            FastNodeType.NewExpression => VisitNewExpression(node as AstNewExpression),
+            FastNodeType.ImportStatement => VisitImportStatement(node as AstImportStatement),
+            FastNodeType.ExportStatement => VisitExportStatement(node as AstExportStatement),
+            FastNodeType.Meta => VisitMeta(node as AstMeta),
+            FastNodeType.TaggedTemplateExpression => VisitTaggedTemplateExpression(node as AstTaggedTemplateExpression),
+            FastNodeType.AwaitExpression => VisitAwaitExpression(node as AstAwaitExpression),
+            _ => throw new NotImplementedException($"No implementation for {node.Type}"),
+        };
     }
 
     protected abstract T VisitAwaitExpression(AstAwaitExpression node);

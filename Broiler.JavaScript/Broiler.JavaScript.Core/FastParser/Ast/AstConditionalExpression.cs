@@ -1,5 +1,8 @@
 ﻿#nullable enable
-namespace YantraJS.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+
+namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstConditionalExpression(AstExpression previous, AstExpression @true, AstExpression @false) : AstExpression(previous.Start, FastNodeType.ConditionalExpression, @false.End)
 {

@@ -1,9 +1,9 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using YantraJS.Core;
 
-public class AstCallExpression(
-    AstExpression previous,
-    IFastEnumerable<AstExpression> plist,
-    bool coalesce = false) : AstExpression(previous.Start, FastNodeType.CallExpression, plist.Count > 0 ? plist.Last().End : previous.End)
+namespace Broiler.JavaScript.Core.FastParser.Ast;
+
+public class AstCallExpression(AstExpression previous, IFastEnumerable<AstExpression> plist, bool coalesce = false) : 
+    AstExpression(previous.Start, FastNodeType.CallExpression, plist.Count > 0 ? plist.Last().End : previous.End)
 {
     public readonly AstExpression Callee = previous;
     public readonly IFastEnumerable<AstExpression> Arguments = plist;

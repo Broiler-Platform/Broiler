@@ -3,6 +3,9 @@ using System.Text.RegularExpressions;
 using Broiler.App.Rendering;
 using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.Image;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Storage;
 using SkiaSharp;
 using YantraJS.Core;
 

@@ -3,7 +3,6 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using PointF = System.Drawing.PointF;
-using Broiler.HTML.WPF.Utilities;
 
 namespace Broiler.HTML.WPF.Adapters;
 

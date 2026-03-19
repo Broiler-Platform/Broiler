@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstYieldExpression(FastToken token, FastToken previousToken, AstExpression target, bool @delegate = false) : AstExpression(token, FastNodeType.YieldExpression, previousToken)
 {

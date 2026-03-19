@@ -1,7 +1,8 @@
 ﻿#nullable enable
+using Yantra.Core.Events;
 using YantraJS.Core;
 
-namespace Yantra.Core.Events;
+namespace Broiler.JavaScript.Core.Core.Events;
 
 public readonly struct DomEventHandler
 {
@@ -11,22 +12,15 @@ public readonly struct DomEventHandler
     public readonly bool Once;
     public readonly bool Deferred;
 
-    public DomEventHandler(
-        DomEventHandlerDelegate @delegate,
-        bool once = false,
-        bool deferred = false
-        )
+    public DomEventHandler(DomEventHandlerDelegate @delegate, bool once = false, bool deferred = false)
     {
         Delegate = @delegate;
         JSDelegate = null;
         Once = once;
         Deferred = deferred;
     }
-    public DomEventHandler(
-        JSFunction @delegate,
-        bool once = false,
-        bool deferred = false
-        )
+
+    public DomEventHandler(JSFunction @delegate, bool once = false, bool deferred = false)
     {
         JSDelegate = @delegate;
         Delegate = null;

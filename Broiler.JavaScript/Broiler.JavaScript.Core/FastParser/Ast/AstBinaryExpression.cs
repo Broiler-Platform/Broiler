@@ -1,5 +1,8 @@
 ﻿#nullable enable
-namespace YantraJS.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+
+namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstBinaryExpression(AstExpression node, TokenTypes type, AstExpression right) : AstExpression(node.Start, FastNodeType.BinaryExpression, right.End)
 {
@@ -7,39 +10,23 @@ public class AstBinaryExpression(AstExpression node, TokenTypes type, AstExpress
     public readonly TokenTypes Operator = type;
     public readonly AstExpression Right = right;
 
-    private string OperatorToString(TokenTypes type)
+    private static string OperatorToString(TokenTypes type) => type switch
     {
-        switch(type)
-        {
-            case TokenTypes.BooleanAnd:
-                return "&&";
-            case TokenTypes.BooleanOr:
-                return "||";
-            case TokenTypes.BitwiseAnd:
-                return "&";
-            case TokenTypes.BitwiseOr:
-                return "|";
-            case TokenTypes.Plus:
-                return "+";
-            case TokenTypes.Minus:
-                return "-";
-            case TokenTypes.Mod:
-                return "%";
-            case TokenTypes.Multiply:
-                return "*";
-            case TokenTypes.NotEqual:
-                return "!=";
-            case TokenTypes.Equal:
-                return "==";
-            case TokenTypes.StrictlyNotEqual:
-                return "!==";
-            case TokenTypes.StrictlyEqual:
-                return "===";
-            case TokenTypes.Assign:
-                return "=";
-        }
-        return type.ToString();
-    }
+        TokenTypes.BooleanAnd => "&&",
+        TokenTypes.BooleanOr => "||",
+        TokenTypes.BitwiseAnd => "&",
+        TokenTypes.BitwiseOr => "|",
+        TokenTypes.Plus => "+",
+        TokenTypes.Minus => "-",
+        TokenTypes.Mod => "%",
+        TokenTypes.Multiply => "*",
+        TokenTypes.NotEqual => "!=",
+        TokenTypes.Equal => "==",
+        TokenTypes.StrictlyNotEqual => "!==",
+        TokenTypes.StrictlyEqual => "===",
+        TokenTypes.Assign => "=",
+        _ => type.ToString(),
+    };
 
     public override string ToString() => $"({Left} {OperatorToString(Operator)} {Right})";
 }

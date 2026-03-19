@@ -1,16 +1,16 @@
 ﻿#nullable enable
 using System;
+using YantraJS.Core;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core;
 
 public class DisposableList : IDisposable
 {
-
     private Sequence<IDisposable>? list;
 
     public void Register(IDisposable d)
     {
-        list = list ?? [];
+        list ??= [];
         list.Add(d);
     }
 
@@ -18,11 +18,11 @@ public class DisposableList : IDisposable
     {
         var l = list;
         list = null;
-        if (l != null) {
-            foreach (var i in l)
-            {
-                i.Dispose();
-            }
-        }
+
+        if (l == null)
+            return;
+
+        foreach (var i in l)
+            i.Dispose();
     }
 }

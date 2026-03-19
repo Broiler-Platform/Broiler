@@ -21,12 +21,6 @@ public class TryCatchLabelMarker(ILTryBlock tryBlock, LabelInfo labels) : YExpre
         return base.VisitLabel(yLabelExpression);
     }
 
-    //protected override YExpression VisitReturn(YReturnExpression yReturnExpression)
-    //{
-    //    labels.Create(yReturnExpression.Target, tryBlock, false);
-    //    return base.VisitReturn(yReturnExpression);
-    //}
-
     protected override YExpression VisitLoop(YLoopExpression yLoopExpression)
     {
         labels.Create(yLoopExpression.Break, tryBlock, false);
@@ -37,9 +31,4 @@ public class TryCatchLabelMarker(ILTryBlock tryBlock, LabelInfo labels) : YExpre
     protected override YExpression VisitTryCatchFinally(YTryCatchFinallyExpression tryCatchFinallyExpression) => tryCatchFinallyExpression;
 
     protected override YExpression VisitLambda(YLambdaExpression yLambdaExpression) => yLambdaExpression;
-
-    //protected override YExpression VisitRelay(YRelayExpression relayExpression)
-    //{
-    //    return relayExpression;
-    //}
 }

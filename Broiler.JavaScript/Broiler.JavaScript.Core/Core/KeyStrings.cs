@@ -1,8 +1,9 @@
-﻿using System.Runtime.CompilerServices;
+﻿using Broiler.JavaScript.Core.Core.Storage;
+using System.Runtime.CompilerServices;
 using System.Threading;
-using YantraJS.Core.Core.Storage;
+using YantraJS.Core;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core;
 
 /// <summary>
 /// KeyStrings is a collection of frequently used string, KeyString is created with
@@ -88,7 +89,7 @@ public static class KeyStrings
     public readonly static KeyString Map;
     public readonly static KeyString Set;
     public readonly static KeyString WeakRef;
-    public readonly static KeyString WeakMap; 
+    public readonly static KeyString WeakMap;
     public readonly static KeyString WeakSet;
     public readonly static KeyString valueOf;
     public readonly static KeyString name;
@@ -105,7 +106,7 @@ public static class KeyStrings
     public readonly static KeyString writable;
 
     public readonly static KeyString @assert;
-    
+
     public readonly static KeyString native;
     public readonly static KeyString value;
     public readonly static KeyString done;
@@ -190,20 +191,24 @@ public static class KeyStrings
         {
             map = ConcurrentStringMap<KeyString>.Create();
             names = ConcurrentUInt32Map<StringSpan>.Create();
-            KeyString Create(string key)
+
+            static KeyString Create(string key)
             {
                 var i = (uint)NextID++;
                 var js = new KeyString(i);
-                map[key] =  js;
+                
+                map[key] = js;
                 names[i] = key;
+                
                 return js;
             }
+
             var t = typeof(KeyString);
-            foreach (var f in typeof(KeyStrings)
-                .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static))
+            foreach (var f in typeof(KeyStrings).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static))
             {
                 if (f.FieldType != t)
                     continue;
+                
                 f.SetValue(null, Create(f.Name));
             }
         }
@@ -233,8 +238,6 @@ public static class KeyStrings
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static StringSpan GetNameString(uint id) => names[id];
-
-
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static JSString GetJSString(uint id)

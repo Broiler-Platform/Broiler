@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Array;
 
 internal class Comparer<T>(Comparison<T> cx) : IComparer<T>
 {

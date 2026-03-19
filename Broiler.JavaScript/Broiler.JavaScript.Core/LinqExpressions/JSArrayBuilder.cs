@@ -4,25 +4,19 @@ using System.Reflection;
 using YantraJS.Core;
 using Expression = YantraJS.Expressions.YExpression;
 using YantraJS.Expressions;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Enumerators;
 
-namespace YantraJS.ExpHelper;
+namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public class JSArrayBuilder
 {
     private static Type type = typeof(JSArray);
 
-    public static ConstructorInfo _New =
-        type.GetConstructor([]);
-
-    private static ConstructorInfo _NewFromElementEnumerator =
-        type.GetConstructor([typeof(IElementEnumerator)]);
-
-    public static MethodInfo _Add =
-        type.GetMethod(nameof(JSArray.Add), [typeof(JSValue)]);
-
-    public static MethodInfo _AddRange =
-        type.GetMethod(nameof(JSArray.AddRange), [typeof(JSValue)]);
-
+    public static ConstructorInfo _New = type.GetConstructor([]);
+    private static readonly ConstructorInfo _NewFromElementEnumerator = type.GetConstructor([typeof(IElementEnumerator)]);
+    public static MethodInfo _Add = type.GetMethod(nameof(JSArray.Add), [typeof(JSValue)]);
+    public static MethodInfo _AddRange = type.GetMethod(nameof(JSArray.AddRange), [typeof(JSValue)]);
 
     public static Expression New()
     {
@@ -40,20 +34,12 @@ public class JSArrayBuilder
     {
         var ei = new Sequence<YElementInit>(list.Count());
         var en = list.GetFastEnumerator();
-        while(en.MoveNext(out var e))
-        {
+
+        while (en.MoveNext(out var e))
             ei.Add(Expression.ElementInit(_Add, [e]));
-        }
+
         return Expression.ListInit(Expression.New(_New), ei);
-        //Expression start = Expression.New(_New);
-        //foreach (var p in list)
-        //{
-        //    start = Expression.Call(start, _Add, p);
-        //}
-        //return start;
     }
 
     public static Expression NewFromElementEnumerator(Expression en) => Expression.New(_NewFromElementEnumerator, en);
-
-
 }

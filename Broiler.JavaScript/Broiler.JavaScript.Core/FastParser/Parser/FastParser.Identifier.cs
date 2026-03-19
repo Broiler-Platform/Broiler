@@ -1,12 +1,12 @@
-﻿using System.Runtime.CompilerServices;
+﻿using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+using System.Runtime.CompilerServices;
 
 namespace YantraJS.Core.FastParser;
 
 
 partial class FastParser
 {
-
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     bool Identitifer(out AstIdentifier node)
     {
@@ -15,9 +15,8 @@ partial class FastParser
             node = new AstIdentifier(token);
             return true;
         }
+
         node = null;
         return false;
     }
-
-
 }

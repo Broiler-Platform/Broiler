@@ -40,18 +40,6 @@ public partial class ILCodeGenerator
             il.EmitLoadLocal(data.Index);
             return true;
         }
-        //switch (exp.NodeType)
-        //{
-        //    case YExpressionType.Assign:
-        //        var a = (exp as YAssignExpression)!;
-        //        if(index == -1)
-        //        {
-        //            index = tempVariables[a.Right.Type].LocalIndex;
-        //        }
-        //        VisitAssign(a, index);
-        //        il.EmitLoadLocal(index);
-        //        return true;
-        //}
 
         Visit(exp);
         if(index != -1)
@@ -97,33 +85,6 @@ public partial class ILCodeGenerator
         }
         throw new NotImplementedException();
     }
-
-    //private CodeInfo Assign(YExpression left, int savedIndex = -1)
-    //{
-    //    switch (left.NodeType)
-    //    {
-    //        case YExpressionType.Parameter:
-    //            return AssignParameter(left as YParameterExpression, savedIndex);
-    //        case YExpressionType.Field:
-    //            return AssignField(left as YFieldExpression, savedIndex);
-    //        case YExpressionType.Property:
-    //            return AssignProperty(left as YPropertyExpression, savedIndex);
-    //        case YExpressionType.Assign:
-    //            var a = left as YAssignExpression;
-    //            if (savedIndex >= 0) {
-    //                il.EmitLoadLocal(savedIndex);
-    //                return Assign(a.Right, savedIndex);
-    //            }
-    //            Visit(a.Right);
-    //            return Assign(a.Left, savedIndex);
-    //        case YExpressionType.ArrayIndex:
-    //            return AssignArrayIndex(left as YArrayIndexExpression, savedIndex);
-    //        case YExpressionType.Index:
-    //            return AssignIndex(left as YIndexExpression, savedIndex);
-    //    }
-
-    //    throw new NotImplementedException();
-    //}
 
     private CodeInfo AssignIndex(DataSource exp, YIndexExpression yIndexExpression, int savedIndex = -1)
     {

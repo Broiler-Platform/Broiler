@@ -1,5 +1,6 @@
-﻿using System.Text;
-using YantraJS.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using System.Text;
 
 namespace YantraJS.Core;
 
@@ -11,29 +12,37 @@ public partial class JSString
     {
         if (a.Length == 0)
             return new JSString(string.Empty);
+
         var al = a.Length;
         StringBuilder sb = new(al);
-        for(var ai = 0; ai < al; ai++)
+
+        for (var ai = 0; ai < al; ai++)
         {
             var ch = a.GetAt(ai);
             sb.Append((char)ch.IntValue);
         }
+
         return new JSString(sb.ToString());
     }
 
     [JSExport("fromCodePoint", Length = 1)]
-    internal static JSValue FromCodePoint(in Arguments a) {
+    internal static JSValue FromCodePoint(in Arguments a)
+    {
         if (a.Length == 0)
             return new JSString(string.Empty);
+
         var len = a.Length;
         var result = new StringBuilder(len);
 
-        for (var i = 0; i < len; i++) {
+        for (var i = 0; i < len; i++)
+        {
             var item = a.GetAt(i);
             var codePointDouble = item.DoubleValue;
             int codePoint = (int)codePointDouble;
+
             if (codePoint < 0 || codePoint > 0x10FFFF || codePoint != codePointDouble)
-                throw JSContext.Current.NewRangeError($"Invalid code point {codePointDouble}");
+                throw JSContext.NewRangeError($"Invalid code point {codePointDouble}");
+
             if (codePoint <= 65535)
                 result.Append((char)codePoint);
             else
@@ -43,6 +52,7 @@ public partial class JSString
             }
 
         }
+
         return new JSString(result.ToString());
     }
 
@@ -50,28 +60,31 @@ public partial class JSString
     internal static JSValue Raw(in Arguments a)
     {
         var template = a.Get1();
-        if (!(template is JSObject))
-            throw JSContext.Current.NewTypeError($"Cannot convert undefined or null to object");
-        
+        if (template is not JSObject)
+            throw JSContext.NewTypeError($"Cannot convert undefined or null to object");
+
         var raw = template[KeyStrings.raw];
-        if (! (raw.IsString || raw.IsArray)) {
-            throw JSContext.Current.NewTypeError($"Cannot convert undefined or null to object");
-        }
+        if (!(raw.IsString || raw.IsArray))
+            throw JSContext.NewTypeError($"Cannot convert undefined or null to object");
+
         var len = raw.Length;
         if (len <= 0)
             return new JSString(string.Empty);
-        
+
         var result = new StringBuilder(len);
         for (uint i = 0; i < len; i++)
         {
             var item = raw[i];
             result.Append(item.ToString());
+
             var substitutionIndex = i + 1;
-            if (i < len - 1 && substitutionIndex < a.Length) {
+            if (i < len - 1 && substitutionIndex < a.Length)
+            {
                 item = a.GetAt((int)substitutionIndex);
                 result.Append(item.ToString());
             }
         }
+
         return new JSString(result.ToString());
     }
 }

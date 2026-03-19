@@ -1,12 +1,14 @@
-﻿// using FastExpressionCompiler;
-using Microsoft.Threading;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Promise;
+using Broiler.JavaScript.Core.Emit;
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Compiler;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using YantraJS.Core;
-using YantraJS.Core.FastParser.Compiler;
-using YantraJS.Emit;
 using Exp = YantraJS.Expressions.YExpression;
-namespace YantraJS;
+
+namespace Broiler.JavaScript.Core;
 
 
 /// <summary>
@@ -34,15 +36,12 @@ public class CoreScript
             codeCache = codeCache ?? DictionaryCodeCache.Current;
             var script = code;
             var compiler = _compiler;
-            var jsc = new JSCode(location, code, args, () =>
-            {
-                return compiler.Compile(script, location, args, codeCache);
-            });
+            var jsc = new JSCode(location, code, args, () => compiler.Compile(script, location, args, codeCache));
             return codeCache.GetOrCreate(in jsc);
         }
-        catch (Core.FastParser.FastParseException ex)
+        catch (FastParseException ex)
         {
-            throw JSContext.Current.NewSyntaxError(ex.Message, "Compile", location, ex.Token.Start.Line);
+            throw JSContext.NewSyntaxError(ex.Message, "Compile", location, ex.Token.Start.Line);
         }
     }
 
@@ -59,14 +58,15 @@ public class CoreScript
         var result = JSUndefined.Value;
         var ctx = JSContext.Current;
         var fx = Compile(code, location, codeCache: ctx.CodeCache);
+        
         AsyncPump.Run(() =>
         {
             result = fx(new Arguments(ctx));
             return Task.CompletedTask;
         });
+        
         return result;
     }
-
 
     /// <summary>
     /// Evaluates JavaScript code synchronously in the current context.
@@ -92,23 +92,19 @@ public class CoreScript
     /// <param name="location">Optional source location for diagnostics.</param>
     /// <param name="codeCache">Optional code cache for compiled script reuse.</param>
     /// <returns>The result of evaluating <paramref name="code"/>.</returns>
-    public static async Task<JSValue> EvaluateAsync(
-        string code, 
-        string location = null, 
-        ICodeCache codeCache = null)
+    public static async Task<JSValue> EvaluateAsync(string code, string location = null, ICodeCache codeCache = null)
     {
         var result = JSUndefined.Value;
         var ctx = JSContext.Current;
         var fx = Compile(code, location, null, codeCache ?? ctx.CodeCache);
+        
         result = fx(new Arguments(ctx));
+        
         if (ctx.WaitTask != null)
-        {
             await ctx.WaitTask;
-        }
+        
         return result;
     }
-
-
 }
 
 /// <summary>

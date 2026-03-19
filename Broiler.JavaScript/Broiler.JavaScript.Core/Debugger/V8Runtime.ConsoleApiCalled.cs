@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Debugger;
+using System;
 using System.Collections.Generic;
 
 namespace YantraJS.Core.Debugger;

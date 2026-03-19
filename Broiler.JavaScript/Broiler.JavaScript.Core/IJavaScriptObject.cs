@@ -1,8 +1,9 @@
 ﻿#nullable enable
 
-using YantraJS.Core.Clr;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core;
 
 /// <summary>
 /// Moving JavaScript objects in and out of JavaScript Runtime and CLR requires
@@ -25,14 +26,6 @@ public interface IJavaScriptObject
     /// </summary>
     JSValue? JSHandle { get; set; }
 }
-
-//public interface IJavaScriptArray
-//{
-//    int Length { get; }
-
-//    JSValue this[int index] { get; set; }
-//}
-
 
 public abstract class JavaScriptObject(in Arguments a) : IJavaScriptObject
 {

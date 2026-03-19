@@ -1,20 +1,19 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using System;
 using System.Reflection;
 using YantraJS.Core;
 using Expression = YantraJS.Expressions.YExpression;
 
-namespace YantraJS.ExpHelper;
+namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public class JSValueExtensionsBuilder
 {
     private readonly static Type type = typeof(JSValueExtensions);
 
-    private static readonly MethodInfo _InstanceOf =
-        type.GetMethod(nameof(JSValueExtensions.InstanceOf));
+    private static readonly MethodInfo _InstanceOf = type.GetMethod(nameof(JSValueExtensions.InstanceOf));
     public static Expression InstanceOf(Expression target, Expression value) => Expression.Call(null, _InstanceOf, target, value);
 
-    static readonly MethodInfo _IsIn =
-        type.GetMethod(nameof(JSValueExtensions.IsIn));
+    static readonly MethodInfo _IsIn = type.GetMethod(nameof(JSValueExtensions.IsIn));
     public static Expression IsIn(Expression target, Expression value) => Expression.Call(null, _IsIn, target, value);
 
     public static Expression Assign(Expression e, Expression value) => Expression.Assign(e, value);
@@ -22,19 +21,15 @@ public class JSValueExtensionsBuilder
     public static Expression AssignCoalesce(Expression e, Expression value) => Expression.Assign(e, Expression.Coalesce(NullIfUndefined(e), value));
 
 
-    private readonly static MethodInfo _NullIfTrue =
-        type.PublicMethod(nameof(JSValueExtensions.NullIfTrue), typeof(JSValue));
+    private readonly static MethodInfo _NullIfTrue = type.PublicMethod(nameof(JSValueExtensions.NullIfTrue), typeof(JSValue));
 
     public static Expression NullIfTrue(Expression exp) => Expression.Call(null, _NullIfTrue, exp);
 
-    private readonly static MethodInfo _NullIfFalse =
-        type.PublicMethod(nameof(JSValueExtensions.NullIfFalse), typeof(JSValue));
+    private readonly static MethodInfo _NullIfFalse = type.PublicMethod(nameof(JSValueExtensions.NullIfFalse), typeof(JSValue));
 
-    private readonly static MethodInfo _NullIfUndefined =
-        type.StaticMethod<JSValue>(nameof(JSValueExtensions.NullIfUndefined));
+    private readonly static MethodInfo _NullIfUndefined = type.StaticMethod<JSValue>(nameof(JSValueExtensions.NullIfUndefined));
 
-    private readonly static MethodInfo _NullIfNullOrUndefined =
-        type.PublicMethod(nameof(JSValueExtensions.NullIfUndefinedOrNull), typeof(JSValue));
+    private readonly static MethodInfo _NullIfNullOrUndefined = type.PublicMethod(nameof(JSValueExtensions.NullIfUndefinedOrNull), typeof(JSValue));
 
     public static Expression Coalesce(Expression left, Expression right) => Expression.Coalesce(Expression.Call(null, _NullIfNullOrUndefined, left), right);
 
@@ -42,8 +37,7 @@ public class JSValueExtensionsBuilder
     public static Expression NullIfUndefined(Expression exp) => Expression.Call(null, _NullIfUndefined, exp);
 
 
-    static readonly MethodInfo[] _InvokeMethodKeyString
-        = [
+    static readonly MethodInfo[] _InvokeMethodKeyString = [
             type.PublicMethod(nameof(JSValueExtensions.InvokeMethodSpread), typeof(JSValue), KeyStringsBuilder.RefType, typeof(JSValue[])),
             type.PublicMethod(nameof(JSValueExtensions.InvokeMethod), typeof(JSValue), KeyStringsBuilder.RefType),
             type.PublicMethod(nameof(JSValueExtensions.InvokeMethod), typeof(JSValue), KeyStringsBuilder.RefType, typeof(JSValue)),
@@ -52,8 +46,8 @@ public class JSValueExtensionsBuilder
             type.PublicMethod(nameof(JSValueExtensions.InvokeMethod), typeof(JSValue), KeyStringsBuilder.RefType, typeof(JSValue), typeof(JSValue), typeof(JSValue), typeof(JSValue)),
             type.PublicMethod(nameof(JSValueExtensions.InvokeMethod), typeof(JSValue), KeyStringsBuilder.RefType, typeof(JSValue[]))
         ];
-    static readonly MethodInfo[] _InvokeMethodKeyUint
-        = [
+
+    static readonly MethodInfo[] _InvokeMethodKeyUint = [
             type.PublicMethod(nameof(JSValueExtensions.InvokeMethodSpread), typeof(JSValue), typeof(uint), typeof(JSValue[])),
             type.PublicMethod(nameof(JSValueExtensions.InvokeMethod), typeof(JSValue), typeof(uint)),
             type.PublicMethod(nameof(JSValueExtensions.InvokeMethod), typeof(JSValue), typeof(uint), typeof(JSValue)),
@@ -62,8 +56,7 @@ public class JSValueExtensionsBuilder
             type.PublicMethod(nameof(JSValueExtensions.InvokeMethod), typeof(JSValue), typeof(uint), typeof(JSValue), typeof(JSValue), typeof(JSValue), typeof(JSValue)),
             type.PublicMethod(nameof(JSValueExtensions.InvokeMethod), typeof(JSValue), typeof(uint), typeof(JSValue[]))
         ];
-    static readonly MethodInfo[] _InvokeMethodJSValue
-                = [
+    static readonly MethodInfo[] _InvokeMethodJSValue = [
             type.PublicMethod(nameof(JSValueExtensions.InvokeMethodSpread), typeof(JSValue), typeof(JSValue), typeof(JSValue[])),
             type.PublicMethod(nameof(JSValueExtensions.InvokeMethod), typeof(JSValue), typeof(JSValue)),
             type.PublicMethod(nameof(JSValueExtensions.InvokeMethod), typeof(JSValue), typeof(JSValue), typeof(JSValue)),
@@ -75,32 +68,17 @@ public class JSValueExtensionsBuilder
 
     public static Expression InvokeMethod(Expression target, Expression method, IFastEnumerable<Expression> args, bool hasSpread)
     {
-
-        var methods = method.Type == typeof(KeyString)
-            ? _InvokeMethodKeyString
-            : method.Type == typeof(uint)
-                ? _InvokeMethodKeyUint
-                : _InvokeMethodJSValue;
-
-
+        var methods = method.Type == typeof(KeyString) ? _InvokeMethodKeyString : method.Type == typeof(uint) ? _InvokeMethodKeyUint : _InvokeMethodJSValue;
         var m = hasSpread ? methods[0] : methods[args.Count <= 4 ? args.Count + 1 : 6];
 
         if (!hasSpread && args.Count <= 4)
         {
-            var finalArgs = new Sequence<Expression>(args.Count + 2) { 
-                target,
-                method
-            };
-            finalArgs.AddRange(args);
-            // finalArgs[0] = target;
-            // finalArgs[1] = method;
-            // Array.Copy(args, 0, finalArgs, 2, args.Length);
-            // args.Copy(finalArgs, 2);
+            var finalArgs = new Sequence<Expression>(args.Count + 2) { target, method };
 
+            finalArgs.AddRange(args);
             return Expression.Call(null, m, finalArgs);
         }
+
         return Expression.Call(null, m, target, method, Expression.NewArray(typeof(JSValue), args));
     }
-
-
 }

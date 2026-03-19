@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core;
 
 public class CancellableDisposableAction(Action action) : IDisposable
 {
@@ -17,7 +17,6 @@ public class CancellableDisposableAction(Action action) : IDisposable
         action = null;
         return true;
     }
-
 
     public void Dispose() => action?.Invoke();
 }

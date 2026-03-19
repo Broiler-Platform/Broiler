@@ -1,6 +1,11 @@
-﻿using System;
-using YantraJS.ExpHelper;
-using YantraJS.Utils;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Enumerators;
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+using Broiler.JavaScript.Core.FastParser.Compiler;
+using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.Core.Utils;
+using System;
 using Exp = YantraJS.Expressions.YExpression;
 using Expression = YantraJS.Expressions.YExpression;
 
@@ -8,16 +13,14 @@ namespace YantraJS.Core.FastParser.Compiler;
 
 partial class FastCompiler
 {
-    private Expression VisitAssignmentExpression(
-        AstExpression left, 
-        TokenTypes assignmentOperator, 
-        AstExpression right)
+    private Expression VisitAssignmentExpression(AstExpression left, TokenTypes assignmentOperator, AstExpression right)
     {
         switch (left.Type)
         {
             case FastNodeType.ArrayPattern:
             case FastNodeType.ObjectPattern:
                 return CreateAssignment(left, Visit(right));
+
             case FastNodeType.Identifier:
                 var id = left as AstIdentifier;
                 id.VerifyIdentifierForUpdate();
@@ -26,66 +29,46 @@ partial class FastCompiler
 
 
         // we need to rewrite left side if it is computed expression with member assignment...
-        if (assignmentOperator != TokenTypes.Assign 
-            && left.Type == FastNodeType.MemberExpression 
-            && left is AstMemberExpression mem)
+        if (assignmentOperator != TokenTypes.Assign && left.Type == FastNodeType.MemberExpression && left is AstMemberExpression mem)
         {
             if (mem.Object.Type != FastNodeType.Identifier)
             {
                 // this needs to be computed...
                 var tmp = scope.Top.GetTempVariable();
                 var leftExp = CreateMemberExpression(tmp.Expression, mem.Property, mem.Computed);
-                return Expression.Block(
-                    Expression.Assign(tmp.Expression, Visit(mem.Object)),
-                    Assign(leftExp, right, assignmentOperator),
-                    tmp.Expression
-                    );
-
+                return Expression.Block(Expression.Assign(tmp.Expression, Visit(mem.Object)), Assign(leftExp, right, assignmentOperator), tmp.Expression);
             }
         }
+
         return Assign(Visit(left), right, assignmentOperator);
     }
 
     private Exp Assign(Expression exp, AstExpression right, TokenTypes assignmentOperator)
     {
-        if(assignmentOperator == TokenTypes.AssignAdd)
+        if (assignmentOperator == TokenTypes.AssignAdd && right.Type == FastNodeType.Literal && right is AstLiteral literal)
         {
-            if(right.Type == FastNodeType.Literal && right is AstLiteral literal)
-            {
-                if(literal.TokenType == TokenTypes.String)
-                {
-                    return Expression.Assign(exp, JSValueBuilder.AddString(exp, Expression.Constant(literal.StringValue)));
-                }
-                if (literal.TokenType == TokenTypes.Number)
-                {
-                    return Expression.Assign(exp, JSValueBuilder.AddDouble(exp, Expression.Constant(literal.NumericValue)));
-                }
-            }
+            if (literal.TokenType == TokenTypes.String)
+                return Expression.Assign(exp, JSValueBuilder.AddString(exp, Expression.Constant(literal.StringValue)));
+
+            if (literal.TokenType == TokenTypes.Number)
+                return Expression.Assign(exp, JSValueBuilder.AddDouble(exp, Expression.Constant(literal.NumericValue)));
         }
+
         return BinaryOperation.Assign(exp, Visit(right), assignmentOperator);
     }
 
-    private Exp CreateAssignment(
-        AstExpression pattern,
-        Exp init,
-        bool createVariable = false,
-        bool newScope = false)
+    private Exp CreateAssignment(AstExpression pattern, Exp init, bool createVariable = false, bool newScope = false)
     {
         var inits = new Sequence<Exp>();
         CreateAssignment(inits, pattern, init, createVariable, newScope);
-        // var span = inits.ToArray();
-        // inits.Clear();
+
         return Exp.Block(inits);
     }
 
-    private void CreateAssignment(
-        Sequence<Exp> inits,
-        AstExpression pattern,
-        Exp init,
-        bool createVariable = false,
-        bool newScope = false)
+    private void CreateAssignment(Sequence<Exp> inits, AstExpression pattern, Exp init, bool createVariable = false, bool newScope = false)
     {
         Exp target;
+
         switch (pattern.Type)
         {
             case FastNodeType.Identifier:
@@ -94,21 +77,23 @@ partial class FastCompiler
                     if (createVariable)
                     {
                         var v = scope.Top.CreateVariable(id.Name.Value, JSVariableBuilder.New(id.Name.Value), newScope);
-                        // inits.Add(Exp.Assign(v.Variable, JSVariableBuilder.New(id.Name.Value)));
                         target = v.Expression;
                     }
                     else
                     {
                         target = VisitIdentifier(id);
                     }
+
                     inits.Add(Exp.Assign(target, init));
                 }
                 return;
+
             case FastNodeType.ObjectPattern:
                 var objectPattern = pattern as AstObjectPattern;
                 {
                     var en = objectPattern.Properties.GetFastEnumerator();
-                    while(en.MoveNext(out var property))
+
+                    while (en.MoveNext(out var property))
                     {
                         Exp start = null;
                         switch (property.Key.Type)
@@ -134,6 +119,7 @@ partial class FastCompiler
                             default:
                                 throw new NotImplementedException();
                         }
+
                         switch (property.Value.Type)
                         {
                             case FastNodeType.Identifier:
@@ -156,6 +142,7 @@ partial class FastCompiler
                     }
                 }
                 return;
+
             case FastNodeType.ArrayPattern:
                 var arrayPattern = pattern as AstArrayPattern;
                 using (var enVar = scope.Top.GetTempVariable(typeof(IElementEnumerator)))
@@ -163,7 +150,8 @@ partial class FastCompiler
                     var destExp = enVar.Expression;
                     inits.Add(Exp.Assign(destExp, IElementEnumeratorBuilder.Get(init)));
                     var en = arrayPattern.Elements.GetFastEnumerator();
-                    while(en.MoveNext(out var element))
+
+                    while (en.MoveNext(out var element))
                     {
                         switch (element.Type)
                         {
@@ -176,12 +164,9 @@ partial class FastCompiler
                                 break;
                             case FastNodeType.Identifier:
                                 var id = element as AstIdentifier;
-                                // inits.Add(CreateAssignment(id, start));
                                 if (createVariable)
-                                {
                                     scope.Top.CreateVariable(id.Name.Value, null, newScope);
-                                    // inits.Add(Exp.Assign(v.Variable, JSVariableBuilder.New(id.Name.Value)));
-                                }
+
                                 var assignee = VisitIdentifier(id);
                                 inits.Add(IElementEnumeratorBuilder.AssignMoveNext(assignee, destExp));
                                 break;
@@ -189,35 +174,34 @@ partial class FastCompiler
                                 var be = element as AstBinaryExpression;
                                 if (be.Left.Type != FastNodeType.Identifier)
                                 {
-                                    using (var te = scope.Top.GetTempVariable(typeof(JSValue)))
-                                    {
-                                        inits.Add(IElementEnumeratorBuilder.MoveNext(destExp, te.Expression));
-                                        inits.Add(JSValueExtensionsBuilder.AssignCoalesce(te.Expression, Visit(be.Right)));
-                                        CreateAssignment(inits, be.Left, te.Expression, true, newScope);
-                                    }
+                                    using var te = scope.Top.GetTempVariable(typeof(JSValue));
+                                    inits.Add(IElementEnumeratorBuilder.MoveNext(destExp, te.Expression));
+                                    inits.Add(JSValueExtensionsBuilder.AssignCoalesce(te.Expression, Visit(be.Right)));
+
+                                    CreateAssignment(inits, be.Left, te.Expression, true, newScope);
+
                                     break;
                                 }
+
                                 id = be.Left as AstIdentifier;
                                 if (createVariable)
-                                {
                                     scope.Top.CreateVariable(id.Name.Value, null, newScope);
-                                }
+
                                 assignee = VisitIdentifier(id);
                                 inits.Add(IElementEnumeratorBuilder.AssignMoveNext(assignee, destExp));
                                 inits.Add(JSValueExtensionsBuilder.AssignCoalesce(assignee, Visit(be.Right)));
                                 break;
+
                             case FastNodeType.SpreadElement:
                                 var spe = element as AstSpreadElement;
                                 // loop...
                                 if (createVariable && spe.Argument is AstIdentifier id2)
-                                {
                                     scope.Top.CreateVariable(id2.Name.Value, null, newScope);
-                                    // inits.Add(Exp.Assign(v.Variable, JSVariableBuilder.New(id2.Name.Value)));
-                                }
 
                                 var spid = Visit(spe.Argument);
                                 inits.Add(Exp.Assign(spid, JSArrayBuilder.NewFromElementEnumerator(destExp)));
                                 break;
+
                             case FastNodeType.ObjectPattern:
                             case FastNodeType.ArrayPattern:
                                 var ape = element;
@@ -230,13 +214,16 @@ partial class FastCompiler
                                     CreateAssignment(inits, ape, te.Expression, true, newScope);
                                 }
                                 break;
+
                             default:
                                 throw new NotSupportedException($"{element.Type}");
                         }
                     }
                 }
+
                 return;
         }
+
         throw new NotImplementedException();
     }
 }

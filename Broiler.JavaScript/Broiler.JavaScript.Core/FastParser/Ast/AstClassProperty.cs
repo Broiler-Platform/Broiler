@@ -1,14 +1,7 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿namespace Broiler.JavaScript.Core.FastParser.Ast;
 
-public class AstClassProperty(
-    FastToken begin,
-    FastToken last,
-    AstPropertyKind propertyKind,
-    bool isPrivate,
-    bool isStatic,
-    AstExpression propertyName,
-    bool computed,
-    AstExpression init) : AstNode(begin,  FastNodeType.ClassProperty, last)
+public class AstClassProperty(FastToken begin, FastToken last, AstPropertyKind propertyKind, bool isPrivate, bool isStatic, AstExpression propertyName, bool computed, AstExpression init) : 
+    AstNode(begin, FastNodeType.ClassProperty, last)
 {
     public readonly bool IsStatic = isStatic;
     public readonly bool IsPrivate = isPrivate;
@@ -23,31 +16,40 @@ public class AstClassProperty(
     {
         if (Kind == AstPropertyKind.Constructor)
             return $"constructor: {Init}";
-        if(IsStatic)
+
+        if (IsStatic)
         {
             if (Kind == AstPropertyKind.Get)
                 return $"static get {Key} {Init}";
+
             if (Kind == AstPropertyKind.Set)
                 return $"static set {Key} {Init}";
+
             if (Computed)
             {
                 if (Kind == AstPropertyKind.Data)
                     return $"static [{Key}]: {Init}";
             }
+
             if (Kind == AstPropertyKind.Data)
                 return $"static {Key}: {Init}";
         }
+
         if (Kind == AstPropertyKind.Get)
             return $"get {Key} {Init}";
+
         if (Kind == AstPropertyKind.Set)
             return $"set {Key} {Init}";
+
         if (Kind == AstPropertyKind.Data)
             return $"{Key}: {Init}";
+
         if (Computed)
         {
             if (Kind == AstPropertyKind.Data)
                 return $"[{Key}]: {Init}";
         }
+
         return "AstClassProperty";
     }
 }

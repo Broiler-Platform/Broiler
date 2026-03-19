@@ -1,7 +1,8 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using YantraJS.Core;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core;
 
 
 public enum KeyType
@@ -23,20 +24,18 @@ public readonly struct PropertyKey
 
     public bool IsSymbol => Type == KeyType.Symbol;
 
-    private PropertyKey(KeyType type, uint index,in KeyString key, JSSymbol symbol = null) {
+    private PropertyKey(KeyType type, uint index, in KeyString key, JSSymbol symbol = null)
+    {
         Type = type;
         Index = index;
         KeyString = key;
         Symbol = symbol;
     }
+
     public static implicit operator PropertyKey(int index) => new(KeyType.UInt, (uint)index, KeyString.Empty);
-
     public static implicit operator PropertyKey(uint index) => new(KeyType.UInt, index, KeyString.Empty);
-
     public static implicit operator PropertyKey(in KeyString key) => new(KeyType.String, 0, key);
-
     public static implicit operator PropertyKey(string key) => new(KeyType.String, 0, KeyStrings.GetOrCreate(key));
-
     public static implicit operator PropertyKey(JSSymbol key) => new(KeyType.Symbol, key.Key, KeyString.Empty, key);
 }
 
@@ -44,7 +43,6 @@ public readonly struct PropertyKey
 [DebuggerDisplay("Key:{Key},{Value}")]
 public readonly struct KeyString
 {
-
     public readonly static KeyString Empty = new();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -53,21 +51,19 @@ public readonly struct KeyString
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static implicit operator KeyString(in StringSpan value) => KeyStrings.GetOrCreate(value);
 
-
     // private readonly KeyType Type;
     // public readonly StringSpan Value;
     public readonly uint Key;
 
     public bool HasValue => Key != 0;
 
-    internal KeyString(uint key) =>
-        // this.Value = value;
-        Key = key;
+    internal KeyString(uint key) => Key = key;
 
     public override bool Equals(object obj)
     {
         if (obj is KeyString k)
             return Key == k.Key;
+
         return false;
     }
 
@@ -78,8 +74,4 @@ public readonly struct KeyString
     public JSValue ToJSValue() => new JSString(KeyStrings.GetNameString(Key), this);
 
     public StringSpan Value => KeyStrings.GetNameString(Key);
-
-    // public static (int size, int total, int next) Total =>
-        // KeyStrings.Total;
-
 }

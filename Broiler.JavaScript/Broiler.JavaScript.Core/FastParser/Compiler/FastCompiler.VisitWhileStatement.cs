@@ -1,4 +1,7 @@
-﻿using Exp = YantraJS.Expressions.YExpression;
+﻿using Broiler.JavaScript.Core.CodeGen;
+using Broiler.JavaScript.Core.FastParser.Ast;
+using Broiler.JavaScript.Core.LinqExpressions;
+using Exp = YantraJS.Expressions.YExpression;
 using Expression = YantraJS.Expressions.YExpression;
 
 namespace YantraJS.Core.FastParser.Compiler;
@@ -9,18 +12,11 @@ partial class FastCompiler
     {
         var breakTarget = Exp.Label();
         var continueTarget = Exp.Label();
-        using (var s = scope.Top.Loop.Push(new LoopScope(breakTarget, continueTarget, false, label)))
-        {
 
-            var body = Visit(whileStatement.Body);
+        using var s = scope.Top.Loop.Push(new LoopScope(breakTarget, continueTarget, false, label));
+        var body = Visit(whileStatement.Body);
+        var test = Exp.Not(JSValueBuilder.BooleanValue(Visit(whileStatement.Test)));
 
-            var test = Exp.Not(ExpHelper.JSValueBuilder.BooleanValue(Visit(whileStatement.Test)));
-
-            return Exp.Loop(
-                Exp.Block(Exp.IfThen(test, Exp.Goto(breakTarget)), body),
-                breakTarget,
-                continueTarget);
-        }
+        return Exp.Loop(Exp.Block(Exp.IfThen(test, Exp.Goto(breakTarget)), body), breakTarget, continueTarget);
     }
-
 }

@@ -1,13 +1,11 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
 
+namespace YantraJS.Core.FastParser;
 
 
 partial class FastParser
 {
-
-
-
-
     bool PropertyName(out AstExpression node, out bool computed, bool acceptKeywords = false)
     {
         var begin = BeginUndo();
@@ -24,45 +22,56 @@ partial class FastParser
                 case TokenTypes.Null:
                 case TokenTypes.Identifier:
                     stream.Consume();
+
                     if (token.ContextualKeyword != FastKeywords.none)
                     {
                         node = new AstIdentifier(token);
                         computed = false;
+
                         return true;
                     }
+
                     node = new AstIdentifier(token.AsString());
                     computed = false;
+
                     return true;
             }
         }
 
-        if (Identitifer(out var id)) {
+        if (Identitifer(out var id))
+        {
             node = id;
             computed = false;
-            return true;
-        }
-        if (StringLiteral(out node)) {
-            computed = false;
+
             return true;
         }
 
-        if(NumberLiteral(out node))
+        if (StringLiteral(out node))
         {
             computed = false;
             return true;
         }
-        if(stream.CheckAndConsume(TokenTypes.SquareBracketStart))
+
+        if (NumberLiteral(out node))
+        {
+            computed = false;
+            return true;
+        }
+
+        if (stream.CheckAndConsume(TokenTypes.SquareBracketStart))
         {
             if (!Expression(out node))
                 throw stream.Unexpected();
+
             stream.Expect(TokenTypes.SquareBracketEnd);
             computed = true;
+            
             return true;
         }
+
         node = null;
         computed = false;
+        
         return begin.Reset();
     }
-
-
 }

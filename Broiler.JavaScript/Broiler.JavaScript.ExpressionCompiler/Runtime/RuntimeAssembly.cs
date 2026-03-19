@@ -14,7 +14,7 @@ public static class RuntimeAssembly
         exp = exp.WithThis(typeof(Closures));
 
         var method = new DynamicMethod(exp.Name.FullName, exp.ReturnType, exp.ParameterTypesWithThis, typeof(Closures), true);
-        
+
         var ilg = method.GetILGenerator();
 
         ILCodeGenerator icg = new(ilg, null);
@@ -63,7 +63,7 @@ public static class RuntimeAssembly
         StringWriter sw = new();
         var expWriter = new StringWriter();
         // ILCodeGenerator.GenerateLogs = true;
-        ILCodeGenerator icg = new(ilg, methodBuilder,  sw, expWriter);
+        ILCodeGenerator icg = new(ilg, methodBuilder, sw, expWriter);
         icg.Emit(exp);
 
         string il = sw.ToString();
@@ -75,29 +75,10 @@ public static class RuntimeAssembly
     public static T CompileWithNestedLambdas<T>(this YExpression<T> expression)
     {
         var repository = new MethodRepository();
-
-        var outerLambda = YExpression
-            .InstanceLambda<Func<T>>(
-                expression.Name + "_outer", 
-                expression, 
-                YExpression.Parameter(typeof(Closures))
-                , [])
-            as YLambdaExpression;
-
-
-        //var f = new FlattenVisitor();
-        //outerLambda = f.Visit(outerLambda) as YLambdaExpression;
+        var outerLambda = YExpression.InstanceLambda<Func<T>>(expression.Name + "_outer", expression, YExpression.Parameter(typeof(Closures)), []) as YLambdaExpression;
 
         LambdaRewriter.Rewrite(outerLambda);
-        //    as YLambdaExpression;
-
-
-
         var runtimeMethodBuilder = new RuntimeMethodBuilder(repository);
-
-        // NestedRewriter nw = new NestedRewriter(outerLambda, runtimeMethodBuilder);
-
-        // outerLambda = nw.Visit(outerLambda) as YLambdaExpression;
 
         var (outer, il, exp) = outerLambda.CompileToBoundDynamicMethod(typeof(Closures), runtimeMethodBuilder);
 
@@ -105,13 +86,9 @@ public static class RuntimeAssembly
         repository.Exp = exp;
         var root = new Closures(repository, null, il, exp);
 
-        // var fx = Delegate.CreateDelegate(typeof(Func<T>), repository, outer, true);
         var func = outer.CreateDelegate(typeof(Func<T>), root) as Func<T>;
 
         return func();
-
-        // return (T)(object)outer.CreateDelegate(typeof(Func<T>), repository);
-        // return (T)func.DynamicInvoke();
     }
 
 }

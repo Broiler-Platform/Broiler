@@ -1,20 +1,14 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core.Storage;
+using System;
 using System.Collections.Generic;
-using YantraJS.Core.Core.Storage;
+using YantraJS.Core;
 
-namespace YantraJS.Core;
-
-//internal class ModuleCache: ConcurrentSharedStringTrie<JSModule>
-//{
-//    internal static Key module = "module";
-//    internal static Key clr = "clr";
-//}
+namespace Broiler.JavaScript.Core.Core.Module;
 
 public struct ModuleCache(bool v)
 {
     private static ConcurrentNameMap nameCache;
     private ConcurrentUInt32Map<JSModule> modules = ConcurrentUInt32Map<JSModule>.Create();
-    
 
     static ModuleCache()
     {
@@ -29,14 +23,16 @@ public struct ModuleCache(bool v)
     public static ModuleCache Create() => new(true);
     public readonly bool TryGetValue(in StringSpan key, out JSModule obj)
     {
-        if(nameCache.TryGetValue(key, out var i))
+        if (nameCache.TryGetValue(key, out var i))
         {
             if (modules.TryGetValue(i.Key, out obj))
                 return true;
         }
+
         obj = null;
         return false;
     }
+
     public readonly JSModule GetOrCreate(in StringSpan key, Func<JSModule> factory)
     {
         var k = nameCache.Get(key);
@@ -51,12 +47,15 @@ public struct ModuleCache(bool v)
 
     public readonly JSModule this[in (uint Key, StringSpan name) key]
     {
-        get {
+        get
+        {
             if (modules.TryGetValue(key.Key, out var m))
                 return m;
+
             return null;
         }
-        set {
+        set
+        {
             modules[key.Key] = value;
         }
     }

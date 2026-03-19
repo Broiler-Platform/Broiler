@@ -1,36 +1,43 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
-using YantraJS.Core;
-using YantraJS.Core.Clr;
 using Expression = YantraJS.Expressions.YExpression;
 
-namespace YantraJS.LinqExpressions;
+namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public static class ClrProxyBuilder
 {
-
     static ClrProxyBuilder()
     {
         var d = new Dictionary<Type, MethodInfo>(10);
         var marshal = nameof(ClrProxy.Marshal);
-        foreach(var m in type.GetMethods())
+
+        foreach (var m in type.GetMethods())
         {
             if (m.Name != marshal)
                 continue;
+
             d[m.GetParameters()[0].ParameterType] = m;
         }
+
         _marshal = d;
+
         var from = nameof(ClrProxy.From);
         d = new Dictionary<Type, MethodInfo>(10);
+
         foreach (var m in type.GetMethods())
         {
             if (m.Name != from)
                 continue;
+
             if (m.GetParameters().Length != 1)
                 continue;
+
             d[m.GetParameters()[0].ParameterType] = m;
         }
+
         _from = d;
     }
 
@@ -44,14 +51,13 @@ public static class ClrProxyBuilder
     {
         if (typeof(JSValue).IsAssignableFrom(target.Type))
             return target;
+
         if (_marshal.TryGetValue(target.Type, out var m))
-        {
             return Expression.Call(null, m, target);
-        }
+
         if (target.Type.IsValueType)
-        {
-            return Expression.Call(null, _marshal[typeof(object)], Expression.Box( target));
-        }
+            return Expression.Call(null, _marshal[typeof(object)], Expression.Box(target));
+
         return Expression.Call(null, _marshal[typeof(object)], target);
     }
 
@@ -59,22 +65,20 @@ public static class ClrProxyBuilder
     {
         if (typeof(JSValue).IsAssignableFrom(target.Type))
             return target;
+
         var targetType = target.Type;
         if (_from.TryGetValue(targetType, out var m))
-        {
             return Expression.Call(null, m, target);
-        }
+
         if (targetType.IsValueType)
-        {
             return Expression.Call(null, _from[typeof(object)], Expression.Box(target));
-        }
-        foreach(var pair in _from)
+
+        foreach (var pair in _from)
         {
             if (pair.Key.IsAssignableFrom(targetType))
-            {
                 return Expression.Call(null, pair.Value, target);
-            }
         }
+
         return Expression.Call(null, _from[typeof(object)], target);
     }
 }

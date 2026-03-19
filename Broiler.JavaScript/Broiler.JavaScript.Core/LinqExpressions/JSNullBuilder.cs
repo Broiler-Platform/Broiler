@@ -1,19 +1,11 @@
-﻿using YantraJS.Core;
-using Expression = YantraJS.Expressions.YExpression;
-using YantraJS.Core.LambdaGen;
+﻿using Expression = YantraJS.Expressions.YExpression;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.LambdaGen;
 
-namespace YantraJS.ExpHelper;
+namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public class JSNullBuilder
 {
-
-    public static Expression Value =
-         // Expression.TypeAs(
-             NewLambdaExpression.StaticFieldExpression<JSValue>(() => () => JSNull.Value)
-             //, Expression.Field(
-             //       null, 
-             //       typeof(JSNull)
-             //           .GetField(nameof(JSNull.Value))), 
-             // typeof(JSValue))
-             ;
+    public static Expression Value = NewLambdaExpression.StaticFieldExpression<JSValue>(() => () => JSNull.Value);
 }

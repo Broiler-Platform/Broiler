@@ -1,11 +1,11 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+
+namespace YantraJS.Core.FastParser;
 
 
 partial class FastParser
 {
-
-
-
     bool IfStatement(out AstStatement node)
     {
         var begin = stream.Current;
@@ -13,10 +13,9 @@ partial class FastParser
         stream.Consume();
 
         stream.Expect(TokenTypes.BracketStart);
+
         if (!ExpressionSequence(out var test))
             throw stream.Unexpected();
-
-        // stream.Expect(TokenTypes.BracketEnd);
 
         if (!Statement(out var @true))
             throw stream.Unexpected();
@@ -25,6 +24,7 @@ partial class FastParser
         {
             if (!Statement(out var @else))
                 throw stream.Unexpected();
+
             node = new AstIfStatement(begin, PreviousToken, test, @true, @else);
             return true;
         }
@@ -32,6 +32,4 @@ partial class FastParser
         node = new AstIfStatement(begin, PreviousToken, test, @true);
         return true;
     }
-
-
 }

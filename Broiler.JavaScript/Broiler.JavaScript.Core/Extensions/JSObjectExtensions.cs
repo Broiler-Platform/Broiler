@@ -1,19 +1,20 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Storage;
+using System;
 using System.ComponentModel;
 using YantraJS.Core;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.Core.Extensions;
 
 
 public static class JSObjectExtensions
 {
-
-
     [EditorBrowsable(EditorBrowsableState.Never)]
     public static void FastAddSetter(JSObject target, KeyString key, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
     {
         ref var pr = ref target.GetOwnProperties();
         ref var existing = ref pr.Put(key.Key);
+
         var getter = existing.get;
         existing = new JSProperty(key, getter, setter, attributes);
     }
@@ -23,6 +24,7 @@ public static class JSObjectExtensions
     {
         ref var pr = ref target.GetOwnProperties();
         ref var existing = ref pr.Put(key.Key);
+
         var setter = existing.set;
         existing = new JSProperty(key, getter, setter, attributes);
     }
@@ -32,6 +34,7 @@ public static class JSObjectExtensions
     {
         ref var pr = ref target.GetSymbols();
         ref var existing = ref pr.Put(key.Key);
+
         var getter = existing.get;
         existing = new JSProperty(key.Key, getter, setter, existing.value, attributes);
     }
@@ -50,8 +53,10 @@ public static class JSObjectExtensions
     {
         ref var pr = ref target.GetElements(true);
         ref var existing = ref pr.Put(key);
+
         if (target is JSArray a)
             a._length = a._length > key ? a._length : key + 1;
+        
         var getter = existing.get;
         existing = new JSProperty(key, getter, setter, existing.value, attributes);
     }
@@ -61,8 +66,10 @@ public static class JSObjectExtensions
     {
         ref var pr = ref target.GetElements(true);
         ref var existing = ref pr.Put(key);
+
         if (target is JSArray a)
             a._length = a._length > key ? a._length : key + 1;
+        
         var setter = existing.set;
         existing = new JSProperty(key, getter, setter, existing.value, attributes);
     }
@@ -124,6 +131,7 @@ public static class JSObjectExtensions
             ownProperties.Put(key.Key) = JSProperty.Property(key, getter, setter, attributes);
             return target;
         }
+
         p = JSProperty.Property(key, getter ?? p.get, setter ?? p.set, attributes);
         return target;
     }
@@ -145,6 +153,7 @@ public static class JSObjectExtensions
             ownProperties.Put(key) = JSProperty.Property(getter, setter, attributes);
             return target;
         }
+
         p = JSProperty.Property(getter ?? p.get, setter ?? p.set, attributes);
         return target;
     }
@@ -166,6 +175,7 @@ public static class JSObjectExtensions
             ownProperties.Put(key.Key) = JSProperty.Property(getter, setter, attributes);
             return target;
         }
+
         p = JSProperty.Property(getter ?? p.get, setter ?? p.set, attributes);
         return target;
     }
@@ -175,13 +185,11 @@ public static class JSObjectExtensions
     {
         var key = name.ToKey();
         if (key.IsSymbol)
-        {
             return AddProperty(target, key.Symbol, value, attributes);
-        }
+
         if (key.IsUInt)
-        {
             return target.AddProperty(key.Index, value, attributes);
-        }
+
         return AddProperty(target, key.KeyString, value,attributes);
     }
 
@@ -190,13 +198,11 @@ public static class JSObjectExtensions
     {
         var key = name.ToKey();
         if (key.IsSymbol)
-        {
             return AddProperty(target, key.Symbol, getter, setter, attributes);
-        }
+
         if (key.IsUInt)
-        {
             return target.AddProperty(key.Index, getter, setter, attributes);
-        }
+
         return AddProperty(target, key.KeyString, getter, setter, attributes);
     }
 }

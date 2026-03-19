@@ -1,7 +1,8 @@
-using YantraJS.Core.Generator;
+using Broiler.JavaScript.Core.Core.Storage;
+using YantraJS.Core;
 using YantraJS.Core.Iterator;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core;
 
 /// <summary>
 /// Default implementation of <see cref="IBuiltInRegistry"/> that delegates
@@ -35,38 +36,29 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
 
         // Iterator.prototype[Symbol.iterator] returns `this`.
         ref var symbols = ref proto.GetSymbols();
-        symbols.Put(JSSymbol.iterator.Key) = JSProperty.Property(
-            new JSFunction(
-                (in Arguments a) => a.This,
-                "Symbol.iterator"),
-            JSPropertyAttributes.ConfigurableValue);
+        symbols.Put(JSSymbol.iterator.Key) = JSProperty.Property(new JSFunction((in Arguments a) => a.This, "Symbol.iterator"), JSPropertyAttributes.ConfigurableValue);
 
         // Register prototype helper methods so they work on any iterator
         // (generators, user iterators, etc.) — not just JSIteratorObject.
-        AddProto(proto, "map",      JSIteratorObject.StaticMap);
-        AddProto(proto, "filter",   JSIteratorObject.StaticFilter);
-        AddProto(proto, "take",     JSIteratorObject.StaticTake);
-        AddProto(proto, "drop",     JSIteratorObject.StaticDrop);
-        AddProto(proto, "flatMap",  JSIteratorObject.StaticFlatMap);
-        AddProto(proto, "reduce",   JSIteratorObject.StaticReduce);
-        AddProto(proto, "toArray",  JSIteratorObject.StaticToArray);
-        AddProto(proto, "forEach",  JSIteratorObject.StaticForEach);
-        AddProto(proto, "some",     JSIteratorObject.StaticSome);
-        AddProto(proto, "every",    JSIteratorObject.StaticEvery);
-        AddProto(proto, "find",     JSIteratorObject.StaticFind);
+        AddProto(proto, "map", JSIteratorObject.StaticMap);
+        AddProto(proto, "filter", JSIteratorObject.StaticFilter);
+        AddProto(proto, "take", JSIteratorObject.StaticTake);
+        AddProto(proto, "drop", JSIteratorObject.StaticDrop);
+        AddProto(proto, "flatMap", JSIteratorObject.StaticFlatMap);
+        AddProto(proto, "reduce", JSIteratorObject.StaticReduce);
+        AddProto(proto, "toArray", JSIteratorObject.StaticToArray);
+        AddProto(proto, "forEach", JSIteratorObject.StaticForEach);
+        AddProto(proto, "some", JSIteratorObject.StaticSome);
+        AddProto(proto, "every", JSIteratorObject.StaticEvery);
+        AddProto(proto, "find", JSIteratorObject.StaticFind);
 
         // Generator.prototype → Iterator.prototype (§2.1.14).
         if (context[Names.Generator] is JSFunction generatorCtor)
-        {
             generatorCtor.prototype.SetPrototypeOf(proto);
-        }
     }
 
     private static void AddProto(JSObject proto, string name, JSFunctionDelegate fn)
     {
-        proto.FastAddValue(
-            KeyStrings.GetOrCreate(name),
-            new JSFunction(fn, name, $"function {name}() {{ [native] }}", createPrototype: false),
-            JSPropertyAttributes.ConfigurableValue);
+        proto.FastAddValue(KeyStrings.GetOrCreate(name), new JSFunction(fn, name, $"function {name}() {{ [native] }}", createPrototype: false), JSPropertyAttributes.ConfigurableValue);
     }
 }

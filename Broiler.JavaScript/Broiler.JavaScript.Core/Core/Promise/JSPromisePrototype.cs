@@ -1,24 +1,27 @@
-﻿using YantraJS.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
 
 namespace YantraJS.Core;
 
 
 public partial class JSPromise
 {
-
-
     [JSExport("then")]
     public JSValue Then(in Arguments a)
     {
         var (success, fail) = a.Get2();
-        if (!(success is JSFunction successFx))
-            throw JSContext.Current.NewTypeError($"Parameter for then is not a function");
+
+        if (success is not JSFunction successFx)
+            throw JSContext.NewTypeError($"Parameter for then is not a function");
+
         if (!fail.IsUndefined)
         {
-            if (!(fail is JSFunction failFx))
-                throw JSContext.Current.NewTypeError($"Parameter for then is not a function");
+            if (fail is not JSFunction failFx)
+                throw JSContext.NewTypeError($"Parameter for then is not a function");
+
             return Then(successFx.f, failFx.f);
         }
+
         return Then(successFx.f, null);
     }
 

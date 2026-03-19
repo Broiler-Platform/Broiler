@@ -1,4 +1,8 @@
-﻿namespace YantraJS.Core.Enumerators;
+﻿using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Core.Enumerators;
+using YantraJS.Core;
+
+namespace Broiler.JavaScript.Core.Core.Object;
 
 public class PropertyEnumerator
 {
@@ -12,9 +16,7 @@ public class PropertyEnumerator
     {
         target = jSObject;
         ref var op = ref jSObject.GetOwnProperties(false);
-        properties = !op.IsEmpty
-            ? new PropertySequence.ValueEnumerator(jSObject, showEnumerableOnly)
-            : new PropertySequence.ValueEnumerator();
+        properties = !op.IsEmpty ? new PropertySequence.ValueEnumerator(jSObject, showEnumerableOnly) : new PropertySequence.ValueEnumerator();
         this.showEnumerableOnly = showEnumerableOnly;
         this.inherited = inherited;
         parent = null;
@@ -25,28 +27,26 @@ public class PropertyEnumerator
         if (properties.target != null)
         {
             if (properties.MoveNextProperty(out value, out key))
-            {
                 return true;
-            }
+
             properties.target = null;
+
             if (inherited)
             {
                 var @base = target.prototypeChain?.@object;
-                if (@base != null
-                    && @base != target)
-                {
+                if (@base != null && @base != target)
                     parent = new PropertyEnumerator(@base, showEnumerableOnly, inherited);
-                }
             }
         }
+
         if (parent != null)
         {
             if (parent.MoveNextProperty(out key, out value))
-            {
                 return true;
-            }
+
             parent = null;
         }
+
         key = KeyString.Empty;
         value = default;
         return false;
@@ -57,28 +57,26 @@ public class PropertyEnumerator
         if (properties.target != null)
         {
             if (properties.MoveNext(out value, out key))
-            {
                 return true;
-            }
+
             properties.target = null;
+            
             if (inherited)
             {
                 var @base = target.prototypeChain?.@object;
-                if (@base != null 
-                    && @base != target)
-                {
+                if (@base != null && @base != target)
                     parent = new PropertyEnumerator(@base, showEnumerableOnly, inherited);
-                }
             }
         }
+
         if (parent != null)
         {
             if (parent.MoveNext(out key, out value))
-            {
                 return true;
-            }
+
             parent = null;
         }
+
         key = KeyString.Empty;
         value = null;
         return false;
@@ -102,8 +100,10 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
                 index = ui;
                 return true;
             }
+
             elements = null;
         }
+        
         if (properties.target != null)
         {
             if (properties.MoveNext(out var key))
@@ -113,24 +113,25 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
                 index = 0;
                 return true;
             }
+
             properties.target = null;
+
             if (inherited)
             {
                 var @base = jSObject.prototypeChain?.@object;
                 if (@base != null && @base != jSObject)
-                {
                     parent = new KeyEnumerator(@base, showEnumerableOnly, inherited);
-                }
             }
         }
+
         if (parent != null)
         {
             if (parent.MoveNext(out hasValue, out value, out index))
-            {
                 return true;
-            }
+
             parent = null;
         }
+
         hasValue = false;
         value = null;
         index = 0;
@@ -146,8 +147,10 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
                 value = new JSString(ui.ToString());
                 return true;
             }
+
             elements = null;
         }
+        
         if (properties.target != null)
         {
             if (properties.MoveNext(out var key))
@@ -155,24 +158,25 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
                 value = key.ToJSValue();
                 return true;
             }
+
             properties.target = null;
+
             if (inherited)
             {
                 var @base = jSObject.prototypeChain?.@object;
                 if (@base != null && @base != jSObject)
-                {
                     parent = new KeyEnumerator(@base, showEnumerableOnly, inherited);
-                }
             }
         }
+
         if (parent != null)
         {
             if (parent.MoveNext(out value))
-            {
                 return true;
-            }
+
             parent = null;
         }
+
         value = JSUndefined.Value;
         return false;
     }
@@ -181,13 +185,15 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
     {
         if (elements != null)
         {
-            if (elements.MoveNext(out var hasValueout, out var _, out var ui))
+            if (elements.MoveNext(out _, out _, out var ui))
             {
                 value = new JSString(ui.ToString());
                 return true;
             }
+
             elements = null;
         }
+
         if (properties.target != null)
         {
             if (properties.MoveNext(out var key))
@@ -195,24 +201,25 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
                 value = key.ToJSValue();
                 return true;
             }
+
             properties.target = null;
+
             if (inherited)
             {
                 var @base = jSObject.prototypeChain?.@object;
                 if (@base != null && @base != jSObject)
-                {
                     parent = new KeyEnumerator(@base, showEnumerableOnly, inherited);
-                }
             }
         }
+
         if (parent != null)
         {
             if (parent.MoveNext(out value))
-            {
                 return true;
-            }
+
             parent = null;
         }
+
         value = @default;
         return false;
     }
@@ -222,35 +229,34 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
         if (elements != null)
         {
             if (elements.MoveNext(out var hasValueout, out var _, out var ui))
-            {
                 return new JSString(ui.ToString());
-            }
+
             elements = null;
         }
+
         if (properties.target != null)
         {
             if (properties.MoveNext(out var key))
-            {
                 return key.ToJSValue();
-            }
+
             properties.target = null;
+
             if (inherited)
             {
                 var @base = jSObject.prototypeChain?.@object;
                 if (@base != null && @base != jSObject)
-                {
                     parent = new KeyEnumerator(@base, showEnumerableOnly, inherited);
-                }
             }
         }
+
         if (parent != null)
         {
             if (parent.MoveNext(out var value))
-            {
                 return value;
-            }
+
             parent = null;
         }
+
         return @default;
     }
 }

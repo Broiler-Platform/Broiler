@@ -87,12 +87,6 @@ public partial class ILCodeGenerator
 
         il.MarkLabel(@break);
 
-        // lets leave one value...
-        //if (node.Type != typeof(void))
-        //{
-        //    il.IncrementStack();
-        //}
-
         return true;
 
         Action LoadTargetMethod()

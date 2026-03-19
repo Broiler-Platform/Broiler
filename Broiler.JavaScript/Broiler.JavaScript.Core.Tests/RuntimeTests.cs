@@ -1,4 +1,6 @@
-namespace YantraJS.Core.Tests;
+using Broiler.JavaScript.Core.Core;
+
+namespace Broiler.JavaScript.Core.Tests;
 
 /// <summary>
 /// Tests for the YantraJS runtime: JSContext lifecycle, JSValue type system,

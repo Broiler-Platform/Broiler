@@ -1,31 +1,27 @@
 ﻿using YantraJS.Expressions;
 using Exp = YantraJS.Expressions.YExpression;
 
-namespace YantraJS.Core.LinqExpressions.GeneratorsV2;
+namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 
 public static class YieldFinderHelper
 {
-    private static object yes = new();
-    private static object no = new();
+    private static readonly object yes = new();
+    private static readonly object no = new();
 
-    private static System.Runtime.CompilerServices.ConditionalWeakTable<Exp, object>
-        cache = [];
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Exp, object> cache = [];
 
     public static bool HasYield(this Exp expression)
     {
         if (cache.TryGetValue(expression, out var a))
-        {
             return ReferenceEquals(a, yes);
-        }
+
         var r = YieldFinder.HasYield(expression);
         cache.Add(expression, r ? yes : no);
         return r;
     }
 
-
     public class YieldFinder : YExpressionMapVisitor
     {
-
         public static bool HasYield(Exp exp)
         {
             var yf = new YieldFinder();
@@ -39,6 +35,7 @@ public static class YieldFinderHelper
         {
             if (hasYield)
                 return exp;
+
             return base.VisitIn(exp);
         }
 
@@ -55,10 +52,5 @@ public static class YieldFinderHelper
         }
 
         protected override Exp VisitLambda(YLambdaExpression yLambdaExpression) => yLambdaExpression;
-
-        //protected override Exp VisitRelay(YRelayExpression relayExpression)
-        //{
-        //    return relayExpression;
-        //}
     }
 }

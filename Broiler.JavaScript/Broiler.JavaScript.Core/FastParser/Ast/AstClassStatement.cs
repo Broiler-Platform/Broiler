@@ -1,12 +1,12 @@
 ﻿#nullable enable
-namespace YantraJS.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+using YantraJS.Core;
 
-public class AstClassExpression(
-    FastToken token,
-    FastToken previousToken,
-    AstIdentifier? identifier,
-    AstExpression? @base,
-    IFastEnumerable<AstClassProperty> astClassProperties) : AstExpression(token,  FastNodeType.ClassStatement, previousToken)
+namespace Broiler.JavaScript.Core.FastParser.Ast;
+
+public class AstClassExpression(FastToken token, FastToken previousToken, AstIdentifier? identifier, AstExpression? @base, IFastEnumerable<AstClassProperty> astClassProperties) :
+    AstExpression(token, FastNodeType.ClassStatement, previousToken)
 {
     public readonly AstIdentifier? Identifier = identifier;
     public readonly AstExpression? Base = @base;
@@ -14,12 +14,12 @@ public class AstClassExpression(
 
     public override string ToString()
     {
-        if(Base != null)
-        {
+        if (Base != null)
             return $"class {Identifier} extends {Base} {{ {Members.Join("\n\t")} }}";
-        }
-        if(Identifier == null)
+
+        if (Identifier == null)
             return $"class {{ {Members.Join("\n\t")} }}";
+
         return $"class {Identifier} {{ {Members.Join("\n\t")} }}";
     }
 }

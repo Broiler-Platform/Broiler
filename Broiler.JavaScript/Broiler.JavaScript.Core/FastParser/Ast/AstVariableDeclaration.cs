@@ -1,4 +1,6 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using YantraJS.Core;
+
+namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 
 public enum FastVariableKind
@@ -9,10 +11,9 @@ public enum FastVariableKind
     Var,
 }
 
-public class AstVariableDeclaration: AstStatement
+public class AstVariableDeclaration : AstStatement
 {
     public readonly IFastEnumerable<VariableDeclarator> Declarators;
-
     public readonly FastVariableKind Kind;
 
     /// <summary>
@@ -25,14 +26,8 @@ public class AstVariableDeclaration: AstStatement
     /// </summary>
     public readonly bool AwaitUsing;
 
-    public AstVariableDeclaration(
-        FastToken begin,
-        FastToken previousToken,
-        in VariableDeclarator declarator,
-        FastVariableKind kind = FastVariableKind.Var, 
-        bool @using = false,
-        bool @await = false)
-        : base(begin, FastNodeType.VariableDeclaration, previousToken)
+    public AstVariableDeclaration(FastToken begin, FastToken previousToken, in VariableDeclarator declarator, FastVariableKind kind = FastVariableKind.Var, bool @using = false,
+        bool @await = false) : base(begin, FastNodeType.VariableDeclaration, previousToken)
     {
         Declarators = new Sequence<VariableDeclarator>(1) { declarator };
         Kind = kind;
@@ -40,15 +35,8 @@ public class AstVariableDeclaration: AstStatement
         AwaitUsing = @await;
     }
 
-
-    public AstVariableDeclaration(
-        FastToken begin, 
-        FastToken previousToken, 
-        IFastEnumerable<VariableDeclarator> declarators, 
-        FastVariableKind kind = FastVariableKind.Var,
-        bool @using = false,
-        bool @await = false)
-        :base(begin, FastNodeType.VariableDeclaration, previousToken)
+    public AstVariableDeclaration(FastToken begin, FastToken previousToken, IFastEnumerable<VariableDeclarator> declarators, FastVariableKind kind = FastVariableKind.Var, 
+        bool @using = false, bool @await = false) : base(begin, FastNodeType.VariableDeclaration, previousToken)
     {
         Declarators = declarators;
         Kind = kind;
@@ -61,18 +49,16 @@ public class AstVariableDeclaration: AstStatement
         if (Using)
         {
             if (AwaitUsing)
-            {
                 return $"await using {Declarators.Join()}";
-            }
+
             return $"using {Declarators.Join()}";
         }
-        switch (Kind)
+
+        return Kind switch
         {
-            case FastVariableKind.Let:
-                return $"let {Declarators.Join()}";
-            case FastVariableKind.Const:
-                return $"const {Declarators.Join()}";
-        }
-        return $"var {Declarators.Join()}";
+            FastVariableKind.Let => $"let {Declarators.Join()}",
+            FastVariableKind.Const => $"const {Declarators.Join()}",
+            _ => $"var {Declarators.Join()}",
+        };
     }
 }

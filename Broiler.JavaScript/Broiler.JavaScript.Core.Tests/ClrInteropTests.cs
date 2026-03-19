@@ -1,7 +1,9 @@
-using System;
-using YantraJS.Core.Clr;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using YantraJS.Core;
 
-namespace YantraJS.Core.Tests;
+namespace Broiler.JavaScript.Core.Tests;
 
 /// <summary>
 /// Tests for the <see cref="IClrInterop"/> interface and the

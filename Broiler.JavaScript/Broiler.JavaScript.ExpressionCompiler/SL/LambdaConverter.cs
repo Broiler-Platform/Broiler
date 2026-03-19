@@ -53,50 +53,30 @@ public class LambdaConverter : YExpressionVisitor<Expression>
     {
         var left = Visit(yBinaryExpression.Left);
         var right = Visit(yBinaryExpression.Right);
-        switch (yBinaryExpression.Operator)
+        return yBinaryExpression.Operator switch
         {
-            case YOperator.Add:
-                return Expression.Add(left, right);
-            case YOperator.Subtract:
-                return Expression.Subtract(left, right);
-            case YOperator.Multipley:
-                return Expression.Multiply(left, right);
-            case YOperator.Divide:
-                return Expression.Divide(left, right);
-            case YOperator.Mod:
-                return Expression.Modulo(left, right);
-            case YOperator.Power:
-                return Expression.Power(left, right);
-            case YOperator.Xor:
-                return Expression.ExclusiveOr(left, right);
-            case YOperator.BitwiseAnd:
-                return Expression.And(left, right);
-            case YOperator.BitwiseOr:
-                return Expression.Or(left, right);
-            case YOperator.BooleanAnd:
-                return Expression.AndAlso(left, right);
-            case YOperator.BooleanOr:
-                return Expression.OrElse(left, right);
-            case YOperator.Less:
-                return Expression.LessThan(left, right);
-            case YOperator.LessOrEqual:
-                return Expression.LessThanOrEqual(left, right);
-            case YOperator.Greater:
-                return Expression.GreaterThan(left, right);
-            case YOperator.GreaterOrEqual:
-                return Expression.GreaterThanOrEqual(left, right);
-            case YOperator.Equal:
-                return Expression.Equal(left, right);
-            case YOperator.NotEqual:
-                return Expression.NotEqual(left, right);
-            case YOperator.LeftShift:
-                return Expression.LeftShift(left, right);
-            case YOperator.RightShift:
-                return Expression.RightShift(left, right);
-            case YOperator.UnsignedRightShift:
-                return Expression.RightShift( Expression.Convert(left, typeof(uint)), right);
-        }
-        throw new NotImplementedException();
+            YOperator.Add => Expression.Add(left, right),
+            YOperator.Subtract => Expression.Subtract(left, right),
+            YOperator.Multipley => Expression.Multiply(left, right),
+            YOperator.Divide => Expression.Divide(left, right),
+            YOperator.Mod => Expression.Modulo(left, right),
+            YOperator.Power => Expression.Power(left, right),
+            YOperator.Xor => Expression.ExclusiveOr(left, right),
+            YOperator.BitwiseAnd => Expression.And(left, right),
+            YOperator.BitwiseOr => Expression.Or(left, right),
+            YOperator.BooleanAnd => Expression.AndAlso(left, right),
+            YOperator.BooleanOr => Expression.OrElse(left, right),
+            YOperator.Less => Expression.LessThan(left, right),
+            YOperator.LessOrEqual => Expression.LessThanOrEqual(left, right),
+            YOperator.Greater => Expression.GreaterThan(left, right),
+            YOperator.GreaterOrEqual => Expression.GreaterThanOrEqual(left, right),
+            YOperator.Equal => Expression.Equal(left, right),
+            YOperator.NotEqual => Expression.NotEqual(left, right),
+            YOperator.LeftShift => Expression.LeftShift(left, right),
+            YOperator.RightShift => Expression.RightShift(left, right),
+            YOperator.UnsignedRightShift => Expression.RightShift(Expression.Convert(left, typeof(uint)), right),
+            _ => throw new NotImplementedException(),
+        };
     }
 
     protected override Expression VisitBlock(YBlockExpression yBlockExpression)
@@ -176,11 +156,6 @@ public class LambdaConverter : YExpressionVisitor<Expression>
     protected override Expression VisitParameter(YParameterExpression yParameterExpression) => throw new NotImplementedException();
 
     protected override Expression VisitProperty(YPropertyExpression yPropertyExpression) => throw new NotImplementedException();
-
-    //protected override Expression VisitRelay(YRelayExpression yRelayExpression)
-    //{
-    //    throw new NotImplementedException();
-    //}
 
     protected override Expression VisitReturn(YReturnExpression yReturnExpression) => throw new NotImplementedException();
 

@@ -1,35 +1,16 @@
 ﻿using YantraJS.Core;
 using Expression = YantraJS.Expressions.YExpression;
-using YantraJS.Core.LambdaGen;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.LambdaGen;
 
-namespace YantraJS.ExpHelper;
+namespace Broiler.JavaScript.Core.LinqExpressions;
 
-public class JSBooleanBuilder 
+public class JSBooleanBuilder
 {
-    // static Type type = typeof(JSBoolean);
-
-    public static Expression True =
-        NewLambdaExpression.StaticFieldExpression<JSValue>(() => () => JSBoolean.True);
-        // Expression.TypeAs( Expression.Field(null, type.GetField(nameof(JSBoolean.True))), typeof(JSValue));
-
-    public static Expression False =
-        NewLambdaExpression.StaticFieldExpression<JSValue>(() => () => JSBoolean.False);
-    // Expression.TypeAs( Expression.Field(null, type.GetField(nameof(JSBoolean.False))), typeof(JSValue));
-
-    //private static FieldInfo _Value =
-    //    type.InternalField(nameof(Core.JSBoolean._value));
-
-    //public static Expression Value(Expression target)
-    //{
-    //    return Expression.Field(target, _Value);
-    //}
+    public static Expression True = NewLambdaExpression.StaticFieldExpression<JSValue>(() => () => JSBoolean.True);
+    public static Expression False = NewLambdaExpression.StaticFieldExpression<JSValue>(() => () => JSBoolean.False);
 
     public static Expression NewFromCLRBoolean(Expression target) => Expression.Condition(target, True, False);
 
-
-    public static Expression Not(Expression value) => Expression.Condition(
-            JSValueBuilder.BooleanValue(value),
-            False,
-            True
-            );
+    public static Expression Not(Expression value) => Expression.Condition(JSValueBuilder.BooleanValue(value), False, True);
 }

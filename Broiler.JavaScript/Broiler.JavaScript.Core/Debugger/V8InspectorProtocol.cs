@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -6,35 +7,28 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
-using YantraJS.Debugger;
+using System.Text.Json.Serialization;
+using YantraJS;
+using YantraJS.Core;
+using YantraJS.Core.Debugger;
+using Broiler.JavaScript.Core.Extensions;
 
-namespace YantraJS.Core.Debugger;
+namespace Broiler.JavaScript.Core.Debugger;
 
 public delegate Task<string> MessageProcessor(long id, JsonNode p);
 
 public abstract class V8InspectorProtocol : JSDebugger, IDisposable
 {
-    private static JsonSerializerOptions options =
-        new()
-        {
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        };
-   //     new JsonSerializerSettings {
-    
-   //     ContractResolver = new Newtonsoft.Json.Serialization.DefaultContractResolver
-   //     {
-   //         NamingStrategy = new Newtonsoft.Json.Serialization.CamelCaseNamingStrategy()
-   //     },
-   //     NullValueHandling = NullValueHandling.Ignore
-
-   //};
+    private static readonly JsonSerializerOptions options = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
 
     public abstract void Dispose();
     public abstract Task ConnectAsync();
 
-    private Dictionary<string, MessageProcessor> protocols
-        = [];
+    private readonly Dictionary<string, MessageProcessor> protocols = [];
 
     public string ID { get; }
 
@@ -50,7 +44,6 @@ public abstract class V8InspectorProtocol : JSDebugger, IDisposable
 
     public V8InspectorProtocol()
     {
-
         ID = $"D-{Interlocked.Increment(ref id)}";
 
         var runtime = new V8Runtime(this);
@@ -79,62 +72,55 @@ public abstract class V8InspectorProtocol : JSDebugger, IDisposable
         {
             var name = $"{prefix}.{m.Name.ToCamelCase()}";
             var pl = m.GetParameters();
+
             if (typeof(Task).IsAssignableFrom(m.ReturnType))
             {
-                if(pl.Length == 0)
+                if (pl.Length == 0)
                 {
-                    //protocols[name] = createEmptyAsyncMethod.MakeGenericMethod(m.ReturnType.GetGenericArguments()[0])
-                    //    .Invoke(null, new object[] { p, m }) as MessageProcessor;
                     protocols[name] = Generic.InvokeAs(m.ReturnType.GetGenericArguments()[0], CreateEmptyAsync<object>, m);
                     continue;
                 }
-                //protocols[name] = createAsyncMethod.MakeGenericMethod(pl[0].ParameterType, m.ReturnType.GetGenericArguments()[0])
-                //    .Invoke(null, new object[] { p, m }) as MessageProcessor;
-                protocols[name] = Generic.InvokeAs(
-                    pl[0].ParameterType, m.ReturnType.GetGenericArguments()[0], CreateAsync<object,object>, m);
+
+                protocols[name] = Generic.InvokeAs(pl[0].ParameterType, m.ReturnType.GetGenericArguments()[0], CreateAsync<object, object>, m);
                 continue;
             }
-            if(pl.Length == 0)
+
+            if (pl.Length == 0)
             {
-                protocols[name] = Generic.InvokeAs(
-                    m.ReturnType, CreateEmpty<object>, p, m);
-                // protocols[name] = createEmptyMethod.MakeGenericMethod(m.ReturnType).Invoke(null, new object[] { p, m }) as MessageProcessor;
+                protocols[name] = Generic.InvokeAs(m.ReturnType, CreateEmpty<object>, p, m);
                 continue;
             }
-            // protocols[name] = createMethod.MakeGenericMethod(pl[0].ParameterType, m.ReturnType).Invoke(null, new object[] { p, m }) as MessageProcessor;
-            protocols[name] = Generic.InvokeAs(pl[0].ParameterType, m.ReturnType, Create<object,object>, p, m );
+
+            protocols[name] = Generic.InvokeAs(pl[0].ParameterType, m.ReturnType, Create<object, object>, p, m);
         }
     }
 
     public static MessageProcessor CreateEmpty<RT>(V8ProtocolObject p, MethodInfo m)
     {
-
         var fx = (Func<RT>)m.CreateDelegate(typeof(Func<RT>), p);
         Task<string> RunAsync(long id, JsonNode e)
         {
             var result = fx();
-            return Task.Run(() => JsonSerializer.Serialize(new { id , result }, options));
+            return Task.Run(() => JsonSerializer.Serialize(new { id, result }, options));
         }
+
         return RunAsync;
     }
 
-
     public static MessageProcessor CreateEmptyAsync<RT>(MethodInfo m)
     {
-
         var fx = (Func<Task<RT>>)m.CreateDelegate(typeof(Func<Task<RT>>));
         async Task<string> RunAsync(long id, JsonNode e)
         {
             var result = await fx();
             return await Task.Run(() => JsonSerializer.Serialize(new { id, result }, options));
         }
+
         return RunAsync;
     }
 
-
     public static MessageProcessor Create<T, RT>(V8ProtocolObject p, MethodInfo m)
     {
-
         var fx = (Func<T, RT>)m.CreateDelegate(typeof(Func<T, RT>), p);
         Task<string> RunAsync(long id, JsonNode e)
         {
@@ -142,28 +128,25 @@ public abstract class V8InspectorProtocol : JSDebugger, IDisposable
             var result = fx(a);
             return Task.Run(() => JsonSerializer.Serialize(new { id, result }, options));
         }
+
         return RunAsync;
     }
 
 
-    public static MessageProcessor CreateAsync<T, RT>(MethodInfo m) {
-
-        var fx = (Func<T,Task<RT>>)m.CreateDelegate(typeof(Func<T, Task<RT>>));
+    public static MessageProcessor CreateAsync<T, RT>(MethodInfo m)
+    {
+        var fx = (Func<T, Task<RT>>)m.CreateDelegate(typeof(Func<T, Task<RT>>));
         async Task<string> RunAsync(long id, JsonNode e)
         {
             var a = JsonSerializer.Deserialize<T>(e, options);
             var result = await fx(a);
             return await Task.Run(() => JsonSerializer.Serialize(new { id, result }, options));
         }
+
         return RunAsync;
     }
 
     public abstract void SendMessage(string message);
-
-    //public static V8InspectorProtocol CreateWebSocketServer(int port)
-    //{
-    //    return new V8InspectorProtocolServer(port);
-    //}
 
     public static V8InspectorProtocol CreateInverseProxy(Uri uri)
     {
@@ -171,19 +154,11 @@ public abstract class V8InspectorProtocol : JSDebugger, IDisposable
         return p;
     }
 
+    public void Send(V8ProtocolEvent e) => Task.Run(() => SendMessage(JsonSerializer.Serialize(new { method = e.EventName, @params = e }, options)));
 
+    public override void ReportException(JSValue error) { }
 
-    public void Send(V8ProtocolEvent e) => Task.Run(() =>
-    {
-        SendMessage(JsonSerializer.Serialize(new { method = e.EventName, @params = e }, options));
-    });
-
-    public override void ReportException(JSValue error)
-    {
-        
-    }
-
-    private SHA256 hash = SHA256.Create();
+    private readonly SHA256 hash = SHA256.Create();
 
     public override void ScriptParsed(long contextId, string code, string codeFilePath) => Task.Run(() =>
                                                                                                     {
@@ -201,17 +176,19 @@ public abstract class V8InspectorProtocol : JSDebugger, IDisposable
                                                                                                         });
                                                                                                     });
 
-    public async Task OnMessageReceived(IncomingMessage e) {
-
-        if(!protocols.TryGetValue(e.Method, out var vm))
+    public async Task OnMessageReceived(IncomingMessage e)
+    {
+        if (!protocols.TryGetValue(e.Method, out var vm))
         {
             var sr = new JsonObject
             {
                 { "id", e.ID },
                 { "error", "Not found" }
             };
+
             System.Diagnostics.Debug.WriteLine($"Method {e.Method} not found");
             SendMessage(sr.ToString());
+
             return;
         }
 
@@ -219,13 +196,10 @@ public abstract class V8InspectorProtocol : JSDebugger, IDisposable
         {
             var r = await vm(e.ID, e.Params);
             SendMessage(r);
-
-        } catch (Exception ex)
+        }
+        catch (Exception ex)
         {
             ReportException(new JSString(ex.ToString()));
         }
-
-        return;
     }
-
 }

@@ -1,16 +1,14 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
-using YantraJS.Core.Core.Storage;
-using YantraJS.Core.Storage;
-using YantraJS.ExpHelper;
-using YantraJS.LinqExpressions;
 using Expression = YantraJS.Expressions.YExpression;
 using YantraJS.Runtime;
-using YantraJS.Core.Core.Clr;
+using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.Core.Core.Function;
 
-namespace YantraJS.Core.Clr;
-
+namespace Broiler.JavaScript.Core.Core.Clr;
 
 
 /// <summary>
@@ -18,43 +16,40 @@ namespace YantraJS.Core.Clr;
 /// </summary>
 public class ClrType : JSFunction
 {
-
     private static ConcurrentUInt32Map<ClrType> cachedTypes = ConcurrentUInt32Map<ClrType>.Create();
 
-    internal class ClrPrototype: JSObject
+    internal class ClrPrototype : JSObject
     {
         internal Func<object, uint, JSValue> GetElementAt;
-
         internal Func<object, uint, object, JSValue> SetElementAt;
-
     }
-
 
     public static ClrType From(Type type)
     {
         // need to create base type first...
         ClrType baseType = null;
-        if(type.BaseType != null && type.BaseType != typeof(object))
-        {
+        if (type.BaseType != null && type.BaseType != typeof(object))
             baseType = From(type.BaseType);
-        }
+
         var nc = JSContext.Current.ClrMemberNamingConvention;
         var key = ConcurrentTypeCache.GetOrCreate(type, nc.Name);
+
         return cachedTypes.GetOrCreate(key, () => new ClrType(nc, type, baseType));
     }
 
     private readonly ClrMemberNamingConvention namingConvention;
     public readonly Type Type;
 
-    (ConstructorInfo method, ParameterInfo[] parameters)[] constructorCache;
+    readonly (ConstructorInfo method, ParameterInfo[] parameters)[] constructorCache;
 
     public override bool ConvertTo(Type type, out object value)
     {
-        if(type == typeof(Type))
+        if (type == typeof(Type))
         {
             value = Type;
             return true;
         }
+
         return base.ConvertTo(type, out value);
     }
 
@@ -75,22 +70,26 @@ public class ClrType : JSFunction
 
         var declaredFields = type.GetTypeInfo().DeclaredFields.Where(x => x.IsStatic == isStatic && x.IsPublic);
 
-        foreach(var field in declaredFields)
+        foreach (var field in declaredFields)
         {
             var f = new JSFieldInfo(namingConvention, field);
             var name = f.Name;
+
             if (isJavaScriptObject)
             {
                 if (!f.Export)
                     continue;
             }
+
             JSFunction getter = f.GenerateFieldGetter();
             JSFunction setter = null;
+
             if (!(field.IsInitOnly || field.IsLiteral))
             {
                 // you can only read...
                 setter = f.GenerateFieldSetter();
             }
+
             target.FastAddProperty(name, getter, setter, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
@@ -98,19 +97,20 @@ public class ClrType : JSFunction
             ? type.GetProperties(flags)
             : type.GetTypeInfo()
                 .DeclaredProperties
-                .Where(x => 
-                    x.GetMethod?.IsStatic == isStatic 
+                .Where(x =>
+                    x.GetMethod?.IsStatic == isStatic
                     || x.SetMethod?.IsStatic == isStatic).ToArray();
 
 
-        foreach (var property in declaredProperties
-            .GroupBy(x => x.Name)) {
+        foreach (var property in declaredProperties.GroupBy(x => x.Name))
+        {
             // only indexer property can have more items...
             var list = property.ToList();
             if (list.Count > 1)
             {
                 throw new NotImplementedException();
-            } else
+            }
+            else
             {
                 var f = new JSPropertyInfo(namingConvention, property.First());
                 if (f.PropertyType.IsGenericTypeDefinition)
@@ -125,6 +125,7 @@ public class ClrType : JSFunction
 
                 var fgm = f.GetMethod;
                 var fsm = f.SetMethod;
+
                 if (fgm?.GetParameters().Length > 0)
                 {
                     // it is an index property...
@@ -138,56 +139,53 @@ public class ClrType : JSFunction
                     {
                         indexGetter = f.GenerateIndexedGetter();
                         indexSetter = f.GenerateIndexedSetter();
-                    } else
+                    }
+                    else
                     {
                         if (indexGetter != null)
                             continue;
+
                         indexGetter = f.GenerateIndexedGetter();
                         indexSetter = f.GenerateIndexedSetter();
                     }
-                } else
+                }
+                else
                 {
-                    JSFunction getter = f.CanRead
-                        ? f.GeneratePropertyGetter()
-                        : null;
-                    JSFunction setter = f.CanWrite
-                        ? f.GeneratePropertySetter()
-                        : null;
+                    JSFunction getter = f.CanRead ? f.GeneratePropertyGetter() : null;
+                    JSFunction setter = f.CanWrite ? f.GeneratePropertySetter() : null;
 
                     if (getter != null || setter != null)
-                    {                            
                         target.FastAddProperty(name, getter, setter, JSPropertyAttributes.EnumerableConfigurableProperty);
-                    }
                 }
-
             }
         }
 
         var clrPrototype = target as ClrPrototype;
 
-        if (isJavaScriptObject) {
-
-            foreach(var method in type.GetMethods(flags))
+        if (isJavaScriptObject)
+        {
+            foreach (var method in type.GetMethods(flags))
             {
                 var jsm = new JSMethodInfo(namingConvention, method);
+
                 if (!jsm.Export)
                     continue;
+
                 var name = jsm.Name;
+
                 if (method.IsJSFunctionDelegate())
                 {
-                    target.FastAddValue(name,
-                        jsm.GenerateInvokeJSFunction(), JSPropertyAttributes.EnumerableConfigurableValue);
-                } else
+                    target.FastAddValue(name, jsm.GenerateInvokeJSFunction(), JSPropertyAttributes.EnumerableConfigurableValue);
+                }
+                else
                 {
-                    target.FastAddValue(name
-                        ,new JSFunction( jsm.GenerateMethod(), name)
-                        , JSPropertyAttributes.EnumerableConfigurableValue);
+                    target.FastAddValue(name, new JSFunction(jsm.GenerateMethod(), name), JSPropertyAttributes.EnumerableConfigurableValue);
                 }
             }
 
-
             if (indexGetter != null)
                 clrPrototype.GetElementAt = indexGetter;
+
             if (indexSetter != null)
                 clrPrototype.SetElementAt = indexSetter;
 
@@ -195,29 +193,21 @@ public class ClrType : JSFunction
         }
 
 
-        foreach (var methods in type.GetMethods(flags)
-            .Where(x => !x.IsSpecialName)
-            .GroupBy(x => x.Name)) {
+        foreach (var methods in type.GetMethods(flags).Where(x => !x.IsSpecialName).GroupBy(x => x.Name))
+        {
             var g = new JSMethodGroup(namingConvention, type, methods);
             var jsMethod = g.JSMethod;
+
             if (jsMethod != null)
             {
                 var jsm = new JSMethodInfo(namingConvention, jsMethod);
                 var name = jsm.Name;
-                target.FastAddValue(name,
-                    jsm.GenerateInvokeJSFunction(), JSPropertyAttributes.EnumerableConfigurableValue);
 
+                target.FastAddValue(name, jsm.GenerateInvokeJSFunction(), JSPropertyAttributes.EnumerableConfigurableValue);
 
                 continue;
             }
-            //target.FastAddValue(name, isStatic
-            //    ? new JSFunction((in Arguments a) => {
-            //        return StaticInvoke(name, all, a);
-            //    }, name)
-            //    : new JSFunction((in Arguments a) => {
-            //        return Invoke(name, type, all, a);
-            //        }, name)
-            //    , JSPropertyAttributes.EnumerableConfigurableValue);
+
             target.FastAddValue(g.name, g.Generate(isStatic), JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
@@ -226,61 +216,48 @@ public class ClrType : JSFunction
 
         if (indexGetter != null)
             clrPrototype.GetElementAt = indexGetter;
+
         if (indexSetter != null)
             clrPrototype.SetElementAt = indexSetter;
 
         // setup disposables...
         var disposableType = typeof(IDisposable);
         var asyncDisposableType = typeof(IAsyncDisposable);
-        if (disposableType.IsAssignableFrom(type) && type.GetInterfaceMap(disposableType)
-            .InterfaceMethods
-            .Any())
+
+        if (disposableType.IsAssignableFrom(type) && type.GetInterfaceMap(disposableType).InterfaceMethods.Length != 0)
         {
             target.FastAddValue(JSSymbol.dispose, new JSFunction((in Arguments a) =>
             {
                 if (a.This is ClrProxy p && p.value is IDisposable d)
-                {
                     d.Dispose();
-                }
+
                 return JSUndefined.Value;
             }), JSPropertyAttributes.ConfigurableValue);
         }
-        if (asyncDisposableType.IsAssignableFrom(type) && type.GetInterfaceMap(typeof(IAsyncDisposable))
-            .InterfaceMethods
-            .Any())
+
+        if (asyncDisposableType.IsAssignableFrom(type) && type.GetInterfaceMap(typeof(IAsyncDisposable)).InterfaceMethods.Length != 0)
         {
             target.FastAddValue(JSSymbol.asyncDispose, new JSFunction((in Arguments a) =>
             {
                 if (a.This is ClrProxy p && p.value is IAsyncDisposable d)
-                {
                     return ClrProxy.From(d.DisposeAsync().AsTask());
-                }
+
                 return JSUndefined.Value;
             }), JSPropertyAttributes.ConfigurableValue);
         }
     }
 
-    private ClrType(
-        ClrMemberNamingConvention namingConvention,
-        Type type, 
-        ClrType baseType = null) : 
-        base(
-            type.Name, 
-            $"function {type.Name}() {{ [clr-native] }}", 
-            new ClrPrototype())
+    private ClrType(ClrMemberNamingConvention namingConvention, Type type, ClrType baseType = null) :
+        base(type.Name, $"function {type.Name}() {{ [clr-native] }}", new ClrPrototype())
     {
         f = Create;
         this.namingConvention = namingConvention;
         Type = type;
 
         Generate(this, type, true);
-
         Generate(prototype, type, false);
 
-        constructorCache = type.GetConstructors()
-            .Select(c => (method: c, parameters: c.GetParameters()))
-            .OrderByDescending(x => x.parameters.RequiredCount())
-            .ToArray();
+        constructorCache = [.. type.GetConstructors().Select(c => (method: c, parameters: c.GetParameters())).OrderByDescending(x => x.parameters.RequiredCount())];
 
         foreach (var (method, parameters) in constructorCache)
         {
@@ -294,28 +271,22 @@ public class ClrType : JSFunction
         if (type.IsGenericTypeDefinition)
         {
             // make generic type..
-
-            FastAddValue(
-                "makeGenericType",
-                new JSFunction(MakeGenericType, "makeGenericType"), JSPropertyAttributes.EnumerableConfigurableValue);
+            FastAddValue("makeGenericType", new JSFunction(MakeGenericType, "makeGenericType"), JSPropertyAttributes.EnumerableConfigurableValue);
         }
         else
         {
             // getMethod... name and types...
-            FastAddValue("getMethod",
-                new JSFunction(GetMethod, "getMethod"), JSPropertyAttributes.EnumerableConfigurableValue);
-            FastAddValue("getConstructor",
-                new JSFunction(GetConstructor, "getConstructor"),
-                JSPropertyAttributes.EnumerableConfigurableValue);
+            FastAddValue("getMethod", new JSFunction(GetMethod, "getMethod"), JSPropertyAttributes.EnumerableConfigurableValue);
+            FastAddValue("getConstructor", new JSFunction(GetConstructor, "getConstructor"), JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
-        if(baseType != null)
+        if (baseType != null)
         {
             BasePrototypeObject = baseType;
             prototype.BasePrototypeObject = baseType.prototype;
 
             // set indexer... for int/uint
-            
+
             if (prototype is ClrPrototype p)
             {
                 if (baseType.prototype is ClrPrototype bp)
@@ -323,73 +294,56 @@ public class ClrType : JSFunction
                     if (p.GetElementAt == null)
                     {
                         // add converter here...
-                        p.GetElementAt = (a1, a2) =>
-                        {
-                            return bp.GetElementAt(a1, a2);
-                        };
+                        p.GetElementAt = (a1, a2) => bp.GetElementAt(a1, a2);
+
                         var et = type.GetElementTypeOrGeneric();
                         if (et != null)
                         {
                             p.SetElementAt = (a1, a2, a3) =>
                             {
                                 if (a3 is JSValue j3)
-                                {
                                     a3 = j3.ForceConvert(et);
-                                }
+
                                 return bp.SetElementAt(a1, a2, a3);
                             };
-
                         }
                         else
                         {
-                            p.SetElementAt = (a1, a2, a3) =>
-                            {
-                                return bp.SetElementAt(a1, a2, a3);
-                            };
-                        }
-                    }
-                } else
-                {
-                    var old = p.SetElementAt;
-                    if (old != null)
-                    {
-                        var et = type.GetElementTypeOrGeneric();
-                        if (et != null)
-                        {
-                            p.SetElementAt = (a1, a2, a3) => {
-                                if (a3 is JSValue j3)
-                                    a3 = j3.ForceConvert(et);
-                                return old(a1, a2, a3);
-                            };
+                            p.SetElementAt = (a1, a2, a3) => bp.SetElementAt(a1, a2, a3);
                         }
                     }
                 }
+                else
+                {
+                    var old = p.SetElementAt;
+
+                    if (old == null)
+                        return;
+
+                    var et = type.GetElementTypeOrGeneric();
+                    if (et == null)
+                        return;
+
+                    p.SetElementAt = (a1, a2, a3) =>
+                    {
+                        if (a3 is JSValue j3)
+                            a3 = j3.ForceConvert(et);
+
+                        return old(a1, a2, a3);
+                    };
+                }
             }
         }
-
     }
-
-    //private JSValue Create2(ConstructorInfo c, in Arguments a)
-    //{
-    //    // improve later...
-    //    // return ClrProxy.From(c.Invoke(new object[] { a }), prototype);
-        
-    //}
 
     public JSFunction CreateConstuctorDelegate(ConstructorInfo c)
     {
         var pe = Expression.Parameter(ArgumentsBuilder.refType);
         var name = this.name.Value;
-        JSFunctionDelegate newDelegate =
-            Expression.Lambda<JSFunctionDelegate>(name,
-                ClrProxyBuilder.From(Expression.New(c,pe)),
-                pe
-            ).Compile();
+        JSFunctionDelegate newDelegate = Expression.Lambda<JSFunctionDelegate>(name, ClrProxyBuilder.From(Expression.New(c, pe)), pe).Compile();
+
         return new JSFunction(newDelegate, name);
     }
-
-    // private static MethodInfo createConstuctorDelegate = typeof(ClrType).GetMethod(nameof(CreateConstuctorDelegate));
-
 
     public JSValue Create(in Arguments a)
     {
@@ -401,39 +355,46 @@ public class ClrType : JSFunction
     {
         var a1 = a.Get1();
         if (a1.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError($"Name is required");
+            throw JSContext.NewTypeError($"Name is required");
+
         var name = a1.ToString();
         MethodInfo method;
         Type[] types = null;
-        var flags = BindingFlags.IgnoreCase 
-            | BindingFlags.Default 
-            | BindingFlags.Public 
+        var flags = BindingFlags.IgnoreCase
+            | BindingFlags.Default
+            | BindingFlags.Public
             | BindingFlags.FlattenHierarchy
             | BindingFlags.Instance
             | BindingFlags.Static;
+
         if (a.Length == 1)
         {
             method = Type.GetMethod(name, flags);
-        } else {
+        }
+        else
+        {
             types = new Type[a.Length - 1];
             for (int i = 1; i < a.Length; i++)
             {
                 var v = a.GetAt(i);
-                types[i-1] = (Type)v.ForceConvert(typeof(Type));
+                types[i - 1] = (Type)v.ForceConvert(typeof(Type));
             }
+
             method = Type.GetMethod(name, flags, null, types, null);
         }
+
         if (method == null)
             throw new JSException($"Method {name} not found on {Type.Name}");
+
         var jsm = new JSMethodInfo(namingConvention, method);
         return new JSFunction(jsm.GenerateMethod(), name, "native");
     }
-
 
     public JSValue GetConstructor(in Arguments a)
     {
         ConstructorInfo method;
         Type[] types = null;
+
         if (a.Length == 0)
         {
             method = Type.GetConstructor([]);
@@ -446,10 +407,13 @@ public class ClrType : JSFunction
                 var v = a.GetAt(i);
                 types[i] = (Type)v.ForceConvert(typeof(Type));
             }
+
             method = Type.GetConstructor(types);
         }
-        if (method == null) 
+
+        if (method == null)
             throw new JSException($"Constructor({string.Join(",", types.Select(x => x.Name))}) not found on {Type.Name}");
+
         return new JSFunction(GenerateConstructor(method, prototype), this);
     }
 
@@ -462,39 +426,33 @@ public class ClrType : JSFunction
             var r = fx(in a);
             return ClrProxy.From(r, prototype);
         }
+
         return Factory;
     }
 
     private JSFunctionDelegate GenerateConstructor(ConstructorInfo m, JSObject prototype)
     {
         var jfs = m.CompileToJSFunctionDelegate(m.DeclaringType.Name);
+
         JSValue Factory(in Arguments a)
         {
             var r = jfs(in a);
             return ClrProxy.From(r, prototype);
         }
+
         return Factory;
-
-        //var args = Expression.Parameter(typeof(Arguments).MakeByRefType());
-        //var parameters = m.GetArgumentsExpression(args);
-        //var call = Expression.TypeAs( Expression.New(m, parameters), typeof(object));
-        //var lambda = Expression.Lambda<JSValueFactory>(m.DeclaringType.Name, call, args);
-        //var factory = lambda.Compile();
-        //return JSValueFactoryDelegate(factory, prototype);
     }
-
 
     public JSValue MakeGenericType(in Arguments a)
     {
         var types = new Type[a.Length];
+
         for (int i = 0; i < a.Length; i++)
         {
             var v = a.GetAt(i);
             types[i] = (Type)v.ForceConvert(typeof(Type));
         }
+
         return From(Type.MakeGenericType(types));
     }
-
-    
-
 }

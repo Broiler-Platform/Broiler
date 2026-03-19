@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace YantraJS.JSClassGenerator;
+namespace Broiler.JavaScript.JSClassGenerator;
 
 public class JSTypeInfo
 {

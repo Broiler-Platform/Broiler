@@ -1,10 +1,6 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿namespace Broiler.JavaScript.Core.FastParser.Ast;
 
-public class AstDoWhileStatement(
-    FastToken start,
-    FastToken end,
-    AstExpression test,
-    AstStatement statement) : AstStatement(start, FastNodeType.DoWhileStatement, end)
+public class AstDoWhileStatement(FastToken start, FastToken end, AstExpression test, AstStatement statement) : AstStatement(start, FastNodeType.DoWhileStatement, end)
 {
     public readonly AstExpression Test = test;
     public readonly AstStatement Body = statement;

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 
-namespace YantraJS.Core.Core;
+namespace Broiler.JavaScript.Core.Core;
 
 public static class JSContextExtensions
 {
@@ -27,8 +27,6 @@ public static class JSContextExtensions
             }
         }
 #endif
-        throw context.NewRangeError("Maximum call stack size exceeded");
+        throw JSContext.NewRangeError("Maximum call stack size exceeded");
     }
-
-
 }

@@ -1,27 +1,21 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Array.Typed;
+using Broiler.JavaScript.Core.Core.Clr;
+using System;
 using Yantra.Core;
-using YantraJS.Core.Clr;
 
 namespace YantraJS.Core.Typed;
 
 [JSClassGenerator("Uint8ClampedArray"), JSBaseClass("TypedArray")]
 public partial class JSUint8ClampedArray : JSTypedArray
 {
-
     [JSExport("BYTES_PER_ELEMENT")]
     internal static readonly int BYTES_PER_ELENENT = 1;
 
-
     [JSExport(Length = 3)]
-    public JSUint8ClampedArray(in Arguments a)
-        : base(new TypedArrayParameters(a, BYTES_PER_ELENENT))
-    {
-    }
+    public JSUint8ClampedArray(in Arguments a) : base(new TypedArrayParameters(a, BYTES_PER_ELENENT)) { }
 
-    private JSUint8ClampedArray(TypedArrayParameters a) : base(a)
-    {
-
-    }
+    private JSUint8ClampedArray(TypedArrayParameters a) : base(a) { }
 
     protected internal override JSValue GetValue(uint index, JSValue receiver, bool throwError = true)
     {

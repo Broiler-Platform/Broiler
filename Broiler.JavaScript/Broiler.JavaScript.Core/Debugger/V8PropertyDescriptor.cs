@@ -1,8 +1,9 @@
-﻿using System;
-using YantraJS.Core.Core;
-using YantraJS.Extensions;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Core.Extensions;
+using System;
 
-namespace YantraJS.Core.Debugger;
+namespace Broiler.JavaScript.Core.Debugger;
 
 public class V8PropertyDescriptor
 {
@@ -25,17 +26,22 @@ public class V8PropertyDescriptor
         IsOwn = isOwn;
         if (!p.IsProperty)
         {
-            try {
+            try 
+            {
                 Value = new V8RemoteObject(v.GetValue(p));
-            } catch (Exception ex)
+            } 
+            catch (Exception ex)
             {
                 Value = new V8RemoteObject(ex.ToString());
                 WasThrown = true;
             }
+            
             return;
         }
+
         if (p.get != null)
             Get = new V8RemoteObject(p.get);
+
         if (p.set != null)
             Set = new V8RemoteObject(p.set);
     }

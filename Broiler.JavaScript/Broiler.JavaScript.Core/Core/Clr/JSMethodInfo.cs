@@ -1,8 +1,9 @@
 ﻿using System.Reflection;
 using System.ComponentModel;
-using YantraJS.Core.Clr;
+using YantraJS;
+using YantraJS.Core;
 
-namespace YantraJS.Core.Core.Clr;
+namespace Broiler.JavaScript.Core.Core.Clr;
 
 internal class JSMethodInfo
 {

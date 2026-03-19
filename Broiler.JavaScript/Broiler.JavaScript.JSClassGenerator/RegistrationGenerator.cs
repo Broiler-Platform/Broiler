@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace YantraJS.JSClassGenerator;
+namespace Broiler.JavaScript.JSClassGenerator;
 
 internal class RegistrationGenerator(
     ITypeSymbol type,
@@ -24,13 +24,13 @@ internal class RegistrationGenerator(
         sb = sb.AppendLine("using System.Collections.Generic;")
             .AppendLine("using System.Runtime.CompilerServices;")
             .AppendLine("using System.Text;")
-            .AppendLine("using YantraJS.Core.Clr;")
-            .AppendLine("using YantraJS.Extensions;");
+            .AppendLine("using Broiler.JavaScript.Core.Clr;")
+            .AppendLine("using Broiler.JavaScript.Extensions;");
 
         var ns = type.ContainingNamespace.ToString();
-        if (ns != "YantraJS.Core")
+        if (ns != "Broiler.JavaScript.Core")
         {
-            sb = sb.AppendLine("using YantraJS.Core;");
+            sb = sb.AppendLine("using Broiler.JavaScript.Core;");
         }
 
         sb = sb.AppendLine($"namespace {ns} {{ ");

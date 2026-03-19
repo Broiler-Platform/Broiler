@@ -1,3 +1,8 @@
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Core.Enumerators;
+using Broiler.JavaScript.Core.Extensions;
 using System;
 using System.ComponentModel;
 using System.Data;
@@ -5,19 +10,17 @@ using System.Dynamic;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
-using YantraJS.Core.Clr;
-using YantraJS.Core.Core;
-using YantraJS.Extensions;
+using YantraJS.Core;
 
-namespace YantraJS.Core; 
+namespace Broiler.JavaScript.Core.Core;
 
 /// <summary>
 /// Base class for all JavaScript values.  Every JS type (number, string,
 /// boolean, object, function, symbol, null, undefined) derives from this
 /// class and overrides the relevant virtual members.
 /// </summary>
-public abstract partial class JSValue : IDynamicMetaObjectProvider {
-
+public abstract partial class JSValue : IDynamicMetaObjectProvider
+{
     /// <summary>Gets whether this value is the <c>undefined</c> singleton.</summary>
     public bool IsUndefined
     {
@@ -66,28 +69,28 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     {
         if (type.IsAssignableFrom(typeof(JSValue)))
             return this;
+
         if (ConvertTo(type, out var v))
             return v;
+
         return def;
     }
 
-    public object ForceConvert(Type type) { 
+    public object ForceConvert(Type type)
+    {
         if (type.IsAssignableFrom(GetType()))
-        {
             return this;
-        }
+
         if (ConvertTo(type, out var value))
             return value;
+
         if (prototypeChain?.@object is ClrProxy proxy)
         {
             if (type.IsAssignableFrom(proxy.value.GetType()))
-            {
                 return proxy.value;
-            }
         }
-        //if (type.IsAssignableFrom(this.GetType()))
-        //    return this;
-        throw JSContext.Current.NewTypeError($"Cannot convert {this} to type {type.Name}");
+
+        throw JSContext.NewTypeError($"Cannot convert {this} to type {type.Name}");
     }
 
     internal bool TryConvertTo(Type type, out object value)
@@ -97,13 +100,17 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
             value = this;
             return true;
         }
+
         return ConvertTo(type, out value);
     }
-    public virtual bool ConvertTo(Type type, out object value) {
-        if (type == typeof(JSValue)) {
+    public virtual bool ConvertTo(Type type, out object value)
+    {
+        if (type == typeof(JSValue))
+        {
             value = this;
             return true;
         }
+
         value = null;
         return false;
     }
@@ -111,13 +118,11 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     public bool CanBeNumber
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get
-        {
-            return IsNumber || IsBoolean || IsNull;
-        }
-    } 
+        get => IsNumber || IsBoolean || IsNull;
+    }
 
-    public virtual int Length {
+    public virtual int Length
+    {
         get => 0;
         set { }
     }
@@ -160,10 +165,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
 
     internal virtual JSObject BasePrototypeObject
     {
-        set
-        {
-            prototypeChain = value?.PrototypeObject;
-        }
+        set => prototypeChain = value?.PrototypeObject;
     }
 
 
@@ -180,10 +182,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     public virtual JSValue Multiply(JSValue value) => new JSNumber(DoubleValue * value.DoubleValue);
 
     /// <summary>
-    public virtual JSValue Divide(JSValue value) =>
-        // if (value.DoubleValue == 0)
-        // return JSNumber.PositiveInfinity;
-        new JSNumber(DoubleValue / value.DoubleValue);
+    public virtual JSValue Divide(JSValue value) => new JSNumber(DoubleValue / value.DoubleValue);
 
     public virtual JSValue BitwiseAnd(JSValue value) => new JSNumber(IntValue & value.IntValue);
 
@@ -209,11 +208,11 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
         value = value.IsObject ? value.ValueOf() : value;
 
         if (self.CanBeNumber && value.CanBeNumber)
-        {
             return new JSNumber(self.DoubleValue + value.DoubleValue);
-        }
+
         if (value.ToString().Length == 0)
             return self.IsString ? self : new JSString(self.StringValue);
+
         return new JSString(self.StringValue + value.StringValue);
     }
     /// <summary>
@@ -225,13 +224,11 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     {
         var self = ValueOf();
         if (self.CanBeNumber)
-        {
             return new JSNumber(self.DoubleValue + value);
-        }
-        //if (value.ToString().Length == 0)
-        //    return self.IsString ? self : new JSString(self.StringValue);
+
         return new JSString(self.StringValue + JSNumber.ToECMAString(value));
     }
+
     /// <summary>
     /// Speed improvements for string contact operations
     /// </summary>
@@ -243,10 +240,9 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
 
         if (value.Length == 0)
             return self.IsString ? self : new JSString(self.StringValue);
+
         return new JSString(self.StringValue + value);
     }
-
-
 
     protected JSValue(JSObject prototype) => BasePrototypeObject = prototype ?? GetCurrentPrototype();
 
@@ -263,8 +259,10 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
             BasePrototypeObject = null;
             return;
         }
-        if (!(target is JSObject proto))
-            throw JSContext.Current.NewTypeError($"Prototype must be an object or null");
+
+        if (target is not JSObject proto)
+            throw JSContext.NewTypeError($"Prototype must be an object or null");
+
         BasePrototypeObject = proto;
     }
 
@@ -273,24 +271,30 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     public virtual JSValue GetOwnProperty(in KeyString name)
     {
         var pc = prototypeChain;
+
         if (pc != null)
             return this.GetValue(pc.GetInternalProperty(name));
+
         return JSUndefined.Value;
     }
 
     public virtual JSValue GetOwnProperty(uint name)
     {
         var pc = prototypeChain;
+
         if (pc != null)
             return this.GetValue(pc.GetInternalProperty(name));
+
         return JSUndefined.Value;
     }
 
     public virtual JSValue GetOwnProperty(JSSymbol name)
     {
         var pc = prototypeChain;
+
         if (pc != null)
             return this.GetValue(pc.GetInternalProperty(name));
+
         return JSUndefined.Value;
     }
 
@@ -298,11 +302,12 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     {
         if (name is JSSymbol symbol)
             return GetOwnProperty(symbol);
+
         var key = name.ToKey(false);
+
         if (key.IsUInt)
-        {
             return GetOwnProperty(key.Index);
-        }
+
         return GetOwnProperty(in key.KeyString);
     }
 
@@ -310,6 +315,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     {
         if (this == JSNull.Value || this == JSUndefined.Value)
             return JSUndefined.Value;
+
         return GetValue(name, this);
     }
 
@@ -318,9 +324,12 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     {
         if (this == JSNull.Value || this == JSUndefined.Value)
             return JSUndefined.Value;
+
         var pc = prototypeChain;
+
         if (pc == null)
             return JSUndefined.Value;
+
         return super.GetValue(name, this);
     }
 
@@ -328,6 +337,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     {
         if (this == JSNull.Value || this == JSUndefined.Value)
             return JSUndefined.Value;
+
         return GetValue(name, this);
     }
 
@@ -336,9 +346,11 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     {
         if (this == JSNull.Value || this == JSUndefined.Value)
             return JSUndefined.Value;
+
         var pc = prototypeChain;
         if (pc == null)
             return JSUndefined.Value;
+
         return super.GetValue(name, this);
     }
 
@@ -346,6 +358,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     {
         if (this == JSNull.Value || this == JSUndefined.Value)
             return JSUndefined.Value;
+
         return GetValue(name, this);
     }
 
@@ -354,9 +367,11 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     {
         if (this == JSNull.Value || this == JSUndefined.Value)
             return JSUndefined.Value;
+
         var pc = prototypeChain;
         if (pc == null)
             return JSUndefined.Value;
+
         return super.GetValue(name, this);
     }
 
@@ -364,11 +379,14 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     {
         if (this == JSNull.Value || this == JSUndefined.Value)
             return JSUndefined.Value;
+
         if (name is JSSymbol s)
             return PropertyOrUndefined(s);
+
         var k = name.ToKey(false);
         if (k.IsUInt)
             return PropertyOrUndefined(k.Index);
+
         return PropertyOrUndefined(k.KeyString);
     }
 
@@ -377,20 +395,20 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     {
         if (this == JSNull.Value || this == JSUndefined.Value)
             return JSUndefined.Value;
+
         if (name is JSSymbol s)
             return PropertyOrUndefined(super, s);
+
         var k = name.ToKey(false);
         if (k.IsUInt)
             return PropertyOrUndefined(k.Index);
+
         return PropertyOrUndefined(k.KeyString);
     }
 
     public virtual JSValue this[KeyString name]
     {
-        get
-        {
-            return GetValue(name, this);
-        }
+        get => GetValue(name, this);
         set
         {
             // throw new NotSupportedException();
@@ -399,32 +417,19 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
 
     public virtual JSValue this[uint key]
     {
-        get
-        {
-            return GetValue(key, this);
-        }
+        get => GetValue(key, this);
         set { }
     }
 
     public virtual JSValue this[JSSymbol symbol]
     {
-        get
-        {
-            return GetValue(symbol, this);
-        }
+        get => GetValue(symbol, this);
         set { }
     }
 
     public JSValue this[JSValue key]
     {
-        get
-        {
-            return GetValue(key, this);
-        }
-        set
-        {
-            SetValue(key, value, this);
-        }
+        get => GetValue(key, this); set => SetValue(key, value, this);
     }
 
     internal virtual JSValue this[KeyString name, JSValue @this]
@@ -433,6 +438,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
         {
             if (prototypeChain == null)
                 return JSUndefined.Value;
+
             return GetValue(name, this);
         }
         set { }
@@ -445,6 +451,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
             var p = prototypeChain.GetInternalProperty(key);
             return (receiver ?? this).GetValue(p);
         }
+
         return JSUndefined.Value;
     }
 
@@ -455,6 +462,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
             var p = prototypeChain.GetInternalProperty(key);
             return (receiver ?? this).GetValue(p);
         }
+
         return JSUndefined.Value;
     }
 
@@ -465,23 +473,20 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
             var p = prototypeChain.GetInternalProperty(key);
             return (receiver ?? this).GetValue(p);
         }
+
         return JSUndefined.Value;
     }
 
     internal JSValue GetValue(JSValue key, JSValue receiver, bool throwError = true)
     {
         var k = key.ToKey(false);
-        switch (k.Type)
+        return k.Type switch
         {
-            case KeyType.UInt:
-                return GetValue(k.Index, receiver, throwError);
-            case KeyType.String:
-                return GetValue(k.KeyString, receiver, throwError);
-            case KeyType.Symbol:
-                return GetValue(k.Symbol, receiver, throwError);
-        }
-        return JSUndefined.Value;
-
+            KeyType.UInt => GetValue(k.Index, receiver, throwError),
+            KeyType.String => GetValue(k.KeyString, receiver, throwError),
+            KeyType.Symbol => GetValue(k.Symbol, receiver, throwError),
+            _ => JSUndefined.Value,
+        };
     }
 
     internal protected virtual bool SetValue(uint key, JSValue value, JSValue receiver, bool throwError = true) => false;
@@ -494,50 +499,32 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     internal bool SetValue(JSValue key, JSValue value, JSValue receiver, bool throwError = true)
     {
         var k = key.ToKey();
-        switch (k.Type)
+        return k.Type switch
         {
-            case KeyType.Empty:
-                return false;
-            case KeyType.UInt:
-                return SetValue(k.Index, value, receiver, throwError);
-            case KeyType.String:
-                return SetValue(k.KeyString, value, receiver, throwError);
-            case KeyType.Symbol:
-                return SetValue(k.Symbol, value, receiver, throwError);
-        }
-        return false;
+            KeyType.Empty => false,
+            KeyType.UInt => SetValue(k.Index, value, receiver, throwError),
+            KeyType.String => SetValue(k.KeyString, value, receiver, throwError),
+            KeyType.Symbol => SetValue(k.Symbol, value, receiver, throwError),
+            _ => false,
+        };
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     public JSValue this[JSObject super, KeyString name]
     {
-        get => super.GetValue(name, this);
-        set
-        {
-            super.SetValue(name, value, this);
-        }
+        get => super.GetValue(name, this); set => super.SetValue(name, value, this);
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     public JSValue this[JSObject super, uint index]
     {
-        get => super.GetValue(index, this);
-        set
-        {
-            super.SetValue(index, value, this);
-        }
+        get => super.GetValue(index, this); set => super.SetValue(index, value, this);
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     public JSValue this[JSObject super, JSValue name]
     {
-        get
-        {
-            return super.GetValue(name, this);
-        }
-        set {
-            super.SetValue(name, value, this);
-        }
+        get => super.GetValue(name, this); set => super.SetValue(name, value, this);
     }
 
 
@@ -565,75 +552,86 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
 
     public virtual bool Less(JSValue value)
     {
-        if (!(IsUndefined || value.IsUndefined))
+        if (IsUndefined || value.IsUndefined)
+            return false;
+
+        if (!CanBeNumber && !value.CanBeNumber)
         {
-            if (CanBeNumber || value.CanBeNumber)
-            {
-                if (DoubleValue < value.DoubleValue)
-                    return true;
-            }
-            else if (ToString().Less(value.ToString()))
+            if (ToString().Less(value.ToString()))
                 return true;
         }
-        return false;
+        else
+        {
+            if (DoubleValue < value.DoubleValue)
+                return true;
+        }
 
+        return false;
     }
+
     public virtual bool LessOrEqual(JSValue value)
     {
-        if (!(IsUndefined || value.IsUndefined))
+        if (IsUndefined || value.IsUndefined)
+            return false;
+
+        if (!CanBeNumber && !value.CanBeNumber)
         {
-            if (CanBeNumber || value.CanBeNumber)
-            {
-                if (DoubleValue <= value.DoubleValue)
-                    return true;
-            }
-            else if (ToString().LessOrEqual(value.ToString()))
+            if (ToString().LessOrEqual(value.ToString()))
                 return true;
         }
-        return false;
+        else
+        {
+            if (DoubleValue <= value.DoubleValue)
+                return true;
+        }
 
+        return false;
     }
 
     public virtual bool Greater(JSValue value)
     {
-        if (!(IsUndefined || value.IsUndefined))
+        if (IsUndefined || value.IsUndefined)
+            return false;
+
+        if (!CanBeNumber && !value.CanBeNumber)
         {
-            if (CanBeNumber || value.CanBeNumber)
-            {
-                if (DoubleValue > value.DoubleValue)
-                    return true;
-            }
-            else if (ToString().Greater(value.ToString()))
+            if (ToString().Greater(value.ToString()))
                 return true;
         }
-        return false;
+        else
+        {
+            if (DoubleValue > value.DoubleValue)
+                return true;
+        }
 
+        return false;
     }
+
     public virtual bool GreaterOrEqual(JSValue value)
     {
-        if (!(IsUndefined || value.IsUndefined)) {
-            if (CanBeNumber || value.CanBeNumber)
-            {
-                if (DoubleValue >= value.DoubleValue)
-                    return true;
-            }
-            else if (ToString().Greater(value.ToString()))
+        if (IsUndefined || value.IsUndefined)
+            return false;
+
+        if (!CanBeNumber && !value.CanBeNumber)
+        {
+            if (ToString().Greater(value.ToString()))
                 return true;
         }
+        else
+        {
+            if (DoubleValue >= value.DoubleValue)
+                return true;
+        }
+
         return false;
     }
-
-    //internal virtual IEnumerable<JSValue> GetAllKeys(bool showEnumerableOnly = true, bool inherited = true)
-    //{
-    //    yield break;
-    //}
 
     public virtual IElementEnumerator GetAllKeys(bool showEnumerableOnly = true, bool inherited = true) => new ElementEnumerator();
 
     internal virtual JSBoolean Is(JSValue value) => ReferenceEquals(this, value) ? JSBoolean.True : JSBoolean.False;
 
 
-    public virtual JSValue CreateInstance(in Arguments a) => throw JSContext.Current.NewTypeError($"Cannot create instance of {this}");
+    public virtual JSValue CreateInstance(in Arguments a) => throw JSContext.NewTypeError($"Cannot create instance of {this}");
 
     public abstract JSValue InvokeFunction(in Arguments a);
 
@@ -643,9 +641,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     /// Warning do not use in concatenation
     /// </summary>
     /// <returns></returns>
-    public override string ToString() =>
-        // use inherited version..
-        throw new NotSupportedException($"Use inherited version ... {GetType().Name} ");//var fx = this[KeyStrings.toString];//if (fx.IsUndefined)//    return "undefined";//var obj = fx.InvokeFunction(this, JSArguments.Empty);//if (obj == this)//{//    throw new StackOverflowException();//}//return obj.ToString();
+    public override string ToString() => throw new NotSupportedException($"Use inherited version ... {GetType().Name} ");
 
 
     /// <summary>
@@ -654,36 +650,29 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
     /// <returns> A string containing a locale-dependant version of the number. </returns>
     /// 
     public virtual string ToLocaleString(string format, CultureInfo culture) => throw new NotImplementedException();
-
-
     public virtual string ToDetailString() => ToString();
 
     public virtual JSValue Delete(in KeyString key) => JSBoolean.True;
     public virtual JSValue Delete(uint key) => JSBoolean.True;
-
     public virtual JSValue Delete(JSSymbol symbol) => JSBoolean.True;
 
     public virtual JSValue Delete(JSValue index)
     {
         var key = index.ToKey(false);
-        switch (key.Type)
+        return key.Type switch
         {
-            case KeyType.Empty:
-                return JSBoolean.False;
-            case KeyType.UInt:
-                return Delete(key.Index);
-            case KeyType.String:
-                return Delete(key.KeyString);
-            case KeyType.Symbol:
-                return Delete(key.Symbol);
-        }
-        return JSBoolean.False;
+            KeyType.Empty => JSBoolean.False,
+            KeyType.UInt => Delete(key.Index),
+            KeyType.String => Delete(key.KeyString),
+            KeyType.Symbol => Delete(key.Symbol),
+            _ => JSBoolean.False,
+        };
     }
 
     internal JSValue InternalInvoke(object name, in Arguments a)
     {
         JSValue fx = null;
-        switch(name)
+        switch (name)
         {
             case JSValue v:
                 fx = this[v];
@@ -695,22 +684,26 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
                 fx = this[str];
                 break;
         }
+
         if (fx.IsUndefined)
-            throw JSContext.Current.NewTypeError($"Cannot invoke {name} of object as it is undefined");
+            throw JSContext.NewTypeError($"Cannot invoke {name} of object as it is undefined");
+
         return fx.InvokeFunction(a.OverrideThis(this));
     }
 
     DynamicMetaObject IDynamicMetaObjectProvider.GetMetaObject(Expression parameter) => new JSDynamicMetaData(parameter, this);
 
-    public JSValue Power(JSValue a) {
+    public JSValue Power(JSValue a)
+    {
         var v = DoubleValue;
         var a1 = a.DoubleValue;
+
         if (a1 == 0)
             return JSNumber.One;
+
         if (a1 == Double.PositiveInfinity || a1 == Double.NegativeInfinity)
         {
             if (v == 1 || v == -1)
-
                 return JSNumber.NaN;
         }
 
@@ -729,10 +722,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
         return false;
     }
 
-    internal virtual void MoveElements(int start, int to)
-    {
-
-    }
+    internal virtual void MoveElements(int start, int to) { }
 
     internal virtual bool TryRemove(uint i, out JSProperty p)
     {
@@ -742,17 +732,16 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider {
 
     public virtual IElementEnumerator GetElementEnumerator() => ElementEnumerator.Empty;
 
-
     private readonly struct ElementEnumerator : IElementEnumerator
     {
         public static IElementEnumerator Empty = new ElementEnumerator();
-
 
         public bool MoveNext(out bool hasValue, out JSValue value, out uint index)
         {
             value = JSUndefined.Value;
             index = 0;
             hasValue = false;
+
             return false;
         }
 

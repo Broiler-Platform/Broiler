@@ -1,7 +1,11 @@
-using YantraJS.Core.FastParser;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Parser;
+using Broiler.JavaScript.Core.FastParser.Compiler;
 using YantraJS.Core.FastParser.Compiler;
+using YantraJS.Core.FastParser;
 
-namespace YantraJS.Core.Tests;
+namespace Broiler.JavaScript.Core.Tests;
 
 /// <summary>
 /// Tests for the expression compiler, verifying that JavaScript source code
@@ -14,7 +18,7 @@ public class CompilerTests
     /// Helper: compile source code using the <see cref="IJSCompiler"/> interface
     /// and return the resulting expression tree (non-null assertion included).
     /// </summary>
-    private static Expressions.YExpression<JSFunctionDelegate> CompileViaInterface(string code)
+    private static YantraJS.Expressions.YExpression<JSFunctionDelegate> CompileViaInterface(string code)
     {
         IJSCompiler compiler = new DefaultJSCompiler();
         var result = compiler.Compile(code);
@@ -26,7 +30,7 @@ public class CompilerTests
     /// Helper: compile source code directly using <see cref="FastCompiler"/>
     /// and return the resulting expression tree.
     /// </summary>
-    private static Expressions.YExpression<JSFunctionDelegate> CompileDirect(string code)
+    private static YantraJS.Expressions.YExpression<JSFunctionDelegate> CompileDirect(string code)
     {
         var compiler = new FastCompiler(code);
         Assert.NotNull(compiler.Method);
@@ -671,7 +675,7 @@ public class CompilerTests
     public void IParser_FastParser_Implements_IParser()
     {
         var stream = new FastTokenStream("1 + 2;");
-        var parser = new FastParser.FastParser(stream);
+        var parser = new YantraJS.Core.FastParser.FastParser(stream);
         Assert.IsAssignableFrom<IParser>(parser);
     }
 
@@ -679,7 +683,7 @@ public class CompilerTests
     public void IParser_ParseProgram_Via_Interface()
     {
         var stream = new FastTokenStream("var x = 42;");
-        IParser parser = new FastParser.FastParser(stream);
+        IParser parser = new YantraJS.Core.FastParser.FastParser(stream);
         var program = parser.ParseProgram();
         Assert.NotNull(program);
         Assert.Equal(FastNodeType.Program, program.Type);
@@ -689,7 +693,7 @@ public class CompilerTests
     public void IParser_ParseProgram_EmptySource()
     {
         var stream = new FastTokenStream("");
-        IParser parser = new FastParser.FastParser(stream);
+        IParser parser = new YantraJS.Core.FastParser.FastParser(stream);
         var program = parser.ParseProgram();
         Assert.NotNull(program);
         Assert.Equal(0, program.Statements.Count);
@@ -699,7 +703,7 @@ public class CompilerTests
     public void IParser_InvalidSyntax_Throws()
     {
         var stream = new FastTokenStream("function { }");
-        IParser parser = new FastParser.FastParser(stream);
+        IParser parser = new YantraJS.Core.FastParser.FastParser(stream);
         Assert.ThrowsAny<Exception>(parser.ParseProgram);
     }
 }

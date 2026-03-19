@@ -1,6 +1,7 @@
-using YantraJS.Debugger;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Debugger;
 
-namespace YantraJS.Core.Tests;
+namespace Broiler.JavaScript.Core.Tests;
 
 /// <summary>
 /// Tests for the <see cref="IDebugger"/> interface and the debugger

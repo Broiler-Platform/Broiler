@@ -1,11 +1,14 @@
 ﻿#nullable enable
-using System;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Array;
+using Broiler.JavaScript.Core.Enumerators;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using YantraJS.Core.Core.Array;
+using YantraJS.Core;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core;
 
 
 /// <summary>
@@ -16,10 +19,8 @@ namespace YantraJS.Core;
 [StructLayout(LayoutKind.Sequential)]
 public readonly partial struct Arguments
 {
-
     /// <summary>An empty arguments instance with <c>undefined</c> as <c>this</c>.</summary>
     public static Arguments Empty = new(JSUndefined.Value);
-
     private const int MinArray = 5;
 
     /// <summary>Gets the number of arguments (excluding <c>this</c>).</summary>
@@ -28,14 +29,9 @@ public readonly partial struct Arguments
     /// <summary>Gets the <c>this</c> value for the call.</summary>
     public readonly JSValue? This;
 
-    //public readonly JSValue? NewTarget;
-
     private readonly JSValue? Arg0;
-
     private readonly JSValue? Arg1;
-
     private readonly JSValue? Arg2;
-
     private readonly JSValue? Arg3;
 
     private readonly JSValue[]? Args;
@@ -43,7 +39,7 @@ public readonly partial struct Arguments
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Arguments CopyForCall()
     {
-        switch(Length)
+        switch (Length)
         {
             case 0:
                 return new Arguments(JSUndefined.Value);
@@ -59,7 +55,7 @@ public readonly partial struct Arguments
                 return new Arguments(Args![0], Args[1]!, Args[2]!, Args[3]!, Args[4]!);
             default:
                 var sa = new JSValue[Length - 1];
-                Array.Copy(Args, 1, sa, 0, sa.Length);
+                System.Array.Copy(Args, 1, sa, 0, sa.Length);
                 return new Arguments(Args![0], sa);
         }
     }
@@ -67,24 +63,20 @@ public readonly partial struct Arguments
     public Arguments CopyForBind(in Arguments a)
     {
         // need to append a's parameter to self...
-        //var @this = a.NewTarget != null ? a.This! : this[0]!;
         var @this = this[0]!;
         var total = Length - 1 + a.Length;
         var list = new JSValue[total + a.Length];
         int i;
+
         for (i = 0; i < Length - 1; i++)
-        {
-            list[i] = this[i+1]!;
-        }
+            list[i] = this[i + 1]!;
+
         var start = i;
         for (; i < total; i++)
-        {
             list[i] = a[i - start]!;
-        }
+
         return new Arguments(@this, list);
     }
-
-    //public JSObject? NewPrototype => (NewTarget is JSFunction o) ? o.prototype : null;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Arguments ForApply(JSValue @this, JSValue args)
@@ -108,12 +100,12 @@ public readonly partial struct Arguments
                     var argList = new JSValue[argArray._length];
                     var ee = argArray.GetElementEnumerator();
                     while (ee.MoveNext(out var hasValue, out var value, out var index))
-                    {
                         argList[index] = hasValue ? value : JSUndefined.Value;
-                    }
+
                     return new Arguments(@this, (int)length, null, null, null, null, argList);
             }
         }
+
         if (args is JSArguments arguments)
         {
             var length = arguments.Length;
@@ -133,13 +125,12 @@ public readonly partial struct Arguments
                     var argList = new JSValue[arguments.Length];
                     var ee = arguments.GetElementEnumerator();
                     while (ee.MoveNext(out var hasValue, out var value, out var index))
-                    {
                         argList[index] = hasValue ? value : JSUndefined.Value;
-                    }
+
                     return new Arguments(@this, length, null, null, null, null, argList);
             }
-
         }
+
         return new Arguments(@this, 0, null, null, null, null, null);
     }
 
@@ -147,7 +138,6 @@ public readonly partial struct Arguments
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Arguments CopyForApply()
     {
-
         // in apply first parameter is @this and rest is An Array
         var (@this, args) = Get2();
         return ForApply(@this, args);
@@ -165,6 +155,7 @@ public readonly partial struct Arguments
         Arg3 = null;
         Args = null;
     }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Arguments(JSValue @this, JSValue a0)
     {
@@ -177,6 +168,7 @@ public readonly partial struct Arguments
         Arg3 = null;
         Args = null;
     }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Arguments(JSValue @this, JSValue a0, JSValue a1)
     {
@@ -202,6 +194,7 @@ public readonly partial struct Arguments
         Arg3 = null;
         Args = null;
     }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Arguments(JSValue @this, JSValue a0, JSValue a1, JSValue a2, JSValue a3)
     {
@@ -218,10 +211,9 @@ public readonly partial struct Arguments
     public static Arguments Spread(JSValue @this, params JSValue[] list)
     {
         int length = 0;
-        foreach(var item in list)
-        {
+        foreach (var item in list)
             length += item.IsSpread ? item.Length : 1;
-        }
+
         return new Arguments(@this, list, length);
     }
 
@@ -234,18 +226,20 @@ public readonly partial struct Arguments
         Length = length;
         JSValue[] args = new JSValue[length];
         int i = 0;
-        foreach(var a in list)
+
+        foreach (var a in list)
         {
             if (a is JSSpreadValue spv)
             {
                 for (uint j = 0; j < spv.Length; j++)
-                {
                     args[i++] = spv.Value[j];
-                }
+
                 continue;
             }
+
             args[i++] = a;
         }
+
         switch (Length)
         {
             case 0:
@@ -297,10 +291,10 @@ public readonly partial struct Arguments
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Arguments(JSValue @this, JSValue[] args)
     {
-        // NewTarget = null;
         This = @this;
         Length = args.Length;
-        switch(Length)
+
+        switch (Length)
         {
             case 0:
                 Arg0 = null;
@@ -347,63 +341,9 @@ public readonly partial struct Arguments
         }
     }
 
-    //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-    //public Arguments(JSValue @this, JSValue[] args)
-    //{
-    //    // NewTarget = newTarget;
-    //    This = @this;
-    //    Length = args.Length;
-    //    switch (Length)
-    //    {
-    //        case 0:
-    //            Arg0 = null;
-    //            Arg1 = null;
-    //            Arg2 = null;
-    //            Arg3 = null;
-    //            Args = null;
-    //            break;
-    //        case 1:
-    //            Arg0 = args[0];
-    //            Arg1 = null;
-    //            Arg2 = null;
-    //            Arg3 = null;
-    //            Args = null;
-    //            break;
-    //        case 2:
-    //            Arg0 = args[0];
-    //            Arg1 = args[1];
-    //            Arg2 = null;
-    //            Arg3 = null;
-    //            Args = null;
-    //            break;
-    //        case 3:
-    //            Arg0 = args[0];
-    //            Arg1 = args[1];
-    //            Arg2 = args[2];
-    //            Arg3 = null;
-    //            Args = null;
-    //            break;
-    //        case 4:
-    //            Arg0 = args[0];
-    //            Arg1 = args[1];
-    //            Arg2 = args[2];
-    //            Arg3 = args[3];
-    //            Args = null;
-    //            break;
-    //        default:
-    //            Arg0 = null;
-    //            Arg1 = null;
-    //            Arg2 = null;
-    //            Arg3 = null;
-    //            Args = args;
-    //            break;
-    //    }
-    //}
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Arguments(JSValue @this, Arguments src)
     {
-        // NewTarget = newTarget;
         Length = src.Length;
         Arg0 = src.Arg0;
         Arg1 = src.Arg1;
@@ -414,16 +354,8 @@ public readonly partial struct Arguments
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Arguments(
-        JSValue @this, 
-        int length,
-        JSValue? arg0,
-        JSValue? arg1,
-        JSValue? arg2,
-        JSValue? arg3,
-        JSValue[]? args)
+    private Arguments(JSValue @this, int length, JSValue? arg0, JSValue? arg1, JSValue? arg2, JSValue? arg3, JSValue[]? args)
     {
-        // NewTarget = newTarget;
         Length = length;
         Arg0 = arg0;
         Arg1 = arg1;
@@ -436,20 +368,15 @@ public readonly partial struct Arguments
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Arguments OverrideThis(JSValue @this) => new(@this, this);
 
-    //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-    //public Arguments OverrideThis(JSValue @this)
-    //{
-    //    return new Arguments(@this, this);
-    //}
-
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public JSValue Get1()
     {
         if (Length == 0)
             return JSUndefined.Value;
+
         if (Length < MinArray)
             return Arg0!;
+
         return Args![0];
     }
 
@@ -458,10 +385,13 @@ public readonly partial struct Arguments
     {
         if (Length == 0)
             return (JSUndefined.Value, JSUndefined.Value);
+
         if (Length == 1)
             return (Arg0!, JSUndefined.Value);
+
         if (Length < MinArray)
             return (Arg0!, Arg1!);
+
         return (Args![0], Args[1]);
     }
 
@@ -470,10 +400,13 @@ public readonly partial struct Arguments
     {
         if (Length == 0)
             return (def1, def2);
+
         if (Length == 1)
             return (Arg0!, def2);
+
         if (Length < MinArray)
             return (Arg0!, Arg1!);
+
         return (Args![0], Args[1]);
     }
 
@@ -483,12 +416,16 @@ public readonly partial struct Arguments
     {
         if (Length == 0)
             return (JSUndefined.Value, JSUndefined.Value, JSUndefined.Value);
+
         if (Length == 1)
             return (Arg0!, JSUndefined.Value, JSUndefined.Value);
+
         if (Length == 2)
             return (Arg0!, Arg1!, JSUndefined.Value);
+
         if (Length < MinArray)
             return (Arg0!, Arg1!, Arg2!);
+
         return (Args![0], Args[1], Args[2]);
     }
 
@@ -497,14 +434,19 @@ public readonly partial struct Arguments
     {
         if (Length == 0)
             return (JSUndefined.Value, JSUndefined.Value, JSUndefined.Value, JSUndefined.Value);
+
         if (Length == 1)
             return (Arg0!, JSUndefined.Value, JSUndefined.Value, JSUndefined.Value);
+
         if (Length == 2)
             return (Arg0!, Arg1!, JSUndefined.Value, JSUndefined.Value);
+
         if (Length == 3)
             return (Arg0!, Arg1!, Arg2!, JSUndefined.Value);
+
         if (Length < MinArray)
             return (Arg0!, Arg1!, Arg2!, Arg3!);
+
         return (Args![0], Args[1], Args[2], Args[3]);
     }
 
@@ -513,24 +455,27 @@ public readonly partial struct Arguments
     {
         if (Length == 0)
             return (0, 0, 1, 0, 0, 0, 0);
+
         if (Length == 1)
             return (Arg0!.IntValue, 0, 1, 0, 0, 0, 0);
+
         if (Length == 2)
             return (Arg0!.IntValue, Arg1!.IntValue, 1, 0, 0, 0, 0);
+
         if (Length == 3)
             return (Arg0!.IntValue, Arg1!.IntValue, Arg2!.IntValue, 0, 0, 0, 0);
+
         if (Length == 4)
             return (Arg0!.IntValue, Arg1!.IntValue, Arg2!.IntValue, Arg3!.IntValue, 0, 0, 0);
+
         if (Length == 5)
             return (Args![0].IntValue, Args[1].IntValue, Args[2].IntValue, Args[3].IntValue, Args[4].IntValue, 0, 0);
+
         if (Length == 6)
-            return (Args![0].IntValue, Args[1].IntValue, Args[2].IntValue, Args[3].IntValue, Args[4].IntValue, Args[5].IntValue,0);
-       
-       return (Args![0].IntValue, Args[1].IntValue, Args[2].IntValue, Args[3].IntValue, Args[4].IntValue, Args[5].IntValue, Args[6].IntValue);
+            return (Args![0].IntValue, Args[1].IntValue, Args[2].IntValue, Args[3].IntValue, Args[4].IntValue, Args[5].IntValue, 0);
 
-       
+        return (Args![0].IntValue, Args[1].IntValue, Args[2].IntValue, Args[3].IntValue, Args[4].IntValue, Args[5].IntValue, Args[6].IntValue);
     }
-
 
     public JSValue[]? GetArgs() => Args;
 
@@ -538,20 +483,15 @@ public readonly partial struct Arguments
 
     public JSValue[] ToArray()
     {
-        switch(Length)
+        return Length switch
         {
-            case 0:
-                return _Empty;
-            case 1:
-                return [Arg0!];
-            case 2:
-                return [Arg0!, Arg1!];
-            case 3:
-                return [Arg0!, Arg1!, Arg2!];
-            case 4:
-                return [Arg0!, Arg1!, Arg2!, Arg3!];
-        }
-        return Args!;
+            0 => _Empty,
+            1 => [Arg0!],
+            2 => [Arg0!, Arg1!],
+            3 => [Arg0!, Arg1!, Arg2!],
+            4 => [Arg0!, Arg1!, Arg2!, Arg3!],
+            _ => Args!,
+        };
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -564,26 +504,19 @@ public readonly partial struct Arguments
                 a = Args![index];
                 return true;
             }
-            switch(index)
+
+            a = index switch
             {
-                case 0:
-                    a = Arg0!;
-                    break;
-                case 1:
-                    a = Arg1!;
-                    break;
-                case 2:
-                    a = Arg2!;
-                    break;
-                case 3:
-                    a = Arg3!;
-                    break;
-                default:
-                    a = Args![index];
-                    break;
-            }
+                0 => Arg0!,
+                1 => Arg1!,
+                2 => Arg2!,
+                3 => Arg3!,
+                _ => Args![index],
+            };
+
             return true;
         }
+
         a = null!;
         return false;
     }
@@ -595,24 +528,18 @@ public readonly partial struct Arguments
         if (Length > index)
         {
             if (Length >= MinArray)
-            {
                 return Args![index].IntValue;
-            }
 
-            switch (index)
+            return index switch
             {
-                case 0:
-                    return Arg0!.IntValue;
-                case 1:
-                    return Arg1!.IntValue;
-                case 2:
-                    return Arg2!.IntValue;
-                case 3:
-                    return Arg3!.IntValue;
-                default:
-                    return Args![index].IntValue;
-            }
+                0 => Arg0!.IntValue,
+                1 => Arg1!.IntValue,
+                2 => Arg2!.IntValue,
+                3 => Arg3!.IntValue,
+                _ => Args![index].IntValue,
+            };
         }
+
         return def;
     }
 
@@ -622,23 +549,18 @@ public readonly partial struct Arguments
         if (Length > index)
         {
             if (Length >= MinArray)
-            {
                 return Args![index].IntegerValue;
-            }
-            switch (index)
+
+            return index switch
             {
-                case 0:
-                    return Arg0!.IntegerValue;
-                case 1:
-                    return Arg1!.IntegerValue;
-                case 2:
-                    return Arg2!.IntegerValue;
-                case 3:
-                    return Arg3!.IntegerValue;
-                default:
-                    return Args![index].IntegerValue;
-            }
+                0 => Arg0!.IntegerValue,
+                1 => Arg1!.IntegerValue,
+                2 => Arg2!.IntegerValue,
+                3 => Arg3!.IntegerValue,
+                _ => Args![index].IntegerValue,
+            };
         }
+
         return def;
     }
 
@@ -647,20 +569,16 @@ public readonly partial struct Arguments
     {
         if (Length > index)
         {
-            switch (index)
+            return index switch
             {
-                case 0:
-                    return Arg0!.DoubleValue;
-                case 1:
-                    return Arg1!.DoubleValue;
-                case 2:
-                    return Arg2!.DoubleValue;
-                case 3:
-                    return Arg3!.DoubleValue;
-                default:
-                    return Args![index].DoubleValue;
-            }
+                0 => Arg0!.DoubleValue,
+                1 => Arg1!.DoubleValue,
+                2 => Arg2!.DoubleValue,
+                3 => Arg3!.DoubleValue,
+                _ => Args![index].DoubleValue,
+            };
         }
+
         return def;
     }
 
@@ -675,20 +593,17 @@ public readonly partial struct Arguments
             {
                 if (Length >= MinArray)
                     return Args![index];
-                switch (index)
+
+                return index switch
                 {
-                    case 0:
-                        return Arg0;
-                    case 1:
-                        return Arg1;
-                    case 2:
-                        return Arg2;
-                    case 3:
-                        return Arg3;
-                    default:
-                        return Args![index];
-                }
+                    0 => Arg0,
+                    1 => Arg1,
+                    2 => Arg2,
+                    3 => Arg3,
+                    _ => Args![index],
+                };
             }
+
             return null;
         }
     }
@@ -698,19 +613,15 @@ public readonly partial struct Arguments
     {
         if (Length >= MinArray)
             return index < Length ? Args![index] : JSUndefined.Value;
-        switch (index)
+
+        return index switch
         {
-            case 0:
-                return Arg0 ?? JSUndefined.Value;
-            case 1:
-                return Arg1 ?? JSUndefined.Value;
-            case 2:
-                return Arg2 ?? JSUndefined.Value;
-            case 3:
-                return Arg3 ?? JSUndefined.Value;
-            default:
-                return index >= Length ? JSUndefined.Value : Args![index];
-        }
+            0 => Arg0 ?? JSUndefined.Value,
+            1 => Arg1 ?? JSUndefined.Value,
+            2 => Arg2 ?? JSUndefined.Value,
+            3 => Arg3 ?? JSUndefined.Value,
+            _ => index >= Length ? JSUndefined.Value : Args![index],
+        };
     }
 
     public JSValue RestFrom(uint index)
@@ -719,10 +630,10 @@ public readonly partial struct Arguments
         ref var ae = ref a.GetElements(true);
         uint i;
         uint ai;
-        for (ai = 0,i = index; i < Length; i++, ai++)
-        {
+
+        for (ai = 0, i = index; i < Length; i++, ai++)
             ae.Put(ai, GetAt((int)i));
-        }
+
         a._length = ai;
         return a;
     }
@@ -731,11 +642,8 @@ public readonly partial struct Arguments
     [EditorBrowsable(EditorBrowsableState.Never)]
     public IElementEnumerator GetElementEnumerator() => new ArgumentsElementEnumerator(this);
 
-    public StringSpan GetString(int index, string name,
-        [CallerMemberName] string? function = null,
-        [CallerFilePath] string? filePath = null,
-        [CallerLineNumber] int line = 0) => this[index] is JSString s ? s.value : throw new JSException(
-            name + " is required", function, filePath, line);
+    public StringSpan GetString(int index, string name, [CallerMemberName] string? function = null, [CallerFilePath] string? filePath = null, [CallerLineNumber] int line = 0) =>
+        this[index] is JSString s ? s.value : throw new JSException(name + " is required", function, filePath, line);
 
     struct ArgumentsElementEnumerator(Arguments arguments) : IElementEnumerator
     {
@@ -743,13 +651,14 @@ public readonly partial struct Arguments
 
         public bool MoveNext(out bool hasValue, out JSValue value, out uint index)
         {
-            if((++this.index ) > arguments.Length)
+            if ((++this.index) > arguments.Length)
             {
                 index = (uint)this.index;
                 value = arguments.GetAt(this.index);
                 hasValue = true;
                 return true;
             }
+
             index = 0;
             value = JSUndefined.Value;
             hasValue = false;
@@ -763,6 +672,7 @@ public readonly partial struct Arguments
                 value = arguments.GetAt(index);
                 return true;
             }
+
             value = JSUndefined.Value;
             return false;
         }
@@ -774,6 +684,7 @@ public readonly partial struct Arguments
                 value = arguments.GetAt(index);
                 return true;
             }
+
             value = @default;
             return false;
         }
@@ -781,9 +692,8 @@ public readonly partial struct Arguments
         public JSValue NextOrDefault(JSValue @default)
         {
             if ((++index) > arguments.Length)
-            {
                 return arguments.GetAt(index);
-            }
+
             return @default;
         }
     }

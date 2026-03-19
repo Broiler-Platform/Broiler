@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
 using Broiler.HTML.CSS.Core.Parse;
 using Broiler.HTML.Utils.Core.Utils;
 

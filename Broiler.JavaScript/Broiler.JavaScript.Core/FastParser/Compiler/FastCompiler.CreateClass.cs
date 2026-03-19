@@ -1,30 +1,37 @@
 ﻿using System;
 using System.Collections.Generic;
-using YantraJS.ExpHelper;
 
 using Exp = YantraJS.Expressions.YExpression;
 using Expression = YantraJS.Expressions.YExpression;
 using ParameterExpression = YantraJS.Expressions.YParameterExpression;
 using YantraJS.Expressions;
+using Broiler.JavaScript.Core.Core.Class;
+using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.FastParser.Ast;
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.Core.FastParser.Compiler;
 
 namespace YantraJS.Core.FastParser.Compiler;
 
 partial class FastCompiler
 {
-
-
     private Exp GetName(AstClassProperty property)
     {
         var exp = property.Key;
         var computed = property.Computed;
+
         switch ((exp.Type, exp))
         {
             case (FastNodeType.Identifier, AstIdentifier id):
                 if (computed)
                     return VisitIdentifier(id);
                 return KeyOfName(id.Name);
+
             case (FastNodeType.Literal, AstLiteral l):
                 return KeyOfName(l.StringValue);
+
             default:
                 return Visit(exp);
         }
@@ -32,7 +39,6 @@ partial class FastCompiler
 
     private Exp CreateClass(AstIdentifier id, AstExpression super, AstClassExpression body)
     {
-
         var scope = pool.NewScope();
         var tempVar = this.scope.Top.GetTempVariable(typeof(JSClass));
 
@@ -40,7 +46,6 @@ partial class FastCompiler
         var staticElements = new Sequence<YBinding>();
 
         Dictionary<string, string> added = [];
-
 
         // need to save super..
         // create a super variable...
@@ -69,7 +74,7 @@ partial class FastCompiler
         AstFunctionExpression constructor = null;
 
         var en = body.Members.GetFastEnumerator();
-        while(en.MoveNext(out var property))
+        while (en.MoveNext(out var property))
         {
             Exp name;
             // var el = property.IsStatic ? staticElements : prototypeElements;
@@ -85,6 +90,7 @@ partial class FastCompiler
                     }
                     memberInits.Add(property);
                     break;
+
                 case AstPropertyKind.Get:
                     name = GetName(property);
                     if (property.IsStatic)
@@ -99,21 +105,25 @@ partial class FastCompiler
                         prototypeElements.Add(JSObjectBuilder.AddGetter(name, fx, JSPropertyAttributes.ConfigurableProperty));
                     }
                     break;
+
                 case AstPropertyKind.Set:
                     name = GetName(property);
                     if (property.IsStatic)
                     {
                         var fx = CreateFunction(property.Init as AstFunctionExpression, superVar);
                         staticElements.Add(JSObjectBuilder.AddSetter(name, fx, JSPropertyAttributes.ConfigurableProperty));
-                    } else
+                    }
+                    else
                     {
                         var fx = CreateFunction(property.Init as AstFunctionExpression, superPrototypeVar);
                         prototypeElements.Add(JSObjectBuilder.AddSetter(name, fx, JSPropertyAttributes.ConfigurableProperty));
                     }
                     break;
+
                 case AstPropertyKind.Constructor:
                     constructor = property.Init as AstFunctionExpression;
                     break;
+
                 case AstPropertyKind.Method:
                     name = GetName(property);
                     if (property.IsStatic)
@@ -127,27 +137,14 @@ partial class FastCompiler
                         prototypeElements.Add(JSObjectBuilder.AddValue(name, fx, JSPropertyAttributes.ConfigurableValue));
                     }
                     break;
+
                 default:
                     throw new NotSupportedException();
             }
         }
 
-        //foreach (var exp in members)
-        //{
-        //    if (exp.Value != null)
-        //    {
-        //        retValue = exp.Static
-        //            ? JSClassBuilder.AddStaticValue(retValue, exp.Key, exp.Value)
-        //            : JSClassBuilder.AddValue(retValue, exp.Key, exp.Value);
-        //        continue;
-        //    }
-        //    retValue = exp.Static
-        //        ? JSClassBuilder.AddStaticProperty(retValue, exp.Key, exp.Getter, exp.Setter)
-        //        : JSClassBuilder.AddProperty(retValue, exp.Key, exp.Getter, exp.Setter);
-        //}
-        // stmts.Add(retValue);
-
         var className = id?.Name.Value ?? "Unnamed";
+
         if (constructor != null)
         {
             var fx = CreateFunction(constructor, superVar, true, className, memberInits);
@@ -160,21 +157,17 @@ partial class FastCompiler
                 using var s = this.scope.Push(new FastFunctionScope(null, null, memberInits: memberInits));
                 var args = s.Arguments;
                 var @this = s.ThisExpression;
-                var inits = new Sequence<Exp>() {
-                };
+                var inits = new Sequence<Exp>() { };
+
                 inits.AddRange(s.InitList);
                 inits.Add(Exp.Assign(@this, JSFunctionBuilder.InvokeFunction(superVar, args)));
+
                 InitMembers(inits, s);
                 inits.Add(@this);
-                var lambda = Exp.Lambda<JSFunctionDelegate>(className,
-                    Exp.Block(s.VariableParameters.AsSequence(), inits),
-                    args);
-                var fx = JSFunctionBuilder.New(
-                    lambda,
-                    StringSpanBuilder.New(className),
-                    StringSpanBuilder.Empty,
-                    1
-                    );
+
+                var lambda = Exp.Lambda<JSFunctionDelegate>(className, Exp.Block(s.VariableParameters.AsSequence(), inits), args);
+                var fx = JSFunctionBuilder.New(lambda, StringSpanBuilder.New(className), StringSpanBuilder.Empty, 1);
+
                 staticElements.Add(JSClassBuilder.AddConstructor(fx));
             }
         }
@@ -182,20 +175,11 @@ partial class FastCompiler
         var _new = JSClassBuilder.New(null, superVar, className);
 
         if (prototypeElements.Any())
-        {
             staticElements.Add(new YMemberElementInit(JSFunctionBuilder._prototype, prototypeElements));
-        }
 
-        Expression retVal = staticElements.Any() 
-            ? Expression.MemberInit(_new, staticElements)
-            : _new;
+        Expression retVal = staticElements.Any() ? Expression.MemberInit(_new, staticElements) : _new;
 
-        stmts.Add(
-            Expression.Assign(
-                retValue,
-                retVal
-                    ));
-
+        stmts.Add(Expression.Assign(retValue, retVal));
 
         if (id?.Name != null)
         {

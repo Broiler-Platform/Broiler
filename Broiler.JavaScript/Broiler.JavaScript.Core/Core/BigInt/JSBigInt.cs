@@ -1,9 +1,10 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using System;
 using System.Globalization;
 using System.Numerics;
 using Yantra.Core;
-using YantraJS.Core.Clr;
-using YantraJS.Core.Core.Primitive;
 
 namespace YantraJS.Core.BigInt;
 
@@ -12,14 +13,11 @@ static class JSBigIntExtensions
     public static BigInteger AsBigIntegerOnly(this JSValue @this) => @this is JSBigInt v ? v.value : throw JSBigInt.CannotMix();
 }
 
-// [JSRuntime(typeof(JSBigIntStatic), typeof(JSBigIntPrototype))]
 [JSBaseClass("Object")]
 [JSFunctionGenerator("BigInt")]
 public partial class JSBigInt : JSPrimitive
 {
-
-
-    public static JSException CannotMix() => JSContext.Current.NewTypeError("Cannot mix BigInt and other types, use explicit conversions");
+    public static JSException CannotMix() => JSContext.NewTypeError("Cannot mix BigInt and other types, use explicit conversions");
 
     internal readonly BigInteger value;
 
@@ -33,21 +31,23 @@ public partial class JSBigInt : JSPrimitive
     public static JSValue Constructor(in Arguments a)
     {
         var f = a[0];
+
         switch (f)
         {
             case JSNumber number:
                 return new JSBigInt((BigInteger)number.value);
+
             case JSBigInt bigint:
                 return bigint;
         }
+
         var text = f.ToString();
         text = text.TrimEnd('n').Replace("_", "");
-        if (!BigInteger.TryParse(text, out var v))
-        {
-            throw JSContext.Current.NewTypeError($"{f} is not a valid big integer");
-        }
-        return new JSBigInt(v);
 
+        if (!BigInteger.TryParse(text, out var v))
+            throw JSContext.NewTypeError($"{f} is not a valid big integer");
+
+        return new JSBigInt(v);
     }
 
     public JSBigInt(BigInteger value) => this.value = value;
@@ -55,16 +55,15 @@ public partial class JSBigInt : JSPrimitive
     {
         var v = stringValue.TrimEnd('n').Replace("_", "");
         if (!BigInteger.TryParse(v, out var n))
-            throw JSContext.Current.NewTypeError($"{stringValue} is not a valid big integer");
+            throw JSContext.NewTypeError($"{stringValue} is not a valid big integer");
         value = n;
     }
 
     public override bool Equals(JSValue value)
     {
         if (value is JSBigInt bigint)
-        {
             return this.value == bigint.value;
-        }
+
         var n = (long)value.DoubleValue;
         return this.value == n;
     }
@@ -76,26 +75,24 @@ public partial class JSBigInt : JSPrimitive
     public override JSValue CreateInstance(in Arguments a)
     {
         if (a.Length == 0)
-        {
             return new JSBigInt(0);
-        }
+
         var value = a[0];
         if (value is JSBigInt bigint)
-        {
             return bigint;
-        }
+
         if (value.IsNumber)
-        {
             return new JSBigInt((long)value.DoubleValue);
-        }
+
         var v = long.Parse(value.ToString());
         return new JSBigInt(v);
     }
 
     public override bool StrictEquals(JSValue value)
     {
-        if (!(value is JSBigInt bigint))
+        if (value is not JSBigInt bigint)
             return false;
+
         return this.value == bigint.value;
     }
 
@@ -117,21 +114,25 @@ public partial class JSBigInt : JSPrimitive
             value = this.value;
             return true;
         }
+
         if (type == typeof(ulong))
         {
             value = (ulong)this.value;
             return true;
         }
+
         if (type.IsAssignableFrom(typeof(JSBigInt)))
         {
             value = this;
             return true;
         }
+
         if (type == typeof(object))
         {
             value = this.value;
             return true;
         }
+
         return base.ConvertTo(type, out value);
     }
 
@@ -162,24 +163,22 @@ public partial class JSBigInt : JSPrimitive
     public override JSValue AddValue(JSValue value)
     {
         value = value.IsObject ? value.ValueOf() : value;
+
         if (value is JSPrimitiveObject primitive)
-        {
             value = primitive.value;
-        }
+
         if (value is JSBigInt b)
-        {
             return new JSBigInt(this.value + b.value);
-        }
+
         if (value.IsBoolean || value.IsNumber)
-        {
             throw CannotMix();
-        }
+
         if (value is JSString @string)
-        {
             return new JSString(this.value.ToString() + "n" + @string.ToString());
-        }
+
         if (value is JSObject @object)
             return new JSString(this.value + @object.StringValue);
+
         return new JSBigInt(this.value + value.BigIntValue);
     }
 
@@ -189,33 +188,26 @@ public partial class JSBigInt : JSPrimitive
     [JSExport("toLocaleString")]
     public JSValue ToLocaleString(in Arguments a) => new JSString(value.ToString(CultureInfo.CurrentCulture));
 
-
     [JSExport("valueOf")]
     public override JSValue ValueOf() => this;
-
-
 
     [JSExport("asIntN")]
     public static JSValue AsIntN(long bits, JSBigInt bigint)
     {
         if (bits < 0 || bits > 9007199254740991)
-        {
-            throw JSContext.Current.NewRangeError("Invalid range for bits");
-        }
+            throw JSContext.NewRangeError("Invalid range for bits");
+
         var n = bigint.value;
         var buffer = n.ToByteArray();
+
         if (buffer.Length * 8 < bits)
-        {
             return bigint;
-        }
 
         var reminderBits = bits % 8;
-
         var length = (int)(bits / 8);
+
         if (reminderBits > 0)
-        {
             length++;
-        }
 
         var copy = new byte[length];
         Buffer.BlockCopy(buffer, 0, copy, 0, length);
@@ -240,7 +232,9 @@ public partial class JSBigInt : JSPrimitive
 
             byte mask = 1;
             byte start = 1;
+            
             reminderBits--;
+            
             while (reminderBits > 0)
             {
                 padMask &= (byte)~start;
@@ -249,46 +243,37 @@ public partial class JSBigInt : JSPrimitive
                 mask <<= 1;
                 reminderBits--;
             }
+            
             last &= start;
             var lastValue = last;
 
             if ((mask & lastValue) > 0)
-            {
                 last |= padMask;
-            }
         }
 
         var r = new BigInteger(copy);
         return new JSBigInt(r);
-
     }
-
 
     [JSExport("asUintN")]
     public static JSValue AsUintN(long bits, JSBigInt bigint)
     {
         if (bits < 0 || bits > 9007199254740991)
-        {
-            throw JSContext.Current.NewRangeError("Invalid range for bits");
-        }
+            throw JSContext.NewRangeError("Invalid range for bits");
+
         var n = bigint.value;
         if (n.Sign == BigInteger.MinusOne.Sign)
-        {
             n = -n;
-        }
+
         var buffer = n.ToByteArray();
         if (buffer.Length * 8 < bits)
-        {
             return bigint;
-        }
 
         var reminderBits = bits % 8;
 
         var length = (int)(bits / 8);
         if (reminderBits > 0)
-        {
             length++;
-        }
 
         // extra pad will result in a UInt
         var copy = new byte[length + 1];
@@ -299,17 +284,18 @@ public partial class JSBigInt : JSPrimitive
             ref byte last = ref copy[length - 1];
             byte start = 1;
             reminderBits--;
+            
             while (reminderBits > 0)
             {
                 start <<= 1;
                 start |= 1;
                 reminderBits--;
             }
+
             last &= start;
         }
 
         var r = new BigInteger(copy);
         return new JSBigInt(r);
-
     }
 }

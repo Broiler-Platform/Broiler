@@ -1,27 +1,21 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Array.Typed;
+using Broiler.JavaScript.Core.Core.Clr;
+using System;
 using Yantra.Core;
-using YantraJS.Core.Clr;
 
 namespace YantraJS.Core.Typed;
 
 [JSClassGenerator("Int32Array"), JSBaseClass("TypedArray")]
 public partial class JSInt32Array : JSTypedArray
 {
-
     [JSExport("BYTES_PER_ELEMENT")]
     internal static readonly int BYTES_PER_ELENENT = 4;
 
-
     [JSExport(Length = 3)]
-    public JSInt32Array(in Arguments a)
-        : base(new TypedArrayParameters(a, BYTES_PER_ELENENT))
-    {
-    }
+    public JSInt32Array(in Arguments a) : base(new TypedArrayParameters(a, BYTES_PER_ELENENT)) { }
 
-    private JSInt32Array(TypedArrayParameters a) : base(a)
-    {
-
-    }
+    private JSInt32Array(TypedArrayParameters a) : base(a) { }
 
     protected internal override JSValue GetValue(uint index, JSValue receiver, bool throwError = true)
     {

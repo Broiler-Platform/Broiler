@@ -1,4 +1,6 @@
 ﻿#nullable enable
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -7,7 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using YantraJS.Internals;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core;
 
 
 [DebuggerDisplay("{Key}: {Value}")]
@@ -18,17 +20,14 @@ public struct KeyValue
 }
 
 [DebuggerDisplay("{Value}")]
-public readonly struct StringSpan: 
-    IEquatable<StringSpan>, 
-    IEquatable<string>,
-    IEnumerable<char>
+public readonly struct StringSpan : IEquatable<StringSpan>, IEquatable<string>, IEnumerable<char>
 {
-
     public static readonly StringSpan Empty = string.Empty;
 
     public readonly string? Source;
     public readonly int Offset;
     public readonly int Length;
+
     public StringSpan(string? source)
     {
         Source = source;
@@ -39,13 +38,9 @@ public readonly struct StringSpan:
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public StringSpan(string? buffer, int offset, int length)
     {
-        if (buffer == null
-            || (uint)offset > (uint)buffer.Length
-            || (uint)length > (uint)(buffer.Length - offset
-            ))
-        {
+        if (buffer == null || (uint)offset > (uint)buffer.Length || (uint)length > (uint)(buffer.Length - offset))
             throw new InvalidOperationException($"offset/length represents invalid string or string is null");
-        }
+
         Source = buffer;
         Offset = offset;
         Length = length;
@@ -58,8 +53,10 @@ public readonly struct StringSpan:
         {
             if (Source == null)
                 return Source;
+
             if (Offset == 0 && Length == Source.Length)
                 return Source;
+
             return Source.Substring(Offset, Length);
         }
     }
@@ -70,9 +67,8 @@ public readonly struct StringSpan:
         get
         {
             if (Source == null || (uint)index >= (uint)Length)
-            {
                 throw new ArgumentOutOfRangeException(nameof(index));
-            }
+
             fixed (char* src = Source)
             {
                 char* charAt = src + Offset + index;
@@ -87,30 +83,11 @@ public readonly struct StringSpan:
         var blen = b.Length;
         var n = alen + blen;
         var sb = new StringBuilder(n);
+
         sb.Append(a.Value, a.Offset, a.Length);
         sb.Append(b.Value, b.Offset, b.Length);
+
         return sb.ToString();
-        //var s = new string('\0', n);
-        //fixed (char* dest = s)
-        //{
-        //    fixed (char* aa = a.Source)
-        //    {
-        //        char* astart = aa + a.Offset;
-        //        for (int i = 0; i < alen; i++)
-        //        {
-        //            dest[i] = astart[i];
-        //        }
-        //    }
-        //    fixed (char* aa = b.Source)
-        //    {
-        //        char* astart = aa + b.Offset;
-        //        for (int i = 0; i < blen; i++)
-        //        {
-        //            dest[alen + i] = astart[i];
-        //        }
-        //    }
-        //}
-        //return s;
     }
 
     public static string Concat(in StringSpan a, string value)
@@ -118,39 +95,20 @@ public readonly struct StringSpan:
         var alen = a.Length;
         var n = alen + value.Length;
         var sb = new StringBuilder(n);
+
         sb.Append(a.Source, a.Offset, a.Length);
         sb.Append(value);
+
         return sb.ToString();
-        //var s = new string('\0', n);
-        //fixed (char* dest = s)
-        //{
-        //    fixed(char* aa = a.Source)
-        //    {
-        //        char* astart = aa + a.Offset;
-        //        for (int i = 0; i < alen; i++)
-        //        {
-        //            dest[i] = astart[i];
-        //        }
-        //    }
-        //    fixed(char* aa = value)
-        //    {
-        //        for (int i = 0; i < value.Length; i++)
-        //        {
-        //            dest[alen + i] = aa[i];
-        //        }
-        //    }
-        //}
-        //return s;
     }
 
     public static int Compare(in StringSpan a, in StringSpan b, StringComparison comparisonType)
     {
         int minLength = Math.Min(a.Length, b.Length);
         int diff = string.Compare(a.Source, a.Offset, b.Source, b.Offset, minLength, comparisonType);
+
         if (diff == 0)
-        {
             diff = a.Length - b.Length;
-        }
 
         return diff;
     }
@@ -158,9 +116,7 @@ public readonly struct StringSpan:
     public override bool Equals(object obj)
     {
         if (obj is null)
-        {
             return false;
-        }
 
         return obj is StringSpan segment && Equals(in segment, StringComparison.Ordinal);
     }
@@ -175,10 +131,10 @@ public readonly struct StringSpan:
     {
         int offset = Offset;
         int length = Length;
+
         if (length == 0)
-        {
             return this;
-        }
+
         fixed (char* src = Source)
         {
             char* start = src + offset;
@@ -227,7 +183,7 @@ public readonly struct StringSpan:
     public string ToLower()
     {
         var length = Length;
-        if(length == 0)
+        if (length == 0)
         {
             return string.Empty;
         }
@@ -283,19 +239,19 @@ public readonly struct StringSpan:
     public unsafe bool StartsWith(StringSpan other)
     {
         var length = other.Length;
-        if(length > Length)
+        if (length > Length)
         {
             return false;
         }
-        fixed(char* start = Source)
+        fixed (char* start = Source)
         {
             char* startOffset = start + Offset;
-            fixed(char* otherSource = other.Source)
+            fixed (char* otherSource = other.Source)
             {
                 char* otherOffset = otherSource + other.Offset;
                 for (int i = 0; i < length; i++)
                 {
-                    if(*startOffset != *otherOffset)
+                    if (*startOffset != *otherOffset)
                     {
                         return false;
                     }
@@ -349,8 +305,8 @@ public readonly struct StringSpan:
         if (other.Source == null)
             return -1;
         var n = other.Length;
-        return string.Compare(Source, Offset, other.Source, other.Offset, 
-            Length > n 
+        return string.Compare(Source, Offset, other.Source, other.Offset,
+            Length > n
             ? Length
             : n, StringComparison.Ordinal);
     }
@@ -373,7 +329,7 @@ public readonly struct StringSpan:
         {
             return Array.Empty<byte>();
         }
-        fixed(char* source = Source)
+        fixed (char* source = Source)
         {
             char* start = source + Offset;
             var len = encoding.GetByteCount(start, Length);
@@ -411,7 +367,7 @@ public readonly struct StringSpan:
 
         private readonly unsafe char UnsafeChar()
         {
-            fixed(char* start = span.Source)
+            fixed (char* start = span.Source)
             {
                 char* ch = start + (span.Offset + index);
                 return *ch;

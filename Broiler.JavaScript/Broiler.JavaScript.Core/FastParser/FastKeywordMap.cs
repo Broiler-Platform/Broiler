@@ -1,7 +1,7 @@
-﻿using System;
-using YantraJS.Core.Core.Storage;
+﻿using Broiler.JavaScript.Core.Core.Storage;
+using System;
 
-namespace YantraJS.Core.FastParser;
+namespace Broiler.JavaScript.Core.FastParser;
 
 public class FastKeywordMap
 {

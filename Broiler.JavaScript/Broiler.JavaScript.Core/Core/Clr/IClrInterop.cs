@@ -1,6 +1,6 @@
 using System;
 
-namespace YantraJS.Core.Clr;
+namespace Broiler.JavaScript.Core.Core.Clr;
 
 /// <summary>
 /// Defines the contract for marshalling between .NET (CLR) objects and

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 
-namespace YantraJS.JSClassGenerator;
+namespace Broiler.JavaScript.JSClassGenerator;
 
 
 [Generator]
@@ -13,8 +13,8 @@ public class JSClassGenerator : IIncrementalGenerator
     {
         var jsClasses = context.SyntaxProvider
             .CreateSyntaxProvider(
-                SyntaxNodeExtensions.CouldBeJSClassAsync,
-                SyntaxNodeExtensions.GetJSClassTypeOrNull)
+                Broiler.JavaScript.JSClassGenerator.SyntaxNodeExtensions.CouldBeJSClassAsync,
+                Broiler.JavaScript.JSClassGenerator.SyntaxNodeExtensions.GetJSClassTypeOrNull)
             .Where(x => x is not null)
             .Collect();
 

@@ -1,4 +1,7 @@
-﻿using System.Runtime.CompilerServices;
+﻿using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+using Broiler.JavaScript.Core.FastParser.Parser;
+using System.Runtime.CompilerServices;
 
 namespace YantraJS.Core.FastParser;
 
@@ -7,37 +10,26 @@ public partial class FastParser(FastTokenStream stream) : IParser
 {
     private readonly FastTokenStream stream = stream;
 
-    // public readonly FastPool Pool;
-
     public readonly FastScope variableScope = new FastScope();
 
     /// <summary>
     /// Disable this inside for brackets...
     /// </summary>
     private bool considerInOfAsOperators = true;
-
-
     private bool isAsync = false;
 
     public StreamLocation BeginUndo() => new(this, stream.Current);
 
-
     public StreamLocation Location
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get
-        {
-            return new StreamLocation(this, stream.Current);
-        }
+        get => new StreamLocation(this, stream.Current);
     }
 
     public FastToken PreviousToken
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get
-        {
-            return stream.Previous;
-        }
+        get => stream.Previous;
     }
 
     public readonly struct StreamLocation(FastParser parser, FastToken token)
@@ -55,25 +47,27 @@ public partial class FastParser(FastTokenStream stream) : IParser
     {
         if (Program(out var p))
             return p;
+
         throw stream.Unexpected();
     }
 
     bool EndOfLine()
     {
         var token = stream.Current;
-        if(token.Type == TokenTypes.LineTerminator)
+
+        if (token.Type == TokenTypes.LineTerminator)
         {
             stream.Consume();
             return true;
         }
+
         return false;
     }
 
     bool EndOfStatement()
     {
         var token = stream.Current;
-        //if (token.LineTerminator)
-        //    return true;
+
         switch (token.Type)
         {
             case TokenTypes.SemiColon:
@@ -81,12 +75,13 @@ public partial class FastParser(FastTokenStream stream) : IParser
             case TokenTypes.LineTerminator:
                 stream.Consume();
                 return true;
+
             // since Block will expect curly bracket
             // to be present, we will not consume this..
             case TokenTypes.CurlyBracketEnd:
                 return true;
         }
+
         return false;
     }
-
 }

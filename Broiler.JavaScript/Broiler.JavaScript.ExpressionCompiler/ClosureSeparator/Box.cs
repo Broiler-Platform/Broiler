@@ -2,7 +2,7 @@
 using System.Reflection;
 using YantraJS.Expressions;
 
-namespace YantraJS;
+namespace YantraJS.ClosureSeparator;
 
 public abstract class BoxHelper
 {

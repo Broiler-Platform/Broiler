@@ -1,7 +1,3 @@
-using Broiler.Cli.Tests;
-using System;
-using Xunit;
-
 namespace Broiler.Cli.Tests;
 
 public class Acid3DebugTest

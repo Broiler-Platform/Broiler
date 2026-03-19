@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Microsoft.Threading;
+namespace Broiler.JavaScript.Core.Core.Promise;
 
 /// <summary>Provides a pump that supports running asynchronous methods on the current thread.</summary>
 public static class AsyncPump
@@ -13,9 +13,10 @@ public static class AsyncPump
     /// <param name="func">The asynchronous function to execute.</param>
     public static T Run<T>(Func<Task<T>> func)
     {
-        if (func == null) throw new ArgumentNullException("func");
+        ArgumentNullException.ThrowIfNull(func);
 
         var prevCtx = SynchronizationContext.Current;
+
         try
         {
             // Establish the new context
@@ -23,22 +24,24 @@ public static class AsyncPump
             SynchronizationContext.SetSynchronizationContext(syncCtx);
 
             // Invoke the function and alert the context to when it completes
-            var t = func();
-            if (t == null) throw new InvalidOperationException("No task provided.");
+            var t = func() ?? throw new InvalidOperationException("No task provided.");
             t.ContinueWith(delegate { syncCtx.Complete(); }, TaskScheduler.Default);
 
             // Pump continuations and propagate any exceptions
             syncCtx.RunOnCurrentThread();
             return t.GetAwaiter().GetResult();
         }
-        finally { SynchronizationContext.SetSynchronizationContext(prevCtx); }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(prevCtx);
+        }
     }
 
     /// <summary>Runs the specified asynchronous function.</summary>
     /// <param name="func">The asynchronous function to execute.</param>
     public static void Run(Func<Task> func)
     {
-        if (func == null) throw new ArgumentNullException("func");
+        ArgumentNullException.ThrowIfNull(func);
 
         var prevCtx = SynchronizationContext.Current;
         try
@@ -51,29 +54,29 @@ public static class AsyncPump
             var t = func();
             if (t == null) throw new InvalidOperationException("No task provided.");
             t.ContinueWith(delegate { syncCtx.Complete(); }, TaskScheduler.Default);
-            
+
             // Pump continuations and propagate any exceptions
             syncCtx.RunOnCurrentThread();
             t.GetAwaiter().GetResult();
         }
-        finally { SynchronizationContext.SetSynchronizationContext(prevCtx); }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(prevCtx);
+        }
     }
 
     /// <summary>Provides a SynchronizationContext that's single-threaded.</summary>
     private sealed class SingleThreadSynchronizationContext : SynchronizationContext
     {
         /// <summary>The queue of work items.</summary>
-        private readonly BlockingCollection<KeyValuePair<SendOrPostCallback, object>> m_queue = 
-            [];
-        /// <summary>The processing thread.</summary>
-        private readonly Thread m_thread = Thread.CurrentThread;
+        private readonly BlockingCollection<KeyValuePair<SendOrPostCallback, object>> m_queue = [];
 
         /// <summary>Dispatches an asynchronous message to the synchronization context.</summary>
         /// <param name="d">The System.Threading.SendOrPostCallback delegate to call.</param>
         /// <param name="state">The object passed to the delegate.</param>
         public override void Post(SendOrPostCallback d, object state)
         {
-            if (d == null) throw new ArgumentNullException("d");
+            ArgumentNullException.ThrowIfNull(d);
             m_queue.Add(new KeyValuePair<SendOrPostCallback, object>(d, state));
         }
 

@@ -1,7 +1,6 @@
 ﻿using System;
-using YantraJS.Core.Core.Storage;
 
-namespace YantraJS.Core.Storage;
+namespace Broiler.JavaScript.Core.Core.Storage;
 
 internal class ConcurrentTypeTrie<T>(Func<Type, T> factory)
 {

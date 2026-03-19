@@ -1,69 +1,14 @@
-﻿using YantraJS.Core;
-using Expression = YantraJS.Expressions.YExpression;
-using YantraJS.Core.LambdaGen;
+﻿using Expression = YantraJS.Expressions.YExpression;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.LambdaGen;
 
-namespace YantraJS.ExpHelper;
+namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public class LexicalScopeBuilder
 {
-    //private static Type type = typeof(CallStackItem);
+    public static Expression NewScope(Expression context, Expression fileName, Expression function, int line, int column) =>
+        NewLambdaExpression.NewExpression<CallStackItem>(() => () => 
+        new CallStackItem(null, "", "", 0, 0), context, fileName, function, Expression.Constant(line), Expression.Constant(column));
 
-    //private static MethodInfo _Pop
-    //    = type.GetMethod(nameof(Core.CallStackItem.Pop));
-
-
-    //private static ConstructorInfo _New
-    //    = typeof(Core.CallStackItem)
-    //    .PublicConstructor(
-    //            typeof(JSContext),
-    //            typeof(string),
-    //            StringSpanBuilder.RefType,
-    //            typeof(int),
-    //            typeof(int)
-    //        );
-
-    public static Expression NewScope(
-        Expression context,
-        Expression fileName,
-        Expression function,
-        int line,
-        int column) => NewLambdaExpression.NewExpression<CallStackItem>(() => () => new CallStackItem(null, "", "", 0, 0)
-            , context
-            , fileName
-            , function
-            , Expression.Constant(line)
-            , Expression.Constant(column));//return Expression.New(_New,//    context,//    fileName,//    function,//    Expression.Constant(line),//    Expression.Constant(column));
-
-    //private static PropertyInfo _Position =
-    //    type.Property(nameof(Core.LexicalScope.Position));
-
-    //private static FieldInfo _Line =
-    //    type.PublicField(nameof(CallStackItem.Line));
-
-    //private static FieldInfo _Column =
-    //    type.PublicField(nameof(CallStackItem.Column));
-
-    //private static MethodInfo _Update =
-    //    type.InternalMethod(nameof(CallStackItem.Update));
-
-
-    //public static Expression Update(Expression exp, int line, int column, Expression next)
-    //{
-    //    return Expression.Block(
-    //        Expression.Assign(Expression.Field(exp, _Line), Expression.Constant(line)),
-    //        Expression.Assign(Expression.Field(exp, _Column), Expression.Constant(column)),
-    //        next
-    //        );
-    //}
-
-    public static Expression Pop(Expression exp, Expression context) => exp.CallExpression<CallStackItem>(() => (x) => x.Pop(null), context);// return Expression.Call(exp, _Pop , context);
-
-    //public static Expression SetPosition(Expression exp, int line, int column)
-    //{
-    //    return Expression.Assign(
-    //        Expression.Property(exp, _Position),
-    //        Expression.New(_NewPosition, Expression.Constant(line), Expression.Constant(column)
-    //        ));
-    //}
-
+    public static Expression Pop(Expression exp, Expression context) => exp.CallExpression<CallStackItem>(() => (x) => x.Pop(null), context);
 }

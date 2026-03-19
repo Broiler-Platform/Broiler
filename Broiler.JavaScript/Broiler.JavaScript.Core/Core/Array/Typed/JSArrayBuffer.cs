@@ -1,25 +1,9 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using System;
 using Yantra.Core;
-using YantraJS.Core.Clr;
 
 namespace YantraJS.Core.Typed;
-
-//public abstract class TypedArray<T> : JSValue
-//{
-//    private readonly int length;
-//    private readonly T[] value;
-
-//    public TypedArray(int length, JSObject prototype) : base(prototype)
-//    {
-//        this.length = length;
-//        this.value = new T[length];
-//    }
-
-//    public override JSValue this[uint key] { 
-//        get => base[key]; 
-//        set => base[key] = value; 
-//    }
-//}
 
 [JSClassGenerator("ArrayBuffer")]
 public partial class JSArrayBuffer : JSObject
@@ -29,14 +13,12 @@ public partial class JSArrayBuffer : JSObject
 
     public byte[] Buffer => buffer;
 
-    // public override int Length { get => buffer.Length; set => throw new NotSupportedException(); }
-
-    public JSArrayBuffer(in Arguments a): this(JSContext.NewTargetPrototype)
+    public JSArrayBuffer(in Arguments a) : this(JSContext.NewTargetPrototype)
     {
         int length = a.Get1().AsInt32OrDefault();
         if (length < 0 || length > JSNumber.MaxSafeInteger)
         {
-            throw JSContext.Current.NewRangeError("Buffer length out of range");
+            throw JSContext.NewRangeError("Buffer length out of range");
         }
         buffer = new byte[length];
     }
@@ -50,7 +32,7 @@ public partial class JSArrayBuffer : JSObject
 
     public override bool Equals(JSValue value) => ReferenceEquals(this, value);
 
-    public override JSValue InvokeFunction(in Arguments a) => throw JSContext.Current.NewTypeError($"{this} is not a function");
+    public override JSValue InvokeFunction(in Arguments a) => throw JSContext.NewTypeError($"{this} is not a function");
 
     public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
@@ -64,8 +46,8 @@ public partial class JSArrayBuffer : JSObject
         get
         {
             if (isDetached)
-                throw JSContext.Current.NewTypeError(
-                    "Cannot access byteLength of a detached ArrayBuffer");
+                throw JSContext.NewTypeError("Cannot access byteLength of a detached ArrayBuffer");
+
             return buffer.Length;
         }
     }
@@ -85,15 +67,14 @@ public partial class JSArrayBuffer : JSObject
     internal JSValue Transfer(in Arguments a)
     {
         if (isDetached)
-            throw JSContext.Current.NewTypeError(
-                "Cannot transfer a detached ArrayBuffer");
+            throw JSContext.NewTypeError("Cannot transfer a detached ArrayBuffer");
 
         int newLength = a.Length > 0
             ? a.Get1().AsInt32OrDefault()
             : buffer.Length;
 
         if (newLength < 0)
-            throw JSContext.Current.NewRangeError("Invalid ArrayBuffer length");
+            throw JSContext.NewRangeError("Invalid ArrayBuffer length");
 
         var newBuffer = new byte[newLength];
         Array.Copy(buffer, newBuffer, Math.Min(buffer.Length, newLength));
@@ -126,8 +107,7 @@ public partial class JSArrayBuffer : JSObject
     internal JSValue Slice(in Arguments a)
     {
         if (isDetached)
-            throw JSContext.Current.NewTypeError(
-                "Cannot slice a detached ArrayBuffer");
+            throw JSContext.NewTypeError("Cannot slice a detached ArrayBuffer");
 
         int len = buffer.Length;
         var (beginVal, endVal) = a.Get2();
@@ -146,5 +126,4 @@ public partial class JSArrayBuffer : JSObject
         Array.Copy(buffer, begin, newBuf, 0, newLen);
         return new JSArrayBuffer(newBuf);
     }
-
 }

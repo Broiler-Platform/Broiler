@@ -1,5 +1,8 @@
 ﻿#nullable enable
-namespace YantraJS.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+
+namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstIfStatement(FastToken start, FastToken end, AstExpression test, AstStatement @true, AstStatement? @false = null) : AstStatement(start, FastNodeType.IfStatement, end)
 {
@@ -9,9 +12,9 @@ public class AstIfStatement(FastToken start, FastToken end, AstExpression test, 
 
     public override string ToString()
     {
-        if(False!=null) {
+        if (False != null)
             return $"if({Test}) {True} else {False}";
-        }
+
         return $"if({Test}) {True}";
     }
 }

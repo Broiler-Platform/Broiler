@@ -1,17 +1,19 @@
 ﻿#nullable enable
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.FastParser.Parser;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace YantraJS.Core.FastParser;
+namespace Broiler.JavaScript.Core.FastParser.Parser;
 
 public class FastPool
 {
-
     public void Dispose() => pools.Clear();
 
-    public class Scope(FastPool pool) : DisposableList {
+    public class Scope(FastPool pool) : DisposableList
+    {
         public FastList<T> AllocateList<T>(int size = 0)
         {
             var l = pool.AllocateList<T>(size);
@@ -20,11 +22,9 @@ public class FastPool
         }
 
         public Scope NewScope() => pool.NewScope();
-
     }
 
     public Scope NewScope() => new(this);
-
 
     readonly Dictionary<Type, object> pools = [];
 
@@ -39,7 +39,7 @@ public class FastPool
     public FastStack<T> AllocateStack<T>() => new(this);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Free<T>(FastList<T> list) => list.Clear();
+    public static void Free<T>(FastList<T> list) => list.Clear();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public T[] AllocateArray<T>(int size)
@@ -55,10 +55,9 @@ public class FastPool
         pool!.ReleaseArray(item);
     }
 
-
     class Pool<T>
     {
-        private bool clear = false;
+        private readonly bool clear = false;
 
         public Pool(int buckets = 8)
         {
@@ -66,45 +65,39 @@ public class FastPool
 
             Queues = new Queue<T[]>[buckets];
             for (int i = 0; i < buckets; i++)
-            {
                 Queues[i] = new Queue<T[]>(8);
-            }
-            
         }
 
         private readonly Queue<T[]>[] Queues;
 
-        private (int index, int size) MapSize(int size) {
+        private (int index, int size) MapSize(int size)
+        {
             var begin = 4;
             int i;
-            for(i = 0; i < Queues.Length ; i++)
+
+            for (i = 0; i < Queues.Length; i++)
             {
-                if(size <= begin)
-                {
+                if (size <= begin)
                     break;
-                }
+
                 begin = begin << 1;
             }
+
             if (i < Queues.Length)
-            {
                 return (i, begin);
-            }
+
             return (-1, size);
         }
 
         private T[] AllocateInternal(int i)
         {
             var (index, size) = MapSize(i);
-            if (index >= 0) {
+            if (index >= 0)
+            {
                 if (Queues[index].TryDequeue(out var a))
                     return a;
-                // try one higher...
-                //if (index < Queues.Length - 1)
-                //{
-                //    if (Queues[index + 1].TryDequeue(out a))
-                //        return a;
-                //}
             }
+
             return new T[size];
         }
 
@@ -113,8 +106,9 @@ public class FastPool
             ref var q = ref Queues[i];
             if (q.Count < 8)
             {
-                if(clear)
+                if (clear)
                     Array.Clear(items, 0, items.Length);
+
                 q.Enqueue(items);
             }
         }
@@ -123,10 +117,10 @@ public class FastPool
 
         public void ReleaseArray(T[] item)
         {
-            var (index, size) = MapSize(item.Length);
-            if(index >= 0) {
+            var (index, _) = MapSize(item.Length);
+
+            if (index >= 0)
                 ReleaseInternal(index, item);
-            }
         }
     }
 
@@ -136,12 +130,13 @@ public class FastPool
     {
         if (fastStringBuilders.TryDequeue(out var sb))
             return new FastStringBuilder(this, sb);
+
         return new FastStringBuilder(this, new StringBuilder());
     }
 
     internal void Release(in FastStringBuilder sb)
     {
-        if(fastStringBuilders.Count < 5)
+        if (fastStringBuilders.Count < 5)
             fastStringBuilders.Enqueue(sb.Builder);
     }
 }
@@ -159,6 +154,5 @@ public readonly struct FastStringBuilder
     }
 
     public override string ToString() => Builder.ToString();
-
     public void Clear() => pool.Release(in this);
 }

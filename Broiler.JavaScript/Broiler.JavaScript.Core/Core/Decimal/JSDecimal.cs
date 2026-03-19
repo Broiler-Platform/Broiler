@@ -1,8 +1,9 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using System;
 using System.Globalization;
 using Yantra.Core;
-using YantraJS.Core.Clr;
-using YantraJS.Core.Core.Primitive;
 
 namespace YantraJS.Core;
 
@@ -11,14 +12,11 @@ static class JSDecimalExtensions
     public static decimal AsDecimalOnly(this JSValue @this) => @this is JSDecimal v ? v.value : throw JSDecimal.CannotMix();
 }
 
-// [JSRuntime(typeof(JSBigIntStatic), typeof(JSBigIntPrototype))]
 [JSBaseClass("Object")]
 [JSFunctionGenerator("Decimal")]
 public partial class JSDecimal : JSPrimitive
 {
-
-
-    public static JSException CannotMix() => JSContext.Current.NewTypeError("Cannot mix BigInt and other types, use explicit conversions");
+    public static JSException CannotMix() => JSContext.NewTypeError("Cannot mix BigInt and other types, use explicit conversions");
 
     internal readonly decimal value;
 
@@ -32,6 +30,7 @@ public partial class JSDecimal : JSPrimitive
     public static JSValue Constructor(in Arguments a)
     {
         var f = a[0];
+
         switch (f)
         {
             case JSNumber number:
@@ -39,31 +38,32 @@ public partial class JSDecimal : JSPrimitive
             case JSDecimal bigint:
                 return bigint;
         }
+
         var text = f.ToString();
         text = text.TrimEnd('m').Replace("_", "");
-        if (!decimal.TryParse(text, out var v))
-        {
-            throw JSContext.Current.NewTypeError($"{f} is not a valid big integer");
-        }
-        return new JSDecimal(v);
 
+        if (!decimal.TryParse(text, out var v))
+            throw JSContext.NewTypeError($"{f} is not a valid big integer");
+
+        return new JSDecimal(v);
     }
 
     public JSDecimal(decimal value) => this.value = value;
     public JSDecimal(string stringValue)
     {
         var v = stringValue.TrimEnd('m').Replace("_", "");
+
         if (!decimal.TryParse(v, out var n))
-            throw JSContext.Current.NewTypeError($"{stringValue} is not a valid big integer");
+            throw JSContext.NewTypeError($"{stringValue} is not a valid big integer");
+
         value = n;
     }
 
     public override bool Equals(JSValue value)
     {
         if (value is JSDecimal bigint)
-        {
             return this.value == bigint.value;
-        }
+
         var n = (long)value.DoubleValue;
         return this.value == n;
     }
@@ -75,38 +75,31 @@ public partial class JSDecimal : JSPrimitive
     public override JSValue CreateInstance(in Arguments a)
     {
         if (a.Length == 0)
-        {
             return new JSDecimal(0);
-        }
+
         var value = a[0];
         if (value is JSDecimal d)
-        {
             return d;
-        }
+
         if (value.IsNumber)
-        {
             return new JSDecimal((long)value.DoubleValue);
-        }
+
         var v = long.Parse(value.ToString());
         return new JSDecimal(v);
     }
 
     public override bool StrictEquals(JSValue value)
     {
-        if (!(value is JSDecimal bigint))
+        if (value is not JSDecimal bigint)
             return false;
+
         return this.value == bigint.value;
     }
 
     public override bool EqualsLiteral(string value) => this.value.ToString() == value;
-
     public override bool EqualsLiteral(double value) => (double)this.value == value;
-
-
     public override JSValue TypeOf() => JSConstants.Decimal;
-
     protected override JSObject GetPrototype() => (JSContext.Current[Names.Decimal] as JSFunction).prototype;
-
     internal override PropertyKey ToKey(bool create = true) => (uint)value;
 
     public override bool ConvertTo(Type type, out object value)
@@ -116,21 +109,25 @@ public partial class JSDecimal : JSPrimitive
             value = this.value;
             return true;
         }
+
         if (type == typeof(ulong))
         {
             value = (ulong)this.value;
             return true;
         }
+
         if (type.IsAssignableFrom(typeof(JSDecimal)))
         {
             value = this;
             return true;
         }
+
         if (type == typeof(object))
         {
             value = this.value;
             return true;
         }
+
         return base.ConvertTo(type, out value);
     }
 
@@ -161,24 +158,22 @@ public partial class JSDecimal : JSPrimitive
     public override JSValue AddValue(JSValue value)
     {
         value = value.IsObject ? value.ValueOf() : value;
+        
         if (value is JSPrimitiveObject primitive)
-        {
             value = primitive.value;
-        }
+        
         if (value is JSDecimal b)
-        {
             return new JSDecimal(this.value + b.value);
-        }
+
         if (value.IsBoolean || value.IsNumber)
-        {
             throw CannotMix();
-        }
+
         if (value is JSString @string)
-        {
             return new JSString(this.value.ToString() + "n" + @string.ToString());
-        }
+
         if (value is JSObject @object)
             return new JSString(this.value + @object.StringValue);
+
         return new JSDecimal(this.value + value.BigIntValue);
     }
 
@@ -190,27 +185,28 @@ public partial class JSDecimal : JSPrimitive
     public JSValue JSToFixed(in Arguments a)
     {
         var nv = value;
+        
         if (a.Get1() is JSNumber n1)
         {
             if (double.IsNaN(n1.value) || n1.value > 20 || n1.value < 0)
-                throw JSContext.Current.NewRangeError("toFixed() digitis argument must be between 0 and 100");
+                throw JSContext.NewRangeError("toFixed() digitis argument must be between 0 and 100");
+
             var i = (int)n1.value;
             if (nv > 999999999999999.0m && i <= 15)
                 return new JSString(nv.ToString("g21"));
+
             return new JSString(nv.ToString($"F{i}"));
         }
+
         if (nv > 999999999999999.0m)
             return new JSString(nv.ToString("g21"));
+
         return new JSString(nv.ToString("F0"));
     }
-
 
     [JSExport("toLocaleString")]
     public JSValue ToLocaleString(in Arguments a) => new JSString(value.ToString(CultureInfo.CurrentCulture));
 
-
     [JSExport("valueOf")]
     public override JSValue ValueOf() => this;
-
-
 }

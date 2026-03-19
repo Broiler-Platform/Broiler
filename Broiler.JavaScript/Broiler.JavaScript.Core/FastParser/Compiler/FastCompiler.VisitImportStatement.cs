@@ -1,4 +1,7 @@
-﻿using YantraJS.ExpHelper;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.FastParser.Ast;
+using Broiler.JavaScript.Core.FastParser.Compiler;
+using Broiler.JavaScript.Core.LinqExpressions;
 
 using Exp = YantraJS.Expressions.YExpression;
 using Expression = YantraJS.Expressions.YExpression;
@@ -7,7 +10,6 @@ namespace YantraJS.Core.FastParser.Compiler;
 
 partial class FastCompiler
 {
-
     protected override Exp VisitImportStatement(AstImportStatement importStatement)
     {
         var tempRequire = Exp.Parameter(typeof(JSValue));
@@ -18,8 +20,8 @@ partial class FastCompiler
         {
             Exp.Assign(tempRequire, Expression.Yield(JSFunctionBuilder.InvokeFunction(require.Expression, args)))
         };
-        FastFunctionScope.VariableScope imported;
 
+        FastFunctionScope.VariableScope imported;
         var all = importStatement.All;
 
         if (all != null)
@@ -28,27 +30,25 @@ partial class FastCompiler
             stmts.Add(Exp.Assign(imported.Expression, tempRequire));
         }
 
-        if(importStatement.Default != null)
+        if (importStatement.Default != null)
         {
             imported = scope.Top.CreateVariable(importStatement.Default.Name);
             var prop = JSValueBuilder.Index(tempRequire, KeyOfName("default"));
             stmts.Add(Exp.Assign(imported.Expression, prop));
-
         }
 
-        if(importStatement.Members != null)
+        if (importStatement.Members != null)
         {
             var ve = importStatement.Members.GetFastEnumerator();
-            while(ve.MoveNext(out var item)) {
+            while (ve.MoveNext(out var item))
+            {
                 imported = scope.Top.CreateVariable(item.asName);
                 var prop = JSValueBuilder.Index(tempRequire, KeyOfName(item.name));
                 stmts.Add(Exp.Assign(imported.Expression, prop));
             }
         }
 
-        var importExp =  Exp.Block(
-            tempRequire.AsSequence(),
-            stmts);
+        var importExp = Exp.Block(tempRequire.AsSequence(), stmts);
         return importExp;
     }
 

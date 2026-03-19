@@ -1,6 +1,7 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using System;
 
-namespace YantraJS.Core.Debugger;
+namespace Broiler.JavaScript.Core.Debugger;
 
 public class V8ExceptionDetails
 {
@@ -24,18 +25,17 @@ public class V8ExceptionDetails
 
     public V8ExceptionDetails(Exception ex, JSContext context = null)
     {
-        if(context != null)
+        if (context != null)
         {
             ExecutionContextId = $"C-{context.ID}";
             StackTrace = new V8StackTrace(context);
             LineNumber = context.Top?.Line ?? 0;
             ColumnNumber = context.Top?.Column ?? 0;
         }
+
         Text = ex.ToString();
 
-        if(ex is JSException je)
-        {
+        if (ex is JSException je)
             Exception = new V8RemoteObject(je.Error);
-        }
     }
 }

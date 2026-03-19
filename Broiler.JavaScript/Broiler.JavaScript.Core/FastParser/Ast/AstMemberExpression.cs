@@ -1,11 +1,10 @@
 ﻿#nullable enable
-namespace YantraJS.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser;
 
-public class AstMemberExpression(
-    AstExpression target,
-    AstExpression node,
-    bool computed = false,
-    bool coalesce = false) : AstExpression(target.End, FastNodeType.MemberExpression, node.End)
+namespace Broiler.JavaScript.Core.FastParser.Ast;
+
+public class AstMemberExpression(AstExpression target, AstExpression node, bool computed = false, bool coalesce = false) : 
+    AstExpression(target.End, FastNodeType.MemberExpression, node.End)
 {
     public readonly AstExpression Object = target;
     public readonly AstExpression Property = node;
@@ -14,10 +13,12 @@ public class AstMemberExpression(
 
     public override string ToString()
     {
-        if(Computed)
+        if (Computed)
             return $"{Object}[{Property}]";
-        if(Coalesce)
+    
+        if (Coalesce)
             return $"{Object}?.{Property}";
+        
         return $"{Object}.{Property}";
     }
 }

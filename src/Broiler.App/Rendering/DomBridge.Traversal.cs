@@ -1,3 +1,6 @@
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Storage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -1212,7 +1215,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static DomElement? FindCommonAncestor(DomElement a, DomElement b)
     {
-        var ancestors = new HashSet<DomElement>(ReferenceEqualityComparer.Instance);
+        var ancestors = new HashSet<DomElement>(YantraJS.Core.ReferenceEqualityComparer.Instance);
         var current = a;
         while (current != null)
         {

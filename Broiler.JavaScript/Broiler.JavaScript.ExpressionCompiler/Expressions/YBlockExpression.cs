@@ -97,12 +97,7 @@ public class YBlockExpression: YExpression
                 isLast = index == last;
                 return true;
             }
-            //if((this.index++)<= last)
-            //{
-            //    isLast = last == this.index;
-            //    exp = expressions[index];
-            //    return true;
-            //}
+
             isLast = false;
             exp = default;
             return false;

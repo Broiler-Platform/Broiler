@@ -1,4 +1,6 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using Broiler.JavaScript.Core.FastParser.Parser;
+
+namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstUnaryExpression : AstExpression
 {
@@ -23,6 +25,7 @@ public class AstUnaryExpression : AstExpression
                 }
                 break;
         }
+
         Argument = argument;
         Operator = tokenType;
         Prefix = prefix;
@@ -31,9 +34,8 @@ public class AstUnaryExpression : AstExpression
     public override string ToString()
     {
         if (Prefix)
-        {
             return $"{Operator} {Argument}";
-        }
+
         return $"{Argument} {Operator}";
     }
 }

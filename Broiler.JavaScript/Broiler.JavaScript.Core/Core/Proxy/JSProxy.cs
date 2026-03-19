@@ -1,5 +1,7 @@
-﻿using Yantra.Core;
-using YantraJS.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Enumerators;
+using Yantra.Core;
 
 namespace YantraJS.Core;
 
@@ -14,15 +16,13 @@ public partial class JSProxy : JSObject
     {
         var (target, handler) = p;
         if (target == null || handler == null)
-        {
-            throw JSContext.Current.NewTypeError("Cannot create proxy with a non-object as target or handler");
-        }
+            throw JSContext.NewTypeError("Cannot create proxy with a non-object as target or handler");
+
         this.target = target;
         this.handler = handler;
     }
 
     public override bool BooleanValue => target.BooleanValue;
-
 
     public override bool Equals(JSValue value) => target.Equals(value);
 
@@ -34,6 +34,7 @@ public partial class JSProxy : JSObject
             var args = new JSArray(a.ToArray());
             return fxFunction.Call(this, target, a.This, args);
         }
+
         return target.InvokeFunction(a);
     }
 
@@ -45,6 +46,7 @@ public partial class JSProxy : JSObject
             var args = new JSArray(a.ToArray());
             return fxFunction.Call(this, target, args);
         }
+
         return target.CreateInstance(a);
     }
 
@@ -52,9 +54,8 @@ public partial class JSProxy : JSObject
     {
         var fx = handler[KeyStrings.defineProperty];
         if (fx is JSFunction fxFunction)
-        {
             return fxFunction.InvokeFunction(new Arguments(target, target, key, propertyDescription));
-        }
+
         return target.DefineProperty(key, propertyDescription);
     }
 
@@ -62,9 +63,8 @@ public partial class JSProxy : JSObject
     {
         var fx = handler[KeyStrings.deleteProperty];
         if (fx is JSFunction fxFunction)
-        {
             return fxFunction.InvokeFunction(new Arguments(target, target, index));
-        }
+
         return target.Delete(index);
     }
 
@@ -72,9 +72,8 @@ public partial class JSProxy : JSObject
     {
         var fx = handler[KeyStrings.get];
         if (fx is JSFunction fxFunction)
-        {
             return fxFunction.InvokeFunction(new Arguments(target, target, key, receiver));
-        }
+
         return target.GetValue(key, receiver, throwError);
     }
 
@@ -82,9 +81,8 @@ public partial class JSProxy : JSObject
     {
         var fx = handler[KeyStrings.get];
         if (fx is JSFunction fxFunction)
-        {
             return fxFunction.InvokeFunction(new Arguments(target,target, key.ToJSValue(), receiver));
-        }
+
         return target.GetValue(key, receiver, throwError);
     }
 
@@ -92,9 +90,8 @@ public partial class JSProxy : JSObject
     {
         var fx = handler[KeyStrings.get];
         if (fx is JSFunction fxFunction)
-        {
             return fxFunction.InvokeFunction(new Arguments(target, target, new JSNumber(key), receiver));
-        }
+
         return target.GetValue(key, receiver, throwError);
     }
 
@@ -106,6 +103,7 @@ public partial class JSProxy : JSObject
             fxFunction.InvokeFunction(new Arguments(target, target, name, receiver));
             return true;
         }
+
         return target.SetValue(name, value, receiver, false);
     }
 
@@ -117,6 +115,7 @@ public partial class JSProxy : JSObject
             fxFunction.InvokeFunction(new Arguments(target, target, name.ToJSValue(), receiver));
             return true;
         }
+
         return target.SetValue(name, value, receiver, false);
     }
 
@@ -128,6 +127,7 @@ public partial class JSProxy : JSObject
             fxFunction.InvokeFunction(new Arguments(target, target, new JSNumber(name), receiver));
             return true;
         }
+
         return target.SetValue(name, value, receiver, false);
     }
 
@@ -135,9 +135,8 @@ public partial class JSProxy : JSObject
     {
         var fx = handler[KeyStrings.getPrototypeOf];
         if (fx is JSFunction fxFunction)
-        {
             return fxFunction.InvokeFunction(new Arguments(target));
-        }
+
         return target.GetPrototypeOf();
     }
 
@@ -149,17 +148,16 @@ public partial class JSProxy : JSObject
             fxFunction.InvokeFunction(new Arguments(target, proto));
             return;
         }
+
         target.SetPrototypeOf(proto);
     }
 
     public override IElementEnumerator GetAllKeys(bool showEnumerableOnly = true, bool inherited = true)
     {
-
         var fx = handler[KeyStrings.ownKeys];
         if (fx is JSFunction fxFunction)
-        {
             return fxFunction.InvokeFunction(new Arguments(target)).GetElementEnumerator();
-        }
+
         return target.GetAllKeys(showEnumerableOnly, inherited);
     }
 

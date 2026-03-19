@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace YantraJS.JSClassGenerator;
+namespace Broiler.JavaScript.JSClassGenerator;
 
 internal static class ListExtensions
 {
@@ -20,19 +20,19 @@ internal static class ListExtensions
         switch(typeName)
         {
             case "JSValue":
-            case "YantraJS.Core.JSValue":
+            case "Broiler.JavaScript.Core.JSValue":
                 return name;
             case "JSNumber":
-            case "YantraJS.Core.JSNumber":
-            case "YantraJS.Core.JSNumber?":
+            case "Broiler.JavaScript.Core.JSNumber":
+            case "Broiler.JavaScript.Core.JSNumber?":
                 return $"JSValueToClrConverter.ToJSNumber({name}, \"{parameter}\")";
             case "JSObject":
-            case "YantraJS.Core.JSObject":
+            case "Broiler.JavaScript.Core.JSObject":
                 return $"{name} is JSObject obj{parameter} ? obj{parameter} : throw new JSException(\"{parameter} is not an object\")";
             case "JSFunction":
-            case "YantraJS.Core.JSFunction":
+            case "Broiler.JavaScript.Core.JSFunction":
             case "JSFunction?":
-            case "YantraJS.Core.JSFunction?":
+            case "Broiler.JavaScript.Core.JSFunction?":
                 return $"{name} is JSFunction obj{parameter} ? obj{parameter} : throw new JSException(\"{parameter} is not a function\")";
             case "Int32":
             case "int":

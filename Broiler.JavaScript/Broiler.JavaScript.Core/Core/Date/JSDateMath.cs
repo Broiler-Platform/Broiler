@@ -1,6 +1,6 @@
 using System;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Date;
 
 /// <summary>
 /// ECMAScript date math helpers per ECMA-262 § 21.4.1.
@@ -11,8 +11,7 @@ internal static class JSDateMath
     internal const long MsPerDay = 86_400_000L;
 
     /// <summary>Floor division that rounds toward negative infinity.</summary>
-    private static long FloorDiv(long a, long b) =>
-        a >= 0 ? a / b : (a - b + 1) / b;
+    private static long FloorDiv(long a, long b) => a >= 0 ? a / b : (a - b + 1) / b;
 
     /// <summary>Floor modulo that always returns a non-negative result.</summary>
     private static long FloorMod(long a, long b)
@@ -22,8 +21,7 @@ internal static class JSDateMath
     }
 
     /// <summary>Number of days from epoch (Jan 1, 1970) to Jan 1 of the given year.</summary>
-    internal static long DayFromYear(long y) =>
-        365L * (y - 1970) + FloorDiv(y - 1969, 4) - FloorDiv(y - 1901, 100) + FloorDiv(y - 1601, 400);
+    internal static long DayFromYear(long y) => 365L * (y - 1970) + FloorDiv(y - 1969, 4) - FloorDiv(y - 1901, 100) + FloorDiv(y - 1601, 400);
 
     /// <summary>Millisecond timestamp for the start of the given year.</summary>
     internal static double TimeFromYear(long y) => MsPerDay * (double)DayFromYear(y);
@@ -34,6 +32,7 @@ internal static class JSDateMath
         long m4 = FloorMod(y, 4);
         long m100 = FloorMod(y, 100);
         long m400 = FloorMod(y, 400);
+
         return m4 == 0 && (m100 != 0 || m400 == 0);
     }
 
@@ -60,7 +59,7 @@ internal static class JSDateMath
         return y;
     }
 
-    private static readonly int[] CumulativeDays =     { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
+    private static readonly int[] CumulativeDays = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
     private static readonly int[] CumulativeDaysLeap = { 0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335 };
 
     /// <summary>Month (0-11) from timestamp.</summary>
@@ -69,11 +68,13 @@ internal static class JSDateMath
         long y = YearFromTime(t);
         long dayWithinYear = Day(t) - DayFromYear(y);
         var cumDays = IsLeapYear(y) ? CumulativeDaysLeap : CumulativeDays;
+
         for (int m = 11; m >= 0; m--)
         {
             if (dayWithinYear >= cumDays[m])
                 return m;
         }
+
         return 0;
     }
 
@@ -84,6 +85,7 @@ internal static class JSDateMath
         long dayWithinYear = Day(t) - DayFromYear(y);
         int m = MonthFromTime(t);
         var cumDays = IsLeapYear(y) ? CumulativeDaysLeap : CumulativeDays;
+
         return (int)(dayWithinYear - cumDays[m]) + 1;
     }
 
@@ -113,6 +115,7 @@ internal static class JSDateMath
 
         long dayStart = DayFromYear(yr);
         var cumDays = IsLeapYear(yr) ? CumulativeDaysLeap : CumulativeDays;
+
         return dayStart + cumDays[(int)mn] + date - 1;
     }
 
@@ -120,28 +123,21 @@ internal static class JSDateMath
     internal static double MakeDate(double day, double time) => day * MsPerDay + time;
 
     /// <summary>MakeTime per ECMA-262 § 21.4.1.12.</summary>
-    internal static double MakeTime(double hour, double min, double sec, double ms) =>
-        hour * 3_600_000 + min * 60_000 + sec * 1_000 + ms;
+    internal static double MakeTime(double hour, double min, double sec, double ms) => hour * 3_600_000 + min * 60_000 + sec * 1_000 + ms;
 
     /// <summary>
     /// UTC adjustment: convert local time to UTC.
     /// Uses the timezone offset for the date represented by <paramref name="t"/>
     /// when within .NET DateTimeOffset range; otherwise falls back to current offset.
     /// </summary>
-    internal static double UTC(double t)
-    {
-        return t - GetLocalOffsetMs(t);
-    }
+    internal static double UTC(double t) => t - GetLocalOffsetMs(t);
 
     /// <summary>
     /// LocalTime adjustment: convert UTC to local time.
     /// Uses the timezone offset for the date represented by <paramref name="t"/>
     /// when within .NET DateTimeOffset range; otherwise falls back to current offset.
     /// </summary>
-    internal static double LocalTime(double t)
-    {
-        return t + GetLocalOffsetMs(t);
-    }
+    internal static double LocalTime(double t) => t + GetLocalOffsetMs(t);
 
     /// <summary>
     /// Returns the local timezone offset in milliseconds for the given UTC timestamp.
@@ -152,11 +148,13 @@ internal static class JSDateMath
         long ms = (long)t;
         long minMs = DateTimeOffset.MinValue.ToUnixTimeMilliseconds();
         long maxMs = DateTimeOffset.MaxValue.ToUnixTimeMilliseconds();
+
         if (ms >= minMs && ms <= maxMs)
         {
             var dto = DateTimeOffset.FromUnixTimeMilliseconds(ms);
             return TimeZoneInfo.Local.GetUtcOffset(dto).TotalMilliseconds;
         }
+
         // Fallback for dates outside .NET range (e.g., year 0 or negative years)
         return TimeZoneInfo.Local.GetUtcOffset(DateTimeOffset.UtcNow).TotalMilliseconds;
     }
@@ -168,8 +166,10 @@ internal static class JSDateMath
     {
         if (double.IsInfinity(time) || double.IsNaN(time))
             return double.NaN;
+
         if (Math.Abs(time) > 8.64e15)
             return double.NaN;
+
         return Math.Truncate(time);
     }
 }

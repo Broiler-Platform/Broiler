@@ -1,52 +1,33 @@
-﻿using System;
-using YantraJS.Core;
-using YantraJS.Core.LambdaGen;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.LambdaGen;
+using System;
 using Expression = YantraJS.Expressions.YExpression;
 
-namespace YantraJS.ExpHelper;
+namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public class JSVariableBuilder
 {
-    //static readonly Type type = typeof(JSVariable);
+    public static Expression New(Expression value, string name) => NewLambdaExpression.NewExpression<JSVariable>(() => () =>
+    new JSVariable(null as JSValue, ""), value, Expression.Constant(name));// return Expression.New(_New, value, Expression.Constant(name));
 
-    //static readonly ConstructorInfo _New
-    //    = type.Constructor(typeof(JSValue), typeof(string));
+    public static Expression NewFromException(Expression value, string name) => NewLambdaExpression.NewExpression<JSVariable>(() => () =>
+    new JSVariable(null as Exception, ""), value, Expression.Constant(name));
 
-
-    public static Expression New(Expression value, string name) => NewLambdaExpression.NewExpression<JSVariable>(() => () => new JSVariable(null as JSValue, "")
-            , value
-            , Expression.Constant(name));// return Expression.New(_New, value, Expression.Constant(name));
-
-    //static readonly ConstructorInfo _NewFromException
-    //    = type.Constructor(typeof(Exception), typeof(string));
-
-    public static Expression NewFromException(Expression value, string name) =>
-        // return Expression.New(_NewFromException, value, Expression.Constant(name));
-        NewLambdaExpression.NewExpression<JSVariable>(() => () => new JSVariable(null as Exception, "")
-        , value
-        , Expression.Constant(name));
-
-    //static readonly ConstructorInfo _NewFromArgument
-    //    = type.Constructor(ArgumentsBuilder.refType, typeof(int), typeof(string));
-
-    public static Expression FromArgument(Expression args, int i, string name) => NewLambdaExpression.NewExpression<JSVariable>(() => () => new JSVariable(Arguments.Empty, 0, "")
-        , args
-        , Expression.Constant(i)
-        , Expression.Constant(name));// return Expression.New(_NewFromArgument, args, Expression.Constant(i), Expression.Constant(name));
+    public static Expression FromArgument(Expression args, int i, string name) => NewLambdaExpression.NewExpression<JSVariable>(() => () =>
+    new JSVariable(Arguments.Empty, 0, ""), args, Expression.Constant(i), Expression.Constant(name));
 
     public static Expression FromArgumentOptional(Expression args, int i, Expression optional)
     {
         // check if is undefined...
         if (optional == null)
             return ArgumentsBuilder.GetAt(args, i);
+
         var argAt = ArgumentsBuilder.GetAt(args, i);
         return Expression.Coalesce(JSValueExtensionsBuilder.NullIfUndefined(argAt), optional);
     }
 
-    public static Expression New(string name) => NewLambdaExpression.NewExpression<JSVariable>(() => () => new JSVariable(null as JSValue, "")
-            , JSUndefinedBuilder.Value
-            , Expression.Constant(name));// return Expression.New(_New, ExpHelper.JSUndefinedBuilder.Value, Expression.Constant(name));
+    public static Expression New(string name) => NewLambdaExpression.NewExpression<JSVariable>(() => () =>
+    new JSVariable(null as JSValue, ""), JSUndefinedBuilder.Value, Expression.Constant(name));
 
-    public static Expression Property(Expression target) => target.PropertyExpression<JSVariable, JSValue>(() => (x) => x.GlobalValue);//return Expression.Property(target, _GlobalValue);
-
+    public static Expression Property(Expression target) => target.PropertyExpression<JSVariable, JSValue>(() => (x) => x.GlobalValue);
 }

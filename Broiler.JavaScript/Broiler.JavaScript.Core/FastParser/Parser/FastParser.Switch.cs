@@ -1,4 +1,7 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+
+namespace YantraJS.Core.FastParser;
 
 
 public readonly struct AstCase(AstExpression test, IFastEnumerable<AstStatement> last)
@@ -9,9 +12,6 @@ public readonly struct AstCase(AstExpression test, IFastEnumerable<AstStatement>
 
 partial class FastParser
 {
-
-
-
     bool Switch(out AstStatement node)
     {
         var begin = stream.Current;
@@ -19,57 +19,55 @@ partial class FastParser
         node = null;
 
         stream.Expect(TokenTypes.BracketStart);
+
         if (!Expression(out var target))
             throw stream.Unexpected();
+
         stream.Expect(TokenTypes.BracketEnd);
 
         stream.Expect(TokenTypes.CurlyBracketStart);
+
         var nodes = new Sequence<AstCase>();
         var statements = new Sequence<AstStatement>();
         AstExpression test = null;
         bool hasDefault = false;
-        try
+
+        while (!stream.CheckAndConsume(TokenTypes.CurlyBracketEnd))
         {
-            while (!stream.CheckAndConsume(TokenTypes.CurlyBracketEnd))
+            if (stream.CheckAndConsume(FastKeywords.@case))
             {
-                if(stream.CheckAndConsume(FastKeywords.@case))
+                if (test != null)
                 {
-                    if (test != null)
-                    {
-                        nodes.Add(new AstCase(test, statements));
-                        statements = [];
-                    }
-                    if (!Expression(out test))
-                        throw stream.Unexpected();
-                    stream.Expect(TokenTypes.Colon);
-                } else if(stream.CheckAndConsume(FastKeywords.@default))
-                {
-                    stream.Expect(TokenTypes.Colon);
-                    if (test != null) {
-                        nodes.Add(new AstCase(test, statements));
-                        statements = [];
-                    }
-                    test = null;
-                    hasDefault = true;
-                } else if (Statement(out var stmt))
-                    statements.Add(stmt);
-            }
+                    nodes.Add(new AstCase(test, statements));
+                    statements = [];
+                }
 
-            if(test != null || hasDefault)
+                if (!Expression(out test))
+                    throw stream.Unexpected();
+
+                stream.Expect(TokenTypes.Colon);
+            }
+            else if (stream.CheckAndConsume(FastKeywords.@default))
             {
-                nodes.Add(new AstCase(test, statements));
-                // statements = new Sequence<AstStatement>();
+                stream.Expect(TokenTypes.Colon);
+
+                if (test != null)
+                {
+                    nodes.Add(new AstCase(test, statements));
+                    statements = [];
+                }
+
+                test = null;
+                hasDefault = true;
             }
-
-            node = new AstSwitchStatement(begin, PreviousToken, target, nodes);
-            return true;
-
-        } finally
-        {
-            // nodes.Clear();
-            // statements.Clear();
+            else if (Statement(out var stmt))
+                statements.Add(stmt);
         }
+
+        if (test != null || hasDefault)
+            nodes.Add(new AstCase(test, statements));
+
+        node = new AstSwitchStatement(begin, PreviousToken, target, nodes);
+        return true;
     }
-
-
 }

@@ -1,9 +1,10 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using System;
 using System.Collections.Concurrent;
 using System.Globalization;
-using YantraJS.Core.Clr;
+using YantraJS.Core;
 
-namespace YantraJS.Core.Core.Intl;
+namespace Broiler.JavaScript.Core.Core.Intl;
 
 public class JSIntl
 {
@@ -34,11 +35,7 @@ public class JSIntlDateTimeFormat : JavaScriptObject
 
     internal JSValue Format(DateTimeOffset value, JSObject format) => new JSString(value.ToString());
 
-    public JSIntlDateTimeFormat(in Arguments a) : base(a)
-    {
-    }
+    public JSIntlDateTimeFormat(in Arguments a) : base(a) { }
 
     internal JSIntlDateTimeFormat(CultureInfo locale) : base(Arguments.Empty) => this.locale = locale;
-
-
 }

@@ -1,4 +1,6 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using YantraJS.Core;
+
+namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstArrayPattern(FastToken start, FastToken end, IFastEnumerable<AstExpression> elements) : AstBindingPattern(start, FastNodeType.ArrayPattern, end)
 {

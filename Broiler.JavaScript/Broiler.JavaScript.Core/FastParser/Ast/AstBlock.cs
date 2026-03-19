@@ -1,22 +1,19 @@
 ﻿#nullable enable
-namespace YantraJS.Core.FastParser;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+using YantraJS.Core;
+
+namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstBlock : AstStatement
 {
-
-    /// <summary>
-    /// 
-    /// </summary>
     public IFastEnumerable<StringSpan>? HoistingScope;
-
-
     public readonly IFastEnumerable<AstStatement> Statements;
 
     protected AstBlock(FastToken start, FastNodeType type, FastToken end, IFastEnumerable<AstStatement> statements) : base(start, type, end) => Statements = statements;
 
-
     public AstBlock(FastToken start, FastToken end, IFastEnumerable<AstStatement> list) : base(start, FastNodeType.Block, end) => Statements = list;
 
     public override string ToString() => Statements.Join("\n\t");
-
 }

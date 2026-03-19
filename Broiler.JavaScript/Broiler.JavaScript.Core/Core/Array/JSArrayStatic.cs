@@ -1,12 +1,12 @@
-﻿using System;
-using YantraJS.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using System;
 
 namespace YantraJS.Core;
 
 
 public partial class JSArray
 {
-
     [JSExport("from", Length = 1)]
     public static JSValue StaticFrom(in Arguments a)
     {
@@ -21,17 +21,14 @@ public partial class JSArray
         {
             var cb = fx.f;
             while (en.MoveNext(out var hasValue, out var item, out var index))
-            {
-                elements.Put(length++, cb(new Arguments(mapThis, item,new JSNumber(index))));
-            }
+                elements.Put(length++, cb(new Arguments(mapThis, item, new JSNumber(index))));
         }
         else
         {
             while (en.MoveNext(out var hasValue, out var item, out var index))
-            {
                 elements.Put(length++, item);
-            }
         }
+
         r._length = length;
         return r;
     }
@@ -45,10 +42,10 @@ public partial class JSArray
         var r = new JSArray();
         var al = a.Length;
         ref var rElements = ref r.CreateElements();
-        for(var ai = 0; ai<al; ai++)
-        {
+
+        for (var ai = 0; ai < al; ai++)
             rElements.Put(r._length++, a.GetAt(ai));
-        }
+
         return r;
     }
 
@@ -61,13 +58,14 @@ public partial class JSArray
     public static JSValue StaticFromAsync(in Arguments a)
     {
         var (items, mapFn, thisArg) = a.Get3();
+
         if (items.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(
-                JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
 
         bool hasMap = mapFn.IsFunction;
+
         if (!mapFn.IsNullOrUndefined && !hasMap)
-            throw JSContext.Current.NewTypeError("mapFn must be a function");
+            throw JSContext.NewTypeError("mapFn must be a function");
 
         try
         {
@@ -83,34 +81,25 @@ public partial class JSArray
                 // Await-like: if the element is a promise/thenable, resolve it
                 // synchronously for the current implementation.
                 if (item is JSPromise p && p.state == JSPromise.PromiseState.Resolved)
-                {
                     item = p.result ?? item;
-                }
 
                 if (hasMap)
-                {
-                    item = mapFn.InvokeFunction(
-                        new Arguments(thisArg, item, new JSNumber(length)));
-                }
+                    item = mapFn.InvokeFunction(new Arguments(thisArg, item, new JSNumber(length)));
+
                 elements.Put(length++, item);
             }
+
             result._length = length;
 
-            return new JSPromise(
-                result, JSPromise.PromiseState.Resolved);
+            return new JSPromise(result, JSPromise.PromiseState.Resolved);
         }
         catch (JSException ex)
         {
-            return new JSPromise(
-                ex.Error ?? JSError.From(ex),
-                JSPromise.PromiseState.Rejected);
+            return new JSPromise(ex.Error ?? JSError.From(ex), JSPromise.PromiseState.Rejected);
         }
         catch (Exception ex)
         {
-            return new JSPromise(
-                JSError.From(ex),
-                JSPromise.PromiseState.Rejected);
+            return new JSPromise(JSError.From(ex), JSPromise.PromiseState.Rejected);
         }
     }
-
 }

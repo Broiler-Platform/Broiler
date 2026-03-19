@@ -58,27 +58,6 @@ public partial class ILCodeGenerator
 
                 Visit(a);
 
-                //if (p.IsOut)
-                //{
-                //    if (a.NodeType != YExpressionType.Parameter && a.NodeType != YExpressionType.Field)
-                //    {
-                //        var temp = tempVariables[p.ParameterType];
-                //        saveList ??= new List<(int temp, YExpression exp)>();
-                //        saveList.Add((temp.LocalIndex, a));
-
-                //        Visit(a);
-                //        // save in temp...
-                //        il.EmitSaveLocal(temp.LocalIndex);
-
-                //        il.EmitLoadLocalAddress(temp.LocalIndex);
-                //        continue;
-                //    }
-                //}
-
-                //using (addressScope.Push(p))
-                //{
-                //    Visit(a);
-                //}
                 continue;
             }
             if (!p.HasDefaultValue)

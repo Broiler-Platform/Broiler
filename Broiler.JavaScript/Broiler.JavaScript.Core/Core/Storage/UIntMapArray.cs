@@ -1,224 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using YantraJS.Core;
 using YantraJS.Core.Objects;
 
-namespace YantraJS.Core.Core.Storage;
+namespace Broiler.JavaScript.Core.Core.Storage;
 
-
-#region Old
-
-//public struct ElementArray
-//{
-
-//    private JSProperty[] Storage;
-//    private UInt32Map<uint> Map;
-//    private bool IsSparse;
-//    private uint length;
-//    public ElementArray(int size)
-//    {
-//        Storage = new JSProperty[size < 16 ? 16 : size];
-//        Map = UInt32Map<uint>.Null;
-//        IsSparse = false;
-//        length = 0;
-//    }
-
-//    public bool IsNull => Storage == null;
-
-//    public JSProperty this[uint index]
-//    {
-//        get
-//        {
-//            if(!IsSparse)
-//            {
-//                if (index < Storage.Length)
-//                    return Storage[index];
-//            }
-//            if (Map.TryGetValue(index, out var i))
-//                return Storage[i];
-//            return JSProperty.Empty;
-//        }
-//        set
-//        {
-//            uint key;
-//            if (IsSparse)
-//            {
-//                if(Map.TryGetValue(index, out key))
-//                {
-//                    Storage[key] = value;
-//                    return;
-//                }
-//                key = length++;
-//                Map.Save(index, length);
-//                if (key >= Storage.Length)
-//                {
-//                    Array.Resize(ref Storage, Storage.Length + 8);
-//                }
-//                Storage[key] = value;
-//                return;
-//            }
-//            if (index < 64)
-//            {
-//                if (index >= length)
-//                {
-//                    length = index + 1;
-//                }
-
-//                // extend array...
-//                if (index < Storage.Length)
-//                {
-//                    Storage[index] = value;
-//                    return;
-//                }
-//                if(index < 32)
-//                {
-//                    Array.Resize(ref Storage, 32);
-//                } else
-//                {
-//                    Array.Resize(ref Storage, 64);
-//                }
-//                Storage[index] = value;
-//                return;
-//            }
-
-//            // create map...
-//            IsSparse = true;
-//            key = length++;
-//            Map.Save(index, key);
-//            if (key >= Storage.Length)
-//            {
-//                Array.Resize(ref Storage, Storage.Length + 8);
-//            }
-//            Storage[key] = value;
-//        }
-//    }
-
-//    public bool TryGetValue(uint key, out JSProperty value)
-//    {
-//        if (IsSparse)
-//        {
-//            if (Map.TryGetValue(key, out var index))
-//            {
-//                value = Storage[index];
-//                return !value.IsEmpty;
-//            }
-//            value = JSProperty.Empty;
-//            return false;
-//        }
-//        if (key < Storage.Length)
-//        {
-//            value = Storage[key];
-//        } else
-//        {
-//            value = JSProperty.Empty;
-//            return false;
-//        }
-//        return !value.IsEmpty;
-//    }
-
-//    public bool TryRemove(uint key, out JSProperty value)
-//    {
-//        if (IsSparse)
-//        {
-//            if (Map.TryRemove(key, out var index))
-//            {
-//                value = Storage[index];
-//                Storage[index] = JSProperty.Empty;
-//                return true;
-//            }
-//            value = JSProperty.Empty;
-//            return false;
-//        }
-//        if (key < Storage.Length)
-//        {
-//            value = Storage[key];
-//            Storage[key] = JSProperty.Empty;
-//            return true;
-//        }
-//        value = JSProperty.Empty;
-//        return false;
-//    }
-//    public bool RemoveAt(uint key)
-//    {
-//        if (IsSparse)
-//        {
-//            if(Map.TryRemove(key,out var index))
-//            {
-//                Storage[index] = JSProperty.Empty;
-//                return true;
-//            }
-//            return false;
-//        }
-//        if (key < Storage.Length)
-//        {
-//            Storage[key] = JSProperty.Empty;
-//            return true;
-//        }
-//        return false;
-//    }
-//    public IEnumerable<(uint Key, JSProperty Value)> AllValues()
-//    {
-//        if(IsSparse)
-//        {
-//            for(uint i = 0; i < length; i++)
-//            {
-//                if(Map.TryGetValue(i, out var v))
-//                {
-//                    yield return (i , Storage[v]);
-//                }
-//            }
-//            yield break;
-//        }
-//        if (Storage == null)
-//            yield break;
-//        for (uint i = 0; i < Storage.Length; i++)
-//        {
-//            yield return (i, Storage[i]);
-//        }
-//    }
-//    public bool HasKey(uint key)
-//    {
-//        if (IsSparse)
-//        {
-//            return Map.HasKey(key);
-//        }
-//        if (key >= length)
-//        {
-//            return false;
-//        }
-//        ref var p = ref Storage[key];
-//        return !p.IsEmpty;
-//    }
-//}
-
-//public struct ElementArray
-//{
-//    public UInt32Map<JSProperty> storage;
-
-//    public JSProperty this [uint index]
-//}
-#endregion
 
 public struct ElementArray
 {
-
     private SAUint32Map<JSProperty> Storage;
-
-    // private UInt32Map<JSProperty> Storage;
 
     public uint Length { get; private set; }
 
     public void Put(uint index, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty) => Put(index) = JSProperty.Property(getter, setter, attributes);
-
 
     public void Put(uint index, JSValue value, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => Put(index) = JSProperty.Property(value, attributes);
 
     public ref JSProperty Put(uint index)
     {
         if(index >= Length)
-        {
             Length = index + 1;
-        }
+
         return ref Storage.Put(index);
     }
 
@@ -232,16 +35,6 @@ public struct ElementArray
             ref var p = ref Storage.GetRefOrDefault(index, ref JSProperty.Empty);
             return p;
         }
-        //[Obsolete("Use Put")]
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //set
-        //{
-        //    if (index >= length)
-        //    {
-        //        length = index + 1;
-        //    }
-        //    Storage.Put(index) = value;
-        //}
     }
 
     public bool IsNull => Storage.IsNull;
@@ -275,15 +68,6 @@ public struct ElementArray
         }
     }
 
-    //     PRIVATE IMPLEMENTATION METHODS
-    //_________________________________________________________________________________________
-
-    /// <summary>
-    /// Sorts a array using the quicksort algorithm.
-    /// </summary>
-    /// <param name="comparer"> A comparison function. </param>
-    /// <param name="start"> The first index in the range. </param>
-    /// <param name="end"> The last index in the range. </param>
     internal void QuickSort(Comparison<JSValue> comparer, uint start, uint end)
     {
         if (end - start < 30)

@@ -1,6 +1,6 @@
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core;
 
-namespace YantraJS.Debugger;
+namespace Broiler.JavaScript.Core.Debugger;
 
 /// <summary>
 /// Defines the contract for a JavaScript debugger.

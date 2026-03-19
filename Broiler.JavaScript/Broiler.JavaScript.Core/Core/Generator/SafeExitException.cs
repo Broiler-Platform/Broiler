@@ -1,11 +1,8 @@
 ﻿using System;
 
-namespace YantraJS.Core.Generator;
+namespace Broiler.JavaScript.Core.Core.Generator;
 
 internal class SafeExitException : Exception
 {
-    public SafeExitException()
-    {
-
-    }
+    public SafeExitException() { }
 }

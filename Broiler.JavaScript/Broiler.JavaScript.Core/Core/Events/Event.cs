@@ -1,9 +1,12 @@
 ﻿#nullable enable
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
 using System;
+using Yantra.Core.Events;
 using YantraJS.Core;
-using YantraJS.Core.Clr;
 
-namespace Yantra.Core.Events;
+namespace Broiler.JavaScript.Core.Core.Events;
 
 public class Event : JavaScriptObject
 {
@@ -88,7 +91,6 @@ public class Event : JavaScriptObject
 
     [JSExport]
     public void StopPropoagation() => PropagationStopped = true;
-
 
     [JSExport]
     public void StopImmediatePropoagation() => PropagationStopped = true;

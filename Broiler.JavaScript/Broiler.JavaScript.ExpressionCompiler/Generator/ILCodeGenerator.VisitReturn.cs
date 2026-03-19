@@ -51,7 +51,6 @@ public partial class ILCodeGenerator
         if(!il.IsTryBlock)
         {
             il.Emit(OpCodes.Ret);
-            // il.ClearStack();
             return true;
         }
         il.EmitSaveLocal(localIndex);
@@ -61,15 +60,11 @@ public partial class ILCodeGenerator
 
     private CodeInfo VisitReturnAssign(YAssignExpression assign, ILWriterLabel label, int localIndex)
     {
-        //Visit(assign.Right);
-        //il.EmitSaveLocal(localIndex);
-        //Assign(assign.Left, localIndex);
         VisitAssign(assign, localIndex);
         if (!il.IsTryBlock)
         {
             il.EmitLoadLocal(localIndex);
             il.Emit(OpCodes.Ret);
-            // il.ClearStack();
             return true;
         }
         il.Branch(label, localIndex);

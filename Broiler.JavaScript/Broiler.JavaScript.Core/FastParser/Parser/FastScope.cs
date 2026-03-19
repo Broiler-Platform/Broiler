@@ -1,12 +1,11 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using YantraJS.Core;
 
-public partial class FastScope: LinkedStack<FastScopeItem>
+namespace Broiler.JavaScript.Core.FastParser.Parser;
+
+public partial class FastScope : LinkedStack<FastScopeItem>
 {
-    // private readonly FastPool pool;
-
     public FastScope()
     {
-        // this.pool = pool;
     }
 
     public FastScopeItem Push(FastToken token, FastNodeType nodeType)

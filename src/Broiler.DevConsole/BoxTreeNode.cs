@@ -1,5 +1,4 @@
 using Broiler.HTML.Dom.Core.Dom;
-using System.Collections.Generic;
 
 namespace Broiler.DevConsole;
 

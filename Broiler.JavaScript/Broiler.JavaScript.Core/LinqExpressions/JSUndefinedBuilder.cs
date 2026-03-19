@@ -1,13 +1,11 @@
-﻿using YantraJS.Core;
-using YantraJS.Core.LambdaGen;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.LambdaGen;
+using YantraJS.Core;
 using Expression = YantraJS.Expressions.YExpression;
 
-namespace YantraJS.ExpHelper;
+namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public class JSUndefinedBuilder
 {
-    public static Expression Value =
-        NewLambdaExpression.StaticFieldExpression<JSValue>(() => () => JSUndefined.Value);
-        //Expression.Field(null,
-        //    typeof(JSUndefined).GetField(nameof(Core.JSUndefined.Value)));
+    public static Expression Value = NewLambdaExpression.StaticFieldExpression<JSValue>(() => () => JSUndefined.Value);
 }

@@ -1,7 +1,8 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Storage;
+using System;
 using Yantra.Core;
-using YantraJS.Core.Clr;
-using YantraJS.Core.Core.Storage;
 
 namespace YantraJS.Core;
 
@@ -20,37 +21,33 @@ internal class WeakValue(HashedString key, JSValue value, UnregisterWeakValue un
 [JSClassGenerator("WeakMap")]
 public partial class JSWeakMap: JSObject
 {
-
-
     private StringMap<WeakReference<WeakValue>> index;
 
     public JSWeakMap(in Arguments a) : base(JSContext.NewTargetPrototype)
     {
-        if (a[0] is JSArray array)
-        {
-            var en = array.GetElementEnumerator();
-            while (en.MoveNext(out var value))
-                Set((JSObject)value[0], value[1]);
-        }
+        if (a[0] is not JSArray array)
+            return;
 
+        var en = array.GetElementEnumerator();
+        while (en.MoveNext(out var value))
+            Set((JSObject)value[0], value[1]);
     }
 
     [JSExport("set")]
     public JSValue Set(JSObject key, JSValue value)
     {
         HashedString uk = key.ToUniqueID();
+
         lock (this)
         {
             if (!index.TryGetValue(uk, out var w))
-            {
                 index.Put(uk) = new(new(uk, value, Unregister));
-            }
         }
+
         return value;
     }
 
     private void Unregister(in HashedString key) => index.RemoveAt(key.Value);
-
 
     [JSExport("delete")]
     public JSValue Delete(in Arguments a)
@@ -61,9 +58,8 @@ public partial class JSWeakMap: JSObject
             if (index.TryRemove(key, out var w))
             {
                 if (w.TryGetTarget(out var target))
-                {
                     GC.SuppressFinalize(target);
-                }
+
                 return JSBoolean.True;
             }
         }
@@ -80,9 +76,7 @@ public partial class JSWeakMap: JSObject
             if (index.TryGetValue(key, out var v))
             {
                 if (v.TryGetTarget(out var target))
-                {
                     return JSBoolean.True;
-                }
             }
         }
 
@@ -99,9 +93,7 @@ public partial class JSWeakMap: JSObject
             if (index.TryGetValue(uk, out var v))
             {
                 if (v.TryGetTarget(out var target))
-                {
                     return target.value;
-                }
             }
         }
 
@@ -117,20 +109,21 @@ public partial class JSWeakMap: JSObject
     public JSValue GetOrInsert(in Arguments a)
     {
         var (keyVal, defaultValue) = a.Get2();
-        if (!(keyVal is JSObject key))
-            throw JSContext.Current.NewTypeError("WeakMap key must be an object");
+        if (keyVal is not JSObject key)
+            throw JSContext.NewTypeError("WeakMap key must be an object");
+
         var uk = key.ToUniqueID();
         lock (this)
         {
             if (index.TryGetValue(uk, out var v))
             {
                 if (v.TryGetTarget(out var target))
-                {
                     return target.value;
-                }
             }
+
             index.Put(uk) = new WeakReference<WeakValue>(new WeakValue(uk, defaultValue, Unregister));
         }
+
         return defaultValue;
     }
 
@@ -143,20 +136,21 @@ public partial class JSWeakMap: JSObject
     public JSValue GetOrInsertComputed(in Arguments a)
     {
         var (keyVal, callbackfn) = a.Get2();
-        if (!(keyVal is JSObject key))
-            throw JSContext.Current.NewTypeError("WeakMap key must be an object");
+        if (keyVal is not JSObject key)
+            throw JSContext.NewTypeError("WeakMap key must be an object");
+
         if (!callbackfn.IsFunction)
-            throw JSContext.Current.NewTypeError("getOrInsertComputed requires a callback function");
+            throw JSContext.NewTypeError("getOrInsertComputed requires a callback function");
+
         var uk = key.ToUniqueID();
         lock (this)
         {
             if (index.TryGetValue(uk, out var v))
             {
                 if (v.TryGetTarget(out var target))
-                {
                     return target.value;
-                }
             }
+
             var value = callbackfn.Call(JSUndefined.Value, key);
             index.Put(uk) = new WeakReference<WeakValue>(new WeakValue(uk, value, Unregister));
             return value;

@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
-using YantraJS.Utils;
+using YantraJS.Core;
+using YantraJS.Core.FastParser;
 
-namespace YantraJS.Core.FastParser.Ast;
+namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 
 public class AstIdentifierReplacer : AstReduce
@@ -14,13 +15,12 @@ public class AstIdentifierReplacer : AstReduce
     protected override AstNode VisitIdentifier(AstIdentifier identifier)
     {
         var e = changes.GetFastEnumerator();
-        while(e.MoveNext(out var item))
+        while (e.MoveNext(out var item))
         {
             if (identifier.Name.Equals(item.from))
-            {
                 return item.temp;
-            }
         }
+
         return identifier;
     }
 
@@ -31,12 +31,12 @@ public class AstIdentifierReplacer : AstReduce
     }
 }
 
-public abstract class AstReduce: AstMapVisitor<AstNode>
+public abstract class AstReduce : AstMapVisitor<AstNode>
 {
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool Modified<T>(T node, out T r)
-        where T: AstNode
+        where T : AstNode
     {
         r = Visit(node) as T;
         return r != node;
@@ -78,41 +78,14 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
         return r1 != node1 || r2 != node2 || r3 != node3 || r4 != node4;
     }
 
-    private bool Modified<T>(in ArraySpan<T> statements, out ArraySpan<T> list)
-        where T: AstNode
-    {
-        list = statements;
-        if(statements.Length == 0)
-        {
-            return false;
-        }
-        bool dirty = false;
-        var r = new T[statements.Length];
-        for (int i = 0; i < statements.Length; i++)
-        {
-            ref var item = ref statements[i];
-            var visited = Visit(item);
-            if (visited != item)
-                dirty = true;
-            r[i] = visited as T;
-        }
-        if(!dirty)
-        {
-            return false;
-        }
-        list = new ArraySpan<T>(r, r.Length);
-        return true;
-    }
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool Modified<T>(IFastEnumerable<T> statements, out IFastEnumerable<T> list)
         where T : AstNode
     {
         list = statements;
         if (statements.Count == 0)
-        {
             return false;
-        }
+
         // we will create new sequence only if any expression has been modified
         // this will prevent allocations
         Sequence<T> r = null;
@@ -125,25 +98,30 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
                 r?.Add(item);
                 continue;
             }
+
             if (r == null)
             {
                 r = new Sequence<T>(statements.Count);
                 var ec = statements.GetFastEnumerator();
+
                 while (ec.MoveNext(out var previous))
                 {
                     if (previous == item)
                         break;
+
                     r.Add(previous);
                 }
+
                 r.Add(visited);
                 continue;
             }
+
             r.Add(visited);
         }
+
         if (r == null)
-        {
             return false;
-        }
+
         list = r;
         return true;
     }
@@ -153,137 +131,45 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         list = statements;
         if (statements.Count == 0)
-        {
             return false;
-        }
+
         // we will create new sequence only if any expression has been modified
         // this will prevent allocations
         Sequence<T> r = null;
         var en = statements.GetFastEnumerator();
+
         while (en.MoveNext(out var item, out var index))
         {
             var visitedItem = visitor(item);
-            if (visitedItem.Equals(item)) {
+            if (visitedItem.Equals(item))
+            {
                 r?.Add(item);
                 continue;
             }
+
             if (r == null)
             {
                 r = new Sequence<T>(statements.Count);
                 var ec = statements.GetFastEnumerator();
+
                 while (ec.MoveNext(out var previous, out var i))
                 {
                     if (index == i)
                         break;
                     r.Add(previous);
                 }
+
                 r.Add(visitedItem);
                 continue;
             }
+
             r.Add(visitedItem);
         }
+
         if (r == null)
-        {
             return false;
-        }
+
         list = r;
-        return true;
-    }
-
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool Modified<T>(T[] statements, out T[] list)
-        where T : AstExpression
-    {
-        list = statements;
-        if (statements.Length == 0)
-        {
-            return false;
-        }
-        T[] r = null;
-        for (int i = 0; i < statements.Length; i++)
-        {
-            ref var item = ref statements[i];
-            var visited = Visit(item) as T ?? throw new ArgumentNullException();
-            if (visited == item)
-            {
-                if (r != null)
-                    r[i] = item;
-                continue;
-            }
-            if (r == null)
-            {
-                r = new T[statements.Length];
-                for (int j = 0; j < i; j++)
-                {
-                    r[j] = statements[j];
-                }
-            }
-            r[i] = visited;
-        }
-        if (r == null)
-        {
-            return false;
-        }
-        list = r;
-        return true;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool Modified<T>(T[] statements, Func<T, T> visitor, out T[] list)
-    {
-        list = statements;
-        if (statements.Length == 0)
-        {
-            return false;
-        }
-        T[] r = null;
-        for (int i = 0; i < statements.Length; i++)
-        {
-            ref var item = ref statements[i];
-            var visited = visitor(item);
-            if (visited.Equals(item))
-                continue;
-            if (r == null)
-            {
-                r = new T[statements.Length];
-                for (int j = 0; j < i; j++)
-                {
-                    r[j] = statements[j];
-                }
-            }
-            r[i] = visited;
-        }
-        if (r == null)
-        {
-            return false;
-        }
-        list = r;
-        return true;
-    }
-
-    private bool Modified<T>(in ArraySpan<T> statements, Func<T, T> visitor, out ArraySpan<T> list)
-    {
-        list = statements;
-        if (statements.Length == 0)
-        {
-            return false;
-        }
-        bool dirty = false;
-        var r = new T[statements.Length];
-        for (int i = 0; i < statements.Length; i++)
-        {
-            ref var item = ref statements[i];
-            var visited = visitor(item);
-            if (!visited.Equals(item))
-                dirty = true;
-            r[i] = visited;
-        }
-        if (!dirty)
-        {
-            return false;
-        }
-        list = new ArraySpan<T>(r, r.Length);
         return true;
     }
 
@@ -291,6 +177,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(arrayPattern.Elements, out var elements))
             return new AstArrayPattern(arrayPattern.Start, arrayPattern.End, elements);
+
         return arrayPattern;
     }
 
@@ -298,6 +185,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(program.Statements, out var list))
             return new AstProgram(program.Start, program.End, list, program.IsAsync);
+
         return program;
     }
 
@@ -305,6 +193,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(block.Statements, out var list))
             return new AstBlock(block.Start, block.End, list);
+
         return block;
     }
 
@@ -312,6 +201,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(node.Argument, out var arg))
             return new AstAwaitExpression(node.Start, node.End, arg);
+
         return node;
     }
 
@@ -319,6 +209,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(arrayExpression.Elements, out var list))
             return new AstArrayExpression(arrayExpression.Start, arrayExpression.End, list);
+
         return arrayExpression;
     }
 
@@ -326,9 +217,9 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
 
     protected override AstNode VisitBinaryExpression(AstBinaryExpression binaryExpression)
     {
-        
         if (Modified(binaryExpression.Left, binaryExpression.Right, out var left, out var right))
             return new AstBinaryExpression(left, binaryExpression.Operator, right);
+
         return binaryExpression;
     }
 
@@ -336,10 +227,9 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         var t = Modified(callExpression.Callee, out var target);
         var a = Modified(callExpression.Arguments, out var arguments);
-        if(t || a)
-        {
+        if (t || a)
             return new AstCallExpression(target, arguments, callExpression.Coalesce);
-        }
+
         return callExpression;
     }
 
@@ -348,6 +238,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
         var pc = Modified(classStatement.Identifier, classStatement.Base, out var id, out var @base);
         if (Modified(classStatement.Members, out var members) || pc)
             return new AstClassExpression(classStatement.Start, classStatement.End, id, @base, members);
+
         return classStatement;
     }
 
@@ -355,6 +246,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(conditionalExpression.Test, conditionalExpression.True, conditionalExpression.False, out var test, out var @true, out var @false))
             return new AstConditionalExpression(test, @true, @false);
+
         return conditionalExpression;
     }
 
@@ -362,6 +254,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(astExportStatement.Declaration, astExportStatement.Source, out var d, out var s))
             return new AstExportStatement(astExportStatement.Start, d, s);
+
         return astExportStatement;
     }
 
@@ -373,9 +266,9 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
 
     protected override AstNode VisitDoWhileStatement(AstDoWhileStatement doWhileStatement, string label = null)
     {
-
         if (Modified(doWhileStatement.Body, doWhileStatement.Test, out var statement, out var test))
             return new AstDoWhileStatement(doWhileStatement.Start, doWhileStatement.End, test, statement);
+
         return doWhileStatement;
     }
 
@@ -385,46 +278,41 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(expressionStatement.Expression, out var expression))
             return new AstExpressionStatement(expression);
+
         return expressionStatement;
     }
 
     protected override AstNode VisitForInStatement(AstForInStatement forInStatement, string label = null)
     {
-        if(Modified(forInStatement.Init, forInStatement.Target, forInStatement.Body, 
-            out var init, out var target, out var body))
-        {
+        if (Modified(forInStatement.Init, forInStatement.Target, forInStatement.Body, out var init, out var target, out var body))
             return new AstForInStatement(forInStatement.Start, forInStatement.End, init, target, body);
-        }
+
         return forInStatement;
     }
 
     protected override AstNode VisitForOfStatement(AstForOfStatement forOfStatement, string label = null)
     {
-        if (Modified(forOfStatement.Init, forOfStatement.Target, forOfStatement.Body,
-            out var init, out var target, out var body))
-        {
+        if (Modified(forOfStatement.Init, forOfStatement.Target, forOfStatement.Body, out var init, out var target, out var body))
             return new AstForInStatement(forOfStatement.Start, forOfStatement.End, init, target, body);
-        }
+
         return forOfStatement;
     }
 
     protected override AstNode VisitForStatement(AstForStatement forStatement, string label = null)
     {
-        if (Modified(forStatement.Init, forStatement.Test, forStatement.Update, forStatement.Body,
-            out var init, out var test, out var update, out var body))
+        if (Modified(forStatement.Init, forStatement.Test, forStatement.Update, forStatement.Body, out var init, out var test, out var update, out var body))
             return new AstForStatement(forStatement.Start, forStatement.End, init, test, update, body);
+
         return forStatement;
     }
 
     protected override AstNode VisitFunctionExpression(AstFunctionExpression functionExpression)
     {
         var argsModified = Modified(functionExpression.Params, VisitVariableDeclarator, out var parameters);
-        if(Modified(functionExpression.Id, functionExpression.Body, out var id, out var body) || argsModified)
-            return new AstFunctionExpression(functionExpression.Start, functionExpression.End, 
-                functionExpression.IsArrowFunction, 
-                functionExpression.Async, 
-                functionExpression.Generator, 
-                id, parameters, body);
+        if (Modified(functionExpression.Id, functionExpression.Body, out var id, out var body) || argsModified)
+            return new AstFunctionExpression(functionExpression.Start, functionExpression.End, functionExpression.IsArrowFunction, functionExpression.Async,
+                functionExpression.Generator, id, parameters, body);
+
         return functionExpression;
     }
 
@@ -432,9 +320,9 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
 
     protected override AstNode VisitIfStatement(AstIfStatement ifStatement)
     {
-        if (Modified(ifStatement.Test, ifStatement.True, ifStatement.False,
-            out var test, out var @true, out var @false))
+        if (Modified(ifStatement.Test, ifStatement.True, ifStatement.False, out var test, out var @true, out var @false))
             return new AstIfStatement(ifStatement.Start, ifStatement.End, test, @true, @false);
+
         return ifStatement;
     }
 
@@ -442,6 +330,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(labeledStatement.Body, out var statement))
             return new AstLabeledStatement(labeledStatement.Label, statement);
+
         return labeledStatement;
     }
 
@@ -453,14 +342,17 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(memberExpression.Object, memberExpression.Property, out var target, out var member))
             return new AstMemberExpression(target, member, memberExpression.Computed);
+
         return memberExpression;
     }
 
-    protected override AstNode VisitNewExpression(AstNewExpression newExpression) {
+    protected override AstNode VisitNewExpression(AstNewExpression newExpression)
+    {
         var cm = Modified(newExpression.Callee, out var callee);
         var am = Modified(newExpression.Arguments, out var args);
         if (cm || am)
             return new AstNewExpression(newExpression.Start, callee, args);
+
         return newExpression;
     }
 
@@ -468,19 +360,23 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(objectLiteral.Properties, out var members))
             return new AstObjectLiteral(objectLiteral.Start, objectLiteral.End, members);
+
         return objectLiteral;
     }
 
     protected override AstNode VisitObjectPattern(AstObjectPattern objectPattern)
     {
-        if(Modified(objectPattern.Properties, VisitObjectProperty, out var properties))
+        if (Modified(objectPattern.Properties, VisitObjectProperty, out var properties))
             return new AstObjectPattern(objectPattern.Start, objectPattern.End, properties);
+
         return objectPattern;
     }
 
-    protected override AstNode VisitReturnStatement(AstReturnStatement returnStatement) {
+    protected override AstNode VisitReturnStatement(AstReturnStatement returnStatement)
+    {
         if (Modified(returnStatement.Argument, out var target))
             return new AstReturnStatement(returnStatement.Start, returnStatement.End, target);
+
         return returnStatement;
     }
 
@@ -488,6 +384,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(sequenceExpression.Expressions, out var expressions))
             return new AstSequenceExpression(sequenceExpression.Start, sequenceExpression.End, expressions);
+
         return sequenceExpression;
     }
 
@@ -495,6 +392,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(spreadElement.Argument, out var argument))
             return new AstSpreadElement(spreadElement.Start, spreadElement.End, argument);
+
         return argument;
     }
 
@@ -503,6 +401,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
         var testModified = Modified(switchStatement.Target, out var target);
         if (Modified(switchStatement.Cases, VisitCase, out var cases) || testModified)
             return new AstSwitchStatement(switchStatement.Start, switchStatement.End, target, cases);
+
         return switchStatement;
     }
 
@@ -512,6 +411,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
         var argsModified = Modified(taggedTemplateExpression.Arguments, out var arguments);
         if (tagModified || argsModified)
             return new AstTaggedTemplateExpression(tag, arguments);
+
         return taggedTemplateExpression;
     }
 
@@ -519,6 +419,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(templateExpression.Parts, out var parts))
             return new AstTemplateExpression(templateExpression.Start, templateExpression.End, parts);
+
         return templateExpression;
     }
 
@@ -526,14 +427,15 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(throwStatement.Argument, out var argument))
             return new AstThrowStatement(throwStatement.Start, throwStatement.End, argument);
+
         return throwStatement;
     }
 
     protected override AstNode VisitTryStatement(AstTryStatement tryStatement)
     {
-        if (Modified(tryStatement.Block, tryStatement.Catch, tryStatement.Finally,
-            out var @try, out var @catch, out var @finally))
+        if (Modified(tryStatement.Block, tryStatement.Catch, tryStatement.Finally, out var @try, out var @catch, out var @finally))
             return new AstTryStatement(tryStatement.Start, tryStatement.End, @try, tryStatement.Identifier, @catch, @finally);
+
         return tryStatement;
     }
 
@@ -541,19 +443,16 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(unaryExpression.Argument, out var argument))
             return new AstUnaryExpression(unaryExpression.Start, argument, unaryExpression.Operator, unaryExpression.Prefix);
+
         return unaryExpression;
     }
 
     protected override AstNode VisitVariableDeclaration(AstVariableDeclaration variableDeclaration)
     {
         if (Modified(variableDeclaration.Declarators, VisitVariableDeclarator, out var declarators))
-            return new AstVariableDeclaration(
-                variableDeclaration.Start,
-                variableDeclaration.End,
-                declarators,
-                variableDeclaration.Kind,
-                variableDeclaration.Using,
-                variableDeclaration.AwaitUsing);
+            return new AstVariableDeclaration(variableDeclaration.Start, variableDeclaration.End, declarators, variableDeclaration.Kind,
+                variableDeclaration.Using, variableDeclaration.AwaitUsing);
+        
         return variableDeclaration;
     }
 
@@ -561,6 +460,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(whileStatement.Test, whileStatement.Body, out var test, out var body))
             return new AstWhileStatement(whileStatement.Start, whileStatement.End, test, body);
+
         return whileStatement;
     }
 
@@ -568,6 +468,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
     {
         if (Modified(yieldExpression.Argument, out var argument))
             return new AstYieldExpression(yieldExpression.Start, yieldExpression.End, argument, yieldExpression.Delegate);
+
         return yieldExpression;
     }
 
@@ -577,6 +478,7 @@ public abstract class AstReduce: AstMapVisitor<AstNode>
         var im = Modified(property.Init, out var init);
         if (km || im)
             return property.Reduce(key, init);
+
         return property;
     }
 

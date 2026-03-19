@@ -1,6 +1,12 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.CodeGen;
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+using Broiler.JavaScript.Core.FastParser.Parser;
+using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.Core.Utils;
+using System;
 using System.Linq;
-using YantraJS.ExpHelper;
 
 using Exp = YantraJS.Expressions.YExpression;
 using Expression = YantraJS.Expressions.YExpression;
@@ -17,11 +23,11 @@ partial class FastCompiler
         public readonly LabelTarget Label = Exp.Label("case-start");
     }
 
-    protected override Expression VisitSwitchStatement(AstSwitchStatement switchStatement) {
+    protected override Expression VisitSwitchStatement(AstSwitchStatement switchStatement)
+    {
         bool allStrings = true;
         bool allNumbers = true;
         bool allIntegers = true;
-
 
         var scope = pool.NewScope();
 
@@ -33,218 +39,216 @@ partial class FastCompiler
             var @break = Exp.Label();
             var ls = new LoopScope(@break, @continue, true);
             var cases = new Sequence<SwitchInfo>(switchStatement.Cases.Count + 2);
-            using (var bt = this.scope.Top.Loop.Push(ls))
+            using var bt = this.scope.Top.Loop.Push(ls);
+            SwitchInfo lastCase = new(scope);
+            var casesEn = switchStatement.Cases.GetFastEnumerator();
+
+            while (casesEn.MoveNext(out var c))
             {
-                SwitchInfo lastCase = new(scope);
-                var casesEn = switchStatement.Cases.GetFastEnumerator();
-                while(casesEn.MoveNext(out var c))
+                var body = new Sequence<Exp>(c.Statements.Count);
+                var en = c.Statements.GetFastEnumerator();
+
+                while (en.MoveNext(out var es))
                 {
-                    var body = new Sequence<Exp>(c.Statements.Count);
-                    var en = c.Statements.GetFastEnumerator();
-                    while(en.MoveNext(out var es))
+                    switch (es)
                     {
-                        switch (es)
-                        {
-                            case AstStatement stmt:
-                                body.Add(VisitStatement(stmt));
-                                break;
-                            //case Esprima.Ast.Expression exp:
-                            //    body.Add(VisitExpression(exp));
-                            //    break;
-                            default:
-                                throw new FastParseException(es.Start, $"Invalid statement {es.Type}");
-                        }
-                    }
-
-                    if (c.Test == null)
-                    {
-                        defBody = body;
-                        lastCase = new SwitchInfo(scope);
-                        continue;
-                    }
-
-                    Exp test = null;
-                    switch (c.Test.Type)
-                    {
-                        case FastNodeType.UnaryExpression:
-                            var unary = c.Test as AstUnaryExpression;
-                            var isTestSet = false;
-                            switch (unary.Operator)
-                            {
-                                case UnaryOperator.Plus:
-                                case UnaryOperator.Minus:
-                                    if (unary.Argument.Type == FastNodeType.Literal)
-                                    {
-                                        var l = unary.Argument as AstLiteral;
-                                        if (l.TokenType == TokenTypes.Number)
-                                        {
-                                            var n = l.NumericValue;
-                                            if ((n % 1) != 0)
-                                            {
-                                                allIntegers = false;
-                                            }
-                                            var ln = l.NumericValue;
-                                            if (unary.Operator ==  UnaryOperator.Minus)
-                                            {
-                                                ln = -ln;
-                                            }
-                                            test = Exp.Constant(ln);
-                                            isTestSet = true;
-                                            break;
-                                        }
-                                    }
-                                    break;
-                            }
-                            if (!isTestSet)
-                            {
-                                test = VisitExpression(c.Test);
-                                allNumbers = false;
-                                allStrings = false;
-                                allIntegers = false;
-                            }
+                        case AstStatement stmt:
+                            body.Add(VisitStatement(stmt));
                             break;
 
-                        case FastNodeType.Literal:
-                            var literal = c.Test as AstLiteral;
-
-                            switch (literal.TokenType)
-                            {
-                                case TokenTypes.String:
-                                    allNumbers = false;
-                                    // allStrings = allStrings && true ;
-                                    test = Exp.Constant(literal.StringValue);
-                                    break;
-                                case TokenTypes.Number:
-                                    var n = literal.NumericValue;
-                                    if ((n % 1) != 0)
-                                    {
-                                        allIntegers = false;
-                                    }
-                                    test = Exp.Constant(literal.NumericValue);
-                                    break;
-                                case TokenTypes.True:
-                                    allNumbers = false;
-                                    allStrings = false;
-                                    allIntegers = false;
-                                    test = JSBooleanBuilder.True;
-                                    break;
-                                case TokenTypes.False:
-                                    allNumbers = false;
-                                    allStrings = false;
-                                    allIntegers = false;
-                                    test = JSBooleanBuilder.False;
-                                    break;
-                                default:
-                                    throw new NotImplementedException();
-                            }
-
-                            break;
                         default:
+                            throw new FastParseException(es.Start, $"Invalid statement {es.Type}");
+                    }
+                }
+
+                if (c.Test == null)
+                {
+                    defBody = body;
+                    lastCase = new SwitchInfo(scope);
+
+                    continue;
+                }
+
+                Exp test = null;
+                switch (c.Test.Type)
+                {
+                    case FastNodeType.UnaryExpression:
+                        var unary = c.Test as AstUnaryExpression;
+                        var isTestSet = false;
+
+                        switch (unary.Operator)
+                        {
+                            case UnaryOperator.Plus:
+                            case UnaryOperator.Minus:
+                                if (unary.Argument.Type == FastNodeType.Literal)
+                                {
+                                    var l = unary.Argument as AstLiteral;
+
+                                    if (l.TokenType == TokenTypes.Number)
+                                    {
+                                        var n = l.NumericValue;
+                                        if ((n % 1) != 0)
+                                            allIntegers = false;
+
+                                        var ln = l.NumericValue;
+                                        if (unary.Operator == UnaryOperator.Minus)
+                                            ln = -ln;
+
+                                        test = Exp.Constant(ln);
+                                        isTestSet = true;
+                                        break;
+                                    }
+                                }
+
+                                break;
+                        }
+
+                        if (!isTestSet)
+                        {
                             test = VisitExpression(c.Test);
                             allNumbers = false;
                             allStrings = false;
                             allIntegers = false;
-                            break;
-                    }
-                    lastCase.Tests.Add(test);
+                        }
 
-                    if (body.Count > 0)
-                    {
-                        cases.Add(lastCase);
-                        body.Insert(0, Exp.Label(lastCase.Label));
-                        lastCase.Body = body;
-                        lastCase = new SwitchInfo(scope);
-                    }
+                        break;
+
+                    case FastNodeType.Literal:
+                        var literal = c.Test as AstLiteral;
+
+                        switch (literal.TokenType)
+                        {
+                            case TokenTypes.String:
+                                allNumbers = false;
+                                // allStrings = allStrings && true ;
+                                test = Exp.Constant(literal.StringValue);
+                                break;
+
+                            case TokenTypes.Number:
+                                var n = literal.NumericValue;
+                                if ((n % 1) != 0)
+                                    allIntegers = false;
+
+                                test = Exp.Constant(literal.NumericValue);
+                                break;
+
+                            case TokenTypes.True:
+                                allNumbers = false;
+                                allStrings = false;
+                                allIntegers = false;
+                                test = JSBooleanBuilder.True;
+                                break;
+
+                            case TokenTypes.False:
+                                allNumbers = false;
+                                allStrings = false;
+                                allIntegers = false;
+                                test = JSBooleanBuilder.False;
+                                break;
+
+                            default:
+                                throw new NotImplementedException();
+                        }
+
+                        break;
+                    default:
+                        test = VisitExpression(c.Test);
+                        allNumbers = false;
+                        allStrings = false;
+                        allIntegers = false;
+
+                        break;
                 }
 
-                System.Reflection.MethodInfo equalsMethod = null;
+                lastCase.Tests.Add(test);
 
-                SwitchInfo last = null;
-                foreach (var @case in cases)
+                if (body.Count > 0)
                 {
-                    // if last one is not break statement... make it fall through...
-                    if (last != null)
-                    {
-                        last.Body.Add(Exp.Goto(@case.Label));
-                    }
-                    last = @case;
-
-                    if (allNumbers)
-                    {
-                        if (allIntegers)
-                        {
-                            @case.Tests = @case.Tests.ConvertToInteger(scope);
-                        }
-                        else
-                        {
-                            // convert every case to double..
-                            @case.Tests = @case.Tests.ConvertToNumber(scope);
-                        }
-                    }
-                    else
-                    {
-                        if (allStrings)
-                        {
-                            // force everything to string if it isn't
-                            @case.Tests = @case.Tests.ConvertToString(scope);
-                        }
-                        else
-                        {
-                            @case.Tests = @case.Tests.ConvertToJSValue(scope);
-                            equalsMethod = JSValueBuilder.StaticEquals;
-                        }
-                    }
-
-
+                    cases.Add(lastCase);
+                    body.Insert(0, Exp.Label(lastCase.Label));
+                    lastCase.Body = body;
+                    lastCase = new SwitchInfo(scope);
                 }
+            }
 
-                var testTarget = VisitExpression(switchStatement.Target);
+            System.Reflection.MethodInfo equalsMethod = null;
+
+            SwitchInfo last = null;
+            foreach (var @case in cases)
+            {
+                // if last one is not break statement... make it fall through...
+                last?.Body.Add(Exp.Goto(@case.Label));
+                last = @case;
+
                 if (allNumbers)
                 {
                     if (allIntegers)
                     {
-                        testTarget = JSValueBuilder.IntValue(testTarget);
+                        @case.Tests = @case.Tests.ConvertToInteger(scope);
                     }
                     else
                     {
-                        testTarget = JSValueBuilder.DoubleValue(testTarget);
+                        // convert every case to double..
+                        @case.Tests = @case.Tests.ConvertToNumber(scope);
                     }
                 }
                 else
                 {
                     if (allStrings)
                     {
-                        testTarget = ObjectBuilder.ToString(testTarget);
+                        // force everything to string if it isn't
+                        @case.Tests = @case.Tests.ConvertToString(scope);
                     }
                     else
                     {
-
+                        @case.Tests = @case.Tests.ConvertToJSValue(scope);
+                        equalsMethod = JSValueBuilder.StaticEquals;
                     }
                 }
-
-                Exp d = null;
-                var lastLine = switchStatement.Start.Start.Line;
-                if (defBody != null)
-                {
-                    var defLabel = Exp.Label($"default-start-{lastLine}");
-                    if (last != null)
-                    {
-                        last.Body.Add(Exp.Goto(defLabel));
-                    }
-                    defBody.Insert(0, Exp.Label(defLabel));
-                    d = Exp.Block(defBody);
-                }
-
-                var r = Exp.Block(
-                    Exp.Switch(
-                        testTarget,
-                        d.ToJSValue() ?? JSUndefinedBuilder.Value,
-                        equalsMethod,
-                        cases.Select(x => Exp.SwitchCase(Exp.Block(x.Body).ToJSValue(), x.Tests)).ToList()),
-                    Exp.Label(@break));
-                return r;
             }
-        } finally
+
+            var testTarget = VisitExpression(switchStatement.Target);
+            if (allNumbers)
+            {
+                if (allIntegers)
+                {
+                    testTarget = JSValueBuilder.IntValue(testTarget);
+                }
+                else
+                {
+                    testTarget = JSValueBuilder.DoubleValue(testTarget);
+                }
+            }
+            else
+            {
+                if (allStrings)
+                {
+                    testTarget = ObjectBuilder.ToString(testTarget);
+                }
+                else
+                {
+
+                }
+            }
+
+            Exp d = null;
+            var lastLine = switchStatement.Start.Start.Line;
+
+            if (defBody != null)
+            {
+                var defLabel = Exp.Label($"default-start-{lastLine}");
+                last?.Body.Add(Exp.Goto(defLabel));
+
+                defBody.Insert(0, Exp.Label(defLabel));
+                d = Exp.Block(defBody);
+            }
+
+            var r = Exp.Block(
+                Exp.Switch(testTarget, d.ToJSValue() ?? JSUndefinedBuilder.Value, equalsMethod, [.. cases.Select(x =>
+                Exp.SwitchCase(Exp.Block(x.Body).ToJSValue(), x.Tests))]), Exp.Label(@break));
+            return r;
+        }
+        finally
         {
             scope.Dispose();
         }

@@ -1,11 +1,13 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.LinqExpressions;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
-using YantraJS.Core.Core.Primitive;
-using YantraJS.ExpHelper;
+using YantraJS.Core;
 using YantraJS.Expressions;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Utils;
 
 public static class JSValueToClrConverter
 {
@@ -13,12 +15,9 @@ public static class JSValueToClrConverter
 
     public static string ToString(JSValue value, string name) => value.HasValue() ? value.ToString() : throw new JSException($"{name} is required");
 
+    public static JSNumber ToJSNumber(this JSValue value, string name) =>
+        value is JSNumber n ? n : (value is JSPrimitiveObject po ? po.value.ToJSNumber(name) : throw new JSException($"{name} is not a number"));
 
-    public static JSNumber ToJSNumber(this JSValue value, string name) => value is JSNumber n
-            ? n
-            : (value is JSPrimitiveObject po
-                ? po.value.ToJSNumber(name)
-                : throw new JSException($"{name} is not a number"));
     public static bool ToBoolean(JSValue value, string name) => value.HasValue() ? value.BooleanValue : throw new JSException($"{name} is required");
     public static bool? ToNullableBoolean(JSValue value, string name) => value.IsNullOrUndefined ? null : value.BooleanValue;
 
@@ -42,86 +41,62 @@ public static class JSValueToClrConverter
     public static float? ToNullableFloat(JSValue value, string name) => value.IsNullOrUndefined ? null : (float)value.DoubleValue;
     public static decimal ToDecimal(JSValue value, string name) => value.HasValue() ? (decimal)value.DoubleValue : throw new JSException($"{name} is required");
     public static decimal? ToNullableDecimal(JSValue value, string name) => value.IsNullOrUndefined ? null : (decimal)value.DoubleValue;
-    public static DateTime ToDateTime(JSValue value, string name) => value.HasValue()
-            ? (value is JSDate date
-                ? date.DateTime
-                : DateTime.Parse(value.ToString()))
-            : throw new ArgumentException($"{name} is required");
-    public static DateTime? ToNullableDateTime(JSValue value, string name) => value.HasValue()
-            ? (value is JSDate date
-                ? date.DateTime
-                : DateTime.Parse(value.ToString()))
-            : null;
-    public static DateTimeOffset ToDateTimeOffset(JSValue value, string name) => value.HasValue()
-            ? (value is JSDate date
-                ? date.DateTime
-                : DateTime.Parse(value.ToString()))
-            : throw new ArgumentException($"{name} is required");
-    public static DateTimeOffset? ToNullableDateTimeOffset(JSValue value, string name) => value.HasValue()
-            ? (value is JSDate date
-                ? date.DateTime
-                : DateTime.Parse(value.ToString()))
-            : null;
 
+    public static DateTime ToDateTime(JSValue value, string name) =>
+        value.HasValue() ? (value is JSDate date ? date.DateTime : DateTime.Parse(value.ToString())) : throw new ArgumentException($"{name} is required");
 
-    private static Dictionary<Type, MethodInfo> methods = [];
+    public static DateTime? ToNullableDateTime(JSValue value, string name) =>
+        value.HasValue() ? (value is JSDate date ? date.DateTime : DateTime.Parse(value.ToString())) : null;
 
-    private static MethodInfo GetAsGeneric = typeof(JSValueToClrConverter).GetMethod(nameof(GetAs));
+    public static DateTimeOffset ToDateTimeOffset(JSValue value, string name) =>
+        value.HasValue() ? (value is JSDate date ? date.DateTime : DateTime.Parse(value.ToString())) : throw new ArgumentException($"{name} is required");
 
-    private static MethodInfo GetAsOrThrowGeneric = typeof(JSValueToClrConverter).GetMethod(nameof(GetAsOrThrow));
+    public static DateTimeOffset? ToNullableDateTimeOffset(JSValue value, string name) =>
+        value.HasValue() ? (value is JSDate date ? date.DateTime : DateTime.Parse(value.ToString())) : null;
 
-    private static Type nullableType = typeof(Nullable<>);
+    private static readonly Dictionary<Type, MethodInfo> methods = [];
+    private static readonly MethodInfo GetAsGeneric = typeof(JSValueToClrConverter).GetMethod(nameof(GetAs));
+    private static readonly MethodInfo GetAsOrThrowGeneric = typeof(JSValueToClrConverter).GetMethod(nameof(GetAsOrThrow));
 
     static JSValueToClrConverter()
     {
-        foreach(var method in typeof(JSValueToClrConverter).GetMethods())
+        foreach (var method in typeof(JSValueToClrConverter).GetMethods())
         {
             if (!method.Name.StartsWith("To"))
                 continue;
+
             if (!method.IsStatic)
                 continue;
+
             methods[method.ReturnType] = method;
         }
     }
 
-    public static YExpression GetArgument(
-        YExpression args,
-        int index,
-        Type type,
-        YExpression defaultValue,
-        string name)
+    public static YExpression GetArgument(YExpression args, int index, Type type, YExpression defaultValue, string name)
     {
-        if(methods.TryGetValue(type, out var method))
+        if (methods.TryGetValue(type, out var method))
         {
             if (defaultValue == null)
-            {
                 return YExpression.Call(null, method, ArgumentsBuilder.GetAt(args, index), YExpression.Constant(name));
-            }
-            return YExpression.Condition(
-                YExpression.Binary(
-                    ArgumentsBuilder.Length(args),
-                    YOperator.Greater,
-                    YExpression.Constant(index)),
-                YExpression.Call(null, method, ArgumentsBuilder.GetAt(args, index), YExpression.Constant(name)),
-                defaultValue);
+
+            return YExpression.Condition(YExpression.Binary(ArgumentsBuilder.Length(args), YOperator.Greater, YExpression.Constant(index)),
+                YExpression.Call(null, method, ArgumentsBuilder.GetAt(args, index), YExpression.Constant(name)), defaultValue);
         }
+
         if (typeof(JSValue).IsAssignableFrom(type))
-        {
             return ArgumentsBuilder.GetAt(args, index);
-        }
-        return Get(ArgumentsBuilder.GetAt(args,index), type, defaultValue, $"{name} is required");
+
+        return Get(ArgumentsBuilder.GetAt(args, index), type, defaultValue, $"{name} is required");
     }
 
     public static YExpression Get(YExpression target, Type type, string name)
     {
         if (typeof(JSValue).IsAssignableFrom(type))
-        {
             return target;
-        }
+
         if (methods.TryGetValue(type, out var method))
-        {
             return YExpression.Call(null, method, target, YExpression.Constant(name));
-        }
+
         var m = GetAsOrThrowGeneric.MakeGenericMethod(type);
         return YExpression.Call(null, m, target, YExpression.Constant($"{name} is required"));
     }
@@ -129,31 +104,25 @@ public static class JSValueToClrConverter
     public static YExpression Get(YExpression target, Type type, YExpression defaultValue, string name)
     {
         if (defaultValue == null)
-        {
             return Get(target, type, name);
-        }
-        if (typeof(JSValue).IsAssignableFrom(type))
-        {
-            return target;
-        }
-        if (methods.TryGetValue(type, out var method))
-        {
-            return YExpression.Call(null, method, target, YExpression.Constant(name));
-        }
-        var m = GetAsGeneric.MakeGenericMethod(type);
-        return YExpression.Coalesce(
-                        YExpression.Call(null, m, target),
-                        defaultValue);
-    }
 
+        if (typeof(JSValue).IsAssignableFrom(type))
+            return target;
+
+        if (methods.TryGetValue(type, out var method))
+            return YExpression.Call(null, method, target, YExpression.Constant(name));
+
+        var m = GetAsGeneric.MakeGenericMethod(type);
+        return YExpression.Coalesce(YExpression.Call(null, m, target), defaultValue);
+    }
 
     public static Func<JSValue, string, T> ToFastClrDelegate<T>()
     {
         var type = typeof(T);
+
         if (methods.TryGetValue(type, out var m))
-        {
             return m.CreateDelegate<Func<JSValue, string, T>>();
-        }
+
         return GetAsOrThrow<T>;
     }
 
@@ -161,26 +130,22 @@ public static class JSValueToClrConverter
     {
         var type = typeof(T);
         if (typeof(JSValue).IsAssignableFrom(type))
-        {
             return (T)(object)value;
-        }
 
-        if(methods.TryGetValue(type, out var m))
+        if (methods.TryGetValue(type, out var m))
         {
             var f = m.CreateDelegate<Func<JSValue, string, T>>();
             return f(value, "");
         }
+
         if (value.ConvertTo<T>(out var v))
             return v;
+
         throw new JSException($"Failed to convert JSValue to {type.Name}");
     }
 
-    public static T GetAs<T>(JSValue value) => value.ConvertTo(out T v1)
-                ? v1
-                : default;
+    public static T GetAs<T>(JSValue value) => value.ConvertTo(out T v1) ? v1 : default;
 
-    public static T GetAsOrThrow<T>(JSValue value, string error) => value.ConvertTo(out T v1)
-                ? v1
-                : throw new JSException(error);
+    public static T GetAsOrThrow<T>(JSValue value, string error) => value.ConvertTo(out T v1) ? v1 : throw new JSException(error);
 
 }

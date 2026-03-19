@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstExpressionStatement : AstStatement
 {
@@ -9,5 +9,4 @@ public class AstExpressionStatement : AstStatement
 
     public AstExpressionStatement(AstExpression expression)
         : base(expression.Start, FastNodeType.ExpressionStatement, expression.End) => Expression = expression;
-
 }

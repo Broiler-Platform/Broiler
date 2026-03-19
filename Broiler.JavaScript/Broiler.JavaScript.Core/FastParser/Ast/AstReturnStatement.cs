@@ -1,5 +1,8 @@
 ﻿#nullable enable
-namespace YantraJS.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+
+namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstReturnStatement(FastToken token, FastToken previousToken, AstExpression? target = null) : AstStatement(token, FastNodeType.ReturnStatement, previousToken)
 {
@@ -9,9 +12,8 @@ public class AstReturnStatement(FastToken token, FastToken previousToken, AstExp
     {
         var hasSemiColonAtEnd = End.Type == TokenTypes.SemiColon ? ":" : "";
         if (Argument != null)
-        {
             return $"return {Argument}{hasSemiColonAtEnd}";
-        }
+
         return $"return {hasSemiColonAtEnd}";
     }
 }

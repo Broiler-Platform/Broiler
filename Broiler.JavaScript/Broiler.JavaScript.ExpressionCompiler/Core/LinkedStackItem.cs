@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace YantraJS;
+namespace YantraJS.Core;
 
 public abstract class LinkedStackItem<T> : IDisposable
 where T : LinkedStackItem<T>
@@ -14,8 +14,4 @@ where T : LinkedStackItem<T>
 
 
     public void Pop() => stack._Top = Parent;
-
-    //internal virtual void Init()
-    //{
-    //}
 }

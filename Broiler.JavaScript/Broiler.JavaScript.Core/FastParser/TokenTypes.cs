@@ -1,18 +1,11 @@
 ﻿using System.Runtime.CompilerServices;
 
-namespace YantraJS.Core.FastParser;
-
-public static class HiddenTokens
-{
-    public const int Operator = 0b0100000;
-}
+namespace Broiler.JavaScript.Core.FastParser;
 
 public static class TokenTypesExtensions
 {
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsOperator(this TokenTypes type) => type > TokenTypes.BeginOperators && type < TokenTypes.EndOperators;
-
 }
 
 /// <summary>
@@ -21,8 +14,6 @@ public static class TokenTypesExtensions
 public enum TokenTypes
 {
     Empty = 0,
-    // Operator       = 0b0100000,
-    // AssignOperator = 0b1000000,
     SquareBracketStart,
     SquareBracketEnd,
     CurlyBracketStart,

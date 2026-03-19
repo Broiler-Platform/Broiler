@@ -1,7 +1,7 @@
-﻿using YantraJS.Core;
-using YantraJS.Core.Core.Storage;
+﻿using Broiler.JavaScript.Core.Core.Storage;
+using YantraJS.Core;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.Core;
 
 public class StringArray
 {
@@ -13,9 +13,12 @@ public class StringArray
     {
         if (map.TryGetValue(code, out var i))
             return i;
+
         i = (uint)List.Count;
+        
         map.Put(code) = i;
         List.Add(code);
+        
         return i;
     }
 }

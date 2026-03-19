@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using Broiler.HTML.Core.Core.IR;
 using SkiaSharp;
 

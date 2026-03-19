@@ -1,8 +1,5 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿namespace Broiler.JavaScript.Core.FastParser;
 
-/// <summary>
-/// JavaScript keywords
-/// </summary>
 public enum FastKeywords
 {
     none,

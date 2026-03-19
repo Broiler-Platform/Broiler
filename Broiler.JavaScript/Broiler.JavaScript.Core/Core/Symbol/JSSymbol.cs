@@ -1,15 +1,14 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using System;
 using System.Threading;
 using Yantra.Core;
 
 namespace YantraJS.Core;
 
-// [JSRuntime(typeof(JSSymbolStatic), typeof(JSSymbolPrototype))]
 [JSBaseClass("Object")]
 [JSFunctionGenerator("Symbol")]
 public partial class JSSymbol: JSValue
 {
-
     private static int SymbolID = 1;
     private readonly string name;
     public readonly uint Key;
@@ -18,11 +17,11 @@ public partial class JSSymbol: JSValue
 
     public override bool IsSymbol => true;
 
-    public override double DoubleValue => throw JSContext.Current.NewTypeError("Cannot convert a Symbol value to a number.");
+    public override double DoubleValue => throw JSContext.NewTypeError("Cannot convert a Symbol value to a number.");
 
-    internal override string StringValue => throw JSContext.Current.NewTypeError("Cannot convert a Symbol value to a string.");
+    internal override string StringValue => throw JSContext.NewTypeError("Cannot convert a Symbol value to a string.");
 
-    public override uint UIntValue => throw JSContext.Current.NewTypeError("Cannot convert a Symbol value to a uint32.");
+    public override uint UIntValue => throw JSContext.NewTypeError("Cannot convert a Symbol value to a uint32.");
 
     internal override PropertyKey ToKey(bool create = true) => this;
 
@@ -38,11 +37,11 @@ public partial class JSSymbol: JSValue
     {
         if (obj is JSSymbol s)
             return s.Key == Key;
+
         return false;
     }
 
-    public override bool Equals(JSValue value) => ReferenceEquals(this, value);//if (value == this)//    return JSBoolean.True;//return JSBoolean.False;
-
+    public override bool Equals(JSValue value) => ReferenceEquals(this, value);
     public override int GetHashCode() => (int)Key;
 
     public override JSValue InvokeFunction(in Arguments a)
@@ -50,6 +49,7 @@ public partial class JSSymbol: JSValue
         var f = a.Get1();
         if (f.IsUndefined)
             return new JSSymbol("");
+
         return new JSSymbol(a.ToString());
     }
 
@@ -58,6 +58,4 @@ public partial class JSSymbol: JSValue
     public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
     public override string ToString() => name;
-
-
 }

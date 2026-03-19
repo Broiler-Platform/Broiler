@@ -1,21 +1,26 @@
-﻿using Yantra.Core;
-using YantraJS.Core.Clr;
-using YantraJS.Core.Core.Primitive;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Yantra.Core;
 
 namespace YantraJS.Core;
 
+
 public partial class JSObject
 {
-
     [JSExport(IsConstructor = true)]
-    public static JSValue Constructor(in Arguments a) {
+    public static JSValue Constructor(in Arguments a) 
+    {
         if (a.This != null && !a.This.IsUndefined)
             return a.This;
+
         var first = a.Get1();
         if (first.IsObject)
             return first;
+
         if (first.IsNullOrUndefined)
             return new JSObject();
+
         return new JSPrimitiveObject(first as JSPrimitive);
     }
 
@@ -23,9 +28,8 @@ public partial class JSObject
     public static JSValue PropertyIsEnumerable(in Arguments a)
     {
         if(!a.This.TryAsObjectThrowIfNullOrUndefined(out var @object))
-        {
             return JSBoolean.False;
-        }
+
         if (a.Length > 0)
         {
             var text = a.Get1().ToString();
@@ -33,6 +37,7 @@ public partial class JSObject
             if (!px.IsEmpty && px.IsEnumerable)
                 return JSBoolean.True;
         }
+
         return JSBoolean.False;
     }
 
@@ -45,20 +50,13 @@ public partial class JSObject
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0060:Remove unused parameter", Justification = "JavaScript Method Signature is Standard")]
     public static JSValue ToString(in Arguments a) => new JSString("[object Object]");
 
-    // [JSPrototypeMethod][JSExport("toLocaleString")]
-    // public static JSValue ToLocaleString(JSValue t, params JSValue[] a)
-
-
     [JSExport("__proto__")]
     internal JSValue ObjectPrototype
     {
-        get
-        {
-            return prototypeChain?.@object ?? JSNull.Value;
-        }
+        get => prototypeChain?.@object ?? JSNull.Value;
         set
         {
-            if(value is JSObject o)
+            if (value is JSObject o)
             {
                 BasePrototypeObject = o;
             }
@@ -70,6 +68,7 @@ public partial class JSObject
     {
         if (!a.This.TryAsObjectThrowIfNullOrUndefined(out var @object))
             return JSBoolean.False;
+
         var first = a.Get1();
         var key = first.ToKey(false);
         if (key.IsUInt)
@@ -78,8 +77,10 @@ public partial class JSObject
             ref var property = ref elements.Get(key.Index);
             if (!property.IsEmpty)
                 return JSBoolean.True;
+
             return JSBoolean.False;
         }
+
         if (key.IsSymbol)
         {
             ref var symbols = ref @object.GetSymbols();
@@ -87,9 +88,11 @@ public partial class JSObject
                 return JSBoolean.True;
             return JSBoolean.False;
         }
+
         ref var op = ref @object.GetOwnProperties(false);
         if (op.HasKey(key.KeyString.Key))
             return JSBoolean.True;
+
         return JSBoolean.False;
     }
 
@@ -102,17 +105,19 @@ public partial class JSObject
     {
         if (!a.This.TryAsObjectThrowIfNullOrUndefined(out var @this))
             return JSBoolean.False;
+
         var first = a.Get1();
         while (true)
         {
             if (@this == first.prototypeChain?.@object)
                 return JSBoolean.True;
+
             if (first.prototypeChain?.@object == first || first.prototypeChain?.@object == null)
                 break;
+
             first = first.prototypeChain?.@object;
         }
+
         return JSBoolean.False;
     }
-
-
 }

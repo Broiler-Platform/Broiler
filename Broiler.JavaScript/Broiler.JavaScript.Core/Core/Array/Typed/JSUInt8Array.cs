@@ -1,32 +1,23 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Array.Typed;
+using Broiler.JavaScript.Core.Core.Clr;
+using System;
 using Yantra.Core;
-using YantraJS.Core.Clr;
 
 namespace YantraJS.Core.Typed;
 
 [JSClassGenerator("Uint8Array"), JSBaseClass("TypedArray")]
 public partial class JSUInt8Array : JSTypedArray
 {
-
     [JSExport("BYTES_PER_ELEMENT")]
     internal static readonly int BYTES_PER_ELENENT = 1;
 
-
     [JSExport(Length = 3)]
-    public JSUInt8Array(in Arguments a)
-        : base(new TypedArrayParameters(a, BYTES_PER_ELENENT))
-    {
-    }
+    public JSUInt8Array(in Arguments a) : base(new TypedArrayParameters(a, BYTES_PER_ELENENT)) { }
 
-    private JSUInt8Array(TypedArrayParameters a) : base(a)
-    {
+    private JSUInt8Array(TypedArrayParameters a) : base(a) { }
 
-    }
-
-    internal JSUInt8Array(byte[] data)
-        : base(new TypedArrayParameters(data, BYTES_PER_ELENENT))
-    {
-    }
+    internal JSUInt8Array(byte[] data) : base(new TypedArrayParameters(data, BYTES_PER_ELENENT)) { }
 
     protected internal override JSValue GetValue(uint index, JSValue receiver, bool throwError = true)
     {
@@ -66,7 +57,7 @@ public partial class JSUInt8Array : JSTypedArray
     {
         var str = a.Get1();
         if (!str.IsString)
-            throw JSContext.Current.NewTypeError("Uint8Array.fromBase64 requires a string argument");
+            throw JSContext.NewTypeError("Uint8Array.fromBase64 requires a string argument");
         var bytes = System.Convert.FromBase64String(str.ToString());
         return new JSUInt8Array(bytes);
     }
@@ -80,10 +71,10 @@ public partial class JSUInt8Array : JSTypedArray
     {
         var str = a.Get1();
         if (!str.IsString)
-            throw JSContext.Current.NewTypeError("Uint8Array.fromHex requires a string argument");
+            throw JSContext.NewTypeError("Uint8Array.fromHex requires a string argument");
         var hex = str.ToString();
         if (hex.Length % 2 != 0)
-            throw JSContext.Current.NewSyntaxError("Invalid hex string length");
+            throw JSContext.NewSyntaxError("Invalid hex string length");
         var bytes = new byte[hex.Length / 2];
         for (int i = 0; i < bytes.Length; i++)
         {
@@ -126,7 +117,7 @@ public partial class JSUInt8Array : JSTypedArray
     {
         var str = a.Get1();
         if (!str.IsString)
-            throw JSContext.Current.NewTypeError("setFromBase64 requires a string argument");
+            throw JSContext.NewTypeError("setFromBase64 requires a string argument");
         var bytes = System.Convert.FromBase64String(str.ToString());
         int written = Math.Min(bytes.Length, length);
         Array.Copy(bytes, 0, buffer.buffer, byteOffset, written);
@@ -146,10 +137,10 @@ public partial class JSUInt8Array : JSTypedArray
     {
         var str = a.Get1();
         if (!str.IsString)
-            throw JSContext.Current.NewTypeError("setFromHex requires a string argument");
+            throw JSContext.NewTypeError("setFromHex requires a string argument");
         var hex = str.ToString();
         if (hex.Length % 2 != 0)
-            throw JSContext.Current.NewSyntaxError("Invalid hex string length");
+            throw JSContext.NewSyntaxError("Invalid hex string length");
         var bytes = new byte[hex.Length / 2];
         for (int i = 0; i < bytes.Length; i++)
         {

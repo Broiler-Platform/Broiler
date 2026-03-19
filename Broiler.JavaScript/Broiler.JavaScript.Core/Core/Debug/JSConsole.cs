@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core.Debug;
+﻿namespace Broiler.JavaScript.Core.Core.Debug;
 
 public class JSConsole(JSContext context)
 {
@@ -9,7 +9,6 @@ public class JSConsole(JSContext context)
         context.ReportLog(f);
         return f;
     }
-
 
     public JSValue Warn(in Arguments a)
     {
@@ -26,5 +25,4 @@ public class JSConsole(JSContext context)
         context.FireConsoleEvent("error", a);
         return f;
     }
-
 }

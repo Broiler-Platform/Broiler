@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Linq;
 using YantraJS.Core;
-using YantraJS.Core.FastParser;
-using YantraJS.ExpHelper;
 using Expression = YantraJS.Expressions.YExpression;
 using ParameterExpression = YantraJS.Expressions.YParameterExpression;
-using YantraJS.Core.LambdaGen;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.LambdaGen;
+using Broiler.JavaScript.Core.LinqExpressions;
 
 
-namespace YantraJS.Utils;
+namespace Broiler.JavaScript.Core.Utils;
 
 public delegate Expression CaseExpression(ParameterExpression pe);
 
@@ -40,11 +41,8 @@ public class SwitchExpression
 
     }
 
-    protected static Expression
-        Switch(Expression right,
-                params TypeCheckCase[] cases)
+    protected static Expression Switch(Expression right, params TypeCheckCase[] cases)
     {
-
         var defaultCase = cases.First(x => x.Type == null);
         var allCases = cases.Where(x => x.Type != null);
 
@@ -55,43 +53,30 @@ public class SwitchExpression
 
             if (@case.Type.IsValueType)
             {
-                condition = Expression.Condition(
-                    Expression.TypeIs(right, @case.Type),
-                    Expression.Block(bp.AsSequence(),
-                        @case.TrueCase(bp)
-                    ),
-                    condition,
-                    typeof(JSValue)
-                    );
+                condition = Expression.Condition(Expression.TypeIs(right, @case.Type), Expression.Block(bp.AsSequence(), @case.TrueCase(bp)), condition, typeof(JSValue));
                 continue;
             }
 
             var nbt = Expression.Constant(null, @case.Type);
-            condition = Expression.Block(bp.AsSequence(),
-                Expression.Assign(bp, Expression.TypeAs(right, @case.Type)),
-                Expression.Condition(
-                    Expression.NotEqual(nbt, bp),
-                    @case.TrueCase(bp),
-                    condition,
-                    typeof(JSValue)
-                ));
+            condition = Expression.Block(bp.AsSequence(), Expression.Assign(bp, Expression.TypeAs(right, @case.Type)), Expression.Condition(Expression.NotEqual(nbt, bp),
+                    @case.TrueCase(bp), condition, typeof(JSValue)));
         }
+
         return condition;
     }
 }
 
-public class BinaryOperation: SwitchExpression
+public class BinaryOperation : SwitchExpression
 {
-
     public static Expression Assign(Expression left, Expression right, TokenTypes assignmentOperator)
     {
-
         var oneF = Expression.Constant(0x1F);
 
         switch (assignmentOperator)
         {
             case TokenTypes.Assign:
                 return Assign(left, right);
+
             case TokenTypes.AssignAdd:
                 return Assign(left, JSValueBuilder.Add(left, right));
         }
@@ -101,193 +86,61 @@ public class BinaryOperation: SwitchExpression
 
         var leftInt = JSValueBuilder.IntValue(left);
         var rightInt = JSValueBuilder.IntValue(right);
-        var leftUInt = Expression.Convert(leftDouble, typeof(uint));
-       
 
+        var leftUInt = Expression.Convert(leftDouble, typeof(uint));
         var rightUInt = Expression.Convert(rightDouble, typeof(uint));
 
         // convert to double...
-        switch (assignmentOperator)
+        return assignmentOperator switch
         {
-            case TokenTypes.AssignSubtract:
-                return Assign(left, JSNumberBuilder.New(Expression.Subtract(leftDouble, rightDouble)));
-            case TokenTypes.AssignMultiply:
-                return Assign(left, JSNumberBuilder.New(Expression.Multiply(leftDouble, rightDouble)));
-            case TokenTypes.AssignDivide:
-                return Assign(left, JSNumberBuilder.New(Expression.Divide(leftDouble, rightDouble)));
-            case TokenTypes.AssignMod:
-                return Assign(left, JSNumberBuilder.New(Expression.Modulo(leftDouble, rightDouble)));
-            case TokenTypes.AssignBitwideAnd:
-                return Assign(left, JSNumberBuilder.New(Expression.And(leftInt, rightInt)));
-            case TokenTypes.AssignBitwideOr:
-                return Assign(left, JSNumberBuilder.New(Expression.Or(leftInt, rightInt)));
-            case TokenTypes.AssignXor:
-                return Assign(left, JSNumberBuilder.New(Expression.ExclusiveOr(leftInt, rightInt)));
-            case TokenTypes.AssignLeftShift:
-                return Assign(left, JSNumberBuilder.New(Expression.LeftShift(leftInt, rightInt)));
-            case TokenTypes.AssignRightShift:
-                return Assign(left, JSNumberBuilder.New(Expression.RightShift(leftInt,Expression.And( rightInt, oneF))));
-            case TokenTypes.AssignUnsignedRightShift:
-                return Assign(left, JSNumberBuilder.New(Expression.RightShift(leftInt, rightInt)));
-            case TokenTypes.AssignPower:
-                return Assign(left, JSNumberBuilder.New(Expression.Power(leftDouble, rightDouble)));
-            case TokenTypes.AssignCoalesce:
-                return Assign(left, JSValueBuilder.Coalesce(left, right));
-        }
-
-        throw new NotSupportedException();
+            TokenTypes.AssignSubtract => Assign(left, JSNumberBuilder.New(Expression.Subtract(leftDouble, rightDouble))),
+            TokenTypes.AssignMultiply => Assign(left, JSNumberBuilder.New(Expression.Multiply(leftDouble, rightDouble))),
+            TokenTypes.AssignDivide => Assign(left, JSNumberBuilder.New(Expression.Divide(leftDouble, rightDouble))),
+            TokenTypes.AssignMod => Assign(left, JSNumberBuilder.New(Expression.Modulo(leftDouble, rightDouble))),
+            TokenTypes.AssignBitwideAnd => Assign(left, JSNumberBuilder.New(Expression.And(leftInt, rightInt))),
+            TokenTypes.AssignBitwideOr => Assign(left, JSNumberBuilder.New(Expression.Or(leftInt, rightInt))),
+            TokenTypes.AssignXor => Assign(left, JSNumberBuilder.New(Expression.ExclusiveOr(leftInt, rightInt))),
+            TokenTypes.AssignLeftShift => Assign(left, JSNumberBuilder.New(Expression.LeftShift(leftInt, rightInt))),
+            TokenTypes.AssignRightShift => Assign(left, JSNumberBuilder.New(Expression.RightShift(leftInt, Expression.And(rightInt, oneF)))),
+            TokenTypes.AssignUnsignedRightShift => Assign(left, JSNumberBuilder.New(Expression.RightShift(leftInt, rightInt))),
+            TokenTypes.AssignPower => Assign(left, JSNumberBuilder.New(Expression.Power(leftDouble, rightDouble))),
+            TokenTypes.AssignCoalesce => Assign(left, JSValueBuilder.Coalesce(left, right)),
+            _ => throw new NotSupportedException(),
+        };
     }
 
     private static Expression Assign(Expression left, Expression right) => JSValueExtensionsBuilder.Assign(left, right);
 
-    #region Add
-
-    //public static Expression Add(Expression leftExp, Expression right)
-    //{
-    //    object obj = 4;
-
-    //    var undefined = Expression.Constant("undefined");
-    //    var @null = Expression.Constant("null");
-    //    var nan = ExpHelper.JSContext.NaN;
-    //    var zero = ExpHelper.JSContext.Zero;
-    //    CaseExpression caseUndefined = (left) =>
-    //        Switch(right,
-    //        Case<JSUndefined>(x => nan),
-    //        Case<JSNumber>(x => nan),
-    //        Case<double>(x => nan),
-    //        Case<string>(x => ExpHelper.JSString.ConcatBasicStrings(undefined, x)),
-    //        Default(ExpHelper.JSString.ConcatBasicStrings(undefined, ExpHelper.Object.ToString(right)))
-    //        );
-
-    //    CaseExpression caseNull = (left) =>
-    //        Switch(right,
-    //        Case<JSUndefined>(x => nan),
-    //        Case<JSNull>(x => zero),
-    //        Case<JSNumber>(x => right),
-    //        Case<double>(x => ExpHelper.JSNumber.New(x)),
-    //        Case<string>(x => ExpHelper.JSString.ConcatBasicStrings(@null, x)),
-    //        Default(ExpHelper.JSString.ConcatBasicStrings(@null, ExpHelper.Object.ToString(right)))
-    //        );
-
-    //    // string case avoids toString  of JSString by accessing value directly...
-    //    CaseExpression caseJSString = (left) =>
-    //        Switch(right,
-    //        Case<JSUndefined>(x => ExpHelper.JSString.ConcatBasicStrings(ExpHelper.JSString.Value(left), undefined)),
-    //        Case<JSNull>(x => ExpHelper.JSString.ConcatBasicStrings(ExpHelper.JSString.Value(left), @null)),
-    //        Case<JSNumber>(x => ExpHelper.JSString.ConcatBasicStrings(
-    //            ExpHelper.JSString.Value(left),
-    //            ExpHelper.Object.ToString(ExpHelper.JSNumber.Value(x)))),
-    //        Case<double>(x => ExpHelper.JSString.ConcatBasicStrings(
-    //            ExpHelper.JSString.Value(left),
-    //            ExpHelper.Object.ToString(x))),
-    //        Case<string>(x => ExpHelper.JSString.ConcatBasicStrings(@null, x)),
-    //        Default(ExpHelper.JSString.ConcatBasicStrings(@null, ExpHelper.Object.ToString(right)))
-    //        );
-
-    //    // JSNumber is the most complicated one, and will be too big, so we will
-    //    // call a method on it ..
-    //    // also it should be the first case as most likely we will add numbers and strings...
-    //    CaseExpression caseJSNumber = (left) =>
-    //        ExpHelper.JSNumber.AddValue(left, right);
-
-    //    var StringAdd =
-    //        ExpHelper.JSString.ConcatBasicStrings(
-    //                ExpHelper.Object.ToString(leftExp),
-    //                ExpHelper.Object.ToString(right)
-    //                );
-
-    //    return Switch(leftExp,
-    //            Case<JSNumber>(caseJSNumber),
-    //            Case<JSString>(caseJSString),
-    //            Case<JSUndefined>(caseUndefined),
-    //            Case<JSNull>(caseNull),
-    //            Default(StringAdd)
-    //        );
-
-
-    //}
-    #endregion
     public static Expression Operation(Expression left, Expression right, TokenTypes op)
     {
-        //var leftDouble = ExpHelper.JSValueBuilder.DoubleValue(left);
-        //var rightDouble = ExpHelper.JSValueBuilder.DoubleValue(right);
-
-        //var leftInt = JSValueBuilder.IntValue(left);
-        //var rightInt = JSValueBuilder.IntValue(right);
-
-        //var rightUInt = Expression.Convert(rightDouble, typeof(uint));
-
-        //var oneF = Expression.Constant(0x1F);
-
-        switch (op)
+        return op switch
         {
-            case TokenTypes.Equal:
-                return JSValueBuilder.Equals(left, right);
-            case TokenTypes.NotEqual:
-                return JSValueBuilder.NotEquals(left, right);
-            case TokenTypes.StrictlyEqual:
-                return JSValueBuilder.StrictEquals(left, right);
-            case TokenTypes.StrictlyNotEqual:
-                return JSValueBuilder.NotStrictEquals(left, right);
-
-
-            case TokenTypes.InstanceOf:
-                return JSValueExtensionsBuilder.InstanceOf(left, right);
-            case TokenTypes.In:
-                return JSValueExtensionsBuilder.IsIn(left, right);
-            case TokenTypes.Plus:
-                return JSValueBuilder.Add(left, right);
-            case TokenTypes.Minus:
-                // return ExpHelper.JSNumberBuilder.New(Expression.Subtract(leftDouble, rightDouble));
-                return left.CallExpression<JSValue, JSValue, JSValue>(() => (a,b) => a.Subtract(b), right);
-            case TokenTypes.Multiply:
-                // return ExpHelper.JSNumberBuilder.New(Expression.Multiply(leftDouble, rightDouble));
-                return left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.Multiply(b), right);
-            case TokenTypes.Divide:
-                // return ExpHelper.JSNumberBuilder.New(Expression.Divide(leftDouble, rightDouble));
-                return left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.Divide(b), right);
-            case TokenTypes.Mod:
-                // return ExpHelper.JSNumberBuilder.New(Expression.Modulo(leftDouble, rightDouble));
-                return left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.Modulo(b), right);
-            case TokenTypes.Greater:
-                return JSValueBuilder.Greater(left, right);
-            case TokenTypes.GreaterOrEqual:
-                return JSValueBuilder.GreaterOrEqual(left, right);
-            case TokenTypes.Less:
-                return JSValueBuilder.Less(left, right);
-            case TokenTypes.LessOrEqual:
-                return JSValueBuilder.LessOrEqual(left, right);
-            case TokenTypes.BitwiseAnd:
-                // return ExpHelper.JSNumberBuilder.New(Expression.And(leftInt, rightInt));
-                return left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.BitwiseAnd(b), right);
-            case TokenTypes.BitwiseOr:
-                // return ExpHelper.JSNumberBuilder.New(Expression.Or(leftInt, rightInt));
-                return left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.BitwiseOr(b), right);
-            case TokenTypes.Xor:
-                // return ExpHelper.JSNumberBuilder.New(Expression.ExclusiveOr(leftInt, rightInt));
-                return left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.BitwiseXor(b), right);
-            case TokenTypes.LeftShift:
-                // return ExpHelper.JSNumberBuilder.New(Expression.LeftShift(leftInt, rightInt));
-                return left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.LeftShift(b), right);
-            case TokenTypes.RightShift:
-                // return ExpHelper.JSNumberBuilder.New(Expression.RightShift(leftInt,Expression.And( rightInt, oneF)));
-                return left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.RightShift(b), right);
-            case TokenTypes.UnsignedRightShift:
-                //return ExpHelper.JSNumberBuilder.New(
-                //    Expression.UnsignedRightShift(
-                //        JSValueBuilder.UIntValue(left) , rightInt));
-                return left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.UnsignedRightShift(b), right);
-            case TokenTypes.BooleanAnd:
-                return JSValueBuilder.LogicalAnd(left, right);
-            case TokenTypes.BooleanOr:
-                return JSValueBuilder.LogicalOr(left, right);
-            case TokenTypes.Power:
-
-                return JSValueBuilder.Power(left, right);
-            case TokenTypes.Coalesce:
-                return JSValueExtensionsBuilder.Coalesce(left, right);
-        }
-        return null;
+            TokenTypes.Equal => JSValueBuilder.Equals(left, right),
+            TokenTypes.NotEqual => JSValueBuilder.NotEquals(left, right),
+            TokenTypes.StrictlyEqual => JSValueBuilder.StrictEquals(left, right),
+            TokenTypes.StrictlyNotEqual => JSValueBuilder.NotStrictEquals(left, right),
+            TokenTypes.InstanceOf => JSValueExtensionsBuilder.InstanceOf(left, right),
+            TokenTypes.In => JSValueExtensionsBuilder.IsIn(left, right),
+            TokenTypes.Plus => JSValueBuilder.Add(left, right),
+            TokenTypes.Minus => left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.Subtract(b), right),
+            TokenTypes.Multiply => left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.Multiply(b), right),
+            TokenTypes.Divide => left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.Divide(b), right),
+            TokenTypes.Mod => left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.Modulo(b), right),
+            TokenTypes.Greater => JSValueBuilder.Greater(left, right),
+            TokenTypes.GreaterOrEqual => JSValueBuilder.GreaterOrEqual(left, right),
+            TokenTypes.Less => JSValueBuilder.Less(left, right),
+            TokenTypes.LessOrEqual => JSValueBuilder.LessOrEqual(left, right),
+            TokenTypes.BitwiseAnd => left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.BitwiseAnd(b), right),
+            TokenTypes.BitwiseOr => left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.BitwiseOr(b), right),
+            TokenTypes.Xor => left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.BitwiseXor(b), right),
+            TokenTypes.LeftShift => left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.LeftShift(b), right),
+            TokenTypes.RightShift => left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.RightShift(b), right),
+            TokenTypes.UnsignedRightShift => left.CallExpression<JSValue, JSValue, JSValue>(() => (a, b) => a.UnsignedRightShift(b), right),
+            TokenTypes.BooleanAnd => JSValueBuilder.LogicalAnd(left, right),
+            TokenTypes.BooleanOr => JSValueBuilder.LogicalOr(left, right),
+            TokenTypes.Power => JSValueBuilder.Power(left, right),
+            TokenTypes.Coalesce => JSValueExtensionsBuilder.Coalesce(left, right),
+            _ => null,
+        };
     }
-
 }

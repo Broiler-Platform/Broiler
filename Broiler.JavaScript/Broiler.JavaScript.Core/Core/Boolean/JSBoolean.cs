@@ -1,6 +1,8 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using System;
 using Yantra.Core;
-using YantraJS.Core.Clr;
 
 namespace YantraJS.Core;
 
@@ -8,9 +10,7 @@ namespace YantraJS.Core;
 [JSFunctionGenerator("Boolean")]
 public partial class JSBoolean : JSPrimitive
 {
-
     public static JSBoolean True = new(true);
-
     public static JSBoolean False = new(false);
 
     internal readonly bool _value;
@@ -21,23 +21,6 @@ public partial class JSBoolean : JSPrimitive
     public static JSValue Constructor(in Arguments a) => (a[0]?.BooleanValue ?? false) ? True : False;
 
     protected override JSObject GetPrototype() => GetCurrentPrototype();
-
-
-    //public static bool IsTrue(JSValue value)
-    //{
-    //    switch (value)
-    //    {
-    //        case JSString str:
-    //            return str.Length > 0;
-    //        case JSBoolean bv:
-    //            return bv._value;
-    //        case JSNumber n:
-    //            return n.value != 0 && n.value != double.NaN;
-    //        case JSObject obj:
-    //            return true;
-    //    }
-    //    return false;
-    //}
 
     public override double DoubleValue => _value ? 1 : 0;
 
@@ -56,11 +39,13 @@ public partial class JSBoolean : JSPrimitive
             value = _value;
             return true;
         }
+
         if (type.IsAssignableFrom(typeof(JSBoolean)))
         {
             value = this;
             return true;
         }
+
         if (type == typeof(object))
         {
             value = _value;
@@ -79,6 +64,7 @@ public partial class JSBoolean : JSPrimitive
     {
         if (obj is JSBoolean b)
             return _value == b._value;
+
         return base.Equals(obj);
     }
 
@@ -86,29 +72,30 @@ public partial class JSBoolean : JSPrimitive
     {
         if (ReferenceEquals(this, value))
             return true;
+
         if (!_value)
         {
             if (value.IsNullOrUndefined)
                 return false;
         }
-        if (_value) {
+
+        if (_value)
+        {
             if (value.DoubleValue == 1)
                 return true;
-        } else
+        }
+        else
         {
             if (value.DoubleValue == 0)
                 return true;
         }
+
         return false;
     }
 
-    public override bool EqualsLiteral(double value) => _value
-            ? value == 1
-            : value == 0;
+    public override bool EqualsLiteral(double value) => _value ? value == 1 : value == 0;
 
-    public override bool EqualsLiteral(string value) => _value
-            ? value == "1"
-            : value == "0";
+    public override bool EqualsLiteral(string value) => _value ? value == "1" : value == "0";
 
     public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 

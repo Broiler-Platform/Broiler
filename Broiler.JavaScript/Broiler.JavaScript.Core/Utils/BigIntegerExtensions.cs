@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Numerics;
 
-namespace YantraJS.Utils;
+namespace Broiler.JavaScript.Core.Utils;
 
 public static class BigIntegerExtensions
 {
@@ -46,5 +46,4 @@ public static class BigIntegerExtensions
     /// Can be negative to shift to the right. </param>
     /// <returns> A value that has been shifted to the left by the specified number of bits. </returns>
     public static BigInteger LeftShift(this BigInteger value, int shift) => value << shift;
-
 }

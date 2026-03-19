@@ -1,4 +1,7 @@
-﻿namespace YantraJS.Core.Typed;
+﻿using YantraJS.Core;
+using YantraJS.Core.Typed;
+
+namespace Broiler.JavaScript.Core.Core.Array.Typed;
 
 public readonly struct TypedArrayParameters
 {

@@ -1,15 +1,10 @@
-﻿using YantraJS.Debugger;
-using Expression = YantraJS.Expressions.YExpression;
-using YantraJS.Core.LambdaGen;
+﻿using Expression = YantraJS.Expressions.YExpression;
+using Broiler.JavaScript.Core.Debugger;
+using Broiler.JavaScript.Core.LambdaGen;
 
-namespace YantraJS.ExpHelper;
+namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public class JSDebuggerBuilder
 {
-    //private static Type type = typeof(JSDebugger);
-
-    //private static MethodInfo _RaiseBreak
-    //    = type.InternalMethod(nameof(JSDebugger.RaiseBreak));
-
-    public static Expression RaiseBreak() => NewLambdaExpression.StaticCallExpression(() => () => JSDebugger.RaiseBreak());// return Expression.Call(null, _RaiseBreak);
+    public static Expression RaiseBreak() => NewLambdaExpression.StaticCallExpression(() => () => JSDebugger.RaiseBreak());
 }

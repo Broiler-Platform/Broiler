@@ -1,54 +1,42 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
-using YantraJS.Extensions;
 using Yantra.Core;
-using YantraJS.Core.Clr;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Enumerators;
+using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.Core.Core.Clr;
 
 namespace YantraJS.Core;
 
-// [JSRuntime(typeof(JSArrayStatic), typeof(JSArrayPrototype))]
 [JSBaseClass("Object")]
 [JSFunctionGenerator("Array")]
 
-public partial class JSArray: JSObject
+public partial class JSArray : JSObject
 {
     internal uint _length;
 
-    //internal JSArray(JSObject prototype) : base(prototype)
-    //{
+    public JSArray() : base((JSObject)null) { }
 
-    //}
+    public JSArray(params JSValue[] items) : this((IEnumerable<JSValue>)items) { }
 
-
-    public JSArray() : base((JSObject)null)
-    {
-
-    }
-
-    public JSArray(params JSValue[] items): this((IEnumerable<JSValue>)items)
-    {
-
-    }
-
-    public JSArray(IElementEnumerator en): this()
+    public JSArray(IElementEnumerator en) : this()
     {
         ref var elements = ref GetElements(true);
         while (en.MoveNextOrDefault(out var v, JSUndefined.Value))
             elements.Put(_length++, v);
     }
 
-    public JSArray(IEnumerable<JSValue> items): this()
+    public JSArray(IEnumerable<JSValue> items) : this()
     {
         ref var elements = ref GetElements(true);
         foreach (var item in items)
             elements.Put(_length++, item);
     }
 
-
     internal IElementEnumerator GetEntries() => new EntryEnumerator(this);
 
-    public JSArray(uint count): this()
+    public JSArray(uint count) : this()
     {
         AllocateElements(count);
         CreateElements(count);
@@ -58,7 +46,7 @@ public partial class JSArray: JSObject
     public override string ToString()
     {
         var sb = new StringBuilder();
-        for(uint i =0; i<_length;i++)
+        for (uint i = 0; i < _length; i++)
         {
             if (i > 0)
                 sb.Append(',');
@@ -69,10 +57,7 @@ public partial class JSArray: JSObject
         return sb.ToString();
     }
 
-    public override string ToDetailString()
-    {
-        return $"[{ToString()}]"; ;
-    }
+    public override string ToDetailString() => $"[{ToString()}]";
 
     public override bool IsArray => true;
 
@@ -83,7 +68,7 @@ public partial class JSArray: JSObject
         uint l = _length;
         for (uint i = 0; i < l; i++)
         {
-            if(elements.TryGetValue(i, out var p))
+            if (elements.TryGetValue(i, out var p))
             {
                 yield return (i, p.value);
                 continue;
@@ -100,12 +85,12 @@ public partial class JSArray: JSObject
         set
         {
             if (IsSealedOrFrozen())
-                throw JSContext.Current.NewTypeError("Cannot modify property length");
+                throw JSContext.NewTypeError("Cannot modify property length");
             var prev = _length;
             ref var elements = ref GetElements();
             double n = value;
             if (n < 0 || n > uint.MaxValue || double.IsNaN(n))
-                throw JSContext.Current.NewRangeError("Invalid length");
+                throw JSContext.NewRangeError("Invalid length");
             _length = (uint)n;
             if (prev > _length)
             {
@@ -114,18 +99,19 @@ public partial class JSArray: JSObject
                 {
                     elements.RemoveAt(i);
                 }
-            } else
+            }
+            else
             {
                 elements.Resize(_length);
             }
         }
     }
 
-    public override int Length { 
+    public override int Length
+    {
         get => (int)_length;
         set => ArrayLength = value;
     }
-
 
     public void Add(JSValue item)
     {
@@ -138,25 +124,17 @@ public partial class JSArray: JSObject
             ref var elements = ref CreateElements();
             elements.Put(_length++, item);
         }
-        // return this;
     }
-
-    //internal override bool TryRemove(uint i, out JSProperty p)
-    //{
-    //    ref var elements = ref GetElements();
-    //    return elements.TryRemove(i, out p);
-    //}
 
     public override IElementEnumerator GetElementEnumerator()
     {
-        if(HasIterator)
+        if (HasIterator)
         {
             var v = this.GetValue(GetSymbols()[JSSymbol.iterator.Key]);
             return v.InvokeFunction(Arguments.Empty).GetElementEnumerator();
         }
         return new ElementEnumerator(this);
     }
-
 
     private struct ElementEnumerator(JSArray array) : IElementEnumerator
     {
@@ -177,18 +155,19 @@ public partial class JSArray: JSObject
         public bool MoveNext(out bool hasValue, out JSValue value, out uint index)
         {
             ref var elements = ref array.GetElements();
-            if((this.index = (this.index == uint.MaxValue) ? 0 : (this.index + 1)) < length)
+            if ((this.index = (this.index == uint.MaxValue) ? 0 : (this.index + 1)) < length)
             {
                 index = this.index;
-                if(elements.TryGetValue(index, out var property))
+                if (elements.TryGetValue(index, out var property))
                 {
-                    value = property.IsEmpty 
-                        ? null 
+                    value = property.IsEmpty
+                        ? null
                         : (property.IsValue
                         ? property.value
                         : property.set.InvokeFunction(new Arguments(array)));
                     hasValue = true;
-                } else
+                }
+                else
                 {
                     hasValue = false;
                     value = JSUndefined.Value;
@@ -263,23 +242,23 @@ public partial class JSArray: JSObject
         }
 
         var en = iterator.GetElementEnumerator();
-        while (en.MoveNext(out var hasValue, out var item, out var  index))
+        while (en.MoveNext(out var hasValue, out var item, out var index))
         {
             if (hasValue)
             {
                 et.Put(el++, item);
-            } else
+            }
+            else
             {
                 el++;
             }
         }
         _length = el;
-        // return this;
     }
 
     internal protected override bool SetValue(uint name, JSValue value, JSValue receiver, bool throwError = true)
     {
-        if(base.SetValue(name, value, receiver, throwError))
+        if (base.SetValue(name, value, receiver, throwError))
         {
             if (_length <= name)
             {
@@ -289,11 +268,6 @@ public partial class JSArray: JSObject
         }
         return false;
     }
-
-    //IEnumerator IEnumerable.GetEnumerator()
-    //{
-    //    throw new NotImplementedException();
-    //}
 }
 
 
@@ -349,5 +323,4 @@ struct EntryEnumerator(JSArray typedArray) : IElementEnumerator
         }
         return @default;
     }
-
 }

@@ -1,4 +1,7 @@
-namespace YantraJS.Core.Tests;
+using Broiler.JavaScript.Core.Core;
+using YantraJS.Core;
+
+namespace Broiler.JavaScript.Core.Tests;
 
 /// <summary>
 /// Tests for the <see cref="IBuiltInRegistry"/> interface and

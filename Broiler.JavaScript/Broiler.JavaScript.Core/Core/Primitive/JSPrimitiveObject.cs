@@ -1,21 +1,19 @@
-﻿using System;
-using YantraJS.Extensions;
+﻿using Broiler.JavaScript.Core.Extensions;
+using System;
+using YantraJS.Core;
 
-namespace YantraJS.Core.Core.Primitive;
+namespace Broiler.JavaScript.Core.Core.Primitive;
 
-public class JSPrimitiveObject: JSObject
+public class JSPrimitiveObject : JSObject
 {
     internal readonly JSValue value;
 
-    public JSPrimitiveObject(JSPrimitive value): base(JSContext.Current.ObjectPrototype)
+    public JSPrimitiveObject(JSPrimitive value) : base(JSContext.Current.ObjectPrototype)
     {
         this.value = value;
         value.ResolvePrototype();
         prototypeChain = value.prototypeChain;
-        //this.DefineProperty(KeyStrings.constructor, 
-        //    JSProperty.Property(value.prototypeChain[KeyStrings.constructor], JSPropertyAttributes.ReadonlyValue));
     }
-
 
     public override string ToString() => value.ToString();
 
@@ -27,9 +25,7 @@ public class JSPrimitiveObject: JSObject
 
     public override bool ConvertTo(Type type, out object value) => this.value.ConvertTo(type, out value);
 
-    public override JSValue CreateInstance(in Arguments a) =>
-        // return value.CreateInstance(a);
-        throw JSContext.Current.NewTypeError($"Cannot create instance of {this}");
+    public override JSValue CreateInstance(in Arguments a) => throw JSContext.NewTypeError($"Cannot create instance of {this}");
 
     public override JSValue AddValue(JSValue value) => this.value.AddValue(value);
 
@@ -38,26 +34,31 @@ public class JSPrimitiveObject: JSObject
         if (key.Key == KeyStrings.length.Key)
         {
             if (value is JSString @string)
-            {
                 return new JSNumber(@string.Length);
-            }
         }
+
         return base.GetValue(key, receiver, throwError);
     }
 
-    public override JSValue this[uint name] {
-        get {
+    public override JSValue this[uint name]
+    {
+        get
+        {
             ref var elements = ref GetElements();
+
             if (elements.TryGetValue(name, out var p))
                 return this.GetValue(p);
+
             return value[name];
         }
-        set {
-            if (value is JSString @string) {
-                if (name < @string.Length) {
+        set
+        {
+            if (value is JSString @string)
+            {
+                if (name < @string.Length)
                     return;
-                }
             }
+
             base[name] = value;
         }
     }
@@ -65,18 +66,18 @@ public class JSPrimitiveObject: JSObject
     /// <summary> Added for below TCs in ExpressionTests.cs
     /// Assert.AreEqual(false, Evaluate("var x = new Number(10); x == new Number(10)"));
     // Assert.AreEqual(true, Evaluate("var x = new Number(10); x == x"));
-   /// </summary>
-   /// <param name="value"></param>
-   /// <returns></returns>
+    /// </summary>
+    /// <param name="value"></param>
+    /// <returns></returns>
 
     public override bool Equals(JSValue value)
     {
         if (ReferenceEquals(this, value))
             return true;
+
         if (value is JSPrimitiveObject)
-        {
             return false;
-        }
+
         return base.Equals(value);
     }
 }

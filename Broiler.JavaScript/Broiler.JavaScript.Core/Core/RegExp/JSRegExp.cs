@@ -1,24 +1,27 @@
-﻿using System.Text;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using System.Text;
 using System.Text.RegularExpressions;
 using Yantra.Core;
-using YantraJS.Core.Clr;
+using System;
+using Broiler.JavaScript.Core.Core;
 
 namespace YantraJS.Core;
 
 
-
 [JSClassGenerator("RegExp")]
-public partial class JSRegExp: JSObject
+public partial class JSRegExp : JSObject
 {
-
     [JSExport("escape")]
     internal static JSValue Escape(in Arguments a)
     {
         var input = a.Get1();
         if (input.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError("RegExp.escape called on null or undefined");
+            throw JSContext.NewTypeError("RegExp.escape called on null or undefined");
+
         var str = input.ToString();
         var sb = new StringBuilder(str.Length + 4);
+
         for (int i = 0; i < str.Length; i++)
         {
             var c = str[i];
@@ -28,11 +31,12 @@ public partial class JSRegExp: JSObject
             {
                 sb.Append('\\');
             }
+
             sb.Append(c);
         }
+
         return new JSString(sb.ToString());
     }
-
 
     [JSExport("source")]
     public readonly string pattern;
@@ -47,49 +51,35 @@ public partial class JSRegExp: JSObject
     public readonly bool multiline;
     [JSExport]
     public readonly bool ignoreCase;
-    
+
     internal Regex value;
 
     [JSExport]
     public int lastIndex = 0;
 
-
-    public JSRegExp(in Arguments a): base(JSContext.NewTargetPrototype)
+    public JSRegExp(in Arguments a) : base(JSContext.NewTargetPrototype)
     {
         var pattern = "";
         var flags = "";
+
         if (a.Length > 0)
-        {
             pattern = a.GetAt(0).ToString();
-        }
+
         if (a.Length > 1)
-        {
             flags = a.GetAt(1).ToString();
-        }
+
         this.flags = flags;
         this.pattern = pattern;
 
         (value, globalSearch, ignoreCase, multiline) = CreateRegex(pattern, flags);
-
     }
 
-
-    public JSRegExp(string pattern, string flags): this()
+    public JSRegExp(string pattern, string flags) : this()
     {
         this.flags = flags;
         this.pattern = pattern;
 
         (value, globalSearch, ignoreCase, multiline) = CreateRegex(pattern, flags);
-
-        //this.DefineProperty(KeyStrings.lastIndex, 
-        //    JSProperty.Property(KeyStrings.lastIndex, 
-        //    (in Arguments a) => new JSNumber(lastIndex), 
-        //    (in Arguments a) =>
-        //    {
-        //        this.lastIndex = a.Get1().IntValue;
-        //        return a.Get1();
-        //    }, 
-        //    JSPropertyAttributes.ConfigurableProperty ));
     }
 
     /// <summary>
@@ -103,7 +93,6 @@ public partial class JSRegExp: JSObject
         if (globalSearch == false)
         {
             var arg = new Arguments(this, input);
-
             return Exec(arg);
         }
 
@@ -112,15 +101,12 @@ public partial class JSRegExp: JSObject
         if (matches.Count == 0)
             return JSNull.Value;
 
-        // Set the deprecated RegExp properties (using the last match).
-        //this.Engine.RegExp.SetDeprecatedProperties(input, matches[matches.Count - 1]);
-
         // Construct the array to return.
         JSArray matchValues = new((uint)matches.Count);
         for (int i = 0; i < matches.Count; i++)
             matchValues[(uint)i] = new JSString(matches[i].Value);
+
         return matchValues;
-        //return this.Engine.Array.New(matchValues);
     }
 
     /// <summary>
@@ -134,15 +120,15 @@ public partial class JSRegExp: JSObject
         // Return an empty array if limit = 0.
         if (limit == 0)
             return new JSArray();
-            
 
         // Find the first match.
         Match match = value.Match(input, 0);
 
-        
+
         var results = new JSArray();
         int startIndex = 0;
         Match lastMatch = null;
+
         while (match.Success == true)
         {
             // Do not match the an empty substring at the start or end of the string or at the
@@ -157,10 +143,12 @@ public partial class JSRegExp: JSObject
             // Add the match results to the array.
             var element = input.Substring(startIndex, match.Index - startIndex);
             results.Add(new JSString(element));
-            //if (results.Count >= limit)
+
             if (results.Length >= limit)
-              return  results;
+                return results;
+
             startIndex = match.Index + match.Length;
+
             for (int i = 1; i < match.Groups.Count; i++)
             {
                 var group = match.Groups[i];
@@ -168,6 +156,7 @@ public partial class JSRegExp: JSObject
                     results.Add(JSUndefined.Value);       // Non-capturing groups return "undefined".
                 else
                     results.Add(new JSString(match.Groups[i].Value));
+
                 if (results.Length >= limit)
                     return results;
             }
@@ -181,13 +170,7 @@ public partial class JSRegExp: JSObject
         var ele = input.Substring(startIndex, input.Length - startIndex);
         results.Add(new JSString(ele));
         return results;
-        // Set the deprecated RegExp properties.
-       // if (lastMatch != null)
-       //     this.Engine.RegExp.SetDeprecatedProperties(input, lastMatch);
-
-       // return this.Engine.Array.New(results.ToArray());
     }
-
 
     /// <summary>
     /// Returns a copy of the given string with text replaced using a regular expression.
@@ -200,6 +183,7 @@ public partial class JSRegExp: JSObject
     {
         if (!replaceFunction.IsFunction)
             return Replace(input, replaceFunction.ToString());
+
         return value.Replace(input, match =>
         {
             // Set the deprecated RegExp properties.
@@ -213,8 +197,10 @@ public partial class JSRegExp: JSObject
                 else
                     parameters[i] = new JSString(match.Groups[i].Value);
             }
+
             parameters[match.Groups.Count] = new JSNumber(match.Index);
             parameters[match.Groups.Count + 1] = new JSString(input);
+
             var a = new Arguments(JSNull.Value, parameters);
             return replaceFunction.InvokeFunction(a).ToString();
         }, globalSearch == true ? int.MaxValue : 1);
@@ -259,9 +245,9 @@ public partial class JSRegExp: JSObject
                     else if (c == '&')
                         replacementBuilder.Append(match.Value);
                     else if (c == '`')
-                        replacementBuilder.Append(input.Substring(0, match.Index));
+                        replacementBuilder.Append(input.AsSpan(0, match.Index));
                     else if (c == '\'')
-                        replacementBuilder.Append(input.Substring(match.Index + match.Length));
+                        replacementBuilder.Append(input.AsSpan(match.Index + match.Length));
                     else if (c >= '0' && c <= '9')
                     {
                         int matchNumber1 = c - '0';
@@ -304,10 +290,6 @@ public partial class JSRegExp: JSObject
             return replacementBuilder.ToString();
         }, globalSearch == true ? -1 : 1);
 
-        // Set the deprecated RegExp properties if at least one match was found.
-        // if (lastMatch != null)
-        //     this.Engine.RegExp.SetDeprecatedProperties(input, lastMatch);
-
         return result;
     }
 
@@ -324,9 +306,7 @@ public partial class JSRegExp: JSObject
     /// v (unicodeSets)
     /// d (hasIndices)</param>
     /// <returns> RegexOptions flags that correspond to the given flags. </returns>
-    private static
-        (RegexOptions, bool, bool, bool, bool)
-        ParseFlags(string flags)
+    private static (RegexOptions, bool, bool, bool, bool) ParseFlags(string flags)
     {
         bool globalSearch = false;
         bool ignoreCase = false;
@@ -335,51 +315,52 @@ public partial class JSRegExp: JSObject
 
         var options = RegexOptions.ECMAScript;
 
-        if (flags != null)
+        if (flags == null)
+            return (options, globalSearch, ignoreCase, multiline, dotAll);
+
+        for (int i = 0; i < flags.Length; i++)
         {
-            for (int i = 0; i < flags.Length; i++)
+            char flag = flags[i];
+            if (flag == 'g')
             {
-                char flag = flags[i];
-                if (flag == 'g')
-                {
-                    if (globalSearch == true)
-                        throw JSContext.Current.NewSyntaxError("The 'g' flag cannot be specified twice");
-                    globalSearch = true;
-                }
-                else if (flag == 'i')
-                {
-                    if ((options & RegexOptions.IgnoreCase) == RegexOptions.IgnoreCase)
-                        throw JSContext.Current.NewSyntaxError("The 'i' flag cannot be specified twice");
-                    options |= RegexOptions.IgnoreCase;
-                    ignoreCase = true;
-                }
-                else if (flag == 'm')
-                {
-                    if ((options & RegexOptions.Multiline) == RegexOptions.Multiline)
-                        throw JSContext.Current.NewSyntaxError("The 'm' flag cannot be specified twice");
-                    options |= RegexOptions.Multiline;
-                    multiline = true;
-                }
-                else if (flag == 's')
-                {
-                    if (dotAll)
-                        throw JSContext.Current.NewSyntaxError("The 's' flag cannot be specified twice");
-                    dotAll = true;
-                    // Singleline makes . match \n as well.
-                    // We remove ECMAScript mode because it does not support Singleline.
-                    options &= ~RegexOptions.ECMAScript;
-                    options |= RegexOptions.Singleline;
-                }
-                else if (flag == 'u' || flag == 'v' || flag == 'y' || flag == 'd')
-                {
-                    // Accepted but not enforced in this implementation.
-                }
-                else
-                {
-                    throw JSContext.Current.NewSyntaxError($"Unknown flag {flag}");
-                }
+                if (globalSearch == true)
+                    throw JSContext.NewSyntaxError("The 'g' flag cannot be specified twice");
+                globalSearch = true;
+            }
+            else if (flag == 'i')
+            {
+                if ((options & RegexOptions.IgnoreCase) == RegexOptions.IgnoreCase)
+                    throw JSContext.NewSyntaxError("The 'i' flag cannot be specified twice");
+                options |= RegexOptions.IgnoreCase;
+                ignoreCase = true;
+            }
+            else if (flag == 'm')
+            {
+                if ((options & RegexOptions.Multiline) == RegexOptions.Multiline)
+                    throw JSContext.NewSyntaxError("The 'm' flag cannot be specified twice");
+                options |= RegexOptions.Multiline;
+                multiline = true;
+            }
+            else if (flag == 's')
+            {
+                if (dotAll)
+                    throw JSContext.NewSyntaxError("The 's' flag cannot be specified twice");
+                dotAll = true;
+                // Singleline makes . match \n as well.
+                // We remove ECMAScript mode because it does not support Singleline.
+                options &= ~RegexOptions.ECMAScript;
+                options |= RegexOptions.Singleline;
+            }
+            else if (flag == 'u' || flag == 'v' || flag == 'y' || flag == 'd')
+            {
+                // Accepted but not enforced in this implementation.
+            }
+            else
+            {
+                throw JSContext.NewSyntaxError($"Unknown flag {flag}");
             }
         }
+
         return (options, globalSearch, ignoreCase, multiline, dotAll);
     }
 
@@ -401,16 +382,12 @@ public partial class JSRegExp: JSObject
             // §2.6 — Detect inline pattern modifiers (?i:...) / (?-i:...) / (?ims:...) etc.
             // .NET ECMAScript mode does not support them, so switch to default mode.
             if ((options & RegexOptions.ECMAScript) != 0 && HasInlineModifiers(pattern))
-            {
                 options &= ~RegexOptions.ECMAScript;
-            }
 
             // §2.7 — Detect duplicate named capturing groups.
             // .NET ECMAScript mode does not allow them; default mode does.
             if ((options & RegexOptions.ECMAScript) != 0 && HasDuplicateNamedGroups(pattern))
-            {
                 options &= ~RegexOptions.ECMAScript;
-            }
 
             if ((options & RegexOptions.Multiline) == RegexOptions.Multiline)
             {
@@ -427,14 +404,17 @@ public partial class JSRegExp: JSObject
                     end = pattern.IndexOfAny(['.', '^', '$', '\\'], end + 1);
                     if (end == -1)
                         break;
+                    
                     builder ??= new StringBuilder();
-                    builder.Append(pattern.Substring(start, end - start));
+                    builder.Append(pattern.AsSpan(start, end - start));
+                    
                     start = end + 1;
                     switch (pattern[end])
                     {
                         case '.':
                             builder.Append(@"[^\r\n]");
                             break;
+
                         case '^':
                             // [^abc] is a thing. The ^ does NOT match the start of the line in this case.
                             if (end > 0 && pattern[end - 1] == '[')
@@ -442,9 +422,11 @@ public partial class JSRegExp: JSObject
                             else
                                 builder.Append(@"(?<=^|\r)");
                             break;
+
                         case '$':
                             builder.Append(@"(?=$|\r)");
                             break;
+
                         case '\\':
                             // $ is an anchor. \$ matches the literal dollar sign. \\$ is a backslash then an anchor.
                             if (end < pattern.Length - 1)
@@ -457,15 +439,17 @@ public partial class JSRegExp: JSObject
                             break;
                     }
                 }
+
                 if (builder != null)
                 {
-                    builder.Append(pattern.Substring(start));
+                    builder.Append(pattern.AsSpan(start));
                     pattern = builder.ToString();
                 }
             }
 
             return (new Regex(pattern, options), globalSearch, ignoreCase, multiline);
-        } catch
+        }
+        catch
         {
             return (null, false, false, false);
         }
@@ -490,14 +474,17 @@ public partial class JSRegExp: JSObject
                 {
                     j++;
                 }
+
                 // If followed by ':' and we consumed at least one modifier char, it's an inline modifier
                 if (j > i + 2 && j < pattern.Length && pattern[j] == ':')
                     return true;
             }
+
             // Skip escaped characters
             if (pattern[i] == '\\' && i + 1 < pattern.Length)
                 i++;
         }
+
         return false;
     }
 
@@ -525,10 +512,12 @@ public partial class JSRegExp: JSObject
                     i = end;
                 }
             }
+
             // Skip escaped characters
             if (pattern[i] == '\\' && i + 1 < pattern.Length)
                 i++;
         }
+
         return false;
     }
 
@@ -545,6 +534,7 @@ public partial class JSRegExp: JSObject
         var sb = new StringBuilder(pattern.Length + 8);
         bool inClass = false;
         int groupsSeen = 0;
+
         for (int i = 0; i < pattern.Length; i++)
         {
             char c = pattern[i];
@@ -557,11 +547,13 @@ public partial class JSRegExp: JSObject
                     // Backreference \N — check if it's a forward reference
                     int refNum = 0;
                     int j = i + 1;
+                    
                     while (j < pattern.Length && pattern[j] >= '0' && pattern[j] <= '9')
                     {
                         refNum = refNum * 10 + (pattern[j] - '0');
                         j++;
                     }
+                    
                     if (refNum > totalGroups)
                     {
                         // Reference to non-existent group — treat as empty match
@@ -569,6 +561,7 @@ public partial class JSRegExp: JSObject
                         i = j - 1;
                         continue;
                     }
+                    
                     if (refNum > groupsSeen)
                     {
                         // Forward reference to not-yet-captured group — matches empty string per ES3
@@ -576,11 +569,14 @@ public partial class JSRegExp: JSObject
                         i = j - 1;
                         continue;
                     }
+                    
                     // Normal backreference — pass through
                     sb.Append(pattern, i, j - i);
                     i = j - 1;
+                    
                     continue;
                 }
+                
                 if (next == '0')
                 {
                     // \0 — NUL escape. Check if followed by an octal digit.
@@ -590,11 +586,13 @@ public partial class JSRegExp: JSObject
                         sb.Append(c);
                         continue;
                     }
+
                     // \0 alone — NUL character. Use \x00 for .NET compatibility.
                     sb.Append("\\x00");
                     i++; // skip the '0'
                     continue;
                 }
+
                 // Other escapes — pass through
                 sb.Append(c);
                 sb.Append(next);
@@ -606,6 +604,7 @@ public partial class JSRegExp: JSObject
             {
                 if (c == ']')
                     inClass = false;
+
                 sb.Append(c);
                 continue;
             }
@@ -620,6 +619,7 @@ public partial class JSRegExp: JSObject
                     i++; // skip ']'
                     continue;
                 }
+
                 if (i + 2 < pattern.Length && pattern[i + 1] == '^' && pattern[i + 2] == ']')
                 {
                     // [^] — complement of empty class, matches any character
@@ -627,15 +627,14 @@ public partial class JSRegExp: JSObject
                     i += 2; // skip '^]'
                     continue;
                 }
+
                 inClass = true;
                 sb.Append(c);
                 continue;
             }
 
             if (c == '(' && (i + 1 >= pattern.Length || pattern[i + 1] != '?'))
-            {
                 groupsSeen++;
-            }
 
             sb.Append(c);
         }
@@ -648,6 +647,7 @@ public partial class JSRegExp: JSObject
     {
         int count = 0;
         bool inClass = false;
+
         for (int i = 0; i < pattern.Length; i++)
         {
             char c = pattern[i];
@@ -656,17 +656,20 @@ public partial class JSRegExp: JSObject
                 i++; // skip escaped char
                 continue;
             }
+
             if (inClass)
             {
                 if (c == ']') inClass = false;
                 continue;
             }
+
             if (c == '[') { inClass = true; continue; }
             if (c == '(' && (i + 1 >= pattern.Length || pattern[i + 1] != '?'))
             {
                 count++;
             }
         }
+
         return count;
     }
 

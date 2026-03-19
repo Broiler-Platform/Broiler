@@ -1,7 +1,9 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.FastParser.Parser;
+using System;
 using System.Runtime.CompilerServices;
 
-namespace YantraJS.Core.FastParser;
+namespace Broiler.JavaScript.Core.FastParser;
 
 /// <summary>
 /// This class will provide stream of tokens, we are using this instead of
@@ -23,15 +25,11 @@ public class FastTokenStream
     public override string ToString() => $"{Current} {Next}";
 
     public readonly FastKeywordMap Keywords;
-    // private readonly List<FastToken> tokens;
     FastToken current;
-    // private int index;
 
     public FastTokenStream(in StringSpan text, FastKeywordMap keywords = null)
     {
         Pool = new FastPool();
-        // tokens = new List<FastToken>(Math.Max(1, text.Length/4));
-        // index = 0;
         Keywords = keywords ?? FastKeywordMap.Instance;
         scanner = new FastScanner(Pool, text, Keywords);
     }
@@ -48,24 +46,9 @@ public class FastTokenStream
     public FastTokenStream(FastPool pool, in StringSpan text, FastKeywordMap keywords = null)
     {
         Pool = pool;
-        // tokens = new List<FastToken>(Math.Max(1, text.Length / 4));
-        //  index = 0;
         Keywords = keywords ?? FastKeywordMap.Instance;
         scanner = new FastScanner(pool, text, Keywords);
     }
-
-    //private FastToken this[int index]
-    //{
-    //    get
-    //    {
-    //        while (tokens.Count <= index)
-    //        {
-    //            tokens.Add(scanner.Token);
-    //            scanner.ConsumeToken();
-    //        }
-    //        return tokens[index];
-    //    }
-    //}
 
     public FastToken Current => current ??= scanner.Token;
 
@@ -77,9 +60,11 @@ public class FastTokenStream
     public FastToken Expect(TokenTypes type)
     {
         SkipNewLines();
+        
         var c = Current;
         if (c.Type != type)
             throw new FastParseException(c, $"Expecting {type} at {c.Start.Line}, {c.Start.Column}");
+
         Consume();
         return c;
     }
@@ -88,9 +73,11 @@ public class FastTokenStream
     public FastToken Expect(FastKeywords type)
     {
         SkipNewLines();
+        
         var c = Current;
         if (c.Keyword != type)
             throw new FastParseException(c, $"Expecting keyword {type} at {c.Start.Line}, {c.Start.Column}");
+        
         Consume();
         return c;
     }
@@ -99,9 +86,11 @@ public class FastTokenStream
     public FastToken ExpectContextualKeyword(FastKeywords type)
     {
         SkipNewLines();
+        
         var c = Current;
-        if (c.ContextualKeyword != type) 
+        if (c.ContextualKeyword != type)
             throw new FastParseException(c, $"Expecting keyword {type} at {c.Start.Line}, {c.Start.Column}");
+        
         Consume();
         return c;
     }
@@ -112,11 +101,13 @@ public class FastTokenStream
     {
         var m = SkipNewLines();
         var c = Current;
+        
         if (c.ContextualKeyword == keyword)
         {
             Consume();
             return true;
         }
+        
         m.Undo();
         return false;
     }
@@ -127,11 +118,13 @@ public class FastTokenStream
     {
         var m = SkipNewLines();
         var c = Current;
+        
         if (c.Keyword == keyword)
         {
             Consume();
             return true;
         }
+        
         m.Undo();
         return false;
     }
@@ -141,11 +134,13 @@ public class FastTokenStream
     {
         var m = SkipNewLines();
         var c = Current;
+        
         if (c.Type == type)
         {
             Consume();
             return true;
         }
+        
         m.Undo();
         return false;
     }
@@ -155,11 +150,13 @@ public class FastTokenStream
     {
         var m = SkipNewLines();
         var c = Current.Type;
-        if (c == type1 ||  c == type2)
+        
+        if (c == type1 || c == type2)
         {
             Consume();
             return true;
         }
+        
         m.Undo();
         return false;
     }
@@ -170,15 +167,16 @@ public class FastTokenStream
     {
         var m = SkipNewLines();
         var c = Current.Type;
+
         if (c == type)
         {
             Consume();
             return true;
         }
+
         if (m.LinesSkipped)
-        {
             return true;
-        }
+
         m.Undo();
         return false;
     }
@@ -188,15 +186,16 @@ public class FastTokenStream
     {
         var m = SkipNewLines();
         var c = Current.Type;
+
         if (c == type1 || c == type2)
         {
             Consume();
             return true;
         }
+
         if (m.LinesSkipped)
-        {
             return true;
-        }
+
         m.Undo();
         return false;
     }
@@ -207,11 +206,13 @@ public class FastTokenStream
     {
         var m = SkipNewLines();
         var c = Current.Type;
+
         if (c == type1 || c == type2 || c == type3)
         {
             Consume();
             return true;
         }
+
         m.Undo();
         return false;
     }
@@ -222,11 +223,13 @@ public class FastTokenStream
     {
         var m = SkipNewLines();
         var ct = Current.Type;
+
         if (ct == type1 || ct == type2 || ct == type3 || ct == type4)
         {
             Consume();
             return true;
         }
+
         m.Undo();
         return false;
     }
@@ -237,12 +240,14 @@ public class FastTokenStream
     {
         var m = SkipNewLines();
         var c = Current;
+
         if (c.Type == type)
         {
             token = c;
             Consume();
             return true;
         }
+
         m.Undo();
         token = null;
         return false;
@@ -260,11 +265,13 @@ public class FastTokenStream
         var index = Current;
         var c = index.Type;
         bool skipped = false;
-        while(c == TokenTypes.LineTerminator)
+
+        while (c == TokenTypes.LineTerminator)
         {
             c = Consume().Type;
             skipped = true;
         }
+
         return new Marker(this, index, skipped);
     }
 
@@ -273,12 +280,14 @@ public class FastTokenStream
     {
         var marker = SkipNewLines();
         var c = Current;
+
         if (c.Type == type1)
         {
             token1 = c;
             SkipNewLines();
             c = Next;
-            if(c.Type == type2)
+        
+            if (c.Type == type2)
             {
                 Consume();
                 Consume();
@@ -286,6 +295,7 @@ public class FastTokenStream
                 return true;
             }
         }
+
         marker.Undo();
         token1 = null;
         token2 = null;
@@ -313,9 +323,7 @@ public class FastTokenStream
     public CancellableDisposableAction UndoMark()
     {
         var i = current;
-        return new CancellableDisposableAction(() => {
-            current = i;
-        });
+        return new CancellableDisposableAction(() => current = i);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

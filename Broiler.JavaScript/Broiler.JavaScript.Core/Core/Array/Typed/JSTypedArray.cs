@@ -1,8 +1,12 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Array.Typed;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Core.Enumerators;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Yantra.Core;
-using YantraJS.Core.Clr;
 using YantraJS.Core.Generator;
 
 namespace YantraJS.Core.Typed;
@@ -11,8 +15,6 @@ namespace YantraJS.Core.Typed;
 [JSClassGenerator("TypedArray")]
 public partial class JSTypedArray: JSObject
 {
-
-
     [JSExport]
     private static JSValue From(in Arguments a) => a.This.InvokeMethod(Names.from, a);
 
@@ -33,23 +35,25 @@ public partial class JSTypedArray: JSObject
     [JSExport]
     internal int ByteLength => buffer.buffer.Length;
     
-
     public override int Length { get => length; set => throw new NotSupportedException(); }
-
 
     public JSTypedArray(in Arguments a) : this(JSContext.NewTargetPrototype) => throw new NotSupportedException();
 
-    public JSTypedArray(in TypedArrayParameters p): this(p.prototype) {
+    public JSTypedArray(in TypedArrayParameters p): this(p.prototype) 
+    {
         buffer = p.buffer;
         length = p.length;
         byteOffset = p.byteOffset;
         bytesPerElement = p.bytesPerElement;
+
         if (p.copyFrom == null)
         {
             if (buffer == null)
             {
                 buffer = new JSArrayBuffer(length * bytesPerElement);
-            } else {
+            } 
+            else 
+            {
                 var l = length;
                 if (l == -1)
                 {
@@ -61,13 +65,12 @@ public partial class JSTypedArray: JSObject
                     length = l / bytesPerElement;
                 }
 
-                if (l < 0 ||
-                    ((byteOffset + l) > buffer.buffer.Length))
-                    throw JSContext.Current.NewRangeError($"Start offset {byteOffset} is outside the bounds of the buffer");
+                if (l < 0 || ((byteOffset + l) > buffer.buffer.Length))
+                    throw JSContext.NewRangeError($"Start offset {byteOffset} is outside the bounds of the buffer");
 
                 if (((l - byteOffset) % bytesPerElement) != 0)
                 {
-                    throw JSContext.Current.NewRangeError($"byte length of TypedArray should be multiple of {bytesPerElement}");
+                    throw JSContext.NewRangeError($"byte length of TypedArray should be multiple of {bytesPerElement}");
                 }
 
             }
@@ -171,7 +174,7 @@ public partial class JSTypedArray: JSObject
     public override double DoubleValue => double.NaN;
     public override bool Equals(JSValue value) => ReferenceEquals(this, value);
 
-    public override JSValue InvokeFunction(in Arguments a) => throw JSContext.Current.NewTypeError($"{this} is not a function");
+    public override JSValue InvokeFunction(in Arguments a) => throw JSContext.NewTypeError($"{this} is not a function");
 
     public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
@@ -201,8 +204,6 @@ public partial class JSTypedArray: JSObject
     public override IElementEnumerator GetAllKeys(bool showEnumerableOnly = true, bool inherited = true) => new KeyEnumerator(length);
 
     internal JSGenerator GetKeys() => new(new KeyEnumerator(length), "Array Iterator");
-
-
 
     struct ElementEnumerator(JSTypedArray typedArray, int startIndex = 0) : IElementEnumerator
     {
@@ -257,7 +258,6 @@ public partial class JSTypedArray: JSObject
 
             return @default;
         }
-
     }
 
     struct EntryEnumerator(JSTypedArray typedArray) : IElementEnumerator
@@ -313,8 +313,6 @@ public partial class JSTypedArray: JSObject
             return @default;
         }
     }
-
-
 }
 
 internal struct KeyEnumerator(int length) : IElementEnumerator
@@ -366,5 +364,4 @@ internal struct KeyEnumerator(int length) : IElementEnumerator
         }
         return @default;
     }
-
 }

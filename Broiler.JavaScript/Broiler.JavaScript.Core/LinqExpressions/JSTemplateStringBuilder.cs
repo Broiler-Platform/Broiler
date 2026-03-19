@@ -1,87 +1,36 @@
 ﻿using System.Collections.Generic;
-using YantraJS.Core.String;
 using Expression = YantraJS.Expressions.YExpression;
 using YantraJS.Expressions;
 using YantraJS.Core;
-using YantraJS.Core.LambdaGen;
-using YantraJS.Core.Types;
+using Broiler.JavaScript.Core.Core.String;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.LambdaGen;
 
-namespace YantraJS.ExpHelper;
+namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public class JSTemplateStringBuilder
 {
-    // private static Type type = typeof(JSTemplateString);
-
-    //private static ConstructorInfo _new =
-    //    type.GetConstructor(new Type[] { typeof(int) });
-
-    //private static MethodInfo _addQuasi =
-    //    type.GetMethod(nameof(JSTemplateString.AddQuasi));
-
-    //private static MethodInfo _addExpression =
-    //    type.GetMethod(nameof(JSTemplateString.AddExpression));
-
-    //private static MethodInfo _toJSString =
-    //    type.GetMethod(nameof(JSTemplateString.ToJSString));
-
-    //private static MethodInfo _addString =
-    //    type.PublicMethod(nameof(JSTemplateString.Add), typeof(string));
-
-    //private static MethodInfo _addValue =
-    //    type.PublicMethod(nameof(JSTemplateString.Add), typeof(JSValue));
-
     public static Expression New(IEnumerable<Expression> select, int total)
     {
         var list = new Sequence<YElementInit>();
-        var newExp = NewLambdaExpression.NewExpression<JSTemplateString>(() => () => new JSTemplateString(0),
-            Expression.Constant(total));
-        // var newExp = Expression.New(_new, Expression.Constant(total));
+        var newExp = NewLambdaExpression.NewExpression<JSTemplateString>(() => () => new JSTemplateString(0), Expression.Constant(total));
         var en = select.GetEnumerator();
 
-        var addStringMethod = TypeQuery.QueryInstanceMethod<JSTemplateString>(() => (x) => x.Add(""));
-        var addValueMethod = TypeQuery.QueryInstanceMethod<JSTemplateString>(() => (x) => x.Add((JSValue)null));
+        var addStringMethod = Broiler.JavaScript.Core.TypeQuery.TypeQuery.QueryInstanceMethod<JSTemplateString>(() => (x) => x.Add(""));
+        var addValueMethod = Broiler.JavaScript.Core.TypeQuery.TypeQuery.QueryInstanceMethod<JSTemplateString>(() => (x) => x.Add((JSValue)null));
 
         while (en.MoveNext())
         {
             var current = en.Current;
             if (current.NodeType == YExpressionType.Constant)
             {
-                // exp = Expression.Call(exp, _addQuasi, current);
                 list.Add(Expression.ElementInit(addStringMethod, current));
                 continue;
             }
+
             list.Add(Expression.ElementInit(addValueMethod, current));
         }
-        return Expression.ListInit(newExp, list)
-            .CallExpression<JSTemplateString>(() => (x) => x.ToJSString());
+
+        return Expression.ListInit(newExp, list).CallExpression<JSTemplateString>(() => (x) => x.ToJSString());
     }
-
-    //public static Expression New(List<string> quasis, IEnumerable<Expression> select)
-    //{
-    //    var total = quasis.Sum(x => x.Length);
-    //    Expression exp = Expression.New(_new, Expression.Constant(total));
-    //    var qn = quasis.GetEnumerator();
-    //    var en = select.GetEnumerator();
-    //    bool end = false;
-    //    while (!end)
-    //    {
-    //        end = true;
-    //        if (qn.MoveNext())
-    //        {
-    //            var ec = qn.Current;
-    //            if (ec.Length > 0)
-    //            {
-    //                exp = Expression.Call(exp, _addQuasi, Expression.Constant(ec));
-    //            }
-    //            end = false;
-    //        }
-    //        if (en.MoveNext())
-    //        {
-    //            var ec = en.Current;
-    //            exp = Expression.Call(exp, _addExpression, ec);
-    //        }
-    //    }
-    //    return Expression.Call(exp, _toJSString);
-    //}
-
 }

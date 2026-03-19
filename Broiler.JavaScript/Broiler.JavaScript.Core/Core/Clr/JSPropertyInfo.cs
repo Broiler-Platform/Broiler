@@ -2,12 +2,12 @@
 
 using System;
 using System.Reflection;
-using YantraJS.ExpHelper;
-using YantraJS.LinqExpressions;
 using YantraJS.Runtime;
-using YantraJS.Core.Clr;
+using YantraJS.Core;
+using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.Core.Utils;
 
-namespace YantraJS.Core.Core.Clr;
+namespace Broiler.JavaScript.Core.Core.Clr;
 
 
 internal class JSPropertyInfo
@@ -53,11 +53,11 @@ internal class JSPropertyInfo
         var @this = Expression.Parameter(typeof(object));
         var index = Expression.Parameter(typeof(uint));
         var indexParameter = Property.GetMethod.GetParameters()[0];
-        Expression indexAccess = index.Type != indexParameter.ParameterType
-            ? Expression.Convert(index, indexParameter.ParameterType)
-            : index;
+
+        Expression indexAccess = index.Type != indexParameter.ParameterType ? Expression.Convert(index, indexParameter.ParameterType) : index;
         Expression indexExpression;
         Expression convertThis = Expression.TypeAs(@this, Property.DeclaringType);
+
         if (Property.DeclaringType.IsArray)
         {
             // this is direct array.. cast and get.. 
@@ -67,8 +67,10 @@ internal class JSPropertyInfo
         {
             indexExpression = Expression.MakeIndex(convertThis, Property, [indexAccess]);
         }
+
         Expression body = JSExceptionBuilder.Wrap(ClrProxyBuilder.Marshal(indexExpression));
         var lambda = Expression.Lambda<Func<object, uint, JSValue>>($"set {Property.Name}", body, @this, index);
+
         return lambda.Compile();
     }
 
@@ -84,11 +86,11 @@ internal class JSPropertyInfo
         var index = Expression.Parameter(typeof(uint));
         var value = Expression.Parameter(typeof(object));
         var indexParameter = Property.SetMethod.GetParameters()[0];
-        Expression indexAccess = index.Type != indexParameter.ParameterType
-            ? Expression.Convert(index, indexParameter.ParameterType)
-            : index;
+
+        Expression indexAccess = index.Type != indexParameter.ParameterType ? Expression.Convert(index, indexParameter.ParameterType) : index;
         Expression indexExpression;
         Expression convertThis = Expression.TypeAs(@this, Property.DeclaringType);
+
         if (Property.DeclaringType.IsArray)
         {
             // this is direct array.. cast and get.. 
@@ -99,12 +101,9 @@ internal class JSPropertyInfo
             indexExpression = Expression.MakeIndex(convertThis, Property, [indexAccess]);
         }
 
-
-        Expression body = Expression.Block(
-            JSExceptionBuilder.Wrap(
-                Expression.Assign(indexExpression, Expression.TypeAs(value, elementType)).ToJSValue()));
+        Expression body = Expression.Block(JSExceptionBuilder.Wrap(Expression.Assign(indexExpression, Expression.TypeAs(value, elementType)).ToJSValue()));
         var lambda = Expression.Lambda<Func<object, uint, object, JSValue>>("get " + Property.Name, body, @this, index, value);
+        
         return lambda.Compile();
     }
-
 }

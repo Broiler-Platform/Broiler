@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace YantraJS.Core.Core.Array;
+namespace Broiler.JavaScript.Core.Core.Array;
 
 public class JSSpreadValue(JSValue value) : JSValue(null)
 {

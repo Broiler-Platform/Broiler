@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using System.Threading;
 using System.Linq;
 
-namespace YantraJS.JSClassGenerator;
+namespace Broiler.JavaScript.JSClassGenerator;
 
 internal static class SyntaxNodeExtensions
 {
@@ -55,14 +55,6 @@ internal static class SyntaxNodeExtensions
     {
         var aName = type.GetAttributes().FirstOrDefault(x => x.AttributeClass?.Name?.IsGeneratorAttributeName() ?? false);
         return aName;
-        //return type.GetAttributes()
-        //           .FirstOrDefault(a => (a.AttributeClass?.Name == "JSClassGeneratorAttribute" || a.AttributeClass?.Name == "JSClassGenerator")
-        //                    //&& a.AttributeClass.ContainingNamespace is
-        //                    // {
-        //                    //     Name: "Yantra.Core",
-        //                    //     // ContainingNamespace.IsGlobalNamespace: true
-        //                    // }
-        //                     );
     }
 
 

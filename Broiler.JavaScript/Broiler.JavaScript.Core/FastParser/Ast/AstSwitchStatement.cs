@@ -1,4 +1,7 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using YantraJS.Core;
+using YantraJS.Core.FastParser;
+
+namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstSwitchStatement(FastToken start, FastToken end, AstExpression target, IFastEnumerable<AstCase> astCases) : AstStatement(start, FastNodeType.SwitchStatement, end)
 {

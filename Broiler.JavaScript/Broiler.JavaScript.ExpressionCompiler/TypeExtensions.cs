@@ -99,10 +99,6 @@ internal static class TypeExtensions
         {
             var p = pa[i];
             var pd = m.DefineParameter(i + 1, ParameterAttributes.None, p.Name);
-            //foreach(var cb in p.GetCustomAttributes())
-            //{
-            //    System.Diagnostics.Debug.WriteLine(cb);
-            //}
         }
 
 

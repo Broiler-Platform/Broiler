@@ -1,6 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using Broiler.JavaScript.Core.Core;
+using System.Collections.Generic;
 
-namespace YantraJS.Core.Debugger;
+namespace Broiler.JavaScript.Core.Debugger;
 
 public class V8StackTrace
 {
@@ -8,22 +9,25 @@ public class V8StackTrace
     {
         List<V8CallFrame> cflist = [];
         var top = context.Top;
-        while(top != null)
+
+        while (top != null)
         {
-            cflist.Add(new V8CallFrame { 
+            cflist.Add(new V8CallFrame
+            {
                 FunctionName = top.Function.Value,
                 ScriptId = top.FileName,
                 Url = top.FileName,
                 LineNumber = top.Line,
                 ColumnNumber = top.Column
             });
+
             top = top.Parent;
         }
+
         CallFrames = cflist;
     }
 
     public List<V8CallFrame> CallFrames { get; set; }
-
 }
 
 public class V8CallFrame

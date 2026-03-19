@@ -1,8 +1,10 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using YantraJS.Core;
 
-namespace YantraJS.Core.Debugger;
+namespace Broiler.JavaScript.Core.Debugger;
 
 public class V8RemoteObject
 {
@@ -19,9 +21,8 @@ public class V8RemoteObject
     {
         var list = new List<V8RemoteObject>();
         for (int i = 0; i < a.Length; i++)
-        {
             list.Add(new V8RemoteObject(a.GetAt(i)));
-        }
+
         return list;
     }
 
@@ -35,9 +36,11 @@ public class V8RemoteObject
             {
                 return h.Target as JSValue;
             }
-        } catch (Exception)
+        }
+        catch (Exception)
         {
         }
+
         return JSUndefined.Value;
     }
 
@@ -49,12 +52,13 @@ public class V8RemoteObject
 
     public V8RemoteObject(JSValue v)
     {
-        if(v.IsUndefined)
+        if (v.IsUndefined)
         {
             Type = "undefined";
             Description = "undefined";
             return;
         }
+
         if (v.IsNull)
         {
             Type = "object";
@@ -62,6 +66,7 @@ public class V8RemoteObject
             Description = "null";
             return;
         }
+
         if (v.IsString)
         {
             Type = "string";
@@ -70,6 +75,7 @@ public class V8RemoteObject
             Description = t;
             return;
         }
+
         if (v.IsNumber)
         {
             Type = "number";
@@ -78,6 +84,7 @@ public class V8RemoteObject
             Description = t.ToString();
             return;
         }
+
         if (v.IsBoolean)
         {
             Type = "boolean";
@@ -106,28 +113,31 @@ public class V8RemoteObject
                 ClassName = "global";
                 Description = "global";
                 break;
+
             case JSError:
                 SubType = "error";
                 Description = "Error";
                 break;
+
             case JSArray:
                 SubType = "array";
                 Description = "Array";
                 break;
+
             default:
                 Description = "Object";
                 break;
         }
 
         var p = v.prototypeChain?.@object;
-        if(p != null)
+        if (p != null)
         {
             var c = p[KeyStrings.constructor];
-            if (!c.IsNullOrUndefined)
-            {
-                ClassName = c[KeyStrings.name].ToString();
-                Description = ClassName;
-            }
+            if (c.IsNullOrUndefined)
+                return;
+
+            ClassName = c[KeyStrings.name].ToString();
+            Description = ClassName;
         }
     }
 }

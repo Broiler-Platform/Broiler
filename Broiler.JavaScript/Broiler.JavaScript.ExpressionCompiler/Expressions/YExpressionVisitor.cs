@@ -8,119 +8,67 @@ public abstract class YExpressionVisitor<T>: StackGuard<T, YExpression>
     {
         if (exp == null)
             return default;
-        switch (exp.NodeType)
+        
+        return exp.NodeType switch
         {
-            case YExpressionType.Block:
-                return VisitBlock(exp as YBlockExpression);
-            case YExpressionType.Call:
-                return VisitCall(exp as YCallExpression);
-            case YExpressionType.Binary:
-                return VisitBinary(exp as YBinaryExpression);
-            case YExpressionType.Constant:
-                return VisitConstant(exp as YConstantExpression);
-            case YExpressionType.Conditional:
-                return VisitConditional(exp as YConditionalExpression);
-            case YExpressionType.Assign:
-                return VisitAssign(exp as YAssignExpression);
-            case YExpressionType.Parameter:
-                return VisitParameter(exp as YParameterExpression);
-            case YExpressionType.New:
-                return VisitNew(exp as YNewExpression);
-            case YExpressionType.Field:
-                return VisitField(exp as YFieldExpression);
-            case YExpressionType.Property:
-                return VisitProperty(exp as YPropertyExpression);
-            case YExpressionType.NewArray:
-                return VisitNewArray(exp as YNewArrayExpression);
-            case YExpressionType.GoTo:
-                return VisitGoto(exp as YGoToExpression);
-            case YExpressionType.Return:
-                return VisitReturn(exp as YReturnExpression);
-            case YExpressionType.Loop:
-                return VisitLoop(exp as YLoopExpression);
-            case YExpressionType.Lambda:
-                return VisitLambda(exp as YLambdaExpression);
-            case YExpressionType.Label:
-                return VisitLabel(exp as YLabelExpression);
-            case YExpressionType.TypeAs:
-                return VisitTypeAs(exp as YTypeAsExpression);
-            case YExpressionType.TypeIs:
-                return VisitTypeIs(exp as YTypeIsExpression);
-            case YExpressionType.NewArrayBounds:
-                return VisitNewArrayBounds(exp as YNewArrayBoundsExpression);
-            case YExpressionType.ArrayIndex:
-                return VisitArrayIndex(exp as YArrayIndexExpression);
-            case YExpressionType.Index:
-                return VisitIndex(exp as YIndexExpression);
-            case YExpressionType.Coalesce:
-                return VisitCoalesce(exp as YCoalesceExpression);
-            case YExpressionType.Unary:
-                return VisitUnary(exp as YUnaryExpression);
-            case YExpressionType.ArrayLength:
-                return VisitArrayLength(exp as YArrayLengthExpression);
-            case YExpressionType.TryCatchFinally:
-                return VisitTryCatchFinally(exp as YTryCatchFinallyExpression);
-            case YExpressionType.Throw:
-                return VisitThrow(exp as YThrowExpression);
-            case YExpressionType.Convert:
-                return VisitConvert(exp as YConvertExpression);
-            case YExpressionType.Invoke:
-                return VisitInvoke(exp as YInvokeExpression);
-            case YExpressionType.Delegate:
-                return VisitDelegate(exp as YDelegateExpression);
-            case YExpressionType.MemberInit:
-                return VisitMemberInit(exp as YMemberInitExpression);
+            YExpressionType.Block => VisitBlock(exp as YBlockExpression),
+            YExpressionType.Call => VisitCall(exp as YCallExpression),
+            YExpressionType.Binary => VisitBinary(exp as YBinaryExpression),
+            YExpressionType.Constant => VisitConstant(exp as YConstantExpression),
+            YExpressionType.Conditional => VisitConditional(exp as YConditionalExpression),
+            YExpressionType.Assign => VisitAssign(exp as YAssignExpression),
+            YExpressionType.Parameter => VisitParameter(exp as YParameterExpression),
+            YExpressionType.New => VisitNew(exp as YNewExpression),
+            YExpressionType.Field => VisitField(exp as YFieldExpression),
+            YExpressionType.Property => VisitProperty(exp as YPropertyExpression),
+            YExpressionType.NewArray => VisitNewArray(exp as YNewArrayExpression),
+            YExpressionType.GoTo => VisitGoto(exp as YGoToExpression),
+            YExpressionType.Return => VisitReturn(exp as YReturnExpression),
+            YExpressionType.Loop => VisitLoop(exp as YLoopExpression),
+            YExpressionType.Lambda => VisitLambda(exp as YLambdaExpression),
+            YExpressionType.Label => VisitLabel(exp as YLabelExpression),
+            YExpressionType.TypeAs => VisitTypeAs(exp as YTypeAsExpression),
+            YExpressionType.TypeIs => VisitTypeIs(exp as YTypeIsExpression),
+            YExpressionType.NewArrayBounds => VisitNewArrayBounds(exp as YNewArrayBoundsExpression),
+            YExpressionType.ArrayIndex => VisitArrayIndex(exp as YArrayIndexExpression),
+            YExpressionType.Index => VisitIndex(exp as YIndexExpression),
+            YExpressionType.Coalesce => VisitCoalesce(exp as YCoalesceExpression),
+            YExpressionType.Unary => VisitUnary(exp as YUnaryExpression),
+            YExpressionType.ArrayLength => VisitArrayLength(exp as YArrayLengthExpression),
+            YExpressionType.TryCatchFinally => VisitTryCatchFinally(exp as YTryCatchFinallyExpression),
+            YExpressionType.Throw => VisitThrow(exp as YThrowExpression),
+            YExpressionType.Convert => VisitConvert(exp as YConvertExpression),
+            YExpressionType.Invoke => VisitInvoke(exp as YInvokeExpression),
+            YExpressionType.Delegate => VisitDelegate(exp as YDelegateExpression),
+            YExpressionType.MemberInit => VisitMemberInit(exp as YMemberInitExpression),
             //case YExpressionType.Relay:
             //    return VisitRelay(exp as YRelayExpression);
-            case YExpressionType.Empty:
-                return VisitEmpty(exp as YEmptyExpression);
-            case YExpressionType.Switch:
-                return VisitSwitch(exp as YSwitchExpression);
-            case YExpressionType.Yield:
-                return VisitYield(exp as YYieldExpression);
-            case YExpressionType.DebugInfo:
-                return VisitDebugInfo(exp as YDebugInfoExpression);
-            case YExpressionType.ILOffset:
-                return VisitILOffset(exp as YILOffsetExpression);
-            case YExpressionType.Box:
-                return VisitBox(exp as YBoxExpression);
-            case YExpressionType.Unbox:
-                return VisitUnbox(exp as YUnboxExpression);
-            case YExpressionType.JumpSwitch:
-                return VisitJumpSwitch(exp as YJumpSwitchExpression);
-            case YExpressionType.ListInit:
-                return VisitListInit(exp as YListInitExpression);
-            case YExpressionType.CoalesceCall:
-                return VisitCoalesceCall(exp as YCoalesceCallExpression);
+            YExpressionType.Empty => VisitEmpty(exp as YEmptyExpression),
+            YExpressionType.Switch => VisitSwitch(exp as YSwitchExpression),
+            YExpressionType.Yield => VisitYield(exp as YYieldExpression),
+            YExpressionType.DebugInfo => VisitDebugInfo(exp as YDebugInfoExpression),
+            YExpressionType.ILOffset => VisitILOffset(exp as YILOffsetExpression),
+            YExpressionType.Box => VisitBox(exp as YBoxExpression),
+            YExpressionType.Unbox => VisitUnbox(exp as YUnboxExpression),
+            YExpressionType.JumpSwitch => VisitJumpSwitch(exp as YJumpSwitchExpression),
+            YExpressionType.ListInit => VisitListInit(exp as YListInitExpression),
+            YExpressionType.CoalesceCall => VisitCoalesceCall(exp as YCoalesceCallExpression),
             //case YExpressionType.TypeEqual:
             //    break;
-            case YExpressionType.Int32Constant:
-                return VisitInt32Constant(exp as YInt32ConstantExpression);
-            case YExpressionType.UInt32Constant:
-                return VisitUInt32Constant(exp as YUInt32ConstantExpression);
-            case YExpressionType.Int64Constant:
-                return VisitInt64Constant(exp as YInt64ConstantExpression);
-            case YExpressionType.UInt64Constant:
-                return VisitUInt64Constant(exp as YUInt64ConstantExpression);
-            case YExpressionType.DoubleConstant:
-                return VisitDoubleConstant(exp as YDoubleConstantExpression);
-            case YExpressionType.FloatConstant:
-                return VisitFloatConstant(exp as YFloatConstantExpression);
-            case YExpressionType.BooleanConstant:
-                return VisitBooleanConstant(exp as YBooleanConstantExpression);
-            case YExpressionType.StringConstant:
-                return VisitStringConstant(exp as YStringConstantExpression);
-            case YExpressionType.ByteConstant:
-                return VisitByteConstant(exp as YByteConstantExpression);
-            case YExpressionType.TypeConstant:
-                return VisitTypeConstant(exp as YTypeConstantExpression);
-            case YExpressionType.MethodConstant:
-                return VisitMethodConstant(exp as YMethodConstantExpression);
-            case YExpressionType.AddressOf:
-                return VisitAddressOf(exp as YAddressOfExpression);
-            default:
-                throw new NotImplementedException($"{exp.NodeType}");
-        }
+            YExpressionType.Int32Constant => VisitInt32Constant(exp as YInt32ConstantExpression),
+            YExpressionType.UInt32Constant => VisitUInt32Constant(exp as YUInt32ConstantExpression),
+            YExpressionType.Int64Constant => VisitInt64Constant(exp as YInt64ConstantExpression),
+            YExpressionType.UInt64Constant => VisitUInt64Constant(exp as YUInt64ConstantExpression),
+            YExpressionType.DoubleConstant => VisitDoubleConstant(exp as YDoubleConstantExpression),
+            YExpressionType.FloatConstant => VisitFloatConstant(exp as YFloatConstantExpression),
+            YExpressionType.BooleanConstant => VisitBooleanConstant(exp as YBooleanConstantExpression),
+            YExpressionType.StringConstant => VisitStringConstant(exp as YStringConstantExpression),
+            YExpressionType.ByteConstant => VisitByteConstant(exp as YByteConstantExpression),
+            YExpressionType.TypeConstant => VisitTypeConstant(exp as YTypeConstantExpression),
+            YExpressionType.MethodConstant => VisitMethodConstant(exp as YMethodConstantExpression),
+            YExpressionType.AddressOf => VisitAddressOf(exp as YAddressOfExpression),
+            _ => throw new NotImplementedException($"{exp.NodeType}"),
+        };
     }
 
     protected abstract T VisitAddressOf(YAddressOfExpression node);

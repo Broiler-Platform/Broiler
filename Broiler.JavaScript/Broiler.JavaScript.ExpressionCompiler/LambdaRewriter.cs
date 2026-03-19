@@ -1,6 +1,7 @@
 ﻿#nullable enable
 using System;
 using System.Collections.Generic;
+using YantraJS.ClosureSeparator;
 using YantraJS.Core;
 using YantraJS.Expressions;
 
@@ -17,7 +18,7 @@ public class ClosureRepository
         [];
 
     public readonly Dictionary<YParameterExpression, (YParameterExpression local, YExpression value, int index, int argIndex)>
-        Closures = new(ReferenceEqualityComparer.Instance);
+        Closures = new(Core.ReferenceEqualityComparer.Instance);
 
     public List<YParameterExpression> Inputs 
         = [];
@@ -173,19 +174,5 @@ public class LambdaRewriter: YExpressionMapVisitor
         l.RootExpression = convert;
         l.Visit(convert);   
         return convert;
-        //var l = new LambdaRewriter(
-        //    convert.This ?? convert.Parameters.FirstOrDefault(x => x.Type == typeof(IMethodRepository)));
-        //return l.Convert(convert);
     }
-
-    //private YExpression Convert(YLambdaExpression exp)
-    //{
-    //    using (var scope = stack.Push(exp))
-    //    {
-    //        var r = Visit(exp);
-    //        Collect = false;
-    //        var t = Visit(r);
-    //        return t;
-    //    }
-    //}
 }

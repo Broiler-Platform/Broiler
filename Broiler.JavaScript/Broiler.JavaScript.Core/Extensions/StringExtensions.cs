@@ -1,6 +1,7 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System;
+using System.Runtime.CompilerServices;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.Core.Extensions;
 
 internal static class StringExtensions
 {
@@ -27,9 +28,10 @@ internal static class StringExtensions
                 i++;
                 continue;
             }
+
             break;
         }
-        return text.Substring(0, i).ToLower() + text.Substring(i);
-    }
 
+        return string.Concat(text.Substring(0, i).ToLower(), text.AsSpan(i));
+    }
 }

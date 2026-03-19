@@ -3,11 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-namespace YantraJS.Core.FastParser;
+namespace Broiler.JavaScript.Core.FastParser.Parser;
 
-public class FastList<T>: IList<T>, IDisposable
+public class FastList<T> : IList<T>, IDisposable
 {
-
     private T[] items = null;
     private int size = 0;
     private readonly FastPool pool;
@@ -20,7 +19,6 @@ public class FastList<T>: IList<T>, IDisposable
         SetCapacity(size);
     }
 
-
     public T this[int index] { get => items[index]; set => items[index] = value; }
 
     public int Count { get; private set; } = 0;
@@ -31,19 +29,17 @@ public class FastList<T>: IList<T>, IDisposable
     private void SetCapacity(int capacity)
     {
         if (size >= capacity)
-        {
             return;
-        }
+
         T[] release = null;
         if (size > 0)
-        {
             release = items;
-        }
 
         size = capacity;
         items = pool.AllocateArray<T>(size);
         size = items.Length;
-        if (release!=null)
+
+        if (release != null)
         {
             Array.Copy(release, 0, items, 0, release.Length);
             pool.ReleaseArray(release);
@@ -58,21 +54,22 @@ public class FastList<T>: IList<T>, IDisposable
     }
 
     public bool Any() => Count > 0;
+
     public void Clear()
     {
-        if (items != null)
-        {
-            pool.ReleaseArray(items);
+        if (items == null)
+            return;
 
-            items = null;
-            Count = 0;
-            size = 0;
-        }
+        pool.ReleaseArray(items);
+
+        items = null;
+        Count = 0;
+        size = 0;
     }
 
     public T[] Release()
     {
-        if(size == Count)
+        if (size == Count)
         {
             var r = items;
             items = null;
@@ -80,6 +77,7 @@ public class FastList<T>: IList<T>, IDisposable
             Count = 0;
             return r;
         }
+
         var copy = new T[Count];
         Array.Copy(items, copy, Count);
         return copy;
@@ -90,9 +88,11 @@ public class FastList<T>: IList<T>, IDisposable
         var array = items;
         var length = Count;
         var a = new ArraySpan<T>(array, length);
+
         items = null;
         Count = 0;
         size = 0;
+
         return a;
     }
 
@@ -100,11 +100,13 @@ public class FastList<T>: IList<T>, IDisposable
     {
         if (items == null)
             return false;
-        foreach(var i in items)
+
+        foreach (var i in items)
         {
             if (Equals(i, item))
                 return true;
         }
+
         return false;
     }
 
@@ -112,6 +114,7 @@ public class FastList<T>: IList<T>, IDisposable
     {
         if (items == null)
             return;
+
         Array.Copy(items, 0, array, arrayIndex, Count);
     }
 
@@ -127,11 +130,12 @@ public class FastList<T>: IList<T>, IDisposable
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool MoveNext(out T item)
         {
-            if(--index >= 0)
+            if (--index >= 0)
             {
                 item = items[index];
                 return true;
             }
+
             item = default;
             return false;
         }
@@ -147,27 +151,24 @@ public class FastList<T>: IList<T>, IDisposable
 
         readonly object IEnumerator.Current => Current;
 
-        public readonly void Dispose()
-        {
-            
-        }
+        public readonly void Dispose() { }
 
         public bool MoveNext() => ++index < length;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool MoveNext(out T item) {
-            if(++index < length) {
+        public bool MoveNext(out T item)
+        {
+            if (++index < length)
+            {
                 item = items[index];
                 return true;
             }
+
             item = default;
             return false;
         }
 
-        public readonly void Reset()
-        {
-            
-        }
+        public readonly void Reset() { }
     }
 
     internal void AddRange(FastList<T> initList)
@@ -176,7 +177,6 @@ public class FastList<T>: IList<T>, IDisposable
         while (e.MoveNext(out var item))
             Add(item);
     }
-
 
     internal void AddRange(IEnumerable<T> initList)
     {
@@ -196,6 +196,7 @@ public class FastList<T>: IList<T>, IDisposable
             if (Equals(e, item))
                 return i;
         }
+
         return -1;
     }
 
@@ -203,10 +204,10 @@ public class FastList<T>: IList<T>, IDisposable
     {
         SetCapacity(Count + 1);
         Count++;
-        for (int i = Count-1; i > index; i--)
-        {
+
+        for (int i = Count - 1; i > index; i--)
             items[i] = items[i - 1];
-        }
+
         items[index] = item;
     }
 
@@ -218,15 +219,15 @@ public class FastList<T>: IList<T>, IDisposable
             RemoveAt(index);
             return true;
         }
+
         return false;
     }
 
     public void RemoveAt(int index)
     {
-        for (int i = index; i < Count-1; i++)
-        {
-            items[i] = items[i+1];
-        }
+        for (int i = index; i < Count - 1; i++)
+            items[i] = items[i + 1];
+
         items[Count - 1] = default;
         Count--;
     }

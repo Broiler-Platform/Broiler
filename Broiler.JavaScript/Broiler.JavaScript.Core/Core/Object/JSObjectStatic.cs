@@ -1,8 +1,11 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Object;
+using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Core.Extensions;
+using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using YantraJS.Core.Clr;
-using YantraJS.Extensions;
 
 namespace YantraJS.Core;
 
@@ -13,33 +16,38 @@ public static class JSObjectStatic
     {
         if (value is JSObject @object)
             return @object;
+
         if (value.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
-        throw JSContext.Current.NewTypeError(JSError.Parameter_is_not_an_object);
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+
+        throw JSContext.NewTypeError(JSError.Parameter_is_not_an_object);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool TryAsObjectThrowIfNullOrUndefined(this JSValue value, out JSObject @object)
     {
         if (value.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+
         @object = value as JSObject;
         return @object != null;
     }
 }
 
-public partial class JSObject {
-
+public partial class JSObject
+{
     [JSExport("create")]
     internal static JSValue StaticCreate(in Arguments a)
     {
         var p = a.Get1();
-        if (!(p is JSObject proto))
+        if (p is not JSObject proto)
         {
             if (!p.IsNull)
-                throw JSContext.Current.NewTypeError("Object prototype may only be an Object or null");
+                throw JSContext.NewTypeError("Object prototype may only be an Object or null");
+
             proto = JSContext.Current.ObjectPrototype;
         }
+
         return new JSObject(proto);
     }
 
@@ -48,14 +56,17 @@ public partial class JSObject {
     {
         var first = a.Get1();
         if (first.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
-        if (!(first is JSObject firstObject))
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+
+        if (first is not JSObject firstObject)
             return first;
+
         for (var i = 1; i < a.Length; i++)
         {
             var ai = a.GetAt(i);
             firstObject.FastAddRange(ai);
         }
+
         return first;
     }
 
@@ -64,27 +75,27 @@ public partial class JSObject {
     {
         var target = a.Get1();
         if (target.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+
         if (!target.IsObject)
             return new JSArray();
+
         var r = new JSArray();
         ref var rElements = ref r.CreateElements();
         var ownEntries = target.GetElementEnumerator();
-        while(ownEntries.MoveNext(out var hasValue, out var item, out var index))
+
+        while (ownEntries.MoveNext(out var hasValue, out var item, out var index))
         {
             if (!hasValue)
                 continue;
-            rElements.Put(r._length++,
-                    new JSArray(new JSString(index.ToString()), item)
-                ); 
+
+            rElements.Put(r._length++, new JSArray(new JSString(index.ToString()), item));
         }
+
         var en = (target as JSObject).GetOwnProperties(false).GetEnumerator();
         while (en.MoveNext(out var key, out var property))
-        {
-            rElements.Put(r._length++,
-                    new JSArray(key.ToJSValue(), target.GetValue(property))
-                );
-        }
+            rElements.Put(r._length++, new JSArray(key.ToJSValue(), target.GetValue(property)));
+
         return r;
     }
 
@@ -95,36 +106,35 @@ public partial class JSObject {
     internal static JSValue DefineProperties(in Arguments a)
     {
         var (a0, a1) = a.Get2();
-        if (!(a0 is JSObject target))
-            throw JSContext.Current.NewTypeError("Object.defineProperty called on non-object");
+        if (a0 is not JSObject target)
+            throw JSContext.NewTypeError("Object.defineProperty called on non-object");
+
         var pds = a1;
         if (pds.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
-        if (!(pds is JSObject pdObject))
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+
+        if (pds is not JSObject pdObject)
             return target;
+
         if (!target.IsExtensible())
-            throw JSContext.Current.NewTypeError("Object is not extensible");
+            throw JSContext.NewTypeError("Object is not extensible");
 
         var ownElements = pdObject.GetElementEnumerator();
         while (ownElements.MoveNext(out var hasValue, out var item, out var index))
         {
             if (!hasValue)
                 continue;
-            if (item is JSObject itemObject)
-            {
-                target.DefineProperty(index, itemObject);
-            }
-            // JSObject.InternalAddProperty(target, index, item);
 
+            if (item is JSObject itemObject)
+                target.DefineProperty(index, itemObject);
         }
 
         var properties = pdObject.GetOwnProperties(false).GetEnumerator();
         while (properties.MoveNext(out var keyString, out var property))
         {
             var item = target.GetValue(property);
-            if (item is JSObject itemObject) {
+            if (item is JSObject itemObject)
                 target.DefineProperty(keyString, itemObject);
-            }
         }
 
         return target;
@@ -134,22 +144,25 @@ public partial class JSObject {
     internal static JSValue DefineProperty(in Arguments a)
     {
         var (target, key, desc) = a.Get3();
-        if (!(target is JSObject targetObject))
-            throw JSContext.Current.NewTypeError("Object.defineProperty called on non-object");
+
+        if (target is not JSObject targetObject)
+            throw JSContext.NewTypeError("Object.defineProperty called on non-object");
+
         if (!targetObject.IsExtensible())
-            throw JSContext.Current.NewTypeError("Object is not extensible");
-        if (!(desc is JSObject pd))
-            throw JSContext.Current.NewTypeError("Property Description must be an object");
+            throw JSContext.NewTypeError("Object is not extensible");
+
+        if (desc is not JSObject pd)
+            throw JSContext.NewTypeError("Property Description must be an object");
+
         return targetObject.DefineProperty(key, pd);
     }
 
     [JSExport("entries")]
-    internal static JSValue GetEntries(in  Arguments a)
+    internal static JSValue GetEntries(in Arguments a)
     {
-        if(a[0] is not JSObject obj)
-        // if(@this.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSTypeError.NotIterable("undefined"));
-        // var obj = @this as JSObject;
+        if (a[0] is not JSObject obj)
+            throw JSContext.NewTypeError(JSTypeError.NotIterable("undefined"));
+
         var r = new JSArray();
 
         var es = obj.GetElementEnumerator();
@@ -160,38 +173,35 @@ public partial class JSObject {
         }
 
         var vp = new PropertySequence.ValueEnumerator(obj, false);
-        while(vp.MoveNext(out var value, out var key))
-        {
+        while (vp.MoveNext(out var value, out var key))
             r[r._length++] = new JSArray(key.ToJSValue(), value);
-        }
+
         return r;
     }
 
-
     [JSExport("fromEntries")]
-
     internal static JSValue FromEntries(in Arguments a)
     {
         var v = a.Get1();
         if (v.IsNullOrUndefined)
-        {
-            throw JSContext.Current.NewTypeError(JSTypeError.NotIterable("undefined"));
-        }
+            throw JSContext.NewTypeError(JSTypeError.NotIterable("undefined"));
+
         var r = new JSObject();
         if (v is JSArray va)
         {
-
             ref var vaElements = ref va.GetElements();
             for (uint i = 0; i < va._length; i++)
             {
                 var vi = vaElements[i];
-                if (!(vi.value is JSArray ia))
-                    throw JSContext.Current.NewTypeError(JSTypeError.NotEntry(vi));
+                if (vi.value is not JSArray ia)
+                    throw JSContext.NewTypeError(JSTypeError.NotEntry(vi));
+
                 var first = ia[0];
                 var second = ia[1];
                 r.FastAddValue(first, second, JSPropertyAttributes.EnumerableConfigurableValue);
             }
         }
+
         return r;
     }
 
@@ -206,9 +216,8 @@ public partial class JSObject {
     internal static JSValue IsExtensible(in Arguments a)
     {
         if (a.Get1() is JSObject @object && @object.IsExtensible())
-        {
             return JSBoolean.True;
-        }
+
         return JSBoolean.False;
     }
 
@@ -217,6 +226,7 @@ public partial class JSObject {
     {
         if ((a.Get1() is JSObject @object) && @object.IsFrozen())
             return JSBoolean.True;
+
         return JSBoolean.False;
     }
 
@@ -225,6 +235,7 @@ public partial class JSObject {
     {
         if ((a.Get1() is JSObject @object) && @object.IsSealed())
             return JSBoolean.True;
+
         return JSBoolean.False;
     }
 
@@ -232,19 +243,23 @@ public partial class JSObject {
     internal static JSValue Keys(in Arguments a)
     {
         var first = a.Get1();
+
         if (first.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
-        if (!(first is JSObject jobj))
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+
+        if (first is not JSObject jobj)
             return new JSArray();
+
         var en = jobj.GetAllKeys(true, false);
         var r = new JSArray();
         ref var e = ref r.GetElements();
-        while (en.MoveNext(out var hasValue, out var value, out var index)) {
+
+        while (en.MoveNext(out var hasValue, out var value, out var index))
+        {
             if (hasValue)
-            {
                 e.Put(r._length++, value);
-            }
         }
+
         return r;
     }
 
@@ -252,25 +267,22 @@ public partial class JSObject {
     internal static JSValue PreventExtensions(in Arguments a)
     {
         var first = a.Get1();
-        if (!(first is JSObject @object))
+        if (first is not JSObject @object)
             return first;
+
         @object.status |= ObjectStatus.NonExtensible;
         return @object;
     }
 
     [JSExport("seal")]
-
     internal static JSValue Seal(in Arguments a)
     {
         var first = a.Get1();
-        if (!(first is JSObject @object))
+        if (first is not JSObject @object)
             return first;
+
         @object.status |= ObjectStatus.Sealed;
-        @object.GetOwnProperties().Update((uint x, ref JSProperty v) =>
-        {
-            // v.Attributes &= ~(JSPropertyAttributes.Configurable);
-            v = new JSProperty(x, v.get, v.set, v.value, v.Attributes & (~JSPropertyAttributes.Configurable));
-        });
+        @object.GetOwnProperties().Update((uint x, ref JSProperty v) => v = new JSProperty(x, v.get, v.set, v.value, v.Attributes & (~JSPropertyAttributes.Configurable)));
         return first;
     }
 
@@ -286,30 +298,29 @@ public partial class JSObject {
     internal static JSValue Values(in Arguments a)
     {
         var first = a.Get1();
+
         if (first.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
-        if (!(first is JSObject target))
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+
+        if (first is not JSObject target)
             return new JSArray();
+
         var r = new JSArray();
         ref var rElements = ref r.CreateElements();
         var ownEntries = target.GetElementEnumerator();
+
         while (ownEntries.MoveNext(out var hasValue, out var item, out var index))
         {
-            if(!hasValue)
-            {
+            if (!hasValue)
                 continue;
-            }
-            rElements.Put(r._length++,
-                    item
-                );
+
+            rElements.Put(r._length++, item);
         }
+
         var en = target.GetOwnProperties(false).GetEnumerator();
-        while (en.MoveNext(out  var property))
-        {
-            rElements.Put(r._length++,
-                    target.GetValue(property)
-                );
-        }
+        while (en.MoveNext(out var property))
+            rElements.Put(r._length++, target.GetValue(property));
+
         return r;
     }
 
@@ -317,32 +328,13 @@ public partial class JSObject {
     internal static JSValue GetOwnPropertyDescriptor(in Arguments a)
     {
         var (first, name) = a.Get2();
-        if (first.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
-        if (!(first is JSObject jobj))
-            return JSUndefined.Value;
-        //var key = name.ToKey(false);
-        //JSProperty p;
-        //if (key.IsUInt)
-        //{
-        //    // check for typedArray..
-        //    if (first is TypedArray ta)
-        //    {
-        //        var v = ta[key.Index];
-        //        if (v.IsUndefined)
-        //            return JSUndefined.Value;
 
-        //        p = JSProperty.Property(v, JSPropertyAttributes.Enumerable | JSPropertyAttributes.Value);
-        //    }
-        //    else
-        //    {
-        //        p = jobj.GetInternalProperty(key.Index, false);
-        //    }
-        //} else {
-        //    p = jobj.GetInternalProperty(key.KeyString, false);
-        //}
-        //if (!p.IsEmpty)
-        //    return p.ToJSValue();
+        if (first.IsNullOrUndefined)
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+
+        if (first is not JSObject jobj)
+            return JSUndefined.Value;
+
         return jobj.GetOwnPropertyDescriptor(name);
     }
 
@@ -350,17 +342,20 @@ public partial class JSObject {
     internal static JSValue GetOwnPropertyDescriptors(in Arguments a)
     {
         var first = a.Get1();
+
         if (first.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
-        if (!(first is JSObject jobj))
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+
+        if (first is not JSObject jobj)
             return new JSArray();
+
         var r = new JSObject();
         ref var p = ref r.GetOwnProperties(true);
         var en = jobj.GetOwnProperties(false).GetEnumerator();
-        while(en.MoveNext(out var key, out var property))
-        {
-            p.Put(key.Key) = property;    
-        }
+
+        while (en.MoveNext(out var key, out var property))
+            p.Put(key.Key) = property;
+
         return r;
     }
 
@@ -375,10 +370,13 @@ public partial class JSObject {
     internal static JSValue GetOwnPropertyNames(in Arguments a)
     {
         var first = a.Get1();
+
         if (first.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
-        if (!(first is JSObject jobj))
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+
+        if (first is not JSObject jobj)
             return new JSArray();
+
         var r = new JSArray(jobj.GetAllKeys(false, false));
         return r;
     }
@@ -388,11 +386,14 @@ public partial class JSObject {
     {
         var first = a.Get1();
         if (first.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
-        if (!(first is JSObject jobj))
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+
+        if (first is not JSObject jobj)
             return new JSArray();
+
         ref var symbols = ref jobj.GetSymbols();
-        var keys = symbols.AllValues().Select(x => KeyStrings.GetJSString( x.Value.key));
+        var keys = symbols.AllValues().Select(x => KeyStrings.GetJSString(x.Value.key));
+
         return new JSArray(keys);
     }
 
@@ -403,29 +404,36 @@ public partial class JSObject {
     internal static JSValue GroupBy(in Arguments a)
     {
         var (items, callbackfn) = a.Get2();
+
         if (items.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+
         if (!callbackfn.IsFunction)
-            throw JSContext.Current.NewTypeError("CallbackFn must be a function");
+            throw JSContext.NewTypeError("CallbackFn must be a function");
+
         var result = new JSObject();
         var en = items.GetElementEnumerator();
         int index = 0;
+
         while (en.MoveNext(out var hasValue, out var item, out var _))
         {
             if (!hasValue)
                 continue;
+
             var key = callbackfn.Call(JSUndefined.Value, item, new JSNumber(index));
             var keyStr = key.ToString();
             var group = result[keyStr];
+
             if (group.IsNullOrUndefined)
             {
                 group = new JSArray();
                 result.FastAddValue(keyStr, group, JSPropertyAttributes.EnumerableConfigurableValue);
             }
+
             (group as JSArray)?.Add(item);
             index++;
         }
+
         return result;
     }
-
 }

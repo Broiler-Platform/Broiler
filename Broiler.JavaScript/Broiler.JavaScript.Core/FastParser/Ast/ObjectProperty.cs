@@ -1,11 +1,6 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿namespace Broiler.JavaScript.Core.FastParser.Ast;
 
-public readonly struct ObjectProperty(
-    AstExpression left,
-    AstExpression right,
-    AstExpression init,
-    bool spread = false,
-    bool computed = false)
+public readonly struct ObjectProperty(AstExpression left, AstExpression right, AstExpression init, bool spread = false, bool computed = false)
 {
     public readonly AstExpression Key = left;
     public readonly AstExpression Value = right;

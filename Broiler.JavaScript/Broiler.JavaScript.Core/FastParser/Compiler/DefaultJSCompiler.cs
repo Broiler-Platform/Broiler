@@ -1,8 +1,10 @@
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Emit;
 using System.Collections.Generic;
-using YantraJS.Emit;
+using YantraJS.Core.FastParser.Compiler;
 using YantraJS.Expressions;
 
-namespace YantraJS.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Core.FastParser.Compiler;
 
 /// <summary>
 /// Default implementation of <see cref="IJSCompiler"/> that delegates to
@@ -11,11 +13,7 @@ namespace YantraJS.Core.FastParser.Compiler;
 public class DefaultJSCompiler : IJSCompiler
 {
     /// <inheritdoc />
-    public YExpression<JSFunctionDelegate> Compile(
-        in StringSpan code,
-        string location = null,
-        IList<string> argsList = null,
-        ICodeCache codeCache = null)
+    public YExpression<JSFunctionDelegate> Compile(in StringSpan code, string location = null, IList<string> argsList = null, ICodeCache codeCache = null)
     {
         var compiler = new FastCompiler(code, location, argsList, codeCache);
         return compiler.Method;

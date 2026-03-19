@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-namespace YantraJS;
+namespace YantraJS.Core;
 
 public class ReferenceEqualityComparer : IEqualityComparer<object>
 {

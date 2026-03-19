@@ -1,14 +1,15 @@
 ﻿using System.Text;
+using YantraJS.Core;
 
-namespace YantraJS.Core.String;
+namespace Broiler.JavaScript.Core.Core.String;
 
 public class JSTemplateString(int size)
 {
-    StringBuilder sb = new StringBuilder(size);
+    readonly StringBuilder sb = new(size);
 
     public void Add(string t) => sb.Append(t);
 
-    public unsafe void Add(JSValue value) => sb.Append(value.ToString());
+    public void Add(JSValue value) => sb.Append(value.ToString());
 
     public JSTemplateString AddQuasi(string text)
     {
@@ -16,18 +17,8 @@ public class JSTemplateString(int size)
         return this;
     }
 
-    public unsafe JSTemplateString AddExpression(JSValue value)
+    public JSTemplateString AddExpression(JSValue value)
     {
-        //if (value is JSString @string)
-        //{
-        //    var span = @string.Value;
-        //    fixed (char* start = span.Source)
-        //    {
-        //        char* ch1 = start + (span.Offset);
-        //        sb.Append(ch1, span.Length);
-        //    }
-        //    return this;
-        //}
         sb.Append(value.ToString());
         return this;
     }

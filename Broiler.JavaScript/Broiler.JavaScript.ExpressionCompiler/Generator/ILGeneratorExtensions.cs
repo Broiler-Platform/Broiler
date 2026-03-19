@@ -8,23 +8,6 @@ namespace YantraJS.Generator;
 public static class ILGeneratorExtensions
 {
 
-    ///// <summary>
-    ///// Emits instruction with _s if index is less or equal to 32767
-    ///// </summary>
-    ///// <param name="il"></param>
-    ///// <param name="opCode_S"></param>
-    ///// <param name="opCode"></param>
-    ///// <param name="index"></param>
-    //public static void Emit(this ILWriter il,OpCode opCode_S, OpCode opCode, int index)
-    //{
-    //    if (index <= 32767)
-    //    {
-    //        il.Emit(opCode_S, (short)index);
-    //        return;
-    //    }
-    //    il.Emit(opCode, index);
-    //}
-
     public static void EmitConstant(this ILWriter il, DateTime d) => throw new NotSupportedException();
 
     public static void EmitConstant(this ILWriter il,object value, Type valueType = null)
@@ -116,15 +99,9 @@ public static class ILGeneratorExtensions
             case MethodInfo method:
                 il.Emit(OpCodes.Ldftn, method);
                 return;
-            //case Delegate d:
-            //    il.Emit(OpCodes.Ldftn, d.Method);
-            //    return;
         }
-        //if (typeof(Delegate).IsAssignableFrom(value.GetType()))
-        //{
-        //    il.Emit(OpCodes.Ldftn, ((Delegate)value).Method);
-        //    return;
-        //}
+
+
         throw new NotSupportedException($"Constant of type  {value.GetType()} not supported, you must use a factory to create value of specified type");
 
     }
@@ -351,10 +328,6 @@ public static class ILGeneratorExtensions
 
     public static void EmitConstant(this ILWriter il, string @string) => il.Emit(OpCodes.Ldstr, @string);
 
-    //public static void EmitConstant(this ILWriter il, byte b)
-    //{
-
-    //}
 
     public static void EmitConstant(this ILWriter il,int i)
     {
@@ -391,10 +364,7 @@ public static class ILGeneratorExtensions
                 il.Emit(OpCodes.Ldc_I4_8);
                 return;
         }
-        //if (sbyte.MinValue > i && i < sbyte.MaxValue) {
-        //    il.Emit(OpCodes.Ldc_I4_S, (sbyte)i);
-        //    return;
-        //}
+
         il.Emit(OpCodes.Ldc_I4, i);
         return;
     }

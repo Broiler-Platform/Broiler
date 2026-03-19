@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Module;
 
 /// <summary>
 /// Exports given Type as class

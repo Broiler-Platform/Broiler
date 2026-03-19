@@ -26,9 +26,6 @@ public class YConvertExpression(YExpression exp, Type type, MethodInfo? method) 
             return true;
         }
 
-        //var nfrom = Nullable.GetUnderlyingType(from);
-        //from = nfrom ?? from;
-
         var (method, inputType) = ConvertMethods.FirstOrDefault((m) => m.method.ReturnType == to
             && m.inputType == from);
         if (method == null)

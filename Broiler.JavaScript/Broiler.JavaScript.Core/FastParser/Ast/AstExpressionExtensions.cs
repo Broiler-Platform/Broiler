@@ -1,11 +1,13 @@
 ﻿using System.Runtime.CompilerServices;
-using YantraJS.Core.FastParser;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public static class AstExpressionExtensions
 {
+    public static AstExpression Computed(this AstExpression left, AstExpression right) => new AstMemberExpression(left, right, true);
 
+    public static AstExpression Member(this AstExpression left, AstExpression right, bool computed = false, bool coalesce = false) =>
+        left == null ? right : new AstMemberExpression(left, right, computed, coalesce);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool Is<T>(this AstNode exp, FastNodeType type, out T value)
@@ -15,31 +17,26 @@ public static class AstExpressionExtensions
             value = texp;
             return true;
         }
+
         value = default;
         return false;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsFunction(this AstNode exp, out AstFunctionExpression value) => Is(exp, FastNodeType.FunctionExpression, out value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsFunction(this AstNode exp, out AstFunctionExpression value)
-        => Is(exp, FastNodeType.FunctionExpression, out value);
+    public static bool IsExpressionStatement(this AstNode exp, out AstExpressionStatement value) => Is(exp, FastNodeType.ExpressionStatement, out value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsExpressionStatement(this AstNode exp, out AstExpressionStatement value)
-        => Is(exp, FastNodeType.ExpressionStatement, out value);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsSpreadElement(this AstNode node, out AstSpreadElement value)
-        => Is(node, FastNodeType.SpreadElement, out value);
+    public static bool IsSpreadElement(this AstNode node, out AstSpreadElement value) => Is(node, FastNodeType.SpreadElement, out value);
 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsUnaryExpression(this AstNode exp, out AstUnaryExpression unary)
-        => Is(exp, FastNodeType.UnaryExpression, out unary);
+    public static bool IsUnaryExpression(this AstNode exp, out AstUnaryExpression unary) => Is(exp, FastNodeType.UnaryExpression, out unary);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsBinaryExpression(this AstNode exp, out AstBinaryExpression binary)
-        => Is(exp, FastNodeType.BinaryExpression, out binary);
+    public static bool IsBinaryExpression(this AstNode exp, out AstBinaryExpression binary) => Is(exp, FastNodeType.BinaryExpression, out binary);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsStringLiteral(this AstNode exp, out string value)
@@ -52,10 +49,10 @@ public static class AstExpressionExtensions
                 return true;
             }
         }
+
         value = default;
         return false;
     }
-
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsUIntLiteral(this AstNode exp, out uint value)
@@ -78,6 +75,7 @@ public static class AstExpressionExtensions
                 return false;
             }
         }
+
         value = default;
         return false;
     }
@@ -93,6 +91,7 @@ public static class AstExpressionExtensions
                 return true;
             }
         }
+
         value = default;
         return false;
     }

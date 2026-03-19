@@ -1,10 +1,12 @@
-﻿using YantraJS.Core.Generator;
+﻿using Broiler.JavaScript.Core.Core.Storage;
+using YantraJS.Core;
+using YantraJS.Core.Generator;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core;
 
 public class JSArguments: JSObject
 {
-    public JSValue Callee(in Arguments a) => throw JSContext.Current.NewTypeError($"Cannot access callee in strict mode");
+    public static JSValue Callee(in Arguments a) => throw JSContext.NewTypeError($"Cannot access callee in strict mode");
 
     public new JSValue Values(in Arguments a) => new JSGenerator(GetElementEnumerator(), "Arguments");
 
@@ -26,10 +28,9 @@ public class JSArguments: JSObject
         ref var symbols = ref GetSymbols();
         symbols.Put(JSSymbol.iterator.Key) = JSProperty.Property(new JSFunction(Values), JSPropertyAttributes.ConfigurableValue);
         ref var elements = ref CreateElements();
+        
         for (int i = 0; i < args.Length; i++)
-        {
             elements.Put((uint)i, args.GetAt(i));
-        }
     }
 
     public override string ToString() => "[object Arguments]";

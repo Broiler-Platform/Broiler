@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using YantraJS.ClosureSeparator;
 using YantraJS.Core;
 using YantraJS.Expressions;
 using YantraJS.Generator;
@@ -29,14 +30,11 @@ public class LambdaMethodBuilder(MethodBuilder builder) : IMethodBuilder
 
         var boxes = YExpression.Parameter(typeof(Box[]));
 
-        // exp = null;
-        // il = null;
-
         var cnstrLambda = YExpression.Lambda(innerLambda.Type, "cnstr",
             YExpression.CallNew(Closures.constructor, YExpression.Null, boxes, YExpression.Null, YExpression.Null),
             [YExpression.Parameter(derived), boxes]);
 
-        var cnstrIL = new ILCodeGenerator( cnstr.GetILGenerator(), null);
+        var cnstrIL = new ILCodeGenerator(cnstr.GetILGenerator(), null);
         cnstrIL.EmitConstructor(cnstrLambda);
 
         var dt = innerLambda.Type;
@@ -50,17 +48,7 @@ public class LambdaMethodBuilder(MethodBuilder builder) : IMethodBuilder
 
         var im = derivedType.GetMethods().First(x => x.Name == m.Name);
 
-        //var create = YExpression.Lambda("Create",
-
-        //    YExpression.New(cdt,
-        //        YExpression.New(cnstr, YExpression.Null),
-        //        YExpression.Constant(im))
-        //    , new YParameterExpression[] { });
-
-        return YExpression.New(cdt, YExpression.New(ct,
-            closures == null ? YExpression.Null : YExpression.NewArray(typeof(Box), closures)
-            ),
-            YExpression.Constant(im));
+        return YExpression.New(cdt, YExpression.New(ct, closures == null ? YExpression.Null : YExpression.NewArray(typeof(Box), closures)), YExpression.Constant(im));
 
     }
 }

@@ -1,4 +1,4 @@
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core;
 
 /// <summary>
 /// Defines the contract for registering built-in JavaScript objects

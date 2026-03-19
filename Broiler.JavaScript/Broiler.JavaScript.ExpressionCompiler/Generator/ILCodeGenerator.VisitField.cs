@@ -18,22 +18,11 @@ public partial class ILCodeGenerator
                 return true;
             }
 
-            //if (RequiresAddress && field.FieldType.IsValueType)
-            //{
-            //    il.Emit(OpCodes.Ldsflda, field);
-            //    return true;
-            //}
             il.Emit(OpCodes.Ldsfld, field);
             return true;
         }
 
         Visit(yFieldExpression.Target);
-
-        //if (RequiresAddress && field.FieldType.IsValueType)
-        //{
-        //    il.Emit(OpCodes.Ldflda, field);
-        //    return true;
-        //}
 
         il.Emit(OpCodes.Ldfld, field);
         return true;

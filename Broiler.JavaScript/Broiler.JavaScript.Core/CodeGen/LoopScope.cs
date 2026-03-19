@@ -1,12 +1,9 @@
-﻿using LabelTarget = YantraJS.Expressions.YLabelTarget;
+﻿using YantraJS.Core;
+using LabelTarget = YantraJS.Expressions.YLabelTarget;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.Core.CodeGen;
 
-public class LoopScope(
-    LabelTarget breakTarget,
-    LabelTarget continueTarget,
-    bool isSwitch = false,
-    string name = null) : LinkedStackItem<LoopScope>
+public class LoopScope(LabelTarget breakTarget, LabelTarget continueTarget, bool isSwitch = false, string name = null) : LinkedStackItem<LoopScope>
 {
     public readonly LabelTarget Break = breakTarget;
     public readonly LabelTarget Continue = continueTarget;
@@ -16,7 +13,7 @@ public class LoopScope(
     public LoopScope Get(string name)
     {
         var start = this;
-        while (start != null  && start.Name != name)
+        while (start != null && start.Name != name)
             start = start.Parent;
         return start;
     }

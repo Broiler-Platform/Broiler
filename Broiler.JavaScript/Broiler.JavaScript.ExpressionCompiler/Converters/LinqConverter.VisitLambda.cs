@@ -12,12 +12,7 @@ public partial class LinqConverter
     public YLambdaExpression VisitLambdaSpecific(LambdaExpression lambda)
     {
         var plist = Register(lambda.Parameters);
-        //return new YLambdaExpression(
-        //    lambda.Name ?? "Unknown",
-        //    Visit(lambda.Body),
-        //    plist.ToArray(),
-        //    lambda.ReturnType, 
-        //    lambda.Type);
+
         return YExpression.Lambda(lambda.Type, lambda.Name ?? "unnamed",
             Visit(lambda.Body),
             plist.ToArray());

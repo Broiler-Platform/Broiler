@@ -1,18 +1,18 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Extensions;
+using System;
+using YantraJS.Core;
 
-namespace YantraJS.Core.Clr;
+namespace Broiler.JavaScript.Core.Core.Clr;
 
 
-public abstract class JSClrObject<T>: JSObject
+public abstract class JSClrObject<T> : JSObject
 {
     public JSClrObject() => BasePrototypeObject = ClrType.From(typeof(T));
 }
 
 public static class ClrModule
 {
-
-    public static JSObject Default = JSObject.NewWithProperties()
-        .AddProperty(KeyStrings.@default, ClrType.From(typeof(ClrModule)));
+    public static JSObject Default = JSObject.NewWithProperties().AddProperty(KeyStrings.@default, ClrType.From(typeof(ClrModule)));
 
     public static JSValue Temp1 { get; set; } = new JSNumber(1);
 
@@ -31,8 +31,10 @@ public static class ClrModule
     public static JSValue GetClass(in Arguments a)
     {
         var a1 = a.Get1();
+        
         if (!a1.BooleanValue)
-            throw JSContext.Current.NewTypeError("First parameter should be non empty string");
+            throw JSContext.NewTypeError("First parameter should be non empty string");
+        
         var name = a1.ToString();
         return ClrType.From(Type.GetType(name));
     }
@@ -46,11 +48,10 @@ public static class ClrModule
     public static JSValue ToDateTime(in Arguments a)
     {
         var a1 = a.Get1();
-        if (a1 is JSDate date)
-        {
-            return ClrProxy.From(date.value);
-        }
-        throw JSContext.Current.NewTypeError($"Not a Date");
-    }
 
+        if (a1 is JSDate date)
+            return ClrProxy.From(date.value);
+
+        throw JSContext.NewTypeError($"Not a Date");
+    }
 }

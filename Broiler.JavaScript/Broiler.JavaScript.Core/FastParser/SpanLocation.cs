@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿namespace Broiler.JavaScript.Core.FastParser;
 
 public readonly struct SpanLocation(int line, int column)
 {

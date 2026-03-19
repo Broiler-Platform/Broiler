@@ -1,6 +1,6 @@
-using System.Threading;
+using Broiler.JavaScript.Core.Core;
 
-namespace YantraJS.Core.Tests;
+namespace Broiler.JavaScript.Core.Tests;
 
 /// <summary>
 /// ECMAScript conformance tests for the Promise built-in object.

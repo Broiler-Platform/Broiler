@@ -1,7 +1,7 @@
-﻿using System;
-using YantraJS.Core;
+﻿using Broiler.JavaScript.Core.Core;
+using System;
 
-namespace YantraJS.Debugger;
+namespace Broiler.JavaScript.Core.Debugger;
 
 /// <summary>
 /// Abstract base class for JavaScript debuggers.
@@ -11,7 +11,6 @@ namespace YantraJS.Debugger;
 /// </summary>
 public abstract class JSDebugger : IDebugger
 {
-
     public static event EventHandler Break;
 
     public static object RaiseBreak()
@@ -20,9 +19,6 @@ public abstract class JSDebugger : IDebugger
         return null;
     }
 
-    /// <inheritdoc />
     public abstract void ReportException(JSValue error);
-
-    /// <inheritdoc />
     public abstract void ScriptParsed(long id, string code, string codeFilePath);
 }

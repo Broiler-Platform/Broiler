@@ -1,18 +1,21 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Enumerators;
+using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.Core.Utils;
+using System;
 using System.Globalization;
 using Yantra.Core;
-using YantraJS.Core.Clr;
 using YantraJS.Core.Typed;
-using YantraJS.Utils;
 
 namespace YantraJS.Core;
 
-// [JSRuntime(typeof(JSStringStatic), typeof(JSStringPrototype))]
 [JSBaseClass("Object")]
 [JSFunctionGenerator("String")]
 public partial class JSString : JSPrimitive
 {
-
     internal static JSString Empty = new(string.Empty);
 
     internal readonly string value;
@@ -27,33 +30,34 @@ public partial class JSString : JSPrimitive
         {
             if (NumberParsed)
                 return NumberValue;
+
             NumberValue = NumberParser.CoerceToNumber(value);
             NumberParsed = true;
+
             return NumberValue;
         }
     }
 
-    
-
     public override bool BooleanValue => value.Length > 0;
-
     public override long BigIntValue => long.TryParse(ToString(), out var n) ? n : 0;
-
     public override bool IsString => true;
 
     public override JSValue AddValue(double value)
     {
         var numStr = JSNumber.ToECMAString(value);
+
         if (this.value.IsEmpty())
             return new JSString(numStr);
-        return new JSString( string.Concat(this.value, numStr) );
+
+        return new JSString(string.Concat(this.value, numStr));
     }
 
     public override JSValue AddValue(string value)
     {
         if (this.value.IsEmpty())
             return new JSString(value);
-        return new JSString( string.Concat(this.value, value));
+
+        return new JSString(string.Concat(this.value, value));
     }
 
     public override JSValue AddValue(JSValue value)
@@ -61,29 +65,24 @@ public partial class JSString : JSPrimitive
         if (value is JSString vString)
         {
             if (this.value.IsEmpty())
-            {
                 return vString;
-            }
+
             if (vString.value.IsEmpty())
-            {
                 return this;
-            }
+
             return new JSString(string.Concat(this.value, vString.value));
         }
 
         if (value.IsObject)
-        {
             value = value.ValueOf();
-        }
 
         if (this.value.IsEmpty())
             return new JSString(value.StringValue);
 
         var v = value.StringValue;
         if (v.Length == 0)
-        {
             return this;
-        }
+
         return new JSString(string.Concat(this.value, v));
     }
 
@@ -94,21 +93,25 @@ public partial class JSString : JSPrimitive
             value = this.value;
             return true;
         }
+
         if (type == typeof(object))
         {
             value = this.value;
             return true;
         }
-        if(type == typeof(char))
+
+        if (type == typeof(char))
         {
             value = this.value[0];
             return true;
         }
+
         if (type.IsAssignableFrom(typeof(JSString)))
         {
             value = this;
             return true;
         }
+
         value = null;
         return false;
     }
@@ -117,23 +120,23 @@ public partial class JSString : JSPrimitive
     {
         if (_keyString.HasValue)
             return _keyString;
+
         var d = DoubleValue;
         if (!double.IsNaN(d))
         {
             if (d >= 0 && (d % 1 == 0))
-            {
                 return (uint)d;
-            }
         }
+
         if (!create)
         {
-            if(!KeyStrings.TryGet(value, out _keyString))
+            if (!KeyStrings.TryGet(value, out _keyString))
                 return KeyStrings.undefined;
+
             return _keyString;
         }
-        return _keyString.Value != null
-            ? _keyString
-            : (_keyString = KeyStrings.GetOrCreate(value));
+
+        return _keyString.Value != null ? _keyString : (_keyString = KeyStrings.GetOrCreate(value));
     }
 
     protected override JSObject GetPrototype() => (JSContext.Current[Names.String] as JSFunction).prototype;
@@ -144,10 +147,7 @@ public partial class JSString : JSPrimitive
     public JSString(in StringSpan value) : base() => this.value = value.Value;
 
 
-    public JSString(char ch) : this(new string(ch,1))
-    {
-        
-    }
+    public JSString(char ch) : this(new string(ch, 1)) { }
 
 
     public JSString(in StringSpan value, KeyString keyString) : this(value) => _keyString = keyString;
@@ -155,7 +155,6 @@ public partial class JSString : JSPrimitive
     public static implicit operator KeyString(JSString value) => value.ToString();
 
     public override JSValue TypeOf() => JSConstants.String;
-
 
     public override string ToString() => value;
 
@@ -168,32 +167,10 @@ public partial class JSString : JSPrimitive
     internal protected override JSValue GetValue(uint key, JSValue receiver, bool throwError = true)
     {
         if (key >= value.Length)
-        {
             return JSUndefined.Value;
-        }
+
         return new JSString(new string(value[(int)key], 1));
     }
-
-    //public override JSValue this[uint key] { 
-    //    get
-    //    {
-    //        if (key >= this.value.Length)
-    //            return JSUndefined.Value;
-    //        return new JSString(new string(this.value[(int)key],1));
-    //    }
-    //    set { } 
-    //}
-
-    //public override JSValue this[KeyString name] {
-    //    get {
-    //        this.ResolvePrototype();
-    //        var p = prototypeChain.GetInternalProperty(in name);
-    //        if (p.IsEmpty)
-    //            return JSUndefined.Value;
-    //        return this.GetValue(p);
-    //    }
-    //    set { }
-    //}
 
     public override IElementEnumerator GetAllKeys(bool showEnumerableOnly = true, bool inherited = true) => new KeyEnumerator(Length);
 
@@ -206,6 +183,7 @@ public partial class JSString : JSPrimitive
     {
         if (obj is JSString v)
             return value == v.value;
+
         return base.Equals(obj);
     }
 
@@ -213,20 +191,24 @@ public partial class JSString : JSPrimitive
     {
         if (ReferenceEquals(this, value))
             return true;
+
         switch (value)
         {
             case JSString strValue:
-                if(this.value == strValue.value)
+                if (this.value == strValue.value)
                     return true;
                 return false;
+
             case JSNumber number
                 when (DoubleValue == number.value)
                     || (this.value.CompareTo(number.value.ToString()) == 0):
                 return true;
+
             case JSBoolean boolean
                 when DoubleValue == (boolean._value ? 1D : 0D):
                 return true;
         }
+
         return false;
     }
 
@@ -240,10 +222,10 @@ public partial class JSString : JSPrimitive
     {
         if (value.IsUndefined)
             return false;
+
         if (value.CanBeNumber)
-        {
             return DoubleValue < value.DoubleValue;
-        }
+
         return this.value.Less(value.ToString());
 
     }
@@ -252,10 +234,10 @@ public partial class JSString : JSPrimitive
     {
         if (value.IsUndefined)
             return false;
+
         if (value.CanBeNumber)
-        {
             return DoubleValue <= value.DoubleValue;
-        }
+
         return this.value.LessOrEqual(value.ToString());
     }
 
@@ -263,10 +245,10 @@ public partial class JSString : JSPrimitive
     {
         if (value.IsUndefined)
             return false;
+
         if (value.CanBeNumber)
-        {
             return DoubleValue > value.DoubleValue;
-        }
+
         return this.value.Greater(value.ToString());
     }
 
@@ -274,10 +256,10 @@ public partial class JSString : JSPrimitive
     {
         if (value.IsUndefined)
             return false;
+
         if (value.CanBeNumber)
-        {
             return DoubleValue >= value.DoubleValue;
-        }
+
         return this.value.GreaterOrEqual(value.ToString());
     }
 
@@ -285,9 +267,11 @@ public partial class JSString : JSPrimitive
     {
         if (ReferenceEquals(this, value))
             return true;
+
         if (value is JSString s)
             if (s.value.Equals(this.value))
                 return true;
+
         return false;
     }
 
@@ -297,8 +281,8 @@ public partial class JSString : JSPrimitive
     {
         if (value is JSString @string && this.value == @string.value)
             return JSBoolean.True;
-        return JSBoolean.False;
 
+        return JSBoolean.False;
     }
 
     public override IElementEnumerator GetElementEnumerator() => new ElementEnumerator(value);
@@ -318,9 +302,11 @@ public partial class JSString : JSPrimitive
                 value = new JSString(new string(ch, 1));
                 return true;
             }
+
             i = 0;
             value = JSUndefined.Value;
             hasValue = false;
+            
             return false;
         }
 
@@ -332,6 +318,7 @@ public partial class JSString : JSPrimitive
                 value = new JSString(new string(ch, 1));
                 return true;
             }
+
             value = JSUndefined.Value;
             return false;
         }
@@ -344,6 +331,7 @@ public partial class JSString : JSPrimitive
                 value = new JSString(new string(ch, 1));
                 return true;
             }
+
             value = @default;
             return false;
         }
@@ -355,9 +343,8 @@ public partial class JSString : JSPrimitive
                 index++;
                 return new JSString(new string(ch, 1));
             }
+
             return @default;
         }
-
     }
-
 }

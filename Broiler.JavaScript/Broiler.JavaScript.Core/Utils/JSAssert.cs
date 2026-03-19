@@ -1,13 +1,14 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using System;
 using Yantra.Core;
 using YantraJS.Core;
-using YantraJS.Core.Clr;
 
 namespace YantraJS.Utils;
 
 [JSBaseClass("Function")]
 [JSFunctionGenerator("Assert")]
-public partial class JSAssert: JSFunction
+public partial class JSAssert : JSFunction
 {
     [JSExport(IsConstructor = true)]
     public static JSValue Assert(in Arguments args)
@@ -18,6 +19,7 @@ public partial class JSAssert: JSFunction
             message = message.IsUndefined ? new JSString($"Assert failed, no message, {test}") : message;
             throw new JSException(message);
         }
+
         return JSUndefined.Value;
     }
 
@@ -30,6 +32,7 @@ public partial class JSAssert: JSFunction
             var msg = !msgObj.IsUndefined ? msgObj.ToString() : $"Values {left},{right} are not same";
             throw new JSException(msg);
         }
+
         return JSUndefined.Value;
     }
 
@@ -42,6 +45,7 @@ public partial class JSAssert: JSFunction
             var msg = !msgObj.IsUndefined ? msgObj.ToString() : $"Values {left},{right} are same";
             throw new JSException(msg);
         }
+
         return JSUndefined.Value;
     }
 
@@ -54,6 +58,7 @@ public partial class JSAssert: JSFunction
             var msg = !msgObj.IsUndefined ? msgObj.ToString() : $"Values {left},{right} are not same";
             throw new JSException(msg);
         }
+
         return JSUndefined.Value;
     }
 
@@ -62,16 +67,16 @@ public partial class JSAssert: JSFunction
     {
         var (left, right, msgObj) = a.Get3();
         var diff = Math.Abs(left.DoubleValue - right.DoubleValue);
-        // var leftDiff = 
-        var marginalDiff = Math.Max(0.0001, Math.Max(left.DoubleValue, right.DoubleValue)/ 1000);
+        var marginalDiff = Math.Max(0.0001, Math.Max(left.DoubleValue, right.DoubleValue) / 1000);
+
         if (!(diff < marginalDiff))
         {
             var msg = !msgObj.IsUndefined ? msgObj.ToString() : $"Values {left},{right} are not same difference is {diff}";
             throw new JSException(msg);
         }
+
         return JSUndefined.Value;
     }
-
 
     [JSExport("notEqual")]
     public static JSValue NotEqual(in Arguments a)
@@ -82,6 +87,7 @@ public partial class JSAssert: JSFunction
             var msg = !msgObj.IsUndefined ? msgObj.ToString() : $"Values {left},{right} are same";
             throw new JSException(msg);
         }
+
         return JSUndefined.Value;
     }
 
@@ -91,6 +97,7 @@ public partial class JSAssert: JSFunction
         var (left, error, msgObj) = a.Get3();
         if (!left.IsFunction)
             throw new JSException("assert.throws expect first parameter to be Function");
+
         try
         {
             left.InvokeFunction(a);
@@ -106,8 +113,10 @@ public partial class JSAssert: JSFunction
                     throw new JSException(msg1);
                 }
             }
+
             return JSUndefined.Value;
         }
+
         var msg = !msgObj.IsUndefined ? msgObj.ToString() : $"Function fn did not throw any error";
         throw new JSException(msg);
     }
@@ -124,14 +133,15 @@ public partial class JSAssert: JSFunction
     public static JSValue Match(in Arguments a)
     {
         var (text, regex, msgObj) = a.Get3();
-        if(!(regex is JSRegExp match))
-        {
+        if (regex is not JSRegExp match)
             throw new JSException($"Second parameter must be regex");
-        }
-        if (!match.value.IsMatch(text.ToString())) {
+
+        if (!match.value.IsMatch(text.ToString()))
+        {
             var msg = !msgObj.IsUndefined ? msgObj.ToString() : $"Regex match failed of {text} with {regex}";
             throw new JSException(msg);
         }
+
         return JSUndefined.Value;
     }
 

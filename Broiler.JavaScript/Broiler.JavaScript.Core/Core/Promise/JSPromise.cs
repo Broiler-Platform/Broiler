@@ -1,4 +1,7 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Promise;
+using System;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -9,19 +12,11 @@ namespace YantraJS.Core;
 
 
 
-public delegate void JSPromiseDelegate(
-    Action<JSValue> resolve, 
-    Action<JSValue> reject);
+public delegate void JSPromiseDelegate(Action<JSValue> resolve, Action<JSValue> reject);
 
-/// <summary>
-/// 
-/// </summary>
-// [JSRuntime(typeof(JSPromiseStatic), typeof(JSPromisePrototype))]
 [JSFunctionGenerator("Promise")]
 public partial class JSPromise : JSObject
 {
-
-
     internal enum PromiseState
     {
         Pending,
@@ -38,7 +33,7 @@ public partial class JSPromise : JSObject
     private class Reaction
     {
         public JSPromise Promise;
-        public  ReactionType Type;
+        public ReactionType Type;
         public JSFunctionDelegate Handler;
     }
 
@@ -61,7 +56,7 @@ public partial class JSPromise : JSObject
     /// till resolved/failed are stored in 
     /// global list
     /// </summary>
-    private void  RegisterPromise()
+    private void RegisterPromise()
     {
         promiseID = Interlocked.Increment(ref nextPromiseID);
 
@@ -69,7 +64,7 @@ public partial class JSPromise : JSObject
         pending.TryAdd(promiseID, this);
     }
 
-    internal JSPromise(JSValue value, PromiseState state): this()
+    internal JSPromise(JSValue value, PromiseState state) : this()
     {
         InitPromise();
         this.state = state;
@@ -84,7 +79,8 @@ public partial class JSPromise : JSObject
     {
         sc = JSContext.Current.synchronizationContext;
         RegisterPromise();
-        value.ContinueWith((t) => {
+        value.ContinueWith((t) =>
+        {
             if (t.IsCompleted)
             {
                 if (t.IsFaulted)
@@ -92,15 +88,17 @@ public partial class JSPromise : JSObject
                     Reject(JSException.ErrorFrom(t.Exception));
                     return;
                 }
+
                 Resolve(t.Result);
-            } else
+            }
+            else
             {
                 Reject(JSException.ErrorFrom(t.Exception));
             }
         });
     }
 
-    public JSPromise(in Arguments a): base(JSContext.NewTargetPrototype)
+    public JSPromise(in Arguments a) : base(JSContext.NewTargetPrototype)
     {
         InitPromise();
         JSValue @delegate = a[0];
@@ -114,25 +112,12 @@ public partial class JSPromise : JSObject
         }
     }
 
-    //public JSPromise(JSValue @delegate): this()
-    //{
-    //    InitPromise();
-    //    try
-    //    {
-    //        @delegate.InvokeFunction(new Arguments(this, resolveFunction, rejectFunction));
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        rejectFunction.InvokeFunction(new Arguments(JSUndefined.Value, JSError.From(ex)));
-    //    }
-    //}
-
     public JSPromise(JSPromiseDelegate @delegate) : this()
     {
         InitPromise();
         try
         {
-            @delegate((v) => resolveFunction.Call(JSUndefined.Value,v), (v) => rejectFunction.Call(JSUndefined.Value, v));
+            @delegate((v) => resolveFunction.Call(JSUndefined.Value, v), (v) => rejectFunction.Call(JSUndefined.Value, v));
         }
         catch (Exception ex)
         {
@@ -152,6 +137,7 @@ public partial class JSPromise : JSObject
             Resolve(a.Get1());
             return JSUndefined.Value;
         });
+
         rejectFunction = new JSFunction((in Arguments a) =>
         {
             Reject(a.Get1());
@@ -160,20 +146,10 @@ public partial class JSPromise : JSObject
 
     }
 
-
     /// <summary>
     /// This prevents garbage collection
     /// </summary>
     public JSPromise Parent { get; }
-    //public JSPromise(JSPromiseDelegate @delegate, JSPromise parent) :
-    //    base(JSContext.Current.PromisePrototype)
-    //{
-    //    sc = JSContext.Current.synchronizationContext;
-    //    this.Parent = parent;
-    //    RegisterPromise();
-    //    @delegate(p => Resolve(p), p => Reject(p));
-    //}
-
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void Resolve(JSValue value)
@@ -183,7 +159,7 @@ public partial class JSPromise : JSObject
 
         if (value == this)
         {
-            Reject(JSContext.Current.NewTypeError("A promise cannot be resolved with itself").Error);
+            Reject(JSContext.NewTypeError("A promise cannot be resolved with itself").Error);
             return;
         }
 
@@ -215,15 +191,12 @@ public partial class JSPromise : JSObject
         result = value;
 
         var thenList = this.thenList;
-        if (thenList != null) {
+        if (thenList != null)
+        {
             this.thenList = null;
             foreach (var t in thenList)
-            {
                 Post(t);
-            }
         }
-
-        return;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -242,11 +215,8 @@ public partial class JSPromise : JSObject
         {
             this.rejectList = null;
             foreach (var t in rejectList)
-            {
                 Post(t);
-            }
         }
-        return;
     }
 
     private TaskCompletionSource<JSValue> taskCompletion = null;
@@ -256,25 +226,26 @@ public partial class JSPromise : JSObject
     {
         get
         {
-            if(state == PromiseState.Resolved)
-            {
+            if (state == PromiseState.Resolved)
                 return System.Threading.Tasks.Task.FromResult(result);
-            }
+
             if (state == PromiseState.Rejected)
-            {
                 throw JSException.FromValue(result);
-            }
+
             if (taskCompletion == null)
             {
                 taskCompletion = new TaskCompletionSource<JSValue>();
-                Then((in Arguments a) => {
+                Then((in Arguments a) =>
+                {
                     taskCompletion.TrySetResult(a.Get1());
                     return JSUndefined.Value;
-                },(in Arguments a) => {
+                }, (in Arguments a) =>
+                {
                     taskCompletion.TrySetException(JSException.FromValue(result));
                     return JSUndefined.Value;
                 });
             }
+
             return taskCompletion.Task;
         }
     }
@@ -286,6 +257,7 @@ public partial class JSPromise : JSObject
             value = Task;
             return true;
         }
+
         if (type.IsConstructedGenericType)
         {
             if (type.GetGenericTypeDefinition() == typeof(Task<>))
@@ -294,6 +266,7 @@ public partial class JSPromise : JSObject
                 return true;
             }
         }
+
         return base.ConvertTo(type, out value);
     }
 
@@ -306,19 +279,22 @@ public partial class JSPromise : JSObject
             @return = new JSPromise();
             @return.InitPromise();
         }
+
         var resolved = new Reaction { Promise = @return, Type = ReactionType.Resolve, Handler = resolve };
         var rejected = new Reaction { Promise = @return, Type = ReactionType.Reject, Handler = fail };
 
-        if(state == PromiseState.Pending)
+        if (state == PromiseState.Pending)
         {
             rejectList ??= [];
             thenList ??= [];
             rejectList.Add(rejected);
             thenList.Add(resolved);
-        } else if(state == PromiseState.Resolved)
+        }
+        else if (state == PromiseState.Resolved)
         {
             Post(resolved);
-        } else
+        }
+        else
         {
             Post(rejected);
         }
@@ -333,10 +309,7 @@ public partial class JSPromise : JSObject
             try
             {
                 var handlerResult = reaction.Handler(new Arguments(JSUndefined.Value, result));
-                if (reaction.Promise != null)
-                {
-                    reaction.Promise.Resolve(handlerResult);
-                }
+                reaction.Promise?.Resolve(handlerResult);
             }
             catch (Exception ex)
             {
@@ -345,17 +318,11 @@ public partial class JSPromise : JSObject
         }
         else if (reaction.Type == ReactionType.Resolve)
         {
-            if (reaction.Promise != null)
-            {
-                reaction.Promise.Resolve(result ?? JSUndefined.Value);
-            }
+            reaction.Promise?.Resolve(result ?? JSUndefined.Value);
         }
         else
         {
-            if (reaction.Promise != null)
-            {
-                reaction.Promise.Reject(result ?? JSUndefined.Value);
-            }
+            reaction.Promise?.Reject(result ?? JSUndefined.Value);
         }
     });
 

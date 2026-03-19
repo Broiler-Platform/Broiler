@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using YantraJS.ClosureSeparator;
 using YantraJS.Expressions;
 using YantraJS.Generator;
 
@@ -59,11 +60,6 @@ public static class ExpressionCompiler
             LambdaRewriter.Rewrite(lambdaExpression);
         }
 
-        //var method = type.DefineMethod(GetUniqueName(lambdaExpression.Name),
-        //    MethodAttributes.Public, CallingConventions.HasThis,
-        //    lambdaExpression.ReturnType,
-        //    lambdaExpression.ParameterTypes);
-
         var method = type.CreateMethod(lambdaExpression, GetUniqueName(lambdaExpression.Name), true);
 
         var ln = lambdaExpression.Name;
@@ -73,9 +69,6 @@ public static class ExpressionCompiler
             method.SetCustomAttribute(cb);
         }
 
-        //NestedRewriter nw = new NestedRewriter(lambdaExpression, new LambdaMethodBuilder(method));
-        //lambdaExpression = nw.Visit(lambdaExpression) as YLambdaExpression;
-
         var ilw = new StringWriter();
         var ew = new StringWriter();
 
@@ -84,42 +77,6 @@ public static class ExpressionCompiler
 
         return (method, ilw.ToString(), ew.ToString());
     }
-
-
-    ///// <summary>
-    ///// For debug = true, save it as an instance method..
-    ///// and in static method create an instance of Closure
-    ///// and return the instance method
-    ///// </summary>
-    ///// <param name="lambdaExpression"></param>
-    ///// <param name="type"></param>
-    ///// <param name="debug"></param>
-    ///// <returns></returns>
-    //public static MethodInfo CompileToStaticMethod(
-    //    this YLambdaExpression lambdaExpression,
-    //    TypeBuilder type,
-    //    PdbBuilder builder
-    //    )
-    //{
-    //    var exp = LambdaRewriter.Rewrite(lambdaExpression)
-    //        as YLambdaExpression;
-
-    //    var method = type.DefineMethod(GetUniqueName(lambdaExpression.Name),
-    //        MethodAttributes.Public | MethodAttributes.Static,
-    //        exp.ReturnType,
-    //        exp.ParameterTypes);
-
-    //    NestedRewriter nw = new NestedRewriter(exp, new LambdaMethodBuilder(method));
-    //    exp = nw.Visit(exp) as YLambdaExpression;
-
-    //    var mdh = MetadataTokens.MethodDefinitionHandle(builder.Next);
-
-
-    //    ILCodeGenerator icg = new ILCodeGenerator(method.GetILGenerator());
-    //    var (ict, iexp) = icg.Emit(exp);
-
-    //    return method;
-    //}
 
     /// <summary>
     /// For debug = true, save it as an instance method..
@@ -142,9 +99,6 @@ public static class ExpressionCompiler
             return CompileToStaticMethod(lambdaExpression, type, m, debug);
         }
 
-        //var exp = LambdaRewriter.Rewrite(lambdaExpression)
-        //    as YLambdaExpression;
-
         var method = type.DefineMethod(GetUniqueName(lambdaExpression.Name), 
             MethodAttributes.Public | MethodAttributes.Static,
             lambdaExpression.ReturnType,
@@ -156,9 +110,6 @@ public static class ExpressionCompiler
             var cb = new CustomAttributeBuilder(locationConstructor, [ln.Location, ln.Name, ln.Line, ln.Column]);
             method.SetCustomAttribute(cb);
         }
-
-        //NestedRewriter nw = new NestedRewriter(exp, new LambdaMethodBuilder(method));
-        //exp = nw.Visit(exp) as YLambdaExpression;
 
         ILCodeGenerator icg = new(method.GetILGenerator(), new LambdaMethodBuilder(method));
         icg.Emit(lambdaExpression);
@@ -215,11 +166,6 @@ public static class ExpressionCompiler
         var derivedType = derived.CreateTypeInfo();
         var ct = derivedType.GetConstructors()[0];
 
-        //var create = YExpression.Lambda( "Create", YExpression.Call(YExpression.Constant(im), cd, 
-        //    YExpression.Constant(dt), 
-        //    YExpression.New(cnstr, YExpression.Null)
-        //    ), new YParameterExpression[] { });
-
         var create = YExpression.Lambda( lambdaExpression.Type, "Create", 
             
             YExpression.New(cdt,
@@ -227,8 +173,6 @@ public static class ExpressionCompiler
                 YExpression.Constant(im))
             , []);
 
-        //var m = type.DefineMethod(lambdaExpression.Name + "_Inner_Factory",
-        //    MethodAttributes.Public | MethodAttributes.Static, typeof(object), new Type[] { });
         var m = method;
 
         var ln = lambdaExpression.Name;

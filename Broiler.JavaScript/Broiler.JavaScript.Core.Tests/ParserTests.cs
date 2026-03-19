@@ -1,6 +1,8 @@
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
 using YantraJS.Core.FastParser;
 
-namespace YantraJS.Core.Tests;
+namespace Broiler.JavaScript.Core.Tests;
 
 /// <summary>
 /// Tests for the FastParser, verifying AST output for representative
@@ -11,7 +13,7 @@ public class ParserTests
     private static AstProgram Parse(string code)
     {
         var stream = new FastTokenStream(code);
-        var parser = new FastParser.FastParser(stream);
+        var parser = new YantraJS.Core.FastParser.FastParser(stream);
         return parser.ParseProgram();
     }
 

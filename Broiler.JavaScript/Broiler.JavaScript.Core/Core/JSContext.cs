@@ -3,30 +3,27 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using YantraJS.Core.Debug;
 using System.Collections.Concurrent;
-using Microsoft.Threading;
-using YantraJS.Core.Core.Storage;
-using YantraJS.Core.CodeGen;
 using System.ComponentModel;
-using YantraJS.Debugger;
-using YantraJS.Core.Clr;
-using YantraJS.Emit;
+using Broiler.JavaScript.Core.CodeGen;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Promise;
+using Broiler.JavaScript.Core.Core.Storage;
+using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Debug;
+using Broiler.JavaScript.Core.Debugger;
+using Broiler.JavaScript.Core.Emit;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core;
 
 
 public delegate JSValue JSClosureFunctionDelegate(ScriptInfo script, JSVariable[] closures, in Arguments a);
-
 public delegate JSValue JSFunctionDelegate(in Arguments a);
-
 public delegate void ConsoleEvent(JSContext context, string type, in Arguments a);
-
 public delegate void LogEventHandler(JSContext context, JSValue value);
-
 public delegate void ErrorEventHandler(JSContext context, Exception error);
 
-public class EvalEventArgs: EventArgs
+public class EvalEventArgs : EventArgs
 {
     public JSContext Context { get; set; }
 
@@ -35,7 +32,7 @@ public class EvalEventArgs: EventArgs
     public string Location { get; set; }
 }
 
-public partial class JSContext: JSObject, IDisposable
+public partial class JSContext : JSObject, IDisposable
 {
 
     private static long contextId = 1;
@@ -72,27 +69,20 @@ public partial class JSContext: JSObject, IDisposable
     /// <summary>
     /// Available only when Enable Clr Integration is true in JSModuleContext
     /// </summary>
-    public ClrMemberNamingConvention ClrMemberNamingConvention { get; set; }
-        = ClrMemberNamingConvention.CamelCase;
+    public ClrMemberNamingConvention ClrMemberNamingConvention { get; set; } = ClrMemberNamingConvention.CamelCase;
 
     public static JSContext CurrentContext
     {
         get => Current;
-        set {
+        set
+        {
             _current.Value = value;
             Current = value;
         }
     }
 
-    private static readonly AsyncLocal<JSContext> _current = new((e) => {
-        Current = e.CurrentValue ?? e.PreviousValue;
-    });
+    private static readonly AsyncLocal<JSContext> _current = new((e) => { Current = e.CurrentValue ?? e.PreviousValue; });
 
-    // internal LinkedStack<LexicalScope> Stack = new LinkedStack<LexicalScope>();
-
-    // internal LightWeightStack<CallStackItem> Stack = new LightWeightStack<CallStackItem>(256);
-
-    // internal LinkedList<Task> waitTasks = new LinkedList<Task>();
     private TaskCompletionSource<int> _waitTask;
     internal Task WaitTask => _waitTask?.Task;
 
@@ -110,151 +100,24 @@ public partial class JSContext: JSObject, IDisposable
     internal void DispatchEvalEvent(ref string script, ref string location)
     {
         var ee = EvalEvent;
-        if (ee != null)
-        {
-            var e = new EvalEventArgs { Context = this, Script = script, Location = location };
-            EvalEvent.Invoke(this, e);
-            script = e.Script;
-            location = e.Location;
-        }
+
+        if (ee == null)
+            return;
+
+        var e = new EvalEventArgs { Context = this, Script = script, Location = location };
+        EvalEvent.Invoke(this, e);
+        script = e.Script;
+        location = e.Location;
     }
 
     public void Dispose() => _current.Value = null;
 
-    // public readonly JSObject StringPrototype;
     public readonly JSObject FunctionPrototype;
-
-    // public readonly JSObject NumberPrototype;
-
     public new readonly JSObject ObjectPrototype;
-
-    // public readonly JSObject ArrayPrototype;
-
-    // public readonly JSObject BooleanPrototype;
-
-    //public readonly JSObject TypeErrorPrototype;
-
-    //public readonly JSObject EvalErrorPrototype;
-
-    //public readonly JSObject ErrorPrototype;
-
-    //public readonly JSObject RangeErrorPrototype;
-
-    //public readonly JSObject SyntaxErrorPrototype;
-
-    //public readonly JSObject URIErrorPrototype;
-
-    //public readonly JSObject ReferenceErrorPrototype;
-
-    // public readonly JSObject DatePrototype;
-
-    // public readonly JSObject MapPrototype;
-
-    // public readonly JSObject SetPrototype;
-
-    // public readonly JSObject PromisePrototype;
-
-    // public readonly JSObject RegExpPrototype;
-
-    // public readonly JSObject WeakRefPrototype;
-
-    // internal readonly JSObject WeakMapPrototype;
-
-    // internal readonly JSObject WeakSetPrototype;
-
-    // internal readonly JSObject GeneratorPrototype;
-
-    // internal readonly JSObject BigIntPrototype;
-
-    // public readonly JSObject ArrayBufferPrototype;
-
-    //public readonly JSObject Int8ArrayPrototype;
-
-    //public readonly JSObject Uint8ArrayPrototype;
-
-    //public readonly JSObject Uint8ClampedArrayPrototype;
-
-    //public readonly JSObject Int16ArrayPrototype;
-
-    //public readonly JSObject Uint16ArrayPrototype;
-
-    //public readonly JSObject Int32ArrayPrototype;
-
-    //public readonly JSObject Uint32ArrayPrototype;
-
-    //public readonly JSObject Float32ArrayPrototype;
-
-    //public readonly JSObject Float64ArrayPrototype;
-
-    // public readonly JSObject DataViewPrototype;
-
-    // public readonly JSObject FinalizationRegistryPrototype;
-
-    // public readonly JSObject JSON;
-
-    // public readonly JSMath Math;
-
     public readonly JSFunction Object;
-
-    // public readonly JSReflect Reflect;
-
-    //public static JSContext Current
-    //{
-    //    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    //    get
-    //    {
-    //        return _current.Value;
-    //    }
-    //    set
-    //    {
-    //        _current.Value = value;
-    //        CurrentContext = value;
-    //    }
-    //}
-
     public event LogEventHandler Log;
-
     public event ErrorEventHandler Error;
-
     public event ConsoleEvent ConsoleEvent;
-
-    //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-    //internal int Push(string fileName, in StringSpan function, int line, int column)
-    //{
-    //    ref var top = ref Stack.Push(out var item);
-    //    top.Function = function;
-    //    top.FileName = fileName;
-    //    top.Line = line;
-    //    top.Column = column;
-    //    return item;
-    //}
-
-    //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-    //internal void Pop()
-    //{
-    //    Stack.Pop();
-    //}
-
-    //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-    //internal void Update(int index, int line, int column)
-    //{
-    //    ref var top = ref Stack.GetAt(index);
-    //    top.Line = line;
-    //    top.Column = column;
-    //}
-
-    //internal bool IsRootScope
-    //{
-    //    get
-    //    {
-    //        if (Stack.Count > 0)
-    //        {
-    //            ref var top = ref Stack.Top;
-    //            return top.IsRootScope;
-    //        } 
-    //        return false;
-    //    }
-    //}
 
     SAUint32Map<JSVariable> globalVars = new();
 
@@ -262,84 +125,39 @@ public partial class JSContext: JSObject, IDisposable
     {
         var v = variable.Value;
         var oldV = this[variable.Name];
+
         if (oldV != v)
         {
             // avoid IsReadOnly error
             this[variable.Name] = v;
         }
+
         KeyString name = variable.Name;
         globalVars.Put(name.Key) = variable;
         return v;
     }
 
-    public override JSValue this[KeyString name] { 
+    public override JSValue this[KeyString name]
+    {
         get => base[name];
         set
         {
             base[name] = value;
-            if(globalVars.TryGetValue(name.Key, out var jsv))
-            {
+            if (globalVars.TryGetValue(name.Key, out var jsv))
                 jsv.Value = value;
-            }
         }
     }
 
-    //internal LightWeightStack<CallStackItem>.StackWalker StackWalker
-    //{
-    //    get
-    //    {
-    //        return Stack.Walker;
-    //    }
-    //}
-
-    internal void FillStackTrace(StringBuilder sb)
-    {
-    }
-
-    //internal LightWeightStack<CallStackItem> CloneStack()
-    //{
-    //    var copy = new LightWeightStack<CallStackItem>(this.Stack);
-    //    return copy;
-    //}
-
-    //internal LightWeightStack<CallStackItem> Switch(LightWeightStack<CallStackItem> newValue)
-    //{
-    //    var old = this.Stack;
-    //    this.Stack = newValue;
-    //    return old;
-    //}
+    internal void FillStackTrace(StringBuilder sb) { }
 
     public JSContext(SynchronizationContext synchronizationContext = null)
     {
         this.synchronizationContext = synchronizationContext ?? SynchronizationContext.Current;
 
-        // Scope.Push(new LexicalScope("", "", 1, 1));
-        // Scope.Top.IsRoot = true;
         Current = this;
         _current.Value = this;
 
         ref var ownProperties = ref GetOwnProperties();
-
-        //T CreateInternalObject<T>(KeyString name)
-        //    where T: JSObject
-        //{
-        //    var r = Activator.CreateInstance<T>();
-        //    ref var rop = ref r.GetOwnProperties();
-        //    var cached = cache.GetOrCreate(name.Key, () => { 
-        //        return Bootstrap.Create(name, typeof(T));
-        //    });
-
-        //    ref var op = ref this.GetOwnProperties();
-
-        //    op.Put(name, r, JSPropertyAttributes.ConfigurableReadonlyValue);
-        //    var ve = cached.GetOwnProperties().GetEnumerator(false);
-        //    while(ve.MoveNext(out var keyString, out var value))
-        //    {
-        //        rop.Put(keyString.Key) = value;
-        //    }
-
-        //    return r;
-        //}
 
         this[Names.Symbol] = JSSymbol.CreateClass(this, false);
         var func = JSFunction.CreateClass(this, false);
@@ -349,64 +167,13 @@ public partial class JSContext: JSObject, IDisposable
         this[Names.Object] = Object;
         ObjectPrototype = Object.prototype;
         ObjectPrototype.BasePrototypeObject = null;
-        // ObjectPrototype.Delete(KeyStrings.constructor);
+
         func.BasePrototypeObject = Object;
-        // Object.BasePrototypeObject = null;
         FunctionPrototype.BasePrototypeObject = ObjectPrototype;
 
-        // create object prototype...
-        // Object =  this.Create<JSObject>(KeyStrings.Object);
-        //Object.f = JSObjectPrototype.Constructor;
-        //ObjectPrototype.Delete(KeyStrings.constructor);
-        // ObjectPrototype.BasePrototypeObject = null;
-        // func.BasePrototypeObject = Object;
-        // FunctionPrototype.BasePrototypeObject = ObjectPrototype;
-        // ArrayPrototype = this.Create<JSArray>(KeyStrings.Array).prototype;
-        // StringPrototype = this.Create<JSString>(KeyStrings.String).prototype;
-        // NumberPrototype = this.Create<JSNumber>(KeyStrings.Number).prototype;
-        // BooleanPrototype = this.Create<JSBoolean>(KeyStrings.Boolean).prototype;
-        //ErrorPrototype = this.Create<JSError>(KeyStrings.Error).prototype;
-        //EvalErrorPrototype = this.Create<JSError>(KeyStrings.EvalError, ErrorPrototype).prototype;
-        //TypeErrorPrototype = this.Create<JSError>(KeyStrings.TypeError, ErrorPrototype).prototype;
-        //RangeErrorPrototype = this.Create<JSError>(KeyStrings.RangeError, ErrorPrototype).prototype;
-        //SyntaxErrorPrototype = this.Create<JSError>(KeyStrings.SyntaxError, ErrorPrototype).prototype;
-        //URIErrorPrototype = this.Create<JSError>(KeyStrings.URIError, ErrorPrototype).prototype;
-        //ReferenceErrorPrototype = this.Create<JSError>(KeyStrings.ReferenceError, ErrorPrototype).prototype;
-        // DatePrototype = this.Create<JSDate>(KeyStrings.Date).prototype;
-        // MapPrototype = this.Create<JSMap>(KeyStrings.Map).prototype;
-        // PromisePrototype = this.Create<JSPromise>(KeyStrings.Promise).prototype;
-        // RegExpPrototype = this.Create<JSRegExp>(KeyStrings.RegExp).prototype;
-        // SetPrototype = this.Create<JSSet>(KeyStrings.Set).prototype;
-        // WeakRefPrototype = this.Create<JSWeakRef>(KeyStrings.WeakRef).prototype;
-        // WeakSetPrototype = this.Create<JSWeakSet>(KeyStrings.WeakSet).prototype;
-        // WeakMapPrototype = this.Create<JSWeakMap>(KeyStrings.WeakMap).prototype;
-        // GeneratorPrototype = this.Create<JSGenerator>(KeyStrings.Generator).prototype;
-        // BigIntPrototype = this.Create<JSBigInt>(KeyStrings.BigInt).prototype;
-        // ArrayBufferPrototype = this.Create<JSArrayBuffer>(KeyStrings.ArrayBuffer).prototype;
-        //Int8ArrayPrototype = this.Create<Int8Array>(KeyStrings.Int8Array).prototype;
-        //Uint8ArrayPrototype = this.Create<Uint8Array>(KeyStrings.Uint8Array).prototype;
-        //Uint8ClampedArrayPrototype = this.Create<Uint8ClampedArray>(KeyStrings.Uint8ClampedArray).prototype;
-        //Int16ArrayPrototype = this.Create<Int16Array>(KeyStrings.Int16Array).prototype;
-        //Uint16ArrayPrototype = this.Create<Uint16Array>(KeyStrings.Uint16Array).prototype;
-        //Int32ArrayPrototype = this.Create<Int32Array>(KeyStrings.Int32Array).prototype;
-        //Uint32ArrayPrototype = this.Create<Uint32Array>(KeyStrings.Uint32Array).prototype;
-        //Float32ArrayPrototype = this.Create<Float32Array>(KeyStrings.Float32Array).prototype;
-        //Float64ArrayPrototype = this.Create<Float64Array>(KeyStrings.Float64Array).prototype;
-        // DataViewPrototype = this.Create<DataView>(KeyStrings.DataView).prototype;
-        // FinalizationRegistryPrototype = this.Create<JSFinalizationRegistry>(KeyStrings.FinalizationRegistry).prototype;
-        // JSON = CreateInternalObject<JSJSON>(KeyStrings.JSON);
-        // Math = CreateInternalObject<JSMath>(KeyStrings.Math);
-        // Reflect = CreateInternalObject<JSReflect>(KeyStrings.Reflect);
-
         BuiltInRegistry.Register(this);
-        // this.Fill<JSGlobalStatic>();
 
-        //var c = new JSObject
-        //{
-        //    BasePrototypeObject = (Bootstrap.Create("console", typeof(JSConsole))).prototype
-        //};
         this[KeyStrings.console] = ClrProxy.From(new JSConsole(this));
-
         this[KeyStrings.debug] = new JSFunction(Debug);
 
     }
@@ -424,26 +191,38 @@ public partial class JSContext: JSObject, IDisposable
 
     internal void ClearTimeout(long n)
     {
-        if(timeouts.TryRemove(n, out var timer))
+        if (timeouts.TryRemove(n, out var timer))
         {
-            try { timer.Dispose(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[YantraJS] ClearTimeout dispose error: {ex.Message}"); }
+            try
+            {
+                timer.Dispose();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[YantraJS] ClearTimeout dispose error: {ex.Message}");
+            }
         }
-        if (timers.Count == 0 && timeouts.Count == 0)
-        {
+
+        if (timers.IsEmpty && timeouts.IsEmpty)
             _waitTask.TrySetResult(1);
-        }
     }
 
     internal void ClearInterval(long n)
     {
         if (timers.TryRemove(n, out var timer))
         {
-            try { timer.Dispose(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[YantraJS] ClearInterval dispose error: {ex.Message}"); }
+            try
+            {
+                timer.Dispose();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[YantraJS] ClearInterval dispose error: {ex.Message}");
+            }
         }
-        if (timers.Count == 0 && timeouts.Count == 0)
-        {
+
+        if (timers.IsEmpty && timeouts.IsEmpty)
             _waitTask.TrySetResult(1);
-        }
     }
 
 
@@ -451,34 +230,24 @@ public partial class JSContext: JSObject, IDisposable
     internal readonly SynchronizationContext synchronizationContext;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public JSException NewTypeError(string message,
-        [CallerMemberName] string function = null,
-        [CallerFilePath] string filePath = null,
-        [CallerLineNumber] int line = 0) => new JSTypeError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
+    public static JSException NewTypeError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
+        new JSTypeError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public JSException NewSyntaxError(string message,
-        [CallerMemberName] string function = null,
-        [CallerFilePath] string filePath = null,
-        [CallerLineNumber] int line = 0) => new JSSyntaxError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
+    public static JSException NewSyntaxError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
+        new JSSyntaxError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public JSException NewURIError(string message,
-        [CallerMemberName] string function = null,
-        [CallerFilePath] string filePath = null,
-        [CallerLineNumber] int line = 0) => new JSURIError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
+    public static JSException NewURIError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
+        new JSURIError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public JSException NewRangeError(string message,
-        [CallerMemberName] string function = null,
-        [CallerFilePath] string filePath = null,
-        [CallerLineNumber] int line = 0) => new JSRangeError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
+    public static JSException NewRangeError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
+        new JSRangeError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public JSException NewError(string message,
-        [CallerMemberName] string function = null,
-        [CallerFilePath] string filePath = null,
-        [CallerLineNumber] int line = 0) => new JSError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
+    public static JSException NewError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
+        new JSError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
 
     partial void OnError(Exception ex);
 
@@ -486,21 +255,8 @@ public partial class JSContext: JSObject, IDisposable
     {
         OnError(ex);
         Error?.Invoke(this, ex);
-        //var cx = this[KeyStrings.console];
-        //if (cx.IsUndefined)
-        //{
-        //    System.Diagnostics.Debug.WriteLine(ex);
-        //    return;
-        //}
-
-        //var log = cx[KeyStrings.log];
-        //if (log.IsUndefined)
-        //{
-        //    System.Diagnostics.Debug.WriteLine(ex);
-        //    return;
-        //}
-        //log.InvokeFunction(new Arguments(cx, new JSString(ex.ToString())));
     }
+
     public void ReportLog(JSValue f) => Log?.Invoke(this, f);
 
     private static long nextTimeout = 1;
@@ -508,28 +264,27 @@ public partial class JSContext: JSObject, IDisposable
 
     internal long PostTimeout(int delay, JSFunction f, in Arguments a)
     {
-        var ctx = synchronizationContext;
-        if(ctx == null)
-        {
-            throw NewTypeError($"Synchronization context must be present to set timeout");
-        }
+        var ctx = synchronizationContext ?? throw NewTypeError($"Synchronization context must be present to set timeout");
         var key = Interlocked.Increment(ref nextTimeout);
         JSValue[] args = JSArguments.Empty;
+
         if (a.Length > 2)
         {
             args = new JSValue[a.Length - 2];
             for (int i = 2; i < a.Length; i++)
-            {
                 args[i - 2] = a.GetAt(i);
-            }
         }
-        var timer = new Timer((_) => {
-            ctx.Post((x) => {
+
+        var timer = new Timer((_) =>
+        {
+            ctx.Post((x) =>
+            {
                 var f = x as JSValue;
                 try
                 {
                     f.InvokeFunction(new Arguments(JSUndefined.Value, args));
-                }catch (Exception ex)
+                }
+                catch (Exception ex)
                 {
                     ReportError(ex);
                 }
@@ -538,35 +293,35 @@ public partial class JSContext: JSObject, IDisposable
         }, f, delay, Timeout.Infinite);
 
         timeouts.AddOrUpdate(key, timer, (a1, a2) => a2);
-        lock(this)
+        lock (this)
         {
             _waitTask = _waitTask ?? new TaskCompletionSource<int>();
         }
+
         return key;
     }
     internal long SetInterval(int delay, JSFunction f, in Arguments a)
     {
-        var ctx = synchronizationContext;
-        if (ctx == null)
-        {
-            throw NewTypeError($"Synchronization context must be present to set timeout");
-        }
+        var ctx = synchronizationContext ?? throw NewTypeError($"Synchronization context must be present to set timeout");
         var key = Interlocked.Increment(ref nextInterval);
         JSValue[] args = JSArguments.Empty;
+
         if (a.Length > 2)
         {
             args = new JSValue[a.Length - 2];
             for (int i = 2; i < a.Length; i++)
-            {
                 args[i - 2] = a.GetAt(i);
-            }
         }
-        var timer = new Timer((_) => {
-            ctx.Post(f, (x) => {
+
+        var timer = new Timer((_) =>
+        {
+            ctx.Post(f, (x) =>
+            {
                 try
                 {
                     x.InvokeFunction(new Arguments(JSUndefined.Value, args));
-                }catch (Exception ex)
+                }
+                catch (Exception ex)
                 {
                     ReportError(ex);
                 }
@@ -585,8 +340,7 @@ public partial class JSContext: JSObject, IDisposable
 
     public ICodeCache CodeCache = DictionaryCodeCache.Current;
 
-    internal ConcurrentDictionary<long, JSPromise> PendingPromises
-        = new();
+    internal ConcurrentDictionary<long, JSPromise> PendingPromises = new();
 
     /// <summary>
     /// Quickly evaluates the code, does not wait for promises and timeouts/intervals.
@@ -609,11 +363,11 @@ public partial class JSContext: JSObject, IDisposable
             Debugger.ScriptParsed(ID, code, codeFilePath);
             return f(new Arguments(@this));
         }
-        catch (Exception ex) {
+        catch (Exception ex)
+        {
             ReportError(ex);
-            throw ex;
+            throw;
         }
-        // return CoreScript.Evaluate(code, codeFilePath);
     }
 
     /// <summary>
@@ -629,33 +383,38 @@ public partial class JSContext: JSObject, IDisposable
         var wt = WaitTask;
         if (wt != null)
             await wt;
+
         if (r is JSPromise promise)
-        {
             return await promise.Task;
-        }
-        if (r is JSObject @object)
+
+        if (r is not JSObject @object)
+            return r;
+
+        var then = @object[KeyStrings.then];
+        if (!then.IsFunction)
+            return r;
+
+        promise = new JSPromise((resolve, reject) =>
         {
-            var then = @object[KeyStrings.then];
-            if (then.IsFunction)
+            var resolveF = new JSFunction((in Arguments a) =>
             {
-                promise = new JSPromise((resolve, reject) => {
-                    var resolveF = new JSFunction((in Arguments a) => {
-                        var a1 = a.Get1();
-                        resolve(a1);
-                        return a1;
-                    });
-                    var rejectF = new JSFunction((in Arguments a) => {
-                        var a1 = a.Get1();
-                        reject(a1);
-                        return a1;
-                    });
-                    var a = new Arguments(@object, resolveF, rejectF);
-                    then.InvokeFunction(a);
-                });
-                return await promise.Task;
-            }
-        }
-        return r;
+                var a1 = a.Get1();
+                resolve(a1);
+                return a1;
+            });
+
+            var rejectF = new JSFunction((in Arguments a) =>
+            {
+                var a1 = a.Get1();
+                reject(a1);
+                return a1;
+            });
+
+            var a = new Arguments(@object, resolveF, rejectF);
+            then.InvokeFunction(a);
+        });
+
+        return await promise.Task;
     }
 
 
@@ -667,5 +426,4 @@ public partial class JSContext: JSObject, IDisposable
     /// <param name="codeFilePath"></param>
     /// <returns></returns>
     public JSValue Execute(string code, string codeFilePath = null) => AsyncPump.Run(() => ExecuteAsync(code, codeFilePath));
-
 }

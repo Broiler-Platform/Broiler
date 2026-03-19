@@ -1,4 +1,5 @@
-﻿using Exp = YantraJS.Expressions.YExpression;
+﻿using Broiler.JavaScript.Core.FastParser.Ast;
+using Exp = YantraJS.Expressions.YExpression;
 using Expression = YantraJS.Expressions.YExpression;
 
 namespace YantraJS.Core.FastParser.Compiler;
@@ -13,8 +14,8 @@ partial class FastCompiler
         {
             if (exp != null) list.Add(Visit(exp));
         }
+
         var r = Exp.Block(list);
-        // list.Clear();
         return r;
     }
 }

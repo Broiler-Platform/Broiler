@@ -1,13 +1,14 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.Core.Utils;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
-using YantraJS.Core.Clr;
-using YantraJS.ExpHelper;
-using YantraJS.LinqExpressions;
+using YantraJS;
 using YantraJS.Runtime;
 using Expression = YantraJS.Expressions.YExpression;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Clr;
 
 internal static class ClrTypeBuilder
 {
@@ -20,7 +21,9 @@ internal static class ClrTypeBuilder
     {
         var d = method.CreateDelegate<InstanceDelegate<T>>();
         var thisDelegate = JSValueToClrConverter.ToFastClrDelegate<T>();
-        return (in Arguments a) => {
+
+        return (in Arguments a) =>
+        {
             var @this = thisDelegate(a.This, "this");
             return d(@this, in a);
         };
@@ -30,17 +33,15 @@ internal static class ClrTypeBuilder
         var args = Expression.Parameter(typeof(Arguments).MakeByRefType());
         var parameters = m.GetArgumentsExpression(args);
         Expression body = Expression.New(m, parameters);
-        body = m.DeclaringType.IsValueType
-            ? Expression.Box(body)
-            : body;
+        body = m.DeclaringType.IsValueType ? Expression.Box(body) : body;
         var lambda = Expression.Lambda<ClrProxyFactory>(name, body, args);
         return lambda.Compile();
     }
 
     internal static JSFunctionDelegate CompileToJSFunctionDelegate(this MethodInfo m, string name = null)
     {
-
-        if (m.IsJSFunctionDelegate()) {
+        if (m.IsJSFunctionDelegate())
+        {
             if (m.IsStatic)
             {
                 return (JSFunctionDelegate)m.CreateDelegate(typeof(JSFunctionDelegate));
@@ -68,9 +69,8 @@ internal static class ClrTypeBuilder
         Type returnType;
 
         var @this = ArgumentsBuilder.This(args);
-        var convertedThis = m.IsStatic
-            ? null
-            : JSValueToClrConverter.Get(@this, m.DeclaringType, "this");
+        var convertedThis = m.IsStatic ? null : JSValueToClrConverter.Get(@this, m.DeclaringType, "this");
+        
         body = Expression.Call(convertedThis, m, parameters);
         returnType = m.ReturnType;
 
@@ -93,11 +93,13 @@ internal static class ClrTypeBuilder
     {
         var parameters = new List<Expression>();
         var pList = m.GetParameters();
+        
         for (int i = 0; i < pList.Length; i++)
         {
             var ai = ArgumentsBuilder.GetAt(args, i);
             var pi = pList[i];
             Expression defValue;
+            
             if (pi.HasDefaultValue)
             {
                 defValue = Expression.Constant(pi.DefaultValue);
@@ -108,7 +110,9 @@ internal static class ClrTypeBuilder
                 parameters.Add(JSValueToClrConverter.GetArgument(args, i, pi.ParameterType, defValue, pi.Name));
                 continue;
             }
+            
             defValue = null;
+            
             if (pi.ParameterType.IsValueType)
             {
                 defValue = Expression.Constant(Activator.CreateInstance(pi.ParameterType));
@@ -117,9 +121,10 @@ internal static class ClrTypeBuilder
             {
                 defValue = Expression.Null;
             }
+
             parameters.Add(JSValueToClrConverter.GetArgument(args, i, pi.ParameterType, defValue, pi.Name));
         }
+
         return parameters;
     }
-
 }

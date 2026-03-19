@@ -1,19 +1,19 @@
-﻿using System.Runtime.CompilerServices;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Storage;
+using System.Runtime.CompilerServices;
 using YantraJS.Core;
 
-namespace YantraJS.Extensions;
+namespace Broiler.JavaScript.Core.Extensions;
 
 internal static class JSPropertyExtensions
 {
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static JSValue GetValue(this JSValue target, in JSProperty p)
     {
         if (p.IsEmpty)
             return JSUndefined.Value;
-        return !p.IsProperty
-            ? p.value
-            : p.get.f(new Arguments(target));
+
+        return !p.IsProperty ? p.value : p.get.f(new Arguments(target));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -22,6 +22,7 @@ internal static class JSPropertyExtensions
         var t = JSBoolean.True;
         var f = JSBoolean.False;
         JSObject obj;
+
         if (px.IsValue)
         {
             obj = JSObject.NewWithProperties()
@@ -29,7 +30,8 @@ internal static class JSPropertyExtensions
                 .AddProperty(KeyStrings.enumerable, px.IsEnumerable ? t : f)
                 .AddProperty(KeyStrings.writable, !px.IsReadOnly ? t : f)
                 .AddProperty(KeyStrings.value, px.value);
-        } else
+        }
+        else
         {
             obj = JSObject.NewWithProperties()
                 .AddProperty(KeyStrings.configurable, px.IsConfigurable ? t : f)
@@ -37,6 +39,7 @@ internal static class JSPropertyExtensions
                 .AddProperty(KeyStrings.@get, px.get)
                 .AddProperty(KeyStrings.@set, px.set);
         }
+
         return obj;
     }
 }

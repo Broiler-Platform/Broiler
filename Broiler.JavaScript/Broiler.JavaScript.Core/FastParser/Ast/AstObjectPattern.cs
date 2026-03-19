@@ -1,9 +1,8 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using YantraJS.Core;
 
-public class AstObjectPattern(
-    FastToken start,
-    FastToken end,
-    IFastEnumerable<ObjectProperty> properties) : AstBindingPattern(start, FastNodeType.ObjectPattern, end)
+namespace Broiler.JavaScript.Core.FastParser.Ast;
+
+public class AstObjectPattern(FastToken start, FastToken end, IFastEnumerable<ObjectProperty> properties) : AstBindingPattern(start, FastNodeType.ObjectPattern, end)
 {
     public readonly IFastEnumerable<ObjectProperty> Properties = properties;
 }

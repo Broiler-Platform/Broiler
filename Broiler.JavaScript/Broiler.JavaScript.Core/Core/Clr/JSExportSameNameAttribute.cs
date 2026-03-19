@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core.Clr;
+﻿namespace Broiler.JavaScript.Core.Core.Clr;
 
 public class JSExportSameNameAttribute : JSExportAttribute
 {

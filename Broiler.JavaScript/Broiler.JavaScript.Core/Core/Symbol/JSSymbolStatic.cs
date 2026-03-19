@@ -1,14 +1,13 @@
-﻿using YantraJS.Core.Clr;
-using YantraJS.Core.Core.Storage;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Storage;
 
 namespace YantraJS.Core;
 
 public partial class JSSymbol
 {
-
     [JSExport("asyncDispose")]
     public static JSSymbol asyncDispose = new("@asyncDispose");
-
 
     [JSExport("dispose")]
     public static JSSymbol dispose = new("@dispose");
@@ -49,12 +48,12 @@ public partial class JSSymbol
     [JSExport("unscopables")]
     public static JSSymbol unscopables = new("Symbol.unscopables");
 
-    private static ConcurrentStringMap<JSSymbol> globals
-        = ConcurrentStringMap<JSSymbol>.Create();
+    private static ConcurrentStringMap<JSSymbol> globals = ConcurrentStringMap<JSSymbol>.Create();
 
     public static JSSymbol GlobalSymbol(string name)
     {
         name = name.TrimStart('@');
+
         var f = typeof(JSSymbol).GetField(name);
         return (JSSymbol)f.GetValue(null);
     }

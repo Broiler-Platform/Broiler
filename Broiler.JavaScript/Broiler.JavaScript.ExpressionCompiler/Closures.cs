@@ -1,12 +1,9 @@
 ﻿using System.Reflection;
+using YantraJS.ClosureSeparator;
 
 namespace YantraJS;
 
-public class Closures(
-    IMethodRepository repository,
-    Box[] boxes,
-    string il,
-    string exp)
+public class Closures(IMethodRepository repository, Box[] boxes, string il, string exp)
 {
     internal static FieldInfo repositoryField = typeof(Closures).GetField(nameof(Repository));
     internal static FieldInfo boxesField = typeof(Closures).GetField(nameof(Boxes));

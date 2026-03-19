@@ -1,22 +1,23 @@
-﻿namespace YantraJS.Core.FastParser.Compiler;
+﻿using Broiler.JavaScript.Core.FastParser.Ast;
+using YantraJS.Core.FastParser;
+
+namespace Broiler.JavaScript.Core.FastParser.Compiler;
 
 internal static class StrictModeExtensions
 {
     public static void VerifyIdentifierForUpdate(this AstIdentifier id)
     {
-        if (id.Name.Equals("arguments") || id.Name.Equals("eval") || id.Name.Equals("this")) {
+        if (id.Name.Equals("arguments") || id.Name.Equals("eval") || id.Name.Equals("this"))
             throw new FastParseException(id.Start, $"Invalid left-hand side expression for update");
-        }
     }
 
     public static void VerifyIdentifierForUpdate(this AstExpression expression)
     {
-        switch(expression.Type)
+        switch (expression.Type)
         {
             case FastNodeType.Identifier:
                 VerifyIdentifierForUpdate(expression as AstIdentifier);
                 return;
         }
     }
-
 }

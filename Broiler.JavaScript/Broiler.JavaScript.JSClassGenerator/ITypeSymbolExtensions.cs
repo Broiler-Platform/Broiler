@@ -1,7 +1,6 @@
-﻿#nullable enable
-using Microsoft.CodeAnalysis;
+﻿using Microsoft.CodeAnalysis;
 
-namespace YantraJS.JSClassGenerator;
+namespace Broiler.JavaScript.JSClassGenerator;
 
 public class JSExportInfo
 {

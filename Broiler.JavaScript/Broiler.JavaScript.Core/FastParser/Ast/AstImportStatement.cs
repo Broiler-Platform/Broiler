@@ -1,12 +1,12 @@
 ﻿#nullable enable
-namespace YantraJS.Core.FastParser;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+using YantraJS.Core;
 
-public class AstImportStatement(
-    FastToken token,
-    AstIdentifier? defaultIdentifier,
-    AstIdentifier? all,
-    IFastEnumerable<(StringSpan, StringSpan)>? members,
-    AstLiteral source,
+namespace Broiler.JavaScript.Core.FastParser.Ast;
+
+public class AstImportStatement(FastToken token, AstIdentifier? defaultIdentifier, AstIdentifier? all, IFastEnumerable<(StringSpan, StringSpan)>? members, AstLiteral source, 
     IFastEnumerable<(StringSpan, AstLiteral)>? attributes = null) : AstStatement(token, FastNodeType.ImportStatement, source.End)
 {
     public readonly AstIdentifier? Default = defaultIdentifier;

@@ -1,8 +1,9 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
-using YantraJS.Core.Clr;
 using YantraJS.Core.Generator;
 
 namespace YantraJS.Core.Typed;
@@ -11,7 +12,6 @@ partial class JSTypedArray
 {
     [JSExport("toString")]
     private new JSValue ToString(in Arguments a) => new JSString(ToString());
-
 
     /// <summary>
     /// Copies the sequence of array elements within the array to the position starting at
@@ -74,8 +74,8 @@ partial class JSTypedArray
     {
 
         var (first, thisArg) = a.Get2();
-        if (!(first is JSFunction fn))
-            throw JSContext.Current.NewTypeError($"First argument is not function");
+        if (first is not JSFunction fn)
+            throw JSContext.NewTypeError($"First argument is not function");
         var en = GetElementEnumerator();
         while (en.MoveNext(out var hasValue, out var item, out var index))
         {
@@ -89,7 +89,7 @@ partial class JSTypedArray
     [JSExport("fill", Length = 1)]
     public JSValue Fill(in Arguments a)
     {
-        
+
         var (value, start, end) = a.Get3();
         // JSArray r = new JSArray();
         var len = Length;
@@ -108,11 +108,10 @@ partial class JSTypedArray
     [JSExport("filter", Length = 1)]
     public JSValue Filter(in Arguments a)
     {
-        
         var (callback, thisArg) = a.Get2();
 
-        if (!(callback is JSFunction fn))
-            throw JSContext.Current.NewTypeError($"{callback} is not a function in Array.prototype.filter");
+        if (callback is not JSFunction fn)
+            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.filter");
         var r = new JSArray();
         var en = GetElementEnumerator();
         while (en.MoveNext(out var hasValue, out var item, out var index))
@@ -131,11 +130,10 @@ partial class JSTypedArray
     [JSExport("find", Length = 1)]
     public JSValue Find(in Arguments a)
     {
-        
         var (callback, thisArg) = a.Get2();
 
-        if (!(callback is JSFunction fn))
-            throw JSContext.Current.NewTypeError($"{callback} is not a function in Array.prototype.filter");
+        if (callback is not JSFunction fn)
+            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.filter");
 
         var en = GetElementEnumerator();
         while (en.MoveNext(out var hasValue, out var item, out var index))
@@ -155,10 +153,10 @@ partial class JSTypedArray
     [JSExport("findIndex", Length = 1)]
     public JSValue FindIndex(in Arguments a)
     {
-        
+
         var (callback, thisArg) = a.Get2();
-        if (!(callback is JSFunction fn))
-            throw JSContext.Current.NewTypeError($"{callback} is not a function in Array.prototype.find");
+        if (callback is not JSFunction fn)
+            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.find");
         var en = GetElementEnumerator();
         while (en.MoveNext(out var hasValue, out var item, out var n))
         {
@@ -179,10 +177,9 @@ partial class JSTypedArray
     [JSExport("forEach", Length = 1)]
     public JSValue ForEach(in Arguments a)
     {
-        
         var (callback, thisArg) = a.Get2();
-        if (!(callback is JSFunction fn))
-            throw JSContext.Current.NewTypeError($"{callback} is not a function in Array.prototype.find");
+        if (callback is not JSFunction fn)
+            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.find");
         var en = GetElementEnumerator();
         while (en.MoveNext(out var hasValue, out var item, out var index))
         {
@@ -199,7 +196,6 @@ partial class JSTypedArray
     [JSExport("includes", Length = 1)]
     public JSValue Includes(in Arguments a)
     {
-        
         var (searchElement, fromIndex) = a.Get2();
         var startIndex = fromIndex.AsInt32OrDefault();
         if (startIndex < 0)
@@ -218,7 +214,7 @@ partial class JSTypedArray
     [JSExport("indexOf", Length = 1)]
     public JSValue IndexOf(in Arguments a)
     {
-        
+
         var (searchElement, fromIndex) = a.Get2();
         var n = Length;
         if (n == 0)
@@ -252,7 +248,7 @@ partial class JSTypedArray
     [JSExport("join", Length = 1)]
     public JSValue Join(in Arguments a)
     {
-        
+
         var first = a.Get1();
         var sep = first.IsUndefined ? "," : first.ToString();
         var sb = new StringBuilder();
@@ -281,7 +277,6 @@ partial class JSTypedArray
     [JSExport("lastIndexOf", Length = 1)]
     public JSValue LastIndexOf(in Arguments a)
     {
-        
         var (element, fromIndex) = a.Get2();
         var n = Length;
         if (n == 0)
@@ -299,7 +294,6 @@ partial class JSTypedArray
             startIndex = n + startIndex;
         }
 
-
         var i = (uint)startIndex;
 
         while (i >= 0)
@@ -314,15 +308,12 @@ partial class JSTypedArray
         return JSNumber.MinusOne;
     }
 
-
-
     [JSExport("map", Length = 1)]
     public JSValue Map(in Arguments a)
     {
-        
         var (callback, thisArg) = a.Get2();
-        if (!(callback is JSFunction fn))
-            throw JSContext.Current.NewTypeError($"{callback} is not a function in Array.prototype.find");
+        if (callback is not JSFunction fn)
+            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.find");
         var r = new JSArray();
         ref var rElements = ref r.CreateElements();
         var en = GetElementEnumerator();
@@ -342,16 +333,15 @@ partial class JSTypedArray
     [JSExport("reduce", Length = 1)]
     public JSValue Reduce(in Arguments a)
     {
-        
         var (callback, initialValue) = a.Get2();
-        if (!(callback is JSFunction fn))
-            throw JSContext.Current.NewTypeError($"{callback} is not a function in Array.prototype.reduce");
+        if (callback is not JSFunction fn)
+            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.reduce");
         var en = GetElementEnumerator();
         uint index = 0;
         if (a.Length == 1)
         {
             if (!en.MoveNext(out initialValue))
-                throw JSContext.Current.NewTypeError($"No initial value provided and array is empty");
+                throw JSContext.NewTypeError($"No initial value provided and array is empty");
         }
         while (en.MoveNext(out var hasValue, out var item, out index))
         {
@@ -363,20 +353,19 @@ partial class JSTypedArray
         return initialValue;
     }
 
-
     [JSExport("reduceRight", Length = 1)]
     public JSValue ReduceRight(in Arguments a)
     {
         var r = new JSArray();
-        
+
         var (callback, initialValue) = a.Get2();
-        if (!(callback is JSFunction fn))
-            throw JSContext.Current.NewTypeError($"{callback} is not a function in Array.prototype.reduce");
+        if (callback is not JSFunction fn)
+            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.reduce");
         var start = Length - 1;
         if (a.Length == 1)
         {
             if (Length == 0)
-                throw JSContext.Current.NewTypeError($"No initial value provided and array is empty");
+                throw JSContext.NewTypeError($"No initial value provided and array is empty");
             initialValue = this[(uint)start];
             start--;
         }
@@ -389,12 +378,9 @@ partial class JSTypedArray
         return initialValue;
     }
 
-
     [JSExport("reverse", Length = 0)]
     public JSValue Reverse(in Arguments a)
     {
-        
-
         var src = buffer.buffer;
         var temp = new byte[src.Length];
         Array.Copy(src, temp, src.Length);
@@ -415,7 +401,6 @@ partial class JSTypedArray
     [JSExport("set", Length = 1)]
     public JSValue Set(in Arguments a)
     {
-        
         var (source, offset) = a.Get2();
         int length = Length;
         if (length == 0)
@@ -425,10 +410,10 @@ partial class JSTypedArray
 
         var relativeStart = offset.AsInt32OrDefault();
         if (relativeStart < 0)
-            throw JSContext.Current.NewRangeError("Offset is out of bounds");
+            throw JSContext.NewRangeError("Offset is out of bounds");
         var targetArrayLength = source.Length + relativeStart;
         if (targetArrayLength > length)
-            throw JSContext.Current.NewRangeError("Offset is out of bounds");
+            throw JSContext.NewRangeError("Offset is out of bounds");
         if (source is JSTypedArray typedArray)
         {
             var src = typedArray.buffer.buffer;
@@ -480,15 +465,13 @@ partial class JSTypedArray
         var end = a.TryGetAt(1, out var a2) ? a2.IntValue : int.MaxValue;
 
         int newLength;
-        
 
         begin = begin < 0 ? Math.Max(Length + begin, 0) : Math.Min(begin, Length);
         end = end < 0 ? Math.Max(Length + end, 0) : Math.Min(end, Length);
         newLength = Math.Max(end - begin, 0);
 
-
         var src = buffer.buffer;
-        
+
         var r = a.This[KeyStrings.constructor].CreateInstance(new JSNumber(newLength)) as JSTypedArray;
         var target = r.buffer.buffer;
         int bytesPerElement = this.bytesPerElement;
@@ -499,7 +482,6 @@ partial class JSTypedArray
             Array.Copy(src, byteOffset + (i * bytesPerElement), target, y * bytesPerElement, bytesPerElement);
         }
 
-
         return r;
 
     }
@@ -508,8 +490,8 @@ partial class JSTypedArray
     public JSValue Some(in Arguments a)
     {
         var (callback, thisArg) = a.Get2();
-        if (!(callback is JSFunction fn))
-            throw JSContext.Current.NewTypeError($"First argument is not function");
+        if (callback is not JSFunction fn)
+            throw JSContext.NewTypeError($"First argument is not function");
         var en = GetElementEnumerator();
         while (en.MoveNext(out var hasValue, out var item, out var index))
         {
@@ -522,16 +504,16 @@ partial class JSTypedArray
         return JSBoolean.False;
     }
 
-
     [JSExport("sort", Length = 1)]
     public JSValue Sort(in Arguments a)
     {
         var fx = a.Get1();
-        
+
         Comparison<JSValue> cx = null;
         if (fx is JSFunction fn)
         {
-            cx = (l, r) => {
+            cx = (l, r) =>
+            {
                 var arg = new Arguments(this, l, r);
                 return (int)fn.f(arg).DoubleValue;
             };
@@ -539,7 +521,7 @@ partial class JSTypedArray
         else
         {
             if (!fx.IsUndefined)
-                throw JSContext.Current.NewTypeError($"Argument is not a function");
+                throw JSContext.NewTypeError($"Argument is not a function");
             cx = (l, r) =>
             {
                 var x = l.DoubleValue;
@@ -559,9 +541,6 @@ partial class JSTypedArray
                 if (JSNumber.IsPositiveZero(x) && JSNumber.IsNegativeZero(y))
                     return 1;
                 return 0;
-
-
-
             };
         }
 
@@ -580,8 +559,6 @@ partial class JSTypedArray
         return new JSArray(list);
     }
 
-
-
     [JSExport("subarray", Length = 2)]
     public JSValue SubArray(in Arguments a)
     {
@@ -589,18 +566,12 @@ partial class JSTypedArray
         var end = a.TryGetAt(1, out var a2) ? a2.IntValue : int.MaxValue;
 
         int newLength;
-        
 
         begin = begin < 0 ? Math.Max(Length + begin, 0) : Math.Min(begin, Length);
         end = end < 0 ? Math.Max(Length + end, 0) : Math.Min(end, Length);
         newLength = Math.Max(end - begin, 0);
-        var r = a.This[KeyStrings.constructor].CreateInstance(buffer, new JSNumber(byteOffset + begin * bytesPerElement),
-            new JSNumber(newLength * bytesPerElement));
-        //var r = new TypedArray(this.buffer,
-        //    this.type,
-        //    this.byteOffset + begin * this.bytesPerElement,
-        //    newLength * this.bytesPerElement,
-        //    this.prototypeChain.@object);
+        var r = a.This[KeyStrings.constructor].CreateInstance(buffer, new JSNumber(byteOffset + begin * bytesPerElement), new JSNumber(newLength * bytesPerElement));
+
         return r;
 
     }
@@ -608,11 +579,9 @@ partial class JSTypedArray
     [JSExport("values", Length = 2)]
     public new JSValue Values(in Arguments a) => new JSGenerator(GetElementEnumerator(), "Array Iterator");
 
-
     [JSExport("toLocaleString", Length = 0)]
     internal JSValue ToLocaleString(in Arguments a)
     {
-        
         var (locale, format) = a.Get2();
         StringBuilder sb = new();
 
@@ -626,7 +595,7 @@ partial class JSTypedArray
         }
 
         string strFormat = format.IsNullOrUndefined ? def : (format.IsString ? format.ToString() :
-            throw JSContext.Current.NewTypeError("Options not supported, use .Net String Formats")
+            throw JSContext.NewTypeError("Options not supported, use .Net String Formats")
             );
 
         CultureInfo culture = locale.IsNullOrUndefined ? CultureInfo.CurrentCulture : CultureInfo.GetCultureInfo(locale.ToString());
@@ -645,9 +614,7 @@ partial class JSTypedArray
             first = false;
             sb.Append(n.ToLocaleString(strFormat, culture));
         }
+
         return new JSString(sb.ToString());
-
-
     }
-
 }

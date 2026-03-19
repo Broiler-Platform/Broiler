@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Reflection;
 using System.Linq;
+using Broiler.JavaScript.Core.Core.Clr;
+using YantraJS.Core;
 
-namespace YantraJS.Core.Clr;
+namespace Broiler.JavaScript.Core.Core.Function;
 
 internal class JSMethodGroup
 {
@@ -15,32 +17,30 @@ internal class JSMethodGroup
 
     public JSMethodGroup(ClrMemberNamingConvention namingConvention, Type type, IGrouping<string, MethodInfo> methods)
     {
-        Methods = methods.ToList();
+        Methods = [.. methods];
         JSMethod = Methods.FirstOrDefault(x => x.IsJSFunctionDelegate());
 
-        var (n,e) = ClrTypeExtensions.GetJSName(namingConvention, JSMethod ?? Methods
-            .OrderByDescending(x => x.GetCustomAttribute<JSExportAttribute>())
-            .First());
+        var (n, e) = ClrTypeExtensions.GetJSName(namingConvention, JSMethod ?? Methods.OrderByDescending(x => x.GetCustomAttribute<JSExportAttribute>()).First());
 
         name = n;
-
         all = new (MethodInfo method, ParameterInfo[] parameters)[Methods.Count];
+
         for (int i = 0; i < all.Length; i++)
         {
             var m = Methods[i];
             all[i] = (m, m.GetParameters());
         }
+
         this.type = type;
     }
 
-    internal JSValue Generate(bool isStatic) => isStatic
-                ? new JSFunction(StaticInvoke, name)
-                : new JSFunction(Invoke, name);
+    internal JSValue Generate(bool isStatic) => isStatic ? new JSFunction(StaticInvoke, name) : new JSFunction(Invoke, name);
 
     private JSValue Invoke(in Arguments a)
     {
         if (!a.This.ConvertTo(type, out var target))
-            throw JSContext.Current.NewTypeError($"{type.Name}.prototype.{name} called with object not of type {type.Name}");
+            throw JSContext.NewTypeError($"{type.Name}.prototype.{name} called with object not of type {type.Name}");
+
         try
         {
             var (method, args) = all.Match(a, name);
@@ -64,5 +64,4 @@ internal class JSMethodGroup
             throw JSException.From(ex);
         }
     }
-
 }

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Reflection.Emit;
+using YantraJS.Core;
 using YantraJS.Expressions;
 
 namespace YantraJS.Generator;
@@ -8,7 +9,7 @@ namespace YantraJS.Generator;
 public class VariableInfo(ILGenerator il)
 {
     private Dictionary<YParameterExpression, Variable> variables 
-        = new(ReferenceEqualityComparer.Instance);
+        = new(Core.ReferenceEqualityComparer.Instance);
 
     public Variable this[YParameterExpression exp]
     {

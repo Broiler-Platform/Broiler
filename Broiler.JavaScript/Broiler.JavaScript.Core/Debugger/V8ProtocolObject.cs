@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core.Debugger;
+﻿namespace Broiler.JavaScript.Core.Debugger;
 
 
 public class V8ProtocolObject(V8InspectorProtocol inspectorContext)

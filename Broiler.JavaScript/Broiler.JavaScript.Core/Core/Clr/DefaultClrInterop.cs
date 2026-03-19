@@ -1,6 +1,6 @@
 using System;
 
-namespace YantraJS.Core.Clr;
+namespace Broiler.JavaScript.Core.Core.Clr;
 
 /// <summary>
 /// Default <see cref="IClrInterop"/> implementation that delegates to the

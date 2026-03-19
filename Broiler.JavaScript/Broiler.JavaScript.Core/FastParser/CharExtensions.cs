@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 
-namespace YantraJS.Core.FastParser;
+namespace Broiler.JavaScript.Core.FastParser;
 
 internal static class CharExtensions
 {
@@ -17,9 +17,7 @@ internal static class CharExtensions
             if (ch >= 'a')
             {
                 if (ch <= 'h')
-                {
                     return ch - 'a' + 10;
-                }
             }
             else if (ch <= 'H')
             {
@@ -35,8 +33,7 @@ internal static class CharExtensions
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static bool IsDigitPart(
-        this char ch, bool hex, bool binary)
+    internal static bool IsDigitPart(this char ch, bool hex, bool binary)
     {
         switch (ch)
         {
@@ -53,9 +50,8 @@ internal static class CharExtensions
             case '8':
             case '9':
                 if (binary)
-                {
                     return false;
-                }
+
                 return true;
             case 'a':
             case 'b':
@@ -78,36 +74,20 @@ internal static class CharExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool IsIdentifierStart(this char ch)
     {
-        switch (ch)
+        return ch switch
         {
-            case '_':
-            case '$':
-            case '@':
-                return true;
-        }
-        return char.IsLetter(ch);
+            '_' or '$' or '@' => true,
+            _ => char.IsLetter(ch),
+        };
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool IsIdentifierPart(this char ch)
     {
-        switch (ch)
+        return ch switch
         {
-            case '_':
-            case '$':
-            case '@':
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
-                return true;
-        }
-        return char.IsLetter(ch);
+            '_' or '$' or '@' or '0' or '1' or '2' or '3' or '4' or '5' or '6' or '7' or '8' or '9' => true,
+            _ => char.IsLetter(ch),
+        };
     }
 }

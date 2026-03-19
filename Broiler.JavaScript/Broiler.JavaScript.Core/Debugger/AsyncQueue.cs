@@ -1,10 +1,11 @@
 ﻿#nullable enable
+using Broiler.JavaScript.Core;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace YantraJS.Core.Debugger;
+namespace Broiler.JavaScript.Core.Debugger;
 
 public class AsyncQueue<T>: IDisposable
 {
@@ -27,13 +28,11 @@ public class AsyncQueue<T>: IDisposable
         while (!disposed.IsCancellationRequested)
         {
             while (queue.TryDequeue(out var item))
-            {
                 yield return item;
-            }
+
             CancellationTokenSource c;
             c = wait = new CancellationTokenSource();
             await DelayTask.For(15000, c.Token);
         }
     }
-
 }

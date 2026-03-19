@@ -1,43 +1,15 @@
-﻿using YantraJS.Core;
-using Expression = YantraJS.Expressions.YExpression;
+﻿using Expression = YantraJS.Expressions.YExpression;
 using YantraJS.Expressions;
-using YantraJS.Core.Types;
-using YantraJS.Core.LambdaGen;
+using Broiler.JavaScript.Core.Core.Class;
+using Broiler.JavaScript.Core.LambdaGen;
 
-namespace YantraJS.ExpHelper;
+namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public static class JSClassBuilder
 {
-    //static Type type = typeof(JSClass);
+    public static YElementInit AddConstructor(Expression exp) => Expression.ElementInit(Broiler.JavaScript.Core.TypeQuery.TypeQuery.QueryInstanceMethod<JSClass>(() => (x) => x.AddConstructor(null)), exp);
 
-    //private static ConstructorInfo _New =
-    //    type.Constructor(new Type[] {
-    //        typeof(JSFunctionDelegate), typeof(JSFunction), typeof(string), typeof(string)  });
-
-    //public static MethodInfo _AddConstructor =
-    //    type.PublicMethod(nameof(JSClass.AddConstructor), typeof(JSFunction));
-
-    public static YElementInit AddConstructor(Expression exp) =>
-        // return YExpression.ElementInit(_AddConstructor, exp);
-        Expression.ElementInit(TypeQuery.QueryInstanceMethod<JSClass>(() =>
-            (x) => x.AddConstructor(null))
-            , exp
-        );
-
-
-    public static YNewExpression New(
-        Expression constructor,
-        Expression super,
-        string name,
-        string code = "") => NewLambdaExpression.NewExpression<JSClass>(
-            () => () => new JSClass(
-                null,
-                null,
-                null,
-                null),
-            constructor ?? Expression.Null,
-            super ?? Expression.Null,
-            Expression.Constant(name),
-            Expression.Constant(code)
-        );//return Expression.New(_New,//    constructor ?? Expression.Null,//    super ?? Expression.Null,//    Expression.Constant(name),//    Expression.Constant(code));
+    public static YNewExpression New(Expression constructor, Expression super, string name, string code = "") =>
+        NewLambdaExpression.NewExpression<JSClass>(() => () => new JSClass(null, null, null, null),
+            constructor ?? Expression.Null, super ?? Expression.Null, Expression.Constant(name), Expression.Constant(code));
 }

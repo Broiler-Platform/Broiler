@@ -1,32 +1,28 @@
-﻿using System.Collections.Generic;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Storage;
+using System.Collections.Generic;
 using Yantra.Core;
-using YantraJS.Core.Clr;
-using YantraJS.Core.Core.Storage;
 
 namespace YantraJS.Core;
 
-// [JSRuntime(typeof(JSMapStatic), typeof(JSMap.JSMapPrototype))]
 [JSClassGenerator("Map")]
-public partial class JSMap: JSObject
+public partial class JSMap : JSObject
 {
-
-    private LinkedList<(JSValue key,JSValue value)> store = new();
-    private StringMap<LinkedListNode<(JSValue key,JSValue value)>> index
-        = new();
+    private readonly LinkedList<(JSValue key, JSValue value)> store = new();
+    private StringMap<LinkedListNode<(JSValue key, JSValue value)>> index = new();
 
     [JSExport]
     public int Size => store.Count;
 
-    public JSMap(in Arguments a): base(JSContext.NewTargetPrototype)
+    public JSMap(in Arguments a) : base(JSContext.NewTargetPrototype)
     {
-        if (a[0] is JSArray array)
-        {
-            var en = array.GetElementEnumerator();
-            while (en.MoveNext(out var item))
-            {
-                Set(item[0], item[1]);
-            }
-        }
+        if (a[0] is not JSArray array)
+            return;
+
+        var en = array.GetElementEnumerator();
+        while (en.MoveNext(out var item))
+            Set(item[0], item[1]);
     }
 
     [JSExport("groupBy")]
@@ -34,18 +30,23 @@ public partial class JSMap: JSObject
     {
         var (items, callbackfn) = a.Get2();
         if (items.IsNullOrUndefined)
-            throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+
         if (!callbackfn.IsFunction)
-            throw JSContext.Current.NewTypeError("CallbackFn must be a function");
+            throw JSContext.NewTypeError("CallbackFn must be a function");
+
         var result = new JSMap(Arguments.Empty);
         var en = items.GetElementEnumerator();
         int index = 0;
+
         while (en.MoveNext(out var hasValue, out var item, out var _))
         {
             if (!hasValue)
                 continue;
+
             var key = callbackfn.Call(JSUndefined.Value, item, new JSNumber(index));
             var existing = result.Get(key);
+
             if (existing.IsNullOrUndefined)
             {
                 var arr = new JSArray();
@@ -56,8 +57,10 @@ public partial class JSMap: JSObject
             {
                 (existing as JSArray)?.Add(item);
             }
+
             index++;
         }
+
         return result;
     }
 
@@ -65,14 +68,17 @@ public partial class JSMap: JSObject
     public JSValue Set(JSValue key, JSValue value)
     {
         HashedString uk = key.ToUniqueID();
+
         if (index.TryGetValue(in uk, out var i))
         {
             i.Value = (key, value);
-        } else
+        }
+        else
         {
             var node = store.AddLast((key, value));
             index.Put(in uk) = node;
         }
+
         return value;
     }
 
@@ -81,6 +87,7 @@ public partial class JSMap: JSObject
     {
         index = new();
         store.Clear();
+
         return JSUndefined.Value;
     }
 
@@ -89,11 +96,13 @@ public partial class JSMap: JSObject
     {
         var f = a[0];
         HashedString uk = f.ToUniqueID();
+
         if (index.TryGetValue(in uk, out var i))
         {
             store.Remove(i);
             return JSBoolean.True;
         }
+
         return JSBoolean.False;
     }
 
@@ -101,13 +110,10 @@ public partial class JSMap: JSObject
     public IEnumerable<JSValue> GetEntries()
     {
         if (store == null)
-        {
             yield break;
-        }
-        foreach (var entry in store)
-        {
-            yield return new JSArray(entry.key, entry.value);
-        }
+
+        foreach (var (key, value) in store)
+            yield return new JSArray(key, value);
     }
 
     [JSExport("forEach")]
@@ -115,16 +121,15 @@ public partial class JSMap: JSObject
     {
         var fx = a.Get1();
         if (!fx.IsFunction)
-            throw JSContext.Current.NewTypeError($"Function parameter expected");
+            throw JSContext.NewTypeError($"Function parameter expected");
+
         var @this = a.This ?? this;
         if (store == null)
-        {
             return JSUndefined.Value;
-        }
+        
         foreach (var e in store)
-        {
             fx.Call(@this, e.key, e.value, this);
-        }
+        
         return JSUndefined.Value;
     }
 
@@ -134,9 +139,8 @@ public partial class JSMap: JSObject
         var f = a.Get1();
         HashedString uk = f.ToUniqueID();
         if (index.TryGetValue(in uk, out var i))
-        {
             return JSBoolean.True;
-        }
+
         return JSBoolean.False;
     }
 
@@ -146,9 +150,8 @@ public partial class JSMap: JSObject
     {
         HashedString uk = key.ToUniqueID();
         if (index.TryGetValue(in uk, out var i))
-        {
             return i.Value.value;
-        }
+
         return JSUndefined.Value;
     }
 
@@ -156,13 +159,10 @@ public partial class JSMap: JSObject
     public IEnumerable<JSValue> Keys()
     {
         if (store == null)
-        {
             yield break;
-        }
-        foreach (var entry in store)
-        {
-            yield return entry.key;
-        }
+
+        foreach (var (key, _) in store)
+            yield return key;
     }
 
 
@@ -170,13 +170,10 @@ public partial class JSMap: JSObject
     public IEnumerable<JSValue> Values()
     {
         if (store == null)
-        {
             yield break;
-        }
-        foreach (var entry in store)
-        {
-            yield return entry.value;
-        }
+
+        foreach (var (_, value) in store)
+            yield return value;
     }
 
     /// <summary>
@@ -189,12 +186,13 @@ public partial class JSMap: JSObject
     {
         var (key, defaultValue) = a.Get2();
         HashedString uk = key.ToUniqueID();
+
         if (index.TryGetValue(in uk, out var i))
-        {
             return i.Value.value;
-        }
+
         var node = store.AddLast((key, defaultValue));
         index.Put(in uk) = node;
+
         return defaultValue;
     }
 
@@ -208,17 +206,16 @@ public partial class JSMap: JSObject
     {
         var (key, callbackfn) = a.Get2();
         if (!callbackfn.IsFunction)
-            throw JSContext.Current.NewTypeError("getOrInsertComputed requires a callback function");
+            throw JSContext.NewTypeError("getOrInsertComputed requires a callback function");
+        
         HashedString uk = key.ToUniqueID();
         if (index.TryGetValue(in uk, out var i))
-        {
             return i.Value.value;
-        }
+
         var value = callbackfn.Call(JSUndefined.Value, key);
         var node = store.AddLast((key, value));
         index.Put(in uk) = node;
+
         return value;
     }
-
-
 }

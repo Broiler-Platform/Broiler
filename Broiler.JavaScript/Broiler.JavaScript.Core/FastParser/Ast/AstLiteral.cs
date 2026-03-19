@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstLiteral(TokenTypes tokenType, FastToken token) : AstExpression(token, FastNodeType.Literal, token)
 {

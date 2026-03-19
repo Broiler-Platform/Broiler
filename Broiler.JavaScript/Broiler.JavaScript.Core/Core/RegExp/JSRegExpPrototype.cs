@@ -1,22 +1,16 @@
-﻿using System.Runtime.CompilerServices;
-using YantraJS.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using System.Runtime.CompilerServices;
 
 namespace YantraJS.Core;
 
 public partial class JSRegExp
 {
-
     [JSExport]
     public int LastIndex
     {
-        get
-        {
-            return lastIndex;
-        }
-        set
-        {
-            lastIndex = value;
-        }
+        get => lastIndex; set => lastIndex = value;
     }
 
     [JSExport("test")]
@@ -24,14 +18,15 @@ public partial class JSRegExp
     {
         var text = a.Get1().ToString();
         var match = value.Match(text, CalculateStartPosition(text));
+
         if (match.Success)
         {
             if (globalSearch)
-            {
                 lastIndex = match.Index + match.Length;
-            }
+
             return JSBoolean.True;
         }
+
         return JSBoolean.False;
     }
 
@@ -48,27 +43,30 @@ public partial class JSRegExp
             // Reset the lastIndex property.
             if (globalSearch == true)
                 lastIndex = 0;
+
             return JSNull.Value;
         }
 
         if (globalSearch)
-        {
             lastIndex = match.Index + match.Length;
-        }
+
         var groups = match.Groups;
         var c = groups.Count;
         JSArray result = new((uint)c);
+
         for (int i = 0; i < c; i++)
         {
             var group = groups[i];
             if (group.Captures.Count == 0)
             {
                 result[(uint)i] = JSUndefined.Value;
-            } else
+            } 
+            else
             {
                 result[(uint)i] = new JSString(group.Value);
             }
         }
+
         result[KeyStrings.index] = new JSNumber(match.Index);
         result[KeyStrings.input] = a.Get1();
 
@@ -78,6 +76,7 @@ public partial class JSRegExp
         {
             var namedGroups = new JSObject();
             bool hasNamedGroups = false;
+            
             for (int i = 0; i < groupNames.Length; i++)
             {
                 var name = groupNames[i];
@@ -91,10 +90,9 @@ public partial class JSRegExp
                         : JSUndefined.Value;
                 }
             }
+            
             if (hasNamedGroups)
-            {
                 result[KeyStrings.GetOrCreate("groups")] = namedGroups;
-            }
         }
 
         return result;
@@ -110,9 +108,10 @@ public partial class JSRegExp
     {
         if (globalSearch == false)
             return 0;
+
         var maxIndex = lastIndex > 0 ? lastIndex : 0;
         var minIndex = maxIndex < input.Length ? maxIndex : input.Length;
-        // return Math.Min(Math.Max(r.lastIndex, 0), input.Length);
+
         return minIndex;
     }
 }

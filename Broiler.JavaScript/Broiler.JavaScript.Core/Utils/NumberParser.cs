@@ -1,9 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Numerics;
-using YantraJS.Core;
 
-namespace YantraJS.Utils;
+namespace Broiler.JavaScript.Core.Utils;
 
 /// <summary>
 /// Parses strings into numbers.
@@ -32,6 +31,7 @@ internal static class NumberParser
                 negative = true;
                 firstChar = reader.Read();
                 break;
+
             case '+':
                 firstChar = reader.Read();
                 break;
@@ -62,6 +62,7 @@ internal static class NumberParser
             value = 0;
             return false;
         }
+
         char ch = input[0];
         if (ch == '0')
         {
@@ -70,6 +71,7 @@ internal static class NumberParser
                 value = 0;
                 return true;
             }
+        
             var next = input[1];
             if (char.IsDigit(next))
             {
@@ -77,17 +79,20 @@ internal static class NumberParser
                 return false;
             }
         }
+
         var d = CoerceToNumber(in input);
         if (d == 0 && input.Trim().Length == 0)
         {
             value = 0;
             return false;
         }
+        
         if (d < uint.MaxValue && (d % 1 ) ==0)
         {
             value = (uint)d;
             return true;
         }
+        
         value = 0;
         return false;
     }
@@ -118,6 +123,7 @@ internal static class NumberParser
                 negative = true;
                 firstChar = reader.Read();
                 break;
+
             case '+':
                 firstChar = reader.Read();
                 break;
@@ -133,6 +139,7 @@ internal static class NumberParser
                 for (int i = 7; i < restOfString1.Length; i++)
                     if (IsWhiteSpaceOrLineTerminator(restOfString1[i]) == false)
                         return double.NaN;
+                
                 return negative ? double.NegativeInfinity : double.PositiveInfinity;
             }
         }
@@ -230,6 +237,7 @@ internal static class NumberParser
                     status = ParseCoreStatus.InvalidOctalLiteral;
                     return double.NaN;
                 }
+
                 status = ParseCoreStatus.ES6OctalLiteral;
                 return result;
             }
@@ -239,11 +247,13 @@ internal static class NumberParser
                 reader.Read();
 
                 result = ParseBinary(reader);
+                
                 if (double.IsNaN(result) == true)
                 {
                     status = ParseCoreStatus.InvalidBinaryLiteral;
                     return double.NaN;
                 }
+                
                 status = ParseCoreStatus.BinaryLiteral;
                 return result;
             }
@@ -277,11 +287,13 @@ internal static class NumberParser
         {
             desired1 = firstChar - '0';
             totalDigits = 1;
+
             while (true)
             {
                 int c = reader.Peek();
                 if (c < '0' || c > '9')
                     break;
+
                 reader.Read();
 
                 if (totalDigits < 9)
@@ -290,6 +302,7 @@ internal static class NumberParser
                     desired2 = desired2 * 10 + (c - '0');
                 else
                     desired3 = BigInteger.Add( BigInteger.Multiply(desired3, 10), c - '0');
+                
                 totalDigits++;
             }
         }
@@ -307,6 +320,7 @@ internal static class NumberParser
                 int c = reader.Peek();
                 if (c < '0' || c > '9')
                     break;
+                
                 reader.Read();
 
                 if (totalDigits < 9)
@@ -315,8 +329,10 @@ internal static class NumberParser
                     desired2 = desired2 * 10 + (c - '0');
                 else
                     desired3 = BigInteger.Add(BigInteger.Multiply(desired3, 10), c - '0');
+                
                 totalDigits++;
                 fractionalDigits++;
+                
                 exponentBase10--;
             }
 
@@ -394,11 +410,13 @@ internal static class NumberParser
             // final result.
             var temp = desired3;
             desired3 = new BigInteger((long)desired1 * integerPowersOfTen[Math.Min(totalDigits - 9, 9)] + desired2);
+            
             if (totalDigits > 18)
             {
                 desired3 = BigInteger.Multiply(desired3, BigInteger.Pow(10, totalDigits - 18));
                 desired3 = BigInteger.Add(desired3, temp);
             }
+
             result = (double)desired3;
         }
 
@@ -491,23 +509,32 @@ internal static class NumberParser
         // Read numeric digits 0-9, a-z or A-Z.
         double result = 0;
         var bigResult = BigInteger.Zero;
+        
         while (true)
         {
             int numericValue = -1;
             int c = reader.Read();
+        
             if (c >= '0' && c <= '9')
                 numericValue = c - '0';
+            
             if (c >= 'a' && c <= 'z')
                 numericValue = c - 'a' + 10;
+            
             if (c >= 'A' && c <= 'Z')
                 numericValue = c - 'A' + 10;
+            
             if (numericValue == -1 || numericValue >= radix)
                 break;
+            
             if (digitCount == maxDigits)
                 bigResult = new BigInteger(result);
+            
             result = result * radix + numericValue;
+            
             if (digitCount >= maxDigits)
                 bigResult = BigInteger.Add( BigInteger.Multiply( bigResult, radix), numericValue);
+            
             digitCount++;
         }
 
@@ -545,11 +572,14 @@ internal static class NumberParser
                 result = result * 16 + c - 'A' + 10;
             else
                 break;
+
             digitsRead++;
             reader.Read();
         }
+        
         if (digitsRead == 0)
             return double.NaN;
+        
         return result;
     }
 
@@ -572,8 +602,10 @@ internal static class NumberParser
                 return double.NaN;
             else
                 break;
+            
             reader.Read();
         }
+        
         return result;
     }
 
@@ -598,8 +630,10 @@ internal static class NumberParser
                 return double.NaN;
             else
                 break;
+            
             reader.Read();
         }
+        
         return result;
     }
 

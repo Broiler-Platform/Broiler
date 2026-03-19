@@ -1,3 +1,5 @@
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Enumerators;
 using System;
 using System.Globalization;
 
@@ -5,10 +7,7 @@ namespace YantraJS.Core;
 
 public sealed class JSUndefined : JSValue
 {
-    private JSUndefined():base(null)
-    {
-
-    }
+    private JSUndefined() : base(null) { }
 
     public static JSValue Value = new JSUndefined();
 
@@ -25,13 +24,11 @@ public sealed class JSUndefined : JSValue
     public override int IntegerValue => 0;
 
     public override int IntValue => 0;
-    //public override bool IsUndefined => true;
-
-    //internal override bool IsNullOrUndefined => true;
 
     public override string ToString() => "undefined";
 
-    public override JSValue this[KeyString name] {
+    public override JSValue this[KeyString name]
+    {
         get
         {
 #if DEBUG
@@ -39,32 +36,32 @@ public sealed class JSUndefined : JSValue
             Console.Error.WriteLine($"[JSUndefined] Cannot get property {name} of undefined");
             Console.Error.WriteLine(st.ToString());
 #endif
-            throw JSContext.Current.NewTypeError($"Cannot get property {name} of undefined");
+            throw JSContext.NewTypeError($"Cannot get property {name} of undefined");
         }
-        set => throw JSContext.Current.NewTypeError($"Cannot set property {name} of undefined");
+        set => throw JSContext.NewTypeError($"Cannot set property {name} of undefined");
     }
 
     public override JSValue this[uint key]
     {
-        get => throw JSContext.Current.NewTypeError($"Cannot get property {key} of undefined");
-        set => throw JSContext.Current.NewTypeError($"Cannot set property {key} of undefined");
+        get => throw JSContext.NewTypeError($"Cannot get property {key} of undefined");
+        set => throw JSContext.NewTypeError($"Cannot set property {key} of undefined");
     }
 
-    internal override JSFunctionDelegate GetMethod(in KeyString key) => throw JSContext.Current.NewTypeError($"Cannot get property {key} of undefined");
+    internal override JSFunctionDelegate GetMethod(in KeyString key) => throw JSContext.NewTypeError($"Cannot get property {key} of undefined");
 
-    public override JSValue Delete(in KeyString key) => throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+    public override JSValue Delete(in KeyString key) => throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
 
-    public override JSValue Delete(uint key) => throw JSContext.Current.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+    public override JSValue Delete(uint key) => throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
 
     public override bool Equals(JSValue value) => value.IsNullOrUndefined;//if (value.IsUndefined)//    return true;//return false;
 
     public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
-    public override JSValue CreateInstance(in Arguments a) => throw JSContext.Current.NewTypeError("cannot create instance of undefined");
+    public override JSValue CreateInstance(in Arguments a) => throw JSContext.NewTypeError("cannot create instance of undefined");
 
-    public override JSValue InvokeFunction(in Arguments a) => throw JSContext.Current.NewTypeError("undefined is not a function", null);
+    public override JSValue InvokeFunction(in Arguments a) => throw JSContext.NewTypeError("undefined is not a function", null);
 
-    public override IElementEnumerator GetElementEnumerator() => throw JSContext.Current.NewTypeError("undefined is not iterable");
+    public override IElementEnumerator GetElementEnumerator() => throw JSContext.NewTypeError("undefined is not iterable");
 
     public override bool ConvertTo(Type type, out object value)
     {
@@ -73,6 +70,7 @@ public sealed class JSUndefined : JSValue
             value = this;
             return true;
         }
+
         value = null;
         return !type.IsValueType;
     }

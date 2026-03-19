@@ -1,4 +1,7 @@
-﻿namespace YantraJS.Core.Core.Generator;
+﻿using Broiler.JavaScript.Core.Enumerators;
+using YantraJS.Core;
+
+namespace Broiler.JavaScript.Core.Core.Generator;
 
 public struct JSIterator(JSValue iterator) : IElementEnumerator
 {
@@ -9,12 +12,14 @@ public struct JSIterator(JSValue iterator) : IElementEnumerator
         value = iterator.InvokeMethod(KeyStrings.next);
         var done = value[KeyStrings.done];
         value = value[KeyStrings.value];
+        
         if (done.BooleanValue)
         {
             index = 0;
             hasValue = false;
             return false;
         }
+        
         index = this.index++;
         hasValue = true;
         return true;
@@ -25,10 +30,10 @@ public struct JSIterator(JSValue iterator) : IElementEnumerator
         value = iterator.InvokeMethod(KeyStrings.next);
         var done = value[KeyStrings.done];
         value = value[KeyStrings.value];
+        
         if (done.BooleanValue)
-        {
             return false;
-        }
+
         return true;
     }
 
@@ -36,11 +41,13 @@ public struct JSIterator(JSValue iterator) : IElementEnumerator
     {
         value = iterator.InvokeMethod(KeyStrings.next);
         var done = value[KeyStrings.done];
+
         if (done.BooleanValue)
         {
             value = @default;
             return false;
         }
+
         value = value[KeyStrings.value];
         return true;
     }
@@ -49,11 +56,10 @@ public struct JSIterator(JSValue iterator) : IElementEnumerator
     {
         var value = iterator.InvokeMethod(KeyStrings.next);
         var done = value[KeyStrings.done];
+
         if (done.BooleanValue)
-        {
             return @default;
-        }
+
         return value[KeyStrings.value];
     }
-
 }

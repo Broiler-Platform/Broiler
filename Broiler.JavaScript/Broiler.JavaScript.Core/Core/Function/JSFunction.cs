@@ -1,13 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using YantraJS.Core.Clr;
-using YantraJS.ExpHelper;
-using YantraJS.LinqExpressions;
 using YantraJS.Runtime;
 using Expression = YantraJS.Expressions.YExpression;
 using ParameterExpression = YantraJS.Expressions.YParameterExpression;
 using Yantra.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.Core.Utils;
+using Broiler.JavaScript.Core;
 
 namespace YantraJS.Core;
 
@@ -16,7 +19,6 @@ namespace YantraJS.Core;
 [JSFunctionGenerator("Function", Register = false)]
 public partial class JSFunction : JSObject
 {
-
     internal static JSFunctionDelegate empty = (in Arguments a) => a.This;
 
     [EditorBrowsable(EditorBrowsableState.Never)]
@@ -29,7 +31,7 @@ public partial class JSFunction : JSObject
     public readonly StringSpan name;
 
     internal JSFunctionDelegate f;
-    
+
     public override bool IsFunction => true;
 
     public override JSValue TypeOf() => JSConstants.Function;
@@ -40,98 +42,65 @@ public partial class JSFunction : JSObject
     /// </summary>
     /// <param name="clrDelegate"></param>
     /// <param name="type"></param>
-    internal JSFunction(JSFunctionDelegate clrDelegate, ClrType type)
-        : this()
+    internal JSFunction(JSFunctionDelegate clrDelegate, ClrType type) : this()
     {
         ref var ownProperties = ref GetOwnProperties();
+
         f = clrDelegate;
         name = "clr-native";
-        source = source.IsEmpty 
-            ? $"function {type.name}() {{ [clr-native] }}"
-            : source;
+        source = source.IsEmpty ? $"function {type.name}() {{ [clr-native] }}" : source;
         prototype = type.prototype;
+
         prototype.FastAddValue(KeyStrings.constructor, type, JSPropertyAttributes.EnumerableConfigurableValue);
         ownProperties.Put(KeyStrings.prototype.Key) = JSProperty.Property(KeyStrings.prototype, prototype);
 
-        FastAddValue(KeyStrings.name, name.IsEmpty
-            ? new JSString("native")
-            : new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
+        FastAddValue(KeyStrings.name, name.IsEmpty ? new JSString("native") : new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
         FastAddValue(KeyStrings.length, new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+
         constructor = this;
     }
 
     internal void Seal()
     {
         ref var ownProperties = ref GetOwnProperties();
-        ownProperties.Update((uint key, ref JSProperty p) => {
-            if(p.IsValue)
+        ownProperties.Update((uint key, ref JSProperty p) =>
+        {
+            if (p.IsValue)
                 p = new JSProperty(key, p.get, p.set, p.value, JSPropertyAttributes.ReadonlyValue);
         });
-        //for (int i = 0; i < ownProperties.properties.Length; i++)
-        //{
-        //    ref var p = ref ownProperties.properties[i];
-        //    if (p.IsValue)
-        //    {
-        //        ownProperties.properties[i] = new JSProperty(p.key, p.get, p.set, p.value, JSPropertyAttributes.ReadonlyValue);
-        //    }
-        //}
     }
 
-    protected JSFunction(StringSpan name, StringSpan source, JSObject _prototype)
-        : this()
+    protected JSFunction(StringSpan name, StringSpan source, JSObject _prototype) : this()
     {
         ref var ownProperties = ref GetOwnProperties();
         f = empty;
         this.name = name.IsEmpty ? "native" : name;
-        this.source = source.IsEmpty 
-            ? $"function {this.name}() {{ [native] }}"
-            : source;
+        this.source = source.IsEmpty ? $"function {this.name}() {{ [native] }}" : source;
+
         prototype = _prototype;
         prototype.GetOwnProperties(true).Put(KeyStrings.constructor, this);
+
         ownProperties.Put(KeyStrings.prototype, prototype);
-
-        ownProperties.Put(KeyStrings.name, name.IsEmpty 
-            ? new JSString("native")
-            : new JSString(name));
+        ownProperties.Put(KeyStrings.name, name.IsEmpty ? new JSString("native") : new JSString(name));
         ownProperties.Put(KeyStrings.length, JSNumber.Zero);
+
         constructor = this;
     }
 
-    public JSFunction(JSFunctionDelegate f)
-        : this(f, StringSpan.Empty, StringSpan.Empty)
-    {
+    public JSFunction(JSFunctionDelegate f) : this(f, StringSpan.Empty, StringSpan.Empty) { }
 
-    }
+    public JSFunction(Func<JSFunctionDelegate> fx, in StringSpan name) :
+        this(empty, in name, StringSpan.Empty) => f = (in Arguments a) => { f = fx(); return f(in a); };
 
-    public JSFunction(Func<JSFunctionDelegate> fx, in StringSpan name)
-        : this(empty, in name, StringSpan.Empty) => f = (in Arguments a) =>
-                                                             {
-                                                                 f = fx();
-                                                                 return f(in a);
-                                                             };
+    public JSFunction(JSFunctionDelegate f, in StringSpan name, int length = 0) : this(f, name, StringSpan.Empty, length) { }
 
-    public JSFunction(
-        JSFunctionDelegate f,
-        in StringSpan name,
-        int length = 0): this(f, name, StringSpan.Empty, length)
-    {
-
-    }
-
-    public JSFunction(
-        JSObject basePrototype,
-        JSFunctionDelegate f,
-        in StringSpan name,
-        in StringSpan source,
-        int length = 0,
-        bool createPrototype = true) : base(basePrototype)
+    public JSFunction(JSObject basePrototype, JSFunctionDelegate f, in StringSpan name, in StringSpan source, int length = 0, bool createPrototype = true) : base(basePrototype)
     {
         ref var ownProperties = ref GetOwnProperties();
         this.f = f;
         this.name = name.IsEmpty ? "native" : name;
-        this.source = source.IsEmpty
-            ? $"function {this.name}() {{ [native] }}"
-            : source;
+        this.source = source.IsEmpty ? $"function {this.name}() {{ [native] }}" : source;
+
         if (createPrototype)
         {
             prototype = new JSObject();
@@ -142,30 +111,19 @@ public partial class JSFunction : JSObject
             ownProperties.Put(KeyStrings.prototype, prototype, JSPropertyAttributes.ConfigurableValue);
         }
 
-        //this[KeyStrings.name] = name.IsEmpty
-        //    ? new JSString("native")
-        //    : new JSString(name);
-        // this[KeyStrings.length] = new JSNumber(length);
-        ownProperties.Put(KeyStrings.name, name.IsEmpty
-            ? new JSString("native")
-            : new JSString(name));
+        ownProperties.Put(KeyStrings.name, name.IsEmpty ? new JSString("native") : new JSString(name));
         ownProperties.Put(KeyStrings.length, new JSNumber(length));
+
         constructor = this;
     }
 
-    public JSFunction(
-        JSFunctionDelegate f,
-        in StringSpan name,
-        in StringSpan source,
-        int length = 0,
-        bool createPrototype = true): base(JSContext.Current?.FunctionPrototype)
+    public JSFunction(JSFunctionDelegate f, in StringSpan name, in StringSpan source, int length = 0, bool createPrototype = true) : base(JSContext.Current?.FunctionPrototype)
     {
         ref var ownProperties = ref GetOwnProperties();
         this.f = f;
         this.name = name.IsEmpty ? "native" : name;
-        this.source = source.IsEmpty
-            ? $"function {this.name}() {{ [native] }}"
-            : source;
+        this.source = source.IsEmpty ? $"function {this.name}() {{ [native] }}" : source;
+
         if (createPrototype)
         {
             prototype = new JSObject();
@@ -176,55 +134,41 @@ public partial class JSFunction : JSObject
             ownProperties.Put(KeyStrings.prototype, prototype, JSPropertyAttributes.ConfigurableValue);
         }
 
-        //this[KeyStrings.name] = name.IsEmpty
-        //    ? new JSString("native")
-        //    : new JSString(name);
-        // this[KeyStrings.length] = new JSNumber(length);
-        ownProperties.Put(KeyStrings.name, name.IsEmpty
-            ? new JSString("native")
-            : new JSString(name),
-            JSPropertyAttributes.ConfigurableValue);
-        ownProperties.Put(KeyStrings.length, new JSNumber(length),
-            JSPropertyAttributes.ConfigurableValue);
+        ownProperties.Put(KeyStrings.name, name.IsEmpty ? new JSString("native") : new JSString(name), JSPropertyAttributes.ConfigurableValue);
+        ownProperties.Put(KeyStrings.length, new JSNumber(length), JSPropertyAttributes.ConfigurableValue);
+
         constructor = this;
     }
 
-    public override JSValue this[KeyString name] { 
-        get => base[name]; 
-        set {
+    public override JSValue this[KeyString name]
+    {
+        get => base[name];
+        set
+        {
             if (name.Key == KeyStrings.prototype.Key)
-            {
                 prototype = value as JSObject;
-            }
+
             base[name] = value;
         }
     }
 
-    //public override string ToString()
-    //{
-    //    return name.Value;
-    //}
-
     public override string ToDetailString() => source.Value;
-
     public override JSValue CreateInstance(in Arguments a)
     {
         if (prototype == null)
-        {
-            throw JSContext.Current.NewTypeError($"{name} is not a constructor");
-        }
-        JSValue obj = new JSObject
-        {
-            BasePrototypeObject = prototype
-        };
+            throw JSContext.NewTypeError($"{name} is not a constructor");
+
+        JSValue obj = new JSObject { BasePrototypeObject = prototype };
         var a1 = a.OverrideThis(obj);
         JSContext.Current.CurrentNewTarget = this;
         var r = f(a1);
+
         if (r.IsObject)
         {
             r.BasePrototypeObject = prototype;
             return r;
         }
+
         return obj;
     }
 
@@ -232,27 +176,9 @@ public partial class JSFunction : JSObject
     {
         var r = f(in a);
         if (r.IsObject)
-        {
             return r;
-        }
+
         return a.This;
-        //var prototype = JSContext.NewTargetPrototype;
-        //if (prototype == null)
-        //{
-        //    throw JSContext.Current.NewTypeError($"{name} is called as super outside constructor");
-        //}
-        //JSValue obj = new JSObject
-        //{
-        //    BasePrototypeObject = prototype
-        //};
-        //var a1 = a.OverrideThis(obj);
-        //var r = f(a1);
-        //if (r.IsObject)
-        //{
-        //    r.BasePrototypeObject = prototype;
-        //    return r;
-        //}
-        //return obj;
     }
 
     public override JSValue InvokeFunction(in Arguments a) => f(a);
@@ -261,60 +187,54 @@ public partial class JSFunction : JSObject
     [JSExport("valueOf", Length = 1)]
     public new static JSValue ValueOf(in Arguments a) => a.This;
 
-
-    //public override string ToString()
-    //{
-    //    var fx = this[KeyStrings.toString];
-    //    if (fx.IsNullOrUndefined)
-    //        return this.source.Value;
-    //    return fx.InvokeFunction(Arguments.Empty).ToString();
-    //}
-
-    [JSPrototypeMethod][JSExport("call", Length = 1)]
+    [JSPrototypeMethod]
+    [JSExport("call", Length = 1)]
     public static JSValue Call(in Arguments a)
     {
         var a1 = a.CopyForCall();
         return a.This.InvokeFunction(a1);
     }
 
-    [JSPrototypeMethod][JSExport("apply", Length = 2)]
-    public static JSValue Apply(in Arguments a){
+    [JSPrototypeMethod]
+    [JSExport("apply", Length = 2)]
+    public static JSValue Apply(in Arguments a)
+    {
         var ar = a.CopyForApply();
         return a.This.InvokeFunction(ar);
     }
 
-    [JSPrototypeMethod][JSExport("bind", Length = 1)]
-    public static JSValue Bind(in Arguments a) {
+    [JSPrototypeMethod]
+    [JSExport("bind", Length = 1)]
+    public static JSValue Bind(in Arguments a)
+    {
         var fOriginal = a.This as JSFunction;
         var original = a;
         var copy = a;
-        var fx = new JSFunction((in Arguments a2) =>
-        {
-            return fOriginal.InvokeFunction(copy.CopyForBind(a2));
-        })
+        var fx = new JSFunction((in Arguments a2) => { return fOriginal.InvokeFunction(copy.CopyForBind(a2)); })
         {
             // need to set prototypeChain...
             prototypeChain = fOriginal.prototypeChain,
             prototype = fOriginal.prototype,
             constructor = fOriginal.constructor
         };
+
         return fx;
     }
 
-    [JSPrototypeMethod][JSExport("toString", Length = 0)]
+    [JSPrototypeMethod]
+    [JSExport("toString", Length = 0)]
     public new static JSValue ToString(in Arguments a)
     {
-        if (!(a.This is JSFunction fx))
-            throw JSContext.Current.NewTypeError($"Function.prototype.toString cannot be called with non function");
+        if (a.This is not JSFunction fx)
+            throw JSContext.NewTypeError($"Function.prototype.toString cannot be called with non function");
+        
         var source = fx.source;
         if (source.IsEmpty)
-        {
             return new JSString(string.Empty);
-        }
+
         if (source.Source.Length != source.Length || source.Offset != 0)
-        {
             source = source.Value;
-        }
+
         return new JSString(source.Source);
     }
 
@@ -331,19 +251,19 @@ public partial class JSFunction : JSObject
     [JSExport(IsConstructor = true)]
     internal new static JSValue Constructor(in Arguments args)
     {
-
         var len = args.Length;
-        if (len == 0) {
+        if (len == 0)
             return new JSFunction(empty, "anonymous", "function anonymous() {\n\n}");
-        }
-            
+
         JSValue body = null;
         var al = args.Length;
         var last = al - 1;
         var sargs = new List<string>();
+        
         for (var ai = 0; ai < al; ai++)
         {
             var item = args.GetAt(ai);
+
             if (ai == last)
             {
                 body = item;
@@ -361,7 +281,6 @@ public partial class JSFunction : JSObject
 
         var fx = new JSFunction(empty, "internal", bodyText);
 
-
         // parse and create method...
         var fx1 = CoreScript.Compile(bodyText, "internal", sargs, codeCache: context.CodeCache);
         fx.f = fx1;
@@ -376,18 +295,22 @@ public partial class JSFunction : JSObject
             value = CreateClrDelegate(type, this);
             return true;
         }
-        if(type.IsAssignableFrom(typeof(JSFunction)))
+
+        if (type.IsAssignableFrom(typeof(JSFunction)))
         {
             value = this;
             return true;
         }
-        if(type == typeof(object))
+
+        if (type == typeof(object))
         {
             value = this;
             return true;
         }
+
         return base.ConvertTo(type, out value);
     }
+
     static object CreateClrDelegate(Type type, JSFunction function)
     {
         var method = type.GetMethod("Invoke");
@@ -397,6 +320,7 @@ public partial class JSFunction : JSObject
         var veList = new Sequence<ParameterExpression>(pa.Length + 1);
         var peList = new Sequence<ParameterExpression>(pa.Length);
         var stmts = new Sequence<Expression>();
+
         foreach (var p in method.GetParameters())
         {
             var inP = Expression.Parameter(p.ParameterType, p.Name);
@@ -407,6 +331,7 @@ public partial class JSFunction : JSObject
 
             stmts.Add(Expression.Assign(jsV, ClrProxyBuilder.Marshal(inP)));
         }
+
         // var retVar = Expression.Parameter(method.ReturnType == typeof(void) ? typeof(object) : method.ReturnType);
         // veList.Add(retVar);
         var @delegate = function.f;
@@ -417,13 +342,12 @@ public partial class JSFunction : JSObject
         if (rt == typeof(void) || rt == typeof(object))
         {
             stmts.Add(Expression.Invoke(d, nargs));
-        } else
-        {
-            stmts.Add(JSValueToClrConverter.Get( Expression.Invoke(d, nargs), rt, ""));
         }
-        // stmts.Add(JSValueToClrConverter.Coalesce(Expression.Invoke(d, nargs), rtt, retVar, ""));
-        // stmts.Add(retVar);
+        else
+        {
+            stmts.Add(JSValueToClrConverter.Get(Expression.Invoke(d, nargs), rt, ""));
+        }
 
-        return Expression.Lambda( type, Expression.Block(veList, stmts), type.Name, peList.ToArray()).Compile();
+        return Expression.Lambda(type, Expression.Block(veList, stmts), type.Name, peList.ToArray()).Compile();
     }
 }

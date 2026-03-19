@@ -1,8 +1,8 @@
 ﻿#nullable enable
-using YantraJS.Core;
-using YantraJS.Core.Clr;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
 
-namespace Yantra.Core.Events;
+namespace Broiler.JavaScript.Core.Core.Events;
 
 public class CustomEvent : Event
 {
@@ -11,6 +11,7 @@ public class CustomEvent : Event
         var options = a[1];
         if (options == null || options.IsUndefined || options.IsNull)
             return;
+        
         Detail = options[KeyStrings.detail];
     }
 

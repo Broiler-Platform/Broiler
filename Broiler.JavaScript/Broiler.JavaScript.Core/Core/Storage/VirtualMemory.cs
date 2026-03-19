@@ -1,10 +1,9 @@
 ﻿using System.ComponentModel;
 
-namespace YantraJS.Core.Core.Storage;
+namespace Broiler.JavaScript.Core.Core.Storage;
 
 public struct VirtualMemory<T>
 {
-
     private T[] nodes = null;
     private int last = 0;
 
@@ -12,18 +11,9 @@ public struct VirtualMemory<T>
 
     public readonly int Count => nodes?.Length ?? 0;
 
-    public VirtualMemory()
-    {
+    public VirtualMemory() { }
 
-    }
-
-    public readonly ref T this[VirtualArray a, int index]
-    {
-        get
-        {
-            return ref nodes[a.Offset + index];
-        }
-    }
+    public readonly ref T this[VirtualArray a, int index] => ref nodes[a.Offset + index];
 
     [Browsable(false)]
     public readonly ref T GetAt(int index) => ref nodes[index];
@@ -31,16 +21,17 @@ public struct VirtualMemory<T>
     public VirtualArray Allocate(int length)
     {
         var max = last + length;
+        
         if (nodes == null || nodes.Length <= max)
         {
             // we need to resize...
             var capacity = last * 2;
             if (capacity <= max)
-            {
-                capacity = ((max / 16)+ 1) * 16;
-            }
+                capacity = ((max / 16) + 1) * 16;
+
             SetCapacity(capacity);
         }
+
         var offset = last;
         last += length;
         return new VirtualArray(offset, length);
@@ -48,10 +39,9 @@ public struct VirtualMemory<T>
 
     public void SetCapacity(int max)
     {
-        if (max <=0)
-        {
+        if (max <= 0)
             return;
-        }
+
         if (nodes == null)
         {
             nodes = new T[max];
@@ -59,9 +49,8 @@ public struct VirtualMemory<T>
         }
 
         if (nodes.Length >= max)
-        {
             return;
-        }
+
         System.Array.Resize(ref nodes, max);
     }
 }

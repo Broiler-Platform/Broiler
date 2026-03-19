@@ -1,22 +1,23 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using System;
 using Yantra.Core;
-using YantraJS.Core.Clr;
 
 namespace YantraJS.Core.Weak;
 
 [JSClassGenerator("FinalizationRegistry")]
-public partial class JSFinalizationRegistry: JSObject
+public partial class JSFinalizationRegistry : JSObject
 {
     private readonly JSSymbol finalizationSymbol = new("finalization");
-
     private readonly JSSymbol finalizationToken = new("finalizationToken");
 
     private readonly JSFunction finalizer;
 
-    public JSFinalizationRegistry(in Arguments a): base(JSContext.NewTargetPrototype)
+    public JSFinalizationRegistry(in Arguments a) : base(JSContext.NewTargetPrototype)
     {
         if (a[0] is not JSFunction fx)
-            throw JSContext.Current.NewTypeError($"Argument is not a function");
+            throw JSContext.NewTypeError($"Argument is not a function");
+
         finalizer = fx;
     }
 
@@ -37,24 +38,23 @@ public partial class JSFinalizationRegistry: JSObject
     [JSExport]
     public JSValue Unregister(in Arguments a)
     {
-        if (!(a[0] is JSObject obj))
-            throw JSContext.Current.NewTypeError($"Argument is not an object");
-        // var weakRef = obj[@this.finalizationSymbol] as WeakObject;
-        // GC.SuppressFinalize(weakRef);
+        if (a[0] is not JSObject)
+            throw JSContext.NewTypeError($"Argument is not an object");
+
         Unregister(a[0]);
         return JSUndefined.Value;
     }
 
-
     [JSExport]
     public JSValue Register(in Arguments a)
     {
-        if (!(a[0] is JSObject obj))
-            throw JSContext.Current.NewTypeError($"Argument is not an object");
+        if (a[0] is not JSObject obj)
+            throw JSContext.NewTypeError($"Argument is not an object");
+
         var token = a[1];
         if (token?.IsNullOrUndefined ?? false)
-            throw JSContext.Current.NewTypeError($"Token is required");
-        // obj[@this.finalizationSymbol] = new WeakObject(@this, a[1]);
+            throw JSContext.NewTypeError($"Token is required");
+
         Register(obj, token);
         return JSUndefined.Value;
     }
@@ -65,6 +65,7 @@ public partial class JSFinalizationRegistry: JSObject
         target[finalizationSymbol] = weakRef;
         token[finalizationToken] = weakRef;
     }
+
     private void Unregister(JSValue token)
     {
         var weakRef = token[finalizationSymbol];
@@ -74,13 +75,10 @@ public partial class JSFinalizationRegistry: JSObject
 }
 
 [JSClassGenerator("WeakRef")]
-public  partial class JSWeakRef: JSObject
+public partial class JSWeakRef : JSObject
 {
-
     internal WeakReference<JSValue> weak;
-
     public JSWeakRef(JSValue value) : this() => weak = new WeakReference<JSValue>(value);
-
     public JSWeakRef(in Arguments a) : base(JSContext.NewTargetPrototype) => weak = new WeakReference<JSValue>(a[0] ?? throw new JSException($"argument is missing"));
 
     [JSExport]
@@ -88,7 +86,7 @@ public  partial class JSWeakRef: JSObject
     {
         if (weak.TryGetTarget(out var v))
             return v;
+
         return JSUndefined.Value;
     }
-
 }

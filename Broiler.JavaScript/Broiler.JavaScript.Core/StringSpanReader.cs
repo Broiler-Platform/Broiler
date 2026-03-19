@@ -1,7 +1,7 @@
 ﻿#nullable enable
 using System.IO;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core;
 
 public class StringSpanReader(StringSpan span) : TextReader
 {
@@ -11,6 +11,7 @@ public class StringSpanReader(StringSpan span) : TextReader
     {
         if (index >= span.Length)
             return -1;
+
         return span[index];
     }
 
@@ -18,6 +19,7 @@ public class StringSpanReader(StringSpan span) : TextReader
     {
         if (index >= span.Length)
             return -1;
+
         return span[index++];
     }
 

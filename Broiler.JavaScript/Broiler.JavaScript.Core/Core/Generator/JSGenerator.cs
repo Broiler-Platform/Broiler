@@ -1,7 +1,10 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Enumerators;
+using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
+using System;
 using Yantra.Core;
-using YantraJS.Core.Clr;
-using YantraJS.Core.LinqExpressions.GeneratorsV2;
 
 namespace YantraJS.Core.Generator;
 
@@ -17,12 +20,13 @@ public partial class JSGenerator : JSObject
 
     public JSGenerator(in Arguments a) : base(JSContext.NewTargetPrototype) => throw new NotImplementedException();
 
-    public JSGenerator(IElementEnumerator en, string name): this() {
+    public JSGenerator(IElementEnumerator en, string name) : this()
+    {
         this.en = en;
         this.name = name;
     }
 
-    public JSGenerator(ClrGeneratorV2 g): this()
+    public JSGenerator(ClrGeneratorV2 g) : this()
     {
         cg = g;
         value = JSUndefined.Value;
@@ -34,46 +38,39 @@ public partial class JSGenerator : JSObject
     public new JSValue ToString(in Arguments a) => new JSString(ToString());
 
 
-    // Thread thread;
-
     public JSValue Return(JSValue value)
     {
         done = true;
         this.value = JSUndefined.Value;
-        return NewWithProperties()
-                .AddProperty(KeyStrings.value, value)
-                .AddProperty(KeyStrings.done, done ? JSBoolean.True : JSBoolean.False);
+
+        return NewWithProperties().AddProperty(KeyStrings.value, value).AddProperty(KeyStrings.done, done ? JSBoolean.True : JSBoolean.False);
     }
 
     public JSValue Throw(JSValue value)
     {
-        //yield?.Dispose();
-        //wait?.Dispose();
-        //yield = null;
-        //wait = null;
         cg.InjectException(JSException.FromValue(value));
         return value;
     }
 
-    public JSValue ValueObject => NewWithProperties()
-                .AddProperty(KeyStrings.value, value)
-                .AddProperty(KeyStrings.done, done ? JSBoolean.True : JSBoolean.False);
+    public JSValue ValueObject => NewWithProperties().AddProperty(KeyStrings.value, value).AddProperty(KeyStrings.done, done ? JSBoolean.True : JSBoolean.False);
 
     public bool MoveNext(JSValue replaceOld, out JSValue item)
     {
-
         var c = JSContext.Current;
         var top = c.Top;
+
         try
         {
             // c.Top = cg.StackItem;
             cg.Next(replaceOld, out item, out done);
             value = item;
-            if (!done) {
+
+            if (!done)
                 return true;
-            }
+
             value = item;
             done = true;
+
             return false;
         }
         finally
@@ -91,24 +88,24 @@ public partial class JSGenerator : JSObject
                 value = item;
                 return ValueObject;
             }
+
             done = true;
             value = JSUndefined.Value;
+
             return ValueObject;
         }
+
         var c = JSContext.Current;
         var top = c.Top;
+        
         try
         {
-            // c.Top = cg.StackItem;
             cg.Next(replaceOld, out value, out done);
-            //if(this.done == true && this.value == null)
-            //{
-            //    throw new ArgumentNullException();
-            //}
             return ValueObject;
-        }finally
+        }
+        finally
         {
-            c.Top = top; 
+            c.Top = top;
         }
     }
 
@@ -127,15 +124,15 @@ public partial class JSGenerator : JSObject
                 value = generator.value;
                 return true;
             }
+
             value = JSUndefined.Value;
             return false;
-
         }
-
 
         public bool MoveNext(out bool hasValue, out JSValue value, out uint index)
         {
             generator.Next();
+
             if (!generator.done)
             {
                 this.index++;
@@ -144,38 +141,41 @@ public partial class JSGenerator : JSObject
                 value = generator.value;
                 return true;
             }
+
             index = 0;
             value = JSUndefined.Value;
             hasValue = false;
-            return false;
 
+            return false;
         }
 
         public bool MoveNextOrDefault(out JSValue value, JSValue @default)
         {
             generator.Next();
+
             if (!generator.done)
             {
                 index++;
                 value = generator.value;
                 return true;
             }
+
             value = @default;
             return false;
-
         }
 
         public JSValue NextOrDefault(JSValue @default)
         {
             generator.Next();
+
             if (!generator.done)
             {
                 index++;
                 return generator.value;
             }
+
             return @default;
         }
-
     }
 
     [JSExport("next", Length = 1)]
@@ -186,5 +186,4 @@ public partial class JSGenerator : JSObject
 
     [JSExport("throw", Length = 1)]
     public JSValue Throw(in Arguments a) => Throw(a.Get1());
-
 }

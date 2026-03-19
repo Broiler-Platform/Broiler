@@ -3,19 +3,19 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text;
+using YantraJS.Core;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core;
 
-public class JSException: Exception
+public class JSException : Exception
 {
-
     public override string Message
     {
-        get {
+        get
+        {
             if (Error is JSError error)
-            {
                 return error[KeyStrings.message].ToString();
-            }
+
             return Error.ToString();
         }
     }
@@ -28,57 +28,37 @@ public class JSException: Exception
         return this;
     }
 
-    private List<(StringSpan target, string file, int line, int column)> trace
-        = [];
+    private readonly List<(StringSpan target, string file, int line, int column)> trace = [];
 
-    public JSException(
-                JSValue message,
-                [CallerMemberName] string function = null,
-                [CallerFilePath] string filePath = null,
-                [CallerLineNumber] int line = 0) : base()
+    public JSException(JSValue message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) : base()
     {
         if (function != null)
-        {
             trace.Add((function, filePath ?? "Unknown", line, 1));
-        }
+
         Error = message;
     }
 
-    public JSException(
-        string message, 
-        [CallerMemberName] string function = null,
-        [CallerFilePath] string filePath = null,
-        [CallerLineNumber] int line = 0): base(message)
+    public JSException(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) : base(message)
     {
         if (function != null)
-        {
             trace.Add((function, filePath ?? "Unknown", line, 1));
-        }
+
         Error = new JSError(this, message);
     }
 
-    public JSException(
-        string message, 
-        JSObject prototype,
-        [CallerMemberName] string function = null,
-        [CallerFilePath] string filePath = null,
-        [CallerLineNumber] int line = 0) : base(message)
+    public JSException(string message, JSObject prototype, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) : base(message)
     {
         if (function != null)
-        {
             trace.Add((function, filePath ?? "Unknown", line, 1));
-        }
 
         Error = new JSError(this, prototype);
     }
-
 
     public JSValue JSStackTrace
     {
         get
         {
             var sb = new StringBuilder();
-
             sb.AppendLine(Message);
 
             if (trace.Count > 0)
@@ -93,44 +73,23 @@ public class JSException: Exception
                 // ref var top = ref walker.Current;
                 var fx = top.Function;
                 var file = top.FileName;
+
                 if (fx.IsNullOrWhiteSpace())
-                {
                     fx = "native";
-                }
+
                 if (string.IsNullOrWhiteSpace(file))
-                {
                     file = "file";
-                }
+
                 sb.AppendLine($"    at {fx}:{file}:{top.Line},{top.Column}");
                 trace.Add((fx, file, top.Line, top.Column));
                 top = top.Parent;
             }
-            //var walker = JSContext.Current.StackWalker;
-            //while (walker.MoveNext())
-            //{
-            //    ref var top = ref walker.Current;
-            //    var fx = top.Function;
-            //    var file = top.FileName;
-            //    if (fx.IsNullOrWhiteSpace())
-            //    {
-            //        fx = "native";
-            //    }
-            //    if (string.IsNullOrWhiteSpace(file))
-            //    {
-            //        file = "file";
-            //    }
-            //    sb.AppendLine($"    at {fx}:{file}:{top.Line},{top.Column}");
-            //    trace.Add((fx, file, top.Line, top.Column));
-            //}
+
             return new JSString(sb.ToString());
         }
     }
 
-    internal static void Throw(
-        JSValue value,
-        [CallerMemberName] string function = null,
-        [CallerFilePath] string filePath = null,
-        [CallerLineNumber] int line = 0)
+    internal static void Throw(JSValue value, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0)
     {
 #if DEBUG
         var st = new System.Diagnostics.StackTrace(true);
@@ -143,30 +102,28 @@ public class JSException: Exception
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue ThrowSyntaxError(string value) => throw JSContext.Current.NewSyntaxError(value);
+    public static JSValue ThrowSyntaxError(string value) => throw JSContext.NewSyntaxError(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSFunction ThrowNotFunction(JSValue value) => throw JSContext.Current.NewTypeError($"{value} is not a function");
+    internal static JSFunction ThrowNotFunction(JSValue value) => throw JSContext.NewTypeError($"{value} is not a function");
 
     public static JSException FromValue(JSValue value)
     {
-        if (value is  JSError error)
-        {
+        if (value is JSError error)
             return error.Exception;
-        }
+
         var ex = new JSException(value.ToString());
         return ex;
     }
 
-
     public static JSException From(Exception exception)
     {
         if (exception.InnerException is JSException jse)
-        {
             return jse;
-        }
+
         if (exception is JSException jse2)
             return jse2;
+
         var error = new JSException(exception.InnerException?.ToString() ?? exception.ToString());
         return error;
     }
@@ -174,13 +131,11 @@ public class JSException: Exception
     public static JSValue ErrorFrom(Exception exception)
     {
         if (exception.InnerException is JSException jse)
-        {
             return jse.Error;
-        }
+
         if (exception is JSException jse2)
-        {
             return jse2.Error;
-        }
+
         var error = new JSException(exception.InnerException?.Message ?? exception.Message);
         return error.Error;
     }
@@ -190,43 +145,22 @@ public class JSException: Exception
         get
         {
             var sb = new StringBuilder();
-            foreach(var item in trace)
+            foreach (var (target, file, line, _) in trace)
             {
                 sb.Append("at ");
-                sb.Append(item.target);
+                sb.Append(target);
                 sb.Append(" in ");
-                sb.Append(item.file);
+                sb.Append(file);
                 sb.Append(":line ");
-                sb.Append(item.line);
-                // sb.Append(" , ");
-                // sb.Append(item.column + 1);
+                sb.Append(line);
                 sb.AppendLine();
             }
 
             // add internal stack..
             if (Error is JSError error)
-            {
                 sb.AppendLine(error.Stack);
-            }
 
             return sb.ToString();
         }
     }
-
-    //public override string Message => 
-    //    this.Stack != null 
-    //    ? $"{Stack}{base.Message}"
-    //    : base.Message;
-
-    //public override string ToString()
-    //{
-    //    if (this.Stack != null)
-    //    {
-    //        return $"{Error}{Stack}{base.ToString()}";
-    //    }
-    //    return base.ToString();
-    //}
-
-
-
 }

@@ -1,9 +1,11 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿using Broiler.JavaScript.Core.FastParser;
+using Broiler.JavaScript.Core.FastParser.Ast;
+
+namespace YantraJS.Core.FastParser;
 
 
 partial class FastParser
 {
-
     /// <summary>
     /// Expression Sequence represents a comma separated expressions
     /// terminated by new line or semi colon
@@ -12,73 +14,62 @@ partial class FastParser
     /// <param name="endWith"></param>
     /// <param name="allowEmpty"></param>
     /// <returns></returns>
-    bool ExpressionSequence(
-        out AstExpression expressions, 
-        TokenTypes endWith = TokenTypes.BracketEnd,
-        bool allowEmpty = false)
+    bool ExpressionSequence(out AstExpression expressions, TokenTypes endWith = TokenTypes.BracketEnd, bool allowEmpty = false)
     {
         var begin = stream.Current;
         var nodes = new Sequence<AstExpression>();
-        try
-        {
-            do
-            {
-                if (allowEmpty && stream.Current.Type == TokenTypes.CurlyBracketEnd)
-                    break;
-                if (allowEmpty && stream.CheckAndConsumeAny(endWith, TokenTypes.EOF, TokenTypes.SemiColon))
-                    break;
-                allowEmpty = false;
-                if (Expression(out var node))
-                    nodes.Add(node);
-                if (stream.CheckAndConsume(TokenTypes.Comma))
-                    continue;
-                if (stream.CheckAndConsumeAny(endWith, TokenTypes.EOF, TokenTypes.SemiColon))
-                    break;
-                if (stream.Current.Type == TokenTypes.CurlyBracketEnd)
-                    break;
-                if (stream.LineTerminator())
-                    break;
-                //throw stream.Unexpected();
-                break;
-            } while (true);
-            switch(nodes.Count)
-            {
-                case 0:
-                    expressions = new AstEmptyExpression(begin);
-                    break;
-                case 1:
-                    expressions = nodes[0];
-                    break;
-                default:
-                    expressions = new AstSequenceExpression(begin, PreviousToken, nodes);
-                    break;
-            }
-            return true;
-        } finally
-        {
-            //nodes.Clear();
-        }
-    }
 
+        do
+        {
+            if (allowEmpty && stream.Current.Type == TokenTypes.CurlyBracketEnd)
+                break;
+
+            if (allowEmpty && stream.CheckAndConsumeAny(endWith, TokenTypes.EOF, TokenTypes.SemiColon))
+                break;
+
+            allowEmpty = false;
+
+            if (Expression(out var node))
+                nodes.Add(node);
+
+            if (stream.CheckAndConsume(TokenTypes.Comma))
+                continue;
+
+            if (stream.CheckAndConsumeAny(endWith, TokenTypes.EOF, TokenTypes.SemiColon))
+                break;
+
+            if (stream.Current.Type == TokenTypes.CurlyBracketEnd)
+                break;
+
+            if (stream.LineTerminator())
+                break;
+
+            break;
+        } while (true);
+
+        expressions = nodes.Count switch
+        {
+            0 => new AstEmptyExpression(begin),
+            1 => nodes[0],
+            _ => new AstSequenceExpression(begin, PreviousToken, nodes),
+        };
+
+        return true;
+    }
 
     bool WhileStatement(out AstStatement node)
     {
         var begin = stream.Current;
-        stream.Consume();
 
+        stream.Consume();
         stream.Expect(TokenTypes.BracketStart);
 
         ExpressionSequence(out var test);
 
-        // stream.Expect(TokenTypes.BracketEnd);
-
         if (!NonDeclarativeStatement(out var statement))
             throw stream.Unexpected();
-
 
         node = new AstWhileStatement(begin, PreviousToken, test, statement);
         return true;
     }
-
-
 }

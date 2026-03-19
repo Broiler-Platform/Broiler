@@ -1,4 +1,6 @@
-﻿using YantraJS.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Debugger;
 
 namespace YantraJS.Core.Debugger;
 
@@ -15,10 +17,9 @@ public partial class V8Runtime
 
         public JSValue ToJSValue()
         {
-            if(ObjectId != null)
-            {
+            if (ObjectId != null)
                 return V8RemoteObject.From(ObjectId);
-            }
+
             return ClrProxy.Marshal(Value);
         }
     }

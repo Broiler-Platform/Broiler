@@ -1,15 +1,16 @@
-﻿using System;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Enumerators;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using YantraJS.Core;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.Core.Extensions;
 
 public static class ClrProxyExtensions
 {
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static object CreateClrEnumerator(JSValue target, Type elementType) {
+    internal static object CreateClrEnumerator(JSValue target, Type elementType) 
+    {
         Type type = typeof(ClrObjectEnumerator<>).MakeGenericType(elementType);
         return Activator.CreateInstance(type, target);
     }
@@ -31,8 +32,8 @@ public static class ClrProxyExtensions
             clrObject = CreateClrEnumerator(value, typeof(object));
             return true;
         }
+    
         clrObject = null;
         return false;
     }
-
 }

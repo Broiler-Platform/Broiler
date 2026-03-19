@@ -3,7 +3,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using Expression = YantraJS.Expressions.YExpression;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core;
 
 public class JSVariable
 {
@@ -18,8 +18,7 @@ public class JSVariable
     }
     internal bool IsReadOnly;
 
-    static readonly PropertyInfo _ValueProperty =
-        typeof(JSVariable).GetProperty("Value");
+    static readonly PropertyInfo _ValueProperty = typeof(JSVariable).GetProperty("Value");
     internal readonly StringSpan Name;
     private KeyString key;
 
@@ -37,7 +36,6 @@ public class JSVariable
         Name = name;
     }
 
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public JSVariable(in Arguments a, int i, string name)
     {
@@ -54,33 +52,17 @@ public class JSVariable
         {
             _value = value;
             if (key.Value == null)
-            {
                 key = KeyStrings.GetOrCreate(Name);
-            }
+
             var old = JSContext.Current[key];
             if (old != value && !value.IsUndefined)
-            {
                 JSContext.Current[key] = value;
-            }
         }
     }
 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public JSVariable(Exception e, string name)
-        : this(e is JSException je 
-              ? je.Error
-              : JSException.From(e).Error , name)
-    {
-
-    }
-
-    //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-    //internal static JSVariable New(in Arguments a, int i, string name)
-    //{
-    //    return new JSVariable(a.GetAt(i), name);
-    //}
+    public JSVariable(Exception e, string name) : this(e is JSException je ? je.Error : JSException.From(e).Error, name) { }
 
     internal static Expression ValueExpression(Expression exp) => Expression.Property(exp, _ValueProperty);
-
 }

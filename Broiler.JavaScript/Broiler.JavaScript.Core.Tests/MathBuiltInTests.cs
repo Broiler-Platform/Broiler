@@ -1,4 +1,6 @@
-namespace YantraJS.Core.Tests;
+using Broiler.JavaScript.Core.Core;
+
+namespace Broiler.JavaScript.Core.Tests;
 
 /// <summary>
 /// ECMAScript conformance tests for the Math built-in object.

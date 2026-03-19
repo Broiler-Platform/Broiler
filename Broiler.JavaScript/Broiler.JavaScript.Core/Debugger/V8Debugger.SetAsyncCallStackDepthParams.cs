@@ -2,6 +2,5 @@
 
 public partial class V8Debugger
 {
-    public class SetAsyncCallStackDepthParams { 
-    }
+    public class SetAsyncCallStackDepthParams { }
 }

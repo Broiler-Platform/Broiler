@@ -1,16 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
-using YantraJS.Core.LinqExpressions.GeneratorsV2;
-using YantraJS.ExpHelper;
 using LabelTarget = YantraJS.Expressions.YLabelTarget;
 using Exp = YantraJS.Expressions.YExpression;
 using Expression = YantraJS.Expressions.YExpression;
 using ParameterExpression = YantraJS.Expressions.YParameterExpression;
-using YantraJS.Core.Core.Storage;
-using YantraJS.Core.Core.Disposable;
+using Broiler.JavaScript.Core.CodeGen;
+using Broiler.JavaScript.Core.Core.Disposable;
+using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.FastParser.Ast;
+using YantraJS.Core;
+using Broiler.JavaScript.Core.FastParser.Parser;
+using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
+using Broiler.JavaScript.Core.LinqExpressions;
 
-namespace YantraJS.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Core.FastParser.Compiler;
 
 
 public class SharedParserStringMap<T>
@@ -30,6 +35,7 @@ public class SharedParserStringMap<T>
                 if (indexes.TryGetValue(id.Key, out var index))
                     return storage[index].Value;
             }
+
             return default;
         }
         set
@@ -38,9 +44,9 @@ public class SharedParserStringMap<T>
             if (!indexes.TryGetValue(a.Key, out var id))
             {
                 id = length++;
-                // indexes[a.Key] = id;
                 indexes.Put(a.Key) = id;
             }
+
             Save(id, in name, in value);
         }
     }
@@ -49,9 +55,8 @@ public class SharedParserStringMap<T>
     {
         storage = storage ?? (new (StringSpan, T)[8]);
         if (index >= storage.Length)
-        {
             Array.Resize(ref storage, (((int)index >> 2) + 1) << 2);
-        }
+
         storage[index] = (key, value);
     }
 
@@ -65,6 +70,7 @@ public class SharedParserStringMap<T>
                 return true;
             }
         }
+
         value = default;
         return false;
     }
@@ -104,24 +110,21 @@ public class SharedParserStringMap<T>
                 }
                 else break;
             }
+
             item = (StringSpan.Empty, default);
             index = 0;
             return false;
         }
     }
-
 }
 public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
 {
-
     public class VariableScope : IDisposable
     {
         public ParameterExpression Variable { get; internal set; }
         public Exp Expression { get; internal set; }
         public string Name { get; internal set; }
-
         public bool Create { get; internal set; }
-
         public Expression Init { get; private set; }
 
         /// <summary>
@@ -131,10 +134,8 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
         /// is null when it is being created and accessed at the same time
         /// </summary>
         public Expression PostInit { get; private set; }
-
         public bool InUse { get; internal set; }
         public bool IsTemp { get; internal set; }
-
         public void Dispose() => InUse = false;
 
         public void SetPostInit(Expression exp)
@@ -144,6 +145,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
                 PostInit = null;
                 return;
             }
+
             if (Variable.Type == typeof(JSVariable))
             {
                 if (exp.Type == typeof(JSVariable))
@@ -152,6 +154,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
                     return;
                 }
             }
+
             PostInit = Exp.Assign(Expression, exp);
         }
 
@@ -190,10 +193,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
     // BROILER-PATCH: Register an externally-created variable in this scope.
     // Used for function expression names (ES3 §13) where the variable is
     // declared in the parent scope's block but referenced in the function body.
-    internal void AddExternalVariable(in StringSpan name, VariableScope scope)
-    {
-        variableScopeList[name] = scope;
-    }
+    internal void AddExternalVariable(in StringSpan name, VariableScope scope) => variableScopeList[name] = scope;
 
     public AstFunctionExpression Function { get; }
 
@@ -214,15 +214,9 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
 
     public ParameterExpression StackItem { get; }
 
-    // public ParameterExpression Closures { get; }
-
-    // public ParameterExpression ScriptInfo { get; }
-
     public bool IsRoot => Function == null;
 
     public LinkedStack<LoopScope> Loop;
-
-    // public Expression Super => JSValueBuilder.PrototypeChain( JSValueBuilder.PrototypeChain(ThisExpression));
 
     public Expression Super { get; set; }
 
@@ -234,9 +228,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
             while (en.MoveNext(out var s))
             {
                 if (s.Value.Variable != null)
-                {
                     yield return s.Value;
-                }
             }
         }
     }
@@ -249,9 +241,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
             while (en.MoveNext(out var s))
             {
                 if (s.Value.Variable != null)
-                {
                     yield return s.Value.Variable;
-                }
             }
         }
     }
@@ -264,62 +254,23 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
             while (en.MoveNext(out var s))
             {
                 if (s.Value.Init != null)
-                {
                     yield return s.Value.Init;
-                }
             }
+
             en = variableScopeList.AllValues;
             while (en.MoveNext(out var s))
             {
                 if (s.Value.PostInit != null)
-                {
                     yield return s.Value.PostInit;
-                }
             }
         }
     }
-
-
-
 
     public LabelTarget ReturnLabel { get; }
 
     public readonly FastFunctionScope TopScope;
 
-    //public FastFunctionScope TopScope
-    //{
-    //    get
-    //    {
-    //        var p = this;
-    //        while (p.Parent != null && p.Function == p.Parent.Function)
-    //        {
-    //            p = p.Parent;
-    //        }
-    //        return p;
-    //    }
-    //}
-
-    //public FunctionScope TopStackScope
-    //{
-    //    get
-    //    {
-    //        var p = this;
-    //        if (p.variableScopeList.Any())
-    //            return p;
-    //        while (p.Parent != null && p.Function == p.Parent.Function)
-    //        {
-    //            p = p.Parent;
-    //            if (p.variableScopeList.Any())
-    //                return p;
-    //        }
-    //        return p;
-    //    }
-    //}
-
-    public ParameterExpression Generator
-    {
-        get; set;
-    }
+    public ParameterExpression Generator { get; set; }
 
     public ParameterExpression Awaiter { get; set; }
 
@@ -329,12 +280,8 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
 
     public readonly FastFunctionScope RootScope;
 
-    public FastFunctionScope(
-        FastPool pool,
-        AstFunctionExpression fx, Expression previousThis = null, Expression super = null,
-        bool isAsync = false,
-        IFastEnumerable<AstClassProperty> memberInits = null,
-        FastFunctionScope previous = null)
+    public FastFunctionScope(FastPool pool, AstFunctionExpression fx, Expression previousThis = null, Expression super = null, bool isAsync = false,
+        IFastEnumerable<AstClassProperty> memberInits = null, FastFunctionScope previous = null)
     {
         RootScope = previous ?? this;
         TopScope = this;
@@ -342,6 +289,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
         MemberInits = memberInits;
         Function = fx;
         Super = super;
+
         if (fx?.Generator ?? false)
         {
             Generator = Expression.Parameter(typeof(ClrGeneratorV2), "clrGenerator");
@@ -350,98 +298,68 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
         {
             Generator = null;
         }
-        if (fx?.Async ?? true)
-        {
-            Generator = Expression.Parameter(typeof(ClrGeneratorV2), "clrGenerator");
-            // Awaiter = Expression.Parameter(typeof(JSWeakAwaiter).MakeByRefType());
-            // throw new NotSupportedException();
-        }
-        if (isAsync && Generator == null)
-        {
-            Generator = Expression.Parameter(typeof(ClrGeneratorV2), "clrGenerator");
-        }
-        // this.ThisExpression = Expression.Parameter(typeof(Core.JSValue),"_this");
-        // this.ArgumentsExpression = Expression.Parameter(typeof(Core.JSValue[]),"_arguments");
-        Arguments = (fx?.Generator ?? false)
-            ? Expression.Parameter(typeof(Arguments), $"a-{sID}")
-            : Expression.Parameter(typeof(Arguments).MakeByRefType(), $"a-{sID}");
-        ArgumentsExpression = Arguments;
-        if (previousThis != null)
-        {
-            // this.ThisExpression = previousThis;
-        }
-        else
-        {
-            // this.ThisExpression = Expression.Parameter(typeof(JSValue));
 
+        if (fx?.Async ?? true)
+            Generator = Expression.Parameter(typeof(ClrGeneratorV2), "clrGenerator");
+
+        if (isAsync && Generator == null)
+            Generator = Expression.Parameter(typeof(ClrGeneratorV2), "clrGenerator");
+
+        Arguments = (fx?.Generator ?? false) ? Expression.Parameter(typeof(Arguments), $"a-{sID}") : Expression.Parameter(typeof(Arguments).MakeByRefType(), $"a-{sID}");
+        ArgumentsExpression = Arguments;
+
+        if (previousThis == null)
+        {
             // this is needed to fix closure over lambda
             // this can be improved
             var t = CreateVariable("this", ArgumentsBuilder.This(Arguments));
             ThisExpression = t.Expression;
-            // this.ThisExpression = _this.Expression;
         }
 
         Context = Expression.Parameter(typeof(JSContext), $"{nameof(Context)}{sID}");
         StackItem = Expression.Parameter(typeof(CallStackItem), $"{nameof(StackItem)}{sID}");
-        // this.Closures = Expression.Parameter(typeof(JSVariable[]), $"{nameof(Closures)}{sID}");
-        // this.ScriptInfo = Expression.Parameter(typeof(ScriptInfo), $"{nameof(ScriptInfo)}{sID}");
+
         Loop = new LinkedStack<LoopScope>();
         TempVariables = [];
         ReturnLabel = Expression.Label(typeof(JSValue));
     }
 
-    public FastFunctionScope(
-        FastFunctionScope p
-        )
+    public FastFunctionScope(FastFunctionScope p)
     {
         Function = p.Function;
         TopScope = p.TopScope;
         RootScope = p.RootScope;
         MemberInits = p.MemberInits;
-        // this.pool = p.pool.NewScope();
-        // this.ThisExpression = p.ThisExpression;
         ArgumentsExpression = p.ArgumentsExpression;
         Generator = p.Generator;
         Awaiter = p.Awaiter;
         TempVariables = p.TempVariables;
-        // this.Scope = Expression.Parameter(typeof(Core.LexicalScope), "lexicalScope");
         Super = p.Super;
         Context = p.Context;
         StackItem = p.StackItem;
-        // this.Closures = p.Closures;
-        // this.ScriptInfo = p.ScriptInfo;
         Loop = p.Loop;
         ReturnLabel = p.ReturnLabel;
     }
 
-    public Exp this[string name]
-    {
-        get
-        {
-            return GetVariable(name).Expression;
-        }
-    }
+    public Exp this[string name] => GetVariable(name).Expression;
 
     public VariableScope CreateException(string name)
     {
-        var v = new VariableScope
-        {
-            Variable = Exp.Parameter(typeof(Exception), name + "Exp")
-        };
+        var v = new VariableScope { Variable = Exp.Parameter(typeof(Exception), name + "Exp") };
         variableScopeList[name + DateTime.UtcNow.Ticks] = v;
         v.Expression = v.Variable;
+
         return v;
     }
 
-    private Sequence<VariableScope> TempVariables;
-    // private readonly FastPool.Scope pool;
-
+    private readonly Sequence<VariableScope> TempVariables;
     private static int id;
 
     public VariableScope GetTempVariable(Type type = null)
     {
         type = type ?? typeof(JSValue);
         var fe = TopScope.variableScopeList.AllValues;
+
         while (fe.MoveNext(out var item))
         {
             var v = item.Value;
@@ -451,8 +369,10 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
                 return v;
             }
         }
+
         var tp = Exp.Variable(type, "#Temp" + type.Name + id++);
-        var temp = new VariableScope {
+        var temp = new VariableScope
+        {
             Create = true,
             Name = tp.Name,
             IsTemp = true,
@@ -460,17 +380,14 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
             Expression = tp,
             Variable = tp
         };
+
         TopScope.variableScopeList[temp.Name] = temp;
         return temp;
     }
 
     public bool IsFunctionScope => Parent?.Function != Function;
 
-    public VariableScope CreateVariable(
-        in StringSpan name,
-        Exp init = null,
-        bool newScope = false,
-        Type type = null)
+    public VariableScope CreateVariable(in StringSpan name, Exp init = null, bool newScope = false, Type type = null)
     {
         var v = variableScopeList[name];
         if (v != null)
@@ -485,6 +402,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
                 v = p.variableScopeList[name];
                 if (v != null)
                     return v;
+
                 p = p.Parent;
             }
         }
@@ -492,6 +410,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
         // we need to move variable in top scope...
         var pe = Expression.Parameter(type ?? typeof(JSVariable), name.Value);
         var ve = JSVariable.ValueExpression(pe);
+        
         v = new VariableScope
         {
             Name = name.Value,
@@ -499,39 +418,12 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
             Variable = pe,
             Create = true
         };
+        
         v.SetInit(init);
         variableScopeList[name] = v;
+        
         return v;
     }
-
-
-    //public override void Dispose()
-    //{
-    //    base.Dispose();
-    //    pool.Dispose();
-    //}
-
-    //public VariableScope AddVariable(
-    //    string name, 
-    //    Exp exp, 
-    //    ParameterExpression pe = null,
-    //    Exp init = null)
-    //{
-    //    var v = new VariableScope
-    //    {
-    //        Name = name,
-    //        Expression = exp,
-    //        Variable = pe,
-    //        Init = init
-    //    };
-    //    this.variableScopeList.Add(v);
-    //    return v;
-    //}
-
-    //public Sequence<VariableScope> ClosureList
-    //{
-    //    get; private set;
-    //}
 
     public VariableScope GetVariable(in StringSpan name, bool createClosure = true)
     {
@@ -539,11 +431,9 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
         var start = this;
         while (start != null)
         {
-
             if (start.variableScopeList.TryGetValue(name, out var result))
-            {
                 return result;
-            }
+
             start = start.Parent;
         }
 
@@ -552,34 +442,4 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
 
         return null;
     }
-
-    //private VariableScope CreateClosure(in StringSpan name)
-    //{
-    //    var p = Parent;
-    //    if (p == null)
-    //        return null;
-    //    var v = p.GetVariable(name);
-    //    if (v == null)
-    //        return null;
-    //    ClosureList = ClosureList ?? new Sequence<VariableScope>();
-    //    var v1 = new VariableScope()
-    //    {
-    //        Variable = Expression.Parameter(typeof(JSVariable), name.Value),
-    //        Name = name.Value
-    //    };
-    //    int index = ClosureList.Count;
-    //    if (v.Expression.NodeType == Expressions.YExpressionType.Field)
-    //    {
-    //        v1.Expression = JSVariable.ValueExpression(v1.Variable);
-    //    } else
-    //    {
-    //        v1.Expression = JSVariableBuilder.Property(v1.Variable);
-    //    }
-    //    v1.SetInit(Expression.ArrayIndex(Closures, Expression.Constant(index)));
-    //    ClosureList.Add(v);
-    //    this.variableScopeList[name] = v1;
-    //    return v1;
-    //}
-
-
 }

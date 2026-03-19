@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using Broiler.App.Rendering;
 
 namespace Broiler.DevConsole;
