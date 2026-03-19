@@ -161,7 +161,7 @@ public readonly struct StringSpan : IEquatable<StringSpan>, IEquatable<string>, 
                 if (char.IsWhiteSpace(*start))
                 {
                     length--;
-                    start++;
+                    start--;
                     continue;
                 }
                 break;
