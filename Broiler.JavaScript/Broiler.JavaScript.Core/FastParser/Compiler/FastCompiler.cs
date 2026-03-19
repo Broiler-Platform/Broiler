@@ -1,7 +1,6 @@
 ﻿using Broiler.JavaScript.Core.CodeGen;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Emit;
-using Broiler.JavaScript.Core.FastParser.Parser;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using Broiler.JavaScript.Core.Utils;
@@ -39,7 +38,7 @@ public partial class FastCompiler : AstMapVisitor<Expression>
         // add top level...
 
         var parserPool = new FastPool();
-        var parser = new FastParser(new FastTokenStream(parserPool, code));
+        var parser = new Broiler.JavaScript.Parser.FastParser(new FastTokenStream(parserPool, code));
         var jScript = parser.ParseProgram();
         parserPool.Dispose();
 

@@ -348,7 +348,7 @@ changes:
 | Phase | Assembly | Rationale | Status |
 |-------|----------|-----------|--------|
 | **Phase 1** | **Ast** | Zero dependencies. Pure data types. Smallest, safest extraction. | ✅ Complete |
-| **Phase 2** | **Parser** | Depends only on Ast. Self-contained lexer + parser. | Not started |
+| **Phase 2** | **Parser** | Depends only on Ast. Self-contained lexer + parser. | ✅ Complete |
 | **Phase 3** | **Storage** | Depends on shared primitives. Decouples property storage from runtime logic. | Not started |
 | **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. | Not started |
 | **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | Not started |
@@ -387,18 +387,19 @@ Each extraction phase follows the same steps:
 
 **Phase 1 — Ast: ✅ Complete (2026-03-19)**
 
+**Phase 2 — Parser: ✅ Complete (2026-03-19)**
+
 **Deliverables:**
 - `Broiler.JavaScript.Ast` assembly with all AST node types ✅
-- `Broiler.JavaScript.Parser` assembly with lexer and parser *(Phase 2 — not
-  yet started)*
-- `Broiler.JavaScript.Parser.Tests` project *(Phase 2)*
+- `Broiler.JavaScript.Parser` assembly with lexer and parser ✅
+- `Broiler.JavaScript.Parser.Tests` project *(future — assembly-specific tests)*
 - All existing tests pass ✅
 
 **Key Metrics:**
 - Ast compiles with **zero** references to Runtime types. ✅
 - `Broiler.JavaScript.Core` references Ast but not vice versa. ✅
-- Parser compiles and passes tests with **zero** references to Runtime types.
-  *(Phase 2)*
+- Parser compiles with **zero** references to Runtime types. ✅
+- Parser depends only on Ast and ExpressionCompiler (shared primitives). ✅
 
 ### Milestone 2 — Infrastructure Extraction (Phases 3–4)
 
@@ -686,6 +687,83 @@ assembly remains self-contained (its only reference is ExpressionCompiler for
   `HttpClientMigrationTests` are unrelated — they reference old
   `HtmlRenderer.*.dll` assembly names).
 - Downstream consumers (`Broiler.Cli`, `Broiler.App`) build successfully.
+
+---
+
+### Phase 2 — Parser Extraction ✅
+
+**Status:** Complete
+
+**Date:** 2026-03-19
+
+**What was done:**
+
+1. Created `Broiler.JavaScript.Parser` assembly at
+   `Broiler.JavaScript/Broiler.JavaScript.Parser/`.
+2. Moved **5 infrastructure files** from `Broiler.JavaScript.Core/FastParser/`
+   root:
+   - `FastScanner.cs` (lexer)
+   - `FastKeywordMap.cs` (keyword mapping)
+   - `FastTokenStream.cs` (token stream)
+   - `CharExtensions.cs` (character utilities)
+   - `IParser.cs` (parser interface)
+3. Moved **30 parser files** from `Broiler.JavaScript.Core/FastParser/Parser/`:
+   - `FastParser.cs` (main parser class)
+   - 23 `FastParser.*.cs` partial class files (recursive descent grammar rules)
+   - `FastList.cs`, `FastPool.cs`, `FastScope.cs`, `FastScopeItem.cs`,
+     `FastStack.cs`, `QueueExtensions.cs`
+4. All types use the new namespace `Broiler.JavaScript.Parser`.
+5. `Broiler.JavaScript.Core` references `Broiler.JavaScript.Parser` via
+   `<ProjectReference>`.
+6. Updated `GlobalUsings.cs` (`global using Broiler.JavaScript.Parser;`) in Core
+   for source-level backward compatibility.
+7. Added `ParserTypeForwarding.cs` with `[assembly: TypeForwardedTo(...)]`
+   attributes for binary compatibility.
+8. Updated `Broiler.slnx` to include the new project.
+
+**Dependency resolution (decision points):**
+
+The parser files had four dependencies on types defined in
+`Broiler.JavaScript.Core`. These were resolved without introducing a reference
+from Parser back to Core:
+
+- **`ConcurrentStringMap<FastKeywords>`** (used by `FastKeywordMap`) —
+  Replaced with `ConcurrentDictionary<string, FastKeywords>` from
+  `System.Collections.Concurrent`. The keyword lookup table is small and
+  `ConcurrentDictionary` provides equivalent thread-safe semantics.
+
+- **`StringMap<(StringSpan, FastVariableKind)>`** (used by `FastScopeItem`) —
+  Replaced with `Dictionary<string, (StringSpan, FastVariableKind)>`.
+  Variable scope tracking uses `name.Value` (string conversion) for dictionary
+  keys. This is acceptable because scope tracking during parsing is not a hot
+  path and avoids pulling in the custom trie-based map.
+
+- **`NumberParser.CoerceToNumber`** (used by `FastScanner`) —
+  Extracted the `CoerceToNumber` method and all its private helper methods
+  (`ParseCore`, `ParseHex`, `ParseOctal`, `ParseBinary`,
+  `IsWhiteSpaceOrLineTerminator`, `RefineEstimate`, `AddUlps`,
+  `ScaleToInteger`) into a new internal `NumberCoercion` class in the Parser
+  assembly. The original `NumberParser` remains in Core for runtime use
+  (`parseFloat`, `parseInt`).
+
+- **`CancellableDisposableAction`** (used by `FastTokenStream.UndoMark`) and
+  **`DisposableList`** (used by `FastPool.Scope`) — These small utility classes
+  were recreated as `internal` types in the Parser assembly to avoid a
+  dependency on Core.
+
+**Assembly references:**
+- `Broiler.JavaScript.Parser` references `Broiler.JavaScript.Ast` (for AST
+  node types, `FastToken`, `StringSpan`, etc.) and
+  `Broiler.JavaScript.ExpressionCompiler` (for `LinkedStack<T>`,
+  `LinkedStackItem<T>`, `IFastEnumerable<T>`, `Sequence<T>`).
+- The `FastParser/Compiler/` directory remains in Core (it is the compiler,
+  not the parser). Compiler files use `global using Broiler.JavaScript.Parser;`
+  to access parser types.
+
+**Verification:**
+- `Broiler.JavaScript.Parser` compiles with zero errors.
+- `Broiler.JavaScript.Core` compiles with zero errors.
+- All **641** tests in `Broiler.JavaScript.Core.Tests` pass.
 
 ---
 
