@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using YantraJS.Core;
-using YantraJS.Core.Objects;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Objects;
 
 namespace Broiler.JavaScript.Core.Core.Storage;
 

@@ -1,7 +1,7 @@
-﻿using YantraJS.Core;
-using YantraJS.Expressions;
+﻿using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.ExpressionCompiler;
 
 public interface IMethodBuilder
 {

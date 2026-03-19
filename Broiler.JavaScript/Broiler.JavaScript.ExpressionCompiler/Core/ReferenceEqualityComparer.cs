@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.ExpressionCompiler.Core;
 
 public class ReferenceEqualityComparer : IEqualityComparer<object>
 {

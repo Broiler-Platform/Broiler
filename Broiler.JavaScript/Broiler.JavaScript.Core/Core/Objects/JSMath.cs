@@ -1,9 +1,9 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Decimal;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
-using Yantra.Core;
 
-namespace YantraJS.Core.Objects;
+namespace Broiler.JavaScript.Core.Core.Objects;
 
 [JSClassGenerator("Math"), JSInternalObject]
 public partial class JSMath : JSObject

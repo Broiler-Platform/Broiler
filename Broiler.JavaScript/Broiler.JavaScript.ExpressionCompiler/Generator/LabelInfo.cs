@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
-using YantraJS.Core;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace YantraJS.Generator;
+namespace Broiler.JavaScript.ExpressionCompiler.Generator;
 
 public class LabelInfo(ILWriter il)
 {

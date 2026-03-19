@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using System;
 using System.Reflection;
-using Expression = YantraJS.Expressions.YExpression;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 

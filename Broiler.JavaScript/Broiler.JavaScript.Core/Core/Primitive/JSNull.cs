@@ -1,7 +1,7 @@
 using Broiler.JavaScript.Core.Enumerators;
 using System;
 using System.Globalization;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Error;
 
 namespace Broiler.JavaScript.Core.Core.Primitive;
 

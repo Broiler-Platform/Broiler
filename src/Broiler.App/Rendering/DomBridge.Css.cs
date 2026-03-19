@@ -5,7 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using YantraJS.Core;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core.Function;
 
 namespace Broiler.App.Rendering;
 

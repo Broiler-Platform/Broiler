@@ -1,9 +1,8 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core.Clr;
 using System;
-using Yantra.Core;
+using Broiler.JavaScript.ExpressionCompiler;
 
-namespace YantraJS.Core.Typed;
+namespace Broiler.JavaScript.Core.Core.Array.Typed;
 
 [JSClassGenerator("ArrayBuffer")]
 public partial class JSArrayBuffer : JSObject
@@ -77,11 +76,11 @@ public partial class JSArrayBuffer : JSObject
             throw JSContext.NewRangeError("Invalid ArrayBuffer length");
 
         var newBuffer = new byte[newLength];
-        Array.Copy(buffer, newBuffer, Math.Min(buffer.Length, newLength));
+        System.Array.Copy(buffer, newBuffer, Math.Min(buffer.Length, newLength));
 
         // Detach the source buffer.
         isDetached = true;
-        buffer = Array.Empty<byte>();
+        buffer = System.Array.Empty<byte>();
 
         return new JSArrayBuffer(newBuffer);
     }
@@ -94,7 +93,7 @@ public partial class JSArrayBuffer : JSObject
     internal JSValue TransferToFixedLength(in Arguments a)
     {
         // In engines without resizable buffers the behaviour is identical
-        // to transfer().  YantraJS does not support resizable ArrayBuffers,
+        // to transfer().  Broiler.JavaScript does not support resizable ArrayBuffers,
         // so the result is always a fixed-length buffer.
         return Transfer(in a);
     }
@@ -123,7 +122,7 @@ public partial class JSArrayBuffer : JSObject
 
         int newLen = Math.Max(end - begin, 0);
         var newBuf = new byte[newLen];
-        Array.Copy(buffer, begin, newBuf, 0, newLen);
+        System.Array.Copy(buffer, begin, newBuf, 0, newLen);
         return new JSArrayBuffer(newBuf);
     }
 }

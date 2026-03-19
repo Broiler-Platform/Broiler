@@ -1,9 +1,8 @@
-﻿using Broiler.JavaScript.Core.FastParser;
-using Broiler.JavaScript.Core.FastParser.Ast;
+﻿using Broiler.JavaScript.Core.FastParser.Ast;
 using Broiler.JavaScript.Core.FastParser.Parser;
 using System.Runtime.CompilerServices;
 
-namespace YantraJS.Core.FastParser;
+namespace Broiler.JavaScript.Core.FastParser;
 
 
 public partial class FastParser(FastTokenStream stream) : IParser

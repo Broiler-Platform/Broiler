@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core;
+﻿namespace Broiler.JavaScript.ExpressionCompiler.Core;
 
 public interface IFastEnumerator<T>
 {

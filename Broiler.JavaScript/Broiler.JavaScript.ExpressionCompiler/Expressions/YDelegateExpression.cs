@@ -3,7 +3,7 @@ using System;
 using System.CodeDom.Compiler;
 using System.Reflection;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YDelegateExpression(MethodInfo method, Type? type = null) : YExpression(YExpressionType.Delegate, type ?? GetSignature(method))
 {

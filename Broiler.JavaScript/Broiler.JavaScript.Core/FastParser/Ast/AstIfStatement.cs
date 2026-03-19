@@ -1,7 +1,4 @@
 ﻿#nullable enable
-using Broiler.JavaScript.Core.FastParser;
-using Broiler.JavaScript.Core.FastParser.Ast;
-
 namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstIfStatement(FastToken start, FastToken end, AstExpression test, AstStatement @true, AstStatement? @false = null) : AstStatement(start, FastNodeType.IfStatement, end)

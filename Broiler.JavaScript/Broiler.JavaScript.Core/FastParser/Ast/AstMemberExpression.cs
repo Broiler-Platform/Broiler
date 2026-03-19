@@ -1,6 +1,4 @@
 ﻿#nullable enable
-using Broiler.JavaScript.Core.FastParser;
-
 namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstMemberExpression(AstExpression target, AstExpression node, bool computed = false, bool coalesce = false) : 

@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using YantraJS.Core;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace YantraJS.SL;
+namespace Broiler.JavaScript.ExpressionCompiler.SL;
 
 public class LambdaConverter : YExpressionVisitor<Expression>
 {

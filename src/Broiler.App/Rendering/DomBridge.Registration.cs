@@ -6,7 +6,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
-using YantraJS.Core;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core.Boolean;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Array;
 
 namespace Broiler.App.Rendering;
 

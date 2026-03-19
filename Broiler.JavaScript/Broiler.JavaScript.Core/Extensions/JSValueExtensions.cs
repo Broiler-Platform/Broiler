@@ -1,4 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Extensions;
@@ -6,7 +7,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core;
 
 public static partial class JSValueExtensions
 {

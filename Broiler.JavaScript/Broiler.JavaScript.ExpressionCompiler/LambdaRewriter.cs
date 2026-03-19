@@ -1,11 +1,11 @@
 ﻿#nullable enable
 using System;
 using System.Collections.Generic;
-using YantraJS.ClosureSeparator;
-using YantraJS.Core;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
+using Broiler.JavaScript.ExpressionCompiler.Core;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.ExpressionCompiler;
 
 public static class ClosureRepositoryExtensions
 {

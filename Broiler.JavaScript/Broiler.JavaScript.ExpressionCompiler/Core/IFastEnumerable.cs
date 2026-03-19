@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.ExpressionCompiler.Core;
 
 public interface IFastEnumerable<T>: IEnumerable<T>
 {

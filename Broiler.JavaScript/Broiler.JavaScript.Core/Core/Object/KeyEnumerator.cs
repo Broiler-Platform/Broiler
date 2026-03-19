@@ -1,6 +1,6 @@
 ﻿using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Enumerators;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
 
 namespace Broiler.JavaScript.Core.Core.Object;
 

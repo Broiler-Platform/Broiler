@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.ExpressionCompiler.Core;
 
 public abstract class FastEnumerator<T>: IFastEnumerator<T>, IEnumerator<T>
 {
@@ -26,6 +26,7 @@ public abstract class FastEnumerator<T>: IFastEnumerator<T>, IEnumerator<T>
             Current = item;
             return true;
         }
+
         return false;
     }
 

@@ -1,7 +1,7 @@
 ﻿#nullable enable
 using System;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.ExpressionCompiler;
 
 public class JSInternalObjectAttribute: Attribute
 {

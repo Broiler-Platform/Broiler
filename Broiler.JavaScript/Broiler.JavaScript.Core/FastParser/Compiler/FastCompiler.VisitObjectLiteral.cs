@@ -1,14 +1,14 @@
 ﻿using System;
 
-using Exp = YantraJS.Expressions.YExpression;
-using Expression = YantraJS.Expressions.YExpression;
-using YantraJS.Expressions;
+using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.Core.FastParser.Ast;
-using Broiler.JavaScript.Core.FastParser;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Core;
 
-namespace YantraJS.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Core.FastParser.Compiler;
 
 partial class FastCompiler
 {

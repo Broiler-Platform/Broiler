@@ -1,18 +1,17 @@
-﻿using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.CodeGen;
-using Broiler.JavaScript.Core.FastParser;
+﻿using Broiler.JavaScript.Core.CodeGen;
 using Broiler.JavaScript.Core.FastParser.Ast;
 using Broiler.JavaScript.Core.FastParser.Parser;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
+using Broiler.JavaScript.ExpressionCompiler.Core;
 using System;
 using System.Linq;
 
-using Exp = YantraJS.Expressions.YExpression;
-using Expression = YantraJS.Expressions.YExpression;
-using LabelTarget = YantraJS.Expressions.YLabelTarget;
+using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using LabelTarget = Broiler.JavaScript.ExpressionCompiler.Expressions.YLabelTarget;
 
-namespace YantraJS.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Core.FastParser.Compiler;
 
 partial class FastCompiler
 {

@@ -3,9 +3,9 @@ using System;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.ExpressionCompiler;
 
 internal static class TypeExtensions
 {

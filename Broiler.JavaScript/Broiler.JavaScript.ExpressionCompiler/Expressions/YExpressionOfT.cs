@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YExpression<T>(in FunctionName name, YExpression body, YParameterExpression @this, YParameterExpression[] parameters, Type returnType) : YLambdaExpression(typeof(T), in name, body, @this, parameters, returnType)
 {

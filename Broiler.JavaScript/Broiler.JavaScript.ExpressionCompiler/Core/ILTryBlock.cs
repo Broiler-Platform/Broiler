@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Reflection.Emit;
-using YantraJS.Expressions;
-using YantraJS.Generator;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Generator;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.ExpressionCompiler.Core;
 
 public class ILTryBlock(ILWriter iLWriter, Label label) : LinkedStackItem<ILTryBlock>
 {
@@ -13,9 +13,8 @@ public class ILTryBlock(ILWriter iLWriter, Label label) : LinkedStackItem<ILTryB
     internal readonly ILWriter il = iLWriter;
     private readonly ILWriterLabel label = iLWriter.DefineLabel("tryEnd");
 
-    private Sequence<(ILWriterLabel hop, ILWriterLabel final, int localIndex)> pendingJumps 
-        = [];
-    
+    private Sequence<(ILWriterLabel hop, ILWriterLabel final, int localIndex)> pendingJumps = [];
+
     internal int SavedLocal;
 
     internal void CollectLabels(YTryCatchFinallyExpression exp, LabelInfo labels) => TryCatchLabelMarker.Collect(exp, this, labels);
@@ -24,12 +23,10 @@ public class ILTryBlock(ILWriter iLWriter, Label label) : LinkedStackItem<ILTryB
     {
         if (isFinally)
             throw new InvalidOperationException($"Cannot start catch after finally has begin");
+
         isCatch = true;
 
-        // il.EmitConsoleWriteLine("Begin Catch");
-
         il.Emit(OpCodes.Leave, label);
-
         il.BeginCatchBlock(type);
     }
 
@@ -37,6 +34,7 @@ public class ILTryBlock(ILWriter iLWriter, Label label) : LinkedStackItem<ILTryB
     {
         if (isFinally)
             throw new InvalidOperationException($"You already in the finally block");
+
         isFinally = true;
         isCatch = false;
         il.Emit(OpCodes.Leave, label);
@@ -46,10 +44,8 @@ public class ILTryBlock(ILWriter iLWriter, Label label) : LinkedStackItem<ILTryB
 
     public override void Dispose()
     {
-        if(isCatch)
-        {
+        if (isCatch)
             il.Emit(OpCodes.Leave, label);
-        }
 
         if (!(isCatch || isFinally))
             throw new InvalidOperationException($"Cannot finish try block without catch/finally");
@@ -58,24 +54,22 @@ public class ILTryBlock(ILWriter iLWriter, Label label) : LinkedStackItem<ILTryB
 
         // jump all pending
         il.EndExceptionBlock();
-        // il.ClearStack();
 
-        foreach (var (hop,jump, index) in pendingJumps)
+        foreach (var (hop, jump, index) in pendingJumps)
         {
             il.MarkLabel(hop);
             il.Branch(jump, index);
         }
-        il.MarkLabel(label);
-        if (SavedLocal >= 0)
-        {
-            il.EmitLoadLocal(SavedLocal);
-        }
 
+        il.MarkLabel(label);
+
+        if (SavedLocal >= 0)
+            il.EmitLoadLocal(SavedLocal);
     }
 
     internal void Branch(ILWriterLabel label, int index = -1)
     {
-        if(label.TryBlock == this)
+        if (label.TryBlock == this)
         {
             il.Goto(label, index);
             return;

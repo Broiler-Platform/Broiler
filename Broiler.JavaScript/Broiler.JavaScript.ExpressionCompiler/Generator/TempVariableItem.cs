@@ -1,8 +1,8 @@
-﻿using System;
+﻿using Broiler.JavaScript.ExpressionCompiler.Core;
+using System;
 using System.Reflection.Emit;
-using YantraJS.Core;
 
-namespace YantraJS.Generator;
+namespace Broiler.JavaScript.ExpressionCompiler.Generator;
 
 
 public class TempVariables(ILWriter il) : LinkedStack<TempVariables.TempVariableItem>

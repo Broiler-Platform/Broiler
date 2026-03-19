@@ -1,10 +1,10 @@
 ﻿using System;
 using System.IO;
 using System.Reflection.Emit;
-using YantraJS.Expressions;
-using YantraJS.Generator;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.Generator;
 
-namespace YantraJS.Runtime;
+namespace Broiler.JavaScript.ExpressionCompiler.Runtime;
 
 public static class RuntimeAssembly
 {

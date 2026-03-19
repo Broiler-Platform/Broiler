@@ -9,7 +9,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
 {
     static bool IsPrimitive(string name)
     {
-        switch(name)
+        switch (name)
         {
             case "Number":
             case "Boolean":
@@ -40,9 +40,15 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
 
             sb = sb.AppendLine("using System.Collections.Generic;")
                 .AppendLine("using System.Runtime.CompilerServices;")
-                .AppendLine("using System.Text;")
-                .AppendLine("using Broiler.JavaScript.Core.Clr;")
-                .AppendLine("using Broiler.JavaScript.Extensions;");
+                .AppendLine("using Broiler.JavaScript.Core.Core;")
+            .AppendLine("using Broiler.JavaScript.Core.Core.Clr;")
+            .AppendLine("using Broiler.JavaScript.Core.Core.Function;")
+                        .AppendLine("using Broiler.JavaScript.Core.Utils;")
+        .AppendLine("using Broiler.JavaScript.Core.Core.Primitive;")
+
+            .AppendLine("using Broiler.JavaScript.Core.Core.Storage;")
+
+                .AppendLine("using System.Text;");
 
             var ns = type.ContainingNamespace.ToString();
             if (ns != "Broiler.JavaScript.Core")
@@ -77,7 +83,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
             }
 
             var createClassReturnType = "JSFunction";
-            if(type.InternalClass || type.Globals)
+            if (type.InternalClass || type.Globals)
             {
                 createClassReturnType = "JSObject";
             }
@@ -93,21 +99,24 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
             }
 
 
-            if (type.InternalClass) {
+            if (type.InternalClass)
+            {
                 sb.AppendLine($@"
                     var @class = new JSObject();
                     if (register) {{
                         context[Names.{className}] = @class;
                     }}
                 ");
-            } else if (type.Globals)
+            }
+            else if (type.Globals)
             {
                 sb.AppendLine($@"
                     var @class = context;");
             }
-            else {
+            else
+            {
                 var l = type.ConstructorLength ?? "";
-                if (l.Length>0)
+                if (l.Length > 0)
                 {
                     l = ", length:" + l;
                 }
@@ -128,7 +137,8 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
                         }}
                         var prototype = @class.prototype;
                         ");
-                } else
+                }
+                else
                 {
                     sb.AppendLine($@"
                         var @class = new {clrFunctionType}({type.Name}.{type.ConstructorMethod}
@@ -215,7 +225,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
     {
         var method = exports.Field!;
 
-        var t = $"throw JSContext.Current.NewTypeError(\"Failed to convert this to {type.Name}\")";
+        var t = $"throw JSContext.NewTypeError(\"Failed to convert this to {type.Name}\")";
 
         var access = !method.IsStatic
             ? $"@this.{method.Name}"
@@ -286,7 +296,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
         JSExportInfo exports)
     {
         var method = exports.Property!;
-        var t = $"throw JSContext.Current.NewTypeError(\"Failed to convert this to {type.Name}\")";
+        var t = $"throw JSContext.NewTypeError(\"Failed to convert this to {type.Name}\")";
         var keyName = names.GetOrCreateName(name);
 
         string setter = "null";
@@ -377,13 +387,14 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
         JSExportInfo e)
     {
         var method = e.Method!;
-        
+
         var l = $",\"function {name}() {{ [native] }}\", createPrototype: false";
-        if (e?.Length != null && e.Length.Length > 0) {
+        if (e?.Length != null && e.Length.Length > 0)
+        {
             l += ", length: " + e.Length;
         }
 
-        var t = $"throw JSContext.Current.NewTypeError(\"Failed to convert this to {type.Name}\")";
+        var t = $"throw JSContext.NewTypeError(\"Failed to convert this to {type.Name}\")";
         if (method.IsJSFunction())
         {
             var fx = $"new JSFunction({type.Name}.{method.Name}, \"{name}\" {l})";

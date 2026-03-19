@@ -31,7 +31,7 @@ public class DelayTask
         }
         catch (Exception ex) 
         {
-            Debug.WriteLine($"[YantraJS] DelayTask timer dispose error: {ex.Message}"); 
+            Debug.WriteLine($"[Broiler.JavaScript] DelayTask timer dispose error: {ex.Message}"); 
         }
     }
 

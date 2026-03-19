@@ -7,7 +7,9 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Storage;
 using SkiaSharp;
-using YantraJS.Core;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core.Boolean;
+using Broiler.JavaScript.Core.Core.Function;
 
 namespace Broiler.Cli;
 
@@ -240,7 +242,7 @@ public class CaptureService
         // Process CSS using HTML-Renderer
         ProcessCss(html);
 
-        // Execute inline scripts using YantraJS
+        // Execute inline scripts using Broiler.JavaScript
         ExecuteScripts(html);
 
         // Save the captured content
@@ -421,7 +423,7 @@ public class CaptureService
     }
 
     /// <summary>
-    /// Extracts and executes inline scripts using YantraJS.
+    /// Extracts and executes inline scripts using Broiler.JavaScript.
     /// This exercises the YantraJS engine as part of the rendering pipeline;
     /// script results can be extended in future to influence output content.
     /// </summary>

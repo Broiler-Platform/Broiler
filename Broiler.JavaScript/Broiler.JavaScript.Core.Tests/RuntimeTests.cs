@@ -3,7 +3,7 @@ using Broiler.JavaScript.Core.Core;
 namespace Broiler.JavaScript.Core.Tests;
 
 /// <summary>
-/// Tests for the YantraJS runtime: JSContext lifecycle, JSValue type system,
+/// Tests for the Broiler.JavaScript runtime: JSContext lifecycle, JSValue type system,
 /// type coercion, and end-to-end script evaluation.
 /// </summary>
 public class RuntimeTests : IDisposable

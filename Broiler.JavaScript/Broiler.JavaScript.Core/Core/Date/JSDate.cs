@@ -1,7 +1,7 @@
-﻿using System;
-using Yantra.Core;
+﻿using Broiler.JavaScript.ExpressionCompiler;
+using System;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Date;
 
 [JSFunctionGenerator("Date")]
 public partial class JSDate: JSObject

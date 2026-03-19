@@ -1,4 +1,4 @@
-﻿using Expression = YantraJS.Expressions.YExpression;
+﻿using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LambdaGen;

@@ -23,9 +23,14 @@ internal class RegistrationGenerator(
 
         sb = sb.AppendLine("using System.Collections.Generic;")
             .AppendLine("using System.Runtime.CompilerServices;")
-            .AppendLine("using System.Text;")
-            .AppendLine("using Broiler.JavaScript.Core.Clr;")
-            .AppendLine("using Broiler.JavaScript.Extensions;");
+                            .AppendLine("using Broiler.JavaScript.Core.Core;")
+            .AppendLine("using Broiler.JavaScript.Core.Core.Clr;")
+            .AppendLine("using Broiler.JavaScript.Core.Core.Function;")
+            .AppendLine("using Broiler.JavaScript.Core.Utils;")
+        .AppendLine("using Broiler.JavaScript.Core.Core.Primitive;")
+            .AppendLine("using Broiler.JavaScript.Core.Core.Storage;")
+
+            .AppendLine("using System.Text;");
 
         var ns = type.ContainingNamespace.ToString();
         if (ns != "Broiler.JavaScript.Core")

@@ -1,9 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Reflection.Emit;
-using YantraJS.Core;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace YantraJS.Generator;
+namespace Broiler.JavaScript.ExpressionCompiler.Generator;
 
 
 public class VariableInfo(ILGenerator il)

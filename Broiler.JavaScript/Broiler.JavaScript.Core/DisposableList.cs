@@ -1,6 +1,6 @@
 ﻿#nullable enable
+using Broiler.JavaScript.ExpressionCompiler.Core;
 using System;
-using YantraJS.Core;
 
 namespace Broiler.JavaScript.Core;
 

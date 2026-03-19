@@ -1,5 +1,5 @@
 using Broiler.JavaScript.Core.Core;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Array;
 
 namespace Broiler.JavaScript.Core.Tests;
 

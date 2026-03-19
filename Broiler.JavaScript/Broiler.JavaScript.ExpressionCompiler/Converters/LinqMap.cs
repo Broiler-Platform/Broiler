@@ -1,189 +1,104 @@
 ﻿using System;
 using System.Linq.Expressions;
 
-namespace YantraJS.Converters;
+namespace Broiler.JavaScript.ExpressionCompiler.Converters;
 
-public abstract class LinqMap<T>: StackGuard<T, Expression>
-    where T: class
+public abstract class LinqMap<T> : StackGuard<T, Expression> where T : class
 {
     public override T VisitIn(Expression exp)
     {
         if (exp == null)
             return default;
-        switch (exp.NodeType)
+
+        return exp.NodeType switch
         {
-            case ExpressionType.Add:
-					return VisitAdd(exp as BinaryExpression);
-            case ExpressionType.AddAssign:
-					return VisitAddAssign(exp as BinaryExpression);
-            case ExpressionType.AddAssignChecked:
-					return VisitAddAssignChecked(exp as BinaryExpression);
-            case ExpressionType.AddChecked:
-					return VisitAddChecked(exp as BinaryExpression);
-            case ExpressionType.And:
-					return VisitAnd(exp as BinaryExpression);
-            case ExpressionType.AndAlso:
-					return VisitAndAlso(exp as BinaryExpression);
-            case ExpressionType.AndAssign:
-					return VisitAndAssign(exp as BinaryExpression);
-            case ExpressionType.ArrayIndex:
-					return VisitArrayIndex(exp as BinaryExpression);
-            case ExpressionType.ArrayLength:
-					return VisitArrayLength(exp as UnaryExpression);
-            case ExpressionType.Assign:
-					return VisitAssign(exp as BinaryExpression);
-            case ExpressionType.Block:
-					return VisitBlock(exp as BlockExpression);
-            case ExpressionType.Call:
-					return VisitCall(exp as MethodCallExpression);
-            case ExpressionType.Coalesce:
-					return VisitCoalesce(exp as BinaryExpression);
-            case ExpressionType.Conditional:
-					return VisitConditional(exp as ConditionalExpression);
-            case ExpressionType.Constant:
-					return VisitConstant(exp as ConstantExpression);
-            case ExpressionType.Convert:
-					return VisitConvert(exp as UnaryExpression);
-            case ExpressionType.ConvertChecked:
-					return VisitConvertChecked(exp as UnaryExpression);
-            case ExpressionType.DebugInfo:
-					return VisitDebugInfo(exp as ConstantExpression);
-            case ExpressionType.Decrement:
-					return VisitDecrement(exp as UnaryExpression);
-            case ExpressionType.Default:
-					return VisitDefault(exp as DefaultExpression);
-            case ExpressionType.Divide:
-					return VisitDivide(exp as BinaryExpression);
-            case ExpressionType.DivideAssign:
-					return VisitDivideAssign(exp as BinaryExpression);
-            case ExpressionType.Dynamic:
-					return VisitDynamic(exp as DynamicExpression);
-            case ExpressionType.Equal:
-					return VisitEqual(exp as BinaryExpression);
-            case ExpressionType.ExclusiveOr:
-					return VisitExclusiveOr(exp as BinaryExpression);
-            case ExpressionType.ExclusiveOrAssign:
-					return VisitExclusiveOrAssign(exp as BinaryExpression);
-            case ExpressionType.Extension:
-					return VisitExtension(exp);
-            case ExpressionType.Goto:
-					return VisitGoto(exp as GotoExpression);
-            case ExpressionType.GreaterThan:
-					return VisitGreaterThan(exp as BinaryExpression);
-            case ExpressionType.GreaterThanOrEqual:
-					return VisitGreaterThanOrEqual(exp as BinaryExpression);
-            case ExpressionType.Increment:
-					return VisitIncrement(exp as UnaryExpression);
-            case ExpressionType.Index:
-					return VisitIndex(exp as IndexExpression);
-            case ExpressionType.Invoke:
-					return VisitInvoke(exp as InvocationExpression);
-            case ExpressionType.IsFalse:
-					return VisitIsFalse(exp as UnaryExpression);
-            case ExpressionType.IsTrue:
-					return VisitIsTrue(exp as UnaryExpression);
-            case ExpressionType.Label:
-					return VisitLabel(exp as LabelExpression);
-            case ExpressionType.Lambda:
-					return VisitLambda(exp as LambdaExpression);
-            case ExpressionType.LeftShift:
-					return VisitLeftShift(exp as BinaryExpression);
-            case ExpressionType.LeftShiftAssign:
-					return VisitLeftShiftAssign(exp as BinaryExpression);
-            case ExpressionType.LessThan:
-					return VisitLessThan(exp as BinaryExpression);
-            case ExpressionType.LessThanOrEqual:
-					return VisitLessThanOrEqual(exp as BinaryExpression);
-            case ExpressionType.ListInit:
-					return VisitListInit(exp as ListInitExpression);
-            case ExpressionType.Loop:
-					return VisitLoop(exp as LoopExpression);
-            case ExpressionType.MemberAccess:
-					return VisitMemberAccess(exp as MemberExpression);
-            case ExpressionType.MemberInit:
-					return VisitMemberInit(exp as MemberInitExpression);
-            case ExpressionType.Modulo:
-					return VisitModulo(exp as BinaryExpression);
-            case ExpressionType.ModuloAssign:
-					return VisitModuloAssign(exp as BinaryExpression);
-            case ExpressionType.Multiply:
-					return VisitMultiply(exp as BinaryExpression);
-            case ExpressionType.MultiplyAssign:
-					return VisitMultiplyAssign(exp as BinaryExpression);
-            case ExpressionType.MultiplyAssignChecked:
-					return VisitMultiplyAssignChecked(exp as BinaryExpression);
-            case ExpressionType.MultiplyChecked:
-					return VisitMultiplyChecked(exp as BinaryExpression);
-            case ExpressionType.Negate:
-					return VisitNegate(exp as UnaryExpression);
-            case ExpressionType.NegateChecked:
-					return VisitNegateChecked(exp as BinaryExpression);
-            case ExpressionType.New:
-					return VisitNew(exp as NewExpression);
-            case ExpressionType.NewArrayBounds:
-					return VisitNewArrayBounds(exp as NewArrayExpression);
-            case ExpressionType.NewArrayInit:
-					return VisitNewArrayInit(exp as NewArrayExpression);
-            case ExpressionType.Not:
-					return VisitNot(exp as UnaryExpression);
-            case ExpressionType.NotEqual:
-					return VisitNotEqual(exp as BinaryExpression);
-            case ExpressionType.OnesComplement:
-					return VisitOnesComplement(exp as UnaryExpression);
-            case ExpressionType.Or:
-					return VisitOr(exp as BinaryExpression);
-            case ExpressionType.OrAssign:
-					return VisitOrAssign(exp as BinaryExpression);
-            case ExpressionType.OrElse:
-					return VisitOrElse(exp as BinaryExpression);
-            case ExpressionType.Parameter:
-					return VisitParameter(exp as ParameterExpression);
-            case ExpressionType.PostDecrementAssign:
-					return VisitPostDecrementAssign(exp as UnaryExpression);
-            case ExpressionType.PostIncrementAssign:
-					return VisitPostIncrementAssign(exp as UnaryExpression);
-            case ExpressionType.Power:
-					return VisitPower(exp as BinaryExpression);
-            case ExpressionType.PowerAssign:
-					return VisitPowerAssign(exp as BinaryExpression);
-            case ExpressionType.PreDecrementAssign:
-					return VisitPreDecrementAssign(exp as UnaryExpression);
-            case ExpressionType.PreIncrementAssign:
-					return VisitPreIncrementAssign(exp as UnaryExpression);
-            case ExpressionType.Quote:
-					return VisitQuote(exp as UnaryExpression);
-            case ExpressionType.RightShift:
-					return VisitRightShift(exp as BinaryExpression);
-            case ExpressionType.RightShiftAssign:
-					return VisitRightShiftAssign(exp as BinaryExpression);
-            case ExpressionType.RuntimeVariables:
-					return VisitRuntimeVariables(exp as RuntimeVariablesExpression);
-            case ExpressionType.Subtract:
-					return VisitSubtract(exp as BinaryExpression);
-            case ExpressionType.SubtractAssign:
-					return VisitSubtractAssign(exp as BinaryExpression);
-            case ExpressionType.SubtractAssignChecked:
-					return VisitSubtractAssignChecked(exp as BinaryExpression);
-            case ExpressionType.SubtractChecked:
-					return VisitSubtractChecked(exp as BinaryExpression);
-            case ExpressionType.Switch:
-					return VisitSwitch(exp as SwitchExpression);
-            case ExpressionType.Throw:
-					return VisitThrow(exp as UnaryExpression);
-            case ExpressionType.Try:
-					return VisitTry(exp as TryExpression);
-            case ExpressionType.TypeAs:
-					return VisitTypeAs(exp as UnaryExpression);
-            case ExpressionType.TypeEqual:
-					return VisitTypeEqual(exp as TypeBinaryExpression);
-            case ExpressionType.TypeIs:
-					return VisitTypeIs(exp as TypeBinaryExpression);
-            case ExpressionType.UnaryPlus:
-					return VisitUnaryPlus(exp as UnaryExpression);
-            case ExpressionType.Unbox:
-					return VisitUnbox(exp as UnaryExpression);
-        }
-        throw new NotSupportedException();
+            ExpressionType.Add => VisitAdd(exp as BinaryExpression),
+            ExpressionType.AddAssign => VisitAddAssign(exp as BinaryExpression),
+            ExpressionType.AddAssignChecked => VisitAddAssignChecked(exp as BinaryExpression),
+            ExpressionType.AddChecked => VisitAddChecked(exp as BinaryExpression),
+            ExpressionType.And => VisitAnd(exp as BinaryExpression),
+            ExpressionType.AndAlso => VisitAndAlso(exp as BinaryExpression),
+            ExpressionType.AndAssign => VisitAndAssign(exp as BinaryExpression),
+            ExpressionType.ArrayIndex => VisitArrayIndex(exp as BinaryExpression),
+            ExpressionType.ArrayLength => VisitArrayLength(exp as UnaryExpression),
+            ExpressionType.Assign => VisitAssign(exp as BinaryExpression),
+            ExpressionType.Block => VisitBlock(exp as BlockExpression),
+            ExpressionType.Call => VisitCall(exp as MethodCallExpression),
+            ExpressionType.Coalesce => VisitCoalesce(exp as BinaryExpression),
+            ExpressionType.Conditional => VisitConditional(exp as ConditionalExpression),
+            ExpressionType.Constant => VisitConstant(exp as ConstantExpression),
+            ExpressionType.Convert => VisitConvert(exp as UnaryExpression),
+            ExpressionType.ConvertChecked => VisitConvertChecked(exp as UnaryExpression),
+            ExpressionType.DebugInfo => VisitDebugInfo(exp as ConstantExpression),
+            ExpressionType.Decrement => VisitDecrement(exp as UnaryExpression),
+            ExpressionType.Default => VisitDefault(exp as DefaultExpression),
+            ExpressionType.Divide => VisitDivide(exp as BinaryExpression),
+            ExpressionType.DivideAssign => VisitDivideAssign(exp as BinaryExpression),
+            ExpressionType.Dynamic => VisitDynamic(exp as DynamicExpression),
+            ExpressionType.Equal => VisitEqual(exp as BinaryExpression),
+            ExpressionType.ExclusiveOr => VisitExclusiveOr(exp as BinaryExpression),
+            ExpressionType.ExclusiveOrAssign => VisitExclusiveOrAssign(exp as BinaryExpression),
+            ExpressionType.Extension => VisitExtension(exp),
+            ExpressionType.Goto => VisitGoto(exp as GotoExpression),
+            ExpressionType.GreaterThan => VisitGreaterThan(exp as BinaryExpression),
+            ExpressionType.GreaterThanOrEqual => VisitGreaterThanOrEqual(exp as BinaryExpression),
+            ExpressionType.Increment => VisitIncrement(exp as UnaryExpression),
+            ExpressionType.Index => VisitIndex(exp as IndexExpression),
+            ExpressionType.Invoke => VisitInvoke(exp as InvocationExpression),
+            ExpressionType.IsFalse => VisitIsFalse(exp as UnaryExpression),
+            ExpressionType.IsTrue => VisitIsTrue(exp as UnaryExpression),
+            ExpressionType.Label => VisitLabel(exp as LabelExpression),
+            ExpressionType.Lambda => VisitLambda(exp as LambdaExpression),
+            ExpressionType.LeftShift => VisitLeftShift(exp as BinaryExpression),
+            ExpressionType.LeftShiftAssign => VisitLeftShiftAssign(exp as BinaryExpression),
+            ExpressionType.LessThan => VisitLessThan(exp as BinaryExpression),
+            ExpressionType.LessThanOrEqual => VisitLessThanOrEqual(exp as BinaryExpression),
+            ExpressionType.ListInit => VisitListInit(exp as ListInitExpression),
+            ExpressionType.Loop => VisitLoop(exp as LoopExpression),
+            ExpressionType.MemberAccess => VisitMemberAccess(exp as MemberExpression),
+            ExpressionType.MemberInit => VisitMemberInit(exp as MemberInitExpression),
+            ExpressionType.Modulo => VisitModulo(exp as BinaryExpression),
+            ExpressionType.ModuloAssign => VisitModuloAssign(exp as BinaryExpression),
+            ExpressionType.Multiply => VisitMultiply(exp as BinaryExpression),
+            ExpressionType.MultiplyAssign => VisitMultiplyAssign(exp as BinaryExpression),
+            ExpressionType.MultiplyAssignChecked => VisitMultiplyAssignChecked(exp as BinaryExpression),
+            ExpressionType.MultiplyChecked => VisitMultiplyChecked(exp as BinaryExpression),
+            ExpressionType.Negate => VisitNegate(exp as UnaryExpression),
+            ExpressionType.NegateChecked => VisitNegateChecked(exp as BinaryExpression),
+            ExpressionType.New => VisitNew(exp as NewExpression),
+            ExpressionType.NewArrayBounds => VisitNewArrayBounds(exp as NewArrayExpression),
+            ExpressionType.NewArrayInit => VisitNewArrayInit(exp as NewArrayExpression),
+            ExpressionType.Not => VisitNot(exp as UnaryExpression),
+            ExpressionType.NotEqual => VisitNotEqual(exp as BinaryExpression),
+            ExpressionType.OnesComplement => VisitOnesComplement(exp as UnaryExpression),
+            ExpressionType.Or => VisitOr(exp as BinaryExpression),
+            ExpressionType.OrAssign => VisitOrAssign(exp as BinaryExpression),
+            ExpressionType.OrElse => VisitOrElse(exp as BinaryExpression),
+            ExpressionType.Parameter => VisitParameter(exp as ParameterExpression),
+            ExpressionType.PostDecrementAssign => VisitPostDecrementAssign(exp as UnaryExpression),
+            ExpressionType.PostIncrementAssign => VisitPostIncrementAssign(exp as UnaryExpression),
+            ExpressionType.Power => VisitPower(exp as BinaryExpression),
+            ExpressionType.PowerAssign => VisitPowerAssign(exp as BinaryExpression),
+            ExpressionType.PreDecrementAssign => VisitPreDecrementAssign(exp as UnaryExpression),
+            ExpressionType.PreIncrementAssign => VisitPreIncrementAssign(exp as UnaryExpression),
+            ExpressionType.Quote => VisitQuote(exp as UnaryExpression),
+            ExpressionType.RightShift => VisitRightShift(exp as BinaryExpression),
+            ExpressionType.RightShiftAssign => VisitRightShiftAssign(exp as BinaryExpression),
+            ExpressionType.RuntimeVariables => VisitRuntimeVariables(exp as RuntimeVariablesExpression),
+            ExpressionType.Subtract => VisitSubtract(exp as BinaryExpression),
+            ExpressionType.SubtractAssign => VisitSubtractAssign(exp as BinaryExpression),
+            ExpressionType.SubtractAssignChecked => VisitSubtractAssignChecked(exp as BinaryExpression),
+            ExpressionType.SubtractChecked => VisitSubtractChecked(exp as BinaryExpression),
+            ExpressionType.Switch => VisitSwitch(exp as SwitchExpression),
+            ExpressionType.Throw => VisitThrow(exp as UnaryExpression),
+            ExpressionType.Try => VisitTry(exp as TryExpression),
+            ExpressionType.TypeAs => VisitTypeAs(exp as UnaryExpression),
+            ExpressionType.TypeEqual => VisitTypeEqual(exp as TypeBinaryExpression),
+            ExpressionType.TypeIs => VisitTypeIs(exp as TypeBinaryExpression),
+            ExpressionType.UnaryPlus => VisitUnaryPlus(exp as UnaryExpression),
+            ExpressionType.Unbox => VisitUnbox(exp as UnaryExpression),
+            _ => throw new NotSupportedException(),
+        };
     }
 
     protected abstract T VisitUnbox(UnaryExpression node);

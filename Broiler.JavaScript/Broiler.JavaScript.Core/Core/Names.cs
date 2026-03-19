@@ -1,8 +1,7 @@
 ﻿#nullable enable
-using Broiler.JavaScript.Core.Core;
-using Yantra.Core;
+using Broiler.JavaScript.ExpressionCompiler;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core;
 
 [JSRegistrationGenerator]
 internal static partial class Names

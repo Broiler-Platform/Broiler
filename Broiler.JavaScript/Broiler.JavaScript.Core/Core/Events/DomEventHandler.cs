@@ -1,6 +1,5 @@
 ﻿#nullable enable
-using Yantra.Core.Events;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Function;
 
 namespace Broiler.JavaScript.Core.Core.Events;
 

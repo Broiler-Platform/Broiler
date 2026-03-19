@@ -1,18 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using YantraJS.Runtime;
-using Expression = YantraJS.Expressions.YExpression;
-using ParameterExpression = YantraJS.Expressions.YParameterExpression;
-using Yantra.Core;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Storage;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
-using Broiler.JavaScript.Core;
+using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.ExpressionCompiler.Runtime;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Function;
 
 
 [JSBaseClass("Object")]

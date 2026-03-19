@@ -1,9 +1,10 @@
 ﻿#nullable enable
 using System;
 using System.Reflection.Emit;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Generator;
 
-namespace YantraJS.Generator;
+namespace Broiler.JavaScript.Generator;
 
 public readonly struct DataSource(YExpression? exp, int index = -1)
 {

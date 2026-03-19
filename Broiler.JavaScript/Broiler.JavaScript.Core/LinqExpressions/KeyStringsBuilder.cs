@@ -3,8 +3,8 @@ using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.LambdaGen;
 using System;
 using System.Reflection;
-using YantraJS.Expressions;
-using Expression = YantraJS.Expressions.YExpression;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 

@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Reflection;
-using YantraJS.ClosureSeparator;
-using YantraJS.Core;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
+using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace YantraJS.Runtime;
+namespace Broiler.JavaScript.ExpressionCompiler.Runtime;
 
 
 public class RuntimeMethodBuilder(IMethodRepository methods) : IMethodBuilder

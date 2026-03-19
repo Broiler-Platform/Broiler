@@ -1,15 +1,14 @@
 ﻿#nullable enable
-using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Events;
 using Broiler.JavaScript.Core.Core.Storage;
 using System;
 using System.Collections.Generic;
-using YantraJS;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.ExpressionCompiler.Core;
 
-namespace Yantra.Core.Events;
+namespace Broiler.JavaScript.Core.Core.Events;
 
 
 public delegate JSValue DomEventHandlerDelegate(Event e);

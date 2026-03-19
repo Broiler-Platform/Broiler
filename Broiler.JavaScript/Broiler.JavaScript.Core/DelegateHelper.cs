@@ -3,7 +3,7 @@ using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.Core.Utils;
 using System;
 using System.Reflection;
-using YantraJS;
+using Broiler.JavaScript.ExpressionCompiler;
 
 namespace Broiler.JavaScript.Core;
 

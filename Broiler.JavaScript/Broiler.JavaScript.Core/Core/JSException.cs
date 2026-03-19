@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Error;
+using Broiler.JavaScript.Core.Core.Function;
 
 namespace Broiler.JavaScript.Core.Core;
 

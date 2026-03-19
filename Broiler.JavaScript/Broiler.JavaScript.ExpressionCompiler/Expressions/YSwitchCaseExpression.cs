@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Expressions;
+﻿namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YSwitchCaseExpression(YExpression body, YExpression[] testValues)
 {

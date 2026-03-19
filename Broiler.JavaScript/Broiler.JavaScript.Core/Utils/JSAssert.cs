@@ -1,10 +1,11 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 using System;
-using Yantra.Core;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.ExpressionCompiler;
 
-namespace YantraJS.Utils;
+namespace Broiler.JavaScript.Core.Utils;
 
 [JSBaseClass("Function")]
 [JSFunctionGenerator("Assert")]

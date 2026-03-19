@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
-using YantraJS.Core;
-using YantraJS.Core.FastParser;
+using Broiler.JavaScript.ExpressionCompiler.Core;
 
 namespace Broiler.JavaScript.Core.FastParser.Ast;
 

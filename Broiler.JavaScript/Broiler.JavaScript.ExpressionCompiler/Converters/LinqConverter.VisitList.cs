@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace YantraJS.Converters;
+namespace Broiler.JavaScript.Converters;
 
 
 public partial class LinqConverter
@@ -13,9 +13,7 @@ public partial class LinqConverter
         var r = new YExpression[list.Count];
         for (int i = 0; i < list.Count; i++)
         {
-            var v =Visit(list[i]);
-            if (v == null)
-                throw new ArgumentNullException();
+            var v = Visit(list[i]) ?? throw new ArgumentNullException();
             r[i] = v;
         }
         return r;

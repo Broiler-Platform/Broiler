@@ -1,16 +1,16 @@
 ﻿using System;
 using System.Linq;
-using YantraJS.Expressions;
-using Exp = YantraJS.Expressions.YExpression;
-using Expression = YantraJS.Expressions.YExpression;
-using ParameterExpression = YantraJS.Expressions.YParameterExpression;
-using LambdaExpression = YantraJS.Expressions.YLambdaExpression;
-using LabelTarget = YantraJS.Expressions.YLabelTarget;
-using GotoExpression = YantraJS.Expressions.YGoToExpression;
-using TryExpression = YantraJS.Expressions.YTryCatchFinallyExpression;
+using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
+using LambdaExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YLambdaExpression;
+using LabelTarget = Broiler.JavaScript.ExpressionCompiler.Expressions.YLabelTarget;
+using GotoExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YGoToExpression;
+using TryExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YTryCatchFinallyExpression;
 using Broiler.JavaScript.Core.Core;
-using YantraJS.Core;
-using YantraJS.ClosureSeparator;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
 
 namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 

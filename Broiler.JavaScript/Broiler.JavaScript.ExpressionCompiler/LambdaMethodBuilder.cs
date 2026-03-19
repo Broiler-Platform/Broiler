@@ -2,12 +2,12 @@
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using YantraJS.ClosureSeparator;
-using YantraJS.Core;
-using YantraJS.Expressions;
-using YantraJS.Generator;
+using Broiler.JavaScript.Generator;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.ExpressionCompiler;
 
 public class LambdaMethodBuilder(MethodBuilder builder) : IMethodBuilder
 {

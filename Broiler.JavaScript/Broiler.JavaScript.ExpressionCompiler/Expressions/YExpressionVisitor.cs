@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public abstract class YExpressionVisitor<T>: StackGuard<T, YExpression>
 {

@@ -1,10 +1,10 @@
 ﻿#nullable enable
 using System.Collections.Generic;
-using Expression = YantraJS.Expressions.YExpression;
-using ParameterExpression = YantraJS.Expressions.YParameterExpression;
-using YantraJS.Expressions;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.Core.Utils;
 

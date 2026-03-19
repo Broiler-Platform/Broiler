@@ -1,17 +1,17 @@
-﻿using Exp = YantraJS.Expressions.YExpression;
-using Expression = YantraJS.Expressions.YExpression;
-using ParameterExpression = YantraJS.Expressions.YParameterExpression;
-using LambdaExpression = YantraJS.Expressions.YLambdaExpression;
-using YantraJS.Expressions;
+﻿using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
+using LambdaExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YLambdaExpression;
 using System.Reflection;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.FastParser.Ast;
-using Broiler.JavaScript.Core.FastParser.Compiler;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Core;
 
-namespace YantraJS.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Core.FastParser.Compiler;
 
 partial class FastCompiler
 {

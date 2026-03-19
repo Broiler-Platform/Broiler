@@ -1,6 +1,6 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Storage;
-using YantraJS.Runtime;
+using Broiler.JavaScript.ExpressionCompiler.Runtime;
 
 namespace Broiler.JavaScript.Core.Emit;
 

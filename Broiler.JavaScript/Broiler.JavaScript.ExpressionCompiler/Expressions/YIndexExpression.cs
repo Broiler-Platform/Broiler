@@ -1,9 +1,9 @@
 ﻿#nullable enable
+using Broiler.JavaScript.ExpressionCompiler.Core;
 using System.CodeDom.Compiler;
 using System.Reflection;
-using YantraJS.Core;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YIndexExpression(YExpression target, PropertyInfo propertyInfo, IFastEnumerable<YExpression> args) : YExpression(YExpressionType.Index, propertyInfo.PropertyType)
 {

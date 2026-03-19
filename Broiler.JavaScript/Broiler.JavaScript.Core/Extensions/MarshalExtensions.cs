@@ -6,7 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Boolean;
 
 namespace Broiler.JavaScript.Core.Extensions;
 

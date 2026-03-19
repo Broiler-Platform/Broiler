@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace YantraJS.Tests;
+namespace Broiler.JavaScript.ExpressionCompiler;
 
 
 public class AsyncProcess

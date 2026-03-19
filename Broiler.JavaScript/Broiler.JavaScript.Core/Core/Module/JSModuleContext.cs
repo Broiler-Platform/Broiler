@@ -8,8 +8,9 @@ using System.Text;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
-using YantraJS.Core;
-using YantraJS.Utils;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Utils;
+using Broiler.JavaScript.ExpressionCompiler.Core;
 
 namespace Broiler.JavaScript.Core.Core.Module;
 

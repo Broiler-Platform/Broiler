@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using System.Runtime.CompilerServices;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core;
 
 public static partial class JSValueExtensions
 {

@@ -1,5 +1,4 @@
-﻿using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Enumerators;
@@ -7,10 +6,12 @@ using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.Core.Utils;
 using System;
 using System.Globalization;
-using Yantra.Core;
-using YantraJS.Core.Typed;
+using Broiler.JavaScript.Core.Typed;
+using Broiler.JavaScript.Core.Core.Boolean;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.ExpressionCompiler;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core;
 
 [JSBaseClass("Object")]
 [JSFunctionGenerator("String")]

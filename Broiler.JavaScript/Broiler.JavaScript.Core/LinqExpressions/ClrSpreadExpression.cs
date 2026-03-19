@@ -1,9 +1,10 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Array;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using System;
 using System.CodeDom.Compiler;
 using System.Reflection;
-using Expression = YantraJS.Expressions.YExpression;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 
@@ -16,7 +17,7 @@ internal class JSSpreadValueBuilder
     public static Expression New(Expression target) => Expression.New(_new, target);
 }
 
-public class ClrSpreadExpression(Expression argument) : Expression(YantraJS.Expressions.YExpressionType.Constant, argument.Type)
+public class ClrSpreadExpression(Expression argument) : Expression(YExpressionType.Constant, argument.Type)
 {
     public Expression Argument { get; } = JSSpreadValueBuilder.New(argument);
 

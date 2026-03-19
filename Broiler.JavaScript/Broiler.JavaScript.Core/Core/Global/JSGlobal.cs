@@ -1,17 +1,22 @@
 ﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Date;
 using System;
 using System.Threading;
-using Yantra.Core;
-using YantraJS.Core.BigInt;
-using YantraJS.Core.Set;
-using YantraJS.Core.Typed;
 using System.Collections.Generic;
 using Broiler.JavaScript.Core.Core.Intl;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Utils;
-using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core.Array.Typed;
+using Broiler.JavaScript.Core.Core.BigInt;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Boolean;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Map;
+using Broiler.JavaScript.Core.Core.Error;
+using Broiler.JavaScript.Core.Core.Set;
+using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Core.Core.Array;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Global;
 
 [JSFunctionGenerator("Globals", Globals = true)]
 public partial class JSGlobalStatic
@@ -213,7 +218,7 @@ public partial class JSGlobalStatic
                 throw JSContext.NewTypeError("structuredClone: cannot clone a detached ArrayBuffer");
 
             var newBuf = new byte[arrayBuffer.buffer.Length];
-            Array.Copy(arrayBuffer.buffer, newBuf, arrayBuffer.buffer.Length);
+            System.Array.Copy(arrayBuffer.buffer, newBuf, arrayBuffer.buffer.Length);
 
             var clone = new JSArrayBuffer(newBuf);
             seen[value] = clone;

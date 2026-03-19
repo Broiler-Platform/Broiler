@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.ExpressionCompiler.Core;
 
 public class ScopedStack<T>
 {
@@ -30,8 +30,7 @@ public class ScopedStack<T>
 }
 
 
-public class LinkedStack<T>
-    where T : LinkedStackItem<T>
+public class LinkedStack<T> where T : LinkedStackItem<T>
 {
 
     internal T _Top = null;
@@ -42,7 +41,7 @@ public class LinkedStack<T>
         item.Parent = _Top;
         _Top = item;
         item.stack = this;
-        // item.Init();
+
         return item;
     }
 
@@ -58,5 +57,4 @@ public class LinkedStack<T>
         _Top = top;
         return current;
     }
-
 }

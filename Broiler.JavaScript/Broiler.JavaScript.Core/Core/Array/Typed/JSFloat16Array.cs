@@ -1,10 +1,10 @@
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array.Typed;
 using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Typed;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
-using Yantra.Core;
 
-namespace YantraJS.Core.Typed;
+namespace Broiler.JavaScript.Core.Core.Array.Typed;
 
 [JSClassGenerator("Float16Array"), JSBaseClass("TypedArray")]
 public partial class JSFloat16Array : JSTypedArray
@@ -31,7 +31,7 @@ public partial class JSFloat16Array : JSTypedArray
             return false;
         var half = (Half)value.DoubleValue;
         var bytes = BitConverter.GetBytes(half);
-        Array.Copy(bytes, 0, buffer.buffer, byteOffset + index * 2, 2);
+        System.Array.Copy(bytes, 0, buffer.buffer, byteOffset + index * 2, 2);
         return true;
     }
 

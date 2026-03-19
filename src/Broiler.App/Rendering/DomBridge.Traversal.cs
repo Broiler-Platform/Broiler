@@ -5,7 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using YantraJS.Core;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core.Boolean;
+using Broiler.JavaScript.Core.Core.Function;
 
 namespace Broiler.App.Rendering;
 
@@ -1215,7 +1217,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static DomElement? FindCommonAncestor(DomElement a, DomElement b)
     {
-        var ancestors = new HashSet<DomElement>(YantraJS.Core.ReferenceEqualityComparer.Instance);
+        var ancestors = new HashSet<DomElement>(ReferenceEqualityComparer.Instance);
         var current = a;
         while (current != null)
         {

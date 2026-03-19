@@ -1,9 +1,9 @@
-﻿using System;
+﻿using Broiler.JavaScript.ExpressionCompiler.Core;
+using System;
 using System.Reflection;
 using System.Reflection.Emit;
-using YantraJS.Core;
 
-namespace YantraJS.Generator;
+namespace Broiler.JavaScript.ExpressionCompiler.Generator;
 
 public static class ILGeneratorExtensions
 {

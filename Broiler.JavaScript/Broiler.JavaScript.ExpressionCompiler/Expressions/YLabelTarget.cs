@@ -2,7 +2,7 @@
 using System;
 using System.Threading;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YLabelTarget
 {

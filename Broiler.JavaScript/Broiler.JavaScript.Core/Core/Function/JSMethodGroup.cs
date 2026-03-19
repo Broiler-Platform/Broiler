@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Linq;
 using Broiler.JavaScript.Core.Core.Clr;
-using YantraJS.Core;
 
 namespace Broiler.JavaScript.Core.Core.Function;
 

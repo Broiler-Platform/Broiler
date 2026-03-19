@@ -1,11 +1,10 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Module;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
 using System.Threading.Tasks;
-using Yantra.Core;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Module;
 
 /// <summary>
 /// Create and load a module

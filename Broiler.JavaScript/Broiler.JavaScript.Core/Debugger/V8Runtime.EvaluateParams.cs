@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core.Debugger;
+﻿namespace Broiler.JavaScript.Core.Debugger;
 
 
 public partial class V8Runtime

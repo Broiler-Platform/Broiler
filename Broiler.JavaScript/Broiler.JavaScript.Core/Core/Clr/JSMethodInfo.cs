@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 using System.ComponentModel;
-using YantraJS;
-using YantraJS.Core;
+using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Core.Core.Function;
 
 namespace Broiler.JavaScript.Core.Core.Clr;
 

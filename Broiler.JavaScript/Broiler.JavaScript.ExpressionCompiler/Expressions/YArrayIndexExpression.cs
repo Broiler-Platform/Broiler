@@ -1,6 +1,6 @@
 ﻿using System.CodeDom.Compiler;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YArrayIndexExpression(YExpression target, YExpression index) : YExpression(YExpressionType.ArrayIndex, target.Type.GetElementType())
 {

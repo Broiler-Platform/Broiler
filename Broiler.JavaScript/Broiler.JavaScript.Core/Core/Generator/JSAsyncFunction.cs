@@ -1,9 +1,9 @@
 ﻿#nullable enable
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using System;
-using YantraJS.Core;
-using YantraJS.Core.Generator;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Error;
 
 namespace Broiler.JavaScript.Core.Core.Generator;
 

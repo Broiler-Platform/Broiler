@@ -1,13 +1,13 @@
 ﻿#nullable enable
+using Broiler.JavaScript.ExpressionCompiler.Core;
 using System;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using YantraJS.Core;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 
 /// <summary>

@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core.FastParser;
+﻿namespace Broiler.JavaScript.Core.FastParser;
 
 partial class FastParser
 {

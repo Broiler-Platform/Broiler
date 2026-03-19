@@ -1,13 +1,12 @@
 ﻿using System.Collections.Generic;
 using System.Linq.Expressions;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace YantraJS.Converters;
+namespace Broiler.JavaScript.ExpressionCompiler.Converters;
 
 public class LabelMap
 {
-    private Dictionary<LabelTarget, YLabelTarget> labels 
-        = [];
+    private readonly Dictionary<LabelTarget, YLabelTarget> labels = [];
 
     public YLabelTarget this[LabelTarget label]
     {
@@ -15,6 +14,7 @@ public class LabelMap
         {
             if (labels.TryGetValue(label, out var r))
                 return r;
+
             r = YExpression.Label(label.Name + labels.Count, label.Type);
             labels[label] = r;
             return r;

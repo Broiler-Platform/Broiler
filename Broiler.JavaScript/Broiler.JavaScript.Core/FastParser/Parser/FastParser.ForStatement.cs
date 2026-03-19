@@ -1,10 +1,9 @@
 ﻿#nullable enable
-using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.FastParser;
 using Broiler.JavaScript.Core.FastParser.Ast;
+using Broiler.JavaScript.ExpressionCompiler.Core;
 using System.Threading;
 
-namespace YantraJS.Core.FastParser;
+namespace Broiler.JavaScript.Core.FastParser;
 
 
 partial class FastParser

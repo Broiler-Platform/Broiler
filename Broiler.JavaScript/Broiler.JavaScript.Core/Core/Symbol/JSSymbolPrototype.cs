@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core;
 
 public partial class JSSymbol
 {

@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Globalization;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
 
 namespace Broiler.JavaScript.Core.Core.Intl;
 

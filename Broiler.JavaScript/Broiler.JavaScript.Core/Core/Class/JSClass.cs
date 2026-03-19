@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Function;
 
 namespace Broiler.JavaScript.Core.Core.Class;
 

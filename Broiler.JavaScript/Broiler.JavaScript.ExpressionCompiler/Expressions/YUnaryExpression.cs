@@ -1,6 +1,6 @@
 ﻿using System.CodeDom.Compiler;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YUnaryExpression(YExpression exp, YUnaryOperator @operator) : YExpression(YExpressionType.Unary, exp.Type)
 {

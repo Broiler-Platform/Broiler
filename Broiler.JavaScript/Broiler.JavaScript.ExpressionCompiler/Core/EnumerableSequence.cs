@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.ExpressionCompiler.Core;
 
 public struct EnumerableSequence<T>(IEnumerable<T> enumerable) : IFastEnumerable<T>
 {

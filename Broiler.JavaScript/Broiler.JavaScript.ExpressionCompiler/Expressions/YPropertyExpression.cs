@@ -2,7 +2,7 @@
 using System.CodeDom.Compiler;
 using System.Reflection;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YPropertyExpression : YExpression
 {

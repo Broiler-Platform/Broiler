@@ -1,6 +1,6 @@
 ﻿using System.Reflection.Emit;
 
-namespace YantraJS.Generator;
+namespace Broiler.JavaScript.ExpressionCompiler.Generator;
 
 public class Variable(LocalBuilder builder, bool isArg, short index, bool isReference, string name)
 {

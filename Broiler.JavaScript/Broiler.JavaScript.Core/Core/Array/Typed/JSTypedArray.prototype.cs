@@ -4,9 +4,14 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
-using YantraJS.Core.Generator;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Array.Typed;
+using Broiler.JavaScript.Core.Core.Boolean;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Generator;
+using Broiler.JavaScript.Core.Core.Array;
 
-namespace YantraJS.Core.Typed;
+namespace Broiler.JavaScript.Core.Typed;
 
 partial class JSTypedArray
 {

@@ -1,5 +1,4 @@
-﻿using YantraJS.Core;
-using YantraJS.Core.Typed;
+﻿using Broiler.JavaScript.Core.Core.Function;
 
 namespace Broiler.JavaScript.Core.Core.Array.Typed;
 

@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.Core.LambdaGen;
-using YantraJS.Core;
-using YantraJS.Core.BigInt;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.Core.Core.BigInt;
+using Broiler.JavaScript.Core.Core.Decimal;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 

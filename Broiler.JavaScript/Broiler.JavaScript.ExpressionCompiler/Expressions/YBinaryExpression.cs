@@ -1,7 +1,7 @@
 ﻿using System;
 using System.CodeDom.Compiler;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YBinaryExpression(YExpression left, YOperator @operator, YExpression right) : YExpression(YExpressionType.Binary, GetType(@operator, left.Type, right.Type))
 {

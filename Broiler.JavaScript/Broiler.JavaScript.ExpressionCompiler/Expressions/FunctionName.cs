@@ -1,6 +1,6 @@
 ﻿#nullable enable
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public readonly struct FunctionName(string? name, string? location = null, int line = 0, int column = 0)
 {

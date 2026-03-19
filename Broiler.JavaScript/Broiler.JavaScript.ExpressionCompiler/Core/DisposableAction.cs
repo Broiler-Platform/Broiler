@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.ExpressionCompiler.Core;
 
 public readonly struct DisposableAction(Action action) : IDisposable
 {

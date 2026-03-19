@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.FastParser.Ast;
-using YantraJS.Core.FastParser;
 
 namespace Broiler.JavaScript.Core.FastParser.Compiler;
 

@@ -23,10 +23,25 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
   </ItemGroup>
+
+  <PropertyGroup>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>Generated</CompilerGeneratedFilesOutputPath>
+  </PropertyGroup>
+  <Target Name="AddSourceGeneratedFiles" AfterTargets="CoreCompile">
+    <ItemGroup>
+      <Compile Include="Generated\**" />
+    </ItemGroup>
+  </Target>
+  <Target Name="RemoveSourceGeneratedFiles" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <Compile Remove="Generated\**" />
+    </ItemGroup>
+  </Target>
   
   <ItemGroup>
     <ProjectReference Include="..\Broiler.JavaScript.ExpressionCompiler\Broiler.JavaScript.ExpressionCompiler.csproj" />
-    <ProjectReference Include="..\Broiler.JavaScript.JSClassGenerator\Broiler.JavaScript.JSClassGenerator.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.JSClassGenerator\Broiler.JavaScript.JSClassGenerator.csproj"  ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
   </ItemGroup>
   
 </Project>

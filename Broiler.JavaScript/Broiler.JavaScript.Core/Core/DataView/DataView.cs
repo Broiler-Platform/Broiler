@@ -1,11 +1,11 @@
-﻿using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Core.Core.Array.Typed;
 using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
 using System.Runtime.CompilerServices;
-using Yantra.Core;
-using YantraJS.Core.Typed;
 
-namespace YantraJS.Core.Core.DataView;
+namespace Broiler.JavaScript.Core.Core.DataView;
 
 [JSClassGenerator]
 public partial class DataView : JSObject

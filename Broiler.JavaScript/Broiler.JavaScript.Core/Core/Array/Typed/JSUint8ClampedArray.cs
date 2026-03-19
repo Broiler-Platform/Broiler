@@ -1,10 +1,10 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array.Typed;
-using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Typed;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
-using Yantra.Core;
 
-namespace YantraJS.Core.Typed;
+namespace Broiler.JavaScript.Core.Core.Array.Typed;
 
 [JSClassGenerator("Uint8ClampedArray"), JSBaseClass("TypedArray")]
 public partial class JSUint8ClampedArray : JSTypedArray

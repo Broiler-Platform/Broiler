@@ -1,9 +1,9 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array.Typed;
-using Broiler.JavaScript.Core.Core.Clr;
-using Yantra.Core;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Typed;
+using Broiler.JavaScript.ExpressionCompiler;
 
-namespace YantraJS.Core.Typed;
+namespace Broiler.JavaScript.Core.Core.Array.Typed;
 
 [JSClassGenerator("Int8Array"), JSBaseClass("TypedArray")]
 public partial class JSInt8Array : JSTypedArray

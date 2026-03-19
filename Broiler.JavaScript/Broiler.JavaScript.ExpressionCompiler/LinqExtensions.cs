@@ -1,8 +1,8 @@
 ﻿using System.Linq.Expressions;
-using YantraJS.Converters;
-using YantraJS.Runtime;
+using Broiler.JavaScript.ExpressionCompiler.Converters;
+using Broiler.JavaScript.ExpressionCompiler.Runtime;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.ExpressionCompiler;
 
 public static class LinqExtensions
 {

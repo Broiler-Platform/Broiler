@@ -1,7 +1,8 @@
 ﻿using System;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Generator;
 
-namespace YantraJS.Generator;
+namespace Broiler.JavaScript.Generator;
 
 public partial class ILCodeGenerator
 {

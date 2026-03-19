@@ -1,5 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.Core.Emit;
 

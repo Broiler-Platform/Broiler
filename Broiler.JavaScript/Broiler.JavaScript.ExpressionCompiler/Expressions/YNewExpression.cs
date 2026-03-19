@@ -1,10 +1,10 @@
-﻿using System;
+﻿using Broiler.JavaScript.ExpressionCompiler.Core;
+using System;
 using System.CodeDom.Compiler;
 using System.Linq;
 using System.Reflection;
-using YantraJS.Core;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YNewExpression: YExpression
 {

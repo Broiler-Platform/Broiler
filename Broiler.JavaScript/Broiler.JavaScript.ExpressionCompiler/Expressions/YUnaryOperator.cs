@@ -1,6 +1,6 @@
 ﻿#nullable enable
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public enum YUnaryOperator
 {

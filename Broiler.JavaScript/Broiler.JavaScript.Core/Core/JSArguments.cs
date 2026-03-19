@@ -1,6 +1,6 @@
 ﻿using Broiler.JavaScript.Core.Core.Storage;
-using YantraJS.Core;
-using YantraJS.Core.Generator;
+using Broiler.JavaScript.Core.Core.Generator;
+using Broiler.JavaScript.Core.Core.Function;
 
 namespace Broiler.JavaScript.Core.Core;
 

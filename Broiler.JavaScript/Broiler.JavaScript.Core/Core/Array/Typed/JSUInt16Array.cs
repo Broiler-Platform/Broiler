@@ -1,10 +1,10 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array.Typed;
-using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Typed;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
-using Yantra.Core;
 
-namespace YantraJS.Core.Typed;
+namespace Broiler.JavaScript.Core.Core.Array.Typed;
 
 [JSClassGenerator("Uint16Array"), JSBaseClass("TypedArray")]
 public partial class JSUInt16Array : JSTypedArray
@@ -28,7 +28,7 @@ public partial class JSUInt16Array : JSTypedArray
     {
         if (index < 0 || index >= length)
             return false;
-        Array.Copy(BitConverter.GetBytes((UInt16)value.IntValue), 0, buffer.buffer, byteOffset + index * 2, 2);
+        System.Array.Copy(BitConverter.GetBytes((UInt16)value.IntValue), 0, buffer.buffer, byteOffset + index * 2, 2);
         return true;
     }
 

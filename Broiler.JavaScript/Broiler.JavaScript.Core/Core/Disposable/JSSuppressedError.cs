@@ -1,9 +1,10 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Error;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.ExpressionCompiler;
 using System.Runtime.CompilerServices;
-using Yantra.Core;
 
-namespace YantraJS.Core.Core.Error;
+namespace Broiler.JavaScript.Core.Core.Disposable;
 
 [JSClassGenerator("SuppressedError"), JSBaseClass("Error")]
 public partial class JSSuppressedError : JSError

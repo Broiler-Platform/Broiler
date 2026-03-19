@@ -1,9 +1,9 @@
 ﻿#nullable enable
+using Broiler.JavaScript.ExpressionCompiler.Core;
 using System;
 using System.CodeDom.Compiler;
-using YantraJS.Core;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YInvokeExpression(YExpression target, IFastEnumerable<YExpression> args, Type type) : YExpression(YExpressionType.Invoke, type)
 {

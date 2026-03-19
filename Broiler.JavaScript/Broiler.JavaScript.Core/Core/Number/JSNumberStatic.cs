@@ -1,11 +1,12 @@
 ﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.Core.Utils;
 using System;
 using System.Runtime.CompilerServices;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core;
 
 public partial class JSNumber
 {

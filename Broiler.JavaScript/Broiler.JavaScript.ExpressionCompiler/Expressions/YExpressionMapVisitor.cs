@@ -1,8 +1,8 @@
-﻿using System;
+﻿using Broiler.JavaScript.ExpressionCompiler.Core;
+using System;
 using System.Runtime.CompilerServices;
-using YantraJS.Core;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YExpressionMapVisitor : YExpressionVisitor<YExpression>
 {

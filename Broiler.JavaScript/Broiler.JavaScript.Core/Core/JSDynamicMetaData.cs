@@ -5,7 +5,7 @@ using System.Dynamic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Boolean;
 
 namespace Broiler.JavaScript.Core.Core;
 

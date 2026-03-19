@@ -2,8 +2,8 @@
 using System;
 using System.ComponentModel;
 using System.Threading.Tasks;
-using YantraJS;
-using YantraJS.Core;
+using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Core.Core.Primitive;
 
 namespace Broiler.JavaScript.Core.Core.Promise;
 

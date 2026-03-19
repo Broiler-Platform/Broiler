@@ -1,7 +1,7 @@
 ﻿#nullable enable
 using System.ComponentModel;
 
-namespace YantraJS.Internals;
+namespace Broiler.JavaScript.ExpressionCompiler;
 
 public static class StringHashExtensions
 {

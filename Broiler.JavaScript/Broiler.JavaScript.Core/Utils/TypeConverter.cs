@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Primitive;
 using System;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Boolean;
 
 namespace Broiler.JavaScript.Core.Utils;
 

@@ -2,7 +2,7 @@
 using Broiler.JavaScript.Core.LambdaGen;
 using System;
 using System.Runtime.CompilerServices;
-using Expression = YantraJS.Expressions.YExpression;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 

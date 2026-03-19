@@ -1,5 +1,5 @@
-﻿using YantraJS.Expressions;
-using Exp = YantraJS.Expressions.YExpression;
+﻿using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
 namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 

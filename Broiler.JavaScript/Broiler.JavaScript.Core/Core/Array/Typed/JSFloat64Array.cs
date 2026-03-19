@@ -1,10 +1,10 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array.Typed;
-using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Typed;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
-using Yantra.Core;
 
-namespace YantraJS.Core.Typed;
+namespace Broiler.JavaScript.Core.Core.Array.Typed;
 
 
 [JSClassGenerator("Float64Array"), JSBaseClass("TypedArray")]
@@ -29,7 +29,7 @@ public partial class JSFloat64Array : JSTypedArray
     {
         if (index < 0 || index >= length)
             return false;
-        Array.Copy(BitConverter.GetBytes(value.DoubleValue), 0, buffer.buffer, byteOffset + index * 8, 8);
+        System.Array.Copy(BitConverter.GetBytes(value.DoubleValue), 0, buffer.buffer, byteOffset + index * 8, 8);
         return true;
     }
 

@@ -3,7 +3,7 @@ using System;
 using System.CodeDom.Compiler;
 using System.Threading;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YParameterExpression: YExpression
 {

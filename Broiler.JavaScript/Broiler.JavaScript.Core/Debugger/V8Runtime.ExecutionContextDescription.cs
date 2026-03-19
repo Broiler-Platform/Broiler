@@ -1,4 +1,4 @@
-﻿namespace YantraJS.Core.Debugger;
+﻿namespace Broiler.JavaScript.Core.Debugger;
 
 
 public partial class V8Runtime
@@ -7,7 +7,7 @@ public partial class V8Runtime
     {
         public long Id { get; set; }
 
-        public string Origin { get; set; } = "YantraJS";
+        public string Origin { get; set; } = "Broiler.JavaScript";
 
         public string Name { get; set; }
 

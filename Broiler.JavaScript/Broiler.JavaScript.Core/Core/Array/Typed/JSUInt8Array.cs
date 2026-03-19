@@ -1,10 +1,10 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array.Typed;
-using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Typed;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
-using Yantra.Core;
 
-namespace YantraJS.Core.Typed;
+namespace Broiler.JavaScript.Core.Core.Array.Typed;
 
 [JSClassGenerator("Uint8Array"), JSBaseClass("TypedArray")]
 public partial class JSUInt8Array : JSTypedArray
@@ -91,7 +91,7 @@ public partial class JSUInt8Array : JSTypedArray
     public JSValue ToBase64(in Arguments a)
     {
         var src = new byte[length];
-        Array.Copy(buffer.buffer, byteOffset, src, 0, length);
+        System.Array.Copy(buffer.buffer, byteOffset, src, 0, length);
         return new JSString(System.Convert.ToBase64String(src));
     }
 
@@ -103,7 +103,7 @@ public partial class JSUInt8Array : JSTypedArray
     public JSValue ToHex(in Arguments a)
     {
         var src = new byte[length];
-        Array.Copy(buffer.buffer, byteOffset, src, 0, length);
+        System.Array.Copy(buffer.buffer, byteOffset, src, 0, length);
         return new JSString(System.Convert.ToHexString(src).ToLowerInvariant());
     }
 
@@ -120,7 +120,7 @@ public partial class JSUInt8Array : JSTypedArray
             throw JSContext.NewTypeError("setFromBase64 requires a string argument");
         var bytes = System.Convert.FromBase64String(str.ToString());
         int written = Math.Min(bytes.Length, length);
-        Array.Copy(bytes, 0, buffer.buffer, byteOffset, written);
+        System.Array.Copy(bytes, 0, buffer.buffer, byteOffset, written);
         var result = new JSObject();
         result["read"] = new JSNumber(str.ToString().Length);
         result["written"] = new JSNumber(written);
@@ -147,7 +147,7 @@ public partial class JSUInt8Array : JSTypedArray
             bytes[i] = System.Convert.ToByte(hex.Substring(i * 2, 2), 16);
         }
         int written = Math.Min(bytes.Length, length);
-        Array.Copy(bytes, 0, buffer.buffer, byteOffset, written);
+        System.Array.Copy(bytes, 0, buffer.buffer, byteOffset, written);
         var result = new JSObject();
         result["read"] = new JSNumber(written * 2);
         result["written"] = new JSNumber(written);

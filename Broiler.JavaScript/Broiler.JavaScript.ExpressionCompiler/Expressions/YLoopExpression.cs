@@ -1,6 +1,6 @@
 ﻿using System.CodeDom.Compiler;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YLoopExpression(YExpression body, YLabelTarget @break, YLabelTarget @continue) : YExpression(YExpressionType.Loop, @break.LabelType)
 {

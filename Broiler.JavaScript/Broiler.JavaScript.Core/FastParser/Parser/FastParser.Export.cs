@@ -1,7 +1,6 @@
-﻿using Broiler.JavaScript.Core.FastParser;
-using Broiler.JavaScript.Core.FastParser.Ast;
+﻿using Broiler.JavaScript.Core.FastParser.Ast;
 
-namespace YantraJS.Core.FastParser;
+namespace Broiler.JavaScript.Core.FastParser;
 
 partial class FastParser
 {

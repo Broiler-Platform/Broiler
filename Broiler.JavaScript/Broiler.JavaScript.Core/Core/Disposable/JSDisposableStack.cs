@@ -2,8 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using YantraJS.Core;
-using YantraJS.Core.Core.Error;
+using Broiler.JavaScript.Core.Core.Error;
+using Broiler.JavaScript.Core.Core.Primitive;
 
 namespace Broiler.JavaScript.Core.Core.Disposable;
 

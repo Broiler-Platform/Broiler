@@ -1,5 +1,5 @@
-﻿using YantraJS.Core;
-using LabelTarget = YantraJS.Expressions.YLabelTarget;
+﻿using Broiler.JavaScript.ExpressionCompiler.Core;
+using LabelTarget = Broiler.JavaScript.ExpressionCompiler.Expressions.YLabelTarget;
 
 namespace Broiler.JavaScript.Core.CodeGen;
 

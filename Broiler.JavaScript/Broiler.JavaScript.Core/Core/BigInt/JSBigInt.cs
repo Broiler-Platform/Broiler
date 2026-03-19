@@ -1,12 +1,12 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
 using System.Globalization;
 using System.Numerics;
-using Yantra.Core;
 
-namespace YantraJS.Core.BigInt;
+namespace Broiler.JavaScript.Core.Core.BigInt;
 
 static class JSBigIntExtensions
 {

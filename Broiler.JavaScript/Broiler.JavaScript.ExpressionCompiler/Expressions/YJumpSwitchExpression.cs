@@ -1,7 +1,7 @@
-﻿using System.CodeDom.Compiler;
-using YantraJS.Core;
+﻿using Broiler.JavaScript.ExpressionCompiler.Core;
+using System.CodeDom.Compiler;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YJumpSwitchExpression(YExpression target, IFastEnumerable<YLabelTarget> cases) : YExpression(YExpressionType.JumpSwitch, typeof(void))
 {

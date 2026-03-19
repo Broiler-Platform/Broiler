@@ -1,8 +1,6 @@
 ﻿#nullable enable
-using Broiler.JavaScript.Core.FastParser;
-using Broiler.JavaScript.Core.FastParser.Ast;
+using Broiler.JavaScript.ExpressionCompiler.Core;
 using System;
-using YantraJS.Core;
 namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 internal static class ExpressionPatternExtensions

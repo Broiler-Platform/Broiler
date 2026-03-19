@@ -3,7 +3,7 @@ using System.CodeDom.Compiler;
 using System.Linq;
 using System.Reflection;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YSwitchExpression(YExpression target,
     MethodInfo? method,

@@ -2,7 +2,7 @@
 using System;
 using System.CodeDom.Compiler;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YConditionalExpression(
     YExpression test,

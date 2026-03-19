@@ -1,6 +1,6 @@
 ﻿using System.CodeDom.Compiler;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YDebugInfoExpression(Position start, Position end) : YExpression(YExpressionType.DebugInfo, typeof(void))
 {

@@ -1,8 +1,7 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Debugger;
 
-namespace YantraJS.Core.Debugger;
+namespace Broiler.JavaScript.Core.Debugger;
 
 
 public partial class V8Runtime

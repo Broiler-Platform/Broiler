@@ -1,6 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-
-namespace Broiler.JavaScript.Core.Core.DataView;
+﻿namespace Broiler.JavaScript.Core.Core.DataView;
 
 public static class DataViewStatic
 {

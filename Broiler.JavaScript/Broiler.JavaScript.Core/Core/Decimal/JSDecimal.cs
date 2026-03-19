@@ -1,11 +1,11 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
 using System.Globalization;
-using Yantra.Core;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Decimal;
 
 static class JSDecimalExtensions
 {

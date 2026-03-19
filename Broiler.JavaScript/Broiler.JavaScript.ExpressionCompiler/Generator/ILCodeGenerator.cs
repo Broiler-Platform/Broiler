@@ -4,10 +4,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection.Emit;
-using YantraJS.Core;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Generator;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.ExpressionCompiler.Core;
 
-namespace YantraJS.Generator;
+namespace Broiler.JavaScript.Generator;
 
 
 public partial class ILCodeGenerator
@@ -24,7 +26,7 @@ public partial class ILCodeGenerator
     private readonly TextWriter? expressionWriter;
 
     private readonly Dictionary<YParameterExpression,(Type type, int localIndex)> uninitialized
-        = new(Core.ReferenceEqualityComparer.Instance);
+        = new(ExpressionCompiler.Core.ReferenceEqualityComparer.Instance);
 
     public Sequence<ILDebugInfo> SequencePoints { get; }
         = [];

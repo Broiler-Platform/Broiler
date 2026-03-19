@@ -2,11 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <RootNamespace>YantraJS</RootNamespace>
-    <PackageId>YantraJS.ExpressionCompiler</PackageId>
-    <PackageTags>linq,expression,yantra,yantrajs,javascript,c#,standard,core,framework,.net</PackageTags>
-    <Description>Compile Simple IL Expression (YExpression) to MethodBuilder</Description>
-    <Version>1.0.1</Version>
 	  <LangVersion>latest</LangVersion>
 	  <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
 	  <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>

@@ -1,10 +1,10 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array.Typed;
-using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Typed;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
-using Yantra.Core;
 
-namespace YantraJS.Core.Typed;
+namespace Broiler.JavaScript.Core.Core.Array.Typed;
 
 [JSClassGenerator("Float32Array"), JSBaseClass("TypedArray")]
 public partial class JSFloat32Array : JSTypedArray
@@ -28,7 +28,7 @@ public partial class JSFloat32Array : JSTypedArray
     {
         if (index < 0 || index >= length)
             return false;
-        Array.Copy(BitConverter.GetBytes((float)value.DoubleValue), 0, buffer.buffer, byteOffset + index * 4, 4);
+        System.Array.Copy(BitConverter.GetBytes((float)value.DoubleValue), 0, buffer.buffer, byteOffset + index * 4, 4);
         return true;
     }
 

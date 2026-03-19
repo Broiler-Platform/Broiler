@@ -1,7 +1,7 @@
 ﻿using System;
 using System.CodeDom.Compiler;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YUnboxExpression(YExpression target, Type type) : YExpression(YExpressionType.Unbox, type)
 {

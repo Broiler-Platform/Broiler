@@ -1,9 +1,9 @@
-using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Enumerators;
 using System;
 using System.Globalization;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Primitive;
 
 public sealed class JSUndefined : JSValue
 {

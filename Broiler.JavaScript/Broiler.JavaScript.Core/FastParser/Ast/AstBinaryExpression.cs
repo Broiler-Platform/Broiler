@@ -1,7 +1,4 @@
 ﻿#nullable enable
-using Broiler.JavaScript.Core.FastParser;
-using Broiler.JavaScript.Core.FastParser.Ast;
-
 namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstBinaryExpression(AstExpression node, TokenTypes type, AstExpression right) : AstExpression(node.Start, FastNodeType.BinaryExpression, right.End)

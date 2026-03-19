@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Linq.Expressions;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace YantraJS.Converters;
+namespace Broiler.JavaScript.Converters;
 
 
 public partial class LinqConverter
@@ -11,7 +11,7 @@ public partial class LinqConverter
     {
         if (node.Method != null)
             throw new NotSupportedException();
+
         return YExpression.Coalesce(Visit(node.Left), Visit(node.Right));
     }
-
 }

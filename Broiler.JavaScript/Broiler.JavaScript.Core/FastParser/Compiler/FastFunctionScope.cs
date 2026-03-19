@@ -1,19 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
-using LabelTarget = YantraJS.Expressions.YLabelTarget;
-using Exp = YantraJS.Expressions.YExpression;
-using Expression = YantraJS.Expressions.YExpression;
-using ParameterExpression = YantraJS.Expressions.YParameterExpression;
+using LabelTarget = Broiler.JavaScript.ExpressionCompiler.Expressions.YLabelTarget;
+using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
 using Broiler.JavaScript.Core.CodeGen;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.FastParser.Ast;
-using YantraJS.Core;
 using Broiler.JavaScript.Core.FastParser.Parser;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.ExpressionCompiler.Core;
 
 namespace Broiler.JavaScript.Core.FastParser.Compiler;
 
@@ -199,7 +199,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
 
     public Expression ThisExpression => field ??= GetVariable("this", true).Expression;
 
-    // public Expression NewTarget => Expression.Field(ArgumentsExpression, nameof(YantraJS.Core.Arguments.NewTarget));
+    // public Expression NewTarget => Expression.Field(ArgumentsExpression, nameof(Broiler.JavaScript.Core.Arguments.NewTarget));
 
     public bool HasDisposable => _dispoable != null;
 

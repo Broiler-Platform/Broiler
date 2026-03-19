@@ -1,6 +1,4 @@
-﻿using YantraJS.Core;
-
-namespace Broiler.JavaScript.Core.Core;
+﻿namespace Broiler.JavaScript.Core.Core;
 
 internal static class UniqueID
 {

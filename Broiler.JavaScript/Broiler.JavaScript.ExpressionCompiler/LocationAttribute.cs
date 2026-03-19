@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.ExpressionCompiler;
 
 [AttributeUsage(AttributeTargets.Method)]
 public class LocationAttribute(string location, string name, int line, int column) : Attribute

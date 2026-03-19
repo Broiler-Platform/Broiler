@@ -1,7 +1,7 @@
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Emit;
 using System.Collections.Generic;
-using YantraJS.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.Core.FastParser.Compiler;
 

@@ -1,6 +1,6 @@
 ﻿using System.CodeDom.Compiler;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YAddressOfExpression(YExpression target) : YExpression(YExpressionType.AddressOf, target.Type.IsByRef ? target.Type : target.Type.MakeByRefType())
 {

@@ -8,10 +8,8 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text.Json.Serialization;
-using YantraJS;
-using YantraJS.Core;
-using YantraJS.Core.Debugger;
 using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.ExpressionCompiler;
 
 namespace Broiler.JavaScript.Core.Debugger;
 

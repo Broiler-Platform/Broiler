@@ -1,7 +1,6 @@
 ﻿using Broiler.JavaScript.Core.Core.Storage;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using YantraJS.Core;
 
 namespace Broiler.JavaScript.Core.Core;
 

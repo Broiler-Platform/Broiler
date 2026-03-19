@@ -1,7 +1,7 @@
-﻿using Broiler.JavaScript.Core.FastParser;
-using Broiler.JavaScript.Core.FastParser.Ast;
+﻿using Broiler.JavaScript.Core.FastParser.Ast;
+using Broiler.JavaScript.ExpressionCompiler.Core;
 
-namespace YantraJS.Core.FastParser;
+namespace Broiler.JavaScript.Core.FastParser;
 
 
 public readonly struct AstCase(AstExpression test, IFastEnumerable<AstStatement> last)

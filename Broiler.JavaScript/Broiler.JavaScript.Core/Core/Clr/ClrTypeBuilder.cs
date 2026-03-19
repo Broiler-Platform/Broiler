@@ -4,9 +4,9 @@ using Broiler.JavaScript.Core.Utils;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using YantraJS;
-using YantraJS.Runtime;
-using Expression = YantraJS.Expressions.YExpression;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Runtime;
+using Broiler.JavaScript.ExpressionCompiler;
 
 namespace Broiler.JavaScript.Core.Core.Clr;
 

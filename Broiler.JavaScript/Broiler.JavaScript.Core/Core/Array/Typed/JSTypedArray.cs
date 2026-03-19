@@ -6,10 +6,13 @@ using Broiler.JavaScript.Core.Enumerators;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using Yantra.Core;
-using YantraJS.Core.Generator;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Boolean;
+using Broiler.JavaScript.Core.Core.Generator;
+using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Core.Core.Array;
 
-namespace YantraJS.Core.Typed;
+namespace Broiler.JavaScript.Core.Typed;
 
 
 [JSClassGenerator("TypedArray")]

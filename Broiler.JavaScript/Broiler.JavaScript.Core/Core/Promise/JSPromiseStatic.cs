@@ -1,9 +1,13 @@
 ﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Error;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Primitive;
 using System;
 using System.Threading.Tasks;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core;
 
 
 public partial class JSPromise

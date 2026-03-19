@@ -1,7 +1,10 @@
 ﻿#nullable enable
-using YantraJS.Expressions;
 
-namespace YantraJS.Generator;
+
+#nullable enable
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+
+namespace Broiler.JavaScript.ExpressionCompiler.Generator;
 
 public readonly struct ILDebugInfo(int ilOffset, in Position start, in Position end)
 {

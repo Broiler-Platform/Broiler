@@ -1,7 +1,7 @@
 ﻿using System;
 using System.CodeDom.Compiler;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YNewArrayBoundsExpression(Type type, YExpression size) : YExpression(YExpressionType.NewArrayBounds, type.MakeArrayType())
 {

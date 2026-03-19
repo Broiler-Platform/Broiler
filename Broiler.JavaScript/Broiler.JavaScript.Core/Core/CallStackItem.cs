@@ -1,8 +1,8 @@
 ﻿using System.Runtime.CompilerServices;
 using System.ComponentModel;
 using Broiler.JavaScript.Core.CodeGen;
-using YantraJS.Core;
 using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.Core.Core.Function;
 
 namespace Broiler.JavaScript.Core.Core;
 

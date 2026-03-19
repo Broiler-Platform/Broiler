@@ -3,7 +3,7 @@ using Broiler.JavaScript.Core.Core.Clr;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
 
 namespace Broiler.JavaScript.Core.Enumerators;
 

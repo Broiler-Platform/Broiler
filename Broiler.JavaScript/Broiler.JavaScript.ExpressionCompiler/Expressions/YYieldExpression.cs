@@ -1,6 +1,6 @@
 ﻿using System.CodeDom.Compiler;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YYieldExpression(YExpression arg, bool @delegate) : YExpression(YExpressionType.Yield, arg.Type)
 {

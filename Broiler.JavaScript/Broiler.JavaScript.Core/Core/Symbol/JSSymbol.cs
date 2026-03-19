@@ -1,9 +1,9 @@
 ﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
 using System.Threading;
-using Yantra.Core;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core;
 
 [JSBaseClass("Object")]
 [JSFunctionGenerator("Symbol")]

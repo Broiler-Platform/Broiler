@@ -1,13 +1,13 @@
-﻿using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Error;
+using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Storage;
-using Broiler.JavaScript.Core.Debugger;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace YantraJS.Core.Debugger;
+namespace Broiler.JavaScript.Core.Debugger;
 
 
 public partial class V8Runtime(V8InspectorProtocol inspectorContext) : V8ProtocolObject(inspectorContext)

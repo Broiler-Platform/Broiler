@@ -1,5 +1,4 @@
 ﻿#nullable enable
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using System;
 using System.Collections;
@@ -7,7 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
-using YantraJS.Internals;
+using Broiler.JavaScript.ExpressionCompiler;
 
 namespace Broiler.JavaScript.Core;
 

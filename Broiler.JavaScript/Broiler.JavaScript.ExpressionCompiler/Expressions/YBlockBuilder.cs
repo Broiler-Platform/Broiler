@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
-using YantraJS.Core;
+﻿using Broiler.JavaScript.ExpressionCompiler.Core;
+using System.Collections.Generic;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YBlockBuilder
 {

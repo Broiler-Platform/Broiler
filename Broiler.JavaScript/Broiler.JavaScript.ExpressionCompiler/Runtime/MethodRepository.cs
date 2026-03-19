@@ -1,10 +1,10 @@
-﻿using System;
+﻿using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
+using System;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
-using YantraJS.ClosureSeparator;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.ExpressionCompiler.Runtime;
 
 public class MethodRepository : IMethodRepository
 {

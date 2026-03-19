@@ -3,15 +3,16 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using YantraJS.ClosureSeparator;
-using YantraJS.Expressions;
-using YantraJS.Generator;
+using Broiler.JavaScript.Generator;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.ExpressionCompiler.Runtime;
+using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.ExpressionCompiler;
 
 public interface IMethodRepository
 {
-    object Create(Box[] boxes, ulong id);
+    object Create(ClosureSeparator.Box[] boxes, ulong id);
     ulong RegisterNew(DynamicMethod d, string il, string exp, Type type);
 }
 
@@ -20,7 +21,7 @@ public static class ExpressionCompiler
 
     private static int id = 1;
 
-    internal static string GetUniqueName(in FunctionName name) => $"<YantraJSHidden>{name}<ID>{System.Threading.Interlocked.Increment(ref id)}";
+    internal static string GetUniqueName(in FunctionName name) => $"<Broiler.JavaScriptHidden>{name}<ID>{System.Threading.Interlocked.Increment(ref id)}";
 
     private static ConstructorInfo locationConstructor = typeof(LocationAttribute).GetConstructor([
         typeof(string),

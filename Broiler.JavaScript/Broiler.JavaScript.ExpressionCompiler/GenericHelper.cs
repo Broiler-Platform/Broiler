@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Reflection;
 
-namespace YantraJS;
+namespace Broiler.JavaScript.ExpressionCompiler;
 
 
 public static class Generic

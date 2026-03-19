@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
-using YantraJS.Core;
-using Expression = YantraJS.Expressions.YExpression;
-using YantraJS.Expressions;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.ExpressionCompiler.Core;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 

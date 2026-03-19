@@ -2,7 +2,7 @@
 using System;
 using System.CodeDom.Compiler;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class YThrowExpression(YExpression exp, Type? type = null) : YExpression(YExpressionType.Throw, typeof(void))
 {

@@ -1,13 +1,13 @@
-﻿using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Yantra.Core;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Error;
 
 
 [JSClassGenerator("Error")]

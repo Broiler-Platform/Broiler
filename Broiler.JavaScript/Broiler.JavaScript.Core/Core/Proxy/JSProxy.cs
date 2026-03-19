@@ -1,9 +1,10 @@
-﻿using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Enumerators;
-using Yantra.Core;
+using Broiler.JavaScript.ExpressionCompiler;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.Core.Core.Proxy;
 
 [JSBaseClass("Object")]
 [JSFunctionGenerator("Proxy")]

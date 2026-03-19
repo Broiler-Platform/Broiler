@@ -1,6 +1,6 @@
 ﻿using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
-using YantraJS;
+using Broiler.JavaScript.ExpressionCompiler;
 
 namespace Broiler.JavaScript.Core;
 

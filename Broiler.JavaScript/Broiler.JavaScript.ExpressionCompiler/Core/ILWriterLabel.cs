@@ -1,7 +1,7 @@
 ﻿using System.Reflection.Emit;
 using System.Threading;
 
-namespace YantraJS.Core;
+namespace Broiler.JavaScript.ExpressionCompiler.Core;
 
 public class ILWriterLabel(Label value, string label, ILTryBlock tryBlock)
 {

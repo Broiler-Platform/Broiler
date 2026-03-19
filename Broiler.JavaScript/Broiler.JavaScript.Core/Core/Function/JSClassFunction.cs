@@ -1,6 +1,4 @@
-﻿using YantraJS.Core;
-
-namespace Broiler.JavaScript.Core.Core.Function;
+﻿namespace Broiler.JavaScript.Core.Core.Function;
 
 public class JSClassFunction(JSFunctionDelegate @delegate, in StringSpan name, in StringSpan source, int length = 0) : JSFunction(@delegate, name, source, length)
 {

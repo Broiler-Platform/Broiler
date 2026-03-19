@@ -9,10 +9,12 @@ using Broiler.JavaScript.Core.CodeGen;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.Core.Core.Storage;
-using YantraJS.Core;
 using Broiler.JavaScript.Core.Core.Debug;
 using Broiler.JavaScript.Core.Debugger;
 using Broiler.JavaScript.Core.Emit;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Error;
 
 namespace Broiler.JavaScript.Core.Core;
 
@@ -199,7 +201,7 @@ public partial class JSContext : JSObject, IDisposable
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[YantraJS] ClearTimeout dispose error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[Broiler.JavaScript] ClearTimeout dispose error: {ex.Message}");
             }
         }
 
@@ -217,7 +219,7 @@ public partial class JSContext : JSObject, IDisposable
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[YantraJS] ClearInterval dispose error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[Broiler.JavaScript] ClearInterval dispose error: {ex.Message}");
             }
         }
 

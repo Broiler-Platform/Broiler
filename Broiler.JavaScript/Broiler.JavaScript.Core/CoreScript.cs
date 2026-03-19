@@ -5,8 +5,8 @@ using Broiler.JavaScript.Core.FastParser;
 using Broiler.JavaScript.Core.FastParser.Compiler;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using YantraJS.Core;
-using Exp = YantraJS.Expressions.YExpression;
+using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.Core.Core.Primitive;
 
 namespace Broiler.JavaScript.Core;
 

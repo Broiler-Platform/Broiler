@@ -1,9 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using Broiler.JavaScript.ExpressionCompiler.Core;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using YantraJS.Core;
 
-namespace YantraJS.Expressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public enum BindingType
 {

@@ -1,7 +1,4 @@
 ﻿#nullable enable
-using Broiler.JavaScript.Core.FastParser;
-using Broiler.JavaScript.Core.FastParser.Ast;
-
 namespace Broiler.JavaScript.Core.FastParser.Ast;
 
 public class AstReturnStatement(FastToken token, FastToken previousToken, AstExpression? target = null) : AstStatement(token, FastNodeType.ReturnStatement, previousToken)
