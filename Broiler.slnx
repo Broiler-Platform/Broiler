@@ -40,5 +40,6 @@
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Storage/Broiler.JavaScript.Storage.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.ExpressionCompiler/Broiler.JavaScript.ExpressionCompiler.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.JSClassGenerator/Broiler.JavaScript.JSClassGenerator.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.BuiltIns/Broiler.JavaScript.BuiltIns.csproj" />
   </Folder>
 </Solution>
