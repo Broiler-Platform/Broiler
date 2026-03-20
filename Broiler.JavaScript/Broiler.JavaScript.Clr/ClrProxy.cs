@@ -7,6 +7,7 @@ using Broiler.JavaScript.Core.Core.Date;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Enumerators;
 using Broiler.JavaScript.Core.Utils;
+using Broiler.JavaScript.Storage;
 using System;
 using System.Collections;
 using System.Collections.Generic;
