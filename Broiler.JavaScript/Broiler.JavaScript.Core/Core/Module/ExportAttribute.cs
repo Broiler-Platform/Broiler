@@ -1,13 +1,3 @@
-﻿using System;
-
-namespace Broiler.JavaScript.Core.Core.Module;
-
-/// <summary>
-/// Exports given Type as class
-/// </summary>
-/// <param name="name">Asterix '*' if null</param>
-[AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-public class ExportAttribute(string name = null) : Attribute
-{
-    public string Name { get; } = name;
-}
+// ExportAttribute has been moved to Broiler.JavaScript.Runtime.
+// The type forward in AssemblyInfo.cs ensures binary compatibility.
+// See: Broiler.JavaScript.Runtime/ExportAttribute.cs

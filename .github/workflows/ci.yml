@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Nerdbank.GitVersioning needs full history
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore Broiler.JavaScript/YantraJS.sln
+
+      - name: Build
+        run: dotnet build Broiler.JavaScript/YantraJS.sln --no-restore
+
+      - name: Test — Core
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Core.Tests/Broiler.JavaScript.Core.Tests.csproj --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+      - name: Test — Ast
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Ast.Tests/Broiler.JavaScript.Ast.Tests.csproj --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+      - name: Test — Parser
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Parser.Tests/Broiler.JavaScript.Parser.Tests.csproj --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+      - name: Test — Storage
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Storage.Tests/Broiler.JavaScript.Storage.Tests.csproj --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+      - name: Test — Debugger
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Debugger.Tests/Broiler.JavaScript.Debugger.Tests.csproj --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+      - name: Test — Clr
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Clr.Tests/Broiler.JavaScript.Clr.Tests.csproj --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+      - name: Test — Compiler
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Compiler.Tests/Broiler.JavaScript.Compiler.Tests.csproj --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+      - name: Test — Modules
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Modules.Tests/Broiler.JavaScript.Modules.Tests.csproj --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+      - name: Test — BuiltIns
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.BuiltIns.Tests/Broiler.JavaScript.BuiltIns.Tests.csproj --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+      - name: Test — Runtime
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Runtime.Tests/Broiler.JavaScript.Runtime.Tests.csproj --no-build --verbosity normal --collect:"XPlat Code Coverage"

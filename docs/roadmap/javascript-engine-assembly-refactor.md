@@ -22,7 +22,7 @@ scalability, and testability.
 | `Broiler.JavaScript.BuiltIns` | Broiler.JavaScript.BuiltIns | Extracted built-in objects (WeakRef, FinalizationRegistry, EventTarget, Event) | ✅ Extracted (Phase 6, partial) |
 | `Broiler.JavaScript.Compiler` | Broiler.JavaScript.Compiler | AST → LINQ Expression Tree compilation (`FastCompiler`, 40+ partial files) | ✅ Extracted (Phase 7) |
 | `Broiler.JavaScript.Modules` | Broiler.JavaScript.Modules | ES module system (`JSModuleContext`, `JSModule`, `ModuleCache`) | ✅ Extracted (Phase 8) |
-| `Broiler.JavaScript.Runtime` | Broiler.JavaScript.Runtime | Runtime contract interfaces (`IJSModuleResolver`); future home of execution context and value type system | 🆕 Created (Phase 5 prep) |
+| `Broiler.JavaScript.Runtime` | Broiler.JavaScript.Runtime | Runtime contract interfaces (`IJSModuleResolver`, `ExportAttribute`, `DefaultExportAttribute`); future home of execution context and value type system | 🔧 Active (Phase 9 prep — contracts being migrated) |
 | `Broiler.JavaScript.ExpressionCompiler` | Broiler.JavaScript.ExpressionCompiler | LINQ Expression Tree → IL compilation | Pre-existing |
 | `Broiler.JavaScript.JSClassGenerator` | Broiler.JavaScript.JSClassGenerator | Roslyn source generator for C#-to-JS bindings | Pre-existing |
 | `Broiler.JavaScript.Network` | YantraJS.Network | Fetch API / network module | Pre-existing |
@@ -38,7 +38,7 @@ scalability, and testability.
 | `Broiler.JavaScript.BuiltIns.Tests` | (test) | Unit tests for BuiltIns assembly (16 tests) | ✅ Created |
 | `Broiler.JavaScript.Compiler.Tests` | (test) | Unit tests for Compiler assembly (9 tests) | ✅ Created |
 | `Broiler.JavaScript.Modules.Tests` | (test) | Unit tests for Modules assembly (9 tests) | ✅ Created |
-| `Broiler.JavaScript.Runtime.Tests` | (test) | Unit tests for Runtime assembly (8 tests) | ✅ Created |
+| `Broiler.JavaScript.Runtime.Tests` | (test) | Unit tests for Runtime assembly (15 tests) | ✅ Created |
 
 ### 1.2 Problem
 
@@ -500,13 +500,16 @@ Each extraction phase follows the same steps:
 
 ### Milestone 5 — Runtime Extraction and `InternalsVisibleTo` Elimination (Phases 9–10)
 
-**Status:** ⏳ Phase 10 substantially complete — see progress notes below
+**Status:** ⏳ Phase 10 complete; Phase 9 in progress — contract migration started
 
 **Phase 9 — Runtime Extraction:**
-- [ ] Phase 9a: Move `KeyString`/`KeyStrings` to Ast; move `JSProperty`,
-  `PropertySequence`, `ElementArray` to Storage (with interface-typed fields).
-  *Blocked: `KeyString` depends on `JSSymbol`, `JSValue`, and `JSString`; see
-  Phase 9 feasibility analysis below.*
+- [x] Move `IJSModuleResolver` to Runtime. ✅ (2026-03-20)
+- [x] Move `ExportAttribute` and `DefaultExportAttribute` to Runtime. ✅ (2026-03-20)
+- [ ] Phase 9a: Move `KeyString`/`KeyStrings` to Runtime (not Ast — blocked by
+  `JSSymbol`/`JSValue`/`JSString` dependencies; deferred until after Phase 9b).
+- [ ] Phase 9a: Move `JSProperty`, `PropertySequence`, `ElementArray` to Storage
+  (with interface-typed fields). *Blocked until Phase 9b resolves the
+  `JSValue`/`JSFunction` dependency.*
 - [ ] Phase 9b: Move `JSValue`, `JSObject`, `JSFunction`, `JSContext`,
   `Arguments`, `CoreScript`, `Bootstrap` to Runtime.
 - [ ] Move remaining contract interfaces (`IBuiltInRegistry`, `IClrInterop`,
@@ -522,6 +525,8 @@ Each extraction phase follows the same steps:
 - [x] Update downstream consumers (`Broiler.Cli`, `Broiler.App`) to explicit
   satellite assembly references. ✅ (2026-03-20)
 - [x] Create `Broiler.JavaScript.All` meta-package. ✅ (2026-03-20)
+- [x] Create `.github/workflows/ci.yml` CI workflow. ✅ (2026-03-20)
+- [x] Integrate `coverlet` coverage measurement into CI. ✅ (2026-03-20)
 
 **Key Metrics (target):**
 - Zero `InternalsVisibleTo` migration bridges remain (test-access-only entries
@@ -531,6 +536,8 @@ Each extraction phase follows the same steps:
   in Runtime. ⏳ *Blocked by Phase 9.*
 - All downstream consumers build and run against the new assembly structure. ✅
 - Each assembly has ≥ 90% line coverage in its dedicated test project. ⏳
+  *Coverage collection now enabled via `coverlet.collector` in all 10 test
+  projects; CI collects `XPlat Code Coverage` data.*
 
 ---
 
@@ -691,7 +698,7 @@ Each extracted assembly must have a corresponding test project:
 | Ast | `Broiler.JavaScript.Ast.Tests` | Node construction, token/span types, enum coverage | ✅ 73 tests |
 | Parser | `Broiler.JavaScript.Parser.Tests` | Parsing correctness for all JS constructs, tokenization, keyword maps | ✅ 78 tests |
 | Compiler | `Broiler.JavaScript.Compiler.Tests` | Expression tree generation, generator rewriting | ✅ 9 tests |
-| Runtime | `Broiler.JavaScript.Runtime.Tests` | `IJSModuleResolver` contract, stub implementations, multi-resolver independence | ✅ 8 tests |
+| Runtime | `Broiler.JavaScript.Runtime.Tests` | `IJSModuleResolver` contract, `ExportAttribute`/`DefaultExportAttribute`, stub implementations, multi-resolver independence | ✅ 15 tests |
 | Storage | `Broiler.JavaScript.Storage.Tests` | Property map operations, hash collision handling, `JSPropertyAttributes` | ✅ 76 tests |
 | BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | WeakRef, FinalizationRegistry, EventTarget, Event, AdditionalRegistrations | ✅ 16 tests |
 | Clr | `Broiler.JavaScript.Clr.Tests` | ClrProxy marshalling, ClrType caching, DefaultClrInterop, expression builder registration | ✅ 29 tests |
@@ -733,7 +740,7 @@ consumers need only change one `<ProjectReference>`.
 | **Test coverage gaps** | Require each phase to achieve ≥ 90% line coverage on the extracted assembly before merging. | ⏳ All 10 assemblies have dedicated test projects (962 tests total). Coverage measurement tooling (e.g., `coverlet`) to be integrated into CI. |
 | **Scope creep** | Each phase is a self-contained PR. No functional changes — only structural moves and interface introductions. | ✅ Active — enforced through Phases 1–8. |
 | **Module initializer ordering** | Satellite assemblies (Clr, Compiler, Modules, BuiltIns) register via `[ModuleInitializer]`. Test projects must ensure assemblies are loaded before `JSContext` creation. | ✅ Mitigated — test bootstraps use `RuntimeHelpers.RunModuleConstructor`. Document in contributor guide. |
-| **`InternalsVisibleTo` bridge accumulation** | Track all bridges in Section 6.3. Each phase must reduce bridge count — never increase. Target zero migration bridges by Phase 10. | ⏳ Debugger bridge fully removed. Clr: 34 → target 0. Compiler: ~6 → target 0. |
+| **`InternalsVisibleTo` bridge accumulation** | Track all bridges in Section 6.3. Each phase must reduce bridge count — never increase. Target zero migration bridges by Phase 10. | ✅ All migration bridges eliminated. Only `Core.Tests`, `Runtime` (dynamic assembly), and `WebAtoms.XF` (external) entries remain. |
 | **External consumer breakage (`WebAtoms.XF`)** | Coordinate with external teams before removing `InternalsVisibleTo` entries. Provide migration guide and deprecation timeline. | ⏳ `WebAtoms.XF` entry retained. No removal planned without external coordination. |
 
 ---
@@ -761,11 +768,11 @@ The refactor is complete when:
 | # | Criterion | Status |
 |---|-----------|--------|
 | 1 | Core decomposed into separate assemblies | ⏳ 8 of 11 target assemblies extracted. Core still contains value type system (`JSValue`, `JSContext`, etc.) pending Phase 9. |
-| 2 | Each assembly has test project with ≥ 90% coverage | ⏳ All 10 assemblies have test projects (962 tests). Coverage measurement not yet integrated into CI. |
+| 2 | Each assembly has test project with ≥ 90% coverage | ⏳ All 10 assemblies have test projects (969 tests). Coverage measurement integrated into CI via `coverlet.collector`. |
 | 3 | All existing Core.Tests pass | ✅ 641 Core.Tests pass. |
 | 4 | Downstream consumers build correctly | ✅ Explicit satellite assembly references added to `Broiler.Cli` and `Broiler.App`. |
 | 5 | No `InternalsVisibleTo` migration bridges | ✅ All migration bridges eliminated — Debugger (Phase 4), Clr (Phase 10), Compiler (Phase 10). Only `Core.Tests`, `Runtime` (dynamic assembly), and `WebAtoms.XF` (external) entries remain. |
-| 6 | CI pipeline covers all assemblies | ✅ `.github/workflows/ci.yml` runs 10 test projects on 3 platforms. |
+| 6 | CI pipeline covers all assemblies | ✅ `.github/workflows/ci.yml` runs 10 test projects on 3 platforms with `coverlet` code coverage collection. |
 | 7 | No circular dependencies | ✅ Verified — all assemblies follow unidirectional dependency graph. |
 | 8 | Downstream build instructions updated | ✅ Section 11 documents migration steps; `Broiler.Cli` and `Broiler.App` updated with explicit references. |
 
@@ -785,8 +792,8 @@ The refactor is complete when:
 | 6 | BuiltIns | ⏳ Partial | 2026-03-20 | Deep structural coupling (JSArray 13, JSString 8, JSRegExp 7, JSError 6, JSPromise, JSProxy); internal field access (DataView, JSJSON, JSReflect). |
 | 7 | Compiler | ✅ Complete | 2026-03-20 | `InternalsVisibleTo` bridge **removed** ✅. |
 | 8 | Modules | ✅ Complete | 2026-03-20 | — |
-| 9 | Runtime | 🔲 Planning | — | Circular dependency between Runtime↔Storage; `KeyString` depends on `JSSymbol`/`JSValue`/`JSString` (see Section 10 feasibility analysis). |
-| 10 | Cleanup | ⏳ Substantially complete | 2026-03-20 | Clr and Compiler bridges removed; legacy entry removed; downstream consumers updated. Meta-package creation pending. |
+| 9 | Runtime | ⏳ In progress | 2026-03-20 | `IJSModuleResolver` + `ExportAttribute` + `DefaultExportAttribute` moved; Phase 9b (JSValue/JSContext move) blocked by circular dependency between Runtime↔Storage; `KeyString` depends on `JSSymbol`/`JSValue`/`JSString` (see Section 10 feasibility analysis). |
+| 10 | Cleanup | ✅ Complete | 2026-03-20 | All migration bridges removed; meta-package created; downstream consumers updated; CI workflow created; coverlet coverage integrated. |
 
 ### Phase 1 — Ast Extraction ✅
 
@@ -1770,8 +1777,8 @@ Extracted `JSModuleContext`, `JSModule`, and `ModuleCache` into a new
 | Broiler.JavaScript.Compiler.Tests | 9 | ✅ Pass |
 | Broiler.JavaScript.Modules.Tests | 9 | ✅ Pass |
 | Broiler.JavaScript.BuiltIns.Tests | 16 | ✅ Pass |
-| Broiler.JavaScript.Runtime.Tests | 8 | ✅ Pass |
-| **Total** | **962** | **✅ All Pass** |
+| Broiler.JavaScript.Runtime.Tests | 15 | ✅ Pass |
+| **Total** | **969** | **✅ All Pass** |
 
 ### Continued Implementation Progress (2026-03-20, Phase 3–5)
 
@@ -1861,6 +1868,8 @@ conversion is deferred because:
 | `IDebugger` | Core | References `JSValue` |
 | `IJSCompiler` | Core | References `JSFunctionDelegate`, `ICodeCache` |
 | `IJSModuleResolver` | **Runtime** ✅ | — |
+| `ExportAttribute` | **Runtime** ✅ | — |
+| `DefaultExportAttribute` | **Runtime** ✅ | — |
 
 These interfaces will move to Runtime once `JSValue`, `JSContext`, and
 `JSFunctionDelegate` are extracted from Core to Runtime (full Phase 5).
@@ -2031,26 +2040,30 @@ All remaining Compiler internal accesses were resolved by making APIs public:
   (blocked by internal API access for DataView, JSON, Reflect, Proxy; blocked by
   deep structural coupling for Array, String, Number, Error, Promise, etc. —
   **partially blocked by Phase 10 API changes**)
-- [ ] Phase 9a — move `KeyString`/`KeyStrings` to Ast; move `JSProperty`,
+- [ ] Phase 9a — move `KeyString`/`KeyStrings` to Runtime (deferred until after
+  Phase 9b — depends on `JSSymbol`/`JSValue`/`JSString`); move `JSProperty`,
   `PropertySequence`, `ElementArray` to Storage with interface-typed fields
 - [ ] Phase 9b — move `JSValue`, `JSObject`, `JSFunction`, `JSContext`,
   `Arguments`, `CoreScript`, `Bootstrap` to Runtime
-- [ ] Phase 10 — resolve all `InternalsVisibleTo` bridges, create meta-package,
-  update downstream consumers (see Section 14)
+- [x] Phase 10 — resolve all `InternalsVisibleTo` bridges, create meta-package,
+  update downstream consumers ✅ (2026-03-20)
 
 **Infrastructure:**
 
 - [x] Update downstream consumers (Broiler.App, Broiler.Cli) to reference
   `Broiler.JavaScript.All` meta-package ✅ (2026-03-20)
-- [x] Cross-platform CI build/test matrix (Linux/macOS/Windows) — ✅ added
-  `.github/workflows/ci.yml`; covers all 10 test projects
-- [x] `Broiler.JavaScript.Runtime.Tests` project created — ✅ 8 tests covering
-  `IJSModuleResolver` contract
+- [x] Cross-platform CI build/test matrix (Linux/macOS/Windows) — ✅ created
+  `.github/workflows/ci.yml`; covers all 10 test projects with
+  `coverlet` coverage collection (2026-03-20)
+- [x] `Broiler.JavaScript.Runtime.Tests` project created — ✅ 15 tests covering
+  `IJSModuleResolver` contract and `ExportAttribute`/`DefaultExportAttribute`
 - [x] Create `Broiler.JavaScript.All` meta-package for convenience references ✅
   (2026-03-20)
 - [x] Add missing extracted assemblies to solution file (Clr, Compiler, Modules,
   BuiltIns, their test projects, Runtime.Tests, All) ✅ (2026-03-20)
-- [ ] Integrate `coverlet` coverage measurement into CI (target: ≥ 90% per assembly)
+- [x] Integrate `coverlet` coverage measurement into CI ✅ (2026-03-20) —
+  `coverlet.collector` v6.0.2 added to all 10 test projects; CI collects
+  `XPlat Code Coverage` data on each test run
 
 ---
 
@@ -2109,7 +2122,7 @@ The primary blocker is a circular dependency between Runtime and Storage:
 - [ ] Move `JSProperty`, `PropertySequence`, `ElementArray` to Storage.
 - [ ] Update all Storage.Tests to verify interface-typed fields.
 - [ ] Verify no circular dependencies with `dotnet list reference`.
-- [ ] Run full test suite (962+ tests) — all pass.
+- [ ] Run full test suite (969+ tests) — all pass.
 
 **Phase 9b — Value Type System (target: after 9a):**
 
@@ -2220,12 +2233,14 @@ Both `Broiler.App` and `Broiler.Cli` now reference the meta-package:
 ### Workflow
 
 A GitHub Actions CI workflow has been added at `.github/workflows/ci.yml` that
-runs all 10 test projects on Ubuntu, Windows, and macOS:
+runs all 10 test projects on Ubuntu, Windows, and macOS with code coverage
+collection via `coverlet`:
 
 ```yaml
 # Trigger: push to main, pull requests to main
 # Matrix: ubuntu-latest, windows-latest, macos-latest
-# Steps: checkout → setup .NET 8 → restore → build → test (10 projects)
+# Steps: checkout (full depth) → setup .NET 8 → restore → build → test (10 projects)
+# Coverage: --collect:"XPlat Code Coverage" via coverlet.collector on each test step
 ```
 
 ### Test Matrix
@@ -2241,8 +2256,20 @@ runs all 10 test projects on Ubuntu, Windows, and macOS:
 | Compiler | `Broiler.JavaScript.Compiler.Tests` | 9 |
 | Modules | `Broiler.JavaScript.Modules.Tests` | 9 |
 | BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | 16 |
-| Runtime | `Broiler.JavaScript.Runtime.Tests` | 8 |
-| **Total** | **10 projects** | **962** |
+| Runtime | `Broiler.JavaScript.Runtime.Tests` | 15 |
+| **Total** | **10 projects** | **969** |
+
+### Coverage Configuration
+
+All 10 test projects include `coverlet.collector` v6.0.2 as a package reference.
+The CI workflow passes `--collect:"XPlat Code Coverage"` to each test step,
+generating Cobertura XML coverage reports in the test results directory.
+
+To run coverage locally:
+
+```bash
+dotnet test Broiler.JavaScript/Broiler.JavaScript.Runtime.Tests/ --collect:"XPlat Code Coverage"
+```
 
 ---
 
@@ -2352,7 +2379,7 @@ runs all 10 test projects on Ubuntu, Windows, and macOS:
 
 ### Phase 10 — InternalsVisibleTo Elimination and Downstream Updates (2026-03-20)
 
-**Status:** Substantially complete
+**Status:** ✅ Complete
 
 **Date:** 2026-03-20
 
@@ -2450,7 +2477,7 @@ Use this checklist when contributing to or reviewing any extraction phase PR.
   `coverlet` to measure coverage.
 - [ ] **All existing tests pass.** Run the full test suite
   (`dotnet test Broiler.JavaScript/Broiler.JavaScript.*.Tests/`) and confirm
-  all **962+** tests pass across 10 projects.
+  all **969+** tests pass across 10 projects.
 - [ ] **CI passes on all platforms.** Verify the GitHub Actions CI workflow
   (`.github/workflows/ci.yml`) succeeds on Ubuntu, Windows, and macOS.
 - [ ] **Downstream build instructions are updated.** If the change adds a new
@@ -2505,7 +2532,7 @@ Use this checklist when contributing to or reviewing any extraction phase PR.
 | BuiltIns | ✅ 16 | ✅ | ✅ | N/A | ✅ |
 | Compiler | ✅ 9 | ✅ | ✅ | ✅ Removed | ✅ |
 | Modules | ✅ 9 | ✅ | ✅ | N/A | ✅ |
-| Runtime | ✅ 8 | ✅ | ✅ | ✅ Dynamic assembly (required) | ✅ |
+| Runtime | ✅ 15 | ✅ | ✅ | ✅ Dynamic assembly (required) | ✅ |
 
 ---
 
@@ -2560,10 +2587,11 @@ downstream consumers to use explicit assembly references.
    - ✅ `Broiler.App`: updated to single `Broiler.JavaScript.All` reference
      (replaces Core + 5 explicit satellite references).
 
-6. **Integrate coverage measurement into CI:** ⏳ Pending
-   - Add `coverlet` to all test projects.
-   - Configure CI to report line coverage per assembly.
-   - Enforce ≥ 90% line coverage gate on extraction PRs.
+6. **Integrate coverage measurement into CI:** ✅ **Complete** (2026-03-20)
+   - ✅ `coverlet.collector` v6.0.2 added to all 10 test projects.
+   - ✅ CI configured to collect `XPlat Code Coverage` on each test step.
+   - ⏳ Coverage report aggregation and ≥ 90% enforcement gate to be added
+     when coverage baselines are established.
 
 ### Phase 9 — KeyString/KeyStrings Feasibility Analysis
 
@@ -2627,7 +2655,7 @@ file to include all extracted assemblies and their test projects.
 
 ### Verification
 
-All 962 tests pass across 10 test projects:
+All 969 tests pass across 10 test projects:
 
 | Assembly | Tests | Status |
 |----------|-------|--------|
@@ -2640,8 +2668,8 @@ All 962 tests pass across 10 test projects:
 | Compiler | 9 | ✅ Pass |
 | Modules | 9 | ✅ Pass |
 | BuiltIns | 16 | ✅ Pass |
-| Runtime | 8 | ✅ Pass |
-| **Total** | **962** | ✅ |
+| Runtime | 15 | ✅ Pass |
+| **Total** | **969** | ✅ |
 
 ### InternalsVisibleTo Validation
 
@@ -2656,6 +2684,10 @@ Confirmed that Core's `AssemblyInfo.cs` contains only three
 
 ### Remaining Work
 
+- [x] Move `IJSModuleResolver` to Runtime ✅ (2026-03-20)
+- [x] Move `ExportAttribute`/`DefaultExportAttribute` to Runtime ✅ (2026-03-20)
+- [x] Integrate `coverlet` coverage measurement into CI ✅ (2026-03-20)
+- [x] Create `.github/workflows/ci.yml` CI workflow ✅ (2026-03-20)
 - [ ] Phase 9a — Move `KeyString`/`KeyStrings` to Runtime (blocked by JSSymbol/
   JSValue/JSString dependencies; deferred until Phase 9b)
 - [ ] Phase 9b — Move `JSValue`, `JSObject`, `JSFunction`, `JSContext`,
@@ -2664,8 +2696,84 @@ Confirmed that Core's `AssemblyInfo.cs` contains only three
   `IJSCompiler`) to Runtime (blocked by Phase 9b)
 - [ ] Phase 6 continued — Extract additional built-in types to BuiltIns
   (blocked by deep structural coupling)
-- [ ] Integrate `coverlet` coverage measurement into CI (target: ≥ 90% per
-  assembly)
+- [ ] Add coverage report aggregation and ≥ 90% enforcement gate to CI
+
+---
+
+### Continued Implementation Progress (2026-03-20, Runtime Contract Migration)
+
+**Date:** 2026-03-20
+
+**Contributor:** @copilot
+
+**What was done:**
+
+1. **Moved `ExportAttribute` and `DefaultExportAttribute` to Runtime assembly:**
+   - Created `Broiler.JavaScript.Runtime/ExportAttribute.cs` and
+     `Broiler.JavaScript.Runtime/DefaultExportAttribute.cs`.
+   - Preserved namespace `Broiler.JavaScript.Core.Core.Module` for backward
+     compatibility.
+   - Added `[assembly: TypeForwardedTo(typeof(ExportAttribute))]` and
+     `[assembly: TypeForwardedTo(typeof(DefaultExportAttribute))]` to Core's
+     `AssemblyInfo.cs`.
+   - Core source files replaced with comments pointing to Runtime.
+   - These attribute types have zero runtime dependencies — they extend
+     `System.Attribute` only — making them ideal candidates for early Runtime
+     migration.
+
+2. **Created `.github/workflows/ci.yml`:**
+   - Multi-platform matrix: Ubuntu, Windows, macOS.
+   - Full checkout depth for Nerdbank.GitVersioning compatibility.
+   - Build all projects via `YantraJS.sln`.
+   - Run all 10 test projects with `--collect:"XPlat Code Coverage"`.
+   - Note: The roadmap previously documented CI as existing, but the workflow
+     file was not present in the repository. This is now corrected.
+
+3. **Added `coverlet.collector` v6.0.2 to all 10 test projects:**
+   - Core.Tests, Ast.Tests, Parser.Tests, Storage.Tests, Debugger.Tests,
+     Clr.Tests, Compiler.Tests, Modules.Tests, BuiltIns.Tests, Runtime.Tests.
+   - Coverage data collected in Cobertura XML format by CI.
+
+4. **Added 7 new Runtime tests** for `ExportAttribute`/`DefaultExportAttribute`:
+   - Default name (null), custom name, attribute inheritance, assembly location.
+   - Runtime.Tests now has 15 tests (was 8).
+
+5. **Phase 9 type movability analysis performed:**
+   - Analyzed all types in `Broiler.JavaScript.Core/Core/` for movability to
+     Runtime (which depends only on Ast and Storage).
+   - **Movable types (3):** `ExportAttribute` ✅ moved, `DefaultExportAttribute`
+     ✅ moved, `CancellableDisposableAction` (utility, only uses `System` APIs).
+   - **Blocked types (9+):** `ICodeCache`, `DictionaryCodeCache`,
+     `JSFunctionDelegate`, `JSClosureFunctionDelegate`, `UniqueID`,
+     `CallStackItem`, `JSConstants`, `JSException`, `PrototypeAttribute` — all
+     reference `JSValue`, `JSContext`, `JSFunction`, or other Core types.
+   - **Key insight:** The only types movable to Runtime before Phase 9b
+     (JSValue/JSContext migration) are pure data/attribute types with no
+     runtime dependencies. The vast majority of Core types form a tightly
+     coupled graph anchored by `JSValue` and `JSContext`.
+
+6. **Roadmap document comprehensively updated:**
+   - Project Inventory table: Runtime status updated; Runtime.Tests count
+     updated to 15.
+   - Milestone 5: Phase 9 progress noted (contracts being migrated); Phase 10
+     marked complete; CI and coverlet integration marked done.
+   - Phase Progress Summary: Phase 9 updated to "In progress"; Phase 10
+     updated to "Complete".
+   - Success Criteria: Coverage and CI metrics updated.
+   - Testing Requirements: Runtime tests updated to 15.
+   - Test Matrix: Runtime updated to 15; total to 969.
+   - Contracts table: ExportAttribute/DefaultExportAttribute added as moved.
+   - CI/CD section: Coverage configuration documented; local usage instructions
+     added.
+   - Risk Mitigation: Bridge accumulation risk updated to "Complete".
+   - Phase 14 (Cleanup): Coverage integration marked complete.
+   - Remaining Work: Restructured with completed items and detailed blockers.
+
+**Verification:**
+- All 10 production assemblies compile with zero errors.
+- All **969** tests pass across 10 test projects:
+  - Core: 641, Ast: 73, Parser: 78, Storage: 76, Debugger: 23, Clr: 29,
+    Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 15.
 
 ---
 
