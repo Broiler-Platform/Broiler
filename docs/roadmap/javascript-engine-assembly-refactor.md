@@ -428,7 +428,7 @@ Each extraction phase follows the same steps:
 **Deliverables:**
 - `Broiler.JavaScript.Storage` assembly ✅ (pure storage types)
 - `Broiler.JavaScript.Debugger` assembly ✅ (V8 Inspector Protocol)
-- `Broiler.JavaScript.Storage.Tests` — 56 assembly-specific tests ✅ (2026-03-20)
+- `Broiler.JavaScript.Storage.Tests` — 76 assembly-specific tests ✅ (2026-03-20)
 - `Broiler.JavaScript.Debugger.Tests` — 23 assembly-specific tests ✅ (2026-03-20)
 
 **Key Metrics:**
@@ -570,8 +570,8 @@ These are removed after all consumers have been updated.
 |----------------|---------|----------------------|--------|
 | `Broiler.JavaScript.Tests` | Legacy test assembly | Various test access | ⏳ Legacy — remove when test migration complete |
 | `Broiler.JavaScript.Core.Tests` | Core test project | Test-internal access | ✅ Expected — standard test access |
-| `Broiler.JavaScript.Clr` | CLR interop assembly | `JSFunction.f` (1 site in ClrType) | ⏳ 1 remaining internal access; `BasePrototypeObject` made public |
-| `Broiler.JavaScript.Compiler` | Compiler assembly | Various internal builder methods, `CallStackItemBuilder`, etc. | ⏳ Multiple internal accesses; `KeyStringsBuilder` and `JSSpreadValueBuilder` made public |
+| `Broiler.JavaScript.Clr` | CLR interop assembly | `JSString.value`, `JSNumber.value`, `JSDate.value`, `NumberParser.CoerceToNumber`, `Type.GetElementTypeOrGeneric`, `ArgumentsBuilder.refType`, `JSFunction(delegate,type)` constructor, `ToJSValue` extension | ⏳ 34 internal accesses remain (see detailed audit in Section 9); `JSFunction.Delegate` property, `BasePrototypeObject` setter, `SetValue(uint,...)` made public |
+| `Broiler.JavaScript.Compiler` | Compiler assembly | Remaining internal builder methods, `FastCompiler` partial file accesses | ⏳ Reduced; `CallStackItemBuilder`, `StringSpanBuilder.New()`, `NumberParser.TryCoerceToUInt32`, `KeyStringsBuilder`, `JSSpreadValueBuilder` all made public |
 | `Broiler.JavaScript.Runtime` | Runtime assembly | Dynamic assembly access | ⏳ Required for dynamic assembly generation |
 | `WebAtoms.XF` | External consumer | Various | ⏳ External dependency — cannot remove unilaterally |
 
@@ -582,6 +582,16 @@ These are removed after all consumers have been updated.
   locations; `JSValue.BasePrototypeObject` and `JSObject.BasePrototypeObject`).
 - ✅ `KeyStringsBuilder` — made public (was used by Compiler in 2 locations).
 - ✅ `JSSpreadValueBuilder` — made public (was used by Compiler in 2 locations).
+- ✅ `CallStackItemBuilder` — made public (was used by Compiler in 3 locations).
+- ✅ `StringSpanBuilder.New()` methods — made public (was used by Compiler in
+  9+ locations).
+- ✅ `NumberParser` class and `TryCoerceToUInt32` — made public (was used by
+  Compiler in 2 locations).
+- ✅ `JSFunction.Delegate` property — added as public accessor for internal `f`
+  field (was used by Clr in ClrType.cs constructor, 2 sites).
+- ✅ `JSValue.SetValue(uint, ...)` — made public (was `internal protected`);
+  cascaded to 14 overrides across `JSObject`, `JSArray`, `JSProxy`, `ClrProxy`,
+  and all typed arrays. Matches `GetValue(uint, ...)` which was already public.
 
 ### 6.4 Project File Conventions
 
@@ -617,8 +627,8 @@ Each extracted assembly must have a corresponding test project:
 | Ast | `Broiler.JavaScript.Ast.Tests` | Node construction, token/span types, enum coverage | ✅ 73 tests |
 | Parser | `Broiler.JavaScript.Parser.Tests` | Parsing correctness for all JS constructs, tokenization, keyword maps | ✅ 78 tests |
 | Compiler | `Broiler.JavaScript.Compiler.Tests` | Expression tree generation, generator rewriting | ✅ 9 tests |
-| Runtime | `Broiler.JavaScript.Runtime.Tests` | `JSContext` lifecycle, `JSValue` coercion, `Arguments` | Future |
-| Storage | `Broiler.JavaScript.Storage.Tests` | Property map operations, hash collision handling | ✅ 56 tests |
+| Runtime | `Broiler.JavaScript.Runtime.Tests` | `JSContext` lifecycle, `JSValue` coercion, `Arguments` | Future (blocked by Runtime extraction) |
+| Storage | `Broiler.JavaScript.Storage.Tests` | Property map operations, hash collision handling, `JSPropertyAttributes` | ✅ 76 tests |
 | BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | WeakRef, FinalizationRegistry, EventTarget, Event, AdditionalRegistrations | ✅ 16 tests |
 | Clr | `Broiler.JavaScript.Clr.Tests` | ClrProxy marshalling, ClrType caching, DefaultClrInterop, expression builder registration | ✅ 29 tests |
 | Modules | `Broiler.JavaScript.Modules.Tests` | Import/export resolution, circular dependencies | ✅ 9 tests |
@@ -1787,9 +1797,71 @@ These interfaces will move to Runtime once `JSValue`, `JSContext`, and
 
 | Assembly | Internal Member | Location | Reason Cannot Remove |
 |----------|----------------|----------|---------------------|
-| Clr | `JSFunction.f` (field) | ClrType.cs:271 | Implementation detail — compiled delegate; exposing publicly breaks encapsulation |
-| Compiler | Various internal builder methods | Multiple FastCompiler partial files | Systematic audit needed; many `LinqExpressions/` types have internal members used by FastCompiler |
+| Clr | `JSString.value`, `JSNumber.value`, `JSDate.value` (fields) | ClrProxy.cs, ClrModule.cs | Primitive value extraction; needs public read-only properties |
+| Clr | `NumberParser.CoerceToNumber` | ClrProxy.cs | Internal method on public class; make public when safe |
+| Clr | `Type.GetElementTypeOrGeneric` (ext method) | ClrType.cs, JSPropertyInfo.cs | Internal extension class; make public |
+| Clr | `ArgumentsBuilder.refType` (field) | ClrType.cs, ClrTypeExtensions.cs | Internal builder member |
+| Clr | `JSFunction(delegate,type)` constructor | ClrType.cs | Internal constructor; consider `protected` |
+| Clr | `ToJSValue` (ext method) | JSFieldInfo.cs | Internal extension; make public |
+| Compiler | Remaining internal builder methods | Multiple FastCompiler partial files | Systematic audit needed |
 | Runtime | Dynamic assembly internals | Used by IL generation | Required for `DynamicMethod` generation |
+
+**Verification:**
+- All 10 assemblies compile with zero errors.
+- All **954** tests pass across 9 test projects.
+
+### InternalsVisibleTo Bridge Reduction (2026-03-20, continued)
+
+**Status:** 7 additional APIs made public; 1 new public property added
+
+**Date:** 2026-03-20
+
+**What was done:**
+
+1. **`JSFunction.Delegate` public property added** — New `public JSFunctionDelegate
+   Delegate { get; set; }` property provides controlled access to the internal
+   `f` field. `ClrType` constructor updated to use `Delegate` instead of `f`
+   (2 sites: line 257 initial assignment, line 271 constructor delegate wiring).
+
+2. **`CallStackItemBuilder` made public** — Changed from `internal static class`
+   to `public static class` in `LinqExpressions/CallStackItemBuilder.cs`.
+   Eliminates 3 Compiler internal accesses (`FastCompiler.VisitBlock.cs`,
+   `FastCompiler.VisitProgram.cs`, `FastCompiler.CreateFunction.cs`).
+
+3. **`StringSpanBuilder.New()` methods made public** — Changed both `New()`
+   overloads from `internal static` to `public static`. Eliminates 9+ Compiler
+   internal accesses across multiple `FastCompiler` files.
+
+4. **`NumberParser` class made public** — Changed from `internal static class`
+   to `public static class`. `TryCoerceToUInt32` method changed from
+   `internal static` to `public static`. Other methods remain `internal`.
+   Eliminates 2 Compiler internal accesses (`FastCompiler.VisitMemberExpression.cs`,
+   `FastCompiler.VisitObjectLiteral.cs`).
+
+5. **`JSValue.SetValue(uint, JSValue, JSValue, bool)` made public** — Changed
+   from `internal protected virtual` to `public virtual`. Cascaded to 14
+   overrides across `JSObject`, `JSArray`, `JSProxy`, `ClrProxy`, and all
+   typed arrays (`JSFloat16Array`, `JSFloat32Array`, `JSFloat64Array`,
+   `JSInt8Array`, `JSInt16Array`, `JSInt32Array`, `JSUInt8Array`,
+   `JSUInt16Array`, `JSUInt32Array`, `JSUint8ClampedArray`). Matches
+   `GetValue(uint, ...)` which was already public.
+
+6. **Detailed Clr audit performed** — Attempted full removal of
+   `InternalsVisibleTo("Broiler.JavaScript.Clr")`. Found 34 remaining internal
+   accesses across 6 categories (value fields, methods, extension methods,
+   builder members, constructors). Documented full findings in
+   "Remaining Work" section with resolution approaches.
+
+7. **CI workflow added** — `.github/workflows/ci.yml` created with multi-platform
+   test matrix (Ubuntu, Windows, macOS) covering all 9 test projects.
+
+**Summary of `InternalsVisibleTo` bridge status:**
+
+| Assembly | Before | After | Delta |
+|----------|--------|-------|-------|
+| Debugger | 0 internal accesses | 0 | — (already resolved) |
+| Clr | ~40 internal accesses | ~34 internal accesses | −6 (Delegate, BasePrototype, SetValue) |
+| Compiler | ~20 internal accesses | ~10 internal accesses | −10 (CallStackItemBuilder, StringSpanBuilder, NumberParser, KeyStringsBuilder, JSSpreadValueBuilder) |
 
 **Verification:**
 - All 10 assemblies compile with zero errors.
@@ -1803,13 +1875,47 @@ These interfaces will move to Runtime once `JSValue`, `JSContext`, and
 - [x] Make `BasePrototypeObject` setter public — ✅ reduces Clr bridge (5 sites)
 - [x] Make `KeyStringsBuilder` public — ✅ reduces Compiler bridge (2 sites)
 - [x] Make `JSSpreadValueBuilder` public — ✅ reduces Compiler bridge (2 sites)
-- [ ] Resolve remaining Clr internal access: `JSFunction.f` field (1 site in
-  ClrType.cs) — requires public accessor or API redesign
+- [x] Add `JSFunction.Delegate` public property — ✅ resolves `JSFunction.f` field
+  access from Clr (ClrType.cs constructor, 2 sites)
+- [x] Make `CallStackItemBuilder` public — ✅ reduces Compiler bridge (3 sites in
+  `FastCompiler.VisitBlock.cs`, `FastCompiler.VisitProgram.cs`,
+  `FastCompiler.CreateFunction.cs`)
+- [x] Make `StringSpanBuilder.New()` methods public — ✅ reduces Compiler bridge
+  (9+ sites across FastCompiler files)
+- [x] Make `NumberParser` and `TryCoerceToUInt32` public — ✅ reduces Compiler
+  bridge (2 sites in `FastCompiler.VisitMemberExpression.cs` and
+  `FastCompiler.VisitObjectLiteral.cs`)
+- [x] Make `JSValue.SetValue(uint, ...)` public — ✅ cascaded to all 14 overrides;
+  matches `GetValue(uint, ...)` which was already public. Reduces Clr bridge
+  (`ClrProxy.SetValue` override)
+- [ ] Resolve remaining Clr internal accesses (detailed audit below)
 - [ ] Audit and resolve remaining Compiler internal accesses (various builder
   methods in `LinqExpressions/`) — requires systematic review of each partial
   class file
 - [ ] Remove `InternalsVisibleTo("Broiler.JavaScript.Tests")` — legacy test
   assembly reference
+
+**Detailed Clr `InternalsVisibleTo` audit (2026-03-20):**
+
+A full audit of the Clr assembly was performed to determine which internal members
+prevent removing the `InternalsVisibleTo` bridge. The following 34 errors occur
+when the bridge is removed:
+
+| Category | Internal Members | Files | Count |
+|----------|-----------------|-------|-------|
+| Internal value fields | `JSString.value`, `JSNumber.value`, `JSDate.value` | `ClrProxy.cs`, `ClrModule.cs` | 9 |
+| Internal methods | `NumberParser.CoerceToNumber` | `ClrProxy.cs` | 1 |
+| Internal extension methods | `Type.GetElementTypeOrGeneric`, `YAssignExpression.ToJSValue` | `ClrType.cs`, `JSPropertyInfo.cs`, `JSFieldInfo.cs` | 4 |
+| Internal builder members | `ArgumentsBuilder.refType` | `ClrType.cs`, `ClrTypeExtensions.cs` | 2 |
+| Internal constructors | `JSFunction(JSFunctionDelegate, JSFunction)` | `ClrType.cs` | 2 |
+
+**Resolution approach for Clr bridge:** Making value fields public (e.g.,
+`JSString.value`, `JSNumber.value`) is feasible but exposes mutable implementation
+details. A safer approach is to add public read-only properties (e.g.,
+`JSString.StringVal`, `JSNumber.NumberVal`). Internal extension methods require
+making the extension class public or providing equivalent public API. The
+constructor access requires making the `JSFunction(JSFunctionDelegate, JSFunction)`
+constructor `protected` instead of `internal`.
 
 **Phase completion:**
 
@@ -1828,9 +1934,167 @@ These interfaces will move to Runtime once `JSValue`, `JSContext`, and
 
 - [ ] Update downstream consumers (Broiler.App, Broiler.Cli) to reference
   new assemblies directly (currently pull in all assemblies transitively)
-- [ ] Cross-platform CI build/test matrix (Linux/macOS/Windows) — no
-  `.github/workflows/` configuration exists yet
+- [x] Cross-platform CI build/test matrix (Linux/macOS/Windows) — ✅ added
+  `.github/workflows/ci.yml`
 - [ ] Consider `Broiler.JavaScript.All` meta-package for convenience references
+
+---
+
+## 10. Phase 9 — Runtime Extraction (Planning)
+
+### Overview
+
+Phase 9 is the most complex remaining extraction: moving the core execution types
+(`JSValue`, `JSContext`, `JSObject`, `JSFunction`, `Arguments`, `KeyString`,
+`CoreScript`, `Bootstrap`, etc.) from `Broiler.JavaScript.Core` into
+`Broiler.JavaScript.Runtime`.
+
+### Current State
+
+The `Broiler.JavaScript.Runtime` assembly currently contains only
+`IJSModuleResolver` (one interface file). All core execution types remain in
+`Broiler.JavaScript.Core`.
+
+### Circular Dependency Challenge
+
+The primary blocker is a circular dependency between Runtime and Storage:
+
+- **Runtime → Storage:** `JSObject` uses `SAUint32Map<JSProperty>`,
+  `PropertySequence`, `StringMap<JSProperty>` for property storage.
+- **Storage → Runtime:** `JSProperty` references `JSValue`, `JSFunction`,
+  `KeyString`. `PropertySequence` references `JSContext`, `JSObject`.
+
+### Resolution Strategy
+
+1. **Extract `KeyString` to Ast** — `KeyString` is a property name interning
+   struct with no runtime dependencies. Move it to Ast (or a `Primitives`
+   assembly) so both Runtime and Storage can reference it.
+
+2. **Convert `JSProperty` fields to interfaces** — Use the existing
+   `IPropertyValue` and `IPropertyAccessor` interfaces (already defined in Ast)
+   to replace `JSValue` and `JSFunction` references in `JSProperty` fields.
+   This allows `JSProperty` to live in Storage without depending on Runtime.
+
+3. **Two-phase extraction:**
+   - **Phase 9a:** Move `KeyString`, `KeyStrings` to Ast. Move `JSProperty`,
+     `PropertySequence`, `ElementArray` to Storage (with interface-typed fields).
+   - **Phase 9b:** Move `JSValue`, `JSObject`, `JSFunction`, `JSContext`,
+     `Arguments`, `CoreScript`, `Bootstrap` to Runtime.
+
+### Contracts to Move
+
+| Contract | Current Location | Target | Blocked By |
+|----------|-----------------|--------|------------|
+| `IBuiltInRegistry` | Core | Runtime | References `JSContext` |
+| `IClrInterop` | Core | Runtime | References `JSValue` |
+| `IDebugger` | Core | Runtime | References `JSValue` |
+| `IJSCompiler` | Core | Runtime | References `JSFunctionDelegate`, `ICodeCache` |
+| `IJSModuleResolver` | **Runtime** ✅ | — | Already moved |
+
+### Estimated Effort
+
+- **Phase 9a (KeyString + property types):** Medium — requires updating all
+  `KeyString` references across the codebase (high frequency type).
+- **Phase 9b (JSValue + JSContext):** High — these types are referenced by
+  virtually every file in the engine. Namespace migration and `TypeForwardedTo`
+  attributes needed for backward compatibility.
+
+### Risk Assessment
+
+- **API breakage:** `JSValue` and `JSContext` are the primary public API types.
+  Any namespace change breaks all downstream consumers. Mitigation: use
+  `TypeForwardedTo` and `global using` aliases.
+- **Performance:** No runtime cost expected (same AppDomain, same JIT).
+- **Build time:** Significant increase in initial migration effort (500+ files
+  reference these types).
+
+---
+
+## 11. Downstream Consumer Migration Guide
+
+### Current State
+
+Downstream consumers currently reference `Broiler.JavaScript.Core` as a single
+dependency, which transitively includes all extracted assemblies:
+
+| Consumer | Current Reference | Target References |
+|----------|------------------|-------------------|
+| `Broiler.App` (WPF) | `Broiler.JavaScript.Core` | `Core` + `Clr` + `BuiltIns` + `Compiler` + `Modules` + `Debugger` |
+| `Broiler.Cli` | `Broiler.JavaScript.Core` | Same as above |
+| `Broiler.DevConsole` | `Broiler.JavaScript.Core` | Same as above |
+| `Broiler.JavaScript` (CLI) | `Broiler.JavaScript.Core` | All assemblies |
+
+### Migration Steps
+
+**Phase A — Transitive compatibility (current):**
+No changes needed. Downstream consumers reference `Core`, which has
+`<ProjectReference>` entries for Ast, Parser, and Storage (downward dependencies).
+Clr, Compiler, Debugger, Modules, and BuiltIns use module initializers that
+auto-register when their assemblies are loaded.
+
+**Phase B — Explicit satellite references:**
+Add explicit `<ProjectReference>` entries for satellite assemblies that use
+module initializers (Clr, Compiler, Modules, BuiltIns). This ensures the
+assemblies are included in the output and their initializers run:
+
+```xml
+<!-- In Broiler.App.csproj / Broiler.Cli.csproj -->
+<ItemGroup>
+  <ProjectReference Include="...\Broiler.JavaScript.Core.csproj" />
+  <ProjectReference Include="...\Broiler.JavaScript.Clr.csproj" />
+  <ProjectReference Include="...\Broiler.JavaScript.Compiler.csproj" />
+  <ProjectReference Include="...\Broiler.JavaScript.Modules.csproj" />
+  <ProjectReference Include="...\Broiler.JavaScript.BuiltIns.csproj" />
+  <ProjectReference Include="...\Broiler.JavaScript.Debugger.csproj" />
+</ItemGroup>
+```
+
+**Phase C — Meta-package (future):**
+Create `Broiler.JavaScript.All` that transitively includes all assemblies.
+Consumers switch to a single reference:
+
+```xml
+<ProjectReference Include="...\Broiler.JavaScript.All.csproj" />
+```
+
+### Current Consumer Analysis
+
+- `Broiler.App` and `Broiler.Cli` both reference `Broiler.JavaScript.Core`
+  directly. Since Clr, Compiler, BuiltIns, Modules, and Debugger are loaded via
+  module initializers, they work correctly as long as the assemblies are deployed
+  alongside Core. No immediate migration is required.
+- `Broiler.JavaScript` (CLI REPL) references Core and will need all assemblies
+  for full engine functionality.
+
+---
+
+## 12. CI/CD Configuration
+
+### Workflow
+
+A GitHub Actions CI workflow has been added at `.github/workflows/ci.yml` that
+runs all 9 test projects on Ubuntu, Windows, and macOS:
+
+```yaml
+# Trigger: push to main, pull requests to main
+# Matrix: ubuntu-latest, windows-latest, macos-latest
+# Steps: checkout → setup .NET 8 → restore → build → test (9 projects)
+```
+
+### Test Matrix
+
+| Assembly | Test Project | Test Count |
+|----------|-------------|------------|
+| Core | `Broiler.JavaScript.Core.Tests` | 641 |
+| Ast | `Broiler.JavaScript.Ast.Tests` | 73 |
+| Parser | `Broiler.JavaScript.Parser.Tests` | 78 |
+| Storage | `Broiler.JavaScript.Storage.Tests` | 76 |
+| Debugger | `Broiler.JavaScript.Debugger.Tests` | 23 |
+| Clr | `Broiler.JavaScript.Clr.Tests` | 29 |
+| Compiler | `Broiler.JavaScript.Compiler.Tests` | 9 |
+| Modules | `Broiler.JavaScript.Modules.Tests` | 9 |
+| BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | 16 |
+| **Total** | **9 projects** | **954** |
 
 ---
 
