@@ -1452,6 +1452,103 @@ compatibility but is no longer required for the marshal calls.
   The upward-dependency pattern was already cleanly implemented — `JSContext`
   has no reverse references to `JSModuleContext`.
 
+### Phase 7 — Compiler Extraction (2026-03-20)
+
+**Status: Complete**
+
+Extracted `FastCompiler` and all 40+ partial classes, `FastFunctionScope`, and
+`StrictModeExtensions` into a new **`Broiler.JavaScript.Compiler`** assembly.
+
+**Architecture decisions:**
+- `DefaultJSCompiler` stays in Core with a **delegate registration pattern**
+  (mirrors `ClrProxyBuilder`).  The Compiler assembly's module initializer
+  calls `DefaultJSCompiler.Register(...)` to wire in the `FastCompiler`
+  pipeline.
+- `IJSCompiler` interface remains in Core — consumers depend only on the
+  interface.
+- `InternalsVisibleTo("Broiler.JavaScript.Compiler")` added to Core because
+  `FastCompiler` accesses internal builder methods
+  (`CallStackItemBuilder`, `StrictModeExtensions`, etc.).
+- Test projects use `RuntimeHelpers.RunModuleConstructor(typeof(FastCompiler).Module.ModuleHandle)`
+  in their bootstrap to ensure the Compiler assembly's module initializer runs.
+
+**Files moved:**
+- `FastCompiler.cs` + 35 partial files (`FastCompiler.Visit*.cs`, etc.)
+- `FastFunctionScope.cs`
+- `StrictModeExtensions.cs`
+
+**Files added:**
+- `Broiler.JavaScript.Compiler/CompilerAssemblyInitializer.cs`
+- `Broiler.JavaScript.Compiler/GlobalUsings.cs`
+- `Broiler.JavaScript.Compiler/Broiler.JavaScript.Compiler.csproj`
+
+**Files remaining in Core:**
+- `IJSCompiler.cs` (interface contract)
+- `DefaultJSCompiler.cs` (delegate-based dispatcher)
+
+**Test results:**
+- 9 new assembly-specific tests in `Broiler.JavaScript.Compiler.Tests`
+- All **641** Core tests pass.
+- All **29** Clr tests pass.
+- All **23** Debugger tests pass.
+
+### Phase 8 — Modules Extraction (2026-03-20)
+
+**Status: Complete**
+
+Extracted `JSModuleContext`, `JSModule`, and `ModuleCache` into a new
+**`Broiler.JavaScript.Modules`** assembly.
+
+**Architecture decisions:**
+- Follows the upward-dependency pattern: Modules references Core, not
+  vice-versa.
+- `ClrModuleProvider` static property moved from `JSModuleContext` to
+  `JSContext` so the Clr assembly can set it without referencing Modules.
+- `JSContext.WaitTask` changed from `internal` to `public` so
+  `JSModuleContext` can access it across the assembly boundary.
+- `Names.cs` with `[JSRegistrationGenerator]` enables JSModule source
+  generation in the new assembly (multi-assembly generator pattern).
+- `IJSModuleResolver`, `ExportAttribute`, `DefaultExportAttribute` remain
+  in Core as contract/attribute types.
+
+**Files moved:**
+- `JSModuleContext.cs`
+- `JSModule.cs`
+- `ModuleCache.cs`
+
+**Files added:**
+- `Broiler.JavaScript.Modules/Names.cs`
+- `Broiler.JavaScript.Modules/GlobalUsings.cs`
+- `Broiler.JavaScript.Modules/Broiler.JavaScript.Modules.csproj`
+
+**Test results:**
+- 9 new assembly-specific tests in `Broiler.JavaScript.Modules.Tests`
+- All **641** Core tests pass.
+
+### Updated Test Matrix (2026-03-20)
+
+| Assembly | Tests | Status |
+|----------|-------|--------|
+| Broiler.JavaScript.Ast.Tests | 73 | ✅ Pass |
+| Broiler.JavaScript.Parser.Tests | 78 | ✅ Pass |
+| Broiler.JavaScript.Storage.Tests | 56 | ✅ Pass |
+| Broiler.JavaScript.Core.Tests | 641 | ✅ Pass |
+| Broiler.JavaScript.Debugger.Tests | 23 | ✅ Pass |
+| Broiler.JavaScript.Clr.Tests | 29 | ✅ Pass |
+| Broiler.JavaScript.Compiler.Tests | 9 | ✅ Pass |
+| Broiler.JavaScript.Modules.Tests | 9 | ✅ Pass |
+| **Total** | **918** | **✅ All Pass** |
+
+### Remaining Work
+
+- [ ] Phase 6 — BuiltIns extraction (blocked by JSFunctionGenerator
+  namespace-linked partial classes; requires further JSClassGenerator work)
+- [ ] Remove `InternalsVisibleTo` for Compiler assembly where possible
+  (make required internal APIs public)
+- [ ] Update downstream consumers (Broiler.App, Broiler.Cli) to reference
+  new assemblies
+- [ ] Cross-platform CI build/test matrix (Linux/macOS/Windows)
+
 ---
 
 *This roadmap tracks the creation and documentation of the refactor plan, not
