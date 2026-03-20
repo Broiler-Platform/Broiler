@@ -22,7 +22,7 @@ scalability, and testability.
 | `Broiler.JavaScript.BuiltIns` | Broiler.JavaScript.BuiltIns | Extracted built-in objects (WeakRef, FinalizationRegistry, EventTarget, Event) | ✅ Extracted (Phase 6, partial) |
 | `Broiler.JavaScript.Compiler` | Broiler.JavaScript.Compiler | AST → LINQ Expression Tree compilation (`FastCompiler`, 40+ partial files) | ✅ Extracted (Phase 7) |
 | `Broiler.JavaScript.Modules` | Broiler.JavaScript.Modules | ES module system (`JSModuleContext`, `JSModule`, `ModuleCache`) | ✅ Extracted (Phase 8) |
-| `Broiler.JavaScript.Runtime` | Broiler.JavaScript.Runtime | Runtime contract interfaces (`IJSModuleResolver`, `ExportAttribute`, `DefaultExportAttribute`); future home of execution context and value type system | 🔧 Active (Phase 9 prep — contracts being migrated) |
+| `Broiler.JavaScript.Runtime` | Broiler.JavaScript.Runtime | Runtime contract interfaces (`IJSModuleResolver`, `ExportAttribute`, `DefaultExportAttribute`), utility types (`CancellableDisposableAction`); future home of execution context and value type system | 🔧 Active (Phase 9 prep — contracts and utilities being migrated) |
 | `Broiler.JavaScript.ExpressionCompiler` | Broiler.JavaScript.ExpressionCompiler | LINQ Expression Tree → IL compilation | Pre-existing |
 | `Broiler.JavaScript.JSClassGenerator` | Broiler.JavaScript.JSClassGenerator | Roslyn source generator for C#-to-JS bindings | Pre-existing |
 | `Broiler.JavaScript.Network` | YantraJS.Network | Fetch API / network module | Pre-existing |
@@ -38,7 +38,7 @@ scalability, and testability.
 | `Broiler.JavaScript.BuiltIns.Tests` | (test) | Unit tests for BuiltIns assembly (16 tests) | ✅ Created |
 | `Broiler.JavaScript.Compiler.Tests` | (test) | Unit tests for Compiler assembly (9 tests) | ✅ Created |
 | `Broiler.JavaScript.Modules.Tests` | (test) | Unit tests for Modules assembly (9 tests) | ✅ Created |
-| `Broiler.JavaScript.Runtime.Tests` | (test) | Unit tests for Runtime assembly (15 tests) | ✅ Created |
+| `Broiler.JavaScript.Runtime.Tests` | (test) | Unit tests for Runtime assembly (20 tests) | ✅ Created |
 
 ### 1.2 Problem
 
@@ -505,6 +505,7 @@ Each extraction phase follows the same steps:
 **Phase 9 — Runtime Extraction:**
 - [x] Move `IJSModuleResolver` to Runtime. ✅ (2026-03-20)
 - [x] Move `ExportAttribute` and `DefaultExportAttribute` to Runtime. ✅ (2026-03-20)
+- [x] Move `CancellableDisposableAction` to Runtime. ✅ (2026-03-20)
 - [ ] Phase 9a: Move `KeyString`/`KeyStrings` to Runtime (not Ast — blocked by
   `JSSymbol`/`JSValue`/`JSString` dependencies; deferred until after Phase 9b).
 - [ ] Phase 9a: Move `JSProperty`, `PropertySequence`, `ElementArray` to Storage
@@ -698,7 +699,7 @@ Each extracted assembly must have a corresponding test project:
 | Ast | `Broiler.JavaScript.Ast.Tests` | Node construction, token/span types, enum coverage | ✅ 73 tests |
 | Parser | `Broiler.JavaScript.Parser.Tests` | Parsing correctness for all JS constructs, tokenization, keyword maps | ✅ 78 tests |
 | Compiler | `Broiler.JavaScript.Compiler.Tests` | Expression tree generation, generator rewriting | ✅ 9 tests |
-| Runtime | `Broiler.JavaScript.Runtime.Tests` | `IJSModuleResolver` contract, `ExportAttribute`/`DefaultExportAttribute`, stub implementations, multi-resolver independence | ✅ 15 tests |
+| Runtime | `Broiler.JavaScript.Runtime.Tests` | `IJSModuleResolver` contract, `ExportAttribute`/`DefaultExportAttribute`, `CancellableDisposableAction`, stub implementations, multi-resolver independence | ✅ 20 tests |
 | Storage | `Broiler.JavaScript.Storage.Tests` | Property map operations, hash collision handling, `JSPropertyAttributes` | ✅ 76 tests |
 | BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | WeakRef, FinalizationRegistry, EventTarget, Event, AdditionalRegistrations | ✅ 16 tests |
 | Clr | `Broiler.JavaScript.Clr.Tests` | ClrProxy marshalling, ClrType caching, DefaultClrInterop, expression builder registration | ✅ 29 tests |
@@ -768,7 +769,7 @@ The refactor is complete when:
 | # | Criterion | Status |
 |---|-----------|--------|
 | 1 | Core decomposed into separate assemblies | ⏳ 8 of 11 target assemblies extracted. Core still contains value type system (`JSValue`, `JSContext`, etc.) pending Phase 9. |
-| 2 | Each assembly has test project with ≥ 90% coverage | ⏳ All 10 assemblies have test projects (969 tests). Coverage measurement integrated into CI via `coverlet.collector`. |
+| 2 | Each assembly has test project with ≥ 90% coverage | ⏳ All 10 assemblies have test projects (974 tests). Coverage measurement integrated into CI via `coverlet.collector`. |
 | 3 | All existing Core.Tests pass | ✅ 641 Core.Tests pass. |
 | 4 | Downstream consumers build correctly | ✅ Explicit satellite assembly references added to `Broiler.Cli` and `Broiler.App`. |
 | 5 | No `InternalsVisibleTo` migration bridges | ✅ All migration bridges eliminated — Debugger (Phase 4), Clr (Phase 10), Compiler (Phase 10). Only `Core.Tests`, `Runtime` (dynamic assembly), and `WebAtoms.XF` (external) entries remain. |
@@ -792,7 +793,7 @@ The refactor is complete when:
 | 6 | BuiltIns | ⏳ Partial | 2026-03-20 | Deep structural coupling (JSArray 13, JSString 8, JSRegExp 7, JSError 6, JSPromise, JSProxy); internal field access (DataView, JSJSON, JSReflect). |
 | 7 | Compiler | ✅ Complete | 2026-03-20 | `InternalsVisibleTo` bridge **removed** ✅. |
 | 8 | Modules | ✅ Complete | 2026-03-20 | — |
-| 9 | Runtime | ⏳ In progress | 2026-03-20 | `IJSModuleResolver` + `ExportAttribute` + `DefaultExportAttribute` moved; Phase 9b (JSValue/JSContext move) blocked by circular dependency between Runtime↔Storage; `KeyString` depends on `JSSymbol`/`JSValue`/`JSString` (see Section 10 feasibility analysis). |
+| 9 | Runtime | ⏳ In progress | 2026-03-20 | `IJSModuleResolver` + `ExportAttribute` + `DefaultExportAttribute` + `CancellableDisposableAction` moved; Phase 9b (JSValue/JSContext move) blocked by circular dependency between Runtime↔Storage; `KeyString` depends on `JSSymbol`/`JSValue`/`JSString` (see Section 10 feasibility analysis). Tracked by [continuation issue](https://github.com/MaiRat/Broiler/issues). |
 | 10 | Cleanup | ✅ Complete | 2026-03-20 | All migration bridges removed; meta-package created; downstream consumers updated; CI workflow created; coverlet coverage integrated. |
 
 ### Phase 1 — Ast Extraction ✅
@@ -1777,8 +1778,8 @@ Extracted `JSModuleContext`, `JSModule`, and `ModuleCache` into a new
 | Broiler.JavaScript.Compiler.Tests | 9 | ✅ Pass |
 | Broiler.JavaScript.Modules.Tests | 9 | ✅ Pass |
 | Broiler.JavaScript.BuiltIns.Tests | 16 | ✅ Pass |
-| Broiler.JavaScript.Runtime.Tests | 15 | ✅ Pass |
-| **Total** | **969** | **✅ All Pass** |
+| Broiler.JavaScript.Runtime.Tests | 20 | ✅ Pass |
+| **Total** | **974** | **✅ All Pass** |
 
 ### Continued Implementation Progress (2026-03-20, Phase 3–5)
 
@@ -1870,6 +1871,7 @@ conversion is deferred because:
 | `IJSModuleResolver` | **Runtime** ✅ | — |
 | `ExportAttribute` | **Runtime** ✅ | — |
 | `DefaultExportAttribute` | **Runtime** ✅ | — |
+| `CancellableDisposableAction` | **Runtime** ✅ | — |
 
 These interfaces will move to Runtime once `JSValue`, `JSContext`, and
 `JSFunctionDelegate` are extracted from Core to Runtime (full Phase 5).
@@ -2256,8 +2258,8 @@ collection via `coverlet`:
 | Compiler | `Broiler.JavaScript.Compiler.Tests` | 9 |
 | Modules | `Broiler.JavaScript.Modules.Tests` | 9 |
 | BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | 16 |
-| Runtime | `Broiler.JavaScript.Runtime.Tests` | 15 |
-| **Total** | **10 projects** | **969** |
+| Runtime | `Broiler.JavaScript.Runtime.Tests` | 20 |
+| **Total** | **10 projects** | **974** |
 
 ### Coverage Configuration
 
@@ -2477,7 +2479,7 @@ Use this checklist when contributing to or reviewing any extraction phase PR.
   `coverlet` to measure coverage.
 - [ ] **All existing tests pass.** Run the full test suite
   (`dotnet test Broiler.JavaScript/Broiler.JavaScript.*.Tests/`) and confirm
-  all **969+** tests pass across 10 projects.
+  all **974+** tests pass across 10 projects.
 - [ ] **CI passes on all platforms.** Verify the GitHub Actions CI workflow
   (`.github/workflows/ci.yml`) succeeds on Ubuntu, Windows, and macOS.
 - [ ] **Downstream build instructions are updated.** If the change adds a new
@@ -2532,7 +2534,7 @@ Use this checklist when contributing to or reviewing any extraction phase PR.
 | BuiltIns | ✅ 16 | ✅ | ✅ | N/A | ✅ |
 | Compiler | ✅ 9 | ✅ | ✅ | ✅ Removed | ✅ |
 | Modules | ✅ 9 | ✅ | ✅ | N/A | ✅ |
-| Runtime | ✅ 15 | ✅ | ✅ | ✅ Dynamic assembly (required) | ✅ |
+| Runtime | ✅ 20 | ✅ | ✅ | ✅ Dynamic assembly (required) | ✅ |
 
 ---
 
@@ -2686,16 +2688,22 @@ Confirmed that Core's `AssemblyInfo.cs` contains only three
 
 - [x] Move `IJSModuleResolver` to Runtime ✅ (2026-03-20)
 - [x] Move `ExportAttribute`/`DefaultExportAttribute` to Runtime ✅ (2026-03-20)
+- [x] Move `CancellableDisposableAction` to Runtime ✅ (2026-03-20)
 - [x] Integrate `coverlet` coverage measurement into CI ✅ (2026-03-20)
 - [x] Create `.github/workflows/ci.yml` CI workflow ✅ (2026-03-20)
 - [ ] Phase 9a — Move `KeyString`/`KeyStrings` to Runtime (blocked by JSSymbol/
   JSValue/JSString dependencies; deferred until Phase 9b)
+- [ ] Phase 9a — Move `JSProperty`, `PropertySequence`, `ElementArray` to Storage
+  with interface-typed fields (blocked until Phase 9b resolves JSValue/JSFunction)
 - [ ] Phase 9b — Move `JSValue`, `JSObject`, `JSFunction`, `JSContext`,
   `Arguments`, `CoreScript`, `Bootstrap` to Runtime (high effort, 500+ files)
 - [ ] Move contract interfaces (`IBuiltInRegistry`, `IClrInterop`, `IDebugger`,
   `IJSCompiler`) to Runtime (blocked by Phase 9b)
 - [ ] Phase 6 continued — Extract additional built-in types to BuiltIns
   (blocked by deep structural coupling)
+- [ ] Remove temporary `InternalsVisibleTo` bridges after all phases complete
+- [ ] Update downstream consumers to use new satellite references instead of
+  monolithic Core references (after Phase 9b)
 - [ ] Add coverage report aggregation and ≥ 90% enforcement gate to CI
 
 ---
@@ -2742,7 +2750,7 @@ Confirmed that Core's `AssemblyInfo.cs` contains only three
    - Analyzed all types in `Broiler.JavaScript.Core/Core/` for movability to
      Runtime (which depends only on Ast and Storage).
    - **Movable types (3):** `ExportAttribute` ✅ moved, `DefaultExportAttribute`
-     ✅ moved, `CancellableDisposableAction` (utility, only uses `System` APIs).
+     ✅ moved, `CancellableDisposableAction` ✅ moved.
    - **Blocked types (9+):** `ICodeCache`, `DictionaryCodeCache`,
      `JSFunctionDelegate`, `JSClosureFunctionDelegate`, `UniqueID`,
      `CallStackItem`, `JSConstants`, `JSException`, `PrototypeAttribute` — all
@@ -2774,6 +2782,113 @@ Confirmed that Core's `AssemblyInfo.cs` contains only three
 - All **969** tests pass across 10 test projects:
   - Core: 641, Ast: 73, Parser: 78, Storage: 76, Debugger: 23, Clr: 29,
     Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 15.
+
+---
+
+## 16. Continuation Issue — Phase 9 Implementation Tracking
+
+### Tracking Issue
+
+**Issue:** [Continue JavaScript Engine Assembly Refactor: Implementation and Roadmap Update](https://github.com/MaiRat/Broiler/issues)
+
+This section tracks the ongoing work for Phase 9 (Runtime Extraction) and
+remaining refactor milestones, coordinating the next steps after Phases 1–8 and
+Phase 10 (cleanup) have been completed.
+
+### Current Runtime Assembly Contents
+
+| Type | Namespace | Moved From | Date |
+|------|-----------|-----------|------|
+| `IJSModuleResolver` | `Broiler.JavaScript.Core.Core.Module` | Core | 2026-03-20 |
+| `ExportAttribute` | `Broiler.JavaScript.Core.Core.Module` | Core | 2026-03-20 |
+| `DefaultExportAttribute` | `Broiler.JavaScript.Core.Core.Module` | Core | 2026-03-20 |
+| `CancellableDisposableAction` | `Broiler.JavaScript.Core.Core` | Core | 2026-03-20 |
+
+All moved types have `TypeForwardedTo` attributes in Core for binary
+compatibility. Original namespaces are preserved for backward compatibility.
+
+### Phase 9 Blockers — Detailed Dependency Analysis
+
+#### Why Phase 9b (JSValue/JSContext → Runtime) Is the Critical Path
+
+Almost all remaining extraction work is blocked by Phase 9b. The core value type
+system (`JSValue`, `JSContext`, `JSObject`, `JSFunction`) forms a tightly coupled
+graph that is referenced by **500+ files** across all assemblies. Until these
+types move to Runtime, no other significant extraction can proceed:
+
+| Blocked Item | Depends On | Phase |
+|-------------|-----------|-------|
+| `KeyString`/`KeyStrings` → Runtime | `JSSymbol`, `JSString`, `JSValue` (Core types) | 9a |
+| `JSProperty`/`PropertySequence`/`ElementArray` → Storage | `JSValue`, `JSFunction`, `JSContext` (Core types) | 9a |
+| `IBuiltInRegistry` → Runtime | `JSContext` parameter type | 9b |
+| `IClrInterop` → Runtime | `JSValue` parameter/return types | 9b |
+| `IDebugger` → Runtime | `JSValue` parameter types | 9b |
+| `IJSCompiler` → Runtime | `JSFunctionDelegate`, `ICodeCache` (Core types) | 9b |
+| Additional BuiltIns → BuiltIns | Deep structural coupling to `JSArray`, `JSString`, etc. | 6 |
+
+#### Circular Dependency: Runtime ↔ Storage
+
+The central architectural challenge for Phase 9b is:
+
+```
+Runtime → Storage:  JSObject uses SAUint32Map<JSProperty>, PropertySequence,
+                    StringMap<JSProperty> for property storage.
+
+Storage → Runtime:  JSProperty references JSValue, JSFunction, KeyString.
+                    PropertySequence references JSContext, JSObject.
+```
+
+**Resolution strategy (from Section 10):**
+1. Move `JSValue`/`JSContext`/`JSObject`/`JSFunction` to Runtime first (Phase 9b).
+2. Then move `KeyString`/`KeyStrings` to Runtime (Phase 9a, after 9b).
+3. Convert `JSProperty` fields to `IPropertyValue`/`IPropertyAccessor` interfaces
+   (already defined in Ast) so `JSProperty` can live in Storage without depending
+   on Runtime.
+4. Move `JSProperty`/`PropertySequence`/`ElementArray` to Storage.
+
+#### Pre-Phase 9b Extraction Status (All Movable Types Extracted)
+
+All types that can move to Runtime without Phase 9b are now moved:
+- ✅ `IJSModuleResolver` (interface, no runtime deps)
+- ✅ `ExportAttribute` (attribute, extends `System.Attribute` only)
+- ✅ `DefaultExportAttribute` (attribute, extends `ExportAttribute` only)
+- ✅ `CancellableDisposableAction` (utility, uses only `System.Action`)
+
+**No further pre-Phase 9b extraction is possible.** All remaining types in Core
+depend on `JSValue`, `JSContext`, or other Core types.
+
+### Remaining Refactor Milestones
+
+| # | Milestone | Status | Key Blockers | Estimated Effort |
+|---|-----------|--------|-------------|-----------------|
+| 1 | Phase 9b — Move core value types to Runtime | ⏳ Not started | Circular dependency Runtime↔Storage; 500+ file references; API breakage risk | **High** — largest single extraction |
+| 2 | Phase 9a — Move KeyString/KeyStrings to Runtime | ⏳ Blocked | Depends on Phase 9b (JSSymbol/JSValue/JSString) | Medium |
+| 3 | Phase 9a — Move JSProperty/PropertySequence/ElementArray to Storage | ⏳ Blocked | Depends on Phase 9b; requires interface-typed fields | Medium |
+| 4 | Contract interfaces → Runtime | ⏳ Blocked | Depends on Phase 9b (JSValue/JSContext) | Low — 4 interfaces to move |
+| 5 | Phase 6 — Additional BuiltIns extraction | ⏳ Partially blocked | Deep structural coupling (JSArray 13, JSString 8, JSRegExp 7, JSError 6 type checks); internal field access | High |
+| 6 | `InternalsVisibleTo` final cleanup | ⏳ | Remove remaining bridges after Phase 9 | Low |
+| 7 | Coverage enforcement gate | ⏳ | Requires coverage baselines | Low |
+
+### Integration and Cleanup Status
+
+| Category | Status | Details |
+|----------|--------|---------|
+| **CI Pipeline** | ✅ Complete | `.github/workflows/ci.yml` — Ubuntu/Windows/macOS matrix; 10 test projects |
+| **Coverage Collection** | ✅ Complete | `coverlet.collector` v6.0.2 in all test projects; `XPlat Code Coverage` in CI |
+| **Coverage Enforcement** | ⏳ Pending | ≥ 90% line coverage gate not yet added |
+| **Meta-Package** | ✅ Complete | `Broiler.JavaScript.All` created; downstream consumers updated |
+| **Downstream Consumers** | ✅ Complete | `Broiler.App` and `Broiler.Cli` use `All` meta-package |
+| **Migration Bridges** | ✅ Complete | All `InternalsVisibleTo` migration bridges eliminated |
+| **TypeForwardedTo** | ✅ Active | 39 forwarding attributes in Core for binary compatibility |
+| **Global Using** | ✅ Active | `Broiler.JavaScript.Ast`, `.Parser`, `.Storage` in Core's `GlobalUsings.cs` |
+| **External Consumer** | ⏳ Pending | `WebAtoms.XF` `InternalsVisibleTo` entry retained; needs external coordination |
+
+### Verification (2026-03-20)
+
+All 10 production assemblies compile with zero errors.
+All **974** tests pass across 10 test projects:
+- Core: 641, Ast: 73, Parser: 78, Storage: 76, Debugger: 23, Clr: 29,
+  Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 20.
 
 ---
 
