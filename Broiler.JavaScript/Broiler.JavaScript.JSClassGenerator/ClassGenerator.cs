@@ -444,7 +444,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
         else
         {
             fb.AppendLine($"var @return = {callee}.{method.Name}({args});");
-            fb.AppendLine($"return ClrProxy.Marshal(@return);");
+            fb.AppendLine($"return JSContext.ClrInterop.Marshal(@return);");
         }
         fb.AppendLine("}");
 

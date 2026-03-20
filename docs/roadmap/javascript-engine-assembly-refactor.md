@@ -357,8 +357,8 @@ changes:
 | **Phase 2** | **Parser** | Depends only on Ast. Self-contained lexer + parser. | ✅ Complete |
 | **Phase 3** | **Storage** | Depends on shared primitives. Decouples property storage from runtime logic. | ✅ Partial — pure storage types extracted; test project created (56 tests) |
 | **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. | ✅ Partial — V8 Inspector Protocol extracted; test project created (23 tests) |
-| **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | ⏳ In progress — IClrInterop interface implemented; direct ClrProxy/ClrType method calls refactored to use interface; 7 structural references remain |
-| **Phase 6** | **BuiltIns** | High coupling to Runtime, but only through `JSValue`/`JSContext`. Requires `IBuiltInRegistry` to be in place. | ⏳ In progress — IBuiltInRegistry implemented and wired into JSContext; JSClassGenerator multi-assembly support still needed |
+| **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | ⏳ In progress — IClrInterop interface complete (Marshal, GetClrType, TryUnwrapClrObject); all source code and generated code references refactored to use interface; 3 structural references remain (ClrProxyBuilder expression tree builder, JSFunction constructor parameter) |
+| **Phase 6** | **BuiltIns** | High coupling to Runtime, but only through `JSValue`/`JSContext`. Requires `IBuiltInRegistry` to be in place. | ⏳ In progress — IBuiltInRegistry implemented and wired into JSContext; JSClassGenerator updated to emit JSContext.ClrInterop.Marshal(); multi-assembly namespace support still needed |
 | **Phase 7** | **Compiler** | Depends on Ast, Runtime, and ExpressionCompiler. Requires stable interfaces. | ⏳ Blocked — requires stable Runtime interfaces |
 | **Phase 8** | **Modules** | Last — depends on Runtime, Parser, and Clr. | ⏳ Blocked — JSFunctionGenerator creates partial class in Core namespace; JSModuleContext extends JSContext |
 
@@ -944,7 +944,8 @@ reference the Debugger assembly. This means:
 **Status:** In progress — prerequisite infrastructure implemented
 
 **Date:** 2026-03-19 (initial analysis), 2026-03-20 (IBuiltInRegistry + IClrInterop
-implemented, direct ClrProxy/ClrType calls refactored)
+implemented, direct ClrProxy/ClrType calls refactored, JSClassGenerator updated,
+TryUnwrapClrObject added, structural type checks converted)
 
 **Prerequisite infrastructure (completed):**
 
@@ -966,6 +967,10 @@ Two key interfaces were implemented to unblock Phases 5–6:
    contract for marshalling between .NET objects and JavaScript values:
    - `Marshal(object value)` — converts .NET objects to `JSValue`.
    - `GetClrType(Type type)` — returns JS class wrapper for a .NET `Type`.
+   - `TryUnwrapClrObject(JSValue value, out object clrObject)` — checks if a
+     `JSValue` is a CLR proxy and extracts the underlying .NET object. Replaces
+     direct `is ClrProxy` type checks so non-Clr assemblies can inspect proxy
+     values without referencing the concrete type.
    - `DefaultClrInterop` implements the interface, delegating to the existing
      `ClrProxy.Marshal()` and `ClrType.From()` static methods.
    - `JSContext.ClrInterop` is a static property defaulting to
@@ -991,47 +996,77 @@ Direct `ClrProxy.Marshal()` and `ClrType.From()` calls in Core files outside
 This eliminated **15** direct `ClrProxy.Marshal()`/`ClrType.From()` calls from
 non-Clr source files, reducing the remaining direct references from 30 to 15.
 
+**Structural references refactored (completed 2026-03-20):**
+
+| File | Before | After |
+|------|--------|-------|
+| `Core/JSValue.cs` | `is ClrProxy proxy` (type check) | `JSContext.ClrInterop.TryUnwrapClrObject()` |
+| `Extensions/JSValueExtensions.cs` | `is ClrProxy proxy` (type check) | `JSContext.ClrInterop.TryUnwrapClrObject()` |
+| `IJavaScriptObject.cs` | `ClrProxy.From(@object)` | `JSContext.ClrInterop.Marshal(@object)` |
+
+**Generated code refactoring (completed 2026-03-20):**
+
+The JSClassGenerator was updated in two files:
+- `ListExtensions.cs`: `ClrProxy.Marshal({target})` → `JSContext.ClrInterop.Marshal({target})`
+- `ClassGenerator.cs`: `ClrProxy.Marshal(@return)` → `JSContext.ClrInterop.Marshal(@return)`
+
+This converted **68** generated `ClrProxy.Marshal()` calls across **23** `.g.cs`
+files to use `JSContext.ClrInterop.Marshal()`, eliminating the last bulk
+dependency on the concrete `ClrProxy` type from generated code.
+
 **Remaining ClrProxy/ClrType references (source code, outside Core/Clr/):**
 
-The following references cannot be converted to `IClrInterop` calls because they
+~~The following references cannot be converted to `IClrInterop` calls because they
 require the concrete type (for type checks, expression tree reflection, or type
-parameters):
+parameters):~~
 
-| File | Reference | Reason |
+Most former structural references have been refactored.  The remaining ones are
+limited to the expression tree builder and a constructor parameter:
+
+| File | Reference | Status |
 |------|-----------|--------|
-| `Core/JSValue.cs` | `is ClrProxy proxy` | Type check — needs concrete type for pattern matching |
-| `Extensions/JSValueExtensions.cs` | `is ClrProxy proxy` | Type check — same as above |
-| `Core/Function/JSFunction.cs` | `ClrType type` (constructor parameter) | Structural type dependency |
-| `Core/Function/JSFunction.cs` | `ClrProxyBuilder.Marshal(inP)` | Expression tree generation |
-| `LinqExpressions/ClrProxyBuilder.cs` | `typeof(ClrProxy)`, `nameof(ClrProxy.Marshal)` | Reflection-based expression tree builder — needs concrete type to generate IL |
-| `IJavaScriptObject.cs` | `ClrProxy.From(@object)` | Handle creation — tight coupling to proxy wrapper |
-| `Extensions/ClrProxyExtensions.cs` | Utility class for CLR enumerators | References Clr types structurally |
+| ~~`Core/JSValue.cs`~~ | ~~`is ClrProxy proxy`~~ | ✅ Replaced with `IClrInterop.TryUnwrapClrObject()` |
+| ~~`Extensions/JSValueExtensions.cs`~~ | ~~`is ClrProxy proxy`~~ | ✅ Replaced with `IClrInterop.TryUnwrapClrObject()` |
+| `Core/Function/JSFunction.cs` | `ClrType type` (constructor parameter) | ⏳ Structural type dependency — needs factory pattern |
+| `Core/Function/JSFunction.cs` | `ClrProxyBuilder.Marshal(inP)` | ⏳ Expression tree generation — inherent to compiler |
+| `LinqExpressions/ClrProxyBuilder.cs` | `typeof(ClrProxy)`, `nameof(ClrProxy.Marshal)` | ⏳ Reflection-based expression tree builder — needs concrete type to generate IL |
+| ~~`IJavaScriptObject.cs`~~ | ~~`ClrProxy.From(@object)`~~ | ✅ Replaced with `JSContext.ClrInterop.Marshal(@object)` |
+| `Extensions/ClrProxyExtensions.cs` | Utility class for CLR enumerators | ⏳ References Clr types structurally (no direct ClrProxy/ClrType dependency) |
 
 **Remaining ClrProxy references (generated code):**
 
-The `JSClassGenerator` Roslyn source generator produces `.g.cs` files that call
-`ClrProxy.Marshal()` for property getters and method return values. These are in
-the `Generated/` directory and account for **60+** additional references. They
-cannot be hand-edited; the source generator itself must be updated to emit
-`JSContext.ClrInterop.Marshal()` calls instead (Phase 6 prerequisite).
+~~The `JSClassGenerator` Roslyn source generator produces `.g.cs` files that call
+`ClrProxy.Marshal()` for property getters and method return values.~~
+
+✅ **Resolved** — The JSClassGenerator source generator (`ListExtensions.cs` and
+`ClassGenerator.cs`) has been updated to emit `JSContext.ClrInterop.Marshal()`
+instead of `ClrProxy.Marshal()`.  All **68** generated code references across
+**23** `.g.cs` files now use the `IClrInterop` interface.  The generated code's
+`using Broiler.JavaScript.Core.Core.Clr;` import is retained for forward
+compatibility but is no longer required for the marshal calls.
 
 **Updated findings for Phases 5–8:**
 
-**Phase 5 (Clr) — partially unblocked:**
-- `IClrInterop` interface and `DefaultClrInterop` are implemented.
-- 15 direct `ClrProxy.Marshal()`/`ClrType.From()` calls have been refactored.
-- **7 structural references remain** in source code (type checks, expression
-  trees, constructor parameters). These require deeper design changes:
-  - Type checks (`is ClrProxy`) could be replaced with an `IsClrProxy` method on
-    a base class or interface.
-  - Expression tree builder (`ClrProxyBuilder`) could be refactored to look up
-    marshal methods via `IClrInterop` metadata at runtime.
-  - `IJavaScriptObject.handle` creation needs a factory pattern.
-- **60+ generated code references** require JSClassGenerator updates.
+**Phase 5 (Clr) — mostly unblocked:**
+- `IClrInterop` interface is feature-complete: `Marshal()`, `GetClrType()`,
+  `TryUnwrapClrObject()`.
+- All direct `ClrProxy.Marshal()`/`ClrType.From()` method calls (source + generated)
+  have been refactored to use `IClrInterop`.
+- All `is ClrProxy` type checks outside `Core/Clr/` have been refactored to use
+  `IClrInterop.TryUnwrapClrObject()`.
+- `IJavaScriptObject.handle` creation now uses `JSContext.ClrInterop.Marshal()`.
+- **3 structural references remain** in source code:
+  - `ClrProxyBuilder` (expression tree builder) — uses `typeof(ClrProxy)` and
+    `nameof(ClrProxy.Marshal)` for reflection-based IL generation. This is
+    inherent to the compilation model and will be addressed during Phase 7
+    (Compiler extraction).
+  - `JSFunction` constructor accepts `ClrType type` parameter — needs a factory
+    pattern or interface type to fully decouple.
 
 **Phase 6 (BuiltIns) — partially unblocked:**
 - `IBuiltInRegistry` is fully implemented with `DefaultBuiltInRegistry`.
 - `JSContext` constructor uses the pluggable registry pattern.
+- JSClassGenerator now emits `JSContext.ClrInterop.Marshal()` — ✅ done.
 - **Remaining blocker:** JSClassGenerator must support configurable namespace
   roots / multi-assembly code generation.
 
@@ -1049,22 +1084,23 @@ cannot be hand-edited; the source generator itself must be updated to emit
 
 **Updated recommended next steps (priority order):**
 1. ~~Implement `IBuiltInRegistry` pluggable bootstrap~~ — ✅ Done.
-2. ~~Refactor Core to use `IClrInterop` for method calls~~ — ✅ Done (15 calls
-   converted). 7 structural references + 60+ generated code references remain.
-3. Resolve remaining structural `ClrProxy` references in source code (type
-   checks, expression tree builders, constructor parameters).
-4. Configure `JSClassGenerator` to emit `JSContext.ClrInterop.Marshal()` instead
-   of `ClrProxy.Marshal()` in generated code (prerequisite for Phases 5, 6, 8).
-5. Define stable Runtime interfaces for compiler consumption (prerequisite for
+2. ~~Refactor Core to use `IClrInterop` for method calls~~ — ✅ Done (15 source
+   calls + 68 generated code calls converted).
+3. ~~Resolve type check references (`is ClrProxy`)~~ — ✅ Done via
+   `IClrInterop.TryUnwrapClrObject()`.
+4. ~~Configure `JSClassGenerator` to emit `JSContext.ClrInterop.Marshal()` instead
+   of `ClrProxy.Marshal()`~~ — ✅ Done.
+5. Resolve remaining structural `ClrProxy` references (3 call sites:
+   `ClrProxyBuilder`, `JSFunction` constructor parameter).
+6. Configure `JSClassGenerator` multi-assembly namespace support (prerequisite for
+   Phase 6).
+7. Define stable Runtime interfaces for compiler consumption (prerequisite for
    Phase 7).
 
 **Estimated effort for remaining prerequisites:**
-- Structural `ClrProxy` references: Medium — 7 call sites require introducing
-  new abstractions (`IsClrProxy` checks, factory patterns, expression tree
-  method resolution via metadata).
-- `JSClassGenerator` IClrInterop support: Medium — the source generator must emit
-  `JSContext.ClrInterop.Marshal()` instead of `ClrProxy.Marshal()` for property
-  getters and method return values.
+- Remaining structural `ClrProxy` references: Low-Medium — 3 call sites in
+  expression tree builder and constructor parameter; tightly coupled to
+  compilation model.
 - `JSClassGenerator` multi-assembly: Medium — must support configurable namespace
   roots or assembly-aware code generation.
 - Runtime interfaces: High — must define stable abstractions for `JSValue`,

@@ -13,13 +13,10 @@ public static partial class JSValueExtensions
 {
     public static bool ConvertTo<T>(this JSValue @this, out T value)
     {
-        if (@this is ClrProxy proxy)
+        if (JSContext.ClrInterop.TryUnwrapClrObject(@this, out var clrObj) && clrObj is T t)
         {
-            if (proxy.Target is T t)
-            {
-                value = t;
-                return true;
-            }
+            value = t;
+            return true;
         }
 
         if (@this.TryConvertTo(typeof(T), out var v) && v is T tv)

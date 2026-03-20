@@ -26,4 +26,21 @@ public interface IClrInterop
     /// <param name="type">The .NET type to wrap.</param>
     /// <returns>A <see cref="JSValue"/> representing the type as a JS constructor.</returns>
     JSValue GetClrType(Type type);
+
+    /// <summary>
+    /// Attempts to unwrap a <see cref="JSValue"/> that represents a CLR
+    /// object proxy, returning the underlying .NET object.  This replaces
+    /// direct <c>is ClrProxy</c> type checks so that non-Clr assemblies
+    /// can inspect proxy values without referencing the concrete type.
+    /// </summary>
+    /// <param name="value">The JavaScript value to inspect.</param>
+    /// <param name="clrObject">
+    /// When the method returns <c>true</c>, contains the wrapped .NET
+    /// object; otherwise <c>null</c>.
+    /// </param>
+    /// <returns>
+    /// <c>true</c> if <paramref name="value"/> is a CLR proxy wrapping a
+    /// .NET object; <c>false</c> otherwise.
+    /// </returns>
+    bool TryUnwrapClrObject(JSValue value, out object clrObject);
 }
