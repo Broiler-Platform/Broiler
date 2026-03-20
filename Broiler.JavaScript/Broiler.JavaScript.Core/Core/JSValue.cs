@@ -18,7 +18,7 @@ namespace Broiler.JavaScript.Core.Core;
 /// boolean, object, function, symbol, null, undefined) derives from this
 /// class and overrides the relevant virtual members.
 /// </summary>
-public abstract partial class JSValue : IDynamicMetaObjectProvider
+public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyValue
 {
     /// <summary>Gets whether this value is the <c>undefined</c> singleton.</summary>
     public bool IsUndefined
