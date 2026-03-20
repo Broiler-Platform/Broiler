@@ -165,7 +165,7 @@ public partial class JSString : JSPrimitive
 
     public override string ToLocaleString(string format, CultureInfo culture) => value;
 
-    internal protected override JSValue GetValue(uint key, JSValue receiver, bool throwError = true)
+    public override JSValue GetValue(uint key, JSValue receiver, bool throwError = true)
     {
         if (key >= value.Length)
             return JSUndefined.Value;

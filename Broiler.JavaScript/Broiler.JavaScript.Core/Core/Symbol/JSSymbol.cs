@@ -19,7 +19,7 @@ public partial class JSSymbol: JSValue
 
     public override double DoubleValue => throw JSContext.NewTypeError("Cannot convert a Symbol value to a number.");
 
-    internal override string StringValue => throw JSContext.NewTypeError("Cannot convert a Symbol value to a string.");
+    public override string StringValue => throw JSContext.NewTypeError("Cannot convert a Symbol value to a string.");
 
     public override uint UIntValue => throw JSContext.NewTypeError("Cannot convert a Symbol value to a uint32.");
 

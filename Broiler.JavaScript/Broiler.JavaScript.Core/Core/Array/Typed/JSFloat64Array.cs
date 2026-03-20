@@ -18,7 +18,7 @@ public partial class JSFloat64Array : JSTypedArray
 
     private JSFloat64Array(TypedArrayParameters a) : base(a) { }
 
-    protected internal override JSValue GetValue(uint index, JSValue receiver, bool throwError = true)
+    public override JSValue GetValue(uint index, JSValue receiver, bool throwError = true)
     {
         if (index < 0 || index >= length)
             return JSUndefined.Value;

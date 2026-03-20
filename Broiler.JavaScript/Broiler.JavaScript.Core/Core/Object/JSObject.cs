@@ -543,7 +543,7 @@ public partial class JSObject : JSValue
         return base.GetValue(key, receiver, throwError);
     }
 
-    internal protected override JSValue GetValue(uint key, JSValue receiver, bool throwError = true)
+    public override JSValue GetValue(uint key, JSValue receiver, bool throwError = true)
     {
         ref var p = ref elements.Get(key);
         if (!p.IsEmpty)

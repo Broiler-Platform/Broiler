@@ -37,11 +37,17 @@ public partial class JSFunction : JSObject
 
 
     /// <summary>
-    /// Used as specific type constructor
+    /// Used as specific type constructor.
+    /// Accepts any <see cref="JSFunction"/> as the type wrapper
+    /// (typically a <c>ClrType</c>) so that the Function subsystem
+    /// does not depend on the concrete Clr type.
     /// </summary>
-    /// <param name="clrDelegate"></param>
-    /// <param name="type"></param>
-    internal JSFunction(JSFunctionDelegate clrDelegate, ClrType type) : this()
+    /// <param name="clrDelegate">The delegate implementing the constructor logic.</param>
+    /// <param name="type">
+    /// A <see cref="JSFunction"/> whose <see cref="name"/> and
+    /// <see cref="prototype"/> are used to configure this function.
+    /// </param>
+    internal JSFunction(JSFunctionDelegate clrDelegate, JSFunction type) : this()
     {
         ref var ownProperties = ref GetOwnProperties();
 

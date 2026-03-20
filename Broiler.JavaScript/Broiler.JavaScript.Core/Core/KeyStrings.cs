@@ -236,7 +236,7 @@ public static class KeyStrings
     internal static KeyString GetName(uint id) => new(id);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static StringSpan GetNameString(uint id) => names[id];
+    public static StringSpan GetNameString(uint id) => names[id];
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static JSString GetJSString(uint id)

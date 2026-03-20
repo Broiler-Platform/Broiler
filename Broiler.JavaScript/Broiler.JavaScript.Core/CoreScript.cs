@@ -29,7 +29,7 @@ public class CoreScript
         set => _compiler = value ?? throw new System.ArgumentNullException(nameof(value));
     }
 
-    internal static JSFunctionDelegate Compile(in StringSpan code, string location = null, IList<string> args = null, ICodeCache codeCache = null)
+    public static JSFunctionDelegate Compile(in StringSpan code, string location = null, IList<string> args = null, ICodeCache codeCache = null)
     {
         try
         {

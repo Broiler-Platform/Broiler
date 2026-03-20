@@ -88,7 +88,7 @@ public partial class JSContext : JSObject, IDisposable
     private TaskCompletionSource<int> _waitTask;
     internal Task WaitTask => _waitTask?.Task;
 
-    internal CallStackItem Top;
+    public CallStackItem Top;
 
     public static JSFunction NewTarget => Current.Top.NewTarget;
 

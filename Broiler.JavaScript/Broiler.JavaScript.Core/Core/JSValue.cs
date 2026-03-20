@@ -34,7 +34,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider
         get => this == JSNull.Value;
     }
 
-    internal bool IsNullOrUndefined
+    public bool IsNullOrUndefined
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => this == JSNull.Value || this == JSUndefined.Value;
@@ -132,7 +132,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider
 
     public abstract bool BooleanValue { get; }
 
-    internal virtual string StringValue => ToString();
+    public virtual string StringValue => ToString();
 
     public abstract JSValue TypeOf();
 
@@ -445,7 +445,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider
         set { }
     }
 
-    internal protected virtual JSValue GetValue(uint key, JSValue receiver, bool throwError = true)
+    public virtual JSValue GetValue(uint key, JSValue receiver, bool throwError = true)
     {
         if (prototypeChain != null)
         {

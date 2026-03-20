@@ -17,7 +17,7 @@ public partial class JSUInt32Array : JSTypedArray
 
     private JSUInt32Array(TypedArrayParameters a) : base(a) { }
 
-    protected internal override JSValue GetValue(uint index, JSValue receiver, bool throwError = true)
+    public override JSValue GetValue(uint index, JSValue receiver, bool throwError = true)
     {
         if (index < 0 || index >= length)
             return JSUndefined.Value;
