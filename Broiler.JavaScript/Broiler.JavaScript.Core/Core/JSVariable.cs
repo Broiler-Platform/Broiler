@@ -64,5 +64,5 @@ public class JSVariable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public JSVariable(Exception e, string name) : this(e is JSException je ? je.Error : JSException.From(e).Error, name) { }
 
-    internal static Expression ValueExpression(Expression exp) => Expression.Property(exp, _ValueProperty);
+    public static Expression ValueExpression(Expression exp) => Expression.Property(exp, _ValueProperty);
 }

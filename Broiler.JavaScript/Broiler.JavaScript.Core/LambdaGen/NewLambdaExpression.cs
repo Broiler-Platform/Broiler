@@ -5,7 +5,7 @@ using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.Core.LambdaGen;
 
-internal static class NewLambdaExpression
+public static class NewLambdaExpression
 {
     public static Expression FieldExpression<TTarget, TTOut>(this Expression exp, Func<Expression<Func<TTarget, TTOut>>> func) where TTarget : class
     {

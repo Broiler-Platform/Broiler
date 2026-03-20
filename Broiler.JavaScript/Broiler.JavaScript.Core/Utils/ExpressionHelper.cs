@@ -8,7 +8,7 @@ using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.Core.Utils;
 
-internal static class ExpressionHelper
+public static class ExpressionHelper
 {
     public static void AddExpanded(this IList<Expression> list, IList<ParameterExpression> peList, Expression exp)
     {

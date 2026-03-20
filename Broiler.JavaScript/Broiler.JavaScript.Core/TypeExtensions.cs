@@ -21,9 +21,9 @@ internal static class SynchronizationContextExtensions
     }, value);
 }
 
-internal static class ListOfExpressionsExtensions
+public static class ListOfExpressionsExtensions
 {
-    internal static Sequence<Expression> ConvertToInteger(this IFastEnumerable<Expression> source, FastPool.Scope scope)
+    public static Sequence<Expression> ConvertToInteger(this IFastEnumerable<Expression> source, FastPool.Scope scope)
     {
         var result = new Sequence<Expression>(source.Count);
         var se = source.GetFastEnumerator();
@@ -58,7 +58,7 @@ internal static class ListOfExpressionsExtensions
         return result;
     }
 
-    internal static Sequence<Expression> ConvertToInteger(this IFastEnumerable<Expression> source)
+    public static Sequence<Expression> ConvertToInteger(this IFastEnumerable<Expression> source)
     {
         var result = new Sequence<Expression>(source.Count);
         var se = source.GetFastEnumerator();
@@ -90,7 +90,7 @@ internal static class ListOfExpressionsExtensions
         return result;
     }
 
-    internal static Sequence<Expression> ConvertToNumber(this IFastEnumerable<Expression> source, FastPool.Scope scope)
+    public static Sequence<Expression> ConvertToNumber(this IFastEnumerable<Expression> source, FastPool.Scope scope)
     {
         var result = new Sequence<Expression>(source.Count);
         var se = source.GetFastEnumerator();
@@ -112,7 +112,7 @@ internal static class ListOfExpressionsExtensions
         return result;
     }
 
-    internal static SparseList<Expression> ConvertToNumber(this IList<Expression> source)
+    public static SparseList<Expression> ConvertToNumber(this IList<Expression> source)
     {
         var result = new SparseList<Expression>(source.Count);
 
@@ -133,7 +133,7 @@ internal static class ListOfExpressionsExtensions
         return result;
     }
 
-    internal static Sequence<Expression> ConvertToString(this IFastEnumerable<Expression> source, FastPool.Scope scope)
+    public static Sequence<Expression> ConvertToString(this IFastEnumerable<Expression> source, FastPool.Scope scope)
     {
         var result = new Sequence<Expression>(source.Count);
         var se = source.GetFastEnumerator();
@@ -161,7 +161,7 @@ internal static class ListOfExpressionsExtensions
         return result;
     }
 
-    internal static Sequence<Expression> ConvertToJSValue(this IFastEnumerable<Expression> source, FastPool.Scope scope)
+    public static Sequence<Expression> ConvertToJSValue(this IFastEnumerable<Expression> source, FastPool.Scope scope)
     {
         var result = new Sequence<Expression>(source.Count);
         var se = source.GetFastEnumerator();
@@ -198,7 +198,7 @@ internal static class ListOfExpressionsExtensions
         return result;
     }
 
-    internal static SparseList<Expression> ConvertToString(this IList<Expression> source)
+    public static SparseList<Expression> ConvertToString(this IList<Expression> source)
     {
         var result = new SparseList<Expression>(source.Count);
 
@@ -219,7 +219,7 @@ internal static class ListOfExpressionsExtensions
         return result;
     }
 
-    internal static SparseList<Expression> ConvertToJSValue(this IList<Expression> source)
+    public static SparseList<Expression> ConvertToJSValue(this IList<Expression> source)
     {
         SparseList<Expression> result = new(source.Count);
 
@@ -254,7 +254,7 @@ internal static class ListOfExpressionsExtensions
     }
 }
 
-internal static class TypeExtensions
+public static class TypeExtensions
 {
     public static bool IsJSValueType(this Type type) => typeof(JSValue).IsAssignableFrom(type);
 
@@ -273,7 +273,7 @@ internal static class TypeExtensions
 
     public static bool IsIndexProperty(this PropertyInfo property) => property.GetMethod?.GetParameters()?.Length > 0;
 
-    internal static Type GetElementTypeOrGeneric(this Type type)
+    public static Type GetElementTypeOrGeneric(this Type type)
     {
         if (type.IsArray && type.HasElementType)
         {
@@ -287,26 +287,26 @@ internal static class TypeExtensions
         return null;
     }
 
-    internal static PropertyInfo Property(this Type type, string name)
+    public static PropertyInfo Property(this Type type, string name)
     {
         var a = type.GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance);
         return a == null ? throw new NullReferenceException($"Property {name} not found on {type.FullName}") : a;
     }
 
-    internal static FieldInfo PublicField(this Type type, string name)
+    public static FieldInfo PublicField(this Type type, string name)
     {
         var f = type.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.Static);
         return f == null ? throw new NullReferenceException($"Field {name} not found on {type.FullName}") : f;
     }
 
 
-    internal static FieldInfo InternalField(this Type type, string name)
+    public static FieldInfo InternalField(this Type type, string name)
     {
         var f = type.GetField(name, BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Static);
         return f == null ? throw new NullReferenceException($"Field {name} not found on {type.FullName}") : f;
     }
 
-    internal static PropertyInfo PublicIndex(this Type type, params Type[] types)
+    public static PropertyInfo PublicIndex(this Type type, params Type[] types)
     {
         var px = type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
             .FirstOrDefault(x => x.GetIndexParameters().Length > 0 && x.GetIndexParameters().Select(p => p.ParameterType).SequenceEqual(types));
@@ -320,7 +320,7 @@ internal static class TypeExtensions
         return px;
     }
 
-    internal static PropertyInfo IndexProperty(this Type type, params Type[] types)
+    public static PropertyInfo IndexProperty(this Type type, params Type[] types)
     {
         var px = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
             .FirstOrDefault(x => x.GetIndexParameters().Length > 0 && x.GetIndexParameters().Select(p => p.ParameterType).SequenceEqual(types));

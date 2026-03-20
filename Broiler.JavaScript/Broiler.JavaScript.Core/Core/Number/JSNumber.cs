@@ -16,6 +16,11 @@ public sealed partial class JSNumber : JSPrimitive
 {
     internal readonly double value;
 
+    /// <summary>
+    /// Gets the underlying numeric value of this JSNumber instance.
+    /// </summary>
+    public double NumberValue => value;
+
     private static readonly long positiveZeroBits = BitConverter.DoubleToInt64Bits(0.0);
 
     /// <summary>
