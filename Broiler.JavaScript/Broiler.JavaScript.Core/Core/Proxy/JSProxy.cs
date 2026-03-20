@@ -120,7 +120,7 @@ public partial class JSProxy : JSObject
         return target.SetValue(name, value, receiver, false);
     }
 
-    internal protected override bool SetValue(uint name, JSValue value, JSValue receiver, bool throwError = true)
+    public override bool SetValue(uint name, JSValue value, JSValue receiver, bool throwError = true)
     {
         var fx = handler[KeyStrings.set];
         if (fx is JSFunction fxFunction)

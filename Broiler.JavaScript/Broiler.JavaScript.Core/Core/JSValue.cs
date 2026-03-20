@@ -490,7 +490,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
         };
     }
 
-    internal protected virtual bool SetValue(uint key, JSValue value, JSValue receiver, bool throwError = true) => false;
+    public virtual bool SetValue(uint key, JSValue value, JSValue receiver, bool throwError = true) => false;
 
     internal protected virtual bool SetValue(KeyString key, JSValue value, JSValue receiver, bool throwError = true) => false;
 

@@ -25,7 +25,7 @@ public partial class JSFloat64Array : JSTypedArray
         return new JSNumber(BitConverter.ToDouble(buffer.buffer, byteOffset + (int)index * 8));
     }
 
-    internal protected override bool SetValue(uint index, JSValue value, JSValue receiver, bool throwError = true)
+    public override bool SetValue(uint index, JSValue value, JSValue receiver, bool throwError = true)
     {
         if (index < 0 || index >= length)
             return false;

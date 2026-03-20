@@ -461,7 +461,7 @@ public partial class JSObject : JSValue
         set => SetValue(name, value, this, true);
     }
 
-    internal protected override bool SetValue(uint name, JSValue value, JSValue receiver, bool throwError = true)
+    public override bool SetValue(uint name, JSValue value, JSValue receiver, bool throwError = true)
     {
         var p = GetInternalProperty(name);
         if (p.IsProperty)

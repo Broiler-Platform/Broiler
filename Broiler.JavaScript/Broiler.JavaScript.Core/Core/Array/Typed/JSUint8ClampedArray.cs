@@ -24,7 +24,7 @@ public partial class JSUint8ClampedArray : JSTypedArray
         return new JSNumber(buffer.buffer[byteOffset + index]);
     }
 
-    internal protected override bool SetValue(uint index, JSValue value, JSValue receiver, bool throwError = true)
+    public override bool SetValue(uint index, JSValue value, JSValue receiver, bool throwError = true)
     {
         if (index < 0 || index >= length)
             return false;

@@ -7,7 +7,7 @@ namespace Broiler.JavaScript.Core.Utils;
 /// <summary>
 /// Parses strings into numbers.
 /// </summary>
-internal static class NumberParser
+public static class NumberParser
 {
     /// <summary>
     /// Converts a string to a number (used by parseFloat).
@@ -55,7 +55,7 @@ internal static class NumberParser
         return negative ? -result : result;
     }
 
-    internal static bool TryCoerceToUInt32(in StringSpan input, out uint value) {
+    public static bool TryCoerceToUInt32(in StringSpan input, out uint value) {
 
         if(input.Length == 0)
         {
