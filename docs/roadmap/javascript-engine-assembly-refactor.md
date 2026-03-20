@@ -16,10 +16,11 @@ scalability, and testability.
 | `Broiler.JavaScript.Core` | Broiler.JavaScript.Core | Engine core: compiler, runtime, built-in objects, module system | Active — being decomposed |
 | `Broiler.JavaScript.Ast` | Broiler.JavaScript.Ast | AST node types, shared primitives (`FastToken`, `StringSpan`, `FastNodeType`, etc.) | ✅ Extracted (Phase 1) |
 | `Broiler.JavaScript.Parser` | Broiler.JavaScript.Parser | Lexer (`FastScanner`), recursive-descent parser (`FastParser`), scope tracking | ✅ Extracted (Phase 2) |
-| `Broiler.JavaScript.Storage` | Broiler.JavaScript.Storage | Property hash maps, virtual memory, concurrent caches | ✅ Extracted (Phase 3, partial) |
+| `Broiler.JavaScript.Storage` | Broiler.JavaScript.Storage | Property hash maps, virtual memory, concurrent caches, `JSPropertyAttributes` | ✅ Extracted (Phase 3, partial); `JSPropertyAttributes` moved from Core |
 | `Broiler.JavaScript.Debugger` | Broiler.JavaScript.Debugger | V8 Inspector Protocol handler, protocol data types | ✅ Extracted (Phase 4, partial); `InternalsVisibleTo` bridge removed |
 | `Broiler.JavaScript.Clr` | Broiler.JavaScript.Clr | .NET ↔ JavaScript type bridging (`ClrProxy`, `ClrType`, `DefaultClrInterop`) | ✅ Extracted (Phase 5) |
 | `Broiler.JavaScript.BuiltIns` | Broiler.JavaScript.BuiltIns | Extracted built-in objects (WeakRef, FinalizationRegistry, EventTarget, Event) | ✅ Extracted (Phase 6, partial) |
+| `Broiler.JavaScript.Runtime` | Broiler.JavaScript.Runtime | Runtime contract interfaces (`IJSModuleResolver`); future home of execution context and value type system | 🆕 Created (Phase 5 prep) |
 | `Broiler.JavaScript.ExpressionCompiler` | Broiler.JavaScript.ExpressionCompiler | LINQ Expression Tree → IL compilation | Pre-existing |
 | `Broiler.JavaScript.JSClassGenerator` | Broiler.JavaScript.JSClassGenerator | Roslyn source generator for C#-to-JS bindings | Pre-existing |
 | `Broiler.JavaScript.Network` | YantraJS.Network | Fetch API / network module | Pre-existing |
@@ -29,7 +30,7 @@ scalability, and testability.
 | `Broiler.JavaScript.Core.Tests` | (test) | Unit tests for the core engine (641 tests) | Active |
 | `Broiler.JavaScript.Ast.Tests` | (test) | Unit tests for Ast assembly (73 tests) | ✅ Created |
 | `Broiler.JavaScript.Parser.Tests` | (test) | Unit tests for Parser assembly (78 tests) | ✅ Created |
-| `Broiler.JavaScript.Storage.Tests` | (test) | Unit tests for Storage assembly (56 tests) | ✅ Created |
+| `Broiler.JavaScript.Storage.Tests` | (test) | Unit tests for Storage assembly (76 tests) | ✅ Created |
 | `Broiler.JavaScript.Debugger.Tests` | (test) | Unit tests for Debugger assembly (23 tests) | ✅ Created |
 | `Broiler.JavaScript.Clr.Tests` | (test) | Unit tests for Clr assembly (29 tests) | ✅ Created |
 | `Broiler.JavaScript.BuiltIns.Tests` | (test) | Unit tests for BuiltIns assembly (16 tests) | ✅ Created |
@@ -361,12 +362,12 @@ changes:
 |-------|----------|-----------|--------|
 | **Phase 1** | **Ast** | Zero dependencies. Pure data types. Smallest, safest extraction. | ✅ Complete; test project created (73 tests) |
 | **Phase 2** | **Parser** | Depends only on Ast. Self-contained lexer + parser. | ✅ Complete; test project created (78 tests) |
-| **Phase 3** | **Storage** | Depends on shared primitives. Decouples property storage from runtime logic. | ✅ Partial — pure storage types extracted; test project created (56 tests) |
+| **Phase 3** | **Storage** | Depends on shared primitives. Decouples property storage from runtime logic. | ✅ Partial — pure storage types + `JSPropertyAttributes` extracted; property contract interfaces (`IPropertyValue`, `IPropertyAccessor`) added to Ast; test project created (76 tests) |
 | **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. | ✅ Partial — V8 Inspector Protocol extracted; test project created (23 tests); `InternalsVisibleTo` bridge removed (all accessed APIs now public) |
 | **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | ✅ Complete — 11 files extracted; ClrProxyBuilder decoupled via delegate pattern; FallbackClrInterop as Core default; test project created (29 tests) |
 | **Phase 6** | **BuiltIns** | High coupling to Runtime, but only through `JSValue`/`JSContext`. Requires `IBuiltInRegistry` to be in place. | ✅ Partial — WeakRef, FinalizationRegistry, EventTarget, Event, CustomEvent, DomEventHandler extracted; test project created (16 tests); `AdditionalRegistrations` delegate added to `DefaultBuiltInRegistry`; module initializer pattern |
 | **Phase 7** | **Compiler** | Depends on Ast, Runtime, and ExpressionCompiler. Requires stable interfaces. | ⏳ Unblocked — `IJSCompiler` interface already exists and is wired into `CoreScript.Compiler`; `DefaultJSCompiler` is the extractable implementation |
-| **Phase 8** | **Modules** | Last — depends on Runtime, Parser, and Clr. | ⏳ Partially unblocked — `IJSModuleResolver` interface defined; upward-dependency pattern confirmed (JSModuleContext → JSContext, no reverse reference) |
+| **Phase 8** | **Modules** | Last — depends on Runtime, Parser, and Clr. | ✅ Complete — extracted; `IJSModuleResolver` moved to Runtime assembly |
 
 ### 4.3 Per-Phase Workflow
 
@@ -1629,17 +1630,116 @@ Extracted `JSModuleContext`, `JSModule`, and `ModuleCache` into a new
 |----------|-------|--------|
 | Broiler.JavaScript.Ast.Tests | 73 | ✅ Pass |
 | Broiler.JavaScript.Parser.Tests | 78 | ✅ Pass |
-| Broiler.JavaScript.Storage.Tests | 56 | ✅ Pass |
+| Broiler.JavaScript.Storage.Tests | 76 | ✅ Pass |
 | Broiler.JavaScript.Core.Tests | 641 | ✅ Pass |
 | Broiler.JavaScript.Debugger.Tests | 23 | ✅ Pass |
 | Broiler.JavaScript.Clr.Tests | 29 | ✅ Pass |
 | Broiler.JavaScript.Compiler.Tests | 9 | ✅ Pass |
 | Broiler.JavaScript.Modules.Tests | 9 | ✅ Pass |
 | Broiler.JavaScript.BuiltIns.Tests | 16 | ✅ Pass |
-| **Total** | **934** | **✅ All Pass** |
+| **Total** | **954** | **✅ All Pass** |
+
+### Continued Implementation Progress (2026-03-20, Phase 3–5)
+
+#### Phase 3 — Storage Extraction (Continued)
+
+**What was done:**
+
+1. **Moved `JSPropertyAttributes` enum** from
+   `Broiler.JavaScript.Core/Core/Storage/JSProperty.cs` into the Storage assembly
+   at `Broiler.JavaScript.Storage/JSPropertyAttributes.cs`.
+   - Namespace changed from `Broiler.JavaScript.Core.Core.Storage` to
+     `Broiler.JavaScript.Storage`.
+   - Core already has `global using Broiler.JavaScript.Storage;` so existing
+     Core code compiles without changes.
+   - Added `using Broiler.JavaScript.Storage;` to Clr and Modules.Tests files
+     that reference the enum.
+
+2. **Created property contract interfaces in Ast:**
+   - `IPropertyValue` — marker interface for types storable as property values.
+   - `IPropertyAccessor : IPropertyValue` — marker interface for getter/setter
+     types.
+   - File: `Broiler.JavaScript.Ast/IPropertyContracts.cs`.
+
+3. **Implemented interfaces on Core types:**
+   - `JSValue` now implements `IPropertyValue`.
+   - `JSFunction` now implements `IPropertyAccessor`.
+   - These interfaces prepare for moving `JSProperty` struct to Storage in a
+     future iteration by allowing its `value`/`get`/`set` fields to reference
+     interface types from Ast instead of concrete Core types.
+
+4. **Added 20 tests** for `JSPropertyAttributes` to `Storage.Tests`:
+   - Bit flag values, shortcut combinations, bitwise operations, default value.
+   - Storage.Tests now has **76 tests** (was 56).
+
+**Remaining Phase 3 blockers (JSProperty/PropertySequence/ElementArray):**
+
+The structs `JSProperty`, `PropertySequence`, and `ElementArray` remain in Core
+because their fields directly reference Core types (`JSValue`, `JSFunction`,
+`JSFunctionDelegate`). Moving them to Storage requires converting these fields
+to the new interface types (`IPropertyValue`, `IPropertyAccessor`). This
+conversion is deferred because:
+
+- Changing struct fields from concrete types to interfaces changes the public
+  API surface (consumers must cast back to concrete types).
+- `PropertySequence` depends on `JSContext.NewTypeError`, `KeyStrings.GetName`,
+  `JSObject` (for `ValueEnumerator`).
+- `ElementArray` depends on `JSMath.RandomNumber`, `Comparison<JSValue>`.
+- These dependencies will be resolved when the Runtime assembly absorbs the
+  value type system (Phase 5 full implementation).
+
+#### Phase 4 — Debugger Decoupling (Verification)
+
+**Status:** Previously completed. Verified during this session.
+
+- No `InternalsVisibleTo` attribute for `Broiler.JavaScript.Debugger` exists in
+  `AssemblyInfo.cs`.
+- Debugger assembly interacts with Core via public API only.
+- `Debugger.Tests` has **23 tests** covering `IDebugger` contract, script parsed
+  notifications, exception reporting, and debugger attachment/detachment.
+
+#### Phase 5 — Runtime Assembly (Preparation)
+
+**What was done:**
+
+1. **Created `Broiler.JavaScript.Runtime` project** at
+   `Broiler.JavaScript/Broiler.JavaScript.Runtime/`.
+   - Depends on: Ast, Storage.
+   - Added to `Broiler.slnx`.
+
+2. **Moved `IJSModuleResolver` interface** from Core to Runtime:
+   - File: `Broiler.JavaScript.Runtime/IJSModuleResolver.cs`.
+   - Namespace preserved as `Broiler.JavaScript.Core.Core.Module` for backward
+     compatibility.
+   - Core's `AssemblyInfo.cs` now has `[assembly: TypeForwardedTo(typeof(IJSModuleResolver))]`
+     so downstream assemblies continue to resolve the type through Core.
+   - Core's `IJSModuleResolver.cs` replaced with a comment pointing to Runtime.
+
+3. **Core references Runtime** (`<ProjectReference>` added to Core.csproj).
+   - No circular dependency: Runtime → Storage → Ast; Core → Runtime.
+
+**Contracts awaiting extraction to Runtime:**
+
+| Contract | Current Location | Blocked By |
+|----------|-----------------|------------|
+| `IBuiltInRegistry` | Core | References `JSContext` |
+| `IClrInterop` | Core | References `JSValue` |
+| `IDebugger` | Core | References `JSValue` |
+| `IJSCompiler` | Core | References `JSFunctionDelegate`, `ICodeCache` |
+| `IJSModuleResolver` | **Runtime** ✅ | — |
+
+These interfaces will move to Runtime once `JSValue`, `JSContext`, and
+`JSFunctionDelegate` are extracted from Core to Runtime (full Phase 5).
 
 ### Remaining Work
 
+- [ ] Phase 3 continued — move `JSProperty`, `PropertySequence`, `ElementArray`
+  to Storage by converting fields to `IPropertyValue`/`IPropertyAccessor`
+  (requires Runtime to absorb `JSValue`/`JSFunction` first)
+- [ ] Phase 5 continued — extract `JSValue`, `JSContext`, `JSFunctionDelegate`,
+  `KeyString`, `Arguments`, and bootstrap logic from Core to Runtime
+- [ ] Phase 5 continued — move remaining contract interfaces (`IBuiltInRegistry`,
+  `IClrInterop`, `IDebugger`, `IJSCompiler`) to Runtime once Core types are there
 - [ ] Phase 6 continued — extract additional built-in types to BuiltIns assembly
   (blocked by internal API access for DataView, JSON, Reflect, Proxy; blocked by
   deep structural coupling for Array, String, Number, Error, Promise, etc.)
