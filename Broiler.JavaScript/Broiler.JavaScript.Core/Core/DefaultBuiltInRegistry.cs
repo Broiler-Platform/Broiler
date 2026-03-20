@@ -1,3 +1,4 @@
+using System;
 using Broiler.JavaScript.Core.Core.Debug;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Iterator;
@@ -19,10 +20,21 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
     /// </summary>
     public static readonly DefaultBuiltInRegistry Instance = new();
 
+    /// <summary>
+    /// Optional delegate invoked after Core's generated classes are registered.
+    /// Satellite assemblies (e.g., <c>Broiler.JavaScript.BuiltIns</c>) append
+    /// their own registrations via their module initializer so that all
+    /// built-in types are available when a <see cref="JSContext"/> is created.
+    /// </summary>
+    public static Action<JSContext> AdditionalRegistrations { get; set; }
+
     /// <inheritdoc />
     public void Register(JSContext context)
     {
         context.RegisterGeneratedClasses();
+
+        // Register built-in types from satellite assemblies.
+        AdditionalRegistrations?.Invoke(context);
 
         // Set up Iterator.prototype helpers and prototype chain (ES2025).
         SetupIteratorPrototypeChain(context);
