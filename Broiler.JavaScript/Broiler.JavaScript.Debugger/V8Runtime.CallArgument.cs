@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
 
 namespace Broiler.JavaScript.Debugger;
 
@@ -19,7 +18,7 @@ public partial class V8Runtime
             if (ObjectId != null)
                 return V8RemoteObject.From(ObjectId);
 
-            return ClrProxy.Marshal(Value);
+            return JSContext.ClrInterop.Marshal(Value);
         }
     }
 }

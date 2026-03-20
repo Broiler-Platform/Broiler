@@ -2,6 +2,7 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Date;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Clr;
 
 namespace Broiler.JavaScript.Core.Tests;
 

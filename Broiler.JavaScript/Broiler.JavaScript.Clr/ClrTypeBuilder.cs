@@ -1,4 +1,8 @@
-﻿using Broiler.JavaScript.Core.Extensions;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
 using System;
@@ -8,7 +12,7 @@ using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression
 using Broiler.JavaScript.ExpressionCompiler.Runtime;
 using Broiler.JavaScript.ExpressionCompiler;
 
-namespace Broiler.JavaScript.Core.Core.Clr;
+namespace Broiler.JavaScript.Clr;
 
 internal static class ClrTypeBuilder
 {

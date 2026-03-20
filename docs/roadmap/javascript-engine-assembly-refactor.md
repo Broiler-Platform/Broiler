@@ -13,11 +13,12 @@ scalability, and testability.
 
 | Project | Assembly Name | Role | Status |
 |---------|---------------|------|--------|
-| `Broiler.JavaScript.Core` | Broiler.JavaScript.Core | Engine core: compiler, runtime, built-in objects, CLR interop, module system | Active — being decomposed |
+| `Broiler.JavaScript.Core` | Broiler.JavaScript.Core | Engine core: compiler, runtime, built-in objects, module system | Active — being decomposed |
 | `Broiler.JavaScript.Ast` | Broiler.JavaScript.Ast | AST node types, shared primitives (`FastToken`, `StringSpan`, `FastNodeType`, etc.) | ✅ Extracted (Phase 1) |
 | `Broiler.JavaScript.Parser` | Broiler.JavaScript.Parser | Lexer (`FastScanner`), recursive-descent parser (`FastParser`), scope tracking | ✅ Extracted (Phase 2) |
 | `Broiler.JavaScript.Storage` | Broiler.JavaScript.Storage | Property hash maps, virtual memory, concurrent caches | ✅ Extracted (Phase 3, partial) |
 | `Broiler.JavaScript.Debugger` | Broiler.JavaScript.Debugger | V8 Inspector Protocol handler, protocol data types | ✅ Extracted (Phase 4, partial); `InternalsVisibleTo` bridge removed |
+| `Broiler.JavaScript.Clr` | Broiler.JavaScript.Clr | .NET ↔ JavaScript type bridging (`ClrProxy`, `ClrType`, `DefaultClrInterop`) | ✅ Extracted (Phase 5) |
 | `Broiler.JavaScript.ExpressionCompiler` | Broiler.JavaScript.ExpressionCompiler | LINQ Expression Tree → IL compilation | Pre-existing |
 | `Broiler.JavaScript.JSClassGenerator` | Broiler.JavaScript.JSClassGenerator | Roslyn source generator for C#-to-JS bindings | Pre-existing |
 | `Broiler.JavaScript.Network` | YantraJS.Network | Fetch API / network module | Pre-existing |
@@ -29,6 +30,7 @@ scalability, and testability.
 | `Broiler.JavaScript.Parser.Tests` | (test) | Unit tests for Parser assembly (78 tests) | ✅ Created |
 | `Broiler.JavaScript.Storage.Tests` | (test) | Unit tests for Storage assembly (56 tests) | ✅ Created |
 | `Broiler.JavaScript.Debugger.Tests` | (test) | Unit tests for Debugger assembly (23 tests) | ✅ Created |
+| `Broiler.JavaScript.Clr.Tests` | (test) | Unit tests for Clr assembly (29 tests) | ✅ Created |
 
 ### 1.2 Problem
 
@@ -359,7 +361,7 @@ changes:
 | **Phase 2** | **Parser** | Depends only on Ast. Self-contained lexer + parser. | ✅ Complete; test project created (78 tests) |
 | **Phase 3** | **Storage** | Depends on shared primitives. Decouples property storage from runtime logic. | ✅ Partial — pure storage types extracted; test project created (56 tests) |
 | **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. | ✅ Partial — V8 Inspector Protocol extracted; test project created (23 tests); `InternalsVisibleTo` bridge removed (all accessed APIs now public) |
-| **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | ⏳ In progress — IClrInterop interface complete (Marshal, GetClrType, TryUnwrapClrObject); all source code and generated code references refactored to use interface; JSFunction constructor decoupled from ClrType; 2 structural references remain (ClrProxyBuilder expression tree builder) |
+| **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | ✅ Complete — 11 files extracted; ClrProxyBuilder decoupled via delegate pattern; FallbackClrInterop as Core default; test project created (29 tests) |
 | **Phase 6** | **BuiltIns** | High coupling to Runtime, but only through `JSValue`/`JSContext`. Requires `IBuiltInRegistry` to be in place. | ⏳ In progress — IBuiltInRegistry implemented and wired into JSContext; JSClassGenerator updated to emit JSContext.ClrInterop.Marshal(); multi-assembly namespace support still needed |
 | **Phase 7** | **Compiler** | Depends on Ast, Runtime, and ExpressionCompiler. Requires stable interfaces. | ⏳ Blocked — requires stable Runtime interfaces |
 | **Phase 8** | **Modules** | Last — depends on Runtime, Parser, and Clr. | ⏳ Blocked — JSFunctionGenerator creates partial class in Core namespace; JSModuleContext extends JSContext |
@@ -431,23 +433,26 @@ Each extraction phase follows the same steps:
 
 ### Milestone 3 — Interop Extraction (Phases 5–6)
 
-**Status:** Blocked — prerequisites not yet met
+**Status:** Phase 5 complete; Phase 6 blocked
 
 **Deliverables:**
-- `Broiler.JavaScript.Clr` assembly
-- `Broiler.JavaScript.BuiltIns` assembly
-- `IBuiltInRegistry` pluggable bootstrap in Runtime
+- `Broiler.JavaScript.Clr` assembly ✅
+- `Broiler.JavaScript.Clr.Tests` — 29 assembly-specific tests ✅
+- `Broiler.JavaScript.BuiltIns` assembly — not yet started
+- `IBuiltInRegistry` pluggable bootstrap in Runtime ✅
 
 **Prerequisites (see Phase 5–8 analysis in Implementation Log):**
-1. Refactor Core to use `IClrInterop` exclusively (24+ direct `ClrProxy`
-   references must be replaced).
-2. Implement `IBuiltInRegistry` pluggable bootstrap in Core.
-3. Configure `JSClassGenerator` to work with extracted assemblies.
+1. ~~Refactor Core to use `IClrInterop` exclusively~~ — ✅ Done.
+2. ~~Implement `IBuiltInRegistry` pluggable bootstrap in Core~~ — ✅ Done.
+3. Configure `JSClassGenerator` to work with extracted assemblies — still needed
+   for Phase 6.
 
 **Key Metrics:**
-- `JSContext` bootstrap is driven entirely by `IBuiltInRegistry` — removing
-  BuiltIns or Clr from the dependency chain produces a functional (but
-  feature-reduced) runtime.
+- `Broiler.JavaScript.Clr` compiles independently with zero errors. ✅
+- `JSContext` bootstrap is driven entirely by `IBuiltInRegistry`. ✅
+- CLR interop is pluggable via `IClrInterop` interface. ✅
+- Removing the Clr assembly from the dependency chain produces a functional
+  (but feature-reduced) runtime using `FallbackClrInterop`. ✅
 
 ### Milestone 4 — Compiler and Modules (Phases 7–8)
 
@@ -573,7 +578,7 @@ Each extracted assembly must have a corresponding test project:
 | Runtime | `Broiler.JavaScript.Runtime.Tests` | `JSContext` lifecycle, `JSValue` coercion, `Arguments` | Future |
 | Storage | `Broiler.JavaScript.Storage.Tests` | Property map operations, hash collision handling | ✅ 56 tests |
 | BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | Per-object spec-conformance (Array, String, Date, Promise, etc.) | Future |
-| Clr | `Broiler.JavaScript.Clr.Tests` | .NET type bridging, method invocation | Future |
+| Clr | `Broiler.JavaScript.Clr.Tests` | ClrProxy marshalling, ClrType caching, DefaultClrInterop, expression builder registration | ✅ 29 tests |
 | Modules | `Broiler.JavaScript.Modules.Tests` | Import/export resolution, circular dependencies | Future |
 | Debugger | `Broiler.JavaScript.Debugger.Tests` | V8 Inspector protocol message handling | ✅ 23 tests |
 
@@ -1169,6 +1174,145 @@ compatibility but is no longer required for the marshal calls.
 - All **56** tests in `Broiler.JavaScript.Storage.Tests` pass.
 - All **23** tests in `Broiler.JavaScript.Debugger.Tests` pass.
 - **Total: 871 tests across 5 test projects, all passing.**
+
+---
+
+### Phase 5 — Clr Extraction ✅
+
+**Status:** Complete
+
+**Date:** 2026-03-20
+
+**What was done:**
+
+1. Created `Broiler.JavaScript.Clr` assembly at
+   `Broiler.JavaScript/Broiler.JavaScript.Clr/`.
+2. Moved **11 source files** from `Broiler.JavaScript.Core`:
+   - From `Core/Clr/`: `ClrProxy.cs`, `ClrType.cs`, `ClrTypeBuilder.cs`,
+     `ClrTypeExtensions.cs`, `ClrModule.cs`, `DefaultClrInterop.cs`,
+     `JSFieldInfo.cs`, `JSPropertyInfo.cs`, `JSMethodInfo.cs`,
+     `MethodNamesExtensions.cs`.
+   - From `Core/Function/`: `JSMethodGroup.cs` (CLR method group wrapper —
+     logically belongs with CLR interop types).
+3. All moved types use the new namespace `Broiler.JavaScript.Clr`.
+4. The Clr assembly references Core via `<ProjectReference>` (upward
+   dependency, same pattern as Debugger).
+5. Core does **not** reference the Clr assembly — no `TypeForwardedTo`
+   attributes, no `global using` aliases.
+6. Updated `Broiler.slnx` to include both `Broiler.JavaScript.Clr` and
+   `Broiler.JavaScript.Clr.Tests`.
+
+**Types that remain in Core (by design):**
+
+- `IClrInterop` (interface contract — consumed by Core, implemented by Clr).
+- `ClrMemberNamingConvention` (used by `JSContext.ClrMemberNamingConvention`).
+- `JSExportAttribute`, `JSExportSameNameAttribute` (metadata attributes used
+  by the source generator across assemblies).
+- `FallbackClrInterop` (fallback `IClrInterop` for when Clr assembly is not
+  loaded — handles primitives and JSValue pass-through).
+
+**Decoupling changes (decision points):**
+
+1. **ClrProxyBuilder refactored to delegate pattern** — The expression tree
+   builder (`LinqExpressions/ClrProxyBuilder.cs`) was the last structural
+   dependency between Core and the concrete `ClrProxy` type.  It used
+   `typeof(ClrProxy)` reflection to build method lookup tables.
+
+   Resolution: `ClrProxyBuilder` was converted to a thin dispatcher with
+   `Register(Func<Expression, Expression> marshal, Func<Expression, Expression>
+   from)`.  The actual implementation (`ClrExpressionBuilder`) lives in the Clr
+   assembly and is registered via the assembly's module initializer.  The API
+   surface (`.Marshal()` and `.From()` methods) remains identical — all callers
+   (including `JSFunction.CreateClrDelegate()`) are unchanged.
+
+2. **FallbackClrInterop as default** — `JSContext.ClrInterop` now defaults to
+   `FallbackClrInterop.Instance` (instead of `DefaultClrInterop.Instance`).
+   `FallbackClrInterop` handles primitives (int, string, bool, etc.) and
+   JSValue pass-through.  For complex CLR objects it returns
+   `JSUndefined.Value`.  The full `DefaultClrInterop` is set by the Clr
+   assembly's module initializer, which runs when the assembly is loaded.
+
+3. **Console registration moved to DefaultBuiltInRegistry** — The
+   `JSContext` constructor previously called
+   `ClrInterop.Marshal(new JSConsole(this))` directly.  This was moved into
+   `DefaultBuiltInRegistry.Register()` so that console setup happens through
+   the pluggable registry, not hardcoded in the constructor.
+
+4. **JSModuleContext ClrModule decoupled** — `JSModuleContext` previously
+   referenced `ClrModule.Default` directly.  This was replaced with a static
+   `ClrModuleProvider` delegate (`Func<JSObject>`) that the Clr assembly sets
+   during initialization.  If the Clr assembly is not loaded, no CLR module is
+   registered (the `enableClrIntegration` flag still controls this).
+
+5. **Clr assembly module initializer** — A `[ModuleInitializer]` in the Clr
+   assembly (`ClrAssemblyInitializer.cs`) registers:
+   - `JSContext.ClrInterop = DefaultClrInterop.Instance`
+   - `ClrProxyBuilder.Register(ClrExpressionBuilder.Marshal,
+     ClrExpressionBuilder.From)`
+   - `JSModuleContext.ClrModuleProvider = () => ClrModule.Default`
+
+   This runs automatically when the assembly is loaded, before any Clr type
+   is accessed.
+
+6. **Test project bootstrapping** — Both `Broiler.JavaScript.Core.Tests` and
+   `Broiler.JavaScript.Clr.Tests` include a `[ModuleInitializer]` that
+   forces the Clr assembly to load (by accessing `typeof(DefaultClrInterop)`),
+   ensuring the full CLR interop is available before any test creates a
+   `JSContext`.
+
+**Debugger fix:**
+
+- `V8Runtime.CallArgument.ToJSValue()` previously called
+  `ClrProxy.Marshal(Value)` directly.  Changed to
+  `JSContext.ClrInterop.Marshal(Value)` to use the interface pattern
+  (consistent with all other non-Clr code).
+
+**Accessibility changes:**
+
+- `InternalsVisibleTo("Broiler.JavaScript.Clr")` was added to Core's
+  `AssemblyInfo.cs` as a temporary migration bridge (per Section 4.1 #3).
+
+**New files in Clr assembly:**
+
+- `ClrExpressionBuilder.cs` — The actual expression tree building logic
+  (formerly in `ClrProxyBuilder`), using `typeof(ClrProxy)` reflection.
+- `ClrAssemblyInitializer.cs` — Module initializer for registration.
+
+**Test project (2026-03-20):**
+
+7. Created `Broiler.JavaScript.Clr.Tests` test project at
+   `Broiler.JavaScript/Broiler.JavaScript.Clr.Tests/`.
+8. Added **29 assembly-specific tests** covering:
+   - `ClrProxyTests` — `Marshal()` for null, int, string, bool, complex
+     objects, JSValue pass-through, `Type` → `ClrType`; `From()` factory
+     methods.
+   - `ClrTypeTests` — `From()` returns `ClrType`, caching consistency,
+     different types produce different instances, `ClrType` is `JSFunction`.
+   - `DefaultClrInteropTests` — singleton pattern, `IClrInterop` contract,
+     `Marshal()` primitives and complex objects, `GetClrType()`,
+     `TryUnwrapClrObject()` for both proxy and non-proxy values.
+   - `ClrExpressionBuilderTests` — verifies `ClrProxyBuilder.Marshal()` and
+     `.From()` are registered and produce valid expression nodes; JSValue
+     pass-through optimization.
+   - `ClrAssemblyInitializationTests` — verifies `JSContext.ClrInterop` is
+     `DefaultClrInterop` when Clr assembly is loaded; end-to-end
+     `JSContext.Eval()` works correctly.
+   - `ClrModuleTests` — `ClrModule.Default` is not null and is a `JSValue`.
+9. Test project references `Broiler.JavaScript.Clr` and
+   `Broiler.JavaScript.Core`.
+10. All 29 tests pass.
+
+**Verification:**
+- `Broiler.JavaScript.Clr` compiles with zero errors.
+- `Broiler.JavaScript.Core` compiles with zero errors.
+- `Broiler.JavaScript.Debugger` compiles with zero errors.
+- All **641** tests in `Broiler.JavaScript.Core.Tests` pass.
+- All **73** tests in `Broiler.JavaScript.Ast.Tests` pass.
+- All **78** tests in `Broiler.JavaScript.Parser.Tests` pass.
+- All **56** tests in `Broiler.JavaScript.Storage.Tests` pass.
+- All **23** tests in `Broiler.JavaScript.Debugger.Tests` pass.
+- All **29** tests in `Broiler.JavaScript.Clr.Tests` pass.
+- **Total: 900 tests across 6 test projects, all passing.**
 
 ---
 

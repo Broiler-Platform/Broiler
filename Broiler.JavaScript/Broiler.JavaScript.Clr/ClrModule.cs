@@ -1,8 +1,13 @@
-﻿using Broiler.JavaScript.Core.Extensions;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Date;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Extensions;
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Clr;
+namespace Broiler.JavaScript.Clr;
 
 
 public abstract class JSClrObject<T> : JSObject

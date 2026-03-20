@@ -1,64 +1,43 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
 using System;
-using System.Collections.Generic;
-using System.Reflection;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 
+/// <summary>
+/// Thin dispatcher that delegates CLR expression building to a registered
+/// implementation.  The concrete implementation lives in the
+/// <c>Broiler.JavaScript.Clr</c> assembly and is registered via
+/// <see cref="Register"/>.
+/// </summary>
 public static class ClrProxyBuilder
 {
-    static ClrProxyBuilder()
+    private static Func<Expression, Expression> _marshalImpl;
+    private static Func<Expression, Expression> _fromImpl;
+
+    /// <summary>
+    /// Registers the expression builder implementation.
+    /// Called by the Clr assembly during its module initializer.
+    /// </summary>
+    public static void Register(
+        Func<Expression, Expression> marshal,
+        Func<Expression, Expression> from)
     {
-        var d = new Dictionary<Type, MethodInfo>(10);
-        var marshal = nameof(ClrProxy.Marshal);
-
-        foreach (var m in type.GetMethods())
-        {
-            if (m.Name != marshal)
-                continue;
-
-            d[m.GetParameters()[0].ParameterType] = m;
-        }
-
-        _marshal = d;
-
-        var from = nameof(ClrProxy.From);
-        d = new Dictionary<Type, MethodInfo>(10);
-
-        foreach (var m in type.GetMethods())
-        {
-            if (m.Name != from)
-                continue;
-
-            if (m.GetParameters().Length != 1)
-                continue;
-
-            d[m.GetParameters()[0].ParameterType] = m;
-        }
-
-        _from = d;
+        _marshalImpl = marshal ?? throw new ArgumentNullException(nameof(marshal));
+        _fromImpl = from ?? throw new ArgumentNullException(nameof(from));
     }
-
-    private static Type type = typeof(ClrProxy);
-
-    private static Dictionary<Type, MethodInfo> _marshal;
-
-    private static Dictionary<Type, MethodInfo> _from;
 
     public static Expression Marshal(Expression target)
     {
         if (typeof(JSValue).IsAssignableFrom(target.Type))
             return target;
 
-        if (_marshal.TryGetValue(target.Type, out var m))
-            return Expression.Call(null, m, target);
+        if (_marshalImpl == null)
+            throw new InvalidOperationException(
+                "CLR expression builder not registered. " +
+                "Ensure the Broiler.JavaScript.Clr assembly is loaded.");
 
-        if (target.Type.IsValueType)
-            return Expression.Call(null, _marshal[typeof(object)], Expression.Box(target));
-
-        return Expression.Call(null, _marshal[typeof(object)], target);
+        return _marshalImpl(target);
     }
 
     public static Expression From(Expression target)
@@ -66,19 +45,11 @@ public static class ClrProxyBuilder
         if (typeof(JSValue).IsAssignableFrom(target.Type))
             return target;
 
-        var targetType = target.Type;
-        if (_from.TryGetValue(targetType, out var m))
-            return Expression.Call(null, m, target);
+        if (_fromImpl == null)
+            throw new InvalidOperationException(
+                "CLR expression builder not registered. " +
+                "Ensure the Broiler.JavaScript.Clr assembly is loaded.");
 
-        if (targetType.IsValueType)
-            return Expression.Call(null, _from[typeof(object)], Expression.Box(target));
-
-        foreach (var pair in _from)
-        {
-            if (pair.Key.IsAssignableFrom(targetType))
-                return Expression.Call(null, pair.Value, target);
-        }
-
-        return Expression.Call(null, _from[typeof(object)], target);
+        return _fromImpl(target);
     }
 }

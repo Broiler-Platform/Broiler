@@ -1,8 +1,11 @@
-﻿using Broiler.JavaScript.Core.Extensions;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.Core.LinqExpressions;
 using System.Reflection;
 
-namespace Broiler.JavaScript.Core.Core.Clr;
+namespace Broiler.JavaScript.Clr;
 
 internal static class ClrTypeExtensions
 {
