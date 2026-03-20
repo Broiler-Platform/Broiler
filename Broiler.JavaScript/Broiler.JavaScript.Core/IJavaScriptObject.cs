@@ -38,7 +38,7 @@ public abstract class JavaScriptObject(in Arguments a) : IJavaScriptObject
 
     public static implicit operator JSValue(JavaScriptObject @object)
     {
-        var handle = @object.handle ??= ClrProxy.From(@object);
+        var handle = @object.handle ??= JSContext.ClrInterop.Marshal(@object);
         return handle;
     }
 }

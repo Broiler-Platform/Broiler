@@ -11,7 +11,7 @@ internal static class ListExtensions
         {
             return target;
         }
-        return $"ClrProxy.Marshal({target})";
+        return $"JSContext.ClrInterop.Marshal({target})";
     }
 
     public static string ToJSValueFromClr(this string name, ITypeSymbol type, string parameter)

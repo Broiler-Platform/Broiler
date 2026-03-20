@@ -222,5 +222,8 @@ public class ClrInteropTests : IDisposable
 
         public JSValue GetClrType(Type type) =>
             _getClrTypeFn != null ? _getClrTypeFn(type) : ClrType.From(type);
+
+        public bool TryUnwrapClrObject(JSValue value, out object clrObject) =>
+            DefaultClrInterop.Instance.TryUnwrapClrObject(value, out clrObject);
     }
 }

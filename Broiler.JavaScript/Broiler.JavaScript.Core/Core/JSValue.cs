@@ -1,5 +1,4 @@
 using Broiler.JavaScript.Core.Core.Boolean;
-using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Enumerators;
@@ -84,10 +83,12 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider
         if (ConvertTo(type, out var value))
             return value;
 
-        if (prototypeChain?.@object is ClrProxy proxy)
+        var protoObj = prototypeChain?.@object;
+        if (protoObj != null
+            && JSContext.ClrInterop.TryUnwrapClrObject(protoObj, out var clrObj))
         {
-            if (type.IsAssignableFrom(proxy.value.GetType()))
-                return proxy.value;
+            if (type.IsAssignableFrom(clrObj.GetType()))
+                return clrObj;
         }
 
         throw JSContext.NewTypeError($"Cannot convert {this} to type {type.Name}");

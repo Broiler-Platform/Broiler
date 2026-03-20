@@ -19,4 +19,17 @@ public sealed class DefaultClrInterop : IClrInterop
 
     /// <inheritdoc />
     public JSValue GetClrType(Type type) => ClrType.From(type);
+
+    /// <inheritdoc />
+    public bool TryUnwrapClrObject(JSValue value, out object clrObject)
+    {
+        if (value is ClrProxy proxy)
+        {
+            clrObject = proxy.value;
+            return true;
+        }
+
+        clrObject = null;
+        return false;
+    }
 }
