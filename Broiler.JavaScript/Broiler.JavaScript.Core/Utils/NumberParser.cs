@@ -101,7 +101,7 @@ public static class NumberParser
     /// Converts a string to a number (used in type coercion).
     /// </summary>
     /// <returns> The result of parsing the string as a number. </returns>
-    internal static double CoerceToNumber(in StringSpan input)
+    public static double CoerceToNumber(in StringSpan input)
     {
         // supporting ES2021 _ number separator
         var reader = new StringReader(input.Value.Replace("_", ""));

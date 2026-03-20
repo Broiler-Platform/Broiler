@@ -55,7 +55,7 @@ public static class ClrModule
         var a1 = a.Get1();
 
         if (a1 is JSDate date)
-            return ClrProxy.From(date.value);
+            return ClrProxy.From(date.Value);
 
         throw JSContext.NewTypeError($"Not a Date");
     }

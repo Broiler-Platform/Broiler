@@ -209,23 +209,23 @@ public partial class ClrProxy : JSObject
                     return true;
                 break;
 
-            case JSString @string when @string.value.Equals(this.value):
+            case JSString @string when @string.StringValue.Equals(this.value):
                 return true;
 
             case JSNumber number:
                 switch (this.value)
                 {
-                    case int @int when @int == (int)number.value:
+                    case int @int when @int == (int)number.NumberValue:
                         return true;
-                    case uint @uint when @uint == (uint)number.value:
+                    case uint @uint when @uint == (uint)number.NumberValue:
                         return true;
-                    case long @long when @long == (long)number.value:
+                    case long @long when @long == (long)number.NumberValue:
                         return true;
-                    case ulong @ulong when @ulong == (ulong)number.value:
+                    case ulong @ulong when @ulong == (ulong)number.NumberValue:
                         return true;
-                    case double @double when @double == number.value:
+                    case double @double when @double == number.NumberValue:
                         return true;
-                    case float @float when @float == (float)number.value:
+                    case float @float when @float == (float)number.NumberValue:
                         return true;
                 }
                 break;

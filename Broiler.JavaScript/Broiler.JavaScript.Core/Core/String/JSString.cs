@@ -20,6 +20,12 @@ public partial class JSString : JSPrimitive
     internal static JSString Empty = new(string.Empty);
 
     internal readonly string value;
+
+    /// <summary>
+    /// Gets the underlying string value of this JSString instance.
+    /// </summary>
+    public string StringValue => value;
+
     KeyString _keyString;
 
     private double NumberValue = 0;

@@ -11,6 +11,12 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.WPF\Broiler.HTML.WPF.csproj" />
     <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
+    <!-- Explicit satellite assembly references ensure module initializers run -->
+    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.Clr\Broiler.JavaScript.Clr.csproj" />
+    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.Compiler\Broiler.JavaScript.Compiler.csproj" />
+    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.Modules\Broiler.JavaScript.Modules.csproj" />
+    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.BuiltIns\Broiler.JavaScript.BuiltIns.csproj" />
+    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.Debugger\Broiler.JavaScript.Debugger.csproj" />
     <ProjectReference Include="..\Broiler.DevConsole\Broiler.DevConsole.csproj" />
   </ItemGroup>
 

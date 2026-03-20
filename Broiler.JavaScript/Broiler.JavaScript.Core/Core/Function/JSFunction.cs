@@ -58,7 +58,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor
     /// A <see cref="JSFunction"/> whose <see cref="name"/> and
     /// <see cref="prototype"/> are used to configure this function.
     /// </param>
-    internal JSFunction(JSFunctionDelegate clrDelegate, JSFunction type) : this()
+    public JSFunction(JSFunctionDelegate clrDelegate, JSFunction type) : this()
     {
         ref var ownProperties = ref GetOwnProperties();
 
