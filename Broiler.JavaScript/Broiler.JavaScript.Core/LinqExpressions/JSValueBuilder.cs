@@ -209,7 +209,7 @@ public class JSValueBuilder
 
     public static Expression CreateInstance(Expression target, Expression args) => Expression.Call(target, _CreateInstance, args);
 
-    internal static MethodInfo StaticEquals = type.PublicMethod(nameof(JSValue.StaticEquals), typeof(JSValue), typeof(JSValue));
+    public static MethodInfo StaticEquals = type.PublicMethod(nameof(JSValue.StaticEquals), typeof(JSValue), typeof(JSValue));
 
     private static MethodInfo _Equals = type.PublicMethod(nameof(JSValue.Equals), typeof(JSValue));
 

@@ -38,6 +38,7 @@ scalability, and testability.
 | `Broiler.JavaScript.BuiltIns.Tests` | (test) | Unit tests for BuiltIns assembly (16 tests) | ✅ Created |
 | `Broiler.JavaScript.Compiler.Tests` | (test) | Unit tests for Compiler assembly (9 tests) | ✅ Created |
 | `Broiler.JavaScript.Modules.Tests` | (test) | Unit tests for Modules assembly (9 tests) | ✅ Created |
+| `Broiler.JavaScript.Runtime.Tests` | (test) | Unit tests for Runtime assembly (8 tests) | ✅ Created |
 
 ### 1.2 Problem
 
@@ -571,7 +572,7 @@ These are removed after all consumers have been updated.
 | `Broiler.JavaScript.Tests` | Legacy test assembly | Various test access | ⏳ Legacy — remove when test migration complete |
 | `Broiler.JavaScript.Core.Tests` | Core test project | Test-internal access | ✅ Expected — standard test access |
 | `Broiler.JavaScript.Clr` | CLR interop assembly | `JSString.value`, `JSNumber.value`, `JSDate.value`, `NumberParser.CoerceToNumber`, `Type.GetElementTypeOrGeneric`, `ArgumentsBuilder.refType`, `JSFunction(delegate,type)` constructor, `ToJSValue` extension | ⏳ 34 internal accesses remain (see detailed audit in Section 9); `JSFunction.Delegate` property, `BasePrototypeObject` setter, `SetValue(uint,...)` made public |
-| `Broiler.JavaScript.Compiler` | Compiler assembly | Remaining internal builder methods, `FastCompiler` partial file accesses | ⏳ Reduced; `CallStackItemBuilder`, `StringSpanBuilder.New()`, `NumberParser.TryCoerceToUInt32`, `KeyStringsBuilder`, `JSSpreadValueBuilder` all made public |
+| `Broiler.JavaScript.Compiler` | Compiler assembly | Remaining internal extension methods (`ToJSValue`, `CallExpression`, `ConvertToNumber`, `ConvertToString`, `ConvertToInteger`, `ConvertToJSValue`), `JSVariable.ValueExpression` | ⏳ Reduced; `CallStackItemBuilder`, `StringSpanBuilder.New()`, `NumberParser.TryCoerceToUInt32`, `KeyStringsBuilder`, `JSSpreadValueBuilder`, `ArgumentsBuilder.refType`, `JSValueBuilder.StaticEquals`, `JSBigIntBuilder.New()`, `JSDecimalBuilder.New()` all made public |
 | `Broiler.JavaScript.Runtime` | Runtime assembly | Dynamic assembly access | ⏳ Required for dynamic assembly generation |
 | `WebAtoms.XF` | External consumer | Various | ⏳ External dependency — cannot remove unilaterally |
 
@@ -592,6 +593,14 @@ These are removed after all consumers have been updated.
 - ✅ `JSValue.SetValue(uint, ...)` — made public (was `internal protected`);
   cascaded to 14 overrides across `JSObject`, `JSArray`, `JSProxy`, `ClrProxy`,
   and all typed arrays. Matches `GetValue(uint, ...)` which was already public.
+- ✅ `ArgumentsBuilder.refType` — made public (was used by Compiler in
+  `FastCompiler.cs`).
+- ✅ `JSValueBuilder.StaticEquals` — made public (was used by Compiler in
+  `FastCompiler.VisitSwitchStatement.cs`).
+- ✅ `JSBigIntBuilder.New()` — made public (was used by Compiler in
+  `FastCompiler.VisitLiteral.cs` and `FastCompiler.VisitUnaryExpression.cs`).
+- ✅ `JSDecimalBuilder.New()` — made public (was used by Compiler in
+  `FastCompiler.VisitLiteral.cs`).
 
 ### 6.4 Project File Conventions
 
@@ -627,7 +636,7 @@ Each extracted assembly must have a corresponding test project:
 | Ast | `Broiler.JavaScript.Ast.Tests` | Node construction, token/span types, enum coverage | ✅ 73 tests |
 | Parser | `Broiler.JavaScript.Parser.Tests` | Parsing correctness for all JS constructs, tokenization, keyword maps | ✅ 78 tests |
 | Compiler | `Broiler.JavaScript.Compiler.Tests` | Expression tree generation, generator rewriting | ✅ 9 tests |
-| Runtime | `Broiler.JavaScript.Runtime.Tests` | `JSContext` lifecycle, `JSValue` coercion, `Arguments` | Future (blocked by Runtime extraction) |
+| Runtime | `Broiler.JavaScript.Runtime.Tests` | `IJSModuleResolver` contract, stub implementations, multi-resolver independence | ✅ 8 tests |
 | Storage | `Broiler.JavaScript.Storage.Tests` | Property map operations, hash collision handling, `JSPropertyAttributes` | ✅ 76 tests |
 | BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | WeakRef, FinalizationRegistry, EventTarget, Event, AdditionalRegistrations | ✅ 16 tests |
 | Clr | `Broiler.JavaScript.Clr.Tests` | ClrProxy marshalling, ClrType caching, DefaultClrInterop, expression builder registration | ✅ 29 tests |
@@ -1672,7 +1681,8 @@ Extracted `JSModuleContext`, `JSModule`, and `ModuleCache` into a new
 | Broiler.JavaScript.Compiler.Tests | 9 | ✅ Pass |
 | Broiler.JavaScript.Modules.Tests | 9 | ✅ Pass |
 | Broiler.JavaScript.BuiltIns.Tests | 16 | ✅ Pass |
-| **Total** | **954** | **✅ All Pass** |
+| Broiler.JavaScript.Runtime.Tests | 8 | ✅ Pass |
+| **Total** | **962** | **✅ All Pass** |
 
 ### Continued Implementation Progress (2026-03-20, Phase 3–5)
 
@@ -1803,12 +1813,12 @@ These interfaces will move to Runtime once `JSValue`, `JSContext`, and
 | Clr | `ArgumentsBuilder.refType` (field) | ClrType.cs, ClrTypeExtensions.cs | Internal builder member |
 | Clr | `JSFunction(delegate,type)` constructor | ClrType.cs | Internal constructor; consider `protected` |
 | Clr | `ToJSValue` (ext method) | JSFieldInfo.cs | Internal extension; make public |
-| Compiler | Remaining internal builder methods | Multiple FastCompiler partial files | Systematic audit needed |
+| Compiler | Remaining internal builder methods | Multiple FastCompiler partial files | Internal extension methods (`ToJSValue`, `CallExpression`, `ConvertToNumber`, `ConvertToString`, `ConvertToInteger`, `ConvertToJSValue`) and `JSVariable.ValueExpression`; making extension classes public or refactoring to instance methods needed |
 | Runtime | Dynamic assembly internals | Used by IL generation | Required for `DynamicMethod` generation |
 
 **Verification:**
 - All 10 production assemblies compile with zero errors.
-- All **954** tests pass across 9 test projects (Runtime has no tests yet).
+- All **962** tests pass across 10 test projects.
 
 ### InternalsVisibleTo Bridge Reduction (2026-03-20, continued)
 
@@ -1861,11 +1871,11 @@ These interfaces will move to Runtime once `JSValue`, `JSContext`, and
 |----------|--------|-------|-------|
 | Debugger | 0 internal accesses | 0 | — (already resolved) |
 | Clr | ~40 internal accesses | ~34 internal accesses | −6 (Delegate, BasePrototype, SetValue) |
-| Compiler | ~20 internal accesses | ~10 internal accesses | −10 (CallStackItemBuilder, StringSpanBuilder, NumberParser, KeyStringsBuilder, JSSpreadValueBuilder) |
+| Compiler | ~20 internal accesses | ~6 internal accesses | −14 (CallStackItemBuilder, StringSpanBuilder, NumberParser, KeyStringsBuilder, JSSpreadValueBuilder, ArgumentsBuilder.refType, JSValueBuilder.StaticEquals, JSBigIntBuilder.New, JSDecimalBuilder.New) |
 
 **Verification:**
 - All 10 production assemblies compile with zero errors.
-- All **954** tests pass across 9 test projects.
+- All **962** tests pass across 10 test projects.
 
 ### Remaining Work
 
@@ -1889,9 +1899,10 @@ These interfaces will move to Runtime once `JSValue`, `JSContext`, and
   matches `GetValue(uint, ...)` which was already public. Reduces Clr bridge
   (`ClrProxy.SetValue` override)
 - [ ] Resolve remaining Clr internal accesses (detailed audit below)
-- [ ] Audit and resolve remaining Compiler internal accesses (various builder
-  methods in `LinqExpressions/`) — requires systematic review of each partial
-  class file
+- [ ] Audit and resolve remaining Compiler internal accesses — internal extension
+  methods (`ToJSValue`, `CallExpression`, `ConvertToNumber`, `ConvertToString`,
+  `ConvertToInteger`, `ConvertToJSValue`) and `JSVariable.ValueExpression` still
+  require `InternalsVisibleTo` bridge (44 compilation errors when bridge removed)
 - [ ] Remove `InternalsVisibleTo("Broiler.JavaScript.Tests")` — legacy test
   assembly reference
 
@@ -1935,7 +1946,9 @@ constructor `protected` instead of `internal`.
 - [ ] Update downstream consumers (Broiler.App, Broiler.Cli) to reference
   new assemblies directly (currently pull in all assemblies transitively)
 - [x] Cross-platform CI build/test matrix (Linux/macOS/Windows) — ✅ added
-  `.github/workflows/ci.yml`
+  `.github/workflows/ci.yml`; covers all 10 test projects
+- [x] `Broiler.JavaScript.Runtime.Tests` project created — ✅ 8 tests covering
+  `IJSModuleResolver` contract
 - [ ] Consider `Broiler.JavaScript.All` meta-package for convenience references
 
 ---
@@ -2094,7 +2107,67 @@ runs all 9 test projects on Ubuntu, Windows, and macOS:
 | Compiler | `Broiler.JavaScript.Compiler.Tests` | 9 |
 | Modules | `Broiler.JavaScript.Modules.Tests` | 9 |
 | BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | 16 |
-| **Total** | **9 projects** | **954** |
+| Runtime | `Broiler.JavaScript.Runtime.Tests` | 8 |
+| **Total** | **10 projects** | **962** |
+
+---
+
+### Continued Implementation Progress (2026-03-20, CI/Testing/Bridge Reduction)
+
+**Date:** 2026-03-20
+
+**What was done:**
+
+1. **Created `Broiler.JavaScript.Runtime.Tests`** test project at
+   `Broiler.JavaScript/Broiler.JavaScript.Runtime.Tests/`.
+   - 8 assembly-specific tests covering the `IJSModuleResolver` interface
+     contract: implementation verification, path resolution (found/not-found),
+     async source loading (success/failure), nested path handling, completed
+     task semantics, and multi-resolver independence.
+   - Test project references only `Broiler.JavaScript.Runtime` (no Core dependency).
+   - Added to `Broiler.slnx`.
+
+2. **Created `.github/workflows/ci.yml`** — GitHub Actions CI workflow with
+   multi-platform test matrix:
+   - **Platforms:** Ubuntu, Windows, macOS.
+   - **Steps:** Checkout → Setup .NET 8 → Restore → Build → Test (10 projects).
+   - All 10 test projects run on each platform.
+
+3. **Made 4 additional Compiler internal APIs public:**
+   - `ArgumentsBuilder.refType` — `internal static readonly Type` → `public`
+     (used by `FastCompiler.cs` for `Arguments` by-ref parameter expression).
+   - `JSValueBuilder.StaticEquals` — `internal static MethodInfo` → `public`
+     (used by `FastCompiler.VisitSwitchStatement.cs` for equality comparison).
+   - `JSBigIntBuilder.New(string)` — `internal static` → `public`
+     (used by `FastCompiler.VisitLiteral.cs` and
+     `FastCompiler.VisitUnaryExpression.cs`).
+   - `JSDecimalBuilder.New(string)` — `internal static` → `public`
+     (used by `FastCompiler.VisitLiteral.cs`).
+
+4. **Detailed Compiler `InternalsVisibleTo` audit performed:**
+   - With bridge removed: 44 compilation errors across 4 error categories.
+   - Remaining internal accesses identified: internal extension methods
+     (`ToJSValue`, `CallExpression`, `ConvertToNumber`, `ConvertToString`,
+     `ConvertToInteger`, `ConvertToJSValue`) and `JSVariable.ValueExpression`.
+   - Bridge reduction: ~20 → ~6 internal accesses remaining.
+   - Full removal requires making internal extension classes public, which is a
+     larger API surface change deferred to a future session.
+
+5. **Documentation updated:**
+   - Project Inventory table — added `Runtime.Tests`.
+   - Testing Requirements table — updated Runtime from "Future" to "✅ 8 tests".
+   - Test Matrix — updated from 954 to 962 tests across 10 projects.
+   - InternalsVisibleTo Status — updated Compiler entry with specific remaining
+     internal members and newly resolved bridges.
+   - CI/CD Section 12 — updated test matrix with Runtime row.
+   - Remaining Work — updated Compiler audit with specific member names and
+     error count; added Runtime.Tests completion.
+
+**Verification:**
+- All 10 production assemblies compile with zero errors.
+- All **962** tests pass across 10 test projects:
+  - Core: 641, Ast: 73, Parser: 78, Storage: 76, Debugger: 23, Clr: 29,
+    Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 8.
 
 ---
 
