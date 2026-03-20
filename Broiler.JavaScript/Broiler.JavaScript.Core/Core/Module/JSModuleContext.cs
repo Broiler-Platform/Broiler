@@ -1,5 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Promise;
+﻿using Broiler.JavaScript.Core.Core.Promise;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -24,6 +23,12 @@ public class JSModuleContext : JSContext
     internal readonly JSObject ModulePrototype;
     internal readonly JSFunction Module;
 
+    /// <summary>
+    /// Factory delegate that provides the default CLR module object.
+    /// Set by the Clr assembly during initialization.
+    /// </summary>
+    public static Func<JSObject> ClrModuleProvider { get; set; }
+
     public JSModuleContext(SynchronizationContext ctx = null, bool enableClrIntegration = true) : base(ctx ?? new SynchronizationContext())
     {
         // this.CreateSharedObject(KeyStrings.assert, typeof(JSAssert), true);
@@ -32,8 +37,8 @@ public class JSModuleContext : JSContext
         Module = JSModule.CreateClass(this, false); // this.Create<JSModule>(KeyStrings.Module, null, false);
         ModulePrototype = Module.prototype;
 
-        if (enableClrIntegration)
-            moduleCache[ModuleCache.clr] = new JSModule(this, ClrModule.Default, "clr");
+        if (enableClrIntegration && ClrModuleProvider != null)
+            moduleCache[ModuleCache.clr] = new JSModule(this, ClrModuleProvider(), "clr");
 
         moduleCache[ModuleCache.module] = new JSModule(this, Module, "module");
 

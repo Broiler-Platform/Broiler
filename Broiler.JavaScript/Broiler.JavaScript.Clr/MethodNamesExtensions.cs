@@ -1,9 +1,12 @@
-﻿using System.Collections.Generic;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core.Core.Clr;
+namespace Broiler.JavaScript.Clr;
 
 internal static class MethodNamesExtensions
 {

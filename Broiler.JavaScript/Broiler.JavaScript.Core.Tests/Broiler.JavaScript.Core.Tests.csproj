@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Broiler.JavaScript.Clr\Broiler.JavaScript.Clr.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
   </ItemGroup>
 

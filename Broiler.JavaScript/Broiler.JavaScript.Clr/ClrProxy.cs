@@ -1,4 +1,7 @@
-﻿using Broiler.JavaScript.Core.Core.Primitive;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.Core.Core.Date;
 using Broiler.JavaScript.Core.Core.Storage;
@@ -13,8 +16,9 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Generator;
+using Broiler.JavaScript.Ast;
 
-namespace Broiler.JavaScript.Core.Core.Clr;
+namespace Broiler.JavaScript.Clr;
 
 public partial class ClrProxy : JSObject
 {

@@ -1,3 +1,4 @@
+using Broiler.JavaScript.Core.Core.Debug;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Iterator;
 using Broiler.JavaScript.Core.Core.Storage;
@@ -25,6 +26,9 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
 
         // Set up Iterator.prototype helpers and prototype chain (ES2025).
         SetupIteratorPrototypeChain(context);
+
+        // Register the console object.
+        context[KeyStrings.console] = JSContext.ClrInterop.Marshal(new JSConsole(context));
     }
 
     private static void SetupIteratorPrototypeChain(JSContext context)

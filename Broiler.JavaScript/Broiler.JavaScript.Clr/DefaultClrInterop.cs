@@ -1,6 +1,9 @@
 using System;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
 
-namespace Broiler.JavaScript.Core.Core.Clr;
+namespace Broiler.JavaScript.Clr;
 
 /// <summary>
 /// Default <see cref="IClrInterop"/> implementation that delegates to the

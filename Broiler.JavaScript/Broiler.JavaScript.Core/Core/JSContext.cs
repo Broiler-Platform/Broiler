@@ -64,9 +64,9 @@ public partial class JSContext : JSObject, IDisposable
     /// Gets or sets the CLR interop provider used to marshal between .NET
     /// objects and JavaScript values.  Custom implementations can override
     /// the default marshalling behaviour.
-    /// Defaults to <see cref="DefaultClrInterop.Instance"/>.
+    /// Defaults to <see cref="FallbackClrInterop.Instance"/>.
     /// </summary>
-    public static IClrInterop ClrInterop { get; set; } = DefaultClrInterop.Instance;
+    public static IClrInterop ClrInterop { get; set; } = FallbackClrInterop.Instance;
 
     /// <summary>
     /// Available only when Enable Clr Integration is true in JSModuleContext
@@ -175,7 +175,6 @@ public partial class JSContext : JSObject, IDisposable
 
         BuiltInRegistry.Register(this);
 
-        this[KeyStrings.console] = ClrInterop.Marshal(new JSConsole(this));
         this[KeyStrings.debug] = new JSFunction(Debug);
 
     }

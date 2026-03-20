@@ -1,13 +1,16 @@
-﻿using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-
-using System;
-using System.Reflection;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler.Runtime;
-using Broiler.JavaScript.Core.Core.Function;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
-namespace Broiler.JavaScript.Core.Core.Clr;
+using System;
+using System.Reflection;
+
+namespace Broiler.JavaScript.Clr;
 
 
 internal class JSPropertyInfo
