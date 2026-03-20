@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Object;
 using Broiler.JavaScript.Core.Core.Storage;
 using System;
@@ -13,10 +12,10 @@ namespace Broiler.JavaScript.Core.Extensions;
 public static class MarshalExtensions
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue Marshal(this object value) => ClrProxy.Marshal(value);
+    public static JSValue Marshal(this object value) => JSContext.ClrInterop.Marshal(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue Marshal(this Type type) => ClrType.From(type);
+    public static JSValue Marshal(this Type type) => JSContext.ClrInterop.GetClrType(type);
 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

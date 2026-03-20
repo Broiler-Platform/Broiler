@@ -1,5 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core.Clr;
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Threading.Tasks;
 using Broiler.JavaScript.ExpressionCompiler;
@@ -37,7 +36,7 @@ public static class JSPromiseExtensions
         if (typeof(T) == typeof(JSValue))
             return (JSValue)result;
 
-        return ClrProxy.Marshal(result);
+        return JSContext.ClrInterop.Marshal(result);
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]

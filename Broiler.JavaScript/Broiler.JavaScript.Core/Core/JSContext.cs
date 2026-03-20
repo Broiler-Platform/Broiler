@@ -175,7 +175,7 @@ public partial class JSContext : JSObject, IDisposable
 
         BuiltInRegistry.Register(this);
 
-        this[KeyStrings.console] = ClrProxy.From(new JSConsole(this));
+        this[KeyStrings.console] = ClrInterop.Marshal(new JSConsole(this));
         this[KeyStrings.debug] = new JSFunction(Debug);
 
     }

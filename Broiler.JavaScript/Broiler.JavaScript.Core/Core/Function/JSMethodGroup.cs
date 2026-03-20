@@ -43,7 +43,7 @@ internal class JSMethodGroup
         try
         {
             var (method, args) = all.Match(a, name);
-            return ClrProxy.Marshal(method.Invoke(target, args));
+            return JSContext.ClrInterop.Marshal(method.Invoke(target, args));
         }
         catch (Exception ex)
         {
@@ -56,7 +56,7 @@ internal class JSMethodGroup
         try
         {
             var (method, args) = all.Match(a, name);
-            return ClrProxy.Marshal(method.Invoke(null, args));
+            return JSContext.ClrInterop.Marshal(method.Invoke(null, args));
         }
         catch (Exception ex)
         {

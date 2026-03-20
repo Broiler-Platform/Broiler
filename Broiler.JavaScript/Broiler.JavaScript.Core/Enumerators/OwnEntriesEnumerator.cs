@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -149,7 +148,7 @@ public struct EnumerableElementEnumerable(IEnumerator en) : IElementEnumerator
     {
         if (en.MoveNext())
         {
-            value = ClrProxy.Marshal(en.Current);
+            value = JSContext.ClrInterop.Marshal(en.Current);
             this.index = this.index == uint.MaxValue ? 0 : this.index + 1;
             index = this.index;
             hasValue = true;
@@ -166,7 +165,7 @@ public struct EnumerableElementEnumerable(IEnumerator en) : IElementEnumerator
     {
         if (en.MoveNext())
         {
-            value = ClrProxy.Marshal(en.Current);
+            value = JSContext.ClrInterop.Marshal(en.Current);
             index = index == uint.MaxValue ? 0 : index + 1;
             return true;
         }
@@ -179,7 +178,7 @@ public struct EnumerableElementEnumerable(IEnumerator en) : IElementEnumerator
     {
         if (en.MoveNext())
         {
-            value = ClrProxy.Marshal(en.Current);
+            value = JSContext.ClrInterop.Marshal(en.Current);
             index = index == uint.MaxValue ? 0 : index + 1;
             return true;
         }
@@ -193,7 +192,7 @@ public struct EnumerableElementEnumerable(IEnumerator en) : IElementEnumerator
         if (en.MoveNext())
         {
             index = index == uint.MaxValue ? 0 : index + 1;
-            return ClrProxy.Marshal(en.Current);
+            return JSContext.ClrInterop.Marshal(en.Current);
         }
 
         return @default;
