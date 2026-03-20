@@ -19,6 +19,7 @@ scalability, and testability.
 | `Broiler.JavaScript.Storage` | Broiler.JavaScript.Storage | Property hash maps, virtual memory, concurrent caches | ✅ Extracted (Phase 3, partial) |
 | `Broiler.JavaScript.Debugger` | Broiler.JavaScript.Debugger | V8 Inspector Protocol handler, protocol data types | ✅ Extracted (Phase 4, partial); `InternalsVisibleTo` bridge removed |
 | `Broiler.JavaScript.Clr` | Broiler.JavaScript.Clr | .NET ↔ JavaScript type bridging (`ClrProxy`, `ClrType`, `DefaultClrInterop`) | ✅ Extracted (Phase 5) |
+| `Broiler.JavaScript.BuiltIns` | Broiler.JavaScript.BuiltIns | Extracted built-in objects (WeakRef, FinalizationRegistry, EventTarget, Event) | ✅ Extracted (Phase 6, partial) |
 | `Broiler.JavaScript.ExpressionCompiler` | Broiler.JavaScript.ExpressionCompiler | LINQ Expression Tree → IL compilation | Pre-existing |
 | `Broiler.JavaScript.JSClassGenerator` | Broiler.JavaScript.JSClassGenerator | Roslyn source generator for C#-to-JS bindings | Pre-existing |
 | `Broiler.JavaScript.Network` | YantraJS.Network | Fetch API / network module | Pre-existing |
@@ -31,6 +32,7 @@ scalability, and testability.
 | `Broiler.JavaScript.Storage.Tests` | (test) | Unit tests for Storage assembly (56 tests) | ✅ Created |
 | `Broiler.JavaScript.Debugger.Tests` | (test) | Unit tests for Debugger assembly (23 tests) | ✅ Created |
 | `Broiler.JavaScript.Clr.Tests` | (test) | Unit tests for Clr assembly (29 tests) | ✅ Created |
+| `Broiler.JavaScript.BuiltIns.Tests` | (test) | Unit tests for BuiltIns assembly (16 tests) | ✅ Created |
 
 ### 1.2 Problem
 
@@ -362,7 +364,7 @@ changes:
 | **Phase 3** | **Storage** | Depends on shared primitives. Decouples property storage from runtime logic. | ✅ Partial — pure storage types extracted; test project created (56 tests) |
 | **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. | ✅ Partial — V8 Inspector Protocol extracted; test project created (23 tests); `InternalsVisibleTo` bridge removed (all accessed APIs now public) |
 | **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | ✅ Complete — 11 files extracted; ClrProxyBuilder decoupled via delegate pattern; FallbackClrInterop as Core default; test project created (29 tests) |
-| **Phase 6** | **BuiltIns** | High coupling to Runtime, but only through `JSValue`/`JSContext`. Requires `IBuiltInRegistry` to be in place. | ⏳ In progress — IBuiltInRegistry implemented; JSClassGenerator Clr import removed; multi-assembly generation verified (Network assembly pattern) |
+| **Phase 6** | **BuiltIns** | High coupling to Runtime, but only through `JSValue`/`JSContext`. Requires `IBuiltInRegistry` to be in place. | ✅ Partial — WeakRef, FinalizationRegistry, EventTarget, Event, CustomEvent, DomEventHandler extracted; test project created (16 tests); `AdditionalRegistrations` delegate added to `DefaultBuiltInRegistry`; module initializer pattern |
 | **Phase 7** | **Compiler** | Depends on Ast, Runtime, and ExpressionCompiler. Requires stable interfaces. | ⏳ Unblocked — `IJSCompiler` interface already exists and is wired into `CoreScript.Compiler`; `DefaultJSCompiler` is the extractable implementation |
 | **Phase 8** | **Modules** | Last — depends on Runtime, Parser, and Clr. | ⏳ Partially unblocked — `IJSModuleResolver` interface defined; upward-dependency pattern confirmed (JSModuleContext → JSContext, no reverse reference) |
 
@@ -433,13 +435,15 @@ Each extraction phase follows the same steps:
 
 ### Milestone 3 — Interop Extraction (Phases 5–6)
 
-**Status:** Phase 5 complete; Phase 6 in progress (unblocked)
+**Status:** Phase 5 complete; Phase 6 partial (first batch extracted)
 
 **Deliverables:**
 - `Broiler.JavaScript.Clr` assembly ✅
 - `Broiler.JavaScript.Clr.Tests` — 29 assembly-specific tests ✅
-- `Broiler.JavaScript.BuiltIns` assembly — not yet started
+- `Broiler.JavaScript.BuiltIns` assembly ✅ (partial — WeakRef, FinalizationRegistry, EventTarget, Event, CustomEvent, DomEventHandler)
+- `Broiler.JavaScript.BuiltIns.Tests` — 16 assembly-specific tests ✅
 - `IBuiltInRegistry` pluggable bootstrap in Runtime ✅
+- `DefaultBuiltInRegistry.AdditionalRegistrations` delegate for satellite assembly registration ✅
 
 **Prerequisites (see Phase 5–8 analysis in Implementation Log):**
 1. ~~Refactor Core to use `IClrInterop` exclusively~~ — ✅ Done.
@@ -589,7 +593,7 @@ Each extracted assembly must have a corresponding test project:
 | Compiler | `Broiler.JavaScript.Compiler.Tests` | Expression tree generation, generator rewriting | Future |
 | Runtime | `Broiler.JavaScript.Runtime.Tests` | `JSContext` lifecycle, `JSValue` coercion, `Arguments` | Future |
 | Storage | `Broiler.JavaScript.Storage.Tests` | Property map operations, hash collision handling | ✅ 56 tests |
-| BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | Per-object spec-conformance (Array, String, Date, Promise, etc.) | Future |
+| BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | WeakRef, FinalizationRegistry, EventTarget, Event, AdditionalRegistrations | ✅ 16 tests |
 | Clr | `Broiler.JavaScript.Clr.Tests` | ClrProxy marshalling, ClrType caching, DefaultClrInterop, expression builder registration | ✅ 29 tests |
 | Modules | `Broiler.JavaScript.Modules.Tests` | Import/export resolution, circular dependencies | Future |
 | Debugger | `Broiler.JavaScript.Debugger.Tests` | V8 Inspector protocol message handling | ✅ 23 tests |
@@ -1452,6 +1456,100 @@ compatibility but is no longer required for the marshal calls.
   The upward-dependency pattern was already cleanly implemented — `JSContext`
   has no reverse references to `JSModuleContext`.
 
+### Phase 6 — BuiltIns Extraction ✅ (Partial)
+
+**Status:** Partial — first batch of built-in types extracted
+
+**Date:** 2026-03-20
+
+**What was done:**
+
+1. Created `Broiler.JavaScript.BuiltIns` assembly at
+   `Broiler.JavaScript/Broiler.JavaScript.BuiltIns/`.
+2. Added `AdditionalRegistrations` delegate to `DefaultBuiltInRegistry` to
+   enable satellite assemblies to contribute built-in type registrations without
+   circular dependencies.
+3. Moved **6 source files** from `Broiler.JavaScript.Core`:
+   - From `Core/Weak/`: `WeakRef.cs` (contains `JSWeakRef` and
+     `JSFinalizationRegistry`)
+   - From `Core/Events/`: `EventTarget.cs`, `Event.cs`, `CustomEvent.cs`,
+     `DomEventHandler.cs`
+4. All moved types retain their original namespaces
+   (`Broiler.JavaScript.Core.Core.Weak`, `Broiler.JavaScript.Core.Core.Events`).
+5. The BuiltIns assembly references Core via `<ProjectReference>` (upward
+   dependency, same pattern as Debugger, Clr, Modules, Compiler).
+6. Created `Names.cs` with `[JSRegistrationGenerator]` — the JSClassGenerator
+   source generator produces `RegisterAll` for the moved types.
+7. Created `BuiltInsAssemblyInitializer.cs` with `[ModuleInitializer]` that
+   wires `AdditionalRegistrations` so extracted types are automatically
+   registered when a `JSContext` is created.
+8. Updated `Broiler.slnx` to include both `Broiler.JavaScript.BuiltIns` and
+   `Broiler.JavaScript.BuiltIns.Tests`.
+
+**Types that could NOT be extracted (coupling analysis):**
+
+Three categories of built-in types remain in Core due to coupling:
+
+- **Internal field access:** DataView (`JSArrayBuffer.buffer`), JSJSON
+  (`JSFunction.f`, `JSNumber.value`, `JSString.value`), JSReflect
+  (`JSObject.IsExtensible`). Extracting these requires making internal fields
+  public or adding accessor methods.
+- **Protected internal overrides:** JSProxy overrides `protected internal`
+  `GetValue`/`SetValue` methods on `JSObject`. Moving to another assembly
+  changes access modifier semantics.
+- **Deep structural coupling:** JSArray (13 type checks), JSString (8 type
+  checks), JSNumber (static property access from JSMath/JSDatePrototype),
+  JSError (inheritance from JSSuppressedError, type checks from JSException),
+  JSPromise (stored in JSContext, property access), JSIteratorObject (11 static
+  method refs from DefaultBuiltInRegistry), JSRegExp (7 type checks from
+  JSStringPrototype), JSBigInt/JSDate/JSMap/JSSet/JSIntl (type checks in
+  JSGlobal).
+
+**Registration pattern:**
+
+`DefaultBuiltInRegistry` was enhanced with a static `AdditionalRegistrations`
+delegate property. The module initializer in `BuiltInsAssemblyInitializer`
+appends to this delegate, supporting multiple satellite assemblies:
+
+```csharp
+// In DefaultBuiltInRegistry
+public static Action<JSContext> AdditionalRegistrations { get; set; }
+
+public void Register(JSContext context)
+{
+    context.RegisterGeneratedClasses();      // Core types
+    AdditionalRegistrations?.Invoke(context); // Satellite types
+    SetupIteratorPrototypeChain(context);
+    // ...
+}
+```
+
+**Test project (2026-03-20):**
+
+9. Created `Broiler.JavaScript.BuiltIns.Tests` test project at
+   `Broiler.JavaScript/Broiler.JavaScript.BuiltIns.Tests/`.
+10. Added **16 assembly-specific tests** covering:
+    - `WeakRefTests` — JS registration check, construction, deref, C# API.
+    - `FinalizationRegistryTests` — JS registration check, callback requirement,
+      valid construction.
+    - `EventTargetTests` — JS registration check, construction, dispatchEvent,
+      event type checking.
+    - `EventTests` — C# API for Event.Create factory, type, bubbles, cancelable.
+    - `AdditionalRegistrationsTests` — verifies delegate is set, WeakRef +
+      EventTarget + FinalizationRegistry available in JSContext.
+11. Test project bootstrap forces assembly loading for Clr, Compiler, and
+    BuiltIns assemblies via `RuntimeHelpers.RunModuleConstructor`.
+12. All 16 tests pass.
+
+**Verification:**
+- `Broiler.JavaScript.BuiltIns` compiles with zero errors.
+- `Broiler.JavaScript.Core` compiles with zero errors.
+- All **641** tests in `Broiler.JavaScript.Core.Tests` pass.
+- All **16** tests in `Broiler.JavaScript.BuiltIns.Tests` pass.
+- **Total: 934 tests across 9 test projects, all passing.**
+
+---
+
 ### Phase 7 — Compiler Extraction (2026-03-20)
 
 **Status: Complete**
@@ -1537,12 +1635,14 @@ Extracted `JSModuleContext`, `JSModule`, and `ModuleCache` into a new
 | Broiler.JavaScript.Clr.Tests | 29 | ✅ Pass |
 | Broiler.JavaScript.Compiler.Tests | 9 | ✅ Pass |
 | Broiler.JavaScript.Modules.Tests | 9 | ✅ Pass |
-| **Total** | **918** | **✅ All Pass** |
+| Broiler.JavaScript.BuiltIns.Tests | 16 | ✅ Pass |
+| **Total** | **934** | **✅ All Pass** |
 
 ### Remaining Work
 
-- [ ] Phase 6 — BuiltIns extraction (blocked by JSFunctionGenerator
-  namespace-linked partial classes; requires further JSClassGenerator work)
+- [ ] Phase 6 continued — extract additional built-in types to BuiltIns assembly
+  (blocked by internal API access for DataView, JSON, Reflect, Proxy; blocked by
+  deep structural coupling for Array, String, Number, Error, Promise, etc.)
 - [ ] Remove `InternalsVisibleTo` for Compiler assembly where possible
   (make required internal APIs public)
 - [ ] Update downstream consumers (Broiler.App, Broiler.Cli) to reference
