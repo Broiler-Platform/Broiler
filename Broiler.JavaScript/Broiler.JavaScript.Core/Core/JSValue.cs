@@ -164,7 +164,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
     [EditorBrowsable(EditorBrowsableState.Never)]
     public JSPrototype prototypeChain;
 
-    internal virtual JSObject BasePrototypeObject
+    public virtual JSObject BasePrototypeObject
     {
         set => prototypeChain = value?.PrototypeObject;
     }

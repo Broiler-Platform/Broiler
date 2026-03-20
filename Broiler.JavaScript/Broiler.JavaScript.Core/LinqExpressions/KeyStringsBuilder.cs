@@ -8,7 +8,7 @@ using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 
-internal class KeyStringsBuilder
+public class KeyStringsBuilder
 {
     public static readonly Type RefType = typeof(KeyString).MakeByRefType();
 
