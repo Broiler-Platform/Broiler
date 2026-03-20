@@ -20,6 +20,8 @@ scalability, and testability.
 | `Broiler.JavaScript.Debugger` | Broiler.JavaScript.Debugger | V8 Inspector Protocol handler, protocol data types | ✅ Extracted (Phase 4, partial); `InternalsVisibleTo` bridge removed |
 | `Broiler.JavaScript.Clr` | Broiler.JavaScript.Clr | .NET ↔ JavaScript type bridging (`ClrProxy`, `ClrType`, `DefaultClrInterop`) | ✅ Extracted (Phase 5) |
 | `Broiler.JavaScript.BuiltIns` | Broiler.JavaScript.BuiltIns | Extracted built-in objects (WeakRef, FinalizationRegistry, EventTarget, Event) | ✅ Extracted (Phase 6, partial) |
+| `Broiler.JavaScript.Compiler` | Broiler.JavaScript.Compiler | AST → LINQ Expression Tree compilation (`FastCompiler`, 40+ partial files) | ✅ Extracted (Phase 7) |
+| `Broiler.JavaScript.Modules` | Broiler.JavaScript.Modules | ES module system (`JSModuleContext`, `JSModule`, `ModuleCache`) | ✅ Extracted (Phase 8) |
 | `Broiler.JavaScript.Runtime` | Broiler.JavaScript.Runtime | Runtime contract interfaces (`IJSModuleResolver`); future home of execution context and value type system | 🆕 Created (Phase 5 prep) |
 | `Broiler.JavaScript.ExpressionCompiler` | Broiler.JavaScript.ExpressionCompiler | LINQ Expression Tree → IL compilation | Pre-existing |
 | `Broiler.JavaScript.JSClassGenerator` | Broiler.JavaScript.JSClassGenerator | Roslyn source generator for C#-to-JS bindings | Pre-existing |
@@ -34,6 +36,8 @@ scalability, and testability.
 | `Broiler.JavaScript.Debugger.Tests` | (test) | Unit tests for Debugger assembly (23 tests) | ✅ Created |
 | `Broiler.JavaScript.Clr.Tests` | (test) | Unit tests for Clr assembly (29 tests) | ✅ Created |
 | `Broiler.JavaScript.BuiltIns.Tests` | (test) | Unit tests for BuiltIns assembly (16 tests) | ✅ Created |
+| `Broiler.JavaScript.Compiler.Tests` | (test) | Unit tests for Compiler assembly (9 tests) | ✅ Created |
+| `Broiler.JavaScript.Modules.Tests` | (test) | Unit tests for Modules assembly (9 tests) | ✅ Created |
 
 ### 1.2 Problem
 
@@ -366,7 +370,7 @@ changes:
 | **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. | ✅ Partial — V8 Inspector Protocol extracted; test project created (23 tests); `InternalsVisibleTo` bridge removed (all accessed APIs now public) |
 | **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | ✅ Complete — 11 files extracted; ClrProxyBuilder decoupled via delegate pattern; FallbackClrInterop as Core default; test project created (29 tests) |
 | **Phase 6** | **BuiltIns** | High coupling to Runtime, but only through `JSValue`/`JSContext`. Requires `IBuiltInRegistry` to be in place. | ✅ Partial — WeakRef, FinalizationRegistry, EventTarget, Event, CustomEvent, DomEventHandler extracted; test project created (16 tests); `AdditionalRegistrations` delegate added to `DefaultBuiltInRegistry`; module initializer pattern |
-| **Phase 7** | **Compiler** | Depends on Ast, Runtime, and ExpressionCompiler. Requires stable interfaces. | ⏳ Unblocked — `IJSCompiler` interface already exists and is wired into `CoreScript.Compiler`; `DefaultJSCompiler` is the extractable implementation |
+| **Phase 7** | **Compiler** | Depends on Ast, Runtime, and ExpressionCompiler. Requires stable interfaces. | ✅ Complete; test project created (9 tests) |
 | **Phase 8** | **Modules** | Last — depends on Runtime, Parser, and Clr. | ✅ Complete — extracted; `IJSModuleResolver` moved to Runtime assembly |
 
 ### 4.3 Per-Phase Workflow
@@ -463,12 +467,14 @@ Each extraction phase follows the same steps:
 
 ### Milestone 4 — Compiler and Modules (Phases 7–8)
 
-**Status:** Partially unblocked — key interfaces now in place
+**Status:** ✅ Complete — Compiler and Modules extracted
 
 **Deliverables:**
-- `Broiler.JavaScript.Compiler` assembly
-- `Broiler.JavaScript.Modules` assembly
-- Full integration test suite verifying end-to-end script execution
+- `Broiler.JavaScript.Compiler` assembly ✅
+- `Broiler.JavaScript.Compiler.Tests` — 9 assembly-specific tests ✅
+- `Broiler.JavaScript.Modules` assembly ✅
+- `Broiler.JavaScript.Modules.Tests` — 9 assembly-specific tests ✅
+- Full integration test suite verifying end-to-end script execution ✅ (verified via Core.Tests)
 
 **Prerequisites (see Phase 5–8 analysis in Implementation Log):**
 1. ~~Define stable Runtime interfaces for compiler consumption~~ — ✅ Done.
@@ -485,10 +491,10 @@ Each extraction phase follows the same steps:
    class pattern.
 
 **Key Metrics:**
-- All 10 assemblies compile independently.
-- Existing `Broiler.JavaScript.Core.Tests` pass (may be split across
-  assembly-specific test projects).
-- `Broiler.App` and `Broiler.Cli` build and function correctly.
+- All 10 assemblies compile independently. ✅
+- Existing `Broiler.JavaScript.Core.Tests` pass (641 tests). ✅
+- `Broiler.JavaScript.Compiler.Tests` pass (9 tests). ✅
+- `Broiler.JavaScript.Modules.Tests` pass (9 tests). ✅
 
 ---
 
@@ -558,6 +564,25 @@ These are removed after all consumers have been updated.
   that were added for migration must be resolved by making the required API
   public or removing the dependency.
 
+**Current `InternalsVisibleTo` Status (Core `AssemblyInfo.cs`):**
+
+| Target Assembly | Purpose | Internal APIs Accessed | Status |
+|----------------|---------|----------------------|--------|
+| `Broiler.JavaScript.Tests` | Legacy test assembly | Various test access | ⏳ Legacy — remove when test migration complete |
+| `Broiler.JavaScript.Core.Tests` | Core test project | Test-internal access | ✅ Expected — standard test access |
+| `Broiler.JavaScript.Clr` | CLR interop assembly | `JSFunction.f` (1 site in ClrType) | ⏳ 1 remaining internal access; `BasePrototypeObject` made public |
+| `Broiler.JavaScript.Compiler` | Compiler assembly | Various internal builder methods, `CallStackItemBuilder`, etc. | ⏳ Multiple internal accesses; `KeyStringsBuilder` and `JSSpreadValueBuilder` made public |
+| `Broiler.JavaScript.Runtime` | Runtime assembly | Dynamic assembly access | ⏳ Required for dynamic assembly generation |
+| `WebAtoms.XF` | External consumer | Various | ⏳ External dependency — cannot remove unilaterally |
+
+**Resolved bridges:**
+- ✅ `Broiler.JavaScript.Debugger` — all internal APIs made public (Phase 4);
+  no `InternalsVisibleTo` entry exists.
+- ✅ `BasePrototypeObject` setter — made public (was used by Clr assembly in 5
+  locations; `JSValue.BasePrototypeObject` and `JSObject.BasePrototypeObject`).
+- ✅ `KeyStringsBuilder` — made public (was used by Compiler in 2 locations).
+- ✅ `JSSpreadValueBuilder` — made public (was used by Compiler in 2 locations).
+
 ### 6.4 Project File Conventions
 
 All new assemblies follow this template:
@@ -591,12 +616,12 @@ Each extracted assembly must have a corresponding test project:
 |----------|-------------|-------|--------|
 | Ast | `Broiler.JavaScript.Ast.Tests` | Node construction, token/span types, enum coverage | ✅ 73 tests |
 | Parser | `Broiler.JavaScript.Parser.Tests` | Parsing correctness for all JS constructs, tokenization, keyword maps | ✅ 78 tests |
-| Compiler | `Broiler.JavaScript.Compiler.Tests` | Expression tree generation, generator rewriting | Future |
+| Compiler | `Broiler.JavaScript.Compiler.Tests` | Expression tree generation, generator rewriting | ✅ 9 tests |
 | Runtime | `Broiler.JavaScript.Runtime.Tests` | `JSContext` lifecycle, `JSValue` coercion, `Arguments` | Future |
 | Storage | `Broiler.JavaScript.Storage.Tests` | Property map operations, hash collision handling | ✅ 56 tests |
 | BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | WeakRef, FinalizationRegistry, EventTarget, Event, AdditionalRegistrations | ✅ 16 tests |
 | Clr | `Broiler.JavaScript.Clr.Tests` | ClrProxy marshalling, ClrType caching, DefaultClrInterop, expression builder registration | ✅ 29 tests |
-| Modules | `Broiler.JavaScript.Modules.Tests` | Import/export resolution, circular dependencies | Future |
+| Modules | `Broiler.JavaScript.Modules.Tests` | Import/export resolution, circular dependencies | ✅ 9 tests |
 | Debugger | `Broiler.JavaScript.Debugger.Tests` | V8 Inspector protocol message handling | ✅ 23 tests |
 
 **Test principles:**
@@ -1731,7 +1756,62 @@ conversion is deferred because:
 These interfaces will move to Runtime once `JSValue`, `JSContext`, and
 `JSFunctionDelegate` are extracted from Core to Runtime (full Phase 5).
 
+### InternalsVisibleTo Audit and API Surface Changes (2026-03-20)
+
+**Status:** Audit complete — 3 internal APIs made public
+
+**Date:** 2026-03-20
+
+**What was done:**
+
+1. **`BasePrototypeObject` setter made public** — Changed from
+   `internal virtual` (on `JSValue`) and `internal override` (on `JSObject`)
+   to `public virtual`/`public override`. This eliminates 5 internal-access
+   sites in the Clr assembly (`ClrProxy.cs` ×2, `ClrModule.cs` ×1,
+   `ClrType.cs` ×2). The property is write-only (no getter) and controls
+   prototype chain assignment — a safe and intentional API.
+
+2. **`KeyStringsBuilder` class made public** — Changed from `internal class`
+   to `public class` in `LinqExpressions/KeyStringsBuilder.cs`. This
+   eliminates 2 internal-access sites in the Compiler assembly
+   (`FastCompiler.KeyOfName.cs`). The class provides expression tree building
+   helpers for `KeyString` field lookups.
+
+3. **`JSSpreadValueBuilder` class made public** — Changed from `internal class`
+   to `public class` in `LinqExpressions/ClrSpreadExpression.cs`. This
+   eliminates 2 internal-access sites in the Compiler assembly
+   (`FastCompiler.VisitCallExpression.cs`). The class provides expression tree
+   building for spread arguments.
+
+**Audit results — remaining internal accesses:**
+
+| Assembly | Internal Member | Location | Reason Cannot Remove |
+|----------|----------------|----------|---------------------|
+| Clr | `JSFunction.f` (field) | ClrType.cs:271 | Implementation detail — compiled delegate; exposing publicly breaks encapsulation |
+| Compiler | Various internal builder methods | Multiple FastCompiler partial files | Systematic audit needed; many `LinqExpressions/` types have internal members used by FastCompiler |
+| Runtime | Dynamic assembly internals | Used by IL generation | Required for `DynamicMethod` generation |
+
+**Verification:**
+- All 10 assemblies compile with zero errors.
+- All **954** tests pass across 9 test projects.
+
 ### Remaining Work
+
+**`InternalsVisibleTo` bridge resolution:**
+
+- [x] Remove `InternalsVisibleTo` for Debugger assembly — ✅ all APIs made public
+- [x] Make `BasePrototypeObject` setter public — ✅ reduces Clr bridge (5 sites)
+- [x] Make `KeyStringsBuilder` public — ✅ reduces Compiler bridge (2 sites)
+- [x] Make `JSSpreadValueBuilder` public — ✅ reduces Compiler bridge (2 sites)
+- [ ] Resolve remaining Clr internal access: `JSFunction.f` field (1 site in
+  ClrType.cs) — requires public accessor or API redesign
+- [ ] Audit and resolve remaining Compiler internal accesses (various builder
+  methods in `LinqExpressions/`) — requires systematic review of each partial
+  class file
+- [ ] Remove `InternalsVisibleTo("Broiler.JavaScript.Tests")` — legacy test
+  assembly reference
+
+**Phase completion:**
 
 - [ ] Phase 3 continued — move `JSProperty`, `PropertySequence`, `ElementArray`
   to Storage by converting fields to `IPropertyValue`/`IPropertyAccessor`
@@ -1743,11 +1823,14 @@ These interfaces will move to Runtime once `JSValue`, `JSContext`, and
 - [ ] Phase 6 continued — extract additional built-in types to BuiltIns assembly
   (blocked by internal API access for DataView, JSON, Reflect, Proxy; blocked by
   deep structural coupling for Array, String, Number, Error, Promise, etc.)
-- [ ] Remove `InternalsVisibleTo` for Compiler assembly where possible
-  (make required internal APIs public)
+
+**Infrastructure:**
+
 - [ ] Update downstream consumers (Broiler.App, Broiler.Cli) to reference
-  new assemblies
-- [ ] Cross-platform CI build/test matrix (Linux/macOS/Windows)
+  new assemblies directly (currently pull in all assemblies transitively)
+- [ ] Cross-platform CI build/test matrix (Linux/macOS/Windows) — no
+  `.github/workflows/` configuration exists yet
+- [ ] Consider `Broiler.JavaScript.All` meta-package for convenience references
 
 ---
 

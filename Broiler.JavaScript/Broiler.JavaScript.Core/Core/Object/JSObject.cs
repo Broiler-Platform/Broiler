@@ -29,7 +29,7 @@ public partial class JSObject : JSValue
     private JSPrototype currentPrototype;
     protected bool HasIterator = false;
 
-    internal override JSObject BasePrototypeObject
+    public override JSObject BasePrototypeObject
     {
         set
         {
