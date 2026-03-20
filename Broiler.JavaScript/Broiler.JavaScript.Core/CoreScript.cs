@@ -35,7 +35,7 @@ public class CoreScript
         {
             codeCache = codeCache ?? DictionaryCodeCache.Current;
             var script = code;
-            var compiler = _compiler;
+            var compiler = Compiler;
             var jsc = new JSCode(location, code, args, () => compiler.Compile(script, location, args, codeCache));
             return codeCache.GetOrCreate(in jsc);
         }

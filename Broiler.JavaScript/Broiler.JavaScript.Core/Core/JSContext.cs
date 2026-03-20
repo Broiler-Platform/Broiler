@@ -69,6 +69,13 @@ public partial class JSContext : JSObject, IDisposable
     public static IClrInterop ClrInterop { get; set; } = FallbackClrInterop.Instance;
 
     /// <summary>
+    /// Factory delegate that provides the default CLR module object.
+    /// Set by the Clr assembly during initialization.  Consumed by the
+    /// Modules assembly (<c>JSModuleContext</c>) to register the CLR module.
+    /// </summary>
+    public static Func<JSObject> ClrModuleProvider { get; set; }
+
+    /// <summary>
     /// Available only when Enable Clr Integration is true in JSModuleContext
     /// </summary>
     public ClrMemberNamingConvention ClrMemberNamingConvention { get; set; } = ClrMemberNamingConvention.CamelCase;
@@ -86,7 +93,7 @@ public partial class JSContext : JSObject, IDisposable
     private static readonly AsyncLocal<JSContext> _current = new((e) => { Current = e.CurrentValue ?? e.PreviousValue; });
 
     private TaskCompletionSource<int> _waitTask;
-    internal Task WaitTask => _waitTask?.Task;
+    public Task WaitTask => _waitTask?.Task;
 
     public CallStackItem Top;
 

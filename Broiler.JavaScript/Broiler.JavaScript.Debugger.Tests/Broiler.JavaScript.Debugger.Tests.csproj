@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Broiler.JavaScript.Compiler\Broiler.JavaScript.Compiler.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Debugger\Broiler.JavaScript.Debugger.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
   </ItemGroup>

@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Module;
 using Broiler.JavaScript.Core.LinqExpressions;
 
 namespace Broiler.JavaScript.Clr;
@@ -19,6 +18,6 @@ internal static class ClrAssemblyInitializer
             ClrExpressionBuilder.From);
 
         // Register the default CLR module provider for JSModuleContext.
-        JSModuleContext.ClrModuleProvider = () => ClrModule.Default;
+        JSContext.ClrModuleProvider = () => ClrModule.Default;
     }
 }

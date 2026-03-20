@@ -23,12 +23,6 @@ public class JSModuleContext : JSContext
     internal readonly JSObject ModulePrototype;
     internal readonly JSFunction Module;
 
-    /// <summary>
-    /// Factory delegate that provides the default CLR module object.
-    /// Set by the Clr assembly during initialization.
-    /// </summary>
-    public static Func<JSObject> ClrModuleProvider { get; set; }
-
     public JSModuleContext(SynchronizationContext ctx = null, bool enableClrIntegration = true) : base(ctx ?? new SynchronizationContext())
     {
         // this.CreateSharedObject(KeyStrings.assert, typeof(JSAssert), true);
