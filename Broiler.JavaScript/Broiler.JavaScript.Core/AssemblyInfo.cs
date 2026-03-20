@@ -11,3 +11,5 @@ using Broiler.JavaScript.Core.Core.Module;
 
 // Type forwards for contracts moved to Broiler.JavaScript.Runtime.
 [assembly: TypeForwardedTo(typeof(IJSModuleResolver))]
+[assembly: TypeForwardedTo(typeof(ExportAttribute))]
+[assembly: TypeForwardedTo(typeof(DefaultExportAttribute))]

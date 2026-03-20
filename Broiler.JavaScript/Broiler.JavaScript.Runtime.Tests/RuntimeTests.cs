@@ -108,3 +108,59 @@ public class IJSModuleResolverTests
         Assert.NotSame(resolver1, resolver2);
     }
 }
+
+/// <summary>
+/// Tests for the <see cref="ExportAttribute"/> and <see cref="DefaultExportAttribute"/>
+/// types moved to the Runtime assembly.
+/// </summary>
+public class ExportAttributeTests
+{
+    [Fact]
+    public void ExportAttribute_DefaultName_IsNull()
+    {
+        var attr = new ExportAttribute();
+        Assert.Null(attr.Name);
+    }
+
+    [Fact]
+    public void ExportAttribute_CustomName_IsPreserved()
+    {
+        var attr = new ExportAttribute("myExport");
+        Assert.Equal("myExport", attr.Name);
+    }
+
+    [Fact]
+    public void ExportAttribute_IsAttribute()
+    {
+        var attr = new ExportAttribute();
+        Assert.IsAssignableFrom<Attribute>(attr);
+    }
+
+    [Fact]
+    public void DefaultExportAttribute_Name_IsDefault()
+    {
+        var attr = new DefaultExportAttribute();
+        Assert.Equal("default", attr.Name);
+    }
+
+    [Fact]
+    public void DefaultExportAttribute_ExtendsExportAttribute()
+    {
+        var attr = new DefaultExportAttribute();
+        Assert.IsAssignableFrom<ExportAttribute>(attr);
+    }
+
+    [Fact]
+    public void ExportAttribute_LivesInRuntimeAssembly()
+    {
+        var asm = typeof(ExportAttribute).Assembly;
+        Assert.Equal("Broiler.JavaScript.Runtime", asm.GetName().Name);
+    }
+
+    [Fact]
+    public void DefaultExportAttribute_LivesInRuntimeAssembly()
+    {
+        var asm = typeof(DefaultExportAttribute).Assembly;
+        Assert.Equal("Broiler.JavaScript.Runtime", asm.GetName().Name);
+    }
+}
