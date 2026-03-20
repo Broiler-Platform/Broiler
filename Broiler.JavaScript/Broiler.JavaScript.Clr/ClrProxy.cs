@@ -242,7 +242,7 @@ public partial class ClrProxy : JSObject
         return base.GetValue(key, receiver, throwError);
     }
 
-    internal protected override bool SetValue(uint name, JSValue value, JSValue receiver, bool throwError = true)
+    public override bool SetValue(uint name, JSValue value, JSValue receiver, bool throwError = true)
     {
         if (prototypeChain?.@object is ClrType.ClrPrototype p)
         {

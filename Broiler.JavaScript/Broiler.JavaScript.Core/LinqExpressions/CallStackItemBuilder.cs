@@ -4,7 +4,7 @@ using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 
-internal static class CallStackItemBuilder
+public static class CallStackItemBuilder
 {
     public static YExpression New(YExpression context, YExpression scriptInfo, int nameOffset, int nameLength, int line, int column) =>
         NewLambdaExpression.NewExpression<CallStackItem>(() => () => new CallStackItem(null, null, 0, 0, 0, 0), context, scriptInfo,

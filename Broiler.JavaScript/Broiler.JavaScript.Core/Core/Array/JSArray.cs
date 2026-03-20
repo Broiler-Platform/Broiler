@@ -256,7 +256,7 @@ public partial class JSArray : JSObject
         _length = el;
     }
 
-    internal protected override bool SetValue(uint name, JSValue value, JSValue receiver, bool throwError = true)
+    public override bool SetValue(uint name, JSValue value, JSValue receiver, bool throwError = true)
     {
         if (base.SetValue(name, value, receiver, throwError))
         {

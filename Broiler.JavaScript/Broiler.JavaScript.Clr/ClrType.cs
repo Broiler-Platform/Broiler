@@ -254,7 +254,7 @@ public class ClrType : JSFunction
     private ClrType(ClrMemberNamingConvention namingConvention, Type type, ClrType baseType = null) :
         base(type.Name, $"function {type.Name}() {{ [clr-native] }}", new ClrPrototype())
     {
-        f = Create;
+        Delegate = Create;
         this.namingConvention = namingConvention;
         Type = type;
 
@@ -268,7 +268,7 @@ public class ClrType : JSFunction
             if (parameters.Length == 1 && parameters[0].ParameterType == typeof(Arguments).MakeByRefType())
             {
                 var cx = CreateConstuctorDelegate(method);
-                f = cx.f;
+                Delegate = cx.Delegate;
             }
         }
 

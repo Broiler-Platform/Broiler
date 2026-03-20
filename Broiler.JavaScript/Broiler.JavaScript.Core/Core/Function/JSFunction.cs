@@ -31,6 +31,17 @@ public partial class JSFunction : JSObject, IPropertyAccessor
 
     internal JSFunctionDelegate f;
 
+    /// <summary>
+    /// Gets or sets the underlying <see cref="JSFunctionDelegate"/> that implements
+    /// this function's invocation logic. Used by CLR interop to wire constructor
+    /// delegates.
+    /// </summary>
+    public JSFunctionDelegate Delegate
+    {
+        get => f;
+        set => f = value;
+    }
+
     public override bool IsFunction => true;
 
     public override JSValue TypeOf() => JSConstants.Function;
