@@ -497,6 +497,33 @@ Each extraction phase follows the same steps:
 - `Broiler.JavaScript.Compiler.Tests` pass (9 tests). ✅
 - `Broiler.JavaScript.Modules.Tests` pass (9 tests). ✅
 
+### Milestone 5 — Runtime Extraction and `InternalsVisibleTo` Elimination (Phases 9–10)
+
+**Status:** 🔲 Planning — see Section 10 for Phase 9 details
+
+**Phase 9 — Runtime Extraction:**
+- [ ] Phase 9a: Move `KeyString`/`KeyStrings` to Ast; move `JSProperty`,
+  `PropertySequence`, `ElementArray` to Storage (with interface-typed fields).
+- [ ] Phase 9b: Move `JSValue`, `JSObject`, `JSFunction`, `JSContext`,
+  `Arguments`, `CoreScript`, `Bootstrap` to Runtime.
+- [ ] Move remaining contract interfaces (`IBuiltInRegistry`, `IClrInterop`,
+  `IDebugger`, `IJSCompiler`) to Runtime.
+
+**Phase 10 — `InternalsVisibleTo` Elimination and Final Cleanup:**
+- [ ] Resolve all remaining Clr internal accesses (34 sites — see Remaining Work).
+- [ ] Resolve all remaining Compiler internal accesses (6 sites).
+- [ ] Remove `InternalsVisibleTo("Broiler.JavaScript.Tests")` legacy entry.
+- [ ] Create `Broiler.JavaScript.All` meta-package.
+- [ ] Update downstream consumers to explicit assembly references.
+
+**Key Metrics (target):**
+- Zero `InternalsVisibleTo` migration bridges remain (test-access-only entries
+  are acceptable).
+- `Broiler.JavaScript.Core` no longer contains value type system — types live
+  in Runtime.
+- All downstream consumers build and run against the new assembly structure.
+- Each assembly has ≥ 90% line coverage in its dedicated test project.
+
 ---
 
 ## 6. Implementation Guidance
@@ -670,13 +697,16 @@ consumers need only change one `<ProjectReference>`.
 
 ## 7. Risk Mitigation
 
-| Risk | Mitigation |
-|------|------------|
-| **Breaking downstream builds** | Use `TypeForwardedTo` attributes and `global using` aliases during migration to preserve API compatibility. |
-| **Circular dependencies** | Extract shared primitives (`StringSpan`, `KeyString` base) into **Ast** assembly. Use interfaces for upward references. |
-| **Performance regression** | Assembly boundaries add no runtime cost (same AppDomain, same JIT). Benchmark critical paths (parse → compile → execute) before and after each phase. |
-| **Test coverage gaps** | Require each phase to achieve ≥ 90% line coverage on the extracted assembly before merging. |
-| **Scope creep** | Each phase is a self-contained PR. No functional changes — only structural moves and interface introductions. |
+| Risk | Mitigation | Status |
+|------|------------|--------|
+| **Breaking downstream builds** | Use `TypeForwardedTo` attributes and `global using` aliases during migration to preserve API compatibility. | ✅ Active — `TypeForwardedTo` used for `IJSModuleResolver`, AST types, Parser types, Storage types. |
+| **Circular dependencies** | Extract shared primitives (`StringSpan`, `KeyString` base) into **Ast** assembly. Use interfaces (`IPropertyValue`, `IPropertyAccessor`, `IClrInterop`) for upward references. | ✅ Active — `IPropertyContracts` defined in Ast; `IClrInterop` replaces concrete `ClrProxy` refs. Phase 9a will resolve Storage↔Runtime cycle via interface-typed fields. |
+| **Performance regression** | Assembly boundaries add no runtime cost (same AppDomain, same JIT). Benchmark critical paths (parse → compile → execute) before and after each phase. | ✅ No regressions observed through Phase 8. |
+| **Test coverage gaps** | Require each phase to achieve ≥ 90% line coverage on the extracted assembly before merging. | ⏳ All 10 assemblies have dedicated test projects (962 tests total). Coverage measurement tooling (e.g., `coverlet`) to be integrated into CI. |
+| **Scope creep** | Each phase is a self-contained PR. No functional changes — only structural moves and interface introductions. | ✅ Active — enforced through Phases 1–8. |
+| **Module initializer ordering** | Satellite assemblies (Clr, Compiler, Modules, BuiltIns) register via `[ModuleInitializer]`. Test projects must ensure assemblies are loaded before `JSContext` creation. | ✅ Mitigated — test bootstraps use `RuntimeHelpers.RunModuleConstructor`. Document in contributor guide. |
+| **`InternalsVisibleTo` bridge accumulation** | Track all bridges in Section 6.3. Each phase must reduce bridge count — never increase. Target zero migration bridges by Phase 10. | ⏳ Debugger bridge fully removed. Clr: 34 → target 0. Compiler: ~6 → target 0. |
+| **External consumer breakage (`WebAtoms.XF`)** | Coordinate with external teams before removing `InternalsVisibleTo` entries. Provide migration guide and deprecation timeline. | ⏳ `WebAtoms.XF` entry retained. No removal planned without external coordination. |
 
 ---
 
@@ -686,7 +716,7 @@ The refactor is complete when:
 
 1. `Broiler.JavaScript.Core` no longer exists as a single monolithic assembly.
    Its code is distributed across the assemblies defined in Section 2.
-2. Each assembly has a dedicated test project with comprehensive coverage.
+2. Each assembly has a dedicated test project with ≥ 90% line coverage.
 3. All existing tests in `Broiler.JavaScript.Core.Tests` pass (distributed
    across the new test projects).
 4. `Broiler.App`, `Broiler.Cli`, and `Broiler.Avalonia` build and run correctly
@@ -694,10 +724,41 @@ The refactor is complete when:
 5. No `InternalsVisibleTo` entries remain as migration bridges.
 6. The CI pipeline (`.github/workflows/ci.yml`) builds and tests all new
    assemblies on Linux, macOS, and Windows.
+7. No circular assembly dependencies exist (`dotnet list reference` confirms
+   unidirectional dependency graph).
+8. Downstream build instructions (Section 11) are verified and up to date.
+
+### Current Progress Against Success Criteria
+
+| # | Criterion | Status |
+|---|-----------|--------|
+| 1 | Core decomposed into separate assemblies | ⏳ 8 of 11 target assemblies extracted. Core still contains value type system (`JSValue`, `JSContext`, etc.) pending Phase 9. |
+| 2 | Each assembly has test project with ≥ 90% coverage | ⏳ All 10 assemblies have test projects (962 tests). Coverage measurement not yet integrated into CI. |
+| 3 | All existing Core.Tests pass | ✅ 641 Core.Tests pass. |
+| 4 | Downstream consumers build correctly | ✅ Transitive compatibility maintained. Explicit references not yet required. |
+| 5 | No `InternalsVisibleTo` migration bridges | ⏳ Debugger bridge removed. Clr (34 accesses) and Compiler (~6 accesses) bridges remain. |
+| 6 | CI pipeline covers all assemblies | ✅ `.github/workflows/ci.yml` runs 10 test projects on 3 platforms. |
+| 7 | No circular dependencies | ✅ Verified — all assemblies follow unidirectional dependency graph. |
+| 8 | Downstream build instructions updated | ⏳ Section 11 documents migration steps; not yet verified end-to-end. |
 
 ---
 
 ## 9. Implementation Log
+
+### Phase Progress Summary
+
+| Phase | Assembly | Status | Date | Blockers |
+|-------|----------|--------|------|----------|
+| 1 | Ast | ✅ Complete | 2026-03-19 | — |
+| 2 | Parser | ✅ Complete | 2026-03-19 | — |
+| 3 | Storage | ⏳ Partial | 2026-03-19 | `JSProperty`, `PropertySequence`, `ElementArray` depend on `JSValue`/`JSFunction` — blocked until Phase 9 (Runtime extraction). |
+| 4 | Debugger | ✅ Complete | 2026-03-19 | — |
+| 5 | Clr | ✅ Complete | 2026-03-20 | `InternalsVisibleTo` bridge remains (34 internal accesses). |
+| 6 | BuiltIns | ⏳ Partial | 2026-03-20 | Deep structural coupling (JSArray 13, JSString 8, JSRegExp 7, JSError 6, JSPromise, JSProxy); internal field access (DataView, JSJSON, JSReflect). |
+| 7 | Compiler | ✅ Complete | 2026-03-20 | `InternalsVisibleTo` bridge remains (~6 internal accesses). |
+| 8 | Modules | ✅ Complete | 2026-03-20 | — |
+| 9 | Runtime | 🔲 Planning | — | Circular dependency between Runtime↔Storage (see Section 10). |
+| 10 | Cleanup | 🔲 Not started | — | Depends on Phase 9 completion. |
 
 ### Phase 1 — Ast Extraction ✅
 
@@ -1898,11 +1959,9 @@ These interfaces will move to Runtime once `JSValue`, `JSContext`, and
 - [x] Make `JSValue.SetValue(uint, ...)` public — ✅ cascaded to all 14 overrides;
   matches `GetValue(uint, ...)` which was already public. Reduces Clr bridge
   (`ClrProxy.SetValue` override)
-- [ ] Resolve remaining Clr internal accesses (detailed audit below)
-- [ ] Audit and resolve remaining Compiler internal accesses — internal extension
-  methods (`ToJSValue`, `CallExpression`, `ConvertToNumber`, `ConvertToString`,
-  `ConvertToInteger`, `ConvertToJSValue`) and `JSVariable.ValueExpression` still
-  require `InternalsVisibleTo` bridge (44 compilation errors when bridge removed)
+- [ ] Resolve remaining Clr internal accesses (34 sites — see detailed audit below)
+- [ ] Audit and resolve remaining Compiler internal accesses (~6 sites — internal
+  extension methods and `JSVariable.ValueExpression`)
 - [ ] Remove `InternalsVisibleTo("Broiler.JavaScript.Tests")` — legacy test
   assembly reference
 
@@ -1912,34 +1971,36 @@ A full audit of the Clr assembly was performed to determine which internal membe
 prevent removing the `InternalsVisibleTo` bridge. The following 34 errors occur
 when the bridge is removed:
 
-| Category | Internal Members | Files | Error Count |
-|----------|-----------------|-------|-------------|
-| Internal value fields | `JSString.value`, `JSNumber.value`, `JSDate.value` | `ClrProxy.cs`, `ClrModule.cs` | 9 |
-| Internal methods | `NumberParser.CoerceToNumber` | `ClrProxy.cs` | 1 |
-| Internal extension methods | `Type.GetElementTypeOrGeneric` (×3 sites), `YAssignExpression.ToJSValue` (×1 site) | `ClrType.cs`, `JSPropertyInfo.cs`, `JSFieldInfo.cs` | 4 |
-| Internal builder members | `ArgumentsBuilder.refType` | `ClrType.cs`, `ClrTypeExtensions.cs` | 2 |
-| Internal constructors | `JSFunction(JSFunctionDelegate, JSFunction)` (×2 call sites) | `ClrType.cs` | 2 |
+| Category | Internal Members | Files | Error Count | Resolution |
+|----------|-----------------|-------|-------------|------------|
+| Internal value fields | `JSString.value`, `JSNumber.value`, `JSDate.value` | `ClrProxy.cs`, `ClrModule.cs` | 9 | Add public read-only properties (`StringVal`, `NumberVal`, `DateVal`) |
+| Internal methods | `NumberParser.CoerceToNumber` | `ClrProxy.cs` | 1 | Make method `public` |
+| Internal extension methods | `Type.GetElementTypeOrGeneric` (×3), `YAssignExpression.ToJSValue` (×1) | `ClrType.cs`, `JSPropertyInfo.cs`, `JSFieldInfo.cs` | 4 | Make extension classes `public` |
+| Internal builder members | `ArgumentsBuilder.refType` | `ClrType.cs`, `ClrTypeExtensions.cs` | 2 | Already made public (verify) |
+| Internal constructors | `JSFunction(JSFunctionDelegate, JSFunction)` (×2) | `ClrType.cs` | 2 | Change to `protected` |
 
-**Resolution approach for Clr bridge:** Making value fields public (e.g.,
-`JSString.value`, `JSNumber.value`) is feasible but exposes mutable implementation
-details. A safer approach is to add public read-only properties (e.g.,
-`JSString.StringVal`, `JSNumber.NumberVal`). Internal extension methods require
-making the extension class public or providing equivalent public API. The
-constructor access requires making the `JSFunction(JSFunctionDelegate, JSFunction)`
-constructor `protected` instead of `internal`.
+**Detailed Compiler `InternalsVisibleTo` audit (2026-03-20):**
 
-**Phase completion:**
+| Category | Internal Members | Files | Error Count | Resolution |
+|----------|-----------------|-------|-------------|------------|
+| Internal extension methods | `ToJSValue`, `CallExpression`, `ConvertToNumber`, `ConvertToString`, `ConvertToInteger`, `ConvertToJSValue` | Multiple `FastCompiler.Visit*.cs` | ~38 | Make extension classes `public` |
+| Internal properties | `JSVariable.ValueExpression` | `FastCompiler.VisitVariable.cs` | ~6 | Make property `public` |
+
+**Phase completion (next actions):**
 
 - [ ] Phase 3 continued — move `JSProperty`, `PropertySequence`, `ElementArray`
   to Storage by converting fields to `IPropertyValue`/`IPropertyAccessor`
-  (requires Runtime to absorb `JSValue`/`JSFunction` first)
-- [ ] Phase 5 continued — extract `JSValue`, `JSContext`, `JSFunctionDelegate`,
-  `KeyString`, `Arguments`, and bootstrap logic from Core to Runtime
-- [ ] Phase 5 continued — move remaining contract interfaces (`IBuiltInRegistry`,
-  `IClrInterop`, `IDebugger`, `IJSCompiler`) to Runtime once Core types are there
+  (requires Runtime to absorb `JSValue`/`JSFunction` first — **blocked by Phase 9**)
 - [ ] Phase 6 continued — extract additional built-in types to BuiltIns assembly
   (blocked by internal API access for DataView, JSON, Reflect, Proxy; blocked by
-  deep structural coupling for Array, String, Number, Error, Promise, etc.)
+  deep structural coupling for Array, String, Number, Error, Promise, etc. —
+  **partially blocked by Phase 10 API changes**)
+- [ ] Phase 9a — move `KeyString`/`KeyStrings` to Ast; move `JSProperty`,
+  `PropertySequence`, `ElementArray` to Storage with interface-typed fields
+- [ ] Phase 9b — move `JSValue`, `JSObject`, `JSFunction`, `JSContext`,
+  `Arguments`, `CoreScript`, `Bootstrap` to Runtime
+- [ ] Phase 10 — resolve all `InternalsVisibleTo` bridges, create meta-package,
+  update downstream consumers (see Section 14)
 
 **Infrastructure:**
 
@@ -1949,7 +2010,8 @@ constructor `protected` instead of `internal`.
   `.github/workflows/ci.yml`; covers all 10 test projects
 - [x] `Broiler.JavaScript.Runtime.Tests` project created — ✅ 8 tests covering
   `IJSModuleResolver` contract
-- [ ] Consider `Broiler.JavaScript.All` meta-package for convenience references
+- [ ] Create `Broiler.JavaScript.All` meta-package for convenience references
+- [ ] Integrate `coverlet` coverage measurement into CI (target: ≥ 90% per assembly)
 
 ---
 
@@ -1993,6 +2055,38 @@ The primary blocker is a circular dependency between Runtime and Storage:
      `PropertySequence`, `ElementArray` to Storage (with interface-typed fields).
    - **Phase 9b:** Move `JSValue`, `JSObject`, `JSFunction`, `JSContext`,
      `Arguments`, `CoreScript`, `Bootstrap` to Runtime.
+
+### Phase 9 Task Checklist
+
+**Phase 9a — KeyString + Property Types (target: next iteration):**
+
+- [ ] Move `KeyString` struct to `Broiler.JavaScript.Ast`.
+- [ ] Move `KeyStrings` static class to `Broiler.JavaScript.Ast`.
+- [ ] Add `TypeForwardedTo` attributes in Core for `KeyString`/`KeyStrings`.
+- [ ] Add `global using` alias in Core for namespace compatibility.
+- [ ] Convert `JSProperty.value` field from `JSValue` to `IPropertyValue`.
+- [ ] Convert `JSProperty.get`/`JSProperty.set` fields from `JSFunction` to
+  `IPropertyAccessor`.
+- [ ] Move `JSProperty`, `PropertySequence`, `ElementArray` to Storage.
+- [ ] Update all Storage.Tests to verify interface-typed fields.
+- [ ] Verify no circular dependencies with `dotnet list reference`.
+- [ ] Run full test suite (962+ tests) — all pass.
+
+**Phase 9b — Value Type System (target: after 9a):**
+
+- [ ] Move `JSValue` to `Broiler.JavaScript.Runtime`.
+- [ ] Move `JSObject`, `JSFunction`, `JSContext` to Runtime.
+- [ ] Move `Arguments`, `CoreScript`, `Bootstrap` to Runtime.
+- [ ] Move `JSFunctionDelegate`, `ICodeCache` to Runtime.
+- [ ] Add `TypeForwardedTo` attributes in Core for all moved types.
+- [ ] Add `global using Broiler.JavaScript.Runtime;` in Core.
+- [ ] Move contract interfaces (`IBuiltInRegistry`, `IClrInterop`, `IDebugger`,
+  `IJSCompiler`) to Runtime.
+- [ ] Update all satellite assembly references (Clr, Compiler, Modules,
+  BuiltIns, Debugger) to reference Runtime.
+- [ ] Verify no circular dependencies.
+- [ ] Run full test suite — all pass.
+- [ ] Update downstream consumer docs (Section 11).
 
 ### Contracts to Move
 
@@ -2168,6 +2262,184 @@ runs all 9 test projects on Ubuntu, Windows, and macOS:
 - All **962** tests pass across 10 test projects:
   - Core: 641, Ast: 73, Parser: 78, Storage: 76, Debugger: 23, Clr: 29,
     Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 8.
+
+---
+
+### Roadmap Documentation Update (2026-03-20)
+
+**Date:** 2026-03-20
+
+**Contributor:** @copilot
+
+**What was done:**
+
+1. **Added Milestone 5** to Section 5 (Timeline and Milestones) — covers
+   Phase 9 (Runtime Extraction) and Phase 10 (Cleanup and Final Migration)
+   with task checklists and target metrics.
+
+2. **Updated Risk Mitigation table** (Section 7) — added Status column to all
+   risk entries; added 3 new risks: module initializer ordering, bridge
+   accumulation, and external consumer breakage (`WebAtoms.XF`).
+
+3. **Updated Success Criteria** (Section 8) — added criteria #7 (no circular
+   dependencies) and #8 (downstream build instructions verified); added
+   "Current Progress Against Success Criteria" table tracking status of all
+   8 criteria.
+
+4. **Added Phase Progress Summary table** to Section 9 — shows status, date,
+   and blockers for all 10 phases at a glance.
+
+5. **Added Contributor & Reviewer Checklist** (Section 13) — pre-merge
+   checklist for contributors (10 items), review checklist for reviewers
+   (7 items), and per-assembly verification matrix showing current status
+   of tests, circular deps, `InternalsVisibleTo` tracking, and downstream docs.
+
+6. **Added Phase 10 planning section** (Section 14) — details the cleanup and
+   final migration work: Clr bridge resolution (34 sites), Compiler bridge
+   resolution (~6 sites), legacy entry removal, meta-package creation,
+   downstream consumer updates, and coverage integration.
+
+7. **Updated Remaining Work section** — added Resolution column to Clr and
+   Compiler audit tables with specific resolution steps; restructured
+   phase completion checklist with dependency annotations; added coverage
+   integration to infrastructure items.
+
+8. **Added Phase 9 Task Checklist** — detailed actionable checklists for
+   Phase 9a (KeyString + property types, 10 tasks) and Phase 9b (value type
+   system, 12 tasks).
+
+---
+
+## 13. Contributor & Reviewer Checklist
+
+Use this checklist when contributing to or reviewing any extraction phase PR.
+
+### Pre-Merge Checklist (Contributors)
+
+- [ ] **No circular dependencies.** Run `dotnet list reference` on the modified
+  assemblies and confirm the dependency graph is unidirectional (see Section 2.2).
+- [ ] **Assembly-specific test project exists** with ≥ 90% line coverage on the
+  extracted assembly. Use `dotnet test --collect:"XPlat Code Coverage"` with
+  `coverlet` to measure coverage.
+- [ ] **All existing tests pass.** Run the full test suite
+  (`dotnet test Broiler.JavaScript/Broiler.JavaScript.*.Tests/`) and confirm
+  all **962+** tests pass across 10 projects.
+- [ ] **CI passes on all platforms.** Verify the GitHub Actions CI workflow
+  (`.github/workflows/ci.yml`) succeeds on Ubuntu, Windows, and macOS.
+- [ ] **Downstream build instructions are updated.** If the change adds a new
+  assembly or moves a public type, update Section 11 (Downstream Consumer
+  Migration Guide) with the new reference requirements.
+- [ ] **`InternalsVisibleTo` bridges are tracked.** If any new `InternalsVisibleTo`
+  entries are added, document them in Section 6.3 with the specific internal
+  members accessed and a resolution plan.
+- [ ] **`TypeForwardedTo` attributes are added** for any type moved to a new
+  assembly. This preserves binary compatibility for downstream consumers.
+- [ ] **`global using` aliases are added** in the source assembly for any
+  namespace change. This preserves source-level backward compatibility.
+- [ ] **Module initializer registered** (if applicable). Satellite assemblies
+  must register their services in a `[ModuleInitializer]` method. Test project
+  bootstraps must force-load the assembly via
+  `RuntimeHelpers.RunModuleConstructor`.
+- [ ] **No functional changes.** Extraction PRs must be structural moves only —
+  no logic changes, no new features, no bug fixes mixed in.
+
+### Review Checklist (Reviewers)
+
+- [ ] **Interface stability.** Verify that cross-assembly interfaces (`IClrInterop`,
+  `IBuiltInRegistry`, `IDebugger`, `IJSCompiler`, `IJSModuleResolver`) have not
+  changed signature. Any signature change requires a migration note.
+- [ ] **Test suite coverage.** Confirm the extracted assembly's test project
+  exists and has meaningful tests covering the public API surface. Check that
+  tests reference only the target assembly (plus test helpers) — no unnecessary
+  Core dependency.
+- [ ] **Consumer update instructions.** If the PR moves public types, verify that
+  Section 11 is updated with explicit references required by downstream projects.
+- [ ] **`InternalsVisibleTo` direction.** New `InternalsVisibleTo` entries must
+  only go from lower-level assemblies to higher-level ones (e.g., Core →
+  Compiler is OK; Compiler → Core is not). Each entry must have a documented
+  resolution plan.
+- [ ] **Dependency graph.** Verify no new assembly references create a circular
+  dependency. The dependency graph must remain a DAG.
+- [ ] **Namespace conventions.** Confirm moved types use the namespace matching
+  the target assembly name (Section 6.2). `global using` aliases bridge old
+  namespaces.
+- [ ] **Build artifact check.** Confirm no unintended files (build outputs,
+  test results, IDE settings) are included in the PR.
+
+### Per-Assembly Verification Matrix
+
+| Assembly | Tests Exist | Tests Pass | No Circular Deps | `InternalsVisibleTo` Tracked | Downstream Docs Updated |
+|----------|:-----------:|:----------:|:----------------:|:---------------------------:|:----------------------:|
+| Ast | ✅ 73 | ✅ | ✅ | N/A | ✅ |
+| Parser | ✅ 78 | ✅ | ✅ | N/A | ✅ |
+| Storage | ✅ 76 | ✅ | ✅ | N/A | ✅ |
+| Debugger | ✅ 23 | ✅ | ✅ | ✅ Removed | ✅ |
+| Clr | ✅ 29 | ✅ | ✅ | ⏳ 34 accesses tracked | ✅ |
+| BuiltIns | ✅ 16 | ✅ | ✅ | N/A | ✅ |
+| Compiler | ✅ 9 | ✅ | ✅ | ⏳ ~6 accesses tracked | ✅ |
+| Modules | ✅ 9 | ✅ | ✅ | N/A | ✅ |
+| Runtime | ✅ 8 | ✅ | ✅ | ⏳ Dynamic assembly | ✅ |
+
+---
+
+## 14. Phase 10 — Cleanup and Final Migration
+
+### Overview
+
+Phase 10 covers the final cleanup steps after Phase 9 (Runtime Extraction)
+completes. This phase eliminates all remaining `InternalsVisibleTo` migration
+bridges, creates the `Broiler.JavaScript.All` meta-package, and updates all
+downstream consumers to use explicit assembly references.
+
+### Tasks
+
+1. **Resolve remaining Clr `InternalsVisibleTo` accesses (34 sites):**
+   - Add public read-only properties for value fields (`JSString.StringVal`,
+     `JSNumber.NumberVal`, `JSDate.DateVal`).
+   - Make `NumberParser.CoerceToNumber` public.
+   - Make `Type.GetElementTypeOrGeneric` extension class public.
+   - Change `JSFunction(JSFunctionDelegate, JSFunction)` constructor from
+     `internal` to `protected`.
+   - Make `YAssignExpression.ToJSValue` extension public.
+
+2. **Resolve remaining Compiler `InternalsVisibleTo` accesses (~6 sites):**
+   - Make internal extension classes public: `ToJSValue`, `CallExpression`,
+     `ConvertToNumber`, `ConvertToString`, `ConvertToInteger`,
+     `ConvertToJSValue`.
+   - Make `JSVariable.ValueExpression` public.
+
+3. **Remove legacy `InternalsVisibleTo` entries:**
+   - Remove `InternalsVisibleTo("Broiler.JavaScript.Tests")` after test
+     migration is complete.
+   - Coordinate with `WebAtoms.XF` maintainers on migration timeline.
+
+4. **Create `Broiler.JavaScript.All` meta-package:**
+   - A single `<ProjectReference>` that transitively includes all engine
+     assemblies.
+   - Simplifies downstream consumer references.
+
+5. **Update downstream consumers:**
+   - `Broiler.App`, `Broiler.Cli`, `Broiler.DevConsole`: add explicit
+     `<ProjectReference>` entries for satellite assemblies (Clr, Compiler,
+     Modules, BuiltIns, Debugger).
+   - Verify end-to-end functionality (script evaluation, CLR interop,
+     debugging, module loading).
+
+6. **Integrate coverage measurement into CI:**
+   - Add `coverlet` to all test projects.
+   - Configure CI to report line coverage per assembly.
+   - Enforce ≥ 90% line coverage gate on extraction PRs.
+
+### Estimated Effort
+
+- **Clr bridge resolution:** Medium — 34 access sites across 5 categories. Most
+  changes are straightforward (add public properties/make methods public).
+- **Compiler bridge resolution:** Low — 6 access sites in extension methods.
+  Making extension classes public is safe.
+- **Meta-package creation:** Low — single `.csproj` with `<ProjectReference>` entries.
+- **Downstream consumer updates:** Low — add explicit project references; test
+  with existing integration tests.
+- **Coverage integration:** Low — add NuGet package references and CI steps.
 
 ---
 
