@@ -28,7 +28,7 @@ public partial class JSGlobalStatic
     public static JSNumber NaN = JSNumber.NaN;
 
     [JSExport("Intl")]
-    public static JSValue Intl = ClrType.From(typeof(JSIntl));
+    public static JSValue Intl = JSContext.ClrInterop.GetClrType(typeof(JSIntl));
 
     [JSExport("decodeURI", Length = 1)]
     public static JSValue DecodeURI(in Arguments a)

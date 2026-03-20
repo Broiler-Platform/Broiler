@@ -232,7 +232,7 @@ public class JSModuleContext : JSContext
                 throw NewTypeError("import method's parameter must be a string");
 
             var result = LoadModuleAsync(dirPath, name.StringValue);
-            return ClrProxy.Marshal(result);
+            return ClrInterop.Marshal(result);
         });
 
         newModule.Require = new JSFunction((in Arguments a) =>
@@ -248,7 +248,7 @@ public class JSModuleContext : JSContext
         newModule.Compile = new JSFunction((in Arguments a) =>
         {
             var task = CompileModuleAsync(newModule);
-            return ClrProxy.Marshal(task);
+            return ClrInterop.Marshal(task);
         });
 
         await newModule.InitAsync();
@@ -306,7 +306,7 @@ public class JSModuleContext : JSContext
                     throw NewTypeError("import method's parameter must be a string");
 
                 var result = LoadModuleAsync(dirPath, name.StringValue);
-                return ClrProxy.Marshal(result);
+                return ClrInterop.Marshal(result);
             });
 
             newModule.Require = new JSFunction((in Arguments a) =>
@@ -322,7 +322,7 @@ public class JSModuleContext : JSContext
             newModule.Compile = new JSFunction((in Arguments a) =>
             {
                 var task = CompileModuleAsync(newModule);
-                return ClrProxy.Marshal(task);
+                return ClrInterop.Marshal(task);
             });
 
             return newModule;
