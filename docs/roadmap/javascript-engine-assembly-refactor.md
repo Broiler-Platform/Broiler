@@ -1807,8 +1807,8 @@ These interfaces will move to Runtime once `JSValue`, `JSContext`, and
 | Runtime | Dynamic assembly internals | Used by IL generation | Required for `DynamicMethod` generation |
 
 **Verification:**
-- All 10 assemblies compile with zero errors.
-- All **954** tests pass across 9 test projects.
+- All 10 production assemblies compile with zero errors.
+- All **954** tests pass across 9 test projects (Runtime has no tests yet).
 
 ### InternalsVisibleTo Bridge Reduction (2026-03-20, continued)
 
@@ -1864,7 +1864,7 @@ These interfaces will move to Runtime once `JSValue`, `JSContext`, and
 | Compiler | ~20 internal accesses | ~10 internal accesses | −10 (CallStackItemBuilder, StringSpanBuilder, NumberParser, KeyStringsBuilder, JSSpreadValueBuilder) |
 
 **Verification:**
-- All 10 assemblies compile with zero errors.
+- All 10 production assemblies compile with zero errors.
 - All **954** tests pass across 9 test projects.
 
 ### Remaining Work
@@ -1901,13 +1901,13 @@ A full audit of the Clr assembly was performed to determine which internal membe
 prevent removing the `InternalsVisibleTo` bridge. The following 34 errors occur
 when the bridge is removed:
 
-| Category | Internal Members | Files | Count |
-|----------|-----------------|-------|-------|
+| Category | Internal Members | Files | Error Count |
+|----------|-----------------|-------|-------------|
 | Internal value fields | `JSString.value`, `JSNumber.value`, `JSDate.value` | `ClrProxy.cs`, `ClrModule.cs` | 9 |
 | Internal methods | `NumberParser.CoerceToNumber` | `ClrProxy.cs` | 1 |
-| Internal extension methods | `Type.GetElementTypeOrGeneric`, `YAssignExpression.ToJSValue` | `ClrType.cs`, `JSPropertyInfo.cs`, `JSFieldInfo.cs` | 4 |
+| Internal extension methods | `Type.GetElementTypeOrGeneric` (×3 sites), `YAssignExpression.ToJSValue` (×1 site) | `ClrType.cs`, `JSPropertyInfo.cs`, `JSFieldInfo.cs` | 4 |
 | Internal builder members | `ArgumentsBuilder.refType` | `ClrType.cs`, `ClrTypeExtensions.cs` | 2 |
-| Internal constructors | `JSFunction(JSFunctionDelegate, JSFunction)` | `ClrType.cs` | 2 |
+| Internal constructors | `JSFunction(JSFunctionDelegate, JSFunction)` (×2 call sites) | `ClrType.cs` | 2 |
 
 **Resolution approach for Clr bridge:** Making value fields public (e.g.,
 `JSString.value`, `JSNumber.value`) is feasible but exposes mutable implementation
