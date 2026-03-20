@@ -227,7 +227,7 @@ public partial class JSJSON : JSObject
             // check replacer...
             if (replacer != null)
             {
-                jsValue = replacer((target, KeyStrings.GetJSString(value.key), jsValue));
+                jsValue = replacer((target, KeyStringCoreExtensions.GetJSString(value.key), jsValue));
                 if (jsValue.IsUndefined)
                     continue;
             }

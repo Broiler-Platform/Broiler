@@ -14,3 +14,8 @@ using Broiler.JavaScript.Core.Core.Module;
 [assembly: TypeForwardedTo(typeof(ExportAttribute))]
 [assembly: TypeForwardedTo(typeof(DefaultExportAttribute))]
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.CancellableDisposableAction))]
+
+// Type forwards for KeyString types moved to Broiler.JavaScript.Storage.
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.KeyType))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.KeyString))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.KeyStrings))]
