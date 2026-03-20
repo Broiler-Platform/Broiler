@@ -13,3 +13,4 @@ using Broiler.JavaScript.Core.Core.Module;
 [assembly: TypeForwardedTo(typeof(IJSModuleResolver))]
 [assembly: TypeForwardedTo(typeof(ExportAttribute))]
 [assembly: TypeForwardedTo(typeof(DefaultExportAttribute))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.CancellableDisposableAction))]

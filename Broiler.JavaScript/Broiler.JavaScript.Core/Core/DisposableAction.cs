@@ -1,22 +1,3 @@
-﻿using System;
-
-namespace Broiler.JavaScript.Core.Core;
-
-public class CancellableDisposableAction(Action action) : IDisposable
-{
-    public void Cancel() => action = null;
-
-    public T Commit<T>(T value)
-    {
-        action = null;
-        return value;
-    }
-
-    public bool Commit()
-    {
-        action = null;
-        return true;
-    }
-
-    public void Dispose() => action?.Invoke();
-}
+// CancellableDisposableAction has been moved to Broiler.JavaScript.Runtime.
+// See Broiler.JavaScript.Runtime/CancellableDisposableAction.cs.
+// TypeForwardedTo attribute in AssemblyInfo.cs preserves binary compatibility.

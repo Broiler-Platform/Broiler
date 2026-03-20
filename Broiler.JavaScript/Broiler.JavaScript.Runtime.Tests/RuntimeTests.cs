@@ -1,3 +1,4 @@
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Module;
 
 namespace Broiler.JavaScript.Runtime.Tests;
@@ -161,6 +162,67 @@ public class ExportAttributeTests
     public void DefaultExportAttribute_LivesInRuntimeAssembly()
     {
         var asm = typeof(DefaultExportAttribute).Assembly;
+        Assert.Equal("Broiler.JavaScript.Runtime", asm.GetName().Name);
+    }
+}
+
+/// <summary>
+/// Tests for <see cref="CancellableDisposableAction"/> moved to Runtime.
+/// </summary>
+public class CancellableDisposableActionTests
+{
+    [Fact]
+    public void Dispose_InvokesAction()
+    {
+        var invoked = false;
+        using (var cda = new CancellableDisposableAction(() => invoked = true))
+        {
+            Assert.False(invoked);
+        }
+        Assert.True(invoked);
+    }
+
+    [Fact]
+    public void Cancel_PreventsActionOnDispose()
+    {
+        var invoked = false;
+        using (var cda = new CancellableDisposableAction(() => invoked = true))
+        {
+            cda.Cancel();
+        }
+        Assert.False(invoked);
+    }
+
+    [Fact]
+    public void CommitBool_PreventsActionAndReturnsTrue()
+    {
+        var invoked = false;
+        bool result;
+        using (var cda = new CancellableDisposableAction(() => invoked = true))
+        {
+            result = cda.Commit();
+        }
+        Assert.True(result);
+        Assert.False(invoked);
+    }
+
+    [Fact]
+    public void CommitGeneric_PreventsActionAndReturnsValue()
+    {
+        var invoked = false;
+        int result;
+        using (var cda = new CancellableDisposableAction(() => invoked = true))
+        {
+            result = cda.Commit(42);
+        }
+        Assert.Equal(42, result);
+        Assert.False(invoked);
+    }
+
+    [Fact]
+    public void LivesInRuntimeAssembly()
+    {
+        var asm = typeof(CancellableDisposableAction).Assembly;
         Assert.Equal("Broiler.JavaScript.Runtime", asm.GetName().Name);
     }
 }
