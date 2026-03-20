@@ -28,6 +28,7 @@
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Clr.Tests/Broiler.JavaScript.Clr.Tests.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core.Tests/Broiler.JavaScript.Core.Tests.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core/Broiler.JavaScript.Core.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Modules/Broiler.JavaScript.Modules.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Debugger.Tests/Broiler.JavaScript.Debugger.Tests.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Debugger/Broiler.JavaScript.Debugger.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Parser.Tests/Broiler.JavaScript.Parser.Tests.csproj" />
