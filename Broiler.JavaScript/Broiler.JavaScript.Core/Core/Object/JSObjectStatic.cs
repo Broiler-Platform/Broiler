@@ -396,7 +396,7 @@ public partial class JSObject
             return new JSArray();
 
         ref var symbols = ref jobj.GetSymbols();
-        var keys = symbols.AllValues().Select(x => KeyStrings.GetJSString(x.Value.key));
+        var keys = symbols.AllValues().Select(x => KeyStringCoreExtensions.GetJSString(x.Value.key));
 
         return new JSArray(keys);
     }

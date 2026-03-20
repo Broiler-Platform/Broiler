@@ -250,7 +250,7 @@ public static partial class JSValueExtensions
                     continue;
             }
 
-            yield return (KeyStrings.GetJSString(p.key), value.GetValue(in p));
+            yield return (KeyStringCoreExtensions.GetJSString(p.key), value.GetValue(in p));
         }
 
         var @base = value.prototypeChain?.@object;

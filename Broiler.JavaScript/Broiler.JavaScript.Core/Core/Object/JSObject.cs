@@ -64,18 +64,18 @@ public partial class JSObject : JSValue
     public override bool IsObject => true;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool IsSealed() => (status & ObjectStatus.Sealed) > 0;
+    public bool IsSealed() => (status & ObjectStatus.Sealed) > 0;
 
-    internal bool IsSealedOrFrozen() => (status & ObjectStatus.SealedOrFrozen) > 0;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool IsExtensible() => !((status & ObjectStatus.NonExtensible) > 0);
-
-
-    internal bool IsSealedOrFrozenOrNonExtensible() => (status & ObjectStatus.SealedFrozenNonExtensible) > 0;
+    public bool IsSealedOrFrozen() => (status & ObjectStatus.SealedOrFrozen) > 0;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool IsFrozen() => (status & ObjectStatus.Frozen) > 0;
+    public bool IsExtensible() => !((status & ObjectStatus.NonExtensible) > 0);
+
+
+    public bool IsSealedOrFrozenOrNonExtensible() => (status & ObjectStatus.SealedFrozenNonExtensible) > 0;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool IsFrozen() => (status & ObjectStatus.Frozen) > 0;
 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
