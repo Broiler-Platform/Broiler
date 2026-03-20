@@ -349,11 +349,11 @@ changes:
 |-------|----------|-----------|--------|
 | **Phase 1** | **Ast** | Zero dependencies. Pure data types. Smallest, safest extraction. | ✅ Complete |
 | **Phase 2** | **Parser** | Depends only on Ast. Self-contained lexer + parser. | ✅ Complete |
-| **Phase 3** | **Storage** | Depends on shared primitives. Decouples property storage from runtime logic. | ✅ Partial — pure storage types extracted |
-| **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. | ✅ Partial — V8 Inspector Protocol extracted |
+| **Phase 3** | **Storage** | Depends on shared primitives. Decouples property storage from runtime logic. | ✅ Partial — pure storage types extracted; test project created (56 tests) |
+| **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. | ✅ Partial — V8 Inspector Protocol extracted; test project created (23 tests) |
 | **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | ⏳ Blocked — requires Core refactoring to use IClrInterop exclusively (24+ direct ClrProxy references) |
-| **Phase 6** | **BuiltIns** | High coupling to Runtime, but only through `JSValue`/`JSContext`. Requires `IBuiltInRegistry` to be in place. | Not started |
-| **Phase 7** | **Compiler** | Depends on Ast, Runtime, and ExpressionCompiler. Requires stable interfaces. | Not started |
+| **Phase 6** | **BuiltIns** | High coupling to Runtime, but only through `JSValue`/`JSContext`. Requires `IBuiltInRegistry` to be in place. | ⏳ Blocked — requires IBuiltInRegistry + JSClassGenerator multi-assembly support |
+| **Phase 7** | **Compiler** | Depends on Ast, Runtime, and ExpressionCompiler. Requires stable interfaces. | ⏳ Blocked — requires stable Runtime interfaces |
 | **Phase 8** | **Modules** | Last — depends on Runtime, Parser, and Clr. | ⏳ Blocked — JSFunctionGenerator creates partial class in Core namespace; JSModuleContext extends JSContext |
 
 ### 4.3 Per-Phase Workflow
@@ -392,6 +392,7 @@ Each extraction phase follows the same steps:
 **Deliverables:**
 - `Broiler.JavaScript.Ast` assembly with all AST node types ✅
 - `Broiler.JavaScript.Parser` assembly with lexer and parser ✅
+- `Broiler.JavaScript.Ast.Tests` project *(future — assembly-specific tests)*
 - `Broiler.JavaScript.Parser.Tests` project *(future — assembly-specific tests)*
 - All existing tests pass ✅
 
@@ -410,20 +411,30 @@ Each extraction phase follows the same steps:
 **Deliverables:**
 - `Broiler.JavaScript.Storage` assembly ✅ (pure storage types)
 - `Broiler.JavaScript.Debugger` assembly ✅ (V8 Inspector Protocol)
-- Corresponding test projects *(future — assembly-specific tests)*
+- `Broiler.JavaScript.Storage.Tests` — 56 assembly-specific tests ✅ (2026-03-20)
+- `Broiler.JavaScript.Debugger.Tests` — 23 assembly-specific tests ✅ (2026-03-20)
 
 **Key Metrics:**
 - Storage has no reference to `JSContext` (only to Ast shared primitives). ✅
 - Debugger depends on Core via `InternalsVisibleTo` bridge (temporary). ✅
+- Storage.Tests references only Storage (no Core dependency). ✅
 - 3 runtime-dependent storage types (JSProperty, PropertySequence, ElementArray)
   remain in Core until Runtime extraction resolves the circular dependency.
 
 ### Milestone 3 — Interop Extraction (Phases 5–6)
 
+**Status:** Blocked — prerequisites not yet met
+
 **Deliverables:**
 - `Broiler.JavaScript.Clr` assembly
 - `Broiler.JavaScript.BuiltIns` assembly
 - `IBuiltInRegistry` pluggable bootstrap in Runtime
+
+**Prerequisites (see Phase 5–8 analysis in Implementation Log):**
+1. Refactor Core to use `IClrInterop` exclusively (24+ direct `ClrProxy`
+   references must be replaced).
+2. Implement `IBuiltInRegistry` pluggable bootstrap in Core.
+3. Configure `JSClassGenerator` to work with extracted assemblies.
 
 **Key Metrics:**
 - `JSContext` bootstrap is driven entirely by `IBuiltInRegistry` — removing
@@ -432,10 +443,17 @@ Each extraction phase follows the same steps:
 
 ### Milestone 4 — Compiler and Modules (Phases 7–8)
 
+**Status:** Blocked — prerequisites not yet met
+
 **Deliverables:**
 - `Broiler.JavaScript.Compiler` assembly
 - `Broiler.JavaScript.Modules` assembly
 - Full integration test suite verifying end-to-end script execution
+
+**Prerequisites (see Phase 5–8 analysis in Implementation Log):**
+1. Define stable Runtime interfaces for compiler consumption.
+2. Resolve `JSModuleContext extends JSContext` inheritance dependency.
+3. Configure `JSClassGenerator` for multi-assembly namespace support.
 
 **Key Metrics:**
 - All 10 assemblies compile independently.
@@ -539,17 +557,17 @@ All new assemblies follow this template:
 
 Each extracted assembly must have a corresponding test project:
 
-| Assembly | Test Project | Focus |
-|----------|-------------|-------|
-| Ast | `Broiler.JavaScript.Ast.Tests` | Node construction, immutability |
-| Parser | `Broiler.JavaScript.Parser.Tests` | Parsing correctness for all JS constructs, error recovery |
-| Compiler | `Broiler.JavaScript.Compiler.Tests` | Expression tree generation, generator rewriting |
-| Runtime | `Broiler.JavaScript.Runtime.Tests` | `JSContext` lifecycle, `JSValue` coercion, `Arguments` |
-| Storage | `Broiler.JavaScript.Storage.Tests` | Property map operations, hash collision handling |
-| BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | Per-object spec-conformance (Array, String, Date, Promise, etc.) |
-| Clr | `Broiler.JavaScript.Clr.Tests` | .NET type bridging, method invocation |
-| Modules | `Broiler.JavaScript.Modules.Tests` | Import/export resolution, circular dependencies |
-| Debugger | `Broiler.JavaScript.Debugger.Tests` | V8 Inspector protocol message handling |
+| Assembly | Test Project | Focus | Status |
+|----------|-------------|-------|--------|
+| Ast | `Broiler.JavaScript.Ast.Tests` | Node construction, immutability | Future |
+| Parser | `Broiler.JavaScript.Parser.Tests` | Parsing correctness for all JS constructs, error recovery | Future |
+| Compiler | `Broiler.JavaScript.Compiler.Tests` | Expression tree generation, generator rewriting | Future |
+| Runtime | `Broiler.JavaScript.Runtime.Tests` | `JSContext` lifecycle, `JSValue` coercion, `Arguments` | Future |
+| Storage | `Broiler.JavaScript.Storage.Tests` | Property map operations, hash collision handling | ✅ 56 tests |
+| BuiltIns | `Broiler.JavaScript.BuiltIns.Tests` | Per-object spec-conformance (Array, String, Date, Promise, etc.) | Future |
+| Clr | `Broiler.JavaScript.Clr.Tests` | .NET type bridging, method invocation | Future |
+| Modules | `Broiler.JavaScript.Modules.Tests` | Import/export resolution, circular dependencies | Future |
+| Debugger | `Broiler.JavaScript.Debugger.Tests` | V8 Inspector protocol message handling | ✅ 23 tests |
 
 **Test principles:**
 - All tests run on Linux, macOS, and Windows (CI matrix).
@@ -828,6 +846,22 @@ circular dependency described in Section 2.3.
 - `Broiler.JavaScript.Core` compiles with zero errors.
 - All **641** tests in `Broiler.JavaScript.Core.Tests` pass.
 
+**Test project (2026-03-20):**
+
+8. Created `Broiler.JavaScript.Storage.Tests` test project at
+   `Broiler.JavaScript/Broiler.JavaScript.Storage.Tests/`.
+9. Added **56 assembly-specific tests** covering all extracted storage types:
+   - `VirtualMemoryTests` — allocation, indexing, capacity management.
+   - `SAUint32MapTests` — save, get, remove, put-ref, resize, all-values enumeration.
+   - `StringMapTests` — save, get, remove, put-ref, HashedString overloads.
+   - `HashedStringTests` — construction, equality, comparison, implicit conversions.
+   - `ConcurrentMapTests` — `ConcurrentStringMap<T>`, `ConcurrentNameMap`,
+     `ConcurrentUInt32Map<T>` thread-safe get/set/create operations.
+   - `ConcurrentTypeCacheTests` — `ConcurrentTypeCache` ID consistency,
+     `ConcurrentTypeTrie<T>` factory caching.
+10. Test project references only `Broiler.JavaScript.Storage` (no Core dependency).
+11. All 56 tests pass.
+
 ---
 
 ### Phase 4 — Debugger Extraction ✅ (Partial)
@@ -880,13 +914,30 @@ reference the Debugger assembly. This means:
 - `Broiler.JavaScript.Core` compiles with zero errors.
 - All **641** tests in `Broiler.JavaScript.Core.Tests` pass.
 
+**Test project (2026-03-20):**
+
+7. Created `Broiler.JavaScript.Debugger.Tests` test project at
+   `Broiler.JavaScript/Broiler.JavaScript.Debugger.Tests/`.
+8. Added **23 assembly-specific tests** covering V8 Inspector Protocol types:
+   - `HashExtensionsTests` — SHA256 hash computation, consistency, empty input.
+   - `AsyncQueueTests` — enqueue, dispose, async process yielding.
+   - `V8CallFrameTests` — property construction and defaults.
+   - `V8ReturnValueTests` — default construction, exception wrapping, implicit
+     conversion.
+   - `V8ExceptionDetailsTests` — exception text extraction, JSException handling.
+   - `V8RemoteObjectTests` — JSValue type mapping (undefined, null, string,
+     number, boolean).
+9. Test project references `Broiler.JavaScript.Debugger` and
+   `Broiler.JavaScript.Core` (Debugger types require Core runtime types).
+10. All 23 tests pass.
+
 ---
 
 ### Phase 5–8 — Dependency Analysis
 
 **Status:** Blocked — documented for future work
 
-**Date:** 2026-03-19
+**Date:** 2026-03-19 (analysis), 2026-03-20 (status update)
 
 **Findings:**
 
@@ -928,7 +979,7 @@ identified:
 - Module files use internal Core APIs (`WaitTask`, `StringValue`,
   `CoreScript.Compile`).
 
-**Recommended next steps:**
+**Recommended next steps (priority order):**
 1. Implement `IBuiltInRegistry` pluggable bootstrap in Core (prerequisite for
    Phases 5–6).
 2. Refactor Core to use `IClrInterop` exclusively (prerequisite for Phase 5).
@@ -936,6 +987,21 @@ identified:
    for Phases 6 and 8).
 4. Define stable Runtime interfaces for compiler consumption (prerequisite for
    Phase 7).
+
+**Estimated effort per prerequisite:**
+- `IBuiltInRegistry` bootstrap: Medium — requires modifying `JSContext`
+  constructor and `Bootstrap` class to use registration pattern instead of
+  hard-coded type initialization.
+- `IClrInterop` exclusive usage: High — 24+ call sites across Core must be
+  identified, refactored, and tested. Requires expanding the `IClrInterop`
+  interface to cover all marshalling scenarios currently handled by direct
+  `ClrProxy` references.
+- `JSClassGenerator` multi-assembly: Medium — the source generator currently
+  assumes a single assembly namespace. Must be updated to support configurable
+  namespace roots or assembly-aware code generation.
+- Runtime interfaces: High — must define stable abstractions for `JSValue`,
+  `JSContext`, `Arguments`, and `JSFunction` that the Compiler can reference
+  without pulling in the full Runtime implementation.
 
 ---
 
