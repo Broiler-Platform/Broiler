@@ -793,7 +793,7 @@ The refactor is complete when:
 | 6 | BuiltIns | ⏳ Partial | 2026-03-20 | Deep structural coupling (JSArray 13, JSString 8, JSRegExp 7, JSError 6, JSPromise, JSProxy); internal field access (DataView, JSJSON, JSReflect). |
 | 7 | Compiler | ✅ Complete | 2026-03-20 | `InternalsVisibleTo` bridge **removed** ✅. |
 | 8 | Modules | ✅ Complete | 2026-03-20 | — |
-| 9 | Runtime | ⏳ In progress | 2026-03-20 | `IJSModuleResolver` + `ExportAttribute` + `DefaultExportAttribute` + `CancellableDisposableAction` moved; Phase 9b (JSValue/JSContext move) blocked by circular dependency between Runtime↔Storage; `KeyString` depends on `JSSymbol`/`JSValue`/`JSString` (see Section 10 feasibility analysis). Tracked by [continuation issue](https://github.com/MaiRat/Broiler/issues). |
+| 9 | Runtime | ⏳ In progress | 2026-03-20 | `IJSModuleResolver` + `ExportAttribute` + `DefaultExportAttribute` + `CancellableDisposableAction` moved; Phase 9b (JSValue/JSContext move) blocked by circular dependency between Runtime↔Storage; `KeyString` depends on `JSSymbol`/`JSValue`/`JSString` (see Section 10 feasibility analysis). Tracked by continuation issue (see Section 16). |
 | 10 | Cleanup | ✅ Complete | 2026-03-20 | All migration bridges removed; meta-package created; downstream consumers updated; CI workflow created; coverlet coverage integrated. |
 
 ### Phase 1 — Ast Extraction ✅
@@ -2789,7 +2789,8 @@ Confirmed that Core's `AssemblyInfo.cs` contains only three
 
 ### Tracking Issue
 
-**Issue:** [Continue JavaScript Engine Assembly Refactor: Implementation and Roadmap Update](https://github.com/MaiRat/Broiler/issues)
+**Issue:** *Continue JavaScript Engine Assembly Refactor: Implementation and Roadmap Update*
+(See linked issues in this repository for the tracking issue.)
 
 This section tracks the ongoing work for Phase 9 (Runtime Extraction) and
 remaining refactor milestones, coordinating the next steps after Phases 1–8 and
