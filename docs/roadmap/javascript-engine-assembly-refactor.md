@@ -2863,10 +2863,10 @@ depend on `JSValue`, `JSContext`, or other Core types.
 | # | Milestone | Status | Key Blockers | Estimated Effort |
 |---|-----------|--------|-------------|-----------------|
 | 1 | Phase 9b — Move core value types to Runtime | ⏳ Not started | Circular dependency Runtime↔Storage; 500+ file references; API breakage risk | **High** — largest single extraction |
-| 2 | Phase 9a — Move KeyString/KeyStrings to Runtime | ⏳ Blocked | Depends on Phase 9b (JSSymbol/JSValue/JSString) | Medium |
+| 2 | Phase 9a — Move KeyString/KeyStrings to Storage | ✅ **Complete** | Moved to Storage (not Ast) to avoid circular dependency | — |
 | 3 | Phase 9a — Move JSProperty/PropertySequence/ElementArray to Storage | ⏳ Blocked | Depends on Phase 9b; requires interface-typed fields | Medium |
 | 4 | Contract interfaces → Runtime | ⏳ Blocked | Depends on Phase 9b (JSValue/JSContext) | Low — 4 interfaces to move |
-| 5 | Phase 6 — Additional BuiltIns extraction | ⏳ Partially blocked | Deep structural coupling (JSArray 13, JSString 8, JSRegExp 7, JSError 6 type checks); internal field access | High |
+| 5 | Phase 6 — Additional BuiltIns extraction | ⏳ Partially blocked | Deep structural coupling (JSArray 13, JSString 8, JSRegExp 7, JSError 6 type checks); internal field access (partially resolved: JSObject status methods now public) | High |
 | 6 | `InternalsVisibleTo` final cleanup | ⏳ | Remove remaining bridges after Phase 9 | Low |
 | 7 | Coverage enforcement gate | ⏳ | Requires coverage baselines | Low |
 
@@ -2880,7 +2880,7 @@ depend on `JSValue`, `JSContext`, or other Core types.
 | **Meta-Package** | ✅ Complete | `Broiler.JavaScript.All` created; downstream consumers updated |
 | **Downstream Consumers** | ✅ Complete | `Broiler.App` and `Broiler.Cli` use `All` meta-package |
 | **Migration Bridges** | ✅ Complete | All `InternalsVisibleTo` migration bridges eliminated |
-| **TypeForwardedTo** | ✅ Active | 39 forwarding attributes in Core for binary compatibility |
+| **TypeForwardedTo** | ✅ Active | 42 forwarding attributes in Core for binary compatibility |
 | **Global Using** | ✅ Active | `Broiler.JavaScript.Ast`, `.Parser`, `.Storage` in Core's `GlobalUsings.cs` |
 | **External Consumer** | ⏳ Pending | `WebAtoms.XF` `InternalsVisibleTo` entry retained; needs external coordination |
 
@@ -2890,6 +2890,114 @@ All 10 production assemblies compile with zero errors.
 All **974** tests pass across 10 test projects:
 - Core: 641, Ast: 73, Parser: 78, Storage: 76, Debugger: 23, Clr: 29,
   Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 20.
+
+---
+
+## 17. Phase 9a Continued — KeyString Migration and API Surface Expansion (2026-03-20)
+
+### Overview
+
+This iteration completes the Phase 9a KeyString/KeyStrings migration and
+expands the public API surface to unblock future BuiltIns extraction.
+
+### KeyString/KeyStrings → Storage Assembly
+
+**Decision:** Move KeyString, KeyStrings, and KeyType to the **Storage**
+assembly rather than Ast (the original roadmap target). Rationale:
+
+1. KeyStrings depends on `ConcurrentStringMap<T>` and `ConcurrentUInt32Map<T>`,
+   both defined in Storage. Moving to Ast would create a circular dependency
+   (Ast → Storage → Ast).
+2. KeyString is fundamentally a storage-level interning concept — its uint key
+   maps directly into property storage maps.
+3. Storage already depends on Ast, and Core depends on Storage, so all existing
+   consumers can see the types without additional project references.
+
+**Types Moved:**
+| Type | From | To | Binary Compat |
+|------|------|----|---------------|
+| `KeyType` enum | Core | Storage | `TypeForwardedTo` in Core |
+| `KeyString` struct | Core | Storage | `TypeForwardedTo` in Core |
+| `KeyStrings` static class | Core | Storage | `TypeForwardedTo` in Core |
+
+**Methods Retained in Core:**
+- `KeyString.ToJSValue()` — Now an extension method in `KeyStringCoreExtensions`
+  (depends on `JSString`, a Core type).
+- `KeyStringCoreExtensions.GetJSString(uint id)` — Replacement for the former
+  `KeyStrings.GetJSString()` internal method (depends on `JSString`).
+
+**Methods Made Public in Storage:**
+- `KeyStrings.TryGet(StringSpan, out KeyString)` — Was internal, now public
+  (needed by Core callers like JSObject, JSString, JSNumber).
+- `KeyStrings.GetName(uint)` — Was internal, now public (needed by Core callers
+  like PropertySequence).
+
+**PropertyKey** remains in Core because it references `JSSymbol` (a Core type
+with runtime dependencies).
+
+### JSObject Public API Expansion
+
+Made the following `internal` status-checking methods `public` on `JSObject`:
+
+| Method | Purpose |
+|--------|---------|
+| `IsExtensible()` | Checks if object accepts new properties |
+| `IsSealed()` | Checks if object is sealed |
+| `IsFrozen()` | Checks if object is frozen |
+| `IsSealedOrFrozen()` | Combined check |
+| `IsSealedOrFrozenOrNonExtensible()` | Combined check |
+
+This unblocks future BuiltIns extraction for types like `JSReflect` that call
+these methods.
+
+### JSProperty Public API Expansion
+
+Made the following `internal static` factory methods `public` on `JSProperty`:
+
+- `Property(JSValue, JSPropertyAttributes)` — Create value property
+- `Property(uint, JSValue, JSPropertyAttributes)` — Create indexed property
+- `Property(KeyString, JSValue, JSPropertyAttributes)` — Create named property
+- `Property(KeyString, JSFunction, JSPropertyAttributes)` — Create function property
+- `Property(KeyString, JSFunctionDelegate, JSFunctionDelegate, JSPropertyAttributes)` — Create accessor
+- `Property(KeyString, JSFunction, JSFunction, JSPropertyAttributes)` — Create accessor
+- `Property(JSFunction, JSFunction, JSPropertyAttributes)` — Create anonymous accessor
+- `Function(KeyString, JSFunctionDelegate, JSPropertyAttributes, int)` — Create function
+- `ToNotReadOnly()` — Create mutable copy
+
+### Interface Implementation Status
+
+Verified that interface contracts are already implemented:
+- ✅ `JSValue : IPropertyValue` (already implemented)
+- ✅ `JSFunction : IPropertyAccessor` (already implemented)
+- ✅ Interfaces defined in `Broiler.JavaScript.Ast/IPropertyContracts.cs`
+
+### Test Coverage
+
+24 new tests added to `Broiler.JavaScript.Storage.Tests/KeyStringTests.cs`:
+- KeyType enum values
+- KeyString creation, equality, hashing, ToString, Value
+- KeyStrings well-known keys, GetOrCreate, GetNameString, TryGet, GetName
+- Assembly location verification (all types in Storage assembly)
+
+**Total tests: 998** across 10 test projects:
+- Core: 641, Ast: 73, Parser: 78, **Storage: 100 (+24)**, Debugger: 23,
+  Clr: 29, Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 20.
+
+### TypeForwardedTo Count
+
+Updated to **42** forwarding attributes in Core AssemblyInfo.cs
+(39 existing + 3 new for KeyType, KeyString, KeyStrings).
+
+### Remaining Phase 9a/9b Work
+
+| # | Milestone | Status | Notes |
+|---|-----------|--------|-------|
+| 1 | KeyString/KeyStrings → Storage | ✅ **Complete** | Moved with extension methods for Core-dependent operations |
+| 2 | JSProperty/PropertySequence/ElementArray → Storage | ⏳ Blocked | Fields are concrete Core types (JSValue, JSFunction); requires interface-typed fields or Phase 9b |
+| 3 | Phase 9b — Move core value types to Runtime | ⏳ Not started | 500+ file references; API breakage risk |
+| 4 | Contract interfaces → Runtime | ⏳ Blocked | Depends on Phase 9b |
+| 5 | JSObject status methods → public | ✅ **Complete** | Unblocks JSReflect extraction |
+| 6 | JSProperty factory methods → public | ✅ **Complete** | Unblocks BuiltIns property manipulation |
 
 ---
 

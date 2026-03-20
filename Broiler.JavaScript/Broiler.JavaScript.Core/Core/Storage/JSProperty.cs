@@ -19,7 +19,7 @@ public readonly struct JSProperty
     public readonly JSFunction set;
     public readonly JSValue value;
 
-    internal JSProperty ToNotReadOnly() => new(key, get, set, value, Attributes & (~JSPropertyAttributes.Readonly));
+    public JSProperty ToNotReadOnly() => new(key, get, set, value, Attributes & (~JSPropertyAttributes.Readonly));
 
     public JSProperty(in KeyString key, JSFunction get, JSFunction set, JSPropertyAttributes attributes)
     {
@@ -102,27 +102,27 @@ public readonly struct JSProperty
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSProperty Property(JSValue d, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => new(KeyString.Empty, d, attributes);
+    public static JSProperty Property(JSValue d, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => new(KeyString.Empty, d, attributes);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSProperty Function(in KeyString key, JSFunctionDelegate d, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableValue, int length = 0)
+    public static JSProperty Function(in KeyString key, JSFunctionDelegate d, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableValue, int length = 0)
     {
         var fx = new JSFunction(d, key.ToString(), null, length);
         return new JSProperty(key, fx, null, attributes);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSProperty Property(uint key, JSValue d, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => new(key, d, attributes);
+    public static JSProperty Property(uint key, JSValue d, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => new(key, d, attributes);
 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSProperty Property(in KeyString key, JSValue d, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => new(key, d, attributes);
+    public static JSProperty Property(in KeyString key, JSValue d, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => new(key, d, attributes);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSProperty Property(in KeyString key, JSFunction d, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => new(key, d, attributes);
+    public static JSProperty Property(in KeyString key, JSFunction d, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => new(key, d, attributes);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSProperty Property(in KeyString key, JSFunctionDelegate get, JSFunctionDelegate set = null, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
+    public static JSProperty Property(in KeyString key, JSFunctionDelegate get, JSFunctionDelegate set = null, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
     {
         var fget = get == null ? null : new JSFunction(get, "get " + key.ToString());
         var fset = set == null ? null : new JSFunction(set, "set " + key.ToString());
@@ -131,10 +131,10 @@ public readonly struct JSProperty
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSProperty Property(in KeyString key, JSFunction get, JSFunction set = null, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty) => new(key, get, set, attributes);
+    public static JSProperty Property(in KeyString key, JSFunction get, JSFunction set = null, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty) => new(key, get, set, attributes);
     public JSProperty With(in KeyString key) => new(key, get, set, value, Attributes);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSProperty Property(JSFunction get, JSFunction set = null, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty) => new(KeyString.Empty, get, set, attributes);
+    public static JSProperty Property(JSFunction get, JSFunction set = null, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty) => new(KeyString.Empty, get, set, attributes);
 
 }
