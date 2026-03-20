@@ -18,10 +18,10 @@ public class IJSModuleResolverTests
         public void Register(string path, string source) =>
             _modules[path] = source;
 
-        public string Resolve(string currentPath, string moduleName)
+        public string? Resolve(string currentPath, string moduleName)
         {
             var resolved = Path.Combine(currentPath, moduleName);
-            return _modules.ContainsKey(resolved) ? resolved : null!;
+            return _modules.ContainsKey(resolved) ? resolved : null;
         }
 
         public Task<string> LoadSourceAsync(string resolvedPath)
