@@ -94,6 +94,7 @@ assemblies. Each assembly has a single, well-defined responsibility.
 | 9 | **Broiler.JavaScript.Debugger** | `Debugger/`, `Core/Debug/` | V8 Inspector protocol, `IDebugger` contract |
 | 10 | **Broiler.JavaScript.ExpressionCompiler** | *(already separate)* | LINQ Expression Tree → IL compilation (unchanged) |
 | 11 | **Broiler.JavaScript.JSClassGenerator** | *(already separate)* | Roslyn source generator (unchanged) |
+| 12 | **Broiler.JavaScript.All** | *(meta-package)* | Convenience reference that transitively includes all engine assemblies |
 
 ### 2.2 Assembly Dependency Graph
 
@@ -520,7 +521,7 @@ Each extraction phase follows the same steps:
 - [x] Remove `InternalsVisibleTo("Broiler.JavaScript.Tests")` legacy entry. ✅ (2026-03-20)
 - [x] Update downstream consumers (`Broiler.Cli`, `Broiler.App`) to explicit
   satellite assembly references. ✅ (2026-03-20)
-- [ ] Create `Broiler.JavaScript.All` meta-package.
+- [x] Create `Broiler.JavaScript.All` meta-package. ✅ (2026-03-20)
 
 **Key Metrics (target):**
 - Zero `InternalsVisibleTo` migration bridges remain (test-access-only entries
@@ -2039,13 +2040,16 @@ All remaining Compiler internal accesses were resolved by making APIs public:
 
 **Infrastructure:**
 
-- [ ] Update downstream consumers (Broiler.App, Broiler.Cli) to reference
-  new assemblies directly (currently pull in all assemblies transitively)
+- [x] Update downstream consumers (Broiler.App, Broiler.Cli) to reference
+  `Broiler.JavaScript.All` meta-package ✅ (2026-03-20)
 - [x] Cross-platform CI build/test matrix (Linux/macOS/Windows) — ✅ added
   `.github/workflows/ci.yml`; covers all 10 test projects
 - [x] `Broiler.JavaScript.Runtime.Tests` project created — ✅ 8 tests covering
   `IJSModuleResolver` contract
-- [ ] Create `Broiler.JavaScript.All` meta-package for convenience references
+- [x] Create `Broiler.JavaScript.All` meta-package for convenience references ✅
+  (2026-03-20)
+- [x] Add missing extracted assemblies to solution file (Clr, Compiler, Modules,
+  BuiltIns, their test projects, Runtime.Tests, All) ✅ (2026-03-20)
 - [ ] Integrate `coverlet` coverage measurement into CI (target: ≥ 90% per assembly)
 
 ---
@@ -2191,22 +2195,23 @@ assemblies are included in the output and their initializers run:
 </ItemGroup>
 ```
 
-**Phase C — Meta-package (future):**
-Create `Broiler.JavaScript.All` that transitively includes all assemblies.
-Consumers switch to a single reference:
+**Phase C — Meta-package:** ✅ **Complete** (2026-03-20)
+`Broiler.JavaScript.All` meta-package created. It transitively includes all
+engine assemblies (Core, Clr, Compiler, Modules, BuiltIns, Debugger).
+Both `Broiler.App` and `Broiler.Cli` now reference the meta-package:
 
 ```xml
-<ProjectReference Include="...\Broiler.JavaScript.All.csproj" />
+<ProjectReference Include="...\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />
 ```
 
 ### Current Consumer Analysis
 
-- `Broiler.App` and `Broiler.Cli` both reference `Broiler.JavaScript.Core`
-  directly. Since Clr, Compiler, BuiltIns, Modules, and Debugger are loaded via
-  module initializers, they work correctly as long as the assemblies are deployed
-  alongside Core. No immediate migration is required.
+- `Broiler.App` and `Broiler.Cli` both reference `Broiler.JavaScript.All`,
+  which transitively includes Core and all satellite assemblies (Clr, Compiler,
+  BuiltIns, Modules, Debugger). Module initializers auto-register when loaded.
 - `Broiler.JavaScript` (CLI REPL) references Core and will need all assemblies
-  for full engine functionality.
+  for full engine functionality. It can switch to the `All` meta-package when
+  ready.
 
 ---
 
@@ -2215,12 +2220,12 @@ Consumers switch to a single reference:
 ### Workflow
 
 A GitHub Actions CI workflow has been added at `.github/workflows/ci.yml` that
-runs all 9 test projects on Ubuntu, Windows, and macOS:
+runs all 10 test projects on Ubuntu, Windows, and macOS:
 
 ```yaml
 # Trigger: push to main, pull requests to main
 # Matrix: ubuntu-latest, windows-latest, macos-latest
-# Steps: checkout → setup .NET 8 → restore → build → test (9 projects)
+# Steps: checkout → setup .NET 8 → restore → build → test (10 projects)
 ```
 
 ### Test Matrix
@@ -2541,16 +2546,19 @@ downstream consumers to use explicit assembly references.
      not exist in repository.
    - ⏳ Coordinate with `WebAtoms.XF` maintainers on migration timeline.
 
-4. **Create `Broiler.JavaScript.All` meta-package:** ⏳ Pending
-   - A single `<ProjectReference>` that transitively includes all engine
-     assemblies.
-   - Simplifies downstream consumer references.
+4. **Create `Broiler.JavaScript.All` meta-package:** ✅ **Complete** (2026-03-20)
+   - ✅ Created `Broiler.JavaScript.All` project at
+     `Broiler.JavaScript/Broiler.JavaScript.All/Broiler.JavaScript.All.csproj`.
+   - ✅ References all engine assemblies: Core, Clr, Compiler, Modules,
+     BuiltIns, Debugger.
+   - ✅ Downstream consumers (`Broiler.Cli`, `Broiler.App`) updated to use
+     single `Broiler.JavaScript.All` reference.
 
 5. **Update downstream consumers:** ✅ **Complete** (2026-03-20)
-   - ✅ `Broiler.Cli`: added explicit `<ProjectReference>` entries for Clr,
-     Compiler, Modules, BuiltIns, Debugger satellite assemblies.
-   - ✅ `Broiler.App`: added explicit `<ProjectReference>` entries for Clr,
-     Compiler, Modules, BuiltIns, Debugger satellite assemblies.
+   - ✅ `Broiler.Cli`: updated to single `Broiler.JavaScript.All` reference
+     (replaces Core + 5 explicit satellite references).
+   - ✅ `Broiler.App`: updated to single `Broiler.JavaScript.All` reference
+     (replaces Core + 5 explicit satellite references).
 
 6. **Integrate coverage measurement into CI:** ⏳ Pending
    - Add `coverlet` to all test projects.
@@ -2586,6 +2594,78 @@ Runtime. The `PropertyKey` struct should either:
 - Move with `KeyString` to Runtime (since it depends on `JSSymbol`), or
 - Be split: `KeyType` enum and core `KeyString` struct move to Ast/Primitives,
   while `PropertyKey` stays in Runtime.
+
+---
+
+## 15. Meta-Package and Solution Consolidation (2026-03-20)
+
+### Overview
+
+Created the `Broiler.JavaScript.All` meta-package and consolidated the solution
+file to include all extracted assemblies and their test projects.
+
+### Changes
+
+1. **Created `Broiler.JavaScript.All` meta-package:**
+   - New project at `Broiler.JavaScript/Broiler.JavaScript.All/Broiler.JavaScript.All.csproj`.
+   - Transitively includes: Core, Clr, Compiler, Modules, BuiltIns, Debugger.
+   - Consumers reference one project instead of six individual assemblies.
+
+2. **Updated downstream consumers to use meta-package:**
+   - `Broiler.Cli`: replaced Core + 5 explicit satellite references with single
+     `Broiler.JavaScript.All` reference.
+   - `Broiler.App`: replaced Core + 5 explicit satellite references with single
+     `Broiler.JavaScript.All` reference.
+
+3. **Added missing projects to solution file (`YantraJS.sln`):**
+   - `Broiler.JavaScript.Clr` + `Broiler.JavaScript.Clr.Tests`
+   - `Broiler.JavaScript.Compiler.Tests` (Compiler was already present)
+   - `Broiler.JavaScript.Modules` + `Broiler.JavaScript.Modules.Tests`
+   - `Broiler.JavaScript.BuiltIns` + `Broiler.JavaScript.BuiltIns.Tests`
+   - `Broiler.JavaScript.Runtime.Tests`
+   - `Broiler.JavaScript.All`
+
+### Verification
+
+All 962 tests pass across 10 test projects:
+
+| Assembly | Tests | Status |
+|----------|-------|--------|
+| Core | 641 | ✅ Pass |
+| Ast | 73 | ✅ Pass |
+| Parser | 78 | ✅ Pass |
+| Storage | 76 | ✅ Pass |
+| Debugger | 23 | ✅ Pass |
+| Clr | 29 | ✅ Pass |
+| Compiler | 9 | ✅ Pass |
+| Modules | 9 | ✅ Pass |
+| BuiltIns | 16 | ✅ Pass |
+| Runtime | 8 | ✅ Pass |
+| **Total** | **962** | ✅ |
+
+### InternalsVisibleTo Validation
+
+Confirmed that Core's `AssemblyInfo.cs` contains only three
+`InternalsVisibleTo` entries — all expected, no migration bridges remain:
+
+| Entry | Purpose | Status |
+|-------|---------|--------|
+| `Broiler.JavaScript.Core.Tests` | Test project access | ✅ Expected |
+| `Broiler.JavaScript.Runtime` | Dynamic assembly generation | ✅ Required |
+| `WebAtoms.XF` | External consumer | ⏳ Cannot remove unilaterally |
+
+### Remaining Work
+
+- [ ] Phase 9a — Move `KeyString`/`KeyStrings` to Runtime (blocked by JSSymbol/
+  JSValue/JSString dependencies; deferred until Phase 9b)
+- [ ] Phase 9b — Move `JSValue`, `JSObject`, `JSFunction`, `JSContext`,
+  `Arguments`, `CoreScript`, `Bootstrap` to Runtime (high effort, 500+ files)
+- [ ] Move contract interfaces (`IBuiltInRegistry`, `IClrInterop`, `IDebugger`,
+  `IJSCompiler`) to Runtime (blocked by Phase 9b)
+- [ ] Phase 6 continued — Extract additional built-in types to BuiltIns
+  (blocked by deep structural coupling)
+- [ ] Integrate `coverlet` coverage measurement into CI (target: ≥ 90% per
+  assembly)
 
 ---
 
