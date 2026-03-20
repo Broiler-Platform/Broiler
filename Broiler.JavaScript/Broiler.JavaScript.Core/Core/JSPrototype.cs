@@ -7,17 +7,17 @@ namespace Broiler.JavaScript.Core.Core;
 
 public class JSPrototype
 {
-    internal class JSPropertySet
+    public class JSPropertySet
     {
-        internal SAUint32Map<(JSProperty property, JSPrototype owner)> properties;
-        internal SAUint32Map<(JSProperty property, JSPrototype owner)> elements;
-        internal SAUint32Map<(JSProperty property, JSPrototype owner)> symbols;
+        public SAUint32Map<(JSProperty property, JSPrototype owner)> properties;
+        public SAUint32Map<(JSProperty property, JSPrototype owner)> elements;
+        public SAUint32Map<(JSProperty property, JSPrototype owner)> symbols;
 
-        internal Sequence<KeyString> stringKeys = [];
-        internal Sequence<uint> uintKeys = [];
+        public Sequence<KeyString> stringKeys = [];
+        public Sequence<uint> uintKeys = [];
     }
 
-    internal JSPropertySet propertySet;
+    public JSPropertySet propertySet;
     public readonly JSObject @object;
     private bool dirty = true;
 

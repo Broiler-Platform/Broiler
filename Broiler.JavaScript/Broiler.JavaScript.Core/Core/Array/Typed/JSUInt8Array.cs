@@ -19,7 +19,7 @@ public partial class JSUInt8Array : JSTypedArray
 
     internal JSUInt8Array(byte[] data) : base(new TypedArrayParameters(data, BYTES_PER_ELENENT)) { }
 
-    protected internal override JSValue GetValue(uint index, JSValue receiver, bool throwError = true)
+    public override JSValue GetValue(uint index, JSValue receiver, bool throwError = true)
     {
         if (index < 0 || index >= length)
             return JSUndefined.Value;

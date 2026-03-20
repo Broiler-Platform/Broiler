@@ -229,7 +229,7 @@ public partial class ClrProxy : JSObject
         return false;
     }
 
-    internal protected override JSValue GetValue(uint key, JSValue receiver, bool throwError = true)
+    public override JSValue GetValue(uint key, JSValue receiver, bool throwError = true)
     {
         if (prototypeChain?.@object is ClrType.ClrPrototype p)
             return p.GetElementAt(value, key);

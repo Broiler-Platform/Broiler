@@ -6,10 +6,10 @@ using Broiler.JavaScript.Core.Core.Boolean;
 
 namespace Broiler.JavaScript.Core.Extensions;
 
-internal static class JSPropertyExtensions
+public static class JSPropertyExtensions
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSValue GetValue(this JSValue target, in JSProperty p)
+    public static JSValue GetValue(this JSValue target, in JSProperty p)
     {
         if (p.IsEmpty)
             return JSUndefined.Value;

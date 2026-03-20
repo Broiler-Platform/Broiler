@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace Broiler.JavaScript.Core.Extensions;
 
-internal static class StringExtensions
+public static class StringExtensions
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsEmpty(this string str) => string.IsNullOrEmpty(str);

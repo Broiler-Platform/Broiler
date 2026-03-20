@@ -87,7 +87,7 @@ public partial class JSProxy : JSObject
         return target.GetValue(key, receiver, throwError);
     }
 
-    internal protected override JSValue GetValue(uint key, JSValue receiver, bool throwError = true)
+    public override JSValue GetValue(uint key, JSValue receiver, bool throwError = true)
     {
         var fx = handler[KeyStrings.get];
         if (fx is JSFunction fxFunction)
