@@ -984,7 +984,7 @@ Direct `ClrProxy.Marshal()` and `ClrType.From()` calls in Core files outside
 | `Core/Module/JSModuleContext.cs` (×4) | `ClrProxy.Marshal(result/task)` | `ClrInterop.Marshal(result/task)` |
 | `Core/Promise/JSPromiseExtensions.cs` | `ClrProxy.Marshal(result)` | `JSContext.ClrInterop.Marshal(result)` |
 | `Enumerators/OwnEntriesEnumerator.cs` (×4) | `ClrProxy.Marshal(en.Current)` | `JSContext.ClrInterop.Marshal(en.Current)` |
-| `Core/JSContext.cs` | `ClrProxy.From(new JSConsole(this))` | `ClrInterop.Marshal(new JSConsole(this))` |
+| `Core/JSContext.cs` | `ClrProxy.From(new JSConsole(this))` | `ClrInterop.Marshal(new JSConsole(this))` — `ClrProxy.From()` wraps an object in a proxy; `IClrInterop.Marshal()` handles the same case (complex objects are wrapped in a proxy by the default implementation) |
 | `Core/Global/JSGlobal.cs` | `ClrType.From(typeof(JSIntl))` | `JSContext.ClrInterop.GetClrType(typeof(JSIntl))` |
 | `Core/Intl/JSIntl.cs` (×2) | `ClrType.From(typeof(...))` | `JSContext.ClrInterop.GetClrType(typeof(...))` |
 
