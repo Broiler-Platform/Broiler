@@ -17,7 +17,7 @@ scalability, and testability.
 | `Broiler.JavaScript.Ast` | Broiler.JavaScript.Ast | AST node types, shared primitives (`FastToken`, `StringSpan`, `FastNodeType`, etc.) | ✅ Extracted (Phase 1) |
 | `Broiler.JavaScript.Parser` | Broiler.JavaScript.Parser | Lexer (`FastScanner`), recursive-descent parser (`FastParser`), scope tracking | ✅ Extracted (Phase 2) |
 | `Broiler.JavaScript.Storage` | Broiler.JavaScript.Storage | Property hash maps, virtual memory, concurrent caches | ✅ Extracted (Phase 3, partial) |
-| `Broiler.JavaScript.Debugger` | Broiler.JavaScript.Debugger | V8 Inspector Protocol handler, protocol data types | ✅ Extracted (Phase 4, partial) |
+| `Broiler.JavaScript.Debugger` | Broiler.JavaScript.Debugger | V8 Inspector Protocol handler, protocol data types | ✅ Extracted (Phase 4, partial); `InternalsVisibleTo` bridge removed |
 | `Broiler.JavaScript.ExpressionCompiler` | Broiler.JavaScript.ExpressionCompiler | LINQ Expression Tree → IL compilation | Pre-existing |
 | `Broiler.JavaScript.JSClassGenerator` | Broiler.JavaScript.JSClassGenerator | Roslyn source generator for C#-to-JS bindings | Pre-existing |
 | `Broiler.JavaScript.Network` | YantraJS.Network | Fetch API / network module | Pre-existing |
@@ -25,6 +25,8 @@ scalability, and testability.
 | `Broiler.JavaScript.NodePollyfill` | YantraJS.NodePollyfill | Node.js compatibility polyfills | Pre-existing |
 | `Broiler.JavaScript` | YantraJS (exe) | CLI REPL / runner | Pre-existing |
 | `Broiler.JavaScript.Core.Tests` | (test) | Unit tests for the core engine (641 tests) | Active |
+| `Broiler.JavaScript.Ast.Tests` | (test) | Unit tests for Ast assembly (73 tests) | ✅ Created |
+| `Broiler.JavaScript.Parser.Tests` | (test) | Unit tests for Parser assembly (78 tests) | ✅ Created |
 | `Broiler.JavaScript.Storage.Tests` | (test) | Unit tests for Storage assembly (56 tests) | ✅ Created |
 | `Broiler.JavaScript.Debugger.Tests` | (test) | Unit tests for Debugger assembly (23 tests) | ✅ Created |
 
@@ -353,11 +355,11 @@ changes:
 
 | Phase | Assembly | Rationale | Status |
 |-------|----------|-----------|--------|
-| **Phase 1** | **Ast** | Zero dependencies. Pure data types. Smallest, safest extraction. | ✅ Complete |
-| **Phase 2** | **Parser** | Depends only on Ast. Self-contained lexer + parser. | ✅ Complete |
+| **Phase 1** | **Ast** | Zero dependencies. Pure data types. Smallest, safest extraction. | ✅ Complete; test project created (73 tests) |
+| **Phase 2** | **Parser** | Depends only on Ast. Self-contained lexer + parser. | ✅ Complete; test project created (78 tests) |
 | **Phase 3** | **Storage** | Depends on shared primitives. Decouples property storage from runtime logic. | ✅ Partial — pure storage types extracted; test project created (56 tests) |
-| **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. | ✅ Partial — V8 Inspector Protocol extracted; test project created (23 tests) |
-| **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | ⏳ In progress — IClrInterop interface complete (Marshal, GetClrType, TryUnwrapClrObject); all source code and generated code references refactored to use interface; 3 structural references remain (ClrProxyBuilder expression tree builder, JSFunction constructor parameter) |
+| **Phase 4** | **Debugger** | Already behind `IDebugger` interface. Largely independent. | ✅ Partial — V8 Inspector Protocol extracted; test project created (23 tests); `InternalsVisibleTo` bridge removed (all accessed APIs now public) |
+| **Phase 5** | **Clr** | Already behind `IClrInterop` interface. Medium coupling. | ⏳ In progress — IClrInterop interface complete (Marshal, GetClrType, TryUnwrapClrObject); all source code and generated code references refactored to use interface; JSFunction constructor decoupled from ClrType; 2 structural references remain (ClrProxyBuilder expression tree builder) |
 | **Phase 6** | **BuiltIns** | High coupling to Runtime, but only through `JSValue`/`JSContext`. Requires `IBuiltInRegistry` to be in place. | ⏳ In progress — IBuiltInRegistry implemented and wired into JSContext; JSClassGenerator updated to emit JSContext.ClrInterop.Marshal(); multi-assembly namespace support still needed |
 | **Phase 7** | **Compiler** | Depends on Ast, Runtime, and ExpressionCompiler. Requires stable interfaces. | ⏳ Blocked — requires stable Runtime interfaces |
 | **Phase 8** | **Modules** | Last — depends on Runtime, Parser, and Clr. | ⏳ Blocked — JSFunctionGenerator creates partial class in Core namespace; JSModuleContext extends JSContext |
@@ -398,8 +400,8 @@ Each extraction phase follows the same steps:
 **Deliverables:**
 - `Broiler.JavaScript.Ast` assembly with all AST node types ✅
 - `Broiler.JavaScript.Parser` assembly with lexer and parser ✅
-- `Broiler.JavaScript.Ast.Tests` project *(future — assembly-specific tests)*
-- `Broiler.JavaScript.Parser.Tests` project *(future — assembly-specific tests)*
+- `Broiler.JavaScript.Ast.Tests` project — 73 assembly-specific tests ✅ (2026-03-20)
+- `Broiler.JavaScript.Parser.Tests` project — 78 assembly-specific tests ✅ (2026-03-20)
 - All existing tests pass ✅
 
 **Key Metrics:**
@@ -422,7 +424,7 @@ Each extraction phase follows the same steps:
 
 **Key Metrics:**
 - Storage has no reference to `JSContext` (only to Ast shared primitives). ✅
-- Debugger depends on Core via `InternalsVisibleTo` bridge (temporary). ✅
+- Debugger accesses Core via public APIs only (no `InternalsVisibleTo` needed). ✅
 - Storage.Tests references only Storage (no Core dependency). ✅
 - 3 runtime-dependent storage types (JSProperty, PropertySequence, ElementArray)
   remain in Core until Runtime extraction resolves the circular dependency.
@@ -565,8 +567,8 @@ Each extracted assembly must have a corresponding test project:
 
 | Assembly | Test Project | Focus | Status |
 |----------|-------------|-------|--------|
-| Ast | `Broiler.JavaScript.Ast.Tests` | Node construction, immutability | Future |
-| Parser | `Broiler.JavaScript.Parser.Tests` | Parsing correctness for all JS constructs, error recovery | Future |
+| Ast | `Broiler.JavaScript.Ast.Tests` | Node construction, token/span types, enum coverage | ✅ 73 tests |
+| Parser | `Broiler.JavaScript.Parser.Tests` | Parsing correctness for all JS constructs, tokenization, keyword maps | ✅ 78 tests |
 | Compiler | `Broiler.JavaScript.Compiler.Tests` | Expression tree generation, generator rewriting | Future |
 | Runtime | `Broiler.JavaScript.Runtime.Tests` | `JSContext` lifecycle, `JSValue` coercion, `Arguments` | Future |
 | Storage | `Broiler.JavaScript.Storage.Tests` | Property map operations, hash collision handling | ✅ 56 tests |
@@ -1027,7 +1029,7 @@ limited to the expression tree builder and a constructor parameter:
 |------|-----------|--------|
 | ~~`Core/JSValue.cs`~~ | ~~`is ClrProxy proxy`~~ | ✅ Replaced with `IClrInterop.TryUnwrapClrObject()` |
 | ~~`Extensions/JSValueExtensions.cs`~~ | ~~`is ClrProxy proxy`~~ | ✅ Replaced with `IClrInterop.TryUnwrapClrObject()` |
-| `Core/Function/JSFunction.cs` | `ClrType type` (constructor parameter) | ⏳ Structural type dependency — needs factory pattern |
+| ~~`Core/Function/JSFunction.cs`~~ | ~~`ClrType type` (constructor parameter)~~ | ✅ Changed to `JSFunction type` — decoupled from concrete `ClrType` |
 | `Core/Function/JSFunction.cs` | `ClrProxyBuilder.Marshal(inP)` | ⏳ Expression tree generation — inherent to compiler |
 | `LinqExpressions/ClrProxyBuilder.cs` | `typeof(ClrProxy)`, `nameof(ClrProxy.Marshal)` | ⏳ Reflection-based expression tree builder — needs concrete type to generate IL |
 | ~~`IJavaScriptObject.cs`~~ | ~~`ClrProxy.From(@object)`~~ | ✅ Replaced with `JSContext.ClrInterop.Marshal(@object)` |
@@ -1055,13 +1057,15 @@ compatibility but is no longer required for the marshal calls.
 - All `is ClrProxy` type checks outside `Core/Clr/` have been refactored to use
   `IClrInterop.TryUnwrapClrObject()`.
 - `IJavaScriptObject.handle` creation now uses `JSContext.ClrInterop.Marshal()`.
-- **3 structural references remain** in source code:
+- `JSFunction` constructor decoupled from `ClrType` — now accepts `JSFunction type`
+  instead of `ClrType type`.
+- **2 structural references remain** in source code:
   - `ClrProxyBuilder` (expression tree builder) — uses `typeof(ClrProxy)` and
     `nameof(ClrProxy.Marshal)` for reflection-based IL generation. This is
     inherent to the compilation model and will be addressed during Phase 7
     (Compiler extraction).
-  - `JSFunction` constructor accepts `ClrType type` parameter — needs a factory
-    pattern or interface type to fully decouple.
+  - `ClrProxyBuilder.Marshal(inP)` in `JSFunction.cs` — expression tree
+    generation, also inherent to the compiler.
 
 **Phase 6 (BuiltIns) — partially unblocked:**
 - `IBuiltInRegistry` is fully implemented with `DefaultBuiltInRegistry`.
@@ -1090,22 +1094,81 @@ compatibility but is no longer required for the marshal calls.
    `IClrInterop.TryUnwrapClrObject()`.
 4. ~~Configure `JSClassGenerator` to emit `JSContext.ClrInterop.Marshal()` instead
    of `ClrProxy.Marshal()`~~ — ✅ Done.
-5. Resolve remaining structural `ClrProxy` references (3 call sites:
-   `ClrProxyBuilder`, `JSFunction` constructor parameter).
-6. Configure `JSClassGenerator` multi-assembly namespace support (prerequisite for
+5. ~~Resolve `JSFunction` constructor `ClrType` parameter~~ — ✅ Done (changed to
+   `JSFunction type`).
+6. Resolve remaining structural `ClrProxyBuilder` references (2 call sites in
+   expression tree builder — inherent to compiler, Phase 7).
+7. Configure `JSClassGenerator` multi-assembly namespace support (prerequisite for
    Phase 6).
-7. Define stable Runtime interfaces for compiler consumption (prerequisite for
+8. Define stable Runtime interfaces for compiler consumption (prerequisite for
    Phase 7).
 
 **Estimated effort for remaining prerequisites:**
-- Remaining structural `ClrProxy` references: Low-Medium — 3 call sites in
-  expression tree builder and constructor parameter; tightly coupled to
-  compilation model.
+- Remaining structural `ClrProxyBuilder` references: Low — 2 call sites in
+  expression tree builder; tightly coupled to compilation model. Will be
+  resolved naturally during Phase 7 (Compiler extraction).
 - `JSClassGenerator` multi-assembly: Medium — must support configurable namespace
   roots or assembly-aware code generation.
 - Runtime interfaces: High — must define stable abstractions for `JSValue`,
   `JSContext`, `Arguments`, and `JSFunction` that the Compiler can reference
   without pulling in the full Runtime implementation.
+
+### Continued Implementation Progress (2026-03-20)
+
+**What was done:**
+
+1. **JSFunction constructor decoupled from `ClrType`** — The `JSFunction`
+   constructor parameter `ClrType type` was changed to `JSFunction type`,
+   removing a structural dependency between the Function subsystem and the
+   concrete Clr type. Since `ClrType : JSFunction`, the change is fully
+   backward-compatible. This reduces the remaining structural `ClrProxy`/`ClrType`
+   references from 3 to 2 (both in the expression tree builder, Phase 7).
+
+2. **Debugger `InternalsVisibleTo` bridge removed** — Made 8 internal Core APIs
+   public so the Debugger assembly no longer requires `InternalsVisibleTo`:
+   - `JSContext.Top` (field)
+   - `KeyStrings.GetNameString()` (method)
+   - `JSValue.IsNullOrUndefined` (property)
+   - `JSValue.StringValue` (virtual property — cascaded to `JSSymbol` override)
+   - `JSValue.GetValue(uint, JSValue, bool)` (virtual method — cascaded to
+     10 typed array overrides + `JSObject`, `JSProxy`, `JSString`, `ClrProxy`)
+   - `JSPrototype.JSPropertySet` (nested class + 5 fields)
+   - `CoreScript.Compile()` (static method)
+   - `StringExtensions` (extension class)
+   - `JSPropertyExtensions` (extension class — `GetValue(JSValue, JSProperty)`)
+
+3. **Test projects created:**
+   - `Broiler.JavaScript.Ast.Tests` — 73 assembly-specific tests covering
+     `FastToken`, `StringSpan`, `SpanLocation`, `FastNodeType`, `TokenTypes`,
+     `FastKeywords`, and AST node construction (`AstLiteral`, `AstIdentifier`,
+     `AstExpressionStatement`, `AstReturnStatement`).
+   - `Broiler.JavaScript.Parser.Tests` — 78 assembly-specific tests covering
+     `FastParser` (38 tests: statements, expressions, control flow, functions,
+     classes, try/catch, ES2015+ features, error handling), `FastScanner`
+     (20 tests: tokenization, keywords, operators, comments, location tracking),
+     `FastTokenStream` (7 tests: construction, buffering, EOF),
+     `FastKeywordMap` (3 tests: keyword recognition).
+
+4. **Solution files updated:**
+   - `Broiler.slnx` — Added `Broiler.JavaScript.Ast.Tests` and
+     `Broiler.JavaScript.Parser.Tests`.
+   - `YantraJS.sln` — Removed all broken old-name project references
+     (`YantraJS.Core`, `YantraJS.ExpressionCompiler`, etc.) and added all
+     current Broiler.JavaScript projects (17 projects total including
+     5 test projects).
+
+5. **Roadmap document updated** — This section documents Phase 5–6 progress,
+   test project status, and updated next steps.
+
+**Verification:**
+- `Broiler.JavaScript.Core` compiles with zero errors.
+- `Broiler.JavaScript.Debugger` compiles with zero errors (no `InternalsVisibleTo`).
+- All **641** tests in `Broiler.JavaScript.Core.Tests` pass.
+- All **73** tests in `Broiler.JavaScript.Ast.Tests` pass.
+- All **78** tests in `Broiler.JavaScript.Parser.Tests` pass.
+- All **56** tests in `Broiler.JavaScript.Storage.Tests` pass.
+- All **23** tests in `Broiler.JavaScript.Debugger.Tests` pass.
+- **Total: 871 tests across 5 test projects, all passing.**
 
 ---
 
