@@ -47,13 +47,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Image\Broiler.HTML.Image.csproj" />
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML\Broiler.HTML.csproj" />
-    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
-    <!-- Explicit satellite assembly references ensure module initializers run -->
-    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.Clr\Broiler.JavaScript.Clr.csproj" />
-    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.Compiler\Broiler.JavaScript.Compiler.csproj" />
-    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.Modules\Broiler.JavaScript.Modules.csproj" />
-    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.BuiltIns\Broiler.JavaScript.BuiltIns.csproj" />
-    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.Debugger\Broiler.JavaScript.Debugger.csproj" />
+    <!-- Meta-package includes Core + all satellite assemblies (Clr, Compiler, Modules, BuiltIns, Debugger) -->
+    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />
   </ItemGroup>
 
 </Project>
