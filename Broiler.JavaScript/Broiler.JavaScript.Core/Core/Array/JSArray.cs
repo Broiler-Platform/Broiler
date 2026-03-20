@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Enumerators;
 using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.Core.Core.Clr;
@@ -70,7 +71,7 @@ public partial class JSArray : JSObject
         {
             if (elements.TryGetValue(i, out var p))
             {
-                yield return (i, p.value);
+                yield return (i, (JSValue)p.value);
                 continue;
             }
             if (withHoles)
@@ -163,8 +164,8 @@ public partial class JSArray : JSObject
                     value = property.IsEmpty
                         ? null
                         : (property.IsValue
-                        ? property.value
-                        : property.set.InvokeFunction(new Arguments(array)));
+                        ? (JSValue)property.value
+                        : ((JSFunction)property.set).InvokeFunction(new Arguments(array)));
                     hasValue = true;
                 }
                 else
@@ -190,8 +191,8 @@ public partial class JSArray : JSObject
                     value = property.IsEmpty
                         ? null
                         : (property.IsValue
-                        ? property.value
-                        : property.set.InvokeFunction(new Arguments(array)));
+                        ? (JSValue)property.value
+                        : ((JSFunction)property.set).InvokeFunction(new Arguments(array)));
                 }
                 else
                 {
@@ -213,8 +214,8 @@ public partial class JSArray : JSObject
                     return property.IsEmpty
                         ? null
                         : (property.IsValue
-                        ? property.value
-                        : property.set.InvokeFunction(new Arguments(array)));
+                        ? (JSValue)property.value
+                        : ((JSFunction)property.set).InvokeFunction(new Arguments(array)));
                 }
                 return @default;
             }

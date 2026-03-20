@@ -603,7 +603,7 @@ public partial class JSArray
         if (@this.TryRemove((uint)index, out JSProperty r))
         {
             @this.Length = index;
-            return r.value;
+            return (JSValue)r.value;
         }
 
         return JSUndefined.Value;

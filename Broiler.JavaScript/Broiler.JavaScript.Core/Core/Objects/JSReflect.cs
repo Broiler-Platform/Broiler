@@ -222,7 +222,7 @@ public partial class JSReflect : JSObject
         
             if (p.IsProperty)
             {
-                p.set.InvokeFunction(new Arguments(receiver, value));
+                ((JSFunction)p.set).InvokeFunction(new Arguments(receiver, value));
                 return JSBoolean.True;
             }
             
@@ -237,7 +237,7 @@ public partial class JSReflect : JSObject
                 var p = @object.GetInternalProperty(key.Index, false);
                 if (p.IsProperty)
                 {
-                    p.set.InvokeFunction(new Arguments(receiver, value));
+                    ((JSFunction)p.set).InvokeFunction(new Arguments(receiver, value));
                     return JSBoolean.True;
                 }
                 
@@ -250,7 +250,7 @@ public partial class JSReflect : JSObject
                 var p = @object.GetInternalProperty(in key.KeyString, false);
                 if (p.IsProperty)
                 {
-                    p.set.InvokeFunction(new Arguments(receiver, value));
+                    ((JSFunction)p.set).InvokeFunction(new Arguments(receiver, value));
                     return JSBoolean.True;
                 }
 

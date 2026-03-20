@@ -302,7 +302,7 @@ public struct PropertySequence
 
     public void Put(in KeyString key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty) => Put(key.Key) = JSProperty.Property(key, getter, setter, attributes);
 
-    public void Put(in KeyString key, JSFunctionDelegate getter, JSFunctionDelegate setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty) => Put(key.Key) = JSProperty.Property(key, getter, setter, attributes);
+    public void Put(in KeyString key, JSFunctionDelegate getter, JSFunctionDelegate setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty) => Put(key.Key) = JSPropertyFactory.Property(key, getter, setter, attributes);
 
     public ref JSProperty Put(uint key)
     {

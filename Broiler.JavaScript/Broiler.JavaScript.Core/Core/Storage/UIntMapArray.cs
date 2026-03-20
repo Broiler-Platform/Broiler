@@ -92,7 +92,7 @@ public struct ElementArray
         uint newPivotIndex = start;
         for (uint i = start; i < end; i++)
         {
-            if (comparer(this[i].value, pivotValue.value) <= 0)
+            if (comparer((JSValue)this[i].value, (JSValue)pivotValue.value) <= 0)
             {
                 Swap(i, newPivotIndex);
                 newPivotIndex++;
@@ -123,13 +123,13 @@ public struct ElementArray
         {
             var value = this[i];
             uint j;
-            for (j = i - 1; j > start && comparer(this[j].value, value.value) > 0; j--)
+            for (j = i - 1; j > start && comparer((JSValue)this[j].value, (JSValue)value.value) > 0; j--)
                 Put(j + 1) = this[j];
 
             // Normally the for loop above would continue until j < start but since we are
             // using uint it doesn't work when start == 0.  Therefore the for loop stops one
             // short of start then the extra loop iteration runs below.
-            if (j == start && comparer(this[j].value, value.value) > 0)
+            if (j == start && comparer((JSValue)this[j].value, (JSValue)value.value) > 0)
             {
                 Put(j + 1) = this[j];
                 j--;
