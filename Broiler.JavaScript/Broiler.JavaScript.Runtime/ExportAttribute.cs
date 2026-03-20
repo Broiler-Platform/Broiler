@@ -3,9 +3,9 @@ using System;
 namespace Broiler.JavaScript.Core.Core.Module;
 
 /// <summary>
-/// Exports given Type as class.
+/// Exports the given type as a class.
 /// </summary>
-/// <param name="name">Asterix '*' if null</param>
+/// <param name="name">Asterisk '*' if null</param>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
 public class ExportAttribute(string name = null) : Attribute
 {
