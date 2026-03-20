@@ -2,7 +2,6 @@
 using Broiler.JavaScript.Core.Core.Module;
 
 #if !WEB_ATOMS
-[assembly: InternalsVisibleTo("Broiler.JavaScript.Tests")]
 [assembly: InternalsVisibleTo("Broiler.JavaScript.Core.Tests")]
 
 // used by Dynamic Assembly to access internals
