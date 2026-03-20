@@ -7,4 +7,8 @@
 // used by Dynamic Assembly to access internals
 [assembly: InternalsVisibleTo("Broiler.JavaScript.Runtime")]
 [assembly: InternalsVisibleTo("WebAtoms.XF")]
+
+// Migration bridge for extracted assemblies (temporary — to be resolved
+// by making required APIs public before milestone completion).
+[assembly: InternalsVisibleTo("Broiler.JavaScript.Debugger")]
 #endif
