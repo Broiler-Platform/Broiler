@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Date;
+using Broiler.JavaScript.Core.Core.Decimal;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Global;
 using Broiler.JavaScript.Core.Core.Intl;
@@ -36,5 +37,10 @@ internal static class BuiltInsAssemblyInitializer
         // does not directly reference JSIntlDateTimeFormat.
         JSDate.IntlDateFormatter = static (culture, value, options) =>
             JSIntlDateTimeFormat.Get(culture).Format(value, options);
+
+        // Wire factory delegates for JSDecimal so Core/Compiler can create
+        // and inspect decimal values without referencing the concrete type.
+        JSValue.CreateDecimalFactory = static v => new JSDecimal(v);
+        JSValue.CreateDecimalFromStringFactory = static s => new JSDecimal(s);
     }
 }

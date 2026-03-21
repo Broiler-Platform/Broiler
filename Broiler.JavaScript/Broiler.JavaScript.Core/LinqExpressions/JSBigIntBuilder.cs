@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.Core.LambdaGen;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.Core.Core.BigInt;
-using Broiler.JavaScript.Core.Core.Decimal;
+using Broiler.JavaScript.Core.Core;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 
@@ -12,5 +12,6 @@ public class JSBigIntBuilder
 
 public class JSDecimalBuilder
 {
-    public static YExpression New(string value) => NewLambdaExpression.NewExpression<JSDecimal>(() => () => new JSDecimal("a"), YExpression.Constant(value));
+    public static YExpression New(string value) => NewLambdaExpression.StaticCallExpression<JSValue>(
+        () => () => JSValue.CreateDecimalFromString(""), YExpression.Constant(value));
 }

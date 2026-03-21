@@ -20,6 +20,10 @@ public partial class JSDecimal : JSPrimitive
 
     internal readonly decimal value;
 
+    public override bool IsDecimal => true;
+
+    public override decimal DecimalValue => value;
+
     public override bool BooleanValue => value != 0;
 
     public override double DoubleValue => throw CannotMix();
