@@ -69,11 +69,11 @@ public partial class JSProxy : JSObject
         return target.Delete(index);
     }
 
-    internal protected override JSValue GetValue(JSSymbol key, JSValue receiver, bool throwError = true)
+    internal protected override JSValue GetValue(IJSSymbol key, JSValue receiver, bool throwError = true)
     {
         var fx = handler[KeyStrings.get];
         if (fx is JSFunction fxFunction)
-            return fxFunction.InvokeFunction(new Arguments(target, target, key, receiver));
+            return fxFunction.InvokeFunction(new Arguments(target, target, (JSValue)(JSSymbol)key, receiver));
 
         return target.GetValue(key, receiver, throwError);
     }
@@ -96,12 +96,12 @@ public partial class JSProxy : JSObject
         return target.GetValue(key, receiver, throwError);
     }
 
-    internal protected override bool SetValue(JSSymbol name, JSValue value, JSValue receiver, bool throwError = true)
+    internal protected override bool SetValue(IJSSymbol name, JSValue value, JSValue receiver, bool throwError = true)
     {
         var fx = handler[KeyStrings.set];
         if (fx is JSFunction fxFunction)
         {
-            fxFunction.InvokeFunction(new Arguments(target, target, name, receiver));
+            fxFunction.InvokeFunction(new Arguments(target, target, (JSValue)(JSSymbol)name, receiver));
             return true;
         }
 

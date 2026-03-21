@@ -198,15 +198,3 @@ public struct EnumerableElementEnumerable(IEnumerator en) : IElementEnumerator
         return @default;
     }
 }
-
-/// <summary>
-/// Struct implementing interface is marginally faster than ElementEnumerator being a class.
-/// https://dotnetfiddle.net/EbegMo
-/// </summary>
-public interface IElementEnumerator
-{
-    bool MoveNext(out bool hasValue, out JSValue value, out uint index);
-    bool MoveNext(out JSValue value);
-    bool MoveNextOrDefault(out JSValue value, JSValue @default);
-    JSValue NextOrDefault(JSValue @default);
-}

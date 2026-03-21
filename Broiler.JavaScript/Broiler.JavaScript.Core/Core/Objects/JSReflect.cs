@@ -95,7 +95,7 @@ public partial class JSReflect : JSObject
 
         if (key.IsSymbol)
         {
-            p = @object.GetInternalProperty(key.Symbol);
+            p = @object.GetInternalProperty((JSSymbol)key.Symbol);
         }
         else
         {
@@ -120,7 +120,7 @@ public partial class JSReflect : JSObject
         if (target is not JSObject)
             throw JSContext.NewTypeError($"Not an object");
 
-        var p = target.prototypeChain?.@object;
+        var p = target.prototypeChain?.Object;
         if (p == target || p == null)
             return JSNull.Value;
 
@@ -138,7 +138,7 @@ public partial class JSReflect : JSObject
         JSProperty p;
         if (key.IsSymbol)
         {
-            p = @object.GetInternalProperty(key.Symbol);
+            p = @object.GetInternalProperty((JSSymbol)key.Symbol);
         }
         else
         {
@@ -218,7 +218,7 @@ public partial class JSReflect : JSObject
         if (key.IsSymbol)
         {
             var symbol = key.Symbol;
-            var p = @object.GetInternalProperty(symbol, false);
+            var p = @object.GetInternalProperty((JSSymbol)symbol, false);
         
             if (p.IsProperty)
             {

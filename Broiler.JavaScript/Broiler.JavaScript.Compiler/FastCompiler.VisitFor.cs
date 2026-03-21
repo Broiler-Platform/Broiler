@@ -1,6 +1,6 @@
 ﻿#nullable enable
 using Broiler.JavaScript.Core.CodeGen;
-using Broiler.JavaScript.Core.Enumerators;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;

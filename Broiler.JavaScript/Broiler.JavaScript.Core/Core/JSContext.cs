@@ -20,7 +20,6 @@ namespace Broiler.JavaScript.Core.Core;
 
 
 public delegate JSValue JSClosureFunctionDelegate(ScriptInfo script, JSVariable[] closures, in Arguments a);
-public delegate JSValue JSFunctionDelegate(in Arguments a);
 public delegate void ConsoleEvent(JSContext context, string type, in Arguments a);
 public delegate void LogEventHandler(JSContext context, JSValue value);
 public delegate void ErrorEventHandler(JSContext context, Exception error);

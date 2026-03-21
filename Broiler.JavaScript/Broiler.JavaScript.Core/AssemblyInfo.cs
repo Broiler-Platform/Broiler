@@ -32,3 +32,12 @@ using Broiler.JavaScript.Core.Core.Module;
 
 // Type forward for StringExtensions moved to Broiler.JavaScript.Runtime.
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Extensions.StringExtensions))]
+
+// Type forwards for Phase 9b types moved to Broiler.JavaScript.Runtime.
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.JSValue))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.Arguments))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.PropertyKey))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.JSFunctionDelegate))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.IElementEnumerator))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.IJSPrototype))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.IJSSymbol))]

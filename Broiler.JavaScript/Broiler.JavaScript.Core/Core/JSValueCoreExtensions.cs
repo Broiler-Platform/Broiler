@@ -27,7 +27,7 @@ internal static class JSValueCoreExtensions
         JSValue.CreateDynamicMetaObject = (param, value) => new JSDynamicMetaData(param, value);
         JSValue.ForceConvertHelper = (jsValue, type, _) =>
         {
-            var protoObj = jsValue.prototypeChain?.@object;
+            var protoObj = (jsValue.prototypeChain as JSPrototype)?.@object;
             if (protoObj != null
                 && JSContext.ClrInterop.TryUnwrapClrObject(protoObj, out var clrObj))
             {
@@ -36,5 +36,12 @@ internal static class JSValueCoreExtensions
             }
             return null;
         };
+        JSValue.InvokePropertyGetter = (getter, receiver) => ((JSFunction)getter).InvokeFunction(new Arguments(receiver));
+        JSValue.CreatePrototypeObject = value => (value as JSObject)?.PrototypeObject;
+        Arguments.Empty = new Arguments(JSUndefined.Value);
+        Arguments.ForApplyImpl = ArgumentsCoreExtensions.ForApplyCore;
+        Arguments.RestFromImpl = ArgumentsCoreExtensions.RestFromCore;
+        Arguments.GetStringImpl = ArgumentsCoreExtensions.GetStringCore;
+        Arguments.GetSpreadTarget = ArgumentsCoreExtensions.GetSpreadTargetCore;
     }
 }

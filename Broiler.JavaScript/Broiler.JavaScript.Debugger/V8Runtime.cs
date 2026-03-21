@@ -57,12 +57,12 @@ public partial class V8Runtime(V8InspectorProtocol inspectorContext) : V8Protoco
                 while (en.MoveNext(out var key, out var p))
                     list.Add(new V8PropertyDescriptor(KeyStrings.GetNameString(key.Key).Value, v, p, true));
 
-                list.Add(new V8PropertyDescriptor(c.prototypeChain));
+                list.Add(new V8PropertyDescriptor((JSPrototype)c.prototypeChain));
             }
             else
             {
                 // list all accessors...
-                var accessors = c.prototypeChain.propertySet;
+                var accessors = ((JSPrototype)c.prototypeChain).propertySet;
                 foreach (var (i, (pt, px)) in accessors.properties.AllValues())
                 {
                     if (pt.IsEmpty || !pt.IsProperty)

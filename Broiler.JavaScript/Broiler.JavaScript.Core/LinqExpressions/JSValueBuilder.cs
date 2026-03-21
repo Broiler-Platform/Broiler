@@ -54,7 +54,7 @@ public class JSValueBuilder
     public static Expression UIntValue(Expression exp) => exp.PropertyExpression<JSValue, uint>(() => (x) => x.UIntValue);
 
     public static Expression PrototypeChain(Expression exp) =>
-        exp.FieldExpression<JSValue, JSPrototype>(() => (x) => x.prototypeChain).FieldExpression<JSPrototype, JSObject>(() => (x) => x.@object);
+        exp.FieldExpression<JSValue, IJSPrototype>(() => (x) => x.prototypeChain).PropertyExpression<IJSPrototype, JSValue>(() => (x) => x.Object);
 
     public static Expression Negate(Expression exp) => exp.CallExpression<JSValue, JSValue>(() => (x) => x.Negate());
 
@@ -89,9 +89,9 @@ public class JSValueBuilder
     private static PropertyInfo _IndexKeyString = type.IndexProperty(typeof(KeyString));
     private static PropertyInfo _IndexUInt = type.IndexProperty(typeof(uint));
     private static PropertyInfo _Index = type.IndexProperty(typeof(JSValue));
-    private static PropertyInfo _SuperIndexKeyString = type.PublicIndex(typeof(JSObject), typeof(KeyString));
-    private static PropertyInfo _SuperIndexUInt = type.PublicIndex(typeof(JSObject), typeof(uint));
-    private static PropertyInfo _SuperIndex = type.PublicIndex(typeof(JSObject), typeof(JSValue));
+    private static PropertyInfo _SuperIndexKeyString = type.PublicIndex(typeof(JSValue), typeof(KeyString));
+    private static PropertyInfo _SuperIndexUInt = type.PublicIndex(typeof(JSValue), typeof(uint));
+    private static PropertyInfo _SuperIndex = type.PublicIndex(typeof(JSValue), typeof(JSValue));
 
     private static MethodInfo _PropertyOrUndefinedKeyString = type.PublicMethod(nameof(JSValue.PropertyOrUndefined), KeyStringsBuilder.RefType);
     private static MethodInfo _PropertyOrUndefinedUInt = type.PublicMethod(nameof(JSValue.PropertyOrUndefined), typeof(uint));

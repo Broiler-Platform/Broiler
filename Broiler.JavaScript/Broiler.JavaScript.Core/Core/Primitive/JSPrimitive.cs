@@ -30,7 +30,7 @@ public abstract class JSPrimitive: JSValue
 
     }
 
-    public override JSValue this[JSSymbol symbol] {
+    public override JSValue this[IJSSymbol symbol] {
         get
         {
             ResolvePrototype();

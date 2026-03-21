@@ -32,7 +32,7 @@ public partial class JSFinalizationRegistry : JSObject
 
     private void FinalizeReference(JSValue token)
     {
-        token.Delete(finalizationToken);
+        token.Delete((IJSSymbol)finalizationToken);
         finalizer.InvokeFunction(new Arguments(this, token));
     }
 
@@ -63,14 +63,14 @@ public partial class JSFinalizationRegistry : JSObject
     private void Register(JSValue target, JSValue token)
     {
         var weakRef = new WeakObject(this, token);
-        target[finalizationSymbol] = weakRef;
-        token[finalizationToken] = weakRef;
+        target[(IJSSymbol)finalizationSymbol] = weakRef;
+        token[(IJSSymbol)finalizationToken] = weakRef;
     }
 
     private void Unregister(JSValue token)
     {
-        var weakRef = token[finalizationSymbol];
-        token.Delete(finalizationSymbol);
+        var weakRef = token[(IJSSymbol)finalizationSymbol];
+        token.Delete((IJSSymbol)finalizationSymbol);
         GC.SuppressFinalize(weakRef);
     }
 }

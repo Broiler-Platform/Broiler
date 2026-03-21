@@ -1,0 +1,9 @@
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("Broiler.JavaScript.Core")]
+[assembly: InternalsVisibleTo("Broiler.JavaScript.Core.Tests")]
+[assembly: InternalsVisibleTo("Broiler.JavaScript.Clr")]
+[assembly: InternalsVisibleTo("Broiler.JavaScript.Compiler")]
+[assembly: InternalsVisibleTo("Broiler.JavaScript.Modules")]
+[assembly: InternalsVisibleTo("Broiler.JavaScript.BuiltIns")]
+[assembly: InternalsVisibleTo("Broiler.JavaScript.Debugger")]

@@ -70,11 +70,11 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
 
                 if (IsPrimitive(className))
                 {
-                    sb = sb.AppendLine($"protected override JSObject GetCurrentPrototype() => null;");
+                    sb = sb.AppendLine($"protected override JSValue GetCurrentPrototype() => null;");
                 }
                 else
                 {
-                    sb = sb.AppendLine($"protected override JSObject GetCurrentPrototype() => (JSContext.Current?[{names.GetOrCreateName(className)}] as JSFunction)?.prototype;");
+                    sb = sb.AppendLine($"protected override JSValue GetCurrentPrototype() => (JSContext.Current?[{names.GetOrCreateName(className)}] as JSFunction)?.prototype;");
                 }
 
                 sb = sb.AppendLine($"internal protected {type.Name}(JSObject prototype = null): base(prototype) {{}}");
