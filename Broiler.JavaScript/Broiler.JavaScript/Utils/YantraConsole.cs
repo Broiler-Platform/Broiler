@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
 
 namespace YantraJS.Utils
 {

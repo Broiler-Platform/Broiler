@@ -8,7 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Emit;
-using Broiler.JavaScript.Expressions;
+using Broiler.JavaScript.ExpressionCompiler;
 
 namespace YantraJS
 {
