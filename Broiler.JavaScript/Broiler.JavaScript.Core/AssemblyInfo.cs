@@ -41,3 +41,11 @@ using Broiler.JavaScript.Core.Core.Module;
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.IElementEnumerator))]
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.IJSPrototype))]
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.IJSSymbol))]
+
+// Type forwards for Phase 9c contract interfaces moved to Broiler.JavaScript.Runtime.
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Debugger.IDebugger))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.Clr.IClrInterop))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Emit.ICodeCache))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Emit.JSCode))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Emit.JSCodeCompiler))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.FastParser.Compiler.IJSCompiler))]
