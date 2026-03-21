@@ -29,3 +29,6 @@ using Broiler.JavaScript.Core.Core.Module;
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.Storage.PropertySequence))]
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.Storage.ElementArray))]
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.Storage.Updater<,>))]
+
+// Type forward for StringExtensions moved to Broiler.JavaScript.Runtime.
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Extensions.StringExtensions))]
