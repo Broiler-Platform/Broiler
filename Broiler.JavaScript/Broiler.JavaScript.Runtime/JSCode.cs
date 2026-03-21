@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Broiler.JavaScript.Ast;
 
 namespace Broiler.JavaScript.Core.Emit;
 
