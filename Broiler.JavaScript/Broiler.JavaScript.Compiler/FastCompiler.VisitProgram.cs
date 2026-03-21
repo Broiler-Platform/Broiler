@@ -32,12 +32,13 @@ partial class FastCompiler
         {
             list =
             [
-                // create new disposable and assign ...
-                Expression.Assign(scope.Disposable,Expression.New(scope.Disposable.Type))
+                // create new disposable via factory delegate ...
+                Expression.Assign(scope.Disposable,
+                    NewLambdaExpression.StaticCallExpression<IJSDisposableStack>(() => () => IJSDisposableStack.New()))
             ];
 
             var d = scope.Disposable;
-            var dispose = d.CallExpression<JSDisposableStack, JSValue>(() => (j) => j.Dispose());
+            var dispose = d.CallExpression<IJSDisposableStack, JSValue>(() => (j) => j.Dispose());
             if (scope.Function.Async)
             {
                 // we will move everything inside await dispose...

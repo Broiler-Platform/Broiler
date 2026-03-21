@@ -7,7 +7,7 @@ using Broiler.JavaScript.Core.Core.Primitive;
 
 namespace Broiler.JavaScript.Core.Core.Disposable;
 
-public class JSDisposableStack : IDisposable, IAsyncDisposable
+public class JSDisposableStack : IJSDisposableStack, IDisposable, IAsyncDisposable
 {
     public bool Disposed { get; private set; }
     public bool isAsync { get; private set; }

@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Disposable;
 
 namespace Broiler.JavaScript.BuiltIns;
 
@@ -19,5 +20,9 @@ internal static class BuiltInsAssemblyInitializer
                 existing(context);
                 context.RegisterBuiltInClasses();
             };
+
+        // Wire factory delegate for JSDisposableStack so the Compiler can create
+        // instances via the IJSDisposableStack interface without referencing BuiltIns.
+        IJSDisposableStack.CreateNew = static () => new JSDisposableStack();
     }
 }
