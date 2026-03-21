@@ -4519,10 +4519,33 @@ and clear ownership guidance. Each item is broken into concrete next steps so
 that any contributor can pick up the work.
 
 **Completed items tracked here:**
-- ✅ **ModuleExtensions alignment** — namespace, TFM, and reference alignment
-  completed; bugs fixed; 13-test project created. See Section 30 for full
-  details on reference alignment, namespace/TFM updates, bug fixes, and the
-  test project.
+- ✅ **P1 — ModuleExtensions alignment** (verified 2026-03-21):
+  - [x] Namespace alignment: both source files (`JSModuleContextExtension.cs`,
+    `ModuleBuilder.cs`) updated from `YantraJS.ModuleExtensions` / global
+    namespace to `Broiler.JavaScript.ModuleExtensions`.
+  - [x] TFM alignment: `net8.0` target framework confirmed in both
+    `Broiler.JavaScript.ModuleExtensions.csproj` and
+    `Broiler.JavaScript.ModuleExtensions.Tests.csproj`.
+  - [x] Reference alignment: project references validated — main project
+    depends on Core, Modules, Clr, ExpressionCompiler; test project depends
+    on ModuleExtensions, Core, Clr, Compiler, Modules.
+  - [x] Bug fixes applied and verified:
+    - `ExportType(Type, string?)` respects `name` parameter (`name ?? type.Name`).
+    - Duplicate assignment in `AddModuleToContext` removed.
+    - `ImportModule` uses public `All` property instead of private-field reflection.
+    - Unused `System.Reflection` import removed.
+  - [x] Project file cleanup: duplicate `LangVersion`, contradictory
+    `GeneratePackageOnBuild`, stale URLs and `PackageVersion` removed;
+    collection fields made `readonly`.
+  - [x] Dedicated test project created: 13 tests (9 `ModuleBuilderTests`,
+    4 `JSModuleContextExtensionTests`) covering all public API surface.
+  - [x] CI integration: `ModuleExtensions.Tests` added as 11th test step
+    in `.github/workflows/ci.yml` with `coverlet` coverage collection.
+  - [x] Solution inclusion: both projects registered in `YantraJS.sln`.
+  - See Section 30 for full implementation details.
+- ✅ **P2 — BuiltIns extraction via factory delegates** (completed 2026-03-21):
+  - JSDisposableStack, JSDecimal, JSIntl extracted; remaining candidates
+    assessed as impractical. See Section 29.2 and Section 31 for details.
 
 ### Priority Definitions
 
@@ -4756,10 +4779,12 @@ currently actionable. They are documented here for future reference.
 
 | Milestone | Items | Target | Status |
 |-----------|-------|--------|--------|
-| **Completed** | ModuleExtensions alignment (Section 30) | — | ✅ Namespace, TFM, references aligned; bugs fixed; 13-test project created |
-| **Next (Quality)** | P1: Coverage improvement | Next PR cycle | 📋 Planned |
-| **Near-term (Architecture)** | P2: BuiltIns extraction (JSDisposableStack, JSDecimal, JSIntl) ✅, Integration tests, Docs update | 1–2 PR cycles | ✅ BuiltIns done; integration tests & docs pending |
-| **Future (Full extraction)** | P3: ObjectModel assembly | When preconditions met | ⏳ Deferred |
+| **P1 — ModuleExtensions** | Namespace/TFM/reference alignment, bug fixes, test project (Section 30) | — | ✅ Complete (verified 2026-03-21) |
+| **P2 — BuiltIns extraction** | JSDisposableStack, JSDecimal, JSIntl via factory delegates (Section 31) | — | ✅ Complete (2026-03-21) |
+| **P1 — Coverage improvement** | Per-assembly ≥ 90% line coverage (Section 29.1) | Next PR cycle | 📋 Planned |
+| **P2 — Integration tests** | `Broiler.JavaScript.Integration.Tests` project (Section 29.3) | 1–2 PR cycles | 📋 Planned |
+| **P2 — Docs update** | Downstream consumer migration documentation (Section 29.4) | 1–2 PR cycles | 📋 Planned |
+| **P3 — ObjectModel** | JSObject/JSFunction/JSContext extraction (Section 29.5) | When preconditions met | ⏳ Deferred |
 | **External** | P4: WebAtoms.XF coordination | When external parties respond | ⏳ External |
 
 ---
