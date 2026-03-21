@@ -176,7 +176,7 @@ public partial class JSObject
                 r[r._length++] = new JSArray(new JSNumber(index), value);
         }
 
-        var vp = new PropertySequence.ValueEnumerator(obj, false);
+        var vp = new PropertyValueEnumerator(obj, false);
         while (vp.MoveNext(out var value, out var key))
             r[r._length++] = new JSArray(key.ToJSValue(), value);
 

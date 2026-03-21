@@ -893,7 +893,7 @@ public partial class JSArray
         }
 
         ref var elements = ref @this.GetElements();
-        elements.QuickSort(cx, 0, (uint)(length - 1));
+        elements.QuickSort((a, b) => cx((JSValue)a, (JSValue)b), 0, (uint)(length - 1));
 
         return @this;
     }

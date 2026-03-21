@@ -154,7 +154,7 @@ public partial class JSObject : JSValue
             }
 
             var ownProperties = GetOwnProperties();
-            var en = new PropertySequence.ValueEnumerator(this, false);
+            var en = new PropertyValueEnumerator(this, false);
 
             while (en.MoveNext(out var value, out var key))
                 yield return (KeyStrings.GetNameString(key.Key).Value, value);

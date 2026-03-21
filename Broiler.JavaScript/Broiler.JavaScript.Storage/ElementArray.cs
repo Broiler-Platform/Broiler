@@ -1,8 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core.Core.Function;
-using Broiler.JavaScript.Core.Core.Objects;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Core.Core.Storage;
 
@@ -13,9 +12,9 @@ public struct ElementArray
 
     public uint Length { get; private set; }
 
-    public void Put(uint index, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty) => Put(index) = JSProperty.Property(getter, setter, attributes);
+    public void Put(uint index, IPropertyAccessor getter, IPropertyAccessor setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty) => Put(index) = JSProperty.Property(getter, setter, attributes);
 
-    public void Put(uint index, JSValue value, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => Put(index) = JSProperty.Property(value, attributes);
+    public void Put(uint index, IPropertyValue value, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => Put(index) = JSProperty.Property(value, attributes);
 
     public ref JSProperty Put(uint index)
     {
@@ -68,7 +67,7 @@ public struct ElementArray
         }
     }
 
-    internal void QuickSort(Comparison<JSValue> comparer, uint start, uint end)
+    public void QuickSort(Comparison<IPropertyValue> comparer, uint start, uint end)
     {
         if (end - start < 30)
         {
@@ -78,7 +77,7 @@ public struct ElementArray
         }
 
         // Choose a random pivot.
-        uint pivotIndex = start + (uint)(JSMath.RandomNumber() * (end - start));
+        uint pivotIndex = start + (uint)(Random.Shared.NextDouble() * (end - start));
 
         // Get the pivot value.
         var pivotValue = this[pivotIndex];
@@ -92,7 +91,7 @@ public struct ElementArray
         uint newPivotIndex = start;
         for (uint i = start; i < end; i++)
         {
-            if (comparer((JSValue)this[i].value, (JSValue)pivotValue.value) <= 0)
+            if (comparer(this[i].value, pivotValue.value) <= 0)
             {
                 Swap(i, newPivotIndex);
                 newPivotIndex++;
@@ -117,19 +116,19 @@ public struct ElementArray
     /// <param name="comparer"> A comparison function. </param>
     /// <param name="start"> The first index in the range. </param>
     /// <param name="end"> The last index in the range. </param>
-    private void InsertionSort(Comparison<JSValue> comparer, uint start, uint end)
+    private void InsertionSort(Comparison<IPropertyValue> comparer, uint start, uint end)
     {
         for (uint i = start + 1; i <= end; i++)
         {
             var value = this[i];
             uint j;
-            for (j = i - 1; j > start && comparer((JSValue)this[j].value, (JSValue)value.value) > 0; j--)
+            for (j = i - 1; j > start && comparer(this[j].value, value.value) > 0; j--)
                 Put(j + 1) = this[j];
 
             // Normally the for loop above would continue until j < start but since we are
             // using uint it doesn't work when start == 0.  Therefore the for loop stops one
             // short of start then the extra loop iteration runs below.
-            if (j == start && comparer((JSValue)this[j].value, (JSValue)value.value) > 0)
+            if (j == start && comparer(this[j].value, value.value) > 0)
             {
                 Put(j + 1) = this[j];
                 j--;
