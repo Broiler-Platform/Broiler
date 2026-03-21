@@ -251,10 +251,12 @@ and interfaces every other assembly needs to interact with JavaScript values.
 - `IBuiltInRegistry` — built-in registration contract
 - `CoreScript` — high-level compile-and-evaluate API (factory-delegate-based)
 
-**Future Contents (deferred — see Section 26 for architectural assessment):**
+**Future Contents (deferred — see Section 26 for architectural assessment, Section 29.5 for action plan):**
 - `JSObject`, `JSFunction`, `JSContext`, `JSPrototype` — extraction deferred;
   concrete types intentionally remain in Core. Recommended via intermediate
   `Broiler.JavaScript.ObjectModel` assembly if pursued in the future.
+  Preconditions: P1 coverage targets, P2 integration tests, P2 BuiltIns
+  proof-of-concept must be completed first.
 
 **Design Rules:**
 - Depends on **Ast** (for `IPropertyValue`/`IPropertyAccessor`, `StringSpan`),
@@ -301,7 +303,8 @@ Intl, Generator, BigInt, DataView, WeakRef, etc.
   cross-references.
 - Each built-in type folder is a self-contained unit; future extraction into
   per-type assemblies (e.g., `BuiltIns.Promise`) is possible but not planned
-  for this phase.
+  for this phase. See Section 29.2 for the next batch of BuiltIns extraction
+  via factory delegate and interface abstraction patterns.
 
 ---
 
@@ -464,7 +467,7 @@ Each extraction phase follows the same steps:
 
 ### Milestone 3 — Interop Extraction (Phases 5–6)
 
-**Status:** Phase 5 ✅ complete; Phase 6 ⏳ partial (first batch extracted; remaining types structurally blocked)
+**Status:** Phase 5 ✅ complete; Phase 6 ⏳ partial (first batch extracted; remaining types structurally blocked — see Section 29.2 for action plan)
 
 **Deliverables:**
 - `Broiler.JavaScript.Clr` assembly ✅
@@ -481,6 +484,14 @@ Each extraction phase follows the same steps:
    (Clr import removed from generated code; multi-assembly generation verified
    via Network assembly pattern; each assembly needs its own `Names` class with
    `[JSRegistrationGenerator]`).
+
+**Remaining Phase 6 work (P2):**
+- [ ] Extract `JSDisposableStack` + `JSSuppressedError` via factory delegates
+  (Section 29.2).
+- [ ] Extract `JSDecimal` via factory delegates (Section 29.2).
+- [ ] Extract `JSIntl` family via factory delegates (Section 29.2).
+- [ ] Assess remaining candidates (JSArray, JSString, etc.) after initial
+  extractions prove the pattern at scale.
 
 **Key Metrics:**
 - `Broiler.JavaScript.Clr` compiles independently with zero errors. ✅
@@ -522,7 +533,7 @@ Each extraction phase follows the same steps:
 
 ### Milestone 5 — Runtime Extraction and `InternalsVisibleTo` Elimination (Phases 9–10)
 
-**Status:** Phase 10 ✅ complete; Phase 9a ✅ complete; Phase 9b ✅ complete; Phase 9c ✅ complete; Phase 9c+ ✅ complete; Phase 9d ✅ complete; concrete type extraction deferred (see Section 26)
+**Status:** Phase 10 ✅ complete; Phase 9a ✅ complete; Phase 9b ✅ complete; Phase 9c ✅ complete; Phase 9c+ ✅ complete; Phase 9d ✅ complete; concrete type extraction deferred (see Sections 26, 29.5)
 
 **Phase 9 — Runtime Extraction:**
 - [x] Move `IJSModuleResolver` to Runtime. ✅ (2026-03-20)
@@ -554,7 +565,8 @@ Each extraction phase follows the same steps:
 - [x] Phase 9d: Wire `CoreScript` factory delegates via `[ModuleInitializer]`
   in `CoreScriptCoreExtensions`. ✅ (2026-03-21)
 - [ ] *(Deferred)* Move `JSObject`, `JSFunction`, `JSContext` concrete types
-  to Runtime. ⏳ See Section 26 for architectural assessment.
+  to Runtime. ⏳ See Section 26 for architectural assessment; Section 29.5
+  for action plan and preconditions.
 - [x] Move remaining contract interfaces (`IBuiltInRegistry`, `IClrInterop`,
   `IDebugger`, `IJSCompiler`) to Runtime. ✅ `IBuiltInRegistry` unblocked via
   `IJSContext` interface abstraction (Phase 9c+, 2026-03-21).
@@ -818,7 +830,7 @@ The refactor is complete when:
 | # | Criterion | Status |
 |---|-----------|--------|
 | 1 | Core decomposed into separate assemblies | ✅ 8 of 11 target assemblies extracted (Ast, Parser, Storage, Debugger, Clr, BuiltIns, Compiler, Modules). Runtime assembly contains all base types (`JSValue`, `Arguments`, `PropertyKey`, `CoreScript`), all contract interfaces (`IJSContext`, `IJSFunction`, `IDebugger`, `IClrInterop`, `IJSCompiler`, `ICodeCache`, `IBuiltInRegistry`), and interface abstractions (`IJSPrototype`, `IJSSymbol`). Concrete implementation types (`JSObject`, `JSContext`, `JSFunction`) intentionally remain in Core per architectural assessment (Section 26). All storage types fully migrated to Storage assembly. 31 `TypeForwardedTo` attributes maintain backward compatibility. |
-| 2 | Each assembly has test project with ≥ 90% coverage | ✅ All 10 assemblies have dedicated test projects (998 tests total across 10 projects). Coverage measurement integrated into CI via `coverlet.collector`. |
+| 2 | Each assembly has test project with ≥ 90% coverage | ⏳ All 10 assemblies have dedicated test projects (998 tests total across 10 projects). Coverage measurement integrated into CI via `coverlet.collector`. Coverage thresholds not yet enforced — see Section 29.1 for action plan. |
 | 3 | All existing Core.Tests pass | ✅ 641 Core.Tests pass (verified 2026-03-21). |
 | 4 | Downstream consumers build correctly | ✅ Explicit satellite assembly references added to `Broiler.Cli` and `Broiler.App`. `Broiler.JavaScript.All` meta-package available for convenience. |
 | 5 | No `InternalsVisibleTo` migration bridges | ✅ All migration bridges eliminated — Debugger (Phase 4), Clr (Phase 10), Compiler (Phase 10). Only `Core.Tests` (test access), `Runtime` (dynamic assembly), and `WebAtoms.XF` (external) entries remain. |
@@ -2225,13 +2237,14 @@ The primary blocker is a circular dependency between Runtime and Storage:
 - [x] Update `InternalsVisibleTo` in Runtime for all satellite assemblies. ✅ (2026-03-21)
 - [x] Fix JSValueBuilder reflection for changed field types (`IJSPrototype`, `IJSSymbol`). ✅ (2026-03-21)
 - [x] Run full test suite — all 998 tests pass. ✅ (2026-03-21)
-- [ ] Move `JSObject`, `JSFunction`, `JSContext` to Runtime (Phase 9c — future work).
-- [ ] Move `CoreScript` to Runtime (Phase 9c — future work; `Bootstrap` does not exist).
+- [ ] Move `JSObject`, `JSFunction`, `JSContext` to Runtime (deferred — see
+  Section 26 for architectural assessment; Section 29.5 for action plan).
+- [x] Move `CoreScript` to Runtime ✅ (2026-03-21, Phase 9d — via factory delegates).
 - [x] Move contract interfaces (`IClrInterop`, `IDebugger`, `IJSCompiler`) to
   Runtime ✅ (2026-03-21). `ICodeCache`, `JSCode`, `JSCodeCompiler` also moved.
   `IBuiltInRegistry` resolved in Phase 9c+ via `IJSContext` abstraction.
 - [x] Move `IBuiltInRegistry` to Runtime ✅ (2026-03-21, Phase 9c+ — via `IJSContext` interface).
-- [ ] Update downstream consumer docs (Section 11).
+- [ ] Update downstream consumer docs (Section 11) — tracked in Section 29.4.
 
 ### Contracts to Move
 
@@ -3886,18 +3899,18 @@ All **747** tests pass across 7 test projects:
 
 ### Remaining Work (Phase 9c continued)
 
-| Task | Status | Blocked By |
-|------|--------|------------|
-| Move `JSObject` to Runtime | ⏳ Deferred | ~500+ file references; 22 subtypes cascade; see Section 26 |
-| Move `JSFunction` to Runtime | ⏳ Deferred | Depends on `JSObject` move |
-| Move `JSContext` to Runtime | ⏳ Deferred | Depends on `JSObject`/`JSFunction` moves |
-| Move `JSPrototype`, `JSSymbol` to Runtime | ⏳ Deferred | Depends on `JSObject` move |
-| Move `CoreScript` to Runtime | ✅ Complete | Completed in Phase 9d (2026-03-21) |
-| Move `IBuiltInRegistry` to Runtime | ✅ Complete | Resolved in Phase 9c+ via `IJSContext` (Section 24) |
-| Create `IJSFunction` interface | ✅ Complete | Completed in Phase 9d (2026-03-21) |
-| Extend `IJSContext` with `CodeCache`/`WaitTask` | ✅ Complete | Completed in Phase 9d (2026-03-21) |
-| Additional BuiltIns extraction | ⏳ Blocked | Dependency-direction coupling; see Section 27 |
-| `InternalsVisibleTo` final cleanup | ✅ Complete | All migration bridges removed (Phase 10) |
+| Task | Status | Blocked By | Action Plan |
+|------|--------|------------|-------------|
+| Move `JSObject` to Runtime | ⏳ Deferred | ~500+ file references; 22 subtypes cascade; see Section 26 | Section 29.5 |
+| Move `JSFunction` to Runtime | ⏳ Deferred | Depends on `JSObject` move | Section 29.5 |
+| Move `JSContext` to Runtime | ⏳ Deferred | Depends on `JSObject`/`JSFunction` moves | Section 29.5 |
+| Move `JSPrototype`, `JSSymbol` to Runtime | ⏳ Deferred | Depends on `JSObject` move | Section 29.5 |
+| Move `CoreScript` to Runtime | ✅ Complete | Completed in Phase 9d (2026-03-21) | — |
+| Move `IBuiltInRegistry` to Runtime | ✅ Complete | Resolved in Phase 9c+ via `IJSContext` (Section 24) | — |
+| Create `IJSFunction` interface | ✅ Complete | Completed in Phase 9d (2026-03-21) | — |
+| Extend `IJSContext` with `CodeCache`/`WaitTask` | ✅ Complete | Completed in Phase 9d (2026-03-21) | — |
+| Additional BuiltIns extraction | ⏳ Scheduled | Dependency-direction coupling; see Section 27 | Section 29.2 |
+| `InternalsVisibleTo` final cleanup | ✅ Complete | All migration bridges removed (Phase 10) | — |
 
 ### Open Questions and Design Clarifications
 
@@ -4050,18 +4063,18 @@ All **747** tests pass across 7 test projects:
 
 ### Updated Remaining Work
 
-| Task | Status | Notes |
-|------|--------|-------|
-| Move `IBuiltInRegistry` to Runtime | ✅ | Unblocked via `IJSContext` abstraction |
-| Move contract interfaces to Runtime | ✅ | All contract interfaces now in Runtime |
-| Move `CoreScript` to Runtime | ✅ | Completed in Phase 9d via factory delegates (2026-03-21) |
-| Create `IJSFunction` interface | ✅ | Completed in Phase 9d; `JSFunction` implements it (2026-03-21) |
-| Extend `IJSContext` interface | ✅ | `CodeCache` and `WaitTask` added in Phase 9d (2026-03-21) |
-| Move `JSObject` to Runtime | ⏳ Deferred | ~500+ file references; 22 subtypes would cascade; see Section 26 |
-| Move `JSFunction` to Runtime | ⏳ Deferred | Depends on `JSObject` move; concrete type stays in Core |
-| Move `JSContext` to Runtime | ⏳ Deferred | Depends on `JSObject`/`JSFunction`; concrete type stays in Core |
-| Additional BuiltIns extraction | ⏳ Blocked | Dependency-direction coupling; see Section 27 |
-| `InternalsVisibleTo` final cleanup | ✅ Complete | All migration bridges removed (Phase 10) |
+| Task | Status | Notes | Action Plan |
+|------|--------|-------|-------------|
+| Move `IBuiltInRegistry` to Runtime | ✅ | Unblocked via `IJSContext` abstraction | — |
+| Move contract interfaces to Runtime | ✅ | All contract interfaces now in Runtime | — |
+| Move `CoreScript` to Runtime | ✅ | Completed in Phase 9d via factory delegates (2026-03-21) | — |
+| Create `IJSFunction` interface | ✅ | Completed in Phase 9d; `JSFunction` implements it (2026-03-21) | — |
+| Extend `IJSContext` interface | ✅ | `CodeCache` and `WaitTask` added in Phase 9d (2026-03-21) | — |
+| Move `JSObject` to Runtime | ⏳ Deferred | ~500+ file references; 22 subtypes would cascade; see Section 26 | Section 29.5 |
+| Move `JSFunction` to Runtime | ⏳ Deferred | Depends on `JSObject` move; concrete type stays in Core | Section 29.5 |
+| Move `JSContext` to Runtime | ⏳ Deferred | Depends on `JSObject`/`JSFunction`; concrete type stays in Core | Section 29.5 |
+| Additional BuiltIns extraction | ⏳ Scheduled | Dependency-direction coupling; see Section 27 | Section 29.2 |
+| `InternalsVisibleTo` final cleanup | ✅ Complete | All migration bridges removed (Phase 10) | — |
 
 ### Recommended Next Steps
 
@@ -4301,6 +4314,8 @@ separation of concerns with unidirectional dependencies and no circular
 references**. The Runtime assembly contains all base types, contracts, and
 interfaces needed by satellite assemblies. The concrete implementation types
 remain in Core as an intentional architectural decision, not a limitation.
+**Section 29.5 provides a detailed action plan** with preconditions and subtasks
+if this extraction is pursued in the future.
 
 ---
 
@@ -4388,7 +4403,9 @@ architecture. The 6 types already extracted (Events + Weak) represent all types
 that had zero back-references from Core or Compiler. Further extraction requires
 architectural changes (factory delegates, interface abstractions) that are
 individually feasible but collectively represent significant refactoring effort.
-This is documented as a future improvement opportunity, not a current blocker.
+**Section 29.2 provides a prioritized action plan** for the next batch of
+extractions (JSDisposableStack, JSDecimal, JSIntl), starting with the
+lowest-effort candidates.
 
 ---
 
@@ -4450,28 +4467,273 @@ Satellite assemblies (all → Core, no reverse deps):
 
 ### Phase Completion Summary
 
-| Phase | Assembly | Status | Completion |
-|-------|----------|--------|------------|
-| 1 | Ast | ✅ Complete | 2026-03-19 |
-| 2 | Parser | ✅ Complete | 2026-03-19 |
-| 3 | Storage | ✅ Complete | 2026-03-21 |
-| 4 | Debugger | ✅ Complete | 2026-03-19 |
-| 5 | Clr | ✅ Complete | 2026-03-20 |
-| 6 | BuiltIns | ⏳ Partial | 2026-03-20 |
-| 7 | Compiler | ✅ Complete | 2026-03-20 |
-| 8 | Modules | ✅ Complete | 2026-03-20 |
-| 9a | Storage types | ✅ Complete | 2026-03-21 |
-| 9b | Value types | ✅ Complete | 2026-03-21 |
-| 9c | Contract interfaces | ✅ Complete | 2026-03-21 |
-| 9c+ | IJSContext abstraction | ✅ Complete | 2026-03-21 |
-| 9d | CoreScript + IJSFunction | ✅ Complete | 2026-03-21 |
-| 10 | Cleanup | ✅ Complete | 2026-03-20 |
+| Phase | Assembly | Status | Completion | Next Steps |
+|-------|----------|--------|------------|------------|
+| 1 | Ast | ✅ Complete | 2026-03-19 | — |
+| 2 | Parser | ✅ Complete | 2026-03-19 | — |
+| 3 | Storage | ✅ Complete | 2026-03-21 | — |
+| 4 | Debugger | ✅ Complete | 2026-03-19 | — |
+| 5 | Clr | ✅ Complete | 2026-03-20 | — |
+| 6 | BuiltIns | ⏳ Partial | 2026-03-20 | P2: Extract JSDisposableStack, JSDecimal via factory delegates (Section 29.2) |
+| 7 | Compiler | ✅ Complete | 2026-03-20 | — |
+| 8 | Modules | ✅ Complete | 2026-03-20 | — |
+| 9a | Storage types | ✅ Complete | 2026-03-21 | — |
+| 9b | Value types | ✅ Complete | 2026-03-21 | — |
+| 9c | Contract interfaces | ✅ Complete | 2026-03-21 | — |
+| 9c+ | IJSContext abstraction | ✅ Complete | 2026-03-21 | — |
+| 9d | CoreScript + IJSFunction | ✅ Complete | 2026-03-21 | — |
+| 10 | Cleanup | ✅ Complete | 2026-03-20 | — |
+| — | Coverage | ⏳ Measuring | — | P1: Review reports, enforce thresholds (Section 29.1) |
+| — | Integration tests | 📋 Planned | — | P2: Create Integration.Tests project (Section 29.3) |
+| — | ObjectModel | ⏳ Deferred | — | P3: If needed, extract JSObject hierarchy (Section 29.5) |
 
 ### Open Items
 
-| Item | Status | Notes |
-|------|--------|-------|
-| Phase 6 continued extraction | ⏳ Blocked | Dependency-direction coupling; see Section 27 |
-| JSObject/JSFunction/JSContext extraction | ⏳ Deferred | See Section 26; requires ObjectModel assembly |
-| `WebAtoms.XF` InternalsVisibleTo | ⏳ External | Cannot remove without external coordination |
-| Coverage ≥ 90% per assembly | ⏳ Measuring | `coverlet.collector` integrated; CI collects data |
+| Item | Status | Priority | Notes |
+|------|--------|----------|-------|
+| Phase 6 continued extraction | ⏳ Scheduled | P2 | Dependency-direction coupling; factory delegate + interface patterns identified; see Section 27 and Section 29 |
+| JSObject/JSFunction/JSContext extraction | ⏳ Deferred | P3 | See Section 26; requires ObjectModel assembly; not blocking any current work |
+| `WebAtoms.XF` InternalsVisibleTo | ⏳ External | P4 | Cannot remove without external coordination; document deprecation timeline |
+| Coverage ≥ 90% per assembly | ⏳ Scheduled | P1 | `coverlet.collector` integrated; CI collects data; review and improve per Section 29 |
+| Integration test project | 📋 Planned | P2 | `Broiler.JavaScript.Integration.Tests` mentioned in Section 6.5 but not yet created |
+| Downstream consumer migration docs | ⏳ Scheduled | P2 | Section 11 needs verification pass; unchecked item from Phase 9b checklist |
+
+---
+
+## 29. Future and Deferred Work — Action Plan (2026-03-21)
+
+### Overview
+
+This section consolidates all future, deferred, and blocked items from the
+refactor roadmap into an actionable plan with prioritized subtasks, milestones,
+and clear ownership guidance. Each item is broken into concrete next steps so
+that any contributor can pick up the work.
+
+### Priority Definitions
+
+| Priority | Meaning | Timeline |
+|----------|---------|----------|
+| **P1** | High — enables quality/correctness goals | Next milestone |
+| **P2** | Medium — improves architecture, unblocks future work | 1–2 milestones |
+| **P3** | Low — nice-to-have, large scope, no current blocker | Future, as capacity allows |
+| **P4** | External — depends on third-party coordination | When external parties respond |
+
+---
+
+### 29.1 P1 — Test Coverage Improvement
+
+**Current state:** All 10 assemblies have dedicated test projects (998 tests
+total). `coverlet.collector` is integrated into CI, but coverage thresholds
+have not been enforced and coverage reports have not been reviewed per-assembly.
+
+**Goal:** ≥ 90% line coverage per extracted assembly (Success Criterion #2).
+
+**Actionable subtasks:**
+
+- [ ] Review `coverlet` CI output and generate per-assembly coverage reports.
+- [ ] Identify assemblies below 90% line coverage and prioritize gap areas.
+- [ ] Add tests for uncovered branches in Runtime assembly (currently 20 tests
+  covering 24 source files — likely below 90%).
+- [ ] Add tests for uncovered branches in BuiltIns assembly (currently 16 tests
+  covering 6 source files).
+- [ ] Add tests for uncovered branches in Compiler assembly (currently 9 tests).
+- [ ] Add tests for uncovered branches in Modules assembly (currently 9 tests).
+- [ ] Configure CI to fail on coverage regression (optional — add
+  `coverlet` threshold configuration to test projects or CI workflow).
+- [ ] Update Success Criteria table (Section 8) when ≥ 90% is achieved.
+
+**Validation:** CI coverage report shows ≥ 90% line coverage for each assembly.
+
+---
+
+### 29.2 P2 — Phase 6 Continued: BuiltIns Extraction via Factory Delegates
+
+**Current state:** 6 types extracted (EventTarget, Event, CustomEvent,
+DomEventHandler, JSWeakRef, JSFinalizationRegistry). Remaining types blocked
+by dependency-direction coupling (Section 27). Two proven patterns exist:
+factory delegates (Phase 9d) and interface abstractions (Phase 9b/9c).
+
+**Goal:** Extract additional built-in types to BuiltIns assembly by replacing
+direct type references in Core/Compiler with factory delegates or interfaces.
+
+**Actionable subtasks (ordered by estimated effort, lowest first):**
+
+- [ ] **JSDisposableStack** (estimated 2–3 hours):
+  - Create `IJSDisposableStack` interface in Runtime.
+  - Replace 3 direct references in Compiler (`FastFunctionScope.cs`,
+    `FastCompiler.VisitProgram.cs`, `FastCompiler.VisitVariableDeclaration.cs`)
+    with factory delegate `Func<IJSContext, IJSDisposableStack>`.
+  - Wire factory via `[ModuleInitializer]` in BuiltIns.
+  - Move `JSDisposableStack` and `JSSuppressedError` to BuiltIns.
+  - Add tests to BuiltIns.Tests.
+
+- [ ] **JSDecimal** (estimated 2–3 hours):
+  - Create factory delegate `Func<decimal, JSValue>` in Runtime (e.g.,
+    `JSValue.CreateDecimal`).
+  - Replace 6 `is JSDecimal` type checks in `JSMath.cs` with registered
+    type identity check via type registry or `JSValue` virtual method.
+  - Replace `JSDecimalBuilder.New()` in Compiler with factory delegate.
+  - Wire factory via `[ModuleInitializer]` in BuiltIns.
+  - Move `JSDecimal` to BuiltIns.
+  - Add tests to BuiltIns.Tests.
+
+- [ ] **JSIntl / JSIntlDateTimeFormat / JSIntlRelativeTimeFormat**
+  (estimated 3–4 hours):
+  - Replace `JSGlobal.cs` type registration with factory delegate pattern.
+  - Replace `JSDatePrototype.cs` direct `JSIntlDateTimeFormat.Get` call with
+    factory delegate.
+  - Move all three types to BuiltIns.
+  - Add tests to BuiltIns.Tests.
+
+- [ ] **Remaining BuiltIns candidates** (estimated 1–2 days for all):
+  - Audit each remaining type (JSArray, JSString, JSNumber, JSError, JSPromise,
+    JSRegExp, JSProxy, JSJSON, DataView) for feasibility using factory/interface
+    patterns.
+  - For types with many type checks (JSArray: 13, JSString: 8, JSRegExp: 7):
+    consider registration-based type identity checks via a central type registry.
+  - Document which types remain impractical to extract and why.
+
+**Validation:** Each extracted type compiles independently in BuiltIns; all 998+
+tests pass; no reverse dependencies (Core/Compiler → BuiltIns) introduced.
+
+**Milestone target:** Complete JSDisposableStack and JSDecimal extraction as
+proof-of-concept; assess remaining candidates based on results.
+
+---
+
+### 29.3 P2 — Integration Test Project
+
+**Current state:** Section 6.5 mentions a `Broiler.JavaScript.Integration.Tests`
+project for tests that span multiple assemblies, but it has not been created.
+Currently, cross-assembly integration is validated through `Core.Tests` (641
+tests).
+
+**Goal:** Create a dedicated integration test project to validate end-to-end
+behavior across assembly boundaries.
+
+**Actionable subtasks:**
+
+- [ ] Create `Broiler.JavaScript.Integration.Tests` project referencing all
+  engine assemblies (Core, Runtime, Storage, Compiler, Modules, BuiltIns, Clr,
+  Debugger).
+- [ ] Add to `Broiler.slnx` and CI workflow.
+- [ ] Migrate or duplicate key integration-style tests from `Core.Tests` that
+  exercise cross-assembly boundaries (e.g., script compilation → execution →
+  built-in object interaction).
+- [ ] Add tests for module initializer registration ordering.
+- [ ] Add tests for factory delegate wiring (ensure `CoreScript` delegates,
+  `JSValue` delegates, `PropertySequence` delegates are correctly wired).
+- [ ] Add tests for `TypeForwardedTo` backward compatibility (ensure types
+  resolve correctly through Core even though they live in Runtime/Storage).
+
+**Validation:** Integration.Tests project compiles and all tests pass on all
+3 CI platforms.
+
+---
+
+### 29.4 P2 — Downstream Consumer Migration Documentation
+
+**Current state:** Section 11 documents migration steps for downstream consumers.
+`Broiler.App` and `Broiler.Cli` have been updated to use the `All` meta-package.
+However, the documentation has not been verified end-to-end after Phase 9d
+changes.
+
+**Actionable subtasks:**
+
+- [ ] Verify Section 11 migration steps are accurate for current assembly
+  structure (post-Phase 9d).
+- [ ] Update consumer analysis table with current reference state.
+- [ ] Add migration notes for consumers that use `CoreScript` API (factory
+  delegates must be initialized via module initializer).
+- [ ] Document `TypeForwardedTo` behavior: consumers referencing types via Core
+  namespace continue to work transparently.
+- [ ] Add troubleshooting guide for common migration issues (e.g., missing
+  module initializer registration, `FileNotFoundException` for satellite
+  assemblies).
+
+**Validation:** A clean consumer project can build against the refactored
+assembly structure following only the documented steps.
+
+---
+
+### 29.5 P3 — JSObject/JSFunction/JSContext Extraction (ObjectModel Assembly)
+
+**Current state:** Concrete types intentionally remain in Core per architectural
+assessment (Section 26). The primary refactor goal (clean separation via
+interfaces) has been achieved. This item is deferred, not blocked.
+
+**Goal:** If pursued, create `Broiler.JavaScript.ObjectModel` assembly as an
+intermediate layer between Runtime and Core.
+
+**Preconditions (must be met before starting):**
+
+- [ ] P1 coverage targets achieved (to ensure regression safety).
+- [ ] P2 integration test project created (to validate cross-assembly behavior).
+- [ ] P2 BuiltIns extraction proof-of-concept completed (validates factory
+  delegate pattern at scale).
+
+**Actionable subtasks (if/when pursued):**
+
+- [ ] Create `Broiler.JavaScript.ObjectModel` project.
+- [ ] Audit all `internal` members on `JSObject` accessed by satellite
+  assemblies; make public or provide interface abstractions.
+- [ ] Move leaf subtypes first (e.g., `JSDate`, `JSMath`) to ObjectModel as a
+  pilot.
+- [ ] Move `JSObject` base class to ObjectModel.
+- [ ] Move `JSFunction` and `JSContext` to ObjectModel.
+- [ ] Move remaining 22 subtypes to ObjectModel.
+- [ ] Update all 500+ file references.
+- [ ] Add `TypeForwardedTo` attributes in Core for all moved types.
+- [ ] Run full test suite; verify zero regressions.
+
+**Estimated effort:** 3–5 engineering days, high regression risk.
+
+**Decision criteria:** Only pursue if a concrete downstream need arises (e.g.,
+a consumer needs to depend on `JSObject` without pulling in all of Core).
+Current interface-based architecture satisfies all known requirements.
+
+---
+
+### 29.6 P4 — WebAtoms.XF InternalsVisibleTo Removal
+
+**Current state:** `WebAtoms.XF` is an external consumer with an
+`InternalsVisibleTo` entry in Core's `AssemblyInfo.cs`. Cannot be removed
+without external coordination.
+
+**Actionable subtasks:**
+
+- [ ] Contact `WebAtoms.XF` maintainers to discuss migration timeline.
+- [ ] Provide migration guide listing all internal APIs used by `WebAtoms.XF`
+  and their public replacements (many were already made public in Phase 10).
+- [ ] Set deprecation timeline (e.g., 2 release cycles).
+- [ ] After confirmation from external team, remove `InternalsVisibleTo` entry.
+- [ ] Verify `WebAtoms.XF` builds against public API only.
+
+**Decision criteria:** External coordination required. If no response within
+deprecation timeline, document the entry as permanently retained with
+justification.
+
+---
+
+### 29.7 Deferred Design Decisions
+
+The following design decisions were identified during the refactor but are not
+currently actionable. They are documented here for future reference.
+
+| Decision | Context | Current Status | When to Revisit |
+|----------|---------|----------------|-----------------|
+| Per-type BuiltIns assemblies (e.g., `BuiltIns.Promise`) | Section 3.6 — each built-in folder is self-contained | Not planned | Only if consumers need fine-grained dependency control |
+| Registration-based type identity checks | Section 27 — alternative to `is JSDecimal` etc. | Design proposed, not implemented | When BuiltIns extraction requires replacing type checks at scale |
+| `Bootstrap` class creation | Section 23 — does not exist in repo | Not needed | N/A — `IBuiltInRegistry` + `DefaultBuiltInRegistry` handles bootstrap |
+| Compiler factory delegate refactor | Section 27 — replace direct type refs in Compiler | Proven pattern exists (Phase 9d) | When JSDisposableStack extraction begins |
+
+---
+
+### 29.8 Milestone Summary
+
+| Milestone | Items | Target | Status |
+|-----------|-------|--------|--------|
+| **Next (Quality)** | P1: Coverage improvement | Next PR cycle | 📋 Planned |
+| **Near-term (Architecture)** | P2: BuiltIns extraction (JSDisposableStack, JSDecimal), Integration tests, Docs update | 1–2 PR cycles | 📋 Planned |
+| **Future (Full extraction)** | P3: ObjectModel assembly | When preconditions met | ⏳ Deferred |
+| **External** | P4: WebAtoms.XF coordination | When external parties respond | ⏳ External |
