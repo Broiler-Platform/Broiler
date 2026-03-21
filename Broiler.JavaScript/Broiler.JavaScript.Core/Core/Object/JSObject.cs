@@ -386,13 +386,13 @@ public partial class JSObject : JSValue
             ref var p = ref ownProperties.GetValue(key.Key);
             if (p.IsValue)
             {
-                var g = p.get;
+                var g = (JSFunction)p.get;
                 if (g != null)
                     return g.f;
             }
 
             if (p.IsProperty)
-                return p.get.f;
+                return ((JSFunction)p.get).f;
         }
 
         return prototypeChain?.GetMethod(key);
@@ -412,7 +412,7 @@ public partial class JSObject : JSValue
         {
             if (p.set != null)
             {
-                p.set.f(new Arguments(receiver ?? this, value));
+                ((JSFunction)p.set).f(new Arguments(receiver ?? this, value));
                 return true;
             }
 
@@ -468,7 +468,7 @@ public partial class JSObject : JSValue
         {
             if (p.set != null)
             {
-                p.set.f(new Arguments(receiver ?? this, value));
+                ((JSFunction)p.set).f(new Arguments(receiver ?? this, value));
                 return true;
             }
 
@@ -505,7 +505,7 @@ public partial class JSObject : JSValue
         {
             if (p.set != null)
             {
-                p.set.f(new Arguments(receiver ?? this, value));
+                ((JSFunction)p.set).f(new Arguments(receiver ?? this, value));
                 return true;
             }
 
@@ -549,9 +549,9 @@ public partial class JSObject : JSValue
         if (!p.IsEmpty)
         {
             if (p.IsValue)
-                return p.value;
+                return (JSValue)p.value;
 
-            return p.get.InvokeFunction(new Arguments(receiver ?? this));
+            return ((JSFunction)p.get).InvokeFunction(new Arguments(receiver ?? this));
         }
 
         return base.GetValue(key, receiver, throwError);

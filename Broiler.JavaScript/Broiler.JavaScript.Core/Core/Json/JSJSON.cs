@@ -212,11 +212,11 @@ public partial class JSJSON : JSObject
                 if (value.get == null)
                     continue;
 
-                jsValue = value.get.f(new Arguments(target));
+                jsValue = ((JSFunction)value.get).f(new Arguments(target));
             }
             else
             {
-                jsValue = value.value;
+                jsValue = (JSValue)value.value;
             }
 
             if (jsValue.IsUndefined || jsValue is JSFunction)

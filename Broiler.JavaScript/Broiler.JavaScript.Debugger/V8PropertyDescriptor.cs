@@ -40,10 +40,10 @@ public class V8PropertyDescriptor
         }
 
         if (p.get != null)
-            Get = new V8RemoteObject(p.get);
+            Get = new V8RemoteObject((JSValue)p.get);
 
         if (p.set != null)
-            Set = new V8RemoteObject(p.set);
+            Set = new V8RemoteObject((JSValue)p.set);
     }
 
     public string Name { get; set; }

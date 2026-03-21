@@ -294,7 +294,7 @@ public partial class JSGlobalStatic
                 if (!prop.IsValue)
                     continue;
 
-                clone[key.Value] = StructuredCloneValue(prop.value, seen);
+                clone[key.Value] = StructuredCloneValue((JSValue)prop.value, seen);
             }
 
             return clone;

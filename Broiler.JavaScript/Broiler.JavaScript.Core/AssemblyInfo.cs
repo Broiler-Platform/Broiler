@@ -19,3 +19,6 @@ using Broiler.JavaScript.Core.Core.Module;
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.KeyType))]
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.KeyString))]
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.KeyStrings))]
+
+// Type forwards for JSProperty moved to Broiler.JavaScript.Storage.
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.Storage.JSProperty))]

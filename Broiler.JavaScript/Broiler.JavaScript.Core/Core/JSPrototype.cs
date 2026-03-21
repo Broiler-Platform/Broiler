@@ -1,4 +1,5 @@
-﻿using Broiler.JavaScript.Core.Core.Storage;
+﻿using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 
@@ -124,11 +125,11 @@ public class JSPrototype
         if(p.IsValue)
         {
             if (p.get != null)
-                return p.get.f;
+                return ((JSFunction)p.get).f;
         }
         
         if (p.IsProperty)
-            return p.get.f;
+            return ((JSFunction)p.get).f;
         
         return null;
     }

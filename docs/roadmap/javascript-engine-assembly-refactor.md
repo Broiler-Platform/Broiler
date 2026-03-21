@@ -506,11 +506,12 @@ Each extraction phase follows the same steps:
 - [x] Move `IJSModuleResolver` to Runtime. ✅ (2026-03-20)
 - [x] Move `ExportAttribute` and `DefaultExportAttribute` to Runtime. ✅ (2026-03-20)
 - [x] Move `CancellableDisposableAction` to Runtime. ✅ (2026-03-20)
+- [x] Phase 9a: Move `JSProperty` to Storage with interface-typed fields
+  (`IPropertyValue`/`IPropertyAccessor`). ✅ (2026-03-20)
+- [ ] Phase 9a: Move `PropertySequence`, `ElementArray` to Storage. *Blocked —
+  method signatures depend on `JSValue`/`JSFunction`/`JSContext`.*
 - [ ] Phase 9a: Move `KeyString`/`KeyStrings` to Runtime (not Ast — blocked by
   `JSSymbol`/`JSValue`/`JSString` dependencies; deferred until after Phase 9b).
-- [ ] Phase 9a: Move `JSProperty`, `PropertySequence`, `ElementArray` to Storage
-  (with interface-typed fields). *Blocked until Phase 9b resolves the
-  `JSValue`/`JSFunction` dependency.*
 - [ ] Phase 9b: Move `JSValue`, `JSObject`, `JSFunction`, `JSContext`,
   `Arguments`, `CoreScript`, `Bootstrap` to Runtime.
 - [ ] Move remaining contract interfaces (`IBuiltInRegistry`, `IClrInterop`,
@@ -787,13 +788,13 @@ The refactor is complete when:
 |-------|----------|--------|------|----------|
 | 1 | Ast | ✅ Complete | 2026-03-19 | — |
 | 2 | Parser | ✅ Complete | 2026-03-19 | — |
-| 3 | Storage | ⏳ Partial | 2026-03-19 | `JSProperty`, `PropertySequence`, `ElementArray` depend on `JSValue`/`JSFunction` — blocked until Phase 9 (Runtime extraction). |
+| 3 | Storage | ⏳ Partial | 2026-03-20 | `JSProperty` moved ✅ (interface-typed fields); `PropertySequence`, `ElementArray` still depend on `JSValue`/`JSFunction`/`JSContext` in method signatures — blocked until Phase 9b. |
 | 4 | Debugger | ✅ Complete | 2026-03-19 | — |
 | 5 | Clr | ✅ Complete | 2026-03-20 | `InternalsVisibleTo` bridge **removed** ✅. |
 | 6 | BuiltIns | ⏳ Partial | 2026-03-20 | Deep structural coupling (JSArray 13, JSString 8, JSRegExp 7, JSError 6, JSPromise, JSProxy); internal field access (DataView, JSJSON, JSReflect). |
 | 7 | Compiler | ✅ Complete | 2026-03-20 | `InternalsVisibleTo` bridge **removed** ✅. |
 | 8 | Modules | ✅ Complete | 2026-03-20 | — |
-| 9 | Runtime | ⏳ In progress | 2026-03-20 | `IJSModuleResolver` + `ExportAttribute` + `DefaultExportAttribute` + `CancellableDisposableAction` moved; Phase 9b (JSValue/JSContext move) blocked by circular dependency between Runtime↔Storage; `KeyString` depends on `JSSymbol`/`JSValue`/`JSString` (see Section 10 feasibility analysis). Tracked by continuation issue (see Section 16). |
+| 9 | Runtime | ⏳ In progress | 2026-03-20 | `IJSModuleResolver` + `ExportAttribute` + `DefaultExportAttribute` + `CancellableDisposableAction` moved; `JSProperty` moved to Storage with interface-typed fields; Phase 9b (JSValue/JSContext move) blocked by circular dependency between Runtime↔Storage; `KeyString` depends on `JSSymbol`/`JSValue`/`JSString` (see Section 10 feasibility analysis). Tracked by continuation issue (see Section 16). |
 | 10 | Cleanup | ✅ Complete | 2026-03-20 | All migration bridges removed; meta-package created; downstream consumers updated; CI workflow created; coverlet coverage integrated. |
 
 ### Phase 1 — Ast Extraction ✅
@@ -2112,19 +2113,23 @@ The primary blocker is a circular dependency between Runtime and Storage:
 
 ### Phase 9 Task Checklist
 
-**Phase 9a — KeyString + Property Types (target: next iteration):**
+**Phase 9a — KeyString + Property Types:**
 
-- [ ] Move `KeyString` struct to `Broiler.JavaScript.Ast`.
-- [ ] Move `KeyStrings` static class to `Broiler.JavaScript.Ast`.
-- [ ] Add `TypeForwardedTo` attributes in Core for `KeyString`/`KeyStrings`.
-- [ ] Add `global using` alias in Core for namespace compatibility.
-- [ ] Convert `JSProperty.value` field from `JSValue` to `IPropertyValue`.
-- [ ] Convert `JSProperty.get`/`JSProperty.set` fields from `JSFunction` to
-  `IPropertyAccessor`.
-- [ ] Move `JSProperty`, `PropertySequence`, `ElementArray` to Storage.
-- [ ] Update all Storage.Tests to verify interface-typed fields.
-- [ ] Verify no circular dependencies with `dotnet list reference`.
-- [ ] Run full test suite (969+ tests) — all pass.
+- [x] Move `KeyString` struct to `Broiler.JavaScript.Storage` (originally planned
+  for Ast; moved to Storage to avoid circular dependency). ✅ (2026-03-20)
+- [x] Move `KeyStrings` static class to `Broiler.JavaScript.Storage`. ✅ (2026-03-20)
+- [x] Move `KeyType` enum to `Broiler.JavaScript.Storage`. ✅ (2026-03-20)
+- [x] Add `TypeForwardedTo` attributes in Core for `KeyString`/`KeyStrings`/`KeyType`. ✅ (2026-03-20)
+- [x] Convert `JSProperty.value` field from `JSValue` to `IPropertyValue`. ✅ (2026-03-20)
+- [x] Convert `JSProperty.get`/`JSProperty.set` fields from `JSFunction` to
+  `IPropertyAccessor`. ✅ (2026-03-20)
+- [x] Move `JSProperty` to Storage. ✅ (2026-03-20)
+- [x] Create `JSPropertyFactory` in Core for factory methods requiring `JSFunction`. ✅ (2026-03-20)
+- [x] Add `TypeForwardedTo` attribute in Core for `JSProperty`. ✅ (2026-03-20)
+- [x] Add explicit casts at ~30 field access sites across Core and Debugger. ✅ (2026-03-20)
+- [x] Run full test suite (998 tests) — all pass. ✅ (2026-03-20)
+- [ ] Move `PropertySequence`, `ElementArray` to Storage. *Blocked — method
+  signatures depend on `JSValue`/`JSFunction`/`JSContext`.*
 
 **Phase 9b — Value Type System (target: after 9a):**
 
@@ -2805,6 +2810,15 @@ Phase 10 (cleanup) have been completed.
 | `DefaultExportAttribute` | `Broiler.JavaScript.Core.Core.Module` | Core | 2026-03-20 |
 | `CancellableDisposableAction` | `Broiler.JavaScript.Core.Core` | Core | 2026-03-20 |
 
+### Current Storage Assembly Contents (Types Moved from Core)
+
+| Type | Namespace | Moved From | Date |
+|------|-----------|-----------|------|
+| `KeyType` | `Broiler.JavaScript.Core.Core` | Core | 2026-03-20 |
+| `KeyString` | `Broiler.JavaScript.Core.Core` | Core | 2026-03-20 |
+| `KeyStrings` | `Broiler.JavaScript.Core.Core` | Core | 2026-03-20 |
+| `JSProperty` | `Broiler.JavaScript.Core.Core.Storage` | Core | 2026-03-20 |
+
 All moved types have `TypeForwardedTo` attributes in Core for binary
 compatibility. Original namespaces are preserved for backward compatibility.
 
@@ -2820,7 +2834,8 @@ types move to Runtime, no other significant extraction can proceed:
 | Blocked Item | Depends On | Phase |
 |-------------|-----------|-------|
 | `KeyString`/`KeyStrings` → Runtime | `JSSymbol`, `JSString`, `JSValue` (Core types) | 9a |
-| `JSProperty`/`PropertySequence`/`ElementArray` → Storage | `JSValue`, `JSFunction`, `JSContext` (Core types) | 9a |
+| ~~`JSProperty`~~ → Storage | ~~`JSValue`, `JSFunction`~~ → `IPropertyValue`/`IPropertyAccessor` | ✅ 9a |
+| `PropertySequence`/`ElementArray` → Storage | `JSValue`, `JSFunction`, `JSContext` (Core types) in method signatures | 9a |
 | `IBuiltInRegistry` → Runtime | `JSContext` parameter type | 9b |
 | `IClrInterop` → Runtime | `JSValue` parameter/return types | 9b |
 | `IDebugger` → Runtime | `JSValue` parameter types | 9b |
@@ -2835,7 +2850,7 @@ The central architectural challenge for Phase 9b is:
 Runtime → Storage:  JSObject uses SAUint32Map<JSProperty>, PropertySequence,
                     StringMap<JSProperty> for property storage.
 
-Storage → Runtime:  JSProperty references JSValue, JSFunction, KeyString.
+Storage → Runtime:  JSProperty uses IPropertyValue/IPropertyAccessor (resolved ✅).
                     PropertySequence references JSContext, JSObject.
 ```
 
@@ -2864,7 +2879,8 @@ depend on `JSValue`, `JSContext`, or other Core types.
 |---|-----------|--------|-------------|-----------------|
 | 1 | Phase 9b — Move core value types to Runtime | ⏳ Not started | Circular dependency Runtime↔Storage; 500+ file references; API breakage risk | **High** — largest single extraction |
 | 2 | Phase 9a — Move KeyString/KeyStrings to Storage | ✅ **Complete** | Moved to Storage (not Ast) to avoid circular dependency | — |
-| 3 | Phase 9a — Move JSProperty/PropertySequence/ElementArray to Storage | ⏳ Blocked | Depends on Phase 9b; requires interface-typed fields | Medium |
+| 3 | Phase 9a — Move JSProperty to Storage | ✅ **Complete** | Moved with interface-typed fields (`IPropertyValue`/`IPropertyAccessor`); `JSPropertyFactory` in Core | — |
+| 3b | Phase 9a — Move PropertySequence/ElementArray to Storage | ⏳ Blocked | Method signatures depend on `JSValue`/`JSFunction`/`JSContext` | Medium |
 | 4 | Contract interfaces → Runtime | ⏳ Blocked | Depends on Phase 9b (JSValue/JSContext) | Low — 4 interfaces to move |
 | 5 | Phase 6 — Additional BuiltIns extraction | ⏳ Partially blocked | Deep structural coupling (JSArray 13, JSString 8, JSRegExp 7, JSError 6 type checks); internal field access (partially resolved: JSObject status methods now public) | High |
 | 6 | `InternalsVisibleTo` final cleanup | ⏳ | Remove remaining bridges after Phase 9 | Low |
@@ -2880,15 +2896,15 @@ depend on `JSValue`, `JSContext`, or other Core types.
 | **Meta-Package** | ✅ Complete | `Broiler.JavaScript.All` created; downstream consumers updated |
 | **Downstream Consumers** | ✅ Complete | `Broiler.App` and `Broiler.Cli` use `All` meta-package |
 | **Migration Bridges** | ✅ Complete | All `InternalsVisibleTo` migration bridges eliminated |
-| **TypeForwardedTo** | ✅ Active | 42 forwarding attributes in Core for binary compatibility |
+| **TypeForwardedTo** | ✅ Active | 43 forwarding attributes in Core for binary compatibility |
 | **Global Using** | ✅ Active | `Broiler.JavaScript.Ast`, `.Parser`, `.Storage` in Core's `GlobalUsings.cs` |
 | **External Consumer** | ⏳ Pending | `WebAtoms.XF` `InternalsVisibleTo` entry retained; needs external coordination |
 
 ### Verification (2026-03-20)
 
 All 10 production assemblies compile with zero errors.
-All **974** tests pass across 10 test projects:
-- Core: 641, Ast: 73, Parser: 78, Storage: 76, Debugger: 23, Clr: 29,
+All **998** tests pass across 10 test projects:
+- Core: 641, Ast: 73, Parser: 78, Storage: 100, Debugger: 23, Clr: 29,
   Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 20.
 
 ---
@@ -2985,19 +3001,121 @@ Verified that interface contracts are already implemented:
 
 ### TypeForwardedTo Count
 
-Updated to **42** forwarding attributes in Core AssemblyInfo.cs
-(39 existing + 3 new for KeyType, KeyString, KeyStrings).
+Updated to **43** forwarding attributes in Core AssemblyInfo.cs
+(39 existing + 3 for KeyType/KeyString/KeyStrings + 1 for JSProperty).
 
 ### Remaining Phase 9a/9b Work
 
 | # | Milestone | Status | Notes |
 |---|-----------|--------|-------|
 | 1 | KeyString/KeyStrings → Storage | ✅ **Complete** | Moved with extension methods for Core-dependent operations |
-| 2 | JSProperty/PropertySequence/ElementArray → Storage | ⏳ Blocked | Fields are concrete Core types (JSValue, JSFunction); requires interface-typed fields or Phase 9b |
-| 3 | Phase 9b — Move core value types to Runtime | ⏳ Not started | 500+ file references; API breakage risk |
-| 4 | Contract interfaces → Runtime | ⏳ Blocked | Depends on Phase 9b |
-| 5 | JSObject status methods → public | ✅ **Complete** | Unblocks JSReflect extraction |
-| 6 | JSProperty factory methods → public | ✅ **Complete** | Unblocks BuiltIns property manipulation |
+| 2 | JSProperty → Storage | ✅ **Complete** | Moved with interface-typed fields (`IPropertyValue`/`IPropertyAccessor`); `JSPropertyFactory` in Core for `JSFunction`-dependent factory methods |
+| 3 | PropertySequence/ElementArray → Storage | ⏳ Blocked | Method signatures depend on `JSValue`/`JSFunction`/`JSContext`; blocked until Phase 9b |
+| 4 | Phase 9b — Move core value types to Runtime | ⏳ Not started | 500+ file references; API breakage risk |
+| 5 | Contract interfaces → Runtime | ⏳ Blocked | Depends on Phase 9b |
+| 6 | JSObject status methods → public | ✅ **Complete** | Unblocks JSReflect extraction |
+| 7 | JSProperty factory methods → public | ✅ **Complete** | Unblocks BuiltIns property manipulation |
+
+---
+
+## 18. JSProperty Migration to Storage Assembly (2026-03-20)
+
+### Overview
+
+This iteration completes the JSProperty migration to the Storage assembly,
+resolving the circular dependency between Storage and Core for property
+descriptors. The `JSProperty` struct now uses interface-typed fields
+(`IPropertyValue`/`IPropertyAccessor` from the Ast assembly) instead of concrete
+Core types (`JSValue`/`JSFunction`).
+
+### Changes Made
+
+#### 1. JSProperty → Storage Assembly
+
+**File moved:** `Core/Storage/JSProperty.cs` → `Broiler.JavaScript.Storage/JSProperty.cs`
+
+**Field type changes:**
+| Field | Before | After |
+|-------|--------|-------|
+| `value` | `JSValue` (Core) | `IPropertyValue` (Ast) |
+| `get` | `JSFunction` (Core) | `IPropertyAccessor` (Ast) |
+| `set` | `JSFunction` (Core) | `IPropertyAccessor` (Ast) |
+
+All constructors updated to accept interface types. Implicit upcasting means
+callers constructing `JSProperty` instances with `JSValue`/`JSFunction` arguments
+require no changes.
+
+#### 2. JSPropertyFactory (New — Core)
+
+Factory methods that create `JSFunction` objects cannot live in Storage (no Core
+dependency). Extracted to `JSPropertyFactory` static class in
+`Core/Storage/JSPropertyFactory.cs`:
+
+- `JSPropertyFactory.Function(in KeyString, JSFunctionDelegate, ...)` — creates
+  function properties (was `JSProperty.Function()`)
+- `JSPropertyFactory.Property(in KeyString, JSFunctionDelegate, JSFunctionDelegate, ...)`
+  — creates accessor properties from delegates (was `JSProperty.Property()` overload)
+
+#### 3. Explicit Casts at Field Access Sites
+
+~30 field access sites across 10 files updated with downcasts where the consumer
+needs the concrete runtime type:
+
+```csharp
+// Before (JSProperty.value was JSValue)
+return p.value;
+p.set.f(new Arguments(receiver, value));
+
+// After (JSProperty.value is IPropertyValue)
+return (JSValue)p.value;
+((JSFunction)p.set).f(new Arguments(receiver, value));
+```
+
+**Files modified:**
+- `Core/Object/JSObject.cs` — `GetMethod()`, `SetValue()`, `GetValue()` methods
+- `Core/Array/JSArray.cs` — `GetArrayElements()`, enumerator methods
+- `Core/Array/JSArrayPrototype.cs` — `Pop()` method
+- `Core/JSPrototype.cs` — `GetMethod()` method
+- `Core/Global/JSGlobal.cs` — `StructuredCloneValue()` method
+- `Core/Json/JSJSON.cs` — stringify getter/value access
+- `Core/Objects/JSReflect.cs` — `Set()` method (3 overloads)
+- `Core/Storage/UIntMapArray.cs` — `QuickSort()`, `InsertionSort()` methods
+- `Extensions/JSPropertyExtensions.cs` — `GetValue()`, `ToJSValue()` methods
+- `Debugger/V8PropertyDescriptor.cs` — property descriptor construction
+
+#### 4. PropertySequence Update
+
+`PropertySequence.Put(KeyString, JSFunctionDelegate, JSFunctionDelegate, ...)`
+updated to use `JSPropertyFactory.Property()` instead of the removed
+`JSProperty.Property()` overload.
+
+#### 5. TypeForwardedTo
+
+Added `TypeForwardedTo(typeof(JSProperty))` in Core's `AssemblyInfo.cs` for
+binary compatibility. Total forwarding attributes: **43**.
+
+### Architecture Impact
+
+The circular dependency between Storage and Core for `JSProperty` is now
+**fully resolved**:
+
+```
+Before:  Storage → Core (JSProperty uses JSValue, JSFunction)
+After:   Storage → Ast  (JSProperty uses IPropertyValue, IPropertyAccessor)
+```
+
+This means `JSProperty` can now be referenced by any assembly that depends on
+Storage, without pulling in the full Core runtime type system.
+
+**Remaining circular dependency:** `PropertySequence` and `ElementArray` still
+have method signatures that reference `JSValue`/`JSFunction`/`JSContext`. These
+cannot move to Storage until Phase 9b resolves the value type system location.
+
+### Test Results
+
+All **998** tests pass across 10 test projects:
+- Core: 641, Ast: 73, Parser: 78, Storage: 100, Debugger: 23, Clr: 29,
+  Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 20.
 
 ---
 
