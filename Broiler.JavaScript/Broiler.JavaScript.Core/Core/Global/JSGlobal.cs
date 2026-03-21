@@ -3,7 +3,6 @@ using Broiler.JavaScript.Core.Core.Date;
 using System;
 using System.Threading;
 using System.Collections.Generic;
-using Broiler.JavaScript.Core.Core.Intl;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.Core.Core.Array.Typed;
 using Broiler.JavaScript.Core.Core.BigInt;
@@ -27,8 +26,14 @@ public partial class JSGlobalStatic
     [JSExport("NaN")]
     public static JSNumber NaN = JSNumber.NaN;
 
+    /// <summary>
+    /// Factory delegate for creating the Intl global object.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static Func<JSValue> IntlFactory { get; set; }
+
     [JSExport("Intl")]
-    public static JSValue Intl = JSContext.ClrInterop.GetClrType(typeof(JSIntl));
+    public static JSValue Intl => IntlFactory?.Invoke() ?? JSUndefined.Value;
 
     [JSExport("decodeURI", Length = 1)]
     public static JSValue DecodeURI(in Arguments a)

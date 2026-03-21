@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Intl;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Utils;
 using System;
@@ -11,6 +10,13 @@ public partial class JSDate
 {
     static long MinTime = DateTimeOffset.MinValue.ToUnixTimeMilliseconds();
     static long MaxTime = DateTimeOffset.MaxValue.ToUnixTimeMilliseconds();
+
+    /// <summary>
+    /// Factory delegate for formatting a date using Intl.DateTimeFormat.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// Signature: (CultureInfo culture, DateTimeOffset value, JSObject options) → JSValue
+    /// </summary>
+    internal static Func<CultureInfo, DateTimeOffset, JSObject, JSValue> IntlDateFormatter { get; set; }
 
     [JSExport(Length = 7)]
     JSDate(in Arguments a)
@@ -842,7 +848,8 @@ public partial class JSDate
                 {
                     if (format is JSObject obj)
                     {
-                        return JSIntlDateTimeFormat.Get(culture).Format(value, obj);
+                        if (IntlDateFormatter != null)
+                            return IntlDateFormatter(culture, value, obj);
                     }
                 }
             }
