@@ -4572,6 +4572,7 @@ Satellite assemblies (all → Core, no reverse deps):
 | Storage.Tests | 100 | ✅ Pass |
 | Parser.Tests | 78 | ✅ Pass |
 | Ast.Tests | 73 | ✅ Pass |
+| Integration.Tests | 42 | ✅ Pass |
 | Clr.Tests | 29 | ✅ Pass |
 | BuiltIns.Tests | 29 | ✅ Pass |
 | Debugger.Tests | 23 | ✅ Pass |
@@ -4579,7 +4580,7 @@ Satellite assemblies (all → Core, no reverse deps):
 | ModuleExtensions.Tests | 13 | ✅ Pass |
 | Compiler.Tests | 9 | ✅ Pass |
 | Modules.Tests | 9 | ✅ Pass |
-| **Total** | **1024** | **✅ All pass** |
+| **Total** | **1066** | **✅ All pass** |
 
 ### Phase Completion Summary
 
@@ -4601,19 +4602,20 @@ Satellite assemblies (all → Core, no reverse deps):
 | 10 | Cleanup | ✅ Complete | 2026-03-20 | — |
 | — | ModuleExtensions | ✅ Complete | 2026-03-21 | Namespace aligned, bugs fixed, 13-test project created (Section 30) |
 | — | Coverage | ⏳ Measuring | — | P1: Review reports, enforce thresholds (Section 29.1) |
-| — | Integration tests | 📋 Planned | — | P2: Create Integration.Tests project (Section 29.3) |
+| — | Integration tests | ✅ Complete | 2026-03-21 | 42-test `Integration.Tests` project created (Section 29.3) |
 | — | ObjectModel | ⏳ Deferred | — | P3: If needed, extract JSObject hierarchy (Section 29.5) |
 
 ### Open Items
 
 | Item | Status | Priority | Notes |
 |------|--------|----------|-------|
-| Phase 6 continued extraction | ✅ Complete | P2 | JSDisposableStack, JSDecimal, JSIntl extracted; remaining candidates assessed as impractical (Section 31) |
+| Phase 6 continued extraction | ✅ Complete | P2 | JSDisposableStack, JSDecimal, JSIntl extracted; remaining candidates assessed (Section 31, 35) |
 | JSObject/JSFunction/JSContext extraction | ⏳ Deferred | P3 | See Section 26; requires ObjectModel assembly; not blocking any current work |
 | `WebAtoms.XF` InternalsVisibleTo | ⏳ External | P4 | Cannot remove without external coordination; document deprecation timeline |
 | Coverage ≥ 90% per assembly | ⏳ Scheduled | P1 | `coverlet.collector` integrated; CI collects data; review and improve per Section 29 |
-| Integration test project | 📋 Planned | P2 | `Broiler.JavaScript.Integration.Tests` mentioned in Section 6.5 but not yet created |
-| Downstream consumer migration docs | ⏳ Scheduled | P2 | Section 11 needs verification pass; unchecked item from Phase 9b checklist |
+| Integration test project | ✅ Complete | P2 | 42-test `Broiler.JavaScript.Integration.Tests` created; CI integrated (Section 29.3) |
+| Downstream consumer migration docs | ✅ Complete | P2 | Section 11 verified and updated with CoreScript API notes, TypeForwardedTo docs (Section 29.4) |
+| P3 BuiltIns/Runtime finalization | ✅ Complete | P3 | Assessment and corrected analysis documented (Section 35) |
 
 ---
 
@@ -4662,6 +4664,12 @@ that any contributor can pick up the work.
   - Section 11 verified and updated with CoreScript API notes,
     TypeForwardedTo behavior documentation, and troubleshooting guide.
     See Section 29.4.
+- ✅ **P3 — BuiltIns/Runtime finalization assessment** (completed 2026-03-21):
+  - Corrected Names.g.cs source generator coupling analysis (JSProxy,
+    JSJSON, JSDataView ARE extractable via existing patterns).
+  - Comprehensive dependency audit of all remaining BuiltIns candidates.
+  - Concrete Runtime type extraction (ObjectModel) reconfirmed as deferred.
+  - See Section 35 for the full P3 assessment.
 
 ### Priority Definitions
 
@@ -4759,7 +4767,10 @@ direct type references in Core/Compiler with factory delegates or interfaces.
 tests pass; no reverse dependencies (Core/Compiler → BuiltIns) introduced. ✅
 
 **Milestone target:** ✅ Complete. JSDisposableStack, JSDecimal, and JSIntl
-extracted via factory delegates. Remaining candidates assessed as impractical.
+extracted via factory delegates. Remaining candidates assessed — high-coupling
+types (JSArray, JSString, JSNumber, JSError, JSPromise, JSRegExp) impractical;
+low-coupling types (JSProxy, JSJSON, JSDataView) extractable but deferred as
+low priority (see Section 35 for corrected P3 analysis).
 
 ---
 
@@ -4838,6 +4849,7 @@ assembly structure.
 **Current state:** Concrete types intentionally remain in Core per architectural
 assessment (Section 26). The primary refactor goal (clean separation via
 interfaces) has been achieved. This item is deferred, not blocked.
+P3 assessment completed (2026-03-21) — see Section 35 for full analysis.
 
 **Goal:** If pursued, create `Broiler.JavaScript.ObjectModel` assembly as an
 intermediate layer between Runtime and Core.
@@ -4849,6 +4861,9 @@ intermediate layer between Runtime and Core.
   ✅ Complete — 42 tests in `Broiler.JavaScript.Integration.Tests`.
 - [x] P2 BuiltIns extraction proof-of-concept completed (validates factory
   delegate pattern at scale). ✅ Complete — JSDisposableStack, JSDecimal, JSIntl.
+- [x] P3 BuiltIns/Runtime finalization assessment completed (Section 35).
+  ✅ Complete (2026-03-21) — corrected Names.g.cs coupling analysis; additional
+  extractable candidates identified but deferred as low priority.
 
 **Actionable subtasks (if/when pursued):**
 
@@ -4916,6 +4931,7 @@ currently actionable. They are documented here for future reference.
 | **P1 — Coverage improvement** | Per-assembly ≥ 90% line coverage (Section 29.1) | Next PR cycle | 📋 Planned |
 | **P2 — Integration tests** | 42-test `Integration.Tests` project (Section 29.3) | — | ✅ Complete (2026-03-21) |
 | **P2 — Docs update** | Section 11 migration docs verified and expanded (Section 29.4) | — | ✅ Complete (2026-03-21) |
+| **P3 — BuiltIns/Runtime finalization** | Assessment of remaining candidates; corrected Names.g.cs analysis; next steps documented (Section 35) | — | ✅ Complete (2026-03-21) |
 | **P3 — ObjectModel** | JSObject/JSFunction/JSContext extraction (Section 29.5) | When preconditions met | ⏳ Deferred |
 | **External** | P4: WebAtoms.XF coordination | When external parties respond | ⏳ External |
 
@@ -5090,19 +5106,28 @@ The following types were audited for extraction feasibility:
 | **JSError** | 6 | ❌ Impractical — exception handling requires Core to construct errors directly |
 | **JSPromise** | 6 | ❌ Impractical — async/await compilation and runtime depend on concrete promise type |
 | **JSRegExp** | 8 | ❌ Impractical — used in string methods, compiler literal handling, and structured clone |
-| **JSProxy** | 0 | ❌ Not beneficial — zero type checks but referenced in source-generated `Names.g.cs` |
-| **JSJSON** | 0 | ❌ Not beneficial — same as JSProxy |
-| **JSDataView** | 0 | ❌ Not beneficial — same as JSProxy |
+| **JSProxy** | 0 | ⚠️ Extractable (low priority) — self-contained; Names.g.cs coupling resolved by existing source generator architecture (see Section 35) |
+| **JSJSON** | 0 | ⚠️ Extractable (low priority) — self-contained; Names.g.cs coupling resolved by existing source generator architecture (see Section 35) |
+| **JSDataView** | 0 | ⚠️ Extractable (low priority) — self-contained; Names.g.cs coupling resolved by existing source generator architecture (see Section 35) |
 
-**Conclusion:** All practical extraction candidates have been completed. The
+**Conclusion:** All _high-impact_ extraction candidates have been completed. The
 remaining types (JSArray, JSString, JSNumber, JSError, JSPromise, JSRegExp)
 have 12–16 type checks each deeply embedded in Core's arithmetic, comparison,
 and compilation logic. Extracting them would require pervasive virtual method
-overrides in hot paths, risking measurable performance regressions. Types with
-zero type checks (JSProxy, JSJSON, JSDataView) are still coupled via the source
-generator's `Names.g.cs` registration code, meaning extraction would require
-changes to the `JSClassGenerator` source generator itself — disproportionate
-effort for negligible architectural benefit.
+overrides in hot paths, risking measurable performance regressions.
+
+**Correction (2026-03-21, P3 assessment):** Types with zero type checks
+(JSProxy, JSJSON, JSDataView) were previously assessed as blocked by the source
+generator's `Names.g.cs` registration code. This was incorrect — the existing
+BuiltIns assembly already demonstrates that the JSClassGenerator source
+generator runs independently per project. Each assembly with
+`[JSRegistrationGenerator]` on its `Names` class gets its own `Names.g.cs`
+with independent `RegisterAll` and `CreateClass` calls. JSProxy, JSJSON, and
+JSDataView _could_ be extracted to BuiltIns using the same pattern as JSDecimal
+and other already-extracted types. However, the architectural benefit is
+negligible (zero downstream consumers need these types independently), so
+extraction is deferred as low priority. See Section 35 for the full P3
+assessment.
 
 ### Architecture Impact
 
@@ -5166,10 +5191,12 @@ of the Broiler.JavaScript assembly refactor.
 | **Cleanup and CI** | ✅ Complete | All `InternalsVisibleTo` migration bridges removed; meta-package created; CI pipeline covers 12 test projects on 3 platforms | Phase 10 (Sections 14–15) |
 | **ModuleExtensions** | ✅ Complete | Namespace, TFM, and reference alignment; bugs fixed; 13 tests | Section 30 |
 | **Concrete type extraction** (JSObject/JSFunction/JSContext) | ⏳ Deferred | 500+ file references, 22 cascade subtypes — deferred per architectural assessment | Section 26 |
-| **Remaining BuiltIns** (JSArray, JSString, JSNumber, JSError, JSPromise, JSRegExp) | ❌ Not planned | Deep structural coupling (12–16 type checks each); extraction would risk performance regressions | Sections 27, 31 |
+| **Remaining BuiltIns** (JSArray, JSString, JSNumber, JSError, JSPromise, JSRegExp) | ❌ Not planned | Deep structural coupling (12–16 type checks each); extraction would risk performance regressions | Sections 27, 31, 35 |
+| **Remaining BuiltIns** (JSProxy, JSJSON, JSDataView) | ⚠️ Low priority | Extractable but deferred — zero type checks, Names.g.cs coupling resolved; negligible architectural benefit | Sections 31, 35 |
 | **Coverage ≥ 90% per assembly** | ⏳ In progress | `coverlet` integrated; thresholds not yet enforced | Section 29.1 |
 | **Integration test project** | ✅ Complete | 42 tests in `Broiler.JavaScript.Integration.Tests` | Section 29.3 |
 | **Consumer migration docs** | ✅ Complete | Section 11 verified and expanded with CoreScript notes, TypeForwardedTo docs, troubleshooting | Section 29.4 |
+| **P3 BuiltIns/Runtime finalization** | ✅ Complete | Corrected Names.g.cs coupling analysis; additional candidates identified; next steps documented | Section 35 |
 | **WebAtoms.XF bridge removal** | ⏳ External | Requires third-party coordination | Section 29.6 |
 
 ### Assembly Inventory (current)
@@ -5213,6 +5240,7 @@ maps each phase to its primary documentation sections:
 | 10 — Cleanup | 2026-03-20 | Sections 14–15 | All migration bridges removed; meta-package; downstream updates |
 | ModuleExtensions | 2026-03-21 | Section 30 | Namespace aligned; bugs fixed; 13-test project |
 | BuiltIns completion | 2026-03-21 | Section 31 | JSDisposableStack, JSDecimal, JSIntl via factory delegates |
+| P3 finalization | 2026-03-21 | Section 35 | Corrected Names.g.cs analysis; JSProxy/JSJSON/DataView extractable but deferred; comprehensive dependency audit |
 
 ### CI/CD and Test Coverage Summary
 
@@ -5253,18 +5281,29 @@ by priority and current status.
 
 ### 33.1 BuiltIns Extraction — Remaining Types in Core
 
-**Types:** `JSArray`, `JSString`, `JSNumber`, `JSError`, `JSPromise`, `JSRegExp`,
-`JSProxy`, `JSJSON`, `JSDataView`
+**Types (impractical to extract):** `JSArray`, `JSString`, `JSNumber`, `JSError`,
+`JSPromise`, `JSRegExp`
 
 **Rationale:** These types have 6–16 direct type checks (`is` patterns) deeply
 embedded in Core's arithmetic, comparison, coercion, and compilation logic.
 Extracting them would require pervasive virtual method overrides in hot paths,
-risking measurable performance regressions. Types with zero type checks
-(`JSProxy`, `JSJSON`, `JSDataView`) are coupled via the `JSClassGenerator`
-source generator's `Names.g.cs` registration code. See Section 31 for the full
+risking measurable performance regressions. See Section 31 for the full
 candidate assessment.
 
 **Status:** ❌ Not planned — assessed as impractical (2026-03-21).
+
+**Types (extractable but deferred):** `JSProxy`, `JSJSON`, `JSDataView`
+
+**Rationale:** These types have zero `is` type checks in Core/Compiler and are
+self-contained. The previous assessment (Section 31, pre-P3) incorrectly
+identified them as blocked by `Names.g.cs` source generator coupling. P3
+analysis (Section 35) confirmed that the JSClassGenerator source generator runs
+independently per assembly — the BuiltIns assembly already demonstrates this
+with its own `Names.g.cs`. Extraction is technically feasible using the same
+pattern as JSDecimal and other already-extracted types.
+
+**Status:** ⚠️ Deferred (low priority) — zero downstream consumers need these
+types independently. See Section 35 for the corrected analysis.
 
 ### 33.2 Concrete Runtime Type Extraction (JSObject / JSFunction / JSContext)
 
@@ -5383,25 +5422,216 @@ They are documented as future work (Section 29) and known gaps (Section 33):
    deferred per architectural assessment (Section 26). The interface-based
    abstraction layer satisfies all known requirements.
 
-2. **Full BuiltIns extraction** — remaining types (JSArray, JSString, JSNumber,
-   JSError, JSPromise, JSRegExp) assessed as impractical to extract due to deep
-   structural coupling (Section 31).
+2. **Full BuiltIns extraction** — remaining high-coupling types (JSArray,
+   JSString, JSNumber, JSError, JSPromise, JSRegExp) assessed as impractical
+   due to deep structural coupling (Section 31). Low-coupling types (JSProxy,
+   JSJSON, JSDataView) are technically extractable but deferred as low priority
+   (Section 35).
 
 3. **Coverage threshold enforcement** — `coverlet` integration is complete but
    ≥ 90% line coverage thresholds are not yet enforced in CI (Section 29.1).
 
-4. **Integration test project** — cross-assembly integration is currently
-   validated via `Core.Tests` (Section 29.3).
-
-5. **WebAtoms.XF bridge removal** — external coordination required (Section 29.6).
+4. **WebAtoms.XF bridge removal** — external coordination required (Section 29.6).
 
 ### When to Revisit
 
 - **Concrete type extraction:** Only if a downstream consumer requires depending
   on `JSObject` without pulling in `Core`. No such requirement exists today.
-- **BuiltIns extraction:** Only if performance profiling shows that the factory
-  delegate pattern does not introduce measurable overhead, and if there is
-  consumer demand for per-type BuiltIn references.
+- **BuiltIns extraction (high-coupling types):** Only if performance profiling
+  shows that the factory delegate pattern does not introduce measurable overhead,
+  and if there is consumer demand for per-type BuiltIn references.
+- **BuiltIns extraction (JSProxy/JSJSON/JSDataView):** Can be extracted at any
+  time using the existing source generator and factory delegate patterns. Only
+  pursue if consumer demand arises (Section 35).
 - **Coverage thresholds:** As part of the next quality milestone (Section 29.1).
-- **Integration tests:** Before any future large-scale extraction (Section 29.5
-  lists this as a precondition for ObjectModel extraction).
+- **Integration tests:** ✅ Complete — 42 tests in `Integration.Tests` (Section
+  29.3). Listed as a precondition for ObjectModel extraction (Section 29.5).
+
+---
+
+## 35. P3 Assessment — BuiltIns and Runtime Extraction Finalization (2026-03-21)
+
+This section documents the P3 assessment of remaining BuiltIns and Runtime type
+extractions, as outlined in Section 29 P3. It provides a comprehensive
+dependency analysis, corrects a previous assessment error regarding the
+JSClassGenerator source generator coupling, and proposes actionable next steps.
+
+### Background
+
+Section 29.5 and Section 31 identified two categories of deferred work:
+
+1. **Remaining BuiltIns types** — types assessed in Section 31 as impractical
+   or blocked from extraction to the BuiltIns assembly.
+2. **Concrete Runtime types** — `JSObject`, `JSFunction`, and `JSContext`
+   deferred per Section 26 architectural assessment.
+
+This P3 assessment re-examines both categories with a deeper dependency audit
+and corrects the Names.g.cs source generator coupling analysis.
+
+### Discovery: Names.g.cs Source Generator Coupling Was Incorrectly Assessed
+
+**Previous assessment (Section 31):** JSProxy, JSJSON, and JSDataView were
+marked as "not beneficial — zero type checks but referenced in source-generated
+`Names.g.cs`" with the implication that extraction would require changes to the
+JSClassGenerator source generator.
+
+**Corrected assessment:** The JSClassGenerator source generator runs
+independently per project. Each assembly that includes:
+- A `Names.cs` class with `[JSRegistrationGenerator]` attribute
+- Type classes decorated with `[JSClassGenerator]` or `[JSFunctionGenerator]`
+
+...gets its own `Names.g.cs` with independent `RegisterAll` and `CreateClass`
+calls. The BuiltIns assembly already demonstrates this pattern — it has
+extracted types (including JSDecimal, JSSuppressedError, EventTarget,
+JSFinalizationRegistry, and JSWeakRef) with their own BuiltIns-scoped
+`Names.g.cs` generated file.
+
+**Evidence:** The BuiltIns `Names.g.cs` at
+`Broiler.JavaScript.BuiltIns/Generated/.../Broiler.JavaScript.Core.Core.Names.g.cs`
+(where `Core.Core` reflects the `Broiler.JavaScript.Core` root namespace plus
+`Core` sub-namespace — this is the correct naming convention used by the source
+generator) contains independent `RegisterAll` calls for the extracted types,
+proving that the source generator correctly discovers and registers types within
+each project independently.
+
+**Implication:** JSProxy, JSJSON, and JSDataView _can_ be extracted to BuiltIns
+using the exact same pattern as JSDecimal and other already-extracted types,
+with no changes to the JSClassGenerator source generator.
+
+### Comprehensive Dependency Audit
+
+#### High-Coupling Types (Not Extractable)
+
+| Type | Total Refs | `is`/`as` Checks | `new` Calls | Files | Hot Path | Assessment |
+|------|-----------|-------------------|-------------|-------|----------|------------|
+| **JSNumber** | ~330 | 14 | ~212 | 40+ | ✅ Critical — arithmetic, JSMath, date formatting | ❌ Not extractable |
+| **JSString** | ~205 | 17 | ~136 | 35+ | ✅ Critical — coercion, concatenation, formatting | ❌ Not extractable |
+| **JSArray** | ~115 | 18 | ~67 | 27 | ✅ Critical — construction in Object operations | ❌ Not extractable |
+| **JSError** | ~47 | 6 | ~4 | 12 | ⚠️ Secondary — exception handling | ❌ Not extractable (error hierarchy must stay together) |
+| **JSPromise** | ~42 | 6 | ~17 | 8 | ⚠️ Secondary — async operations | ❌ Not extractable (async/await depends on concrete type) |
+| **JSRegExp** | ~14 | 8 | ~2 | 4 | ⚠️ Light — string pattern matching | ❌ Impractical (string method coupling) |
+
+These types are deeply embedded in Core's fundamental operations. JSNumber alone
+has ~212 constructor calls across 40+ files. JSString has ~136. These are hot
+paths for arithmetic, coercion, and comparison logic where virtual dispatch
+overhead from factory delegates would be measurable. **No further extraction
+work is recommended for these types.**
+
+#### Low-Coupling Types (Extractable but Deferred)
+
+| Type | Total Refs | `is`/`as` Checks | `new` Calls | Files | Hot Path | Assessment |
+|------|-----------|-------------------|-------------|-------|----------|------------|
+| **JSProxy** | ~3 | 0 | ~1 (self) | 1 | ❌ None — metaprogramming | ✅ Immediately extractable |
+| **JSJSON** | ~1 | 0 | 0 | 1 | ❌ None — serialization | ✅ Immediately extractable |
+| **JSDataView** | ~3 | 0 | 0 | 2 | ❌ None — binary data | ✅ Extractable (depends on JSArrayBuffer) |
+
+These types have zero type checks in Core/Compiler and are functionally
+self-contained. The Names.g.cs coupling (the only previously identified blocker)
+is resolved — see above. If future consumer demand arises, these can be moved
+to BuiltIns with minimal effort and zero risk.
+
+#### Additional Potential Candidates Identified
+
+The audit identified additional types in Core that have low coupling and could
+theoretically be extracted:
+
+| Type | Files | Coupling | Notes |
+|------|-------|----------|-------|
+| JSMap / JSWeakMap | 2 | Low | Standalone collection types |
+| JSSet / JSWeakSet | 2 | Low | Standalone collection types |
+| JSIteratorObject | 1 | Very Low | Minimal integration |
+| JSGenerator | 1 | Low | Async-related |
+| JSBigInt | 1 | Low | Primitive numeric type |
+| JSBoolean | 1 | Very Low | Primitive type |
+
+**Assessment:** While technically extractable, these types share the same
+cost/benefit calculus as JSProxy/JSJSON/JSDataView — zero downstream consumers
+need them independently, and extraction would add complexity without concrete
+architectural benefit. They are documented here for future reference.
+
+### Concrete Runtime Type Extraction Assessment
+
+Section 26 deferred the extraction of `JSObject`, `JSFunction`, and `JSContext`
+to a prospective `ObjectModel` assembly. The P3 assessment confirms:
+
+1. **JSObject** is referenced in 168+ locations across Core, with 31 references
+   in `JSObjectStatic.cs` alone and 15 in `JSReflect.cs`. Moving it would
+   cascade to 22+ subtypes and 500+ file updates.
+
+2. **JSFunction** and **JSContext** are referenced throughout the compilation
+   pipeline and runtime infrastructure. They are the two most interconnected
+   types in the engine.
+
+3. **The interface-based abstraction layer** (`IJSContext`, `IJSFunction`,
+   `IJSPrototype`, `IJSSymbol`) successfully decouples downstream consumers
+   from concrete types. No known consumer has expressed a need to depend on
+   `JSObject` without `Core`.
+
+4. **Preconditions for ObjectModel extraction (Section 29.5):**
+   - [x] P2 integration test project created (42 tests) ✅
+   - [x] P2 BuiltIns extraction proof-of-concept completed ✅
+   - [x] P3 assessment completed ✅
+   - [ ] P1 coverage targets achieved (≥ 90% per assembly) — **not yet met**
+
+**Recommendation:** ObjectModel extraction remains deferred. The only unmet
+precondition (P1 coverage) is tracked in Section 29.1. No concrete downstream
+demand exists. The interface-based architecture satisfies all known requirements.
+
+### Actionable Next Steps
+
+The following are the recommended next steps for the engineering team, ordered
+by priority:
+
+#### Recommended (Active)
+
+1. **P1 — Coverage improvement (Section 29.1):**
+   Review per-assembly `coverlet` reports and bring each assembly to ≥ 90% line
+   coverage. This is the remaining P1 item and unblocks ObjectModel extraction
+   preconditions.
+
+#### Available If Needed (Low Priority)
+
+2. **Extract JSProxy to BuiltIns:**
+   Self-contained (3 refs, 0 type checks). Move `Core/Proxy/JSProxy.cs` to
+   `BuiltIns/Proxy/`. The `[JSFunctionGenerator("Proxy")]` attribute ensures
+   automatic Names.g.cs registration. No factory delegates needed.
+
+3. **Extract JSJSON to BuiltIns:**
+   Self-contained (1 ref, 0 type checks). Move `Core/Json/JSJSON.cs` to
+   `BuiltIns/Json/`. The `[JSClassGenerator("JSON")]` attribute ensures
+   automatic Names.g.cs registration. No factory delegates needed.
+
+4. **Extract JSDataView to BuiltIns:**
+   Nearly self-contained (~3 refs, 0 type checks). Move `Core/DataView/` to
+   `BuiltIns/DataView/`. Depends on `JSArrayBuffer` which remains in Core,
+   so a project reference or interface abstraction may be needed.
+
+#### Deferred (No Action Recommended)
+
+5. **ObjectModel assembly:** Deferred until concrete downstream demand arises
+   and P1 coverage targets are met. See Section 29.5.
+
+6. **High-coupling BuiltIns extraction:** No further work recommended for
+   JSArray, JSString, JSNumber, JSError, JSPromise, JSRegExp. The cost/risk
+   ratio is prohibitive.
+
+7. **WebAtoms.XF bridge removal:** Requires external coordination. See
+   Section 29.6.
+
+### Summary
+
+| Category | Types | Count | Status | Action |
+|----------|-------|-------|--------|--------|
+| **Extracted (Phase 6)** | EventTarget, Event, CustomEvent, DomEventHandler, JSWeakRef, JSFinalizationRegistry, JSDisposableStack, JSSuppressedError, JSDecimal, JSIntl, JSIntlDateTimeFormat, JSIntlRelativeTimeFormat | 12 | ✅ Complete | None |
+| **Impractical** | JSArray, JSString, JSNumber, JSError, JSPromise, JSRegExp | 6 | ❌ Not planned | None |
+| **Extractable (deferred)** | JSProxy, JSJSON, JSDataView | 3 | ⚠️ Low priority | Extract if downstream demand arises |
+| **Additional candidates** | JSMap, JSWeakMap, JSSet, JSWeakSet, JSIteratorObject, JSGenerator, JSBigInt, JSBoolean | 8 | ⚠️ Low priority | Document only; extract if demand arises |
+| **Concrete types** | JSObject, JSFunction, JSContext | 3 | ⏳ Deferred | ObjectModel assembly if demand arises |
+
+**Overall conclusion:** The BuiltIns and Runtime extraction is at its practical
+limit for current architectural needs. All high-impact candidates have been
+extracted. The P3 assessment corrected the Names.g.cs source generator coupling
+analysis and identified 3 additional immediately-extractable types (JSProxy,
+JSJSON, JSDataView) plus 8 additional low-coupling candidates — all deferred
+as low priority due to negligible downstream benefit. No further extraction
+work is recommended unless concrete consumer demand emerges.
