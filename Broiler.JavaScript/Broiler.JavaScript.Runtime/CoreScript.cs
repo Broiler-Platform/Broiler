@@ -115,11 +115,9 @@ public class CoreScript
     /// <returns>The result of evaluating <paramref name="code"/>.</returns>
     public static JSValue Evaluate(string code, string location = null, ICodeCache codeCache = null)
     {
-        var result = JSValue.UndefinedValue;
         var ctx = GetCurrentContext();
         var fx = Compile(code, location, null, codeCache ?? ctx.codeCache);
-        result = fx(new Arguments(ctx.value));
-        return result;
+        return fx(new Arguments(ctx.value));
     }
 
     /// <summary>
@@ -132,11 +130,10 @@ public class CoreScript
     /// <returns>The result of evaluating <paramref name="code"/>.</returns>
     public static async Task<JSValue> EvaluateAsync(string code, string location = null, ICodeCache codeCache = null)
     {
-        var result = JSValue.UndefinedValue;
         var ctx = GetCurrentContext();
         var fx = Compile(code, location, null, codeCache ?? ctx.codeCache);
         
-        result = fx(new Arguments(ctx.value));
+        var result = fx(new Arguments(ctx.value));
         
         var waitTask = GetCurrentWaitTask();
         if (waitTask != null)
