@@ -20,6 +20,23 @@ namespace Broiler.JavaScript.Core.Core;
 /// </summary>
 public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyValue
 {
+    // ── Factory infrastructure ──
+    // Initialized by Core's ModuleInitializer so that Runtime types can
+    // create concrete JS values without a direct dependency on Core.
+    // These statics prepare for a future move of JSValue to Runtime.
+    internal static JSValue UndefinedValue;
+    internal static JSValue NullValue;
+    internal static JSValue BooleanTrue;
+    internal static JSValue BooleanFalse;
+    internal static JSValue NumberOne;
+    internal static JSValue NumberNaN;
+    internal static Func<double, JSValue> CreateNumber;
+    internal static Func<string, JSValue> CreateString;
+    internal static Func<string, Exception> NewTypeError;
+    internal static Func<JSValue, object, bool, object> ForceConvertHelper;
+    internal static Func<Expression, JSValue, DynamicMetaObject> CreateDynamicMetaObject;
+    internal static Func<double, string> NumberToECMAString;
+
     /// <summary>Gets whether this value is the <c>undefined</c> singleton.</summary>
     public bool IsUndefined
     {

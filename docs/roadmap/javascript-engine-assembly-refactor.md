@@ -3432,3 +3432,111 @@ All **998** tests pass across 10 test projects:
 *This roadmap tracks the creation and documentation of the refactor plan, not
 the refactor itself. Implementation issues should be created per milestone
 and linked back to this document.*
+
+---
+
+## 21. Phase 9b Preparation — Factory Infrastructure and Analysis
+
+### Overview
+
+Phase 9b requires simultaneously moving the core value type system
+(`JSValue`, `JSObject`, `JSFunction`, `JSContext`, `Arguments`,
+`JSSymbol`, `JSPrototype`, `PropertyKey`, `JSFunctionDelegate`,
+`IElementEnumerator`) from Core to Runtime. This section documents
+the preparatory infrastructure already in place and the dependency
+analysis needed to plan the move.
+
+### Preparatory Changes Already Completed
+
+#### 1. StringExtensions → Runtime
+
+`StringExtensions` (string comparison helpers: `Less`, `Greater`,
+`LessOrEqual`, `GreaterOrEqual`, `ToCamelCase`, `IsEmpty`) moved from
+`Core/Extensions/` to Runtime. These have zero Core dependencies (only
+`System` types) and are used by `JSValue.Less()` / `JSValue.Greater()`
+comparison methods.
+
+- Source: `Broiler.JavaScript.Runtime/StringExtensions.cs`
+- Namespace: `Broiler.JavaScript.Core.Extensions` (unchanged)
+- TypeForwardedTo added in Core AssemblyInfo.cs
+
+#### 2. ExpressionCompiler Reference Added to Runtime
+
+Runtime now references `Broiler.JavaScript.ExpressionCompiler`, needed for
+`YExpression<T>` used by `IJSCompiler.Compile()` return type.
+
+#### 3. JSValue Factory Infrastructure
+
+Added 12 `internal static` factory fields to `JSValue` following the proven
+`PropertySequence.TypeErrorFactory` pattern:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `UndefinedValue` | `JSValue` | Singleton for `JSUndefined.Value` |
+| `NullValue` | `JSValue` | Singleton for `JSNull.Value` |
+| `BooleanTrue` | `JSValue` | Singleton for `JSBoolean.True` |
+| `BooleanFalse` | `JSValue` | Singleton for `JSBoolean.False` |
+| `NumberOne` | `JSValue` | Singleton for `JSNumber.One` |
+| `NumberNaN` | `JSValue` | Singleton for `JSNumber.NaN` |
+| `CreateNumber` | `Func<double, JSValue>` | Factory for `new JSNumber(v)` |
+| `CreateString` | `Func<string, JSValue>` | Factory for `new JSString(v)` |
+| `NewTypeError` | `Func<string, Exception>` | Factory for `JSContext.NewTypeError()` |
+| `ForceConvertHelper` | `Func<JSValue, object, bool, object>` | CLR interop unwrap |
+| `CreateDynamicMetaObject` | `Func<Expression, JSValue, DynamicMetaObject>` | IDynamicMetaObjectProvider |
+| `NumberToECMAString` | `Func<double, string>` | `JSNumber.ToECMAString()` |
+
+#### 4. JSValueCoreExtensions Module Initializer
+
+Created `Core/JSValueCoreExtensions.cs` with `[ModuleInitializer]` that wires
+all factory delegates at Core assembly load time, following the proven pattern
+from `PropertySequenceCoreExtensions`.
+
+### Dependency Analysis for Moving JSValue
+
+JSValue directly references **7 Core-only types** in its method signatures:
+
+| Type | References | Usage | Move Requirement |
+|------|-----------|-------|-----------------|
+| `JSObject` | 11 | Parameter/return type (virtual methods) | Must move simultaneously |
+| `JSSymbol` | 10 | Parameter type (virtual methods) | Must move simultaneously |
+| `JSPrototype` | 1 | Field type (`prototypeChain`) | Must move simultaneously |
+| `Arguments` | 3 | Parameter type | Must move simultaneously |
+| `PropertyKey` | 1 | Abstract method return type | Must move simultaneously |
+| `JSFunctionDelegate` | 1 | Return type | Must move simultaneously |
+| `IElementEnumerator` | 4 | Return type | Must move simultaneously |
+
+**Total types requiring simultaneous move: 8** (JSValue + 7 dependencies).
+
+Each dependency has its own transitive dependencies:
+- `JSObject` (~1050 lines): Uses `PropertySequence`, `ElementArray`, `SAUint32Map`
+  (Storage ✅ already in Runtime), plus `JSArray`, `JSBoolean`, `JSNumber`,
+  `JSString` (Core — need factories)
+- `JSSymbol` (~60 lines): Uses `JSContext.Current`, `JSContext.NewTypeError` (Core)
+- `JSPrototype` (~200 lines): Uses `JSFunction`, `SAUint32Map` (Storage ✅),
+  `Sequence` (ExpressionCompiler ✅)
+- `Arguments` (~500 lines): Uses `JSArray`, `JSUndefined`, `JSSpreadValue` (Core)
+- `PropertyKey` (~28 lines): Uses `JSSymbol` (must move with JSSymbol)
+- `JSFunctionDelegate` (1 line): Uses `JSValue`, `Arguments` (both must be
+  in Runtime)
+- `IElementEnumerator`: Uses `JSValue` (must be in Runtime)
+
+### Recommended Move Order
+
+1. Move `JSFunctionDelegate` (1 line) + `Arguments` (~500 lines) +
+   `IElementEnumerator` to the Runtime simultaneously. Arguments requires
+   extensive factory work for `JSArray`/`JSUndefined` references.
+2. Move `PropertyKey` + `JSSymbol` together.
+3. Move `JSPrototype` (requires `JSFunction` type reference → factory).
+4. Move `JSValue` (with all factory replacements).
+5. Move `JSObject`, `JSFunction`, `JSContext` (largest change).
+6. Move contract interfaces (`IBuiltInRegistry`, `IClrInterop`, `IDebugger`,
+   `IJSCompiler`).
+
+### Estimated Effort
+
+- **Files to modify in Core:** ~50 (factory replacements in moved files)
+- **Files unaffected:** ~450+ (namespace-qualified references resolve
+  automatically via Core's project reference to Runtime)
+- **New factory delegates needed:** ~30-40 (for Core-specific type
+  construction and error creation in moved files)
+- **TypeForwardedTo entries:** ~10 new entries in Core `AssemblyInfo.cs`
