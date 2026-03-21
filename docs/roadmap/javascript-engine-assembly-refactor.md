@@ -22,7 +22,7 @@ scalability, and testability.
 | `Broiler.JavaScript.BuiltIns` | Broiler.JavaScript.BuiltIns | Extracted built-in objects (WeakRef, FinalizationRegistry, EventTarget, Event) | ✅ Extracted (Phase 6, partial) |
 | `Broiler.JavaScript.Compiler` | Broiler.JavaScript.Compiler | AST → LINQ Expression Tree compilation (`FastCompiler`, 40+ partial files) | ✅ Extracted (Phase 7) |
 | `Broiler.JavaScript.Modules` | Broiler.JavaScript.Modules | ES module system (`JSModuleContext`, `JSModule`, `ModuleCache`) | ✅ Extracted (Phase 8) |
-| `Broiler.JavaScript.Runtime` | Broiler.JavaScript.Runtime | Runtime contract interfaces (`IJSModuleResolver`, `ExportAttribute`, `DefaultExportAttribute`), utility types (`CancellableDisposableAction`); future home of execution context and value type system | 🔧 Active (Phase 9 prep — contracts and utilities being migrated) |
+| `Broiler.JavaScript.Runtime` | Broiler.JavaScript.Runtime | Core value type system (`JSValue`, `Arguments`, `PropertyKey`, `JSFunctionDelegate`, `IElementEnumerator`), interface abstractions (`IJSPrototype`, `IJSSymbol`), runtime contracts (`IJSModuleResolver`, `ExportAttribute`, `DefaultExportAttribute`), utility types (`CancellableDisposableAction`, `ObjectStatus`, `StringExtensions`) | ✅ Phase 9b complete — core value types moved from Core |
 | `Broiler.JavaScript.ExpressionCompiler` | Broiler.JavaScript.ExpressionCompiler | LINQ Expression Tree → IL compilation | Pre-existing |
 | `Broiler.JavaScript.JSClassGenerator` | Broiler.JavaScript.JSClassGenerator | Roslyn source generator for C#-to-JS bindings | Pre-existing |
 | `Broiler.JavaScript.Network` | YantraJS.Network | Fetch API / network module | ✅ Updated (references, TFM, namespaces aligned) |
@@ -224,29 +224,38 @@ later compiled to IL by ExpressionCompiler).
 
 ### 3.4 Broiler.JavaScript.Runtime
 
-**Purpose:** Core execution environment — the types every other assembly needs
-to interact with JavaScript values and contexts.
+**Purpose:** Core value type system — the base types every other assembly needs
+to interact with JavaScript values.
 
-**Public API:**
+**Current Contents (Phase 9b complete):**
+- `JSValue` — base class for all JavaScript values (arithmetic, comparison, property access)
+- `Arguments` — function invocation argument struct (spread support, rest parameters)
+- `PropertyKey` — union of string key (`KeyString`) and symbol key (`IJSSymbol`)
+- `JSFunctionDelegate` — delegate type for JavaScript function invocation
+- `IElementEnumerator` — interface for array/spread enumeration
+- `IJSPrototype` — interface abstracting the prototype chain
+- `IJSSymbol` — interface abstracting JavaScript Symbol values
+- `ObjectStatus` — flags enum for object extensibility/freeze/seal state
+- `IJSModuleResolver` — ES module resolution contract
+- `ExportAttribute`, `DefaultExportAttribute` — module export markers
+- `CancellableDisposableAction` — cancellable `IDisposable` utility
+- `StringExtensions` — string comparison helpers
+
+**Future Contents (Phase 9c):**
 - `JSContext` — execution context (create, evaluate, dispose)
-- `JSValue` — base type for all JavaScript values
 - `JSObject`, `JSFunction`, `JSPrototype`
-- `Arguments` — function invocation arguments
 - `CoreScript` — high-level compile-and-evaluate bridge
-- `KeyString`, `KeyStrings` — interned property names
-- `JSException` — JavaScript exception wrapper
-- `IBuiltInRegistry` — registration interface for built-in types
-- `IClrInterop` — contract for CLR interop (consumed, not implemented here)
-- `IDebugger` — contract for debugger integration
+- `IBuiltInRegistry`, `IClrInterop`, `IDebugger` — contracts
 
 **Design Rules:**
-- Depends on **Ast** (for `CoreScript` which calls the compiler) and
-  **Storage**.
+- Depends on **Ast** (for `IPropertyValue`/`IPropertyAccessor`, `StringSpan`),
+  **Storage** (for `KeyString`, `JSProperty`, `PropertySequence`, `ElementArray`),
+  and **ExpressionCompiler** (for `YExpression<T>`).
+- Uses factory delegates (`CreateNumber`, `CreateString`, etc.) wired via
+  `[ModuleInitializer]` in Core to avoid circular dependency.
 - `Bootstrap` must become pluggable: instead of hard-coding every built-in
   type, it calls `IBuiltInRegistry.Register(JSContext)` so that `BuiltIns`,
   `Clr`, and `Modules` assemblies register themselves.
-- IL emission helpers (`Emit/`) stay here because they are tightly coupled to
-  the runtime's `DynamicMethod` generation.
 
 ---
 
@@ -504,7 +513,7 @@ Each extraction phase follows the same steps:
 
 ### Milestone 5 — Runtime Extraction and `InternalsVisibleTo` Elimination (Phases 9–10)
 
-**Status:** ⏳ Phase 10 complete; Phase 9 in progress — contract migration started
+**Status:** ⏳ Phase 10 complete; Phase 9a complete; Phase 9b complete; Phase 9c pending
 
 **Phase 9 — Runtime Extraction:**
 - [x] Move `IJSModuleResolver` to Runtime. ✅ (2026-03-20)
@@ -520,11 +529,18 @@ Each extraction phase follows the same steps:
 - [x] Move `ObjectStatus` enum to Runtime. ✅ (2026-03-21)
 - [x] Fix cross-platform `Path.Combine` in Runtime tests
   (`StubModuleResolver.Resolve` now normalizes separators). ✅ (2026-03-21)
-- [ ] Phase 9b: Move `JSValue`, `JSObject`, `JSFunction`, `JSContext`,
-  `Arguments`, `CoreScript`, `Bootstrap` to Runtime.
+- [x] Phase 9b: Move `JSValue`, `Arguments`, `PropertyKey`,
+  `JSFunctionDelegate`, `IElementEnumerator` to Runtime. ✅ (2026-03-21)
+- [x] Phase 9b: Create `IJSPrototype` and `IJSSymbol` interface abstractions
+  in Runtime. ✅ (2026-03-21)
+- [x] Phase 9b: Wire factory delegates (`InvokePropertyGetter`,
+  `CreatePrototypeObject`) via `[ModuleInitializer]`. ✅ (2026-03-21)
+- [x] Phase 9b: Add `TypeForwardedTo` for all moved types (7 new entries). ✅ (2026-03-21)
+- [ ] Phase 9c: Move `JSObject`, `JSFunction`, `JSContext`,
+  `CoreScript`, `Bootstrap` to Runtime.
 - [ ] Move remaining contract interfaces (`IBuiltInRegistry`, `IClrInterop`,
-  `IDebugger`, `IJSCompiler`) to Runtime. *Blocked by Phase 9b — interfaces
-  reference `JSValue`/`JSContext` which must move to Runtime first.*
+  `IDebugger`, `IJSCompiler`) to Runtime. *Blocked by Phase 9c — interfaces
+  reference `JSContext`/`JSObject` which remain in Core.*
 
 **Phase 10 — `InternalsVisibleTo` Elimination and Final Cleanup:**
 - [x] Resolve all remaining Clr internal accesses (30 errors → 0). ✅ (2026-03-20)
@@ -546,7 +562,9 @@ Each extraction phase follows the same steps:
   are acceptable). ✅ *Achieved — only `Core.Tests`, `Runtime` (dynamic
   assembly), and `WebAtoms.XF` (external) entries remain.*
 - `Broiler.JavaScript.Core` no longer contains value type system — types live
-  in Runtime. ⏳ *Blocked by Phase 9.*
+  in Runtime. ⏳ *Partially achieved — `JSValue`, `Arguments`, `PropertyKey`
+  moved to Runtime (Phase 9b ✅). `JSObject`, `JSFunction`, `JSContext` remain
+  in Core (Phase 9c pending).*
 - All downstream consumers build and run against the new assembly structure. ✅
 - Each assembly has ≥ 90% line coverage in its dedicated test project. ⏳
   *Coverage collection now enabled via `coverlet.collector` in all 10 test
@@ -780,7 +798,7 @@ The refactor is complete when:
 
 | # | Criterion | Status |
 |---|-----------|--------|
-| 1 | Core decomposed into separate assemblies | ⏳ 8 of 11 target assemblies extracted. Core still contains value type system (`JSValue`, `JSContext`, etc.) pending Phase 9b. All storage types fully migrated to Storage assembly. `ObjectStatus` enum moved to Runtime. |
+| 1 | Core decomposed into separate assemblies | ⏳ 8 of 11 target assemblies extracted. Core value type base (`JSValue`, `Arguments`, `PropertyKey`) moved to Runtime (Phase 9b ✅). `JSObject`, `JSContext`, `JSFunction` remain in Core (Phase 9c). All storage types fully migrated to Storage assembly. |
 | 2 | Each assembly has test project with ≥ 90% coverage | ⏳ All 10 assemblies have test projects (998 tests). Coverage measurement integrated into CI via `coverlet.collector`. |
 | 3 | All existing Core.Tests pass | ✅ 641 Core.Tests pass. |
 | 4 | Downstream consumers build correctly | ✅ Explicit satellite assembly references added to `Broiler.Cli` and `Broiler.App`. |
@@ -805,7 +823,7 @@ The refactor is complete when:
 | 6 | BuiltIns | ⏳ Partial | 2026-03-20 | Deep structural coupling (JSArray 13, JSString 8, JSRegExp 7, JSError 6, JSPromise, JSProxy); internal field access (DataView, JSJSON, JSReflect). |
 | 7 | Compiler | ✅ Complete | 2026-03-20 | `InternalsVisibleTo` bridge **removed** ✅. |
 | 8 | Modules | ✅ Complete | 2026-03-20 | — |
-| 9 | Runtime | ⏳ In progress | 2026-03-21 | Phase 9a **complete**: `IJSModuleResolver` + `ExportAttribute` + `DefaultExportAttribute` + `CancellableDisposableAction` moved to Runtime; `JSProperty` + `PropertySequence` + `ElementArray` + `KeyString`/`KeyStrings`/`KeyType` moved to Storage with interface-typed fields/params. `ObjectStatus` moved to Runtime ✅. Cross-platform `StubModuleResolver` test fix ✅. Phase 9b (JSValue/JSContext → Runtime) is the only remaining critical path. |
+| 9 | Runtime | ⏳ In progress | 2026-03-21 | Phase 9a **complete**: all storage types moved to Storage. Phase 9b **complete** ✅: `JSValue`, `Arguments`, `PropertyKey`, `JSFunctionDelegate`, `IElementEnumerator` moved to Runtime; `IJSPrototype`/`IJSSymbol` interface abstractions created; factory delegates wired via `[ModuleInitializer]`. Phase 9c (JSObject/JSFunction/JSContext → Runtime) is the remaining work. |
 | 10 | Cleanup | ✅ Complete | 2026-03-20 | All migration bridges removed; meta-package created; downstream consumers updated; CI workflow created; coverlet coverage integrated. |
 
 ### Phase 1 — Ast Extraction ✅
@@ -2094,9 +2112,12 @@ Phase 9 is the most complex remaining extraction: moving the core execution type
 
 ### Current State
 
-The `Broiler.JavaScript.Runtime` assembly currently contains only
-`IJSModuleResolver` (one interface file). All core execution types remain in
-`Broiler.JavaScript.Core`.
+The `Broiler.JavaScript.Runtime` assembly now contains the core value type
+system (`JSValue`, `Arguments`, `PropertyKey`, `JSFunctionDelegate`,
+`IElementEnumerator`), interface abstractions (`IJSPrototype`, `IJSSymbol`),
+contract types (`IJSModuleResolver`, `ExportAttribute`, `DefaultExportAttribute`),
+and utility types (`CancellableDisposableAction`, `ObjectStatus`,
+`StringExtensions`). Phase 9b is complete.
 
 ### Circular Dependency Challenge
 
@@ -2151,20 +2172,25 @@ The primary blocker is a circular dependency between Runtime and Storage:
   `Random.Shared.NextDouble()`. `TypeForwardedTo` attributes added for
   `JSObjectProperty`, `PropertySequence`, `ElementArray`, `Updater<,>`.
 
-**Phase 9b — Value Type System (target: after 9a):**
+**Phase 9b — Value Type System ✅ (2026-03-21):**
 
-- [ ] Move `JSValue` to `Broiler.JavaScript.Runtime`.
-- [ ] Move `JSObject`, `JSFunction`, `JSContext` to Runtime.
-- [ ] Move `Arguments`, `CoreScript`, `Bootstrap` to Runtime.
-- [ ] Move `JSFunctionDelegate`, `ICodeCache` to Runtime.
-- [ ] Add `TypeForwardedTo` attributes in Core for all moved types.
-- [ ] Add `global using Broiler.JavaScript.Runtime;` in Core.
+- [x] Create `IJSPrototype` interface in Runtime (abstraction over prototype chain). ✅ (2026-03-21)
+- [x] Create `IJSSymbol` interface in Runtime (abstraction over symbol values). ✅ (2026-03-21)
+- [x] Move `JSValue` to `Broiler.JavaScript.Runtime`. ✅ (2026-03-21)
+- [x] Move `Arguments` to Runtime. ✅ (2026-03-21)
+- [x] Move `PropertyKey` to Runtime. ✅ (2026-03-21)
+- [x] Move `JSFunctionDelegate` to Runtime. ✅ (2026-03-21)
+- [x] Move `IElementEnumerator` to Runtime. ✅ (2026-03-21)
+- [x] Add `InvokePropertyGetter` and `CreatePrototypeObject` factory delegates to JSValue. ✅ (2026-03-21)
+- [x] Wire all factory delegates via `[ModuleInitializer]` in `JSValueCoreExtensions`. ✅ (2026-03-21)
+- [x] Add `TypeForwardedTo` attributes in Core for all moved types. ✅ (2026-03-21)
+- [x] Update `InternalsVisibleTo` in Runtime for all satellite assemblies. ✅ (2026-03-21)
+- [x] Fix JSValueBuilder reflection for changed field types (`IJSPrototype`, `IJSSymbol`). ✅ (2026-03-21)
+- [x] Run full test suite — all 998 tests pass. ✅ (2026-03-21)
+- [ ] Move `JSObject`, `JSFunction`, `JSContext` to Runtime (Phase 9c — future work).
+- [ ] Move `CoreScript`, `Bootstrap` to Runtime (Phase 9c — future work).
 - [ ] Move contract interfaces (`IBuiltInRegistry`, `IClrInterop`, `IDebugger`,
-  `IJSCompiler`) to Runtime.
-- [ ] Update all satellite assembly references (Clr, Compiler, Modules,
-  BuiltIns, Debugger) to reference Runtime.
-- [ ] Verify no circular dependencies.
-- [ ] Run full test suite — all pass.
+  `IJSCompiler`) to Runtime (blocked by JSContext/JSObject remaining in Core).
 - [ ] Update downstream consumer docs (Section 11).
 
 ### Contracts to Move
@@ -2179,11 +2205,14 @@ The primary blocker is a circular dependency between Runtime and Storage:
 
 ### Estimated Effort
 
-- **Phase 9a (KeyString + property types):** Medium — requires updating all
-  `KeyString` references across the codebase (high frequency type).
-- **Phase 9b (JSValue + JSContext):** High — these types are referenced by
-  virtually every file in the engine. Namespace migration and `TypeForwardedTo`
-  attributes needed for backward compatibility.
+- **Phase 9a (KeyString + property types):** ✅ **Complete** — all storage types
+  moved to Storage assembly.
+- **Phase 9b (JSValue + Arguments + PropertyKey):** ✅ **Complete** — core value
+  types moved to Runtime. Factory delegate pattern used for cross-assembly
+  construction. Interface abstractions (`IJSPrototype`, `IJSSymbol`) created.
+- **Phase 9c (JSObject + JSFunction + JSContext):** High — these types are
+  referenced by virtually every file in the engine (~500+ files). Requires
+  extensive factory delegate work and interface abstraction.
 
 ### Risk Assessment
 
@@ -2829,6 +2858,15 @@ Phase 10 (cleanup) have been completed.
 | `ExportAttribute` | `Broiler.JavaScript.Core.Core.Module` | Core | 2026-03-20 |
 | `DefaultExportAttribute` | `Broiler.JavaScript.Core.Core.Module` | Core | 2026-03-20 |
 | `CancellableDisposableAction` | `Broiler.JavaScript.Core.Core` | Core | 2026-03-20 |
+| `ObjectStatus` | `Broiler.JavaScript.Core.Core.Object` | Core | 2026-03-21 |
+| `StringExtensions` | `Broiler.JavaScript.Core.Extensions` | Core | 2026-03-21 |
+| `JSValue` | `Broiler.JavaScript.Core.Core` | Core | 2026-03-21 |
+| `Arguments` | `Broiler.JavaScript.Core.Core` | Core | 2026-03-21 |
+| `PropertyKey` | `Broiler.JavaScript.Core.Core` | Core | 2026-03-21 |
+| `JSFunctionDelegate` | `Broiler.JavaScript.Core.Core` | Core | 2026-03-21 |
+| `IElementEnumerator` | `Broiler.JavaScript.Core.Core` | Core | 2026-03-21 |
+| `IJSPrototype` | `Broiler.JavaScript.Core.Core` | *New* (interface) | 2026-03-21 |
+| `IJSSymbol` | `Broiler.JavaScript.Core.Core` | *New* (interface) | 2026-03-21 |
 
 ### Current Storage Assembly Contents (Types Moved from Core)
 
@@ -2848,67 +2886,67 @@ compatibility. Original namespaces are preserved for backward compatibility.
 
 ### Phase 9 Blockers — Detailed Dependency Analysis
 
-#### Why Phase 9b (JSValue/JSContext → Runtime) Is the Critical Path
+#### Phase 9b Status: ✅ Complete (Core Value Types Moved)
 
-Almost all remaining extraction work is blocked by Phase 9b. The core value type
-system (`JSValue`, `JSContext`, `JSObject`, `JSFunction`) forms a tightly coupled
-graph that is referenced by **500+ files** across all assemblies. Until these
-types move to Runtime, no other significant extraction can proceed:
+Phase 9b has been completed. `JSValue`, `Arguments`, `PropertyKey`,
+`JSFunctionDelegate`, and `IElementEnumerator` have been moved to the Runtime
+assembly. New interface abstractions (`IJSPrototype`, `IJSSymbol`) were created
+to decouple the moved types from concrete Core classes.
 
-| Blocked Item | Depends On | Phase |
-|-------------|-----------|-------|
-| `KeyString`/`KeyStrings` → Runtime | `JSSymbol`, `JSString`, `JSValue` (Core types) | 9a |
+The remaining extraction work (Phase 9c: `JSObject`, `JSFunction`, `JSContext`)
+is still blocked by extensive cross-assembly dependencies (~500+ files).
+
+| Item | Depends On | Status |
+|------|-----------|--------|
+| ~~`KeyString`/`KeyStrings`~~ → Storage | ~~`JSSymbol`, `JSString`, `JSValue`~~ | ✅ 9a |
 | ~~`JSProperty`~~ → Storage | ~~`JSValue`, `JSFunction`~~ → `IPropertyValue`/`IPropertyAccessor` | ✅ 9a |
 | ~~`PropertySequence`/`ElementArray`~~ → Storage | ~~`JSValue`, `JSFunction`, `JSContext`~~ → `IPropertyValue`/`IPropertyAccessor` | ✅ 9a |
-| `IBuiltInRegistry` → Runtime | `JSContext` parameter type | 9b |
-| `IClrInterop` → Runtime | `JSValue` parameter/return types | 9b |
-| `IDebugger` → Runtime | `JSValue` parameter types | 9b |
-| `IJSCompiler` → Runtime | `JSFunctionDelegate`, `ICodeCache` (Core types) | 9b |
-| Additional BuiltIns → BuiltIns | Deep structural coupling to `JSArray`, `JSString`, etc. | 6 |
+| ~~`JSValue`/`Arguments`/`PropertyKey`~~ → Runtime | Interface abstractions + factory delegates | ✅ 9b |
+| ~~`JSFunctionDelegate`/`IElementEnumerator`~~ → Runtime | `JSValue`, `Arguments` (moved simultaneously) | ✅ 9b |
+| `IBuiltInRegistry` → Runtime | `JSContext` parameter type (still in Core) | ⏳ 9c |
+| `IClrInterop` → Runtime | `JSValue` in Runtime ✅ but refs `JSObject` in Core | ⏳ 9c |
+| `IDebugger` → Runtime | `JSValue` in Runtime ✅ but refs `JSContext` in Core | ⏳ 9c |
+| `IJSCompiler` → Runtime | `JSFunctionDelegate` in Runtime ✅; `ICodeCache` still in Core | ⏳ 9c |
+| Additional BuiltIns → BuiltIns | Deep structural coupling to `JSArray`, `JSString`, etc. | ⏳ Phase 6 |
 
-#### Circular Dependency: Runtime ↔ Storage
+#### Circular Dependency: Runtime ↔ Storage — Resolved
 
-The central architectural challenge for Phase 9b is:
+The original circular dependency between Runtime and Storage has been resolved
+through interface abstractions:
 
 ```
-Runtime → Storage:  JSObject uses SAUint32Map<JSProperty>, PropertySequence,
-                    StringMap<JSProperty> for property storage.
+Runtime → Storage:  JSValue uses PropertySequence, ElementArray, KeyString
+                    (via Storage project reference — one-way dependency ✅)
 
-Storage → Runtime:  JSProperty uses IPropertyValue/IPropertyAccessor (resolved ✅).
-                    PropertySequence uses IPropertyValue/IPropertyAccessor params (resolved ✅).
-                    ElementArray uses IPropertyValue/IPropertyAccessor params (resolved ✅).
+Storage → Runtime:  JSProperty uses IPropertyValue/IPropertyAccessor (Ast ✅).
+                    PropertySequence uses IPropertyValue/IPropertyAccessor params (Ast ✅).
+                    ElementArray uses IPropertyValue/IPropertyAccessor params (Ast ✅).
+                    No dependency on Runtime assembly. ✅
 ```
 
-**Resolution strategy (from Section 10):**
-1. Move `JSValue`/`JSContext`/`JSObject`/`JSFunction` to Runtime first (Phase 9b).
-2. Then move `KeyString`/`KeyStrings` to Runtime (Phase 9a, after 9b).
-3. Convert `JSProperty` fields to `IPropertyValue`/`IPropertyAccessor` interfaces
-   (already defined in Ast) so `JSProperty` can live in Storage without depending
-   on Runtime.
-4. Move `JSProperty`/`PropertySequence`/`ElementArray` to Storage.
+#### Post-Phase 9b Extraction Status
 
-#### Pre-Phase 9b Extraction Status (All Movable Types Extracted)
+Types now in Runtime:
+- ✅ `IJSModuleResolver`, `ExportAttribute`, `DefaultExportAttribute` (contracts)
+- ✅ `CancellableDisposableAction`, `ObjectStatus`, `StringExtensions` (utilities)
+- ✅ `JSValue`, `Arguments`, `PropertyKey` (core value types)
+- ✅ `JSFunctionDelegate`, `IElementEnumerator` (delegates/interfaces)
+- ✅ `IJSPrototype`, `IJSSymbol` (new interface abstractions)
 
-All types that can move to Runtime without Phase 9b are now moved:
-- ✅ `IJSModuleResolver` (interface, no runtime deps)
-- ✅ `ExportAttribute` (attribute, extends `System.Attribute` only)
-- ✅ `DefaultExportAttribute` (attribute, extends `ExportAttribute` only)
-- ✅ `CancellableDisposableAction` (utility, uses only `System.Action`)
-
-**No further pre-Phase 9b extraction is possible.** All remaining types in Core
-depend on `JSValue`, `JSContext`, or other Core types.
+Types remaining in Core (Phase 9c candidates):
+- `JSObject` (~1050 lines), `JSFunction`, `JSContext`, `JSPrototype`, `JSSymbol`
+- `CoreScript`, `Bootstrap`, contract interfaces
 
 ### Remaining Refactor Milestones
 
 | # | Milestone | Status | Key Blockers | Estimated Effort |
 |---|-----------|--------|-------------|-----------------|
-| 1 | Phase 9b — Move core value types to Runtime | ⏳ Not started | Circular dependency Runtime↔Storage; 500+ file references; API breakage risk | **High** — largest single extraction |
-| 2 | Phase 9a — Move KeyString/KeyStrings to Storage | ✅ **Complete** | Moved to Storage (not Ast) to avoid circular dependency | — |
-| 3 | Phase 9a — Move JSProperty to Storage | ✅ **Complete** | Moved with interface-typed fields (`IPropertyValue`/`IPropertyAccessor`); `JSPropertyFactory` in Core | — |
-| 3b | Phase 9a — Move PropertySequence/ElementArray to Storage | ✅ **Complete** | Moved with interface-typed params; `PropertyValueEnumerator` in Core; `Comparison<IPropertyValue>` sorting | — |
-| 4 | Contract interfaces → Runtime | ⏳ Blocked | Depends on Phase 9b (JSValue/JSContext) | Low — 4 interfaces to move |
-| 5 | Phase 6 — Additional BuiltIns extraction | ⏳ Partially blocked | Deep structural coupling (JSArray 13, JSString 8, JSRegExp 7, JSError 6 type checks); internal field access (partially resolved: JSObject status methods now public) | High |
-| 6 | `InternalsVisibleTo` final cleanup | ⏳ | Remove remaining bridges after Phase 9 | Low |
+| 1 | Phase 9a — Move storage types to Storage | ✅ **Complete** | — | — |
+| 2 | Phase 9b — Move core value types to Runtime | ✅ **Complete** | JSValue, Arguments, PropertyKey, JSFunctionDelegate, IElementEnumerator moved | — |
+| 3 | Phase 9c — Move JSObject/JSFunction/JSContext to Runtime | ⏳ Not started | ~500+ file references; requires extensive factory work | **High** |
+| 4 | Contract interfaces → Runtime | ⏳ Blocked by 9c | Depends on JSContext/JSObject remaining in Core | Low — 4 interfaces |
+| 5 | Phase 6 — Additional BuiltIns extraction | ⏳ Partially blocked | Deep structural coupling (JSArray, JSString, etc.) | High |
+| 6 | `InternalsVisibleTo` final cleanup | ⏳ | Remove remaining bridges after Phase 9c | Low |
 | 7 | Coverage enforcement gate | ⏳ | Requires coverage baselines | Low |
 
 ### Integration and Cleanup Status
@@ -2921,11 +2959,11 @@ depend on `JSValue`, `JSContext`, or other Core types.
 | **Meta-Package** | ✅ Complete | `Broiler.JavaScript.All` created; downstream consumers updated |
 | **Downstream Consumers** | ✅ Complete | `Broiler.App` and `Broiler.Cli` use `All` meta-package |
 | **Migration Bridges** | ✅ Complete | All `InternalsVisibleTo` migration bridges eliminated |
-| **TypeForwardedTo** | ✅ Active | 47 forwarding attributes in Core for binary compatibility |
+| **TypeForwardedTo** | ✅ Active | 21 forwarding attributes in Core for binary compatibility |
 | **Global Using** | ✅ Active | `Broiler.JavaScript.Ast`, `.Parser`, `.Storage` in Core's `GlobalUsings.cs` |
 | **External Consumer** | ⏳ Pending | `WebAtoms.XF` `InternalsVisibleTo` entry retained; needs external coordination |
 
-### Verification (2026-03-20)
+### Verification (2026-03-21)
 
 All 10 production assemblies compile with zero errors.
 All **998** tests pass across 10 test projects:
@@ -3418,16 +3456,15 @@ All **998** tests pass across 10 test projects:
 
 ### Next Immediate Steps
 
-1. **Phase 9b (critical path):** Move `JSValue`, `JSObject`, `JSFunction`,
-   `JSContext`, `Arguments`, `CoreScript`, `Bootstrap` to Runtime. This is the
-   largest remaining task (~500+ file references to update). Recommended
-   approach: start with `JSValue` as the base type, then cascade to dependent
-   types.
-2. **Contract interfaces:** Once Phase 9b completes, move `IBuiltInRegistry`,
+1. **Phase 9c (future):** Move `JSObject`, `JSFunction`, `JSContext`,
+   `JSPrototype`, `JSSymbol`, `CoreScript`, `Bootstrap` to Runtime. This is the
+   largest remaining task (~500+ file references to update). Requires extensive
+   factory delegate work for Core-only type construction.
+2. **Contract interfaces:** Once Phase 9c completes, move `IBuiltInRegistry`,
    `IClrInterop`, `IDebugger`, `IJSCompiler` to Runtime.
 3. **BuiltIns extraction (Phase 6):** Continue extracting built-in objects
-   (JSArray, JSString, JSNumber, etc.) — blocked by Phase 9b for assembly
-   dependency reasons.
+   (JSArray, JSString, JSNumber, etc.) — partially blocked by Phase 9c for
+   assembly dependency reasons.
 
 *This roadmap tracks the creation and documentation of the refactor plan, not
 the refactor itself. Implementation issues should be created per milestone
@@ -3439,12 +3476,10 @@ and linked back to this document.*
 
 ### Overview
 
-Phase 9b requires simultaneously moving the core value type system
-(`JSValue`, `JSObject`, `JSFunction`, `JSContext`, `Arguments`,
-`JSSymbol`, `JSPrototype`, `PropertyKey`, `JSFunctionDelegate`,
-`IElementEnumerator`) from Core to Runtime. This section documents
-the preparatory infrastructure already in place and the dependency
-analysis needed to plan the move.
+Phase 9b moved the core value type system (`JSValue`, `Arguments`,
+`PropertyKey`, `JSFunctionDelegate`, `IElementEnumerator`) from Core to Runtime.
+This section documents the preparatory infrastructure and the dependency
+analysis that guided the move. Phase 9b is now **complete** (see Section 22).
 
 ### Preparatory Changes Already Completed
 
@@ -3540,3 +3575,179 @@ Each dependency has its own transitive dependencies:
 - **New factory delegates needed:** ~30-40 (for Core-specific type
   construction and error creation in moved files)
 - **TypeForwardedTo entries:** ~10 new entries in Core `AssemblyInfo.cs`
+
+---
+
+## 22. Phase 9b Completion — Core Value Types Moved to Runtime (2026-03-21)
+
+### Overview
+
+Phase 9b successfully moves the core value type system from Core to the Runtime
+assembly. This includes `JSValue` (the base class for all JavaScript values),
+`Arguments` (function call argument passing), `PropertyKey` (union of string and
+symbol keys), `JSFunctionDelegate` (function signature delegate), and
+`IElementEnumerator` (spread/iteration interface). Two new interface abstractions
+(`IJSPrototype`, `IJSSymbol`) were created to decouple the moved types from
+concrete Core classes that remain in Core.
+
+### Types Moved to Runtime
+
+| Type | Lines | Namespace | Purpose |
+|------|-------|-----------|---------|
+| `JSValue` | ~784 | `Broiler.JavaScript.Core.Core` | Base class for all JS values; arithmetic, comparison, property access |
+| `Arguments` | ~640 | `Broiler.JavaScript.Core.Core` | Function call argument struct; spread support, rest parameters |
+| `PropertyKey` | ~32 | `Broiler.JavaScript.Core.Core` | Union struct: string key (`KeyString`) or symbol key (`IJSSymbol`) |
+| `JSFunctionDelegate` | ~6 | `Broiler.JavaScript.Core.Core` | Delegate type: `delegate JSValue JSFunctionDelegate(in Arguments a)` |
+| `IElementEnumerator` | ~12 | `Broiler.JavaScript.Core.Core` | Interface for array/spread enumeration |
+
+### New Interface Abstractions
+
+Two interfaces were created in Runtime to abstract over concrete Core types:
+
+#### `IJSPrototype` (29 lines)
+
+Abstracts over the `JSPrototype` class (which remains in Core). Provides:
+- `Object` property — the wrapped JS object
+- `GetInternalProperty(KeyString)` — string-keyed property lookup
+- `GetInternalProperty(uint)` — index-keyed property lookup
+- `GetInternalProperty(IJSSymbol)` — symbol-keyed property lookup
+- `GetMethod(KeyString)` — method delegate lookup
+- `Dirty()` — marks prototype chain as stale
+
+`JSPrototype` in Core implements this interface. `JSValue.prototypeChain`
+field changed from `JSPrototype` to `IJSPrototype`.
+
+#### `IJSSymbol` (12 lines)
+
+Abstracts over the `JSSymbol` class (which remains in Core). Provides:
+- `Key` property — the unique numeric key identifying the symbol
+
+`JSSymbol` in Core implements this interface. `JSValue` virtual methods
+accept `IJSSymbol` parameters instead of `JSSymbol`.
+
+### Factory Delegates Added
+
+Two new factory delegates were added to `JSValue` for Phase 9b:
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `CreatePrototypeObject` | `Func<JSValue, IJSPrototype>` | Creates `JSPrototype` wrapper from a `JSValue` (wired to `(value as JSObject)?.PrototypeObject`) |
+| `InvokePropertyGetter` | `Func<IPropertyAccessor, JSValue, JSValue>` | Invokes a property getter function (wired to `((JSFunction)getter).InvokeFunction(new Arguments(receiver))`) |
+
+These join the 6 existing factory delegates (total: 8 delegates wired via
+`[ModuleInitializer]` in `JSValueCoreExtensions.InitializeFactories()`).
+
+### `JSValueCoreExtensions` Module Initializer
+
+The `JSValueCoreExtensions.InitializeFactories()` method (Core assembly) wires
+all factory delegates at Core assembly load time:
+
+```csharp
+[ModuleInitializer]
+internal static void InitializeFactories()
+{
+    // Singleton values
+    JSValue.UndefinedValue = JSUndefined.Value;
+    JSValue.NullValue = JSNull.Value;
+    JSValue.BooleanTrue = JSBoolean.True;
+    JSValue.BooleanFalse = JSBoolean.False;
+    JSValue.NumberOne = JSNumber.One;
+    JSValue.NumberNaN = JSNumber.NaN;
+
+    // Factory delegates
+    JSValue.CreateNumber = v => new JSNumber(v);
+    JSValue.CreateString = v => new JSString(v);
+    JSValue.NewTypeError = msg => JSContext.NewTypeError(msg);
+    JSValue.NumberToECMAString = JSNumber.ToECMAString;
+    JSValue.CreateDynamicMetaObject = (param, value) => new JSDynamicMetaData(param, value);
+    JSValue.ForceConvertHelper = ...;  // CLR interop unwrap
+    JSValue.InvokePropertyGetter = (getter, receiver) =>
+        ((JSFunction)getter).InvokeFunction(new Arguments(receiver));
+    JSValue.CreatePrototypeObject = value => (value as JSObject)?.PrototypeObject;
+
+    // Arguments delegates
+    Arguments.Empty = new Arguments(JSUndefined.Value);
+    Arguments.ForApplyImpl = ArgumentsCoreExtensions.ForApplyCore;
+    Arguments.RestFromImpl = ArgumentsCoreExtensions.RestFromCore;
+    Arguments.GetStringImpl = ArgumentsCoreExtensions.GetStringCore;
+    Arguments.GetSpreadTarget = ArgumentsCoreExtensions.GetSpreadTargetCore;
+}
+```
+
+### TypeForwardedTo Attributes
+
+7 new `TypeForwardedTo` entries added to Core `AssemblyInfo.cs`:
+
+```csharp
+[assembly: TypeForwardedTo(typeof(JSValue))]
+[assembly: TypeForwardedTo(typeof(Arguments))]
+[assembly: TypeForwardedTo(typeof(PropertyKey))]
+[assembly: TypeForwardedTo(typeof(JSFunctionDelegate))]
+[assembly: TypeForwardedTo(typeof(IElementEnumerator))]
+[assembly: TypeForwardedTo(typeof(IJSPrototype))]
+[assembly: TypeForwardedTo(typeof(IJSSymbol))]
+```
+
+Total TypeForwardedTo attributes in Core `AssemblyInfo.cs`: **21**.
+
+### InternalsVisibleTo in Runtime
+
+Runtime `AssemblyInfo.cs` grants `InternalsVisibleTo` to all satellite
+assemblies that need access to `JSValue`'s internal factory fields:
+
+```
+Broiler.JavaScript.Core
+Broiler.JavaScript.Core.Tests
+Broiler.JavaScript.Clr
+Broiler.JavaScript.Compiler
+Broiler.JavaScript.Modules
+Broiler.JavaScript.BuiltIns
+Broiler.JavaScript.Debugger
+```
+
+### Build Fixes Required
+
+Several build fixes were needed after the move:
+
+1. **JSValueBuilder reflection** — Updated `PrototypeChain` field type from
+   `JSPrototype` to `IJSPrototype` and super indexer parameter types from
+   `typeof(JSObject)` to `typeof(JSValue)`.
+2. **Ambiguous indexer casts** — `JSSymbol` satisfies both `IJSSymbol` and
+   `JSValue` indexer overloads; disambiguated with explicit `(IJSSymbol)` casts.
+3. **`IElementEnumerator` using directive** — Updated from
+   `Broiler.JavaScript.Core.Enumerators` to `Broiler.JavaScript.Core.Core`.
+4. **`InvokePropertyGetter` delegate** — Initially missing; caused
+   `NullReferenceException` in prototype chain property access until wired.
+
+### Architecture Impact
+
+Runtime assembly now contains 14 source files (up from 8 before Phase 9b).
+The assembly dependency graph remains acyclic:
+
+```
+Ast ← Storage ← Runtime ← Core ← {Compiler, Clr, Modules, BuiltIns, Debugger}
+```
+
+Runtime depends on:
+- `Broiler.JavaScript.Ast` (for `IPropertyValue`, `IPropertyAccessor`, `StringSpan`)
+- `Broiler.JavaScript.Storage` (for `KeyString`, `JSProperty`, `PropertySequence`, `ElementArray`)
+- `Broiler.JavaScript.ExpressionCompiler` (for `YExpression<T>` in `IJSCompiler`)
+
+### Test Results
+
+All **998** tests pass across 10 test projects:
+- Core: 641, Ast: 73, Parser: 78, Storage: 100, Debugger: 23, Clr: 29,
+  Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 20.
+
+### Remaining Work (Phase 9c+)
+
+| Task | Status | Blocked By |
+|------|--------|------------|
+| Move `JSObject` to Runtime | ⏳ | ~500+ file references; `PropertySequence`/`ElementArray` usage |
+| Move `JSFunction` to Runtime | ⏳ | Depends on `JSObject` move |
+| Move `JSContext` to Runtime | ⏳ | Depends on `JSObject`/`JSFunction` moves |
+| Move `JSPrototype`, `JSSymbol` to Runtime | ⏳ | Depends on `JSObject` move; currently implement `IJSPrototype`/`IJSSymbol` |
+| Move `CoreScript`, `Bootstrap` to Runtime | ⏳ | Depends on `JSContext` move |
+| Move contract interfaces to Runtime | ⏳ | Depends on `JSContext`/`JSObject` moves |
+| Additional BuiltIns extraction | ⏳ | Deep structural coupling |
+| `InternalsVisibleTo` final cleanup | ⏳ | After all Phase 9 sub-phases complete |
