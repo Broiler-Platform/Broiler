@@ -13,6 +13,8 @@ public partial class JSSymbol: JSValue, IJSSymbol
     private readonly string name;
     public readonly uint Key;
 
+    uint IJSSymbol.Key => Key;
+
     public override bool BooleanValue => true;
 
     public override bool IsSymbol => true;

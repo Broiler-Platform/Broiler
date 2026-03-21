@@ -54,7 +54,7 @@ public class JSValueBuilder
     public static Expression UIntValue(Expression exp) => exp.PropertyExpression<JSValue, uint>(() => (x) => x.UIntValue);
 
     public static Expression PrototypeChain(Expression exp) =>
-        exp.FieldExpression<JSValue, JSPrototype>(() => (x) => x.prototypeChain).FieldExpression<JSPrototype, JSObject>(() => (x) => x.@object);
+        exp.FieldExpression<JSValue, JSPrototype>(() => (x) => (JSPrototype)x.prototypeChain).FieldExpression<JSPrototype, JSObject>(() => (x) => x.@object);
 
     public static Expression Negate(Expression exp) => exp.CallExpression<JSValue, JSValue>(() => (x) => x.Negate());
 

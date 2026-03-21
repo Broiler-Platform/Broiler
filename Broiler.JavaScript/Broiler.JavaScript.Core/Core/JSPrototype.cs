@@ -58,8 +58,8 @@ public class JSPrototype : IJSPrototype
         var @object = target.@object;
 
         var @base = @object.prototypeChain;
-        if (@base != null && @base != this)
-            Build(ps, @base);
+        if (@base is JSPrototype baseProto && baseProto != this)
+            Build(ps, baseProto);
 
         // if it is registered, remove it first
         @object.PropertyChanged -= @object_PropertyChanged;
@@ -95,6 +95,9 @@ public class JSPrototype : IJSPrototype
 
     JSValue IJSPrototype.Object => @object;
     JSProperty IJSPrototype.GetInternalProperty(IJSSymbol symbol) => GetInternalProperty((JSSymbol)symbol);
+    JSProperty IJSPrototype.GetInternalProperty(in KeyString name) => GetInternalProperty(name);
+    JSProperty IJSPrototype.GetInternalProperty(uint name) => GetInternalProperty(name);
+    JSFunctionDelegate IJSPrototype.GetMethod(in KeyString key) => GetMethod(key);
     void IJSPrototype.Dirty() => Dirty();
 
     internal void Dirty() => dirty = true;

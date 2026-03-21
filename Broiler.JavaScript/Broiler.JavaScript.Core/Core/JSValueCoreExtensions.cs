@@ -27,7 +27,7 @@ internal static class JSValueCoreExtensions
         JSValue.CreateDynamicMetaObject = (param, value) => new JSDynamicMetaData(param, value);
         JSValue.ForceConvertHelper = (jsValue, type, _) =>
         {
-            var protoObj = jsValue.prototypeChain?.@object;
+            var protoObj = (jsValue.prototypeChain as JSPrototype)?.@object;
             if (protoObj != null
                 && JSContext.ClrInterop.TryUnwrapClrObject(protoObj, out var clrObj))
             {

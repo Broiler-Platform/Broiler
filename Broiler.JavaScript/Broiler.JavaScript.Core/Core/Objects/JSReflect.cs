@@ -95,7 +95,7 @@ public partial class JSReflect : JSObject
 
         if (key.IsSymbol)
         {
-            p = @object.GetInternalProperty(key.Symbol);
+            p = @object.GetInternalProperty((JSSymbol)key.Symbol);
         }
         else
         {
@@ -138,7 +138,7 @@ public partial class JSReflect : JSObject
         JSProperty p;
         if (key.IsSymbol)
         {
-            p = @object.GetInternalProperty(key.Symbol);
+            p = @object.GetInternalProperty((JSSymbol)key.Symbol);
         }
         else
         {

@@ -19,7 +19,7 @@ public partial class JSBoolean : JSPrimitive
     [JSExport(IsConstructor = true)]
     public static JSValue Constructor(in Arguments a) => (a[0]?.BooleanValue ?? false) ? True : False;
 
-    protected override JSObject GetPrototype() => GetCurrentPrototype();
+    protected override JSObject GetPrototype() => (JSObject)GetCurrentPrototype();
 
     public override double DoubleValue => _value ? 1 : 0;
 

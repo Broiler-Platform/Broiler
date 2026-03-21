@@ -1,4 +1,6 @@
+using Broiler.JavaScript.Ast;
 using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Core.Extensions;
 using System;
 using System.ComponentModel;
 using System.Data;
@@ -33,6 +35,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
     internal static Func<Expression, JSValue, DynamicMetaObject> CreateDynamicMetaObject;
     internal static Func<double, string> NumberToECMAString;
     internal static Func<JSValue, IJSPrototype> CreatePrototypeObject;
+    internal static Func<IPropertyAccessor, JSValue, JSValue> InvokePropertyGetter;
 
     /// <summary>Gets whether this value is the <c>undefined</c> singleton.</summary>
     public bool IsUndefined
@@ -267,13 +270,26 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
             return;
         }
 
-        if (target is not JSObject proto)
+        if (!target.IsObject)
             throw NewTypeError($"Prototype must be an object or null");
 
-        BasePrototypeObject = proto;
+        BasePrototypeObject = target;
     }
 
     public virtual JSValue GetOwnPropertyDescriptor(JSValue name) => throw new NotImplementedException();
+
+    /// <summary>
+    /// Resolves a <see cref="JSProperty"/> to its runtime value, invoking
+    /// getters via the <see cref="InvokePropertyGetter"/> factory delegate.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public JSValue GetValue(in JSProperty p)
+    {
+        if (p.IsEmpty)
+            return UndefinedValue;
+
+        return !p.IsProperty ? (JSValue)p.value : InvokePropertyGetter(p.get, this);
+    }
 
     public virtual JSValue GetOwnProperty(in KeyString name)
     {

@@ -158,7 +158,7 @@ public static partial class JSValueExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSValue InvokeMethod(this JSValue @this, JSSymbol name, in Arguments a)
     {
-        var fx = @this[name];
+        var fx = @this[(IJSSymbol)name];
         if (fx.IsUndefined)
             throw JSContext.NewTypeError($"Method {name} not found on {@this}");
 
@@ -173,7 +173,7 @@ public static partial class JSValueExtensions
             return @this.InvokeMethod(key.Index, a);
 
         if (key.IsSymbol)
-            return @this.InvokeMethod(key.Symbol, a);
+            return @this.InvokeMethod((JSSymbol)key.Symbol, a);
 
         return @this.InvokeMethod(in key.KeyString, a);
     }
@@ -253,7 +253,7 @@ public static partial class JSValueExtensions
             yield return (KeyStringCoreExtensions.GetJSString(p.key), value.GetValue(in p));
         }
 
-        var @base = value.prototypeChain?.@object;
+        var @base = value.(prototypeChain as JSPrototype)?.@object;
         if (@base != value && @base != null)
         {
             foreach (var bp in @base.GetAllEntries(showEnumerableOnly))
@@ -272,7 +272,7 @@ public static partial class JSValueExtensions
         if (!value.IsFunction)
             throw JSContext.NewTypeError("Right side of instanceof is not a function");
 
-        var p = target.prototypeChain?.@object;
+        var p = target.(prototypeChain as JSPrototype)?.@object;
         if (p == null)
             return JSBoolean.False;
 

@@ -88,7 +88,7 @@ public static class JSObjectExtensions
                 FastAddSetter(target, k.Index, setter, attributes);
                 return;
             case KeyType.Symbol:
-                FastAddSetter(target, k.Symbol, setter, attributes);
+                FastAddSetter(target, (JSSymbol)k.Symbol, setter, attributes);
                 return;
             default:
                 throw new NotSupportedException();
@@ -108,7 +108,7 @@ public static class JSObjectExtensions
                 FastAddGetter(target, k.Index, getter, attributes);
                 return;
             case KeyType.Symbol:
-                FastAddGetter(target, k.Symbol, getter, attributes);
+                FastAddGetter(target, (JSSymbol)k.Symbol, getter, attributes);
                 return;
             default:
                 throw new NotSupportedException();
@@ -186,7 +186,7 @@ public static class JSObjectExtensions
     {
         var key = name.ToKey();
         if (key.IsSymbol)
-            return AddProperty(target, key.Symbol, value, attributes);
+            return AddProperty(target, (JSSymbol)key.Symbol, value, attributes);
 
         if (key.IsUInt)
             return target.AddProperty(key.Index, value, attributes);
@@ -199,7 +199,7 @@ public static class JSObjectExtensions
     {
         var key = name.ToKey();
         if (key.IsSymbol)
-            return AddProperty(target, key.Symbol, getter, setter, attributes);
+            return AddProperty(target, (JSSymbol)key.Symbol, getter, setter, attributes);
 
         if (key.IsUInt)
             return target.AddProperty(key.Index, getter, setter, attributes);

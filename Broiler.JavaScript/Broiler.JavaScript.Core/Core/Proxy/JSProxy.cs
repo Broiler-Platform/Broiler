@@ -73,7 +73,7 @@ public partial class JSProxy : JSObject
     {
         var fx = handler[KeyStrings.get];
         if (fx is JSFunction fxFunction)
-            return fxFunction.InvokeFunction(new Arguments(target, target, key, receiver));
+            return fxFunction.InvokeFunction(new Arguments(target, target, (JSValue)(JSSymbol)key, receiver));
 
         return target.GetValue(key, receiver, throwError);
     }
@@ -101,7 +101,7 @@ public partial class JSProxy : JSObject
         var fx = handler[KeyStrings.set];
         if (fx is JSFunction fxFunction)
         {
-            fxFunction.InvokeFunction(new Arguments(target, target, name, receiver));
+            fxFunction.InvokeFunction(new Arguments(target, target, (JSValue)(JSSymbol)name, receiver));
             return true;
         }
 

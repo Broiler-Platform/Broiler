@@ -232,7 +232,7 @@ public partial class JSObject : JSValue
                 return;
 
             default:
-                FastAddValue(k.Symbol, value, attributes);
+                FastAddValue((JSSymbol)k.Symbol, value, attributes);
                 return;
         }
     }
@@ -253,7 +253,7 @@ public partial class JSObject : JSValue
                 return;
 
             default:
-                FastAddProperty(k.Symbol, getter, setter, attributes);
+                FastAddProperty((JSSymbol)k.Symbol, getter, setter, attributes);
                 return;
         }
     }
@@ -565,7 +565,7 @@ public partial class JSObject : JSValue
             KeyType.Empty => JSBoolean.False,
             KeyType.UInt => DefineProperty(k.Index, propertyDescription),
             KeyType.String => DefineProperty(k.KeyString, propertyDescription),
-            KeyType.Symbol => DefineProperty(k.Symbol, propertyDescription),
+            KeyType.Symbol => DefineProperty((JSSymbol)k.Symbol, propertyDescription),
             _ => JSBoolean.False,
         };
     }
@@ -952,7 +952,7 @@ public partial class JSObject : JSValue
         }
 
         if (prototypeChain != null)
-            return prototypeChain.TryRemove(i, out p);
+            return ((JSPrototype)prototypeChain).TryRemove(i, out p);
 
         return false;
     }
