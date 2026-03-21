@@ -206,7 +206,7 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
 
             if (inherited)
             {
-                var @base = jSObject.(prototypeChain as JSPrototype)?.@object;
+                var @base = (jSObject.prototypeChain as JSPrototype)?.@object;
                 if (@base != null && @base != jSObject)
                     parent = new KeyEnumerator(@base, showEnumerableOnly, inherited);
             }

@@ -253,7 +253,7 @@ public static partial class JSValueExtensions
             yield return (KeyStringCoreExtensions.GetJSString(p.key), value.GetValue(in p));
         }
 
-        var @base = value.(prototypeChain as JSPrototype)?.@object;
+        var @base = (value.prototypeChain as JSPrototype)?.@object;
         if (@base != value && @base != null)
         {
             foreach (var bp in @base.GetAllEntries(showEnumerableOnly))
@@ -272,7 +272,7 @@ public static partial class JSValueExtensions
         if (!value.IsFunction)
             throw JSContext.NewTypeError("Right side of instanceof is not a function");
 
-        var p = target.(prototypeChain as JSPrototype)?.@object;
+        var p = (target.prototypeChain as JSPrototype)?.@object;
         if (p == null)
             return JSBoolean.False;
 

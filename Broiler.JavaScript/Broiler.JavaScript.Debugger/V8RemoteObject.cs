@@ -97,11 +97,11 @@ public class V8RemoteObject
         }
 
         Type = "object";
-        var id = v[systemID];
+        var id = v[(IJSSymbol)systemID];
         if (id.IsUndefined)
         {
             var idStr = GCHandle.ToIntPtr(GCHandle.Alloc(v, GCHandleType.Normal)).ToInt64().ToString();
-            v[systemID] = new JSString(idStr);
+            v[(IJSSymbol)systemID] = new JSString(idStr);
             ObjectId = idStr;
         }
         else
@@ -131,7 +131,7 @@ public class V8RemoteObject
                 break;
         }
 
-        var p = v.prototypeChain?.@object;
+        var p = (v.prototypeChain as JSPrototype)?.@object;
         if (p != null)
         {
             var c = p[KeyStrings.constructor];

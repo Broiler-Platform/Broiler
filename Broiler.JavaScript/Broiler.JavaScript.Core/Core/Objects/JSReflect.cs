@@ -218,7 +218,7 @@ public partial class JSReflect : JSObject
         if (key.IsSymbol)
         {
             var symbol = key.Symbol;
-            var p = @object.GetInternalProperty(symbol, false);
+            var p = @object.GetInternalProperty((JSSymbol)symbol, false);
         
             if (p.IsProperty)
             {
