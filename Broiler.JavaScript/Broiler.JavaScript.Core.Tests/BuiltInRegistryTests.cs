@@ -132,8 +132,10 @@ public class BuiltInRegistryTests : IDisposable
             _registerWithContext = register;
         }
 
-        public void Register(JSContext context)
+        public void Register(IJSContext ctx)
         {
+            var context = ctx as JSContext
+                ?? throw new ArgumentException("Expected JSContext instance", nameof(ctx));
             _registerWithContext?.Invoke(context);
             _registerSimple?.Invoke();
         }

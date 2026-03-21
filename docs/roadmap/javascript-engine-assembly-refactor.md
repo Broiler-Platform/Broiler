@@ -227,7 +227,7 @@ later compiled to IL by ExpressionCompiler).
 **Purpose:** Core value type system and cross-cutting contracts — the base types
 and interfaces every other assembly needs to interact with JavaScript values.
 
-**Current Contents (Phase 9c — contract interfaces complete):**
+**Current Contents (Phase 9c+ — all contract interfaces complete):**
 - `JSValue` — base class for all JavaScript values (arithmetic, comparison, property access)
 - `Arguments` — function invocation argument struct (spread support, rest parameters)
 - `PropertyKey` — union of string key (`KeyString`) and symbol key (`IJSSymbol`)
@@ -235,6 +235,7 @@ and interfaces every other assembly needs to interact with JavaScript values.
 - `IElementEnumerator` — interface for array/spread enumeration
 - `IJSPrototype` — interface abstracting the prototype chain
 - `IJSSymbol` — interface abstracting JavaScript Symbol values
+- `IJSContext` — minimal context abstraction for Runtime-level contracts
 - `ObjectStatus` — flags enum for object extensibility/freeze/seal state
 - `IJSModuleResolver` — ES module resolution contract
 - `ExportAttribute`, `DefaultExportAttribute` — module export markers
@@ -246,12 +247,12 @@ and interfaces every other assembly needs to interact with JavaScript values.
 - `ICodeCache` — compiled code caching contract
 - `JSCode` — code unit struct (location + source + compiler)
 - `JSCodeCompiler` — delegate for deferred compilation
+- `IBuiltInRegistry` — built-in registration contract
 
 **Future Contents (Phase 9c continued):**
 - `JSContext` — execution context (create, evaluate, dispose)
 - `JSObject`, `JSFunction`, `JSPrototype`
 - `CoreScript` — high-level compile-and-evaluate bridge
-- `IBuiltInRegistry` — built-in registration contract (blocked by `JSContext`)
 
 **Design Rules:**
 - Depends on **Ast** (for `IPropertyValue`/`IPropertyAccessor`, `StringSpan`),
@@ -519,7 +520,7 @@ Each extraction phase follows the same steps:
 
 ### Milestone 5 — Runtime Extraction and `InternalsVisibleTo` Elimination (Phases 9–10)
 
-**Status:** ⏳ Phase 10 complete; Phase 9a complete; Phase 9b complete; Phase 9c pending
+**Status:** ⏳ Phase 10 complete; Phase 9a complete; Phase 9b complete; Phase 9c contract interfaces complete; Phase 9c+ complete
 
 **Phase 9 — Runtime Extraction:**
 - [x] Move `IJSModuleResolver` to Runtime. ✅ (2026-03-20)
@@ -543,10 +544,11 @@ Each extraction phase follows the same steps:
   `CreatePrototypeObject`) via `[ModuleInitializer]`. ✅ (2026-03-21)
 - [x] Phase 9b: Add `TypeForwardedTo` for all moved types (7 new entries). ✅ (2026-03-21)
 - [ ] Phase 9c: Move `JSObject`, `JSFunction`, `JSContext`,
-  `CoreScript`, `Bootstrap` to Runtime.
-- [ ] Move remaining contract interfaces (`IBuiltInRegistry`, `IClrInterop`,
-  `IDebugger`, `IJSCompiler`) to Runtime. *Blocked by Phase 9c — interfaces
-  reference `JSContext`/`JSObject` which remain in Core.*
+  `CoreScript` to Runtime.
+- [x] Move remaining contract interfaces (`IBuiltInRegistry`, `IClrInterop`,
+  `IDebugger`, `IJSCompiler`) to Runtime. ✅ `IBuiltInRegistry` unblocked via
+  `IJSContext` interface abstraction (Phase 9c+, 2026-03-21).
+- [x] Phase 9c+: Create `IJSContext` interface in Runtime. ✅ (2026-03-21)
 
 **Phase 10 — `InternalsVisibleTo` Elimination and Final Cleanup:**
 - [x] Resolve all remaining Clr internal accesses (30 errors → 0). ✅ (2026-03-20)
@@ -804,7 +806,7 @@ The refactor is complete when:
 
 | # | Criterion | Status |
 |---|-----------|--------|
-| 1 | Core decomposed into separate assemblies | ⏳ 8 of 11 target assemblies extracted. Core value type base (`JSValue`, `Arguments`, `PropertyKey`) moved to Runtime (Phase 9b ✅). `JSObject`, `JSContext`, `JSFunction` remain in Core (Phase 9c). All storage types fully migrated to Storage assembly. |
+| 1 | Core decomposed into separate assemblies | ⏳ 8 of 11 target assemblies extracted. Core value type base (`JSValue`, `Arguments`, `PropertyKey`) moved to Runtime (Phase 9b ✅). All contract interfaces moved to Runtime (Phase 9c/9c+ ✅). `JSObject`, `JSContext`, `JSFunction` remain in Core. All storage types fully migrated to Storage assembly. |
 | 2 | Each assembly has test project with ≥ 90% coverage | ⏳ All 10 assemblies have test projects (998 tests). Coverage measurement integrated into CI via `coverlet.collector`. |
 | 3 | All existing Core.Tests pass | ✅ 641 Core.Tests pass. |
 | 4 | Downstream consumers build correctly | ✅ Explicit satellite assembly references added to `Broiler.Cli` and `Broiler.App`. |
@@ -829,7 +831,7 @@ The refactor is complete when:
 | 6 | BuiltIns | ⏳ Partial | 2026-03-20 | Deep structural coupling (JSArray 13, JSString 8, JSRegExp 7, JSError 6, JSPromise, JSProxy); internal field access (DataView, JSJSON, JSReflect). |
 | 7 | Compiler | ✅ Complete | 2026-03-20 | `InternalsVisibleTo` bridge **removed** ✅. |
 | 8 | Modules | ✅ Complete | 2026-03-20 | — |
-| 9 | Runtime | ⏳ In progress | 2026-03-21 | Phase 9a **complete**: all storage types moved to Storage. Phase 9b **complete** ✅: `JSValue`, `Arguments`, `PropertyKey`, `JSFunctionDelegate`, `IElementEnumerator` moved to Runtime; `IJSPrototype`/`IJSSymbol` interface abstractions created; factory delegates wired via `[ModuleInitializer]`. Phase 9c **in progress**: contract interfaces (`IDebugger`, `IClrInterop`, `IJSCompiler`, `ICodeCache`/`JSCode`/`JSCodeCompiler`) moved to Runtime ✅. Remaining: `JSObject`/`JSFunction`/`JSContext` → Runtime, `IBuiltInRegistry` (blocked by `JSContext`). |
+| 9 | Runtime | ⏳ In progress | 2026-03-21 | Phase 9a **complete**: all storage types moved to Storage. Phase 9b **complete** ✅: `JSValue`, `Arguments`, `PropertyKey`, `JSFunctionDelegate`, `IElementEnumerator` moved to Runtime; `IJSPrototype`/`IJSSymbol` interface abstractions created; factory delegates wired via `[ModuleInitializer]`. Phase 9c **complete** ✅: all contract interfaces (`IDebugger`, `IClrInterop`, `IJSCompiler`, `ICodeCache`/`JSCode`/`JSCodeCompiler`, `IBuiltInRegistry`) moved to Runtime. Phase 9c+ ✅: `IJSContext` abstraction created; `IBuiltInRegistry` unblocked. Remaining: `JSObject`/`JSFunction`/`JSContext`/`CoreScript` → Runtime. |
 | 10 | Cleanup | ✅ Complete | 2026-03-20 | All migration bridges removed; meta-package created; downstream consumers updated; CI workflow created; coverlet coverage integrated. |
 
 ### Phase 1 — Ast Extraction ✅
@@ -2197,15 +2199,15 @@ The primary blocker is a circular dependency between Runtime and Storage:
 - [ ] Move `CoreScript` to Runtime (Phase 9c — future work; `Bootstrap` does not exist).
 - [x] Move contract interfaces (`IClrInterop`, `IDebugger`, `IJSCompiler`) to
   Runtime ✅ (2026-03-21). `ICodeCache`, `JSCode`, `JSCodeCompiler` also moved.
-  `IBuiltInRegistry` remains in Core (blocked by `JSContext` parameter).
-- [ ] Move `IBuiltInRegistry` to Runtime (blocked by `JSContext` remaining in Core).
+  `IBuiltInRegistry` resolved in Phase 9c+ via `IJSContext` abstraction.
+- [x] Move `IBuiltInRegistry` to Runtime ✅ (2026-03-21, Phase 9c+ — via `IJSContext` interface).
 - [ ] Update downstream consumer docs (Section 11).
 
 ### Contracts to Move
 
 | Contract | Current Location | Target | Status |
 |----------|-----------------|--------|--------|
-| `IBuiltInRegistry` | Core | Runtime | ⏳ Blocked by `JSContext` |
+| `IBuiltInRegistry` | **Runtime** ✅ | — | ✅ Moved (2026-03-21, Phase 9c+ via `IJSContext`) |
 | `IClrInterop` | **Runtime** ✅ | — | ✅ Moved (2026-03-21) |
 | `IDebugger` | **Runtime** ✅ | — | ✅ Moved (2026-03-21) |
 | `IJSCompiler` | **Runtime** ✅ | — | ✅ Moved (2026-03-21) |
@@ -3806,11 +3808,12 @@ or its dependencies (Ast, Storage, ExpressionCompiler):
   `JSFunctionDelegate` (Runtime), `StringSpan` (Ast),
   `YExpression<T>` (ExpressionCompiler).
 
-### Blocked: `IBuiltInRegistry`
+### Resolved: `IBuiltInRegistry`
 
-`IBuiltInRegistry` could not be moved because its `Register(JSContext context)`
-method directly references `JSContext`, which remains in Core. This interface
-will be moved once `JSContext` is extracted to Runtime in a future phase.
+`IBuiltInRegistry` was initially blocked because its `Register(JSContext context)`
+method directly referenced `JSContext`. This was resolved in Phase 9c+ by
+introducing the `IJSContext` interface abstraction, allowing the contract to move
+to Runtime without extracting the full `JSContext` class. See Section 24.
 
 ### TypeForwardedTo Attributes
 
@@ -3836,8 +3839,10 @@ The assembly dependency graph remains acyclic:
 Ast ← Storage ← Runtime ← Core ← {Compiler, Clr, Modules, BuiltIns, Debugger}
 ```
 
-Runtime now owns all cross-cutting contract interfaces except `IBuiltInRegistry`:
+Runtime now owns all cross-cutting contract interfaces:
 - Module resolution: `IJSModuleResolver` (moved in earlier phase)
+- Context: `IJSContext` (Phase 9c+)
+- Built-in registration: `IBuiltInRegistry` (Phase 9c+)
 - Debugging: `IDebugger`
 - CLR interop: `IClrInterop`
 - Compilation: `IJSCompiler`, `ICodeCache`, `JSCode`, `JSCodeCompiler`
@@ -3858,7 +3863,7 @@ All **747** tests pass across 7 test projects:
 | Move `JSContext` to Runtime | ⏳ | Depends on `JSObject`/`JSFunction` moves |
 | Move `JSPrototype`, `JSSymbol` to Runtime | ⏳ | Depends on `JSObject` move |
 | Move `CoreScript` to Runtime | ⏳ | Depends on `JSContext` move |
-| Move `IBuiltInRegistry` to Runtime | ⏳ | Depends on `JSContext` move |
+| Move `IBuiltInRegistry` to Runtime | ✅ | Resolved in Phase 9c+ via `IJSContext` (Section 24) |
 | Additional BuiltIns extraction | ⏳ | Deep structural coupling |
 | `InternalsVisibleTo` final cleanup | ⏳ | After all Phase 9 sub-phases complete |
 
@@ -3868,10 +3873,9 @@ All **747** tests pass across 7 test projects:
    the repository. Either it was removed in a prior refactoring or was a
    placeholder name. No action needed.
 
-2. **`IBuiltInRegistry` migration path**: Once `JSContext` is moved to Runtime,
-   `IBuiltInRegistry` can follow immediately. Alternatively, the parameter type
-   could be abstracted to an interface (e.g., `IJSContext`), but this would add
-   significant complexity for limited benefit at this stage.
+2. **`IBuiltInRegistry` migration path**: Resolved in Phase 9c+ by abstracting
+   the parameter type to `IJSContext`. This proved to be a clean, low-disruption
+   solution. See Section 24 for details.
 
 3. **JSObject/JSFunction/JSContext extraction complexity**: These types are
    referenced by ~500+ files across Core, Compiler, Clr, BuiltIns, Modules, and
@@ -3886,4 +3890,157 @@ All **747** tests pass across 7 test projects:
 | Phase 9b (Value types) | — | 2026-03-21 | ✅ Complete |
 | Phase 9c (Contract interfaces) | — | 2026-03-21 | ✅ Complete (partial; `IBuiltInRegistry` blocked) |
 | Phase 9c (JSObject/JSFunction/JSContext) | — | TBD | ⏳ High effort (~500+ files) |
+| Phase 9c+ (IBuiltInRegistry unblocked) | — | 2026-03-21 | ✅ Complete |
 | Phase 10 (Final cleanup) | — | After Phase 9c | ⏳ Blocked by Phase 9c |
+
+## 24. Phase 9c+ — IJSContext Abstraction and IBuiltInRegistry Migration (2026-03-21)
+
+### Overview
+
+Phase 9c+ resolves the `IBuiltInRegistry` blocker that was identified during
+Phase 9c. Rather than waiting for the full `JSContext` extraction (which affects
+~500+ files), this phase introduces a minimal `IJSContext` interface abstraction
+in Runtime. This follows the same proven pattern used for `IJSPrototype` and
+`IJSSymbol` in Phase 9b — creating a thin interface in Runtime to break the
+dependency cycle, while the concrete implementation remains in Core.
+
+### Approach: Interface Abstraction over Full Extraction
+
+The key insight is that `IBuiltInRegistry.Register(JSContext context)` was
+blocked solely because the parameter type `JSContext` lives in Core. By
+introducing `IJSContext` (a minimal interface in Runtime), the contract can
+reference a context without depending on the concrete class:
+
+```csharp
+// Runtime assembly — IJSContext.cs
+public interface IJSContext : IDisposable
+{
+    long ID { get; }
+}
+
+// Runtime assembly — IBuiltInRegistry.cs (moved from Core)
+public interface IBuiltInRegistry
+{
+    void Register(IJSContext context);
+}
+```
+
+Core's `JSContext` implements `IJSContext`, and implementations of
+`IBuiltInRegistry` in Core (e.g., `DefaultBuiltInRegistry`) cast the parameter
+to `JSContext` when they need full access to the concrete type.
+
+### Types Moved / Created
+
+| Type | Action | Lines | Namespace | Purpose |
+|------|--------|-------|-----------|---------|
+| `IJSContext` | **Created** | 15 | `Broiler.JavaScript.Core.Core` | Minimal context abstraction for Runtime contracts |
+| `IBuiltInRegistry` | **Moved** | 25 | `Broiler.JavaScript.Core.Core` | Built-in object registration contract |
+
+### Changes Made
+
+1. **Created `IJSContext` in Runtime** — Minimal interface with `ID` property
+   and `IDisposable`. Follows the `IJSPrototype`/`IJSSymbol` pattern established
+   in Phase 9b.
+
+2. **Moved `IBuiltInRegistry` from Core to Runtime** — Changed parameter type
+   from `JSContext` to `IJSContext`. Implementations that need the concrete type
+   perform a downcast.
+
+3. **Updated `JSContext`** — Now implements `IJSContext` in addition to
+   `IDisposable`.
+
+4. **Updated `DefaultBuiltInRegistry`** — `Register(IJSContext ctx)` casts to
+   `JSContext` for full access. `AdditionalRegistrations` delegate retains its
+   `Action<JSContext>` type for backward compatibility with satellite assemblies.
+
+5. **Updated test code** — `DelegatingRegistry` in `BuiltInRegistryTests`
+   updated to accept `IJSContext` parameter and cast to `JSContext`.
+
+6. **Added `TypeForwardedTo` attributes** — 2 new entries for `IBuiltInRegistry`
+   and `IJSContext` in Core `AssemblyInfo.cs`.
+
+### TypeForwardedTo Attributes
+
+2 new `TypeForwardedTo` entries added to Core `AssemblyInfo.cs`:
+
+```csharp
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.IBuiltInRegistry))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.IJSContext))]
+```
+
+Total TypeForwardedTo attributes in Core `AssemblyInfo.cs`: **29**.
+
+### Architecture Impact
+
+Runtime assembly now contains **23** source files (up from 21 before Phase 9c+).
+All cross-cutting contract interfaces have been successfully extracted to Runtime:
+
+- Module resolution: `IJSModuleResolver`
+- Debugging: `IDebugger`
+- CLR interop: `IClrInterop`
+- Compilation: `IJSCompiler`, `ICodeCache`, `JSCode`, `JSCodeCompiler`
+- Context: `IJSContext`
+- Built-in registration: `IBuiltInRegistry`
+- Value types: `JSValue`, `Arguments`, `PropertyKey`, `JSFunctionDelegate`
+- Type abstractions: `IJSPrototype`, `IJSSymbol`, `IElementEnumerator`
+- Attributes: `ExportAttribute`, `DefaultExportAttribute`
+- Utilities: `CancellableDisposableAction`, `StringExtensions`, `ObjectStatus`
+
+The assembly dependency graph remains acyclic:
+
+```
+Ast ← Storage ← Runtime ← Core ← {Compiler, Clr, Modules, BuiltIns, Debugger}
+```
+
+### Lessons Learned
+
+1. **Interface abstraction is the fastest unblocking strategy.** When a full type
+   extraction involves hundreds of files, introducing a thin interface in the
+   target assembly (and having the concrete type implement it in the source
+   assembly) achieves the contract migration goal with minimal disruption.
+
+2. **Downcast in implementations is acceptable.** `DefaultBuiltInRegistry`
+   casting `IJSContext` to `JSContext` is a pragmatic trade-off. The alternative
+   (a rich `IJSContext` interface exposing all of `JSContext`'s surface) would be
+   premature abstraction that couples Runtime to Core's internal API shape.
+
+3. **IJSContext scope should grow incrementally.** As more types move to Runtime
+   (e.g., `CoreScript`), `IJSContext` can be extended with additional members
+   (`Eval`, `WaitTask`, `CodeCache`) as needed, rather than specifying the full
+   surface upfront.
+
+### Test Results
+
+All **747** tests pass across 7 test projects:
+- Core: 641, Clr: 29, Debugger: 23, Runtime: 20, BuiltIns: 16, Compiler: 9,
+  Modules: 9.
+
+### Updated Remaining Work
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Move `IBuiltInRegistry` to Runtime | ✅ | Unblocked via `IJSContext` abstraction |
+| Move contract interfaces to Runtime | ✅ | All contract interfaces now in Runtime |
+| Move `JSObject` to Runtime | ⏳ | ~500+ file references; requires `IJSFunction` abstraction |
+| Move `JSFunction` to Runtime | ⏳ | Depends on `JSObject` move; circular dependency |
+| Move `JSContext` to Runtime | ⏳ | Depends on `JSObject`/`JSFunction` moves |
+| Move `CoreScript` to Runtime | ⏳ | Depends on `JSContext` + factory delegates for Core types |
+| Extend `IJSContext` interface | ⏳ | Add members as Runtime consumers require them |
+| Additional BuiltIns extraction | ⏳ | Deep structural coupling to Core |
+| `InternalsVisibleTo` final cleanup | ⏳ | After all Phase 9 sub-phases complete |
+
+### Recommended Next Steps
+
+1. **JSObject extraction preparation**: Create `IJSFunction` interface in Runtime
+   to break JSObject's dependency on JSFunction. JSObject references JSFunction
+   for constructor and prototype fields — abstracting these via an interface
+   (similar to IJSPrototype/IJSSymbol) would allow JSObject to move to Runtime.
+
+2. **Factory infrastructure**: Extend the `[ModuleInitializer]` factory pattern
+   from Phase 9b to cover JSObject's dependencies on Core types (e.g.,
+   `JSConstants`, `JSException`, error creation).
+
+3. **Incremental IJSContext enrichment**: As CoreScript and other types prepare
+   to move, add `Eval`, `WaitTask`, and `CodeCache` members to IJSContext. This
+   allows CoreScript to operate through the interface rather than the concrete
+   JSContext class.

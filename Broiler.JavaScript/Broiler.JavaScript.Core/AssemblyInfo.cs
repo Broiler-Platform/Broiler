@@ -49,3 +49,5 @@ using Broiler.JavaScript.Core.Core.Module;
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Emit.JSCode))]
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Emit.JSCodeCompiler))]
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.FastParser.Compiler.IJSCompiler))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.IBuiltInRegistry))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.IJSContext))]
