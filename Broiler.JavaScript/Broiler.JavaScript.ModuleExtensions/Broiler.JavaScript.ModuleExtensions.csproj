@@ -4,19 +4,14 @@
         <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>false</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>default</LangVersion>
-        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <LangVersion>latest</LangVersion>
         <Authors>ZverGuy, ackava</Authors>
         <Description>Bunch of extensions for JSModuleContext
 Adding fluent interface for module registering.</Description>
-        <PackageProjectUrl>http://yantrajs.com/</PackageProjectUrl>
-        <RepositoryUrl>https://github.com/yantrajs/yantra</RepositoryUrl>
-        <PackageVersion>1.0.1</PackageVersion>
       <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
       <IncludeSymbols>true</IncludeSymbols>
       <SymbolPackageFormat>snupkg</SymbolPackageFormat>
       <EmbedAllSources>True</EmbedAllSources>
-      <LangVersion>latest</LangVersion>
       <IsPackable>false</IsPackable>
     </PropertyGroup>
 

@@ -26,7 +26,7 @@ scalability, and testability.
 | `Broiler.JavaScript.ExpressionCompiler` | Broiler.JavaScript.ExpressionCompiler | LINQ Expression Tree → IL compilation | Pre-existing |
 | `Broiler.JavaScript.JSClassGenerator` | Broiler.JavaScript.JSClassGenerator | Roslyn source generator for C#-to-JS bindings | Pre-existing |
 | `Broiler.JavaScript.Network` | YantraJS.Network | Fetch API / network module | ✅ Updated (references, TFM, namespaces aligned) |
-| `Broiler.JavaScript.ModuleExtensions` | (library) | Fluent module-registration extensions | ✅ Updated (references, TFM, namespaces aligned) |
+| `Broiler.JavaScript.ModuleExtensions` | (library) | Fluent module-registration extensions | ✅ Complete — references, TFM, namespaces aligned; bugs fixed; dedicated test project added |
 | `Broiler.JavaScript.NodePollyfill` | YantraJS.NodePollyfill | Node.js compatibility polyfills | ✅ Updated (references, TFM, namespaces aligned) |
 | `Broiler.JavaScript` | YantraJS (exe) | CLI REPL / runner | Pre-existing |
 | `Broiler.JavaScript.Core.Tests` | (test) | Unit tests for the core engine (641 tests) | Active |
@@ -830,7 +830,7 @@ The refactor is complete when:
 | # | Criterion | Status |
 |---|-----------|--------|
 | 1 | Core decomposed into separate assemblies | ✅ 8 of 11 target assemblies extracted (Ast, Parser, Storage, Debugger, Clr, BuiltIns, Compiler, Modules). Runtime assembly contains all base types (`JSValue`, `Arguments`, `PropertyKey`, `CoreScript`), all contract interfaces (`IJSContext`, `IJSFunction`, `IDebugger`, `IClrInterop`, `IJSCompiler`, `ICodeCache`, `IBuiltInRegistry`), and interface abstractions (`IJSPrototype`, `IJSSymbol`). Concrete implementation types (`JSObject`, `JSContext`, `JSFunction`) intentionally remain in Core per architectural assessment (Section 26). All storage types fully migrated to Storage assembly. 31 `TypeForwardedTo` attributes maintain backward compatibility. |
-| 2 | Each assembly has test project with ≥ 90% coverage | ⏳ All 10 assemblies have dedicated test projects (998 tests total across 10 projects). Coverage measurement integrated into CI via `coverlet.collector`. Coverage thresholds not yet enforced — see Section 29.1 for action plan. |
+| 2 | Each assembly has test project with ≥ 90% coverage | ⏳ All 11 assemblies have dedicated test projects (1011 tests total across 11 projects). Coverage measurement integrated into CI via `coverlet.collector`. Coverage thresholds not yet enforced — see Section 29.1 for action plan. |
 | 3 | All existing Core.Tests pass | ✅ 641 Core.Tests pass (verified 2026-03-21). |
 | 4 | Downstream consumers build correctly | ✅ Explicit satellite assembly references added to `Broiler.Cli` and `Broiler.App`. `Broiler.JavaScript.All` meta-package available for convenience. |
 | 5 | No `InternalsVisibleTo` migration bridges | ✅ All migration bridges eliminated — Debugger (Phase 4), Clr (Phase 10), Compiler (Phase 10). Only `Core.Tests` (test access), `Runtime` (dynamic assembly), and `WebAtoms.XF` (external) entries remain. |
@@ -4522,7 +4522,7 @@ that any contributor can pick up the work.
 
 ### 29.1 P1 — Test Coverage Improvement
 
-**Current state:** All 10 assemblies have dedicated test projects (998 tests
+**Current state:** All 11 assemblies have dedicated test projects (1011 tests
 total). `coverlet.collector` is integrated into CI, but coverage thresholds
 have not been enforced and coverage reports have not been reviewed per-assembly.
 
@@ -4737,3 +4737,71 @@ currently actionable. They are documented here for future reference.
 | **Near-term (Architecture)** | P2: BuiltIns extraction (JSDisposableStack, JSDecimal), Integration tests, Docs update | 1–2 PR cycles | 📋 Planned |
 | **Future (Full extraction)** | P3: ObjectModel assembly | When preconditions met | ⏳ Deferred |
 | **External** | P4: WebAtoms.XF coordination | When external parties respond | ⏳ External |
+
+---
+
+## 30. ModuleExtensions — Fluent Module-Registration Extensions (2026-03-21)
+
+This section documents the completion of the `Broiler.JavaScript.ModuleExtensions`
+assembly alignment as part of the JavaScript engine assembly refactor.
+
+### Background
+
+The ModuleExtensions project provides a fluent API for registering JavaScript
+modules from C# code. It was originally created under the `YantraJS.ModuleExtensions`
+namespace with no tests. During Phase 10 (Section 19), project references and
+TFM were updated, but source-level namespace alignment, bug fixes, and test
+coverage were deferred.
+
+### Changes Made
+
+#### 1. Namespace Alignment
+
+Both source files updated to use the `Broiler.JavaScript.ModuleExtensions`
+namespace, matching the assembly naming convention used by all other refactored
+assemblies:
+
+| File | Before | After |
+|------|--------|-------|
+| `JSModuleContextExtension.cs` | `YantraJS.ModuleExtensions` | `Broiler.JavaScript.ModuleExtensions` |
+| `ModuleBuilder.cs` | _(no namespace — global)_ | `Broiler.JavaScript.ModuleExtensions` |
+
+#### 2. Bug Fixes
+
+| Issue | File | Fix |
+|-------|------|-----|
+| `ExportType(Type, string?)` ignored `name` parameter — always used `type.Name` | `ModuleBuilder.cs` | Changed to `name ?? type.Name` (consistent with generic overload) |
+| Duplicate assignment `globalExport[name] = globalExport[name] = jsValue;` | `ModuleBuilder.cs` | Removed redundant assignment |
+| `ImportModule` used fragile reflection to access private `moduleCache` field | `JSModuleContextExtension.cs` | Replaced with public `All` property lookup via LINQ |
+| Removed unused `System.Reflection` import | `JSModuleContextExtension.cs` | Cleaned up imports |
+
+#### 3. Project File Cleanup
+
+| Issue | Fix |
+|-------|-----|
+| Duplicate `LangVersion` declarations (`default` and `latest`) | Consolidated to single `latest` |
+| Contradictory `GeneratePackageOnBuild=true` with `IsPackable=false` | Removed `GeneratePackageOnBuild` |
+| Stale `PackageProjectUrl` and `RepositoryUrl` pointing to old yantrajs repo | Removed stale URLs |
+| Stale `PackageVersion` (ignored when `IsPackable=false`) | Removed |
+| Made collection fields `readonly` | `exportedObjects` and `_moduleName` |
+
+#### 4. Test Project Created
+
+Created `Broiler.JavaScript.ModuleExtensions.Tests` with 13 tests covering:
+
+| Test Class | Tests | Coverage |
+|-----------|-------|----------|
+| `ModuleBuilderTests` | 9 | `ExportType<T>` (default/custom name), `ExportType(Type)` (default/custom name), `ExportValue`, `ExportFunction`, fluent chaining, default export, callable function |
+| `JSModuleContextExtensionTests` | 4 | `CreateModule`, `ImportModule` success, `ImportModule` not found, export value verification |
+
+### Architecture Impact
+
+No architectural changes. The ModuleExtensions assembly continues to depend on
+Core, Clr, ExpressionCompiler, and Modules. Internal APIs remain unchanged;
+only the public namespace and bug fixes affect consumers.
+
+### Test Results
+
+All **1011** tests pass across 11 test projects:
+- Core: 641, Ast: 73, Parser: 78, Storage: 100, Debugger: 23, Clr: 29,
+  Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 20, **ModuleExtensions: 13**.
