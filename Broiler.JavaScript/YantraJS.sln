@@ -73,6 +73,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.All", "B
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.ModuleExtensions.Tests", "Broiler.JavaScript.ModuleExtensions.Tests\Broiler.JavaScript.ModuleExtensions.Tests.csproj", "{9F1CE032-61E5-4AE6-A280-FBF3B5C42DEC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Integration.Tests", "Broiler.JavaScript.Integration.Tests\Broiler.JavaScript.Integration.Tests.csproj", "{0A789E91-3E33-401C-B3FB-329B680A84F8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -431,6 +433,18 @@ Global
 		{9F1CE032-61E5-4AE6-A280-FBF3B5C42DEC}.Release|x64.Build.0 = Release|Any CPU
 		{9F1CE032-61E5-4AE6-A280-FBF3B5C42DEC}.Release|x86.ActiveCfg = Release|Any CPU
 		{9F1CE032-61E5-4AE6-A280-FBF3B5C42DEC}.Release|x86.Build.0 = Release|Any CPU
+		{0A789E91-3E33-401C-B3FB-329B680A84F8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0A789E91-3E33-401C-B3FB-329B680A84F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0A789E91-3E33-401C-B3FB-329B680A84F8}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0A789E91-3E33-401C-B3FB-329B680A84F8}.Debug|x64.Build.0 = Debug|Any CPU
+		{0A789E91-3E33-401C-B3FB-329B680A84F8}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0A789E91-3E33-401C-B3FB-329B680A84F8}.Debug|x86.Build.0 = Debug|Any CPU
+		{0A789E91-3E33-401C-B3FB-329B680A84F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0A789E91-3E33-401C-B3FB-329B680A84F8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0A789E91-3E33-401C-B3FB-329B680A84F8}.Release|x64.ActiveCfg = Release|Any CPU
+		{0A789E91-3E33-401C-B3FB-329B680A84F8}.Release|x64.Build.0 = Release|Any CPU
+		{0A789E91-3E33-401C-B3FB-329B680A84F8}.Release|x86.ActiveCfg = Release|Any CPU
+		{0A789E91-3E33-401C-B3FB-329B680A84F8}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

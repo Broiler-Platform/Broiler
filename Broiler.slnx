@@ -44,5 +44,9 @@
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.BuiltIns/Broiler.JavaScript.BuiltIns.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.BuiltIns.Tests/Broiler.JavaScript.BuiltIns.Tests.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Runtime.Tests/Broiler.JavaScript.Runtime.Tests.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.All/Broiler.JavaScript.All.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.ModuleExtensions/Broiler.JavaScript.ModuleExtensions.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.ModuleExtensions.Tests/Broiler.JavaScript.ModuleExtensions.Tests.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Integration.Tests/Broiler.JavaScript.Integration.Tests.csproj" />
   </Folder>
 </Solution>
