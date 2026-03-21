@@ -3523,7 +3523,7 @@ Each dependency has its own transitive dependencies:
 ### Recommended Move Order
 
 1. Move `JSFunctionDelegate` (1 line) + `Arguments` (~500 lines) +
-   `IElementEnumerator` to Runtime simultaneously. Arguments requires
+   `IElementEnumerator` to the Runtime simultaneously. Arguments requires
    extensive factory work for `JSArray`/`JSUndefined` references.
 2. Move `PropertyKey` + `JSSymbol` together.
 3. Move `JSPrototype` (requires `JSFunction` type reference → factory).
