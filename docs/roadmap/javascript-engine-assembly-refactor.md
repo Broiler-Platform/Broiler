@@ -519,7 +519,7 @@ Each extraction phase follows the same steps:
 - [x] Phase 9a: Move `KeyString`/`KeyStrings`/`KeyType` to Storage. ✅ (2026-03-20)
 - [x] Move `ObjectStatus` enum to Runtime. ✅ (2026-03-21)
 - [x] Fix cross-platform `Path.Combine` in Runtime tests
-  (`StubModuleResolver.Resolve` now normalises separators). ✅ (2026-03-21)
+  (`StubModuleResolver.Resolve` now normalizes separators). ✅ (2026-03-21)
 - [ ] Phase 9b: Move `JSValue`, `JSObject`, `JSFunction`, `JSContext`,
   `Arguments`, `CoreScript`, `Bootstrap` to Runtime.
 - [ ] Move remaining contract interfaces (`IBuiltInRegistry`, `IClrInterop`,
