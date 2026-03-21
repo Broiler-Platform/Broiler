@@ -111,7 +111,7 @@ public struct ElementArray
     }
 
     /// <summary>
-    /// Sorts a array using the insertion sort algorithm.
+    /// Sorts an array using the insertion sort algorithm.
     /// </summary>
     /// <param name="comparer"> A comparison function. </param>
     /// <param name="start"> The first index in the range. </param>
