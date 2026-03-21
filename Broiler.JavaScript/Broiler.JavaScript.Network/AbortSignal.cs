@@ -1,9 +1,10 @@
 ﻿#nullable enable
 using System;
-using Yantra.Core;
-using Yantra.Core.Events;
-using YantraJS.Core;
-using YantraJS.Core.Clr;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Events;
+using Broiler.JavaScript.ExpressionCompiler;
 
 namespace YantraJS.Network
 {

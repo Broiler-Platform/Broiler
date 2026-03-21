@@ -6,9 +6,9 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Security.Cryptography;
 using System.Text;
-using YantraJS.Core;
-using YantraJS.Emit;
-using YantraJS.Expressions;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Emit;
+using Broiler.JavaScript.ExpressionCompiler;
 
 namespace YantraJS
 {

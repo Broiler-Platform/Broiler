@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Reflection;
-using YantraJS.Core;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Module;
 
 namespace YantraJS.ModuleExtensions
 {

@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using YantraJS.Core.FastParser;
+using Broiler.JavaScript.Ast;
+using Broiler.JavaScript.Core.Core;
 
 public class Program
 {
@@ -47,7 +48,7 @@ public class Program
         foreach (var item in files)
         {
             var content = _files[item];
-            var engine = new YantraJS.Core.JSContext();
+            var engine = new JSContext();
             // By default YantraJS is strict mode only, in strict mode
             // unless you pass `this`, `this` in a global context is undefined.
             engine.Eval(content, item + ".js", engine);

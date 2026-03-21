@@ -2,8 +2,13 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using YantraJS.Core;
-using YantraJS.Core.Core.Storage;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.Storage;
 
 namespace YantraJS.NodePollyfill
 {
@@ -31,7 +36,7 @@ namespace YantraJS.NodePollyfill
                 ? "key:" + value.ToString()
                 : ((value is JSSymbol symbol)
                     ? "symbol:" + symbol.Key
-                    : throw JSContext.CurrentContext.NewTypeError("Key can only be string or symbol"));
+                    : throw JSContext.NewTypeError("Key can only be string or symbol"));
 
         public EventEmitter(in Arguments a)
         {

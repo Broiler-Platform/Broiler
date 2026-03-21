@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <AssemblyName>YantraJS.NodePollyfill</AssemblyName>
     <PackageId>YantraJS.NodePollyfill</PackageId>
     <PackageTags>yantra,yantrajs,javascript,c#,standard,core,framework,.net</PackageTags>
@@ -19,7 +19,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\YantraJS.Core\YantraJS.Core.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

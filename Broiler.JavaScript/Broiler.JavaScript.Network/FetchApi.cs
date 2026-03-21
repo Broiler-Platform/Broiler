@@ -4,10 +4,9 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Yantra.Core;
-using YantraJS;
-using YantraJS.Core;
-using YantraJS.Core.Clr;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
 
 namespace YantraJS.Network
 {
@@ -22,7 +21,7 @@ namespace YantraJS.Network
                 // build request ...
                 request = new Request(a);
             }
-            CancellationToken token;
+            CancellationToken token = CancellationToken.None;
             if (request.Signal != null)
             {
                 var ct = new CancellationTokenSource();

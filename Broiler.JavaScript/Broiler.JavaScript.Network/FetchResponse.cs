@@ -1,10 +1,13 @@
 ﻿#nullable enable
 using System.Net.Http;
 using System.Threading.Tasks;
-using Yantra.Core;
-using YantraJS.Core;
-using YantraJS.Core.Clr;
-using YantraJS.Core.Debugger;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Json;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Debugger;
+using Broiler.JavaScript.ExpressionCompiler;
 
 namespace YantraJS.Network
 {

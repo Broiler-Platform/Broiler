@@ -2,10 +2,13 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using Yantra.Core;
-using YantraJS.Core;
-using YantraJS.Core.Clr;
-using YantraJS.Core.Typed;
+using Broiler.JavaScript.Ast;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Array.Typed;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Typed;
+using Broiler.JavaScript.ExpressionCompiler;
 
 namespace YantraJS.Network
 {
@@ -30,7 +33,7 @@ namespace YantraJS.Network
 
             // DataView is pending...
 
-            throw JSContext.CurrentContext.NewTypeError($"Failed to convert {value} to ArrayBuffer");
+            throw JSContext.NewTypeError($"Failed to convert {value} to ArrayBuffer");
         }
     }
 
@@ -41,10 +44,11 @@ namespace YantraJS.Network
 
         public Blob(in Arguments a) : base(JSContext.NewTargetPrototype)
         {
-            var array = a[0] ?? throw JSContext.CurrentContext.NewTypeError("array is required");
+            var array = a[0] ?? throw JSContext.NewTypeError("array is required");
             if(a.TryGetAt(1, out var options))
             {
-                this.Type = options.TryGetProperty(Names.type, out var p) ? p : new JSString(StringSpan.Empty);
+                var p = options[Names.type];
+                this.Type = p.IsNullOrUndefined ? new JSString(StringSpan.Empty) : p;
             }
 
             // save to array... 
@@ -85,7 +89,7 @@ namespace YantraJS.Network
         [JSExport]
         public JSValue Stream(in Arguments a)
         {
-            throw JSContext.CurrentContext.NewTypeError("Not supported yet");
+            throw JSContext.NewTypeError("Not supported yet");
         }
 
         private JSValue Slice(int offset, int length, JSValue type)

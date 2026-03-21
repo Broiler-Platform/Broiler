@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>netstandard2.0</TargetFramework>
+        <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>false</ImplicitUsings>
         <Nullable>enable</Nullable>
         <LangVersion>default</LangVersion>
@@ -26,8 +26,10 @@ Adding fluent interface for module registering.</Description>
   </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\YantraJS.Core\YantraJS.Core.csproj" />
-      <ProjectReference Include="..\YantraJS.ExpressionCompiler\YantraJS.ExpressionCompiler.csproj" />
+      <ProjectReference Include="..\Broiler.JavaScript.Clr\Broiler.JavaScript.Clr.csproj" />
+      <ProjectReference Include="..\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
+      <ProjectReference Include="..\Broiler.JavaScript.ExpressionCompiler\Broiler.JavaScript.ExpressionCompiler.csproj" />
+      <ProjectReference Include="..\Broiler.JavaScript.Modules\Broiler.JavaScript.Modules.csproj" />
     </ItemGroup>
 
   <ItemGroup>

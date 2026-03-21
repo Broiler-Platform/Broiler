@@ -38,8 +38,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\YantraJS.Core\YantraJS.Core.csproj" />
-    <ProjectReference Include="..\YantraJS.Network\YantraJS.Network.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.Clr\Broiler.JavaScript.Clr.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.ExpressionCompiler\Broiler.JavaScript.ExpressionCompiler.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.Modules\Broiler.JavaScript.Modules.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.Network\Broiler.JavaScript.Network.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\modules\inbuilt\**\*">

@@ -3,11 +3,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using YantraJS;
-using YantraJS.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Emit;
+using Broiler.JavaScript.Generator;
 using YantraJS.Utils;
 using YantraJS.REPL;
-using YantraJS.Emit;
-using YantraJS.Generator;
 
 namespace Yantra
 {
