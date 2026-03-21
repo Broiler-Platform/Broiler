@@ -23,6 +23,9 @@ namespace Broiler.JavaScript.ModuleExtensions
 
         /// <summary>
         /// Return JSValue which is a module in js script (require function for C# code side).
+        /// Uses linear search via the public <see cref="JSModuleContext.All"/> property.
+        /// Suitable for typical module counts; for hot paths, consider adding a
+        /// dictionary-backed lookup to <see cref="JSModuleContext"/> directly.
         /// </summary>
         /// <param name="context">The module context to import the module from.</param>
         /// <param name="name">Module name.</param>

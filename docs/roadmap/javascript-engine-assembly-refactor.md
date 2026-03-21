@@ -830,7 +830,7 @@ The refactor is complete when:
 | # | Criterion | Status |
 |---|-----------|--------|
 | 1 | Core decomposed into separate assemblies | ✅ 8 of 11 target assemblies extracted (Ast, Parser, Storage, Debugger, Clr, BuiltIns, Compiler, Modules). Runtime assembly contains all base types (`JSValue`, `Arguments`, `PropertyKey`, `CoreScript`), all contract interfaces (`IJSContext`, `IJSFunction`, `IDebugger`, `IClrInterop`, `IJSCompiler`, `ICodeCache`, `IBuiltInRegistry`), and interface abstractions (`IJSPrototype`, `IJSSymbol`). Concrete implementation types (`JSObject`, `JSContext`, `JSFunction`) intentionally remain in Core per architectural assessment (Section 26). All storage types fully migrated to Storage assembly. 31 `TypeForwardedTo` attributes maintain backward compatibility. |
-| 2 | Each assembly has test project with ≥ 90% coverage | ⏳ All 11 assemblies have dedicated test projects (1011 tests total across 11 projects). Coverage measurement integrated into CI via `coverlet.collector`. Coverage thresholds not yet enforced — see Section 29.1 for action plan. |
+| 2 | Each assembly has test project with ≥ 90% coverage | ⏳ 11 extracted/satellite assemblies have dedicated test projects (1011 tests total across 11 projects). Coverage measurement integrated into CI via `coverlet.collector`. Coverage thresholds not yet enforced — see Section 29.1 for action plan. |
 | 3 | All existing Core.Tests pass | ✅ 641 Core.Tests pass (verified 2026-03-21). |
 | 4 | Downstream consumers build correctly | ✅ Explicit satellite assembly references added to `Broiler.Cli` and `Broiler.App`. `Broiler.JavaScript.All` meta-package available for convenience. |
 | 5 | No `InternalsVisibleTo` migration bridges | ✅ All migration bridges eliminated — Debugger (Phase 4), Clr (Phase 10), Compiler (Phase 10). Only `Core.Tests` (test access), `Runtime` (dynamic assembly), and `WebAtoms.XF` (external) entries remain. |
@@ -4522,9 +4522,10 @@ that any contributor can pick up the work.
 
 ### 29.1 P1 — Test Coverage Improvement
 
-**Current state:** All 11 assemblies have dedicated test projects (1011 tests
-total). `coverlet.collector` is integrated into CI, but coverage thresholds
-have not been enforced and coverage reports have not been reviewed per-assembly.
+**Current state:** 11 extracted/satellite assemblies have dedicated test projects
+(1011 tests total). `coverlet.collector` is integrated into CI, but coverage
+thresholds have not been enforced and coverage reports have not been reviewed
+per-assembly.
 
 **Goal:** ≥ 90% line coverage per extracted assembly (Success Criterion #2).
 
