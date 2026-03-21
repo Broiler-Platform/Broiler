@@ -64,3 +64,6 @@ jobs:
 
       - name: Test — ModuleExtensions
         run: dotnet test Broiler.JavaScript/Broiler.JavaScript.ModuleExtensions.Tests/Broiler.JavaScript.ModuleExtensions.Tests.csproj --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+      - name: Test — Integration
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Integration.Tests/Broiler.JavaScript.Integration.Tests.csproj --no-build --verbosity normal --collect:"XPlat Code Coverage"
