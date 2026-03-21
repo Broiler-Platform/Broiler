@@ -25,9 +25,9 @@ scalability, and testability.
 | `Broiler.JavaScript.Runtime` | Broiler.JavaScript.Runtime | Runtime contract interfaces (`IJSModuleResolver`, `ExportAttribute`, `DefaultExportAttribute`), utility types (`CancellableDisposableAction`); future home of execution context and value type system | 🔧 Active (Phase 9 prep — contracts and utilities being migrated) |
 | `Broiler.JavaScript.ExpressionCompiler` | Broiler.JavaScript.ExpressionCompiler | LINQ Expression Tree → IL compilation | Pre-existing |
 | `Broiler.JavaScript.JSClassGenerator` | Broiler.JavaScript.JSClassGenerator | Roslyn source generator for C#-to-JS bindings | Pre-existing |
-| `Broiler.JavaScript.Network` | YantraJS.Network | Fetch API / network module | Pre-existing |
-| `Broiler.JavaScript.ModuleExtensions` | (library) | Fluent module-registration extensions | Pre-existing |
-| `Broiler.JavaScript.NodePollyfill` | YantraJS.NodePollyfill | Node.js compatibility polyfills | Pre-existing |
+| `Broiler.JavaScript.Network` | YantraJS.Network | Fetch API / network module | ✅ Updated (references, TFM, namespaces aligned) |
+| `Broiler.JavaScript.ModuleExtensions` | (library) | Fluent module-registration extensions | ✅ Updated (references, TFM, namespaces aligned) |
+| `Broiler.JavaScript.NodePollyfill` | YantraJS.NodePollyfill | Node.js compatibility polyfills | ✅ Updated (references, TFM, namespaces aligned) |
 | `Broiler.JavaScript` | YantraJS (exe) | CLI REPL / runner | Pre-existing |
 | `Broiler.JavaScript.Core.Tests` | (test) | Unit tests for the core engine (641 tests) | Active |
 | `Broiler.JavaScript.Ast.Tests` | (test) | Unit tests for Ast assembly (73 tests) | ✅ Created |
@@ -529,6 +529,9 @@ Each extraction phase follows the same steps:
 - [x] Create `Broiler.JavaScript.All` meta-package. ✅ (2026-03-20)
 - [x] Create `.github/workflows/ci.yml` CI workflow. ✅ (2026-03-20)
 - [x] Integrate `coverlet` coverage measurement into CI. ✅ (2026-03-20)
+- [x] Fix legacy project references, target frameworks, and namespaces
+  (Network, ModuleExtensions, NodePollyfill, CLI REPL, JIntPerfTests). ✅ (2026-03-21)
+- [x] Fix JSClassGenerator source generator `JSPropertyAttributes` namespace. ✅ (2026-03-21)
 
 **Key Metrics (target):**
 - Zero `InternalsVisibleTo` migration bridges remain (test-access-only entries
@@ -2229,9 +2232,9 @@ Both `Broiler.App` and `Broiler.Cli` now reference the meta-package:
 - `Broiler.App` and `Broiler.Cli` both reference `Broiler.JavaScript.All`,
   which transitively includes Core and all satellite assemblies (Clr, Compiler,
   BuiltIns, Modules, Debugger). Module initializers auto-register when loaded.
-- `Broiler.JavaScript` (CLI REPL) references Core and will need all assemblies
-  for full engine functionality. It can switch to the `All` meta-package when
-  ready.
+- `Broiler.JavaScript` (CLI REPL) now references Core, Clr, Modules, Network,
+  and ExpressionCompiler directly. References, target framework, and namespaces
+  updated to match the refactored assembly structure (2026-03-21).
 
 ---
 
@@ -3110,6 +3113,96 @@ Storage, without pulling in the full Core runtime type system.
 **Remaining circular dependency:** `PropertySequence` and `ElementArray` still
 have method signatures that reference `JSValue`/`JSFunction`/`JSContext`. These
 cannot move to Storage until Phase 9b resolves the value type system location.
+
+### Test Results
+
+All **998** tests pass across 10 test projects:
+- Core: 641, Ast: 73, Parser: 78, Storage: 100, Debugger: 23, Clr: 29,
+  Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 20.
+
+---
+
+## 19. Legacy Project Cleanup — Network, ModuleExtensions, NodePollyfill, CLI REPL (2026-03-21)
+
+This iteration fixes the CI build failure caused by five legacy projects that
+were not updated during the Core assembly rename from `YantraJS.Core` to
+`Broiler.JavaScript.Core`. These projects had broken `<ProjectReference>` paths,
+incompatible target frameworks, and stale namespace imports.
+
+### Changes Made
+
+#### 1. Broken Project References
+
+Five projects referenced old `YantraJS.*` project paths that no longer exist:
+
+| Project | Old Reference | New Reference |
+|---------|--------------|---------------|
+| `Broiler.JavaScript.Network` | `YantraJS.Core.csproj` | `Broiler.JavaScript.Core.csproj` |
+| `Broiler.JavaScript.Network` | `YantraJS.JSClassGenerator.csproj` | `Broiler.JavaScript.JSClassGenerator.csproj` |
+| `Broiler.JavaScript.ModuleExtensions` | `YantraJS.Core.csproj` | `Broiler.JavaScript.Core.csproj` |
+| `Broiler.JavaScript.ModuleExtensions` | `YantraJS.ExpressionCompiler.csproj` | `Broiler.JavaScript.ExpressionCompiler.csproj` |
+| `Broiler.JavaScript.NodePollyfill` | `YantraJS.Core.csproj` | `Broiler.JavaScript.Core.csproj` |
+| `Broiler.JavaScript` (CLI) | `YantraJS.Core.csproj` | `Broiler.JavaScript.Core.csproj` |
+| `Broiler.JavaScript` (CLI) | `YantraJS.Network.csproj` | `Broiler.JavaScript.Network.csproj` |
+| `JIntPerfTests` | `YantraJS.Core.csproj` | `Broiler.JavaScript.Core.csproj` |
+
+#### 2. Target Framework Updates
+
+Core targets `net8.0`, so all consuming projects must target a compatible TFM:
+
+| Project | Before | After |
+|---------|--------|-------|
+| `Broiler.JavaScript.Network` | `netstandard2.0;netstandard2.1` | `net8.0` |
+| `Broiler.JavaScript.ModuleExtensions` | `netstandard2.0` | `net8.0` |
+| `Broiler.JavaScript.NodePollyfill` | `netstandard2.0` | `net8.0` |
+| `JIntPerfTests` | `net6.0` | `net8.0` |
+
+#### 3. Namespace Migration
+
+All `using` directives updated across 25 files in 5 projects:
+
+| Old Namespace | New Namespace |
+|---------------|---------------|
+| `Yantra.Core` | `Broiler.JavaScript.Core.Core` |
+| `Yantra.Core.Events` | `Broiler.JavaScript.Core.Core.Events` |
+| `YantraJS.Core` | `Broiler.JavaScript.Core.Core` |
+| `YantraJS.Core.Clr` | `Broiler.JavaScript.Core.Core.Clr` |
+| `YantraJS.Core.Typed` | `Broiler.JavaScript.Core.Typed` |
+| `YantraJS.Core.Debugger` | `Broiler.JavaScript.Core.Debugger` |
+| `YantraJS.Core.FastParser` | `Broiler.JavaScript.Ast` |
+| `YantraJS.Emit` | `Broiler.JavaScript.Core.Emit` |
+| `YantraJS.Expressions` | `Broiler.JavaScript.ExpressionCompiler` |
+
+Internal project namespaces (`YantraJS.Network`, `YantraJS.REPL`, etc.)
+retained — they define the project's own types.
+
+#### 4. JSClassGenerator Source Generator Fix
+
+The source generator emitted `using Broiler.JavaScript.Core.Core.Storage;`
+for `JSPropertyAttributes`, but the enum moved to the `Broiler.JavaScript.Storage`
+namespace. Fixed both `ClassGenerator.cs` and `RegistrationGenerator.cs` to
+emit the additional `using Broiler.JavaScript.Storage;` directive.
+
+#### 5. API Compatibility Fixes
+
+Several API changes in Core required code updates in legacy projects:
+
+| Issue | Files | Fix |
+|-------|-------|-----|
+| `TryGetProperty` removed from `JSValue` | `FetchRequest.cs`, `Blob.cs` | Replaced with indexer + `IsNullOrUndefined` check |
+| `JSContext.NewTypeError` now static | `Blob.cs`, `EventEmitter.cs` | Changed instance call to static call |
+| Unassigned `CancellationToken` | `FetchApi.cs` | Initialized to `CancellationToken.None` |
+| `Microsoft.Threading` unused import | 3 CLI files | Removed unused `using` directive |
+
+#### 6. CLI REPL — Additional Project Reference
+
+Added `Broiler.JavaScript.ExpressionCompiler` reference to the CLI REPL
+project, required by `AssemblyCodeCache.cs` for `CompileToStaticMethod`.
+
+### Architecture Impact
+
+No architectural changes. All fixes are namespace/reference corrections to
+align legacy projects with the refactored assembly structure.
 
 ### Test Results
 
