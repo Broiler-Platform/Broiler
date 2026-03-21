@@ -13,8 +13,11 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using YantraJS.Core;
-using YantraJS.Core.Clr;
+using Broiler.JavaScript.Clr;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Module;
 using YantraJS.Utils;
 using YantraJS.Network;
 

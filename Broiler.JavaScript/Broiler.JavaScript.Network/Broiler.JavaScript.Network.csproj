@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	  <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
+	  <TargetFramework>net8.0</TargetFramework>
 	  <AssemblyName>YantraJS.Network</AssemblyName>
 	  <PackageId>YantraJS.Network</PackageId>
 	  <PackageTags>yantrajs.network,network</PackageTags>
@@ -38,7 +38,9 @@
 	</ItemGroup> -->
 
 	<ItemGroup>
-		<ProjectReference Include="..\YantraJS.Core\YantraJS.Core.csproj" />
+		<ProjectReference Include="..\Broiler.JavaScript.BuiltIns\Broiler.JavaScript.BuiltIns.csproj" />
+		<ProjectReference Include="..\Broiler.JavaScript.Clr\Broiler.JavaScript.Clr.csproj" />
+		<ProjectReference Include="..\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
 		<PackageReference Include="Nerdbank.GitVersioning" Version="3.7.115">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
@@ -46,7 +48,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\YantraJS.JSClassGenerator\YantraJS.JSClassGenerator.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+		<ProjectReference Include="..\Broiler.JavaScript.JSClassGenerator\Broiler.JavaScript.JSClassGenerator.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
 
 	</ItemGroup>
 </Project>

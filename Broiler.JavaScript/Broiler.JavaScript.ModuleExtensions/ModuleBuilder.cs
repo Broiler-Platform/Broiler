@@ -1,7 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using YantraJS.Core;
-using YantraJS.Core.Clr;
+using Broiler.JavaScript.Clr;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Module;
+using Broiler.JavaScript.Core.Extensions;
 
 public class ModuleBuilder
 {
