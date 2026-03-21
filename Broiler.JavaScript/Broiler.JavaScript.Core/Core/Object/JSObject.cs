@@ -29,11 +29,11 @@ public partial class JSObject : JSValue
     private JSPrototype currentPrototype;
     protected bool HasIterator = false;
 
-    public override JSObject BasePrototypeObject
+    public override JSValue BasePrototypeObject
     {
         set
         {
-            prototypeChain = value?.PrototypeObject;
+            prototypeChain = (value as JSObject)?.PrototypeObject;
             PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, null));
             currentPrototype?.Dirty();
         }
@@ -112,7 +112,7 @@ public partial class JSObject : JSValue
         return this.GetValue(p);
     }
 
-    public override JSValue GetOwnProperty(JSSymbol name)
+    public override JSValue GetOwnProperty(IJSSymbol name)
     {
         ref var p = ref symbols.GetRefOrDefault(name.Key, ref JSProperty.Empty);
         return this.GetValue(p);
@@ -489,18 +489,18 @@ public partial class JSObject : JSValue
         return true;
     }
 
-    public override JSValue this[JSSymbol name]
+    public override JSValue this[IJSSymbol name]
     {
         get => GetValue(name, this);
         set => SetValue(name, value, null, true);
     }
 
-    internal protected override bool SetValue(JSSymbol name, JSValue value, JSValue receiver, bool throwError = true)
+    internal protected override bool SetValue(IJSSymbol name, JSValue value, JSValue receiver, bool throwError = true)
     {
-        if (name == JSSymbol.iterator)
+        if ((JSSymbol)name == JSSymbol.iterator)
             HasIterator = true;
 
-        var p = GetInternalProperty(name);
+        var p = GetInternalProperty((JSSymbol)name);
         if (p.IsProperty)
         {
             if (p.set != null)
@@ -521,11 +521,11 @@ public partial class JSObject : JSValue
         }
 
         symbols.Put(name.Key) = JSProperty.Property(value);
-        PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, name));
+        PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, (JSSymbol)name));
         return true;
     }
 
-    internal protected override JSValue GetValue(JSSymbol key, JSValue receiver, bool throwError = true)
+    internal protected override JSValue GetValue(IJSSymbol key, JSValue receiver, bool throwError = true)
     {
         ref var p = ref symbols.GetRefOrDefault(key.Key, ref JSProperty.Empty);
         if (!p.IsEmpty)
@@ -802,14 +802,14 @@ public partial class JSObject : JSValue
         return JSBoolean.True;
     }
 
-    public override JSValue Delete(JSSymbol symbol)
+    public override JSValue Delete(IJSSymbol symbol)
     {
         if (IsSealedOrFrozen())
             throw JSContext.NewTypeError($"Cannot delete property {symbol} of {this}");
 
         if (symbols.RemoveAt(symbol.Key))
         {
-            PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, symbol));
+            PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, (JSSymbol)symbol));
             return JSBoolean.True;
         }
 

@@ -120,7 +120,7 @@ public partial class JSReflect : JSObject
         if (target is not JSObject)
             throw JSContext.NewTypeError($"Not an object");
 
-        var p = target.prototypeChain?.@object;
+        var p = target.prototypeChain?.Object;
         if (p == target || p == null)
             return JSNull.Value;
 

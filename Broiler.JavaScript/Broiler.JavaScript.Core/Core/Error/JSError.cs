@@ -64,7 +64,7 @@ public partial class JSError : JSObject
     [JSExport("toString")]
     public new JSValue ToString(in Arguments a)
     {
-        var name = prototypeChain.@object[KeyStrings.constructor][KeyStrings.name];
+        var name = prototypeChain.Object[KeyStrings.constructor][KeyStrings.name];
         return new JSString($"{name}: {Message}");
     }
 
