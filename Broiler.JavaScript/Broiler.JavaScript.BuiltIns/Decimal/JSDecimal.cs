@@ -20,6 +20,10 @@ public partial class JSDecimal : JSPrimitive
 
     internal readonly decimal value;
 
+    public override bool IsDecimal => true;
+
+    public override decimal DecimalValue => value;
+
     public override bool BooleanValue => value != 0;
 
     public override double DoubleValue => throw CannotMix();
@@ -189,7 +193,7 @@ public partial class JSDecimal : JSPrimitive
         if (a.Get1() is JSNumber n1)
         {
             if (double.IsNaN(n1.value) || n1.value > 20 || n1.value < 0)
-                throw JSContext.NewRangeError("toFixed() digitis argument must be between 0 and 100");
+                throw JSContext.NewRangeError("toFixed() digits argument must be between 0 and 100");
 
             var i = (int)n1.value;
             if (nv > 999999999999999.0m && i <= 15)

@@ -36,7 +36,7 @@ partial class FastCompiler
 
                     if (dispose)
                     {
-                        list.Add(top.Disposable.CallExpression<JSDisposableStack, JSValue, bool>(() => (j, v, b) => 
+                        list.Add(top.Disposable.CallExpression<IJSDisposableStack, JSValue, bool>(() => (j, v, b) => 
                         j.AddDisposableResource(v, b), v.Expression, Expression.Constant(async)));
                     }
                     break;
@@ -52,7 +52,7 @@ partial class FastCompiler
 
                         if (dispose)
                         {
-                            list.Add(top.Disposable.CallExpression<JSDisposableStack, JSValue, bool>(() => (j, v, b) => 
+                            list.Add(top.Disposable.CallExpression<IJSDisposableStack, JSValue, bool>(() => (j, v, b) => 
                             j.AddDisposableResource(v, b), temp.Variable, Expression.Constant(async)));
                         }
                     }
@@ -68,7 +68,7 @@ partial class FastCompiler
                         list.Add(CreateAssignment(arrayPattern, temp.Expression, true, newScope));
                         if (dispose)
                         {
-                            list.Add(top.Disposable.CallExpression<JSDisposableStack, JSValue, bool>(() => (j, v, b) => 
+                            list.Add(top.Disposable.CallExpression<IJSDisposableStack, JSValue, bool>(() => (j, v, b) => 
                             j.AddDisposableResource(v, b), temp.Variable, Expression.Constant(async)));
                         }
                     }

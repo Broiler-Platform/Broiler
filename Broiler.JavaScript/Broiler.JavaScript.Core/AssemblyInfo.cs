@@ -6,6 +6,7 @@ using Broiler.JavaScript.Core.Core.Module;
 
 // used by Dynamic Assembly to access internals
 [assembly: InternalsVisibleTo("Broiler.JavaScript.Runtime")]
+[assembly: InternalsVisibleTo("Broiler.JavaScript.BuiltIns")]
 [assembly: InternalsVisibleTo("WebAtoms.XF")]
 #endif
 

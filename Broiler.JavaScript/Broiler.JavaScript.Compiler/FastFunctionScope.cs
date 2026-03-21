@@ -8,6 +8,7 @@ using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YP
 using Broiler.JavaScript.Core.CodeGen;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Core.LambdaGen;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using Broiler.JavaScript.Core.LinqExpressions;
@@ -202,7 +203,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
     public bool HasDisposable => _dispoable != null;
 
     private ParameterExpression _dispoable;
-    public ParameterExpression Disposable => _dispoable ??= Expression.Parameter(typeof(JSDisposableStack));
+    public ParameterExpression Disposable => _dispoable ??= Expression.Parameter(typeof(IJSDisposableStack));
 
     public Expression ArgumentsExpression { get; }
 

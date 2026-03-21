@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Decimal;
 using Broiler.JavaScript.ExpressionCompiler;
 using System;
 
@@ -50,10 +49,10 @@ public partial class JSMath : JSObject
         if (first.IsNull)
             return JSNumber.Zero;
 
-        if (first is JSDecimal @decimal)
+        if (first.IsDecimal)
         {
-            var dv = @decimal.value;
-            return new JSDecimal(Math.Floor(dv + 0.5m));
+            var dv = first.DecimalValue;
+            return JSValue.CreateDecimal(Math.Floor(dv + 0.5m));
         }
 
         var number = first.DoubleValue;
@@ -83,8 +82,8 @@ public partial class JSMath : JSObject
     public static JSValue Floor(in Arguments args)
     {
         var first = args.Get1();
-        if (first is JSDecimal @decimal)
-            return new JSDecimal(Math.Floor(@decimal.value));
+        if (first.IsDecimal)
+            return JSValue.CreateDecimal(Math.Floor(first.DecimalValue));
 
         var d = first.DoubleValue;
         var r = new JSNumber(Math.Floor(d));
@@ -105,8 +104,8 @@ public partial class JSMath : JSObject
     public static JSValue Abs(in Arguments args)
     {
         var first = args.Get1();
-        if (first is JSDecimal @decimal)
-            return new JSDecimal(Math.Abs(@decimal.value));
+        if (first.IsDecimal)
+            return JSValue.CreateDecimal(Math.Abs(first.DecimalValue));
 
         var d = first.DoubleValue;
         var r = new JSNumber(Math.Abs(d));
@@ -201,8 +200,8 @@ public partial class JSMath : JSObject
     public static JSValue Ceil(in Arguments args)
     {
         var first = args.Get1();
-        if (first is JSDecimal @decimal)
-            return new JSDecimal(Math.Ceiling(@decimal.value));
+        if (first.IsDecimal)
+            return JSValue.CreateDecimal(Math.Ceiling(first.DecimalValue));
 
         var d = first.DoubleValue;
         var r = new JSNumber(Math.Ceiling(d));
@@ -477,8 +476,8 @@ public partial class JSMath : JSObject
     {
         var first = args.Get1();
 
-        if (first is JSDecimal @decimal)
-            return new JSDecimal(Math.Sign(@decimal.value));
+        if (first.IsDecimal)
+            return JSValue.CreateDecimal(Math.Sign(first.DecimalValue));
 
         var d = first.DoubleValue;
 
@@ -546,8 +545,8 @@ public partial class JSMath : JSObject
     public static JSValue Trunc(in Arguments args)
     {
         var first = args.Get1();
-        if (first is JSDecimal @decimal)
-            return new JSDecimal(Math.Truncate(@decimal.value));
+        if (first.IsDecimal)
+            return JSValue.CreateDecimal(Math.Truncate(first.DecimalValue));
 
         var d = first.DoubleValue;
         var r = new JSNumber(Math.Truncate(d));

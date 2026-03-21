@@ -37,6 +37,30 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
     internal static Func<JSValue, IJSPrototype> CreatePrototypeObject;
     internal static Func<IPropertyAccessor, JSValue, JSValue> InvokePropertyGetter;
 
+    /// <summary>
+    /// Factory delegate for creating a <c>JSDecimal</c> from a <c>decimal</c> value.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static Func<decimal, JSValue> CreateDecimalFactory;
+
+    /// <summary>
+    /// Factory delegate for creating a <c>JSDecimal</c> from a <c>string</c> value.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// Used by the Compiler for decimal literal compilation.
+    /// </summary>
+    public static Func<string, JSValue> CreateDecimalFromStringFactory;
+
+    /// <summary>
+    /// Creates a <c>JSDecimal</c> from a <c>decimal</c> value via the registered factory delegate.
+    /// </summary>
+    public static JSValue CreateDecimal(decimal value) => CreateDecimalFactory(value);
+
+    /// <summary>
+    /// Creates a <c>JSDecimal</c> from a <c>string</c> value via the registered factory delegate.
+    /// Used by the Compiler for decimal literal compilation.
+    /// </summary>
+    public static JSValue CreateDecimalFromString(string value) => CreateDecimalFromStringFactory(value);
+
     /// <summary>Gets whether this value is the <c>undefined</c> singleton.</summary>
     public bool IsUndefined
     {
@@ -77,6 +101,12 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
 
     /// <summary>Gets whether this value is a JavaScript function.</summary>
     public virtual bool IsFunction => false;
+
+    /// <summary>Gets whether this value is a JavaScript <c>Decimal</c> (ES2025 Decimal128).</summary>
+    public virtual bool IsDecimal => false;
+
+    /// <summary>Gets the underlying <c>decimal</c> value. Only valid when <see cref="IsDecimal"/> is <c>true</c>.</summary>
+    public virtual decimal DecimalValue => throw new InvalidOperationException("Not a decimal value");
 
     internal virtual bool IsSpread => false;
 
