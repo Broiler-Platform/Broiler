@@ -6,7 +6,7 @@ using Broiler.JavaScript.ExpressionCompiler.Core;
 namespace Broiler.JavaScript.Core.Core;
 
 
-public class JSPrototype
+public class JSPrototype : IJSPrototype
 {
     public class JSPropertySet
     {
@@ -92,6 +92,10 @@ public class JSPrototype
             }
         }
     }
+
+    JSValue IJSPrototype.Object => @object;
+    JSProperty IJSPrototype.GetInternalProperty(IJSSymbol symbol) => GetInternalProperty((JSSymbol)symbol);
+    void IJSPrototype.Dirty() => Dirty();
 
     internal void Dirty() => dirty = true;
 

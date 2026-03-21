@@ -7,7 +7,7 @@ namespace Broiler.JavaScript.Core;
 
 [JSBaseClass("Object")]
 [JSFunctionGenerator("Symbol")]
-public partial class JSSymbol: JSValue
+public partial class JSSymbol: JSValue, IJSSymbol
 {
     private static int SymbolID = 1;
     private readonly string name;
@@ -24,6 +24,8 @@ public partial class JSSymbol: JSValue
     public override uint UIntValue => throw JSContext.NewTypeError("Cannot convert a Symbol value to a uint32.");
 
     internal override PropertyKey ToKey(bool create = true) => this;
+
+    public static implicit operator PropertyKey(JSSymbol key) => PropertyKey.FromSymbol(key);
 
     public JSSymbol(string name) : base(JSContext.Current.ObjectPrototype)
     {

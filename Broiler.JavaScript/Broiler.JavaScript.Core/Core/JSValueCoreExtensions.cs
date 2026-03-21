@@ -36,5 +36,11 @@ internal static class JSValueCoreExtensions
             }
             return null;
         };
+        JSValue.CreatePrototypeObject = value => (value as JSObject)?.PrototypeObject;
+        Arguments.Empty = new Arguments(JSUndefined.Value);
+        Arguments.ForApplyImpl = ArgumentsCoreExtensions.ForApplyCore;
+        Arguments.RestFromImpl = ArgumentsCoreExtensions.RestFromCore;
+        Arguments.GetStringImpl = ArgumentsCoreExtensions.GetStringCore;
+        Arguments.GetSpreadTarget = ArgumentsCoreExtensions.GetSpreadTargetCore;
     }
 }
