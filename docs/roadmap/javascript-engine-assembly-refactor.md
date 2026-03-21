@@ -5481,15 +5481,18 @@ independently per project. Each assembly that includes:
 - Type classes decorated with `[JSClassGenerator]` or `[JSFunctionGenerator]`
 
 ...gets its own `Names.g.cs` with independent `RegisterAll` and `CreateClass`
-calls. The BuiltIns assembly already demonstrates this pattern — it has 5
-extracted types (JSDecimal, JSSuppressedError, EventTarget, JSFinalizationRegistry,
-JSWeakRef) with their own BuiltIns-scoped `Names.g.cs` generated file.
+calls. The BuiltIns assembly already demonstrates this pattern — it has
+extracted types (including JSDecimal, JSSuppressedError, EventTarget,
+JSFinalizationRegistry, and JSWeakRef) with their own BuiltIns-scoped
+`Names.g.cs` generated file.
 
 **Evidence:** The BuiltIns `Names.g.cs` at
 `Broiler.JavaScript.BuiltIns/Generated/.../Broiler.JavaScript.Core.Core.Names.g.cs`
-contains independent `RegisterAll` calls for the extracted types, proving that
-the source generator correctly discovers and registers types within each project
-independently.
+(where `Core.Core` reflects the `Broiler.JavaScript.Core` root namespace plus
+`Core` sub-namespace — this is the correct naming convention used by the source
+generator) contains independent `RegisterAll` calls for the extracted types,
+proving that the source generator correctly discovers and registers types within
+each project independently.
 
 **Implication:** JSProxy, JSJSON, and JSDataView _can_ be extracted to BuiltIns
 using the exact same pattern as JSDecimal and other already-extracted types,
