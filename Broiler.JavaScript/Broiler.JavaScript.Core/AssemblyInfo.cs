@@ -51,3 +51,7 @@ using Broiler.JavaScript.Core.Core.Module;
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.FastParser.Compiler.IJSCompiler))]
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.IBuiltInRegistry))]
 [assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.IJSContext))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.IJSFunction))]
+
+// Type forward for Phase 9d: CoreScript moved to Broiler.JavaScript.Runtime.
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.CoreScript))]

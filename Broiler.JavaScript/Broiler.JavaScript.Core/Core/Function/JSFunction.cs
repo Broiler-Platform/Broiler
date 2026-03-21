@@ -16,7 +16,7 @@ namespace Broiler.JavaScript.Core.Core.Function;
 
 [JSBaseClass("Object")]
 [JSFunctionGenerator("Function", Register = false)]
-public partial class JSFunction : JSObject, IPropertyAccessor
+public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
 {
     internal static JSFunctionDelegate empty = (in Arguments a) => a.This;
 
