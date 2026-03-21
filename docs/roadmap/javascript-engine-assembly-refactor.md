@@ -4686,7 +4686,7 @@ intermediate layer between Runtime and Core.
 - [ ] Add `TypeForwardedTo` attributes in Core for all moved types.
 - [ ] Run full test suite; verify zero regressions.
 
-**Estimated effort:** 3–5 engineering days, high regression risk.
+**Estimated effort (as of 2026-03-21):** 3–5 engineering days, high regression risk.
 
 **Decision criteria:** Only pursue if a concrete downstream need arises (e.g.,
 a consumer needs to depend on `JSObject` without pulling in all of Core).
