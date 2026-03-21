@@ -517,6 +517,9 @@ Each extraction phase follows the same steps:
   `PropertyValueEnumerator` extracted to Core. `PropertySequenceCoreExtensions`
   for `JSFunctionDelegate` overload and `TypeErrorFactory` initialization.
 - [x] Phase 9a: Move `KeyString`/`KeyStrings`/`KeyType` to Storage. ✅ (2026-03-20)
+- [x] Move `ObjectStatus` enum to Runtime. ✅ (2026-03-21)
+- [x] Fix cross-platform `Path.Combine` in Runtime tests
+  (`StubModuleResolver.Resolve` now normalises separators). ✅ (2026-03-21)
 - [ ] Phase 9b: Move `JSValue`, `JSObject`, `JSFunction`, `JSContext`,
   `Arguments`, `CoreScript`, `Bootstrap` to Runtime.
 - [ ] Move remaining contract interfaces (`IBuiltInRegistry`, `IClrInterop`,
@@ -777,7 +780,7 @@ The refactor is complete when:
 
 | # | Criterion | Status |
 |---|-----------|--------|
-| 1 | Core decomposed into separate assemblies | ⏳ 8 of 11 target assemblies extracted. Core still contains value type system (`JSValue`, `JSContext`, etc.) pending Phase 9b. All storage types fully migrated to Storage assembly. |
+| 1 | Core decomposed into separate assemblies | ⏳ 8 of 11 target assemblies extracted. Core still contains value type system (`JSValue`, `JSContext`, etc.) pending Phase 9b. All storage types fully migrated to Storage assembly. `ObjectStatus` enum moved to Runtime. |
 | 2 | Each assembly has test project with ≥ 90% coverage | ⏳ All 10 assemblies have test projects (998 tests). Coverage measurement integrated into CI via `coverlet.collector`. |
 | 3 | All existing Core.Tests pass | ✅ 641 Core.Tests pass. |
 | 4 | Downstream consumers build correctly | ✅ Explicit satellite assembly references added to `Broiler.Cli` and `Broiler.App`. |
@@ -802,7 +805,7 @@ The refactor is complete when:
 | 6 | BuiltIns | ⏳ Partial | 2026-03-20 | Deep structural coupling (JSArray 13, JSString 8, JSRegExp 7, JSError 6, JSPromise, JSProxy); internal field access (DataView, JSJSON, JSReflect). |
 | 7 | Compiler | ✅ Complete | 2026-03-20 | `InternalsVisibleTo` bridge **removed** ✅. |
 | 8 | Modules | ✅ Complete | 2026-03-20 | — |
-| 9 | Runtime | ⏳ In progress | 2026-03-21 | Phase 9a **complete**: `IJSModuleResolver` + `ExportAttribute` + `DefaultExportAttribute` + `CancellableDisposableAction` moved to Runtime; `JSProperty` + `PropertySequence` + `ElementArray` + `KeyString`/`KeyStrings`/`KeyType` moved to Storage with interface-typed fields/params. Phase 9b (JSValue/JSContext → Runtime) is the only remaining critical path. |
+| 9 | Runtime | ⏳ In progress | 2026-03-21 | Phase 9a **complete**: `IJSModuleResolver` + `ExportAttribute` + `DefaultExportAttribute` + `CancellableDisposableAction` moved to Runtime; `JSProperty` + `PropertySequence` + `ElementArray` + `KeyString`/`KeyStrings`/`KeyType` moved to Storage with interface-typed fields/params. `ObjectStatus` moved to Runtime ✅. Cross-platform `StubModuleResolver` test fix ✅. Phase 9b (JSValue/JSContext → Runtime) is the only remaining critical path. |
 | 10 | Cleanup | ✅ Complete | 2026-03-20 | All migration bridges removed; meta-package created; downstream consumers updated; CI workflow created; coverlet coverage integrated. |
 
 ### Phase 1 — Ast Extraction ✅
@@ -3362,6 +3365,69 @@ All **998** tests pass across 10 test projects:
   Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 20.
 
 ---
+
+---
+
+## 20. ObjectStatus Migration and CI Fix (2026-03-21)
+
+This iteration moves the `ObjectStatus` enum to Runtime and fixes a
+cross-platform CI failure in the Runtime test suite.
+
+### Changes Made
+
+#### 1. `ObjectStatus` → Runtime
+
+`ObjectStatus` is a simple flags enum (`None`, `Frozen`, `Sealed`,
+`NonExtensible`, combinations) with zero type dependencies. It defines the
+extensibility/freeze/seal state of a JavaScript object.
+
+- **Moved:** `Core/Object/ObjectStatus.cs` → `Runtime/ObjectStatus.cs`
+- **TypeForwardedTo:** Added
+  `[assembly: TypeForwardedTo(typeof(ObjectStatus))]` in Core
+  `AssemblyInfo.cs`.
+- **Namespace:** Retained `Broiler.JavaScript.Core.Core.Object` for backward
+  compatibility.
+- **Consumers:** 4 files in Core (`JSObject.cs`, `JSObjectStatic.cs`,
+  `JSReflect.cs`) — all resolved via existing Core → Runtime project reference.
+
+#### 2. Cross-Platform Runtime Test Fix
+
+Two tests in `IJSModuleResolverTests` failed on Windows CI:
+- `Resolve_ReturnsPath_WhenModuleExists`
+- `Resolve_HandlesNestedPaths`
+
+**Root cause:** `StubModuleResolver.Resolve()` used `Path.Combine()` which
+produces backslashes on Windows (e.g., `/app\math.js`), mismatching the
+forward-slash keys in the module dictionary (e.g., `/app/math.js`).
+
+**Fix:** Normalize path separators to forward slashes after `Path.Combine` in
+the stub resolver. This matches JavaScript module semantics where paths always
+use forward slashes.
+
+### Architecture Impact
+
+`ObjectStatus` joins `IJSModuleResolver`, `ExportAttribute`,
+`DefaultExportAttribute`, and `CancellableDisposableAction` in the Runtime
+assembly. Total TypeForwardedTo attributes in Core `AssemblyInfo.cs`: **48**.
+
+### Test Results
+
+All **998** tests pass across 10 test projects:
+- Core: 641, Ast: 73, Parser: 78, Storage: 100, Debugger: 23, Clr: 29,
+  Compiler: 9, Modules: 9, BuiltIns: 16, Runtime: 20.
+
+### Next Immediate Steps
+
+1. **Phase 9b (critical path):** Move `JSValue`, `JSObject`, `JSFunction`,
+   `JSContext`, `Arguments`, `CoreScript`, `Bootstrap` to Runtime. This is the
+   largest remaining task (~500+ file references to update). Recommended
+   approach: start with `JSValue` as the base type, then cascade to dependent
+   types.
+2. **Contract interfaces:** Once Phase 9b completes, move `IBuiltInRegistry`,
+   `IClrInterop`, `IDebugger`, `IJSCompiler` to Runtime.
+3. **BuiltIns extraction (Phase 6):** Continue extracting built-in objects
+   (JSArray, JSString, JSNumber, etc.) — blocked by Phase 9b for assembly
+   dependency reasons.
 
 *This roadmap tracks the creation and documentation of the refactor plan, not
 the refactor itself. Implementation issues should be created per milestone

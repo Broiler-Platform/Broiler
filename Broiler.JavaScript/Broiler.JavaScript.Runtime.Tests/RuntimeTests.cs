@@ -21,7 +21,10 @@ public class IJSModuleResolverTests
 
         public string? Resolve(string currentPath, string moduleName)
         {
-            var resolved = Path.Combine(currentPath, moduleName);
+            // Normalize to forward slashes so the stub behaves identically
+            // on Windows (which uses '\') and Unix (which uses '/').
+            var resolved = Path.Combine(currentPath, moduleName)
+                .Replace('\\', '/');
             return _modules.ContainsKey(resolved) ? resolved : null;
         }
 
