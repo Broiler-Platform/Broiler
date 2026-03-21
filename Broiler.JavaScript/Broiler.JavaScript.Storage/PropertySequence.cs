@@ -1,6 +1,6 @@
-﻿using Broiler.JavaScript.Core.Extensions;
+﻿using System;
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Core.Core.Storage;
 
@@ -116,120 +116,30 @@ public struct PropertySequence
         }
     }
 
-    #region ValueEnumerator
-    public struct ValueEnumerator
-    {
-        public JSObject target;
-        private SAUint32Map<JSObjectProperty> map;
-        private uint start;
-        readonly bool showEnumerableOnly;
-
-        public ValueEnumerator(JSObject target, bool showEnumerableOnly)
-        {
-            this.showEnumerableOnly = showEnumerableOnly;
-            this.target = target;
-            ref var properties = ref target.GetOwnProperties();
-            map = properties.map;
-            start = properties.head;
-        }
-
-        public bool MoveNext(out KeyString key)
-        {
-            while (start > 0)
-            {
-                ref var objP = ref map.GetRefOrDefault(start, ref JSObjectProperty.Empty);
-                ref var p = ref objP.Property;
-
-                if (p.IsEmpty)
-                {
-                    start = objP.Next;
-                    continue;
-                }
-
-                if (showEnumerableOnly && !p.IsEnumerable)
-                {
-                    start = objP.Next;
-                    continue;
-                }
-
-                key = KeyStrings.GetName(start);
-                start = objP.Next;
-                return true;
-            }
-
-            key = KeyString.Empty;
-            return false;
-        }
-
-        public bool MoveNext(out JSValue value, out KeyString key)
-        {
-            while (start > 0)
-            {
-                ref var objP = ref map.GetRefOrDefault(start, ref JSObjectProperty.Empty);
-                ref var p = ref objP.Property;
-
-                if (p.IsEmpty)
-                {
-                    start = objP.Next;
-                    continue;
-                }
-
-                if (showEnumerableOnly && !p.IsEnumerable)
-                {
-                    start = objP.Next;
-                    continue;
-                }
-
-                value = target.GetValue(in p);
-                key = KeyStrings.GetName(start);
-                start = objP.Next;
-                return true;
-            }
-
-            value = null;
-            key = KeyString.Empty;
-            return false;
-        }
-
-        public bool MoveNextProperty(out JSProperty value, out KeyString key)
-        {
-            while (start > 0)
-            {
-                ref var objP = ref map.GetRefOrDefault(start, ref JSObjectProperty.Empty);
-                ref var p = ref objP.Property;
-
-                if (p.IsEmpty)
-                {
-                    start = objP.Next;
-                    continue;
-                }
-
-                if (showEnumerableOnly && !p.IsEnumerable)
-                {
-                    start = objP.Next;
-                    continue;
-                }
-
-                value = p;
-                key = KeyStrings.GetName(start);
-                start = objP.Next;
-                return true;
-            }
-
-            value = JSProperty.Empty;
-            key = KeyString.Empty;
-            return false;
-        }
-
-    }
-    #endregion
-
+    /// <summary>
+    /// Static delegate factory for creating type errors when property deletion
+    /// is attempted on read-only or non-configurable properties. Set by the
+    /// Core assembly during initialization to produce the correct JavaScript
+    /// TypeError exception. If not set, falls back to InvalidOperationException.
+    /// </summary>
+    public static Func<string, Exception>? TypeErrorFactory { get; set; }
 
     private SAUint32Map<JSObjectProperty> map;
     private uint head;
     private uint tail;
 
     public readonly bool IsEmpty => head == 0;
+
+    /// <summary>
+    /// Returns a reference to the internal map for use by enumerators
+    /// that need direct access to the property storage.
+    /// </summary>
+    public readonly ref SAUint32Map<JSObjectProperty> GetMap() => ref Unsafe.AsRef(in map);
+
+    /// <summary>
+    /// Returns the head index for use by enumerators.
+    /// </summary>
+    public readonly uint Head => head;
 
     public void Update(Updater<uint, JSProperty> func)
     {
@@ -263,7 +173,12 @@ public struct PropertySequence
             return false;
 
         if (property.IsReadOnly || !property.IsConfigurable)
-            throw JSContext.NewTypeError($"Cannot delete property {KeyStrings.GetNameString(key)} of {this}");
+        {
+            var factory = TypeErrorFactory;
+            if (factory != null)
+                throw factory($"Cannot delete property {KeyStrings.GetNameString(key)} of {this}");
+            throw new InvalidOperationException($"Cannot delete property {KeyStrings.GetNameString(key)} of {this}");
+        }
 
         property = JSProperty.Empty;
 
@@ -296,13 +211,11 @@ public struct PropertySequence
         return true;
     }
 
-    public void Put(uint key, JSValue value, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => Put(key) = JSProperty.Property(key, value, attributes);
+    public void Put(uint key, IPropertyValue value, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => Put(key) = JSProperty.Property(key, value, attributes);
 
-    public void Put(in KeyString key, JSValue value, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => Put(key.Key) = JSProperty.Property(key, value, attributes);
+    public void Put(in KeyString key, IPropertyValue value, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue) => Put(key.Key) = JSProperty.Property(key, value, attributes);
 
-    public void Put(in KeyString key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty) => Put(key.Key) = JSProperty.Property(key, getter, setter, attributes);
-
-    public void Put(in KeyString key, JSFunctionDelegate getter, JSFunctionDelegate setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty) => Put(key.Key) = JSPropertyFactory.Property(key, getter, setter, attributes);
+    public void Put(in KeyString key, IPropertyAccessor getter, IPropertyAccessor setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty) => Put(key.Key) = JSProperty.Property(key, getter, setter, attributes);
 
     public ref JSProperty Put(uint key)
     {

@@ -53,7 +53,7 @@ namespace YantraJS.Network
             if (first is JSObject @object)
             {
                 ref var ps = ref @object.GetOwnProperties(false);
-                var ve = new PropertySequence.ValueEnumerator(@object, true);
+                var ve = new PropertyValueEnumerator(@object, true);
                 while (ve.MoveNext(out var value, out var p))
                 {
                     headers[p.Value.Value!] = value.ToString();

@@ -10,13 +10,13 @@ public class PropertyEnumerator
     readonly bool showEnumerableOnly;
     readonly bool inherited;
     private PropertyEnumerator parent;
-    PropertySequence.ValueEnumerator properties;
+    PropertyValueEnumerator properties;
 
     public PropertyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inherited)
     {
         target = jSObject;
         ref var op = ref jSObject.GetOwnProperties(false);
-        properties = !op.IsEmpty ? new PropertySequence.ValueEnumerator(jSObject, showEnumerableOnly) : new PropertySequence.ValueEnumerator();
+        properties = !op.IsEmpty ? new PropertyValueEnumerator(jSObject, showEnumerableOnly) : new PropertyValueEnumerator();
         this.showEnumerableOnly = showEnumerableOnly;
         this.inherited = inherited;
         parent = null;
@@ -87,7 +87,7 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
 {
     private KeyEnumerator parent = null;
     IElementEnumerator elements = jSObject.GetElementEnumerator();
-    PropertySequence.ValueEnumerator properties = new PropertySequence.ValueEnumerator(jSObject, showEnumerableOnly);
+    PropertyValueEnumerator properties = new PropertyValueEnumerator(jSObject, showEnumerableOnly);
 
     public bool MoveNext(out bool hasValue, out JSValue value, out uint index)
     {
