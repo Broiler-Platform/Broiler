@@ -345,7 +345,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
     }
 
-    public ICodeCache CodeCache = DictionaryCodeCache.Current;
+    public ICodeCache CodeCache { get; set; } = DictionaryCodeCache.Current;
 
     internal ConcurrentDictionary<long, JSPromise> PendingPromises = new();
 
