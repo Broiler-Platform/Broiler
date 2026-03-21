@@ -94,7 +94,8 @@ assemblies. Each assembly has a single, well-defined responsibility.
 | 9 | **Broiler.JavaScript.Debugger** | `Debugger/`, `Core/Debug/` | V8 Inspector protocol, `IDebugger` contract |
 | 10 | **Broiler.JavaScript.ExpressionCompiler** | *(already separate)* | LINQ Expression Tree → IL compilation (unchanged) |
 | 11 | **Broiler.JavaScript.JSClassGenerator** | *(already separate)* | Roslyn source generator (unchanged) |
-| 12 | **Broiler.JavaScript.All** | *(meta-package)* | Convenience reference that transitively includes all engine assemblies |
+| 12 | **Broiler.JavaScript.ModuleExtensions** | `ModuleExtensions/` | Fluent module-registration extensions (`ModuleBuilder`, `JSModuleContextExtension`) |
+| 13 | **Broiler.JavaScript.All** | *(meta-package)* | Convenience reference that transitively includes all engine assemblies |
 
 ### 2.2 Assembly Dependency Graph
 
@@ -2647,10 +2648,11 @@ Use this checklist when contributing to or reviewing any extraction phase PR.
 | Storage | ✅ 100 | ✅ | ✅ | N/A | ✅ |
 | Debugger | ✅ 23 | ✅ | ✅ | ✅ Removed | ✅ |
 | Clr | ✅ 29 | ✅ | ✅ | ✅ Removed | ✅ |
-| BuiltIns | ✅ 16 | ✅ | ✅ | N/A | ✅ |
+| BuiltIns | ✅ 29 | ✅ | ✅ | N/A | ✅ |
 | Compiler | ✅ 9 | ✅ | ✅ | ✅ Removed | ✅ |
 | Modules | ✅ 9 | ✅ | ✅ | N/A | ✅ |
 | Runtime | ✅ 20 | ✅ | ✅ | ✅ Dynamic assembly (required) | ✅ |
+| ModuleExtensions | ✅ 13 | ✅ | ✅ | N/A | ✅ |
 
 ---
 
@@ -4443,10 +4445,11 @@ Broiler.JavaScript.Core (implementation layer):
 └── Factory delegate wiring via [ModuleInitializer]
 
 Satellite assemblies (all → Core, no reverse deps):
-├── Broiler.JavaScript.BuiltIns (6 files: Events + Weak)
+├── Broiler.JavaScript.BuiltIns (12 types: Events, Weak, Disposable, Decimal, Intl)
 ├── Broiler.JavaScript.Compiler (AST → LINQ expression trees)
 ├── Broiler.JavaScript.Clr (.NET ↔ JS bridging)
 ├── Broiler.JavaScript.Modules (ES module system)
+├── Broiler.JavaScript.ModuleExtensions (fluent module-registration extensions)
 ├── Broiler.JavaScript.Debugger (V8 Inspector Protocol)
 ├── Broiler.JavaScript.Parser (Lexer + Parser)
 └── Broiler.JavaScript.Ast (AST node types)
@@ -4461,12 +4464,13 @@ Satellite assemblies (all → Core, no reverse deps):
 | Parser.Tests | 78 | ✅ Pass |
 | Ast.Tests | 73 | ✅ Pass |
 | Clr.Tests | 29 | ✅ Pass |
+| BuiltIns.Tests | 29 | ✅ Pass |
 | Debugger.Tests | 23 | ✅ Pass |
 | Runtime.Tests | 20 | ✅ Pass |
-| BuiltIns.Tests | 16 | ✅ Pass |
+| ModuleExtensions.Tests | 13 | ✅ Pass |
 | Compiler.Tests | 9 | ✅ Pass |
 | Modules.Tests | 9 | ✅ Pass |
-| **Total** | **998** | **✅ All pass** |
+| **Total** | **1024** | **✅ All pass** |
 
 ### Phase Completion Summary
 
@@ -4486,6 +4490,7 @@ Satellite assemblies (all → Core, no reverse deps):
 | 9c+ | IJSContext abstraction | ✅ Complete | 2026-03-21 | — |
 | 9d | CoreScript + IJSFunction | ✅ Complete | 2026-03-21 | — |
 | 10 | Cleanup | ✅ Complete | 2026-03-20 | — |
+| — | ModuleExtensions | ✅ Complete | 2026-03-21 | Namespace aligned, bugs fixed, 13-test project created (Section 30) |
 | — | Coverage | ⏳ Measuring | — | P1: Review reports, enforce thresholds (Section 29.1) |
 | — | Integration tests | 📋 Planned | — | P2: Create Integration.Tests project (Section 29.3) |
 | — | ObjectModel | ⏳ Deferred | — | P3: If needed, extract JSObject hierarchy (Section 29.5) |
@@ -4511,6 +4516,12 @@ This section consolidates all future, deferred, and blocked items from the
 refactor roadmap into an actionable plan with prioritized subtasks, milestones,
 and clear ownership guidance. Each item is broken into concrete next steps so
 that any contributor can pick up the work.
+
+**Completed items tracked here:**
+- ✅ **ModuleExtensions alignment** — namespace, TFM, and reference alignment
+  completed; bugs fixed; 13-test project created. See Section 30 for full
+  details on reference alignment, namespace/TFM updates, bug fixes, and the
+  test project.
 
 ### Priority Definitions
 
@@ -4542,6 +4553,8 @@ per-assembly.
   covering 12 source files).
 - [ ] Add tests for uncovered branches in Compiler assembly (currently 9 tests).
 - [ ] Add tests for uncovered branches in Modules assembly (currently 9 tests).
+- [ ] Add tests for uncovered branches in ModuleExtensions assembly (currently
+  13 tests covering 2 source files).
 - [ ] Configure CI to fail on coverage regression (optional — add
   `coverlet` threshold configuration to test projects or CI workflow).
 - [ ] Update Success Criteria table (Section 8) when ≥ 90% is achieved.
@@ -4742,6 +4755,7 @@ currently actionable. They are documented here for future reference.
 
 | Milestone | Items | Target | Status |
 |-----------|-------|--------|--------|
+| **Completed** | ModuleExtensions alignment (Section 30) | — | ✅ Namespace, TFM, references aligned; bugs fixed; 13-test project created |
 | **Next (Quality)** | P1: Coverage improvement | Next PR cycle | 📋 Planned |
 | **Near-term (Architecture)** | P2: BuiltIns extraction (JSDisposableStack, JSDecimal, JSIntl) ✅, Integration tests, Docs update | 1–2 PR cycles | ✅ BuiltIns done; integration tests & docs pending |
 | **Future (Full extraction)** | P3: ObjectModel assembly | When preconditions met | ⏳ Deferred |
