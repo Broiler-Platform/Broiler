@@ -554,7 +554,7 @@ Each extraction phase follows the same steps:
 - [x] Phase 9d: Wire `CoreScript` factory delegates via `[ModuleInitializer]`
   in `CoreScriptCoreExtensions`. ✅ (2026-03-21)
 - [ ] *(Deferred)* Move `JSObject`, `JSFunction`, `JSContext` concrete types
-  to Runtime. ⏳ See Section 25 for architectural assessment.
+  to Runtime. ⏳ See Section 26 for architectural assessment.
 - [x] Move remaining contract interfaces (`IBuiltInRegistry`, `IClrInterop`,
   `IDebugger`, `IJSCompiler`) to Runtime. ✅ `IBuiltInRegistry` unblocked via
   `IJSContext` interface abstraction (Phase 9c+, 2026-03-21).
@@ -583,7 +583,7 @@ Each extraction phase follows the same steps:
   base types and contracts live in Runtime. ✅ *Achieved — `JSValue`,
   `Arguments`, `PropertyKey`, `CoreScript` moved to Runtime. All contract
   interfaces in Runtime. Concrete implementation types (`JSObject`, `JSFunction`,
-  `JSContext`) intentionally remain in Core (see Section 25).*
+  `JSContext`) intentionally remain in Core (see Section 26).*
 - All downstream consumers build and run against the new assembly structure. ✅
 - Each assembly has ≥ 90% line coverage in its dedicated test project. ⏳
   *Coverage collection now enabled via `coverlet.collector` in all 10 test
@@ -3923,7 +3923,7 @@ All **747** tests pass across 7 test projects:
 | Phase 9c (Contract interfaces) | — | 2026-03-21 | ✅ Complete |
 | Phase 9c+ (IBuiltInRegistry unblocked) | — | 2026-03-21 | ✅ Complete |
 | Phase 9d (CoreScript + IJSFunction + IJSContext enrichment) | — | 2026-03-21 | ✅ Complete |
-| JSObject/JSFunction/JSContext concrete extraction | — | Deferred | ⏳ See Section 25 |
+| JSObject/JSFunction/JSContext concrete extraction | — | Deferred | ⏳ See Section 26 |
 | Phase 10 (Final cleanup) | — | 2026-03-20 | ✅ Complete |
 
 ## 24. Phase 9c+ — IJSContext Abstraction and IBuiltInRegistry Migration (2026-03-21)
@@ -4057,21 +4057,23 @@ All **747** tests pass across 7 test projects:
 | Move `CoreScript` to Runtime | ✅ | Completed in Phase 9d via factory delegates (2026-03-21) |
 | Create `IJSFunction` interface | ✅ | Completed in Phase 9d; `JSFunction` implements it (2026-03-21) |
 | Extend `IJSContext` interface | ✅ | `CodeCache` and `WaitTask` added in Phase 9d (2026-03-21) |
-| Move `JSObject` to Runtime | ⏳ Deferred | ~500+ file references; 22 subtypes would cascade; see Section 25 |
+| Move `JSObject` to Runtime | ⏳ Deferred | ~500+ file references; 22 subtypes would cascade; see Section 26 |
 | Move `JSFunction` to Runtime | ⏳ Deferred | Depends on `JSObject` move; concrete type stays in Core |
 | Move `JSContext` to Runtime | ⏳ Deferred | Depends on `JSObject`/`JSFunction`; concrete type stays in Core |
-| Additional BuiltIns extraction | ⏳ | Deep structural coupling to Core |
-| `InternalsVisibleTo` final cleanup | ⏳ | After all Phase 9 sub-phases complete |
+| Additional BuiltIns extraction | ⏳ Blocked | Dependency-direction coupling; see Section 27 |
+| `InternalsVisibleTo` final cleanup | ✅ Complete | All migration bridges removed (Phase 10) |
 
 ### Recommended Next Steps
 
 1. **JSObject extraction (if pursued)**: Now that `IJSFunction` exists, JSObject
    could reference the interface instead of the concrete `JSFunction` class for
    constructor and prototype fields. However, this would still require moving
-   22 subtypes and 500+ file references. See Section 25 for detailed assessment.
+   22 subtypes and 500+ file references. See Section 26 for detailed assessment.
 
 2. **Additional BuiltIns extraction**: With `IJSFunction` and enriched `IJSContext`
-   available, more built-in types may be extractable to the BuiltIns assembly.
+   available, further extraction requires factory delegate or interface
+   abstraction patterns to break dependency-direction coupling. See Section 27
+   for detailed blocker analysis.
 
 3. **Coverage targets**: Focus on achieving ≥ 90% line coverage in each test
    project, now that the architecture is stable.
@@ -4332,9 +4334,9 @@ dependency graph.
 | **JSIntlDateTimeFormat** | `Core/Intl/` | Core: `JSDatePrototype.cs` (date formatting via `JSIntlDateTimeFormat.Get`) | Core → BuiltIns reverse dependency | ❌ |
 | **JSIntlRelativeTimeFormat** | `Core/Intl/` | `JSIntl.cs` (internal only) | Blocked by JSIntl | ❌ |
 | **JSDecimal** | `Core/Decimal/` | Core: `JSMath.cs` (6 methods with `is JSDecimal` type checks), `JSBigIntBuilder.cs` (expression builder); Compiler: `FastCompiler.VisitLiteral.cs` | Core + Compiler → BuiltIns reverse dependency | ❌ |
-| **DataView** | `Core/DataView/` | Internal field access to `JSArrayBuffer.buffer` | Access modifier + reverse dependency | ❌ |
-| **JSJSON** | `Core/Json/` | Deep type checks, Core internal usage | Core → BuiltIns reverse dependency | ❌ |
-| **JSProxy** | `Core/Proxy/` | `protected internal` overrides on `JSObject` | Access modifier semantics | ❌ |
+| **DataView** | `Core/DataView/` | Internal: `JSArrayBuffer.buffer` field access; Network: `FetchResponse.cs` | Internal field access + Core → BuiltIns reverse dependency | ❌ |
+| **JSJSON** | `Core/Json/` | Core: `Names.g.cs` (generated registration); Network: `FetchResponse.cs` (`JSJSON.Parse` call) | Core → BuiltIns reverse dependency | ❌ |
+| **JSProxy** | `Core/Proxy/` | Core: overrides `protected internal` `GetValue`/`SetValue` on `JSObject` | Access modifier semantics change across assemblies | ❌ |
 | **JSArray** | `Core/Array/` | 13 type checks across Core | Core → BuiltIns reverse dependency | ❌ |
 | **JSString** | `Core/String/` | 8 type checks across Core | Core → BuiltIns reverse dependency | ❌ |
 | **JSNumber** | `Core/Number/` | Static property access from JSMath/JSDatePrototype | Core → BuiltIns reverse dependency | ❌ |
