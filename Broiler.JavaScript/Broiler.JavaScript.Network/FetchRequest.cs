@@ -27,27 +27,39 @@ namespace YantraJS.Network
             }
 
             var options = a[1];
-            JSValue? v;
-            this.Method = options.TryGetProperty(Names.method, out var p) ? p.ToString() : "GET";
-            this.Headers = new Headers(options.TryGetProperty(Names.headers, out v) ? v : null);
-            if(options.TryGetProperty(Names.body, out v))
+            JSValue v;
+            v = options[Names.method];
+            this.Method = v.IsNullOrUndefined ? "GET" : v.ToString();
+            v = options[Names.headers];
+            this.Headers = new Headers(v.IsNullOrUndefined ? null : v);
+            v = options[Names.body];
+            if(!v.IsNullOrUndefined)
             {
                 this.Body = v;
             }
-            this.Mode = options.TryGetProperty(Names.mode, out v) ? v.ToString() : "cors";
-            this.Credentials = options.TryGetProperty(Names.credentials, out v) ? v.ToString() : "same-origin";
-            this.Cache = options.TryGetProperty(Names.cache, out v) ? v.ToString() : null;
-            this.Redirect = options.TryGetProperty(Names.redirect, out v) ? v.ToString() : "follow";
-            this.Referrer = options.TryGetProperty(Names.referrer, out v) ? v.ToString() : "about:client";
-            if (options.TryGetProperty(Names.referrerPolicy, out v))
+            v = options[Names.mode];
+            this.Mode = v.IsNullOrUndefined ? "cors" : v.ToString();
+            v = options[Names.credentials];
+            this.Credentials = v.IsNullOrUndefined ? "same-origin" : v.ToString();
+            v = options[Names.cache];
+            this.Cache = v.IsNullOrUndefined ? null : v.ToString();
+            v = options[Names.redirect];
+            this.Redirect = v.IsNullOrUndefined ? "follow" : v.ToString();
+            v = options[Names.referrer];
+            this.Referrer = v.IsNullOrUndefined ? "about:client" : v.ToString();
+            v = options[Names.referrerPolicy];
+            if (!v.IsNullOrUndefined)
             {
                 this.ReferrerPolicy = v.ToString();
             }
-            if (options.TryGetProperty(Names.integrity, out v))
+            v = options[Names.integrity];
+            if (!v.IsNullOrUndefined)
                 this.Integrity = v.ToString();
 
-            this.KeepAlive = options.TryGetProperty(Names.keepalive, out v) ? v.BooleanValue : false;
-            if (options.TryGetProperty(Names.signal, out v))
+            v = options[Names.keepalive];
+            this.KeepAlive = v.IsNullOrUndefined ? false : v.BooleanValue;
+            v = options[Names.signal];
+            if (!v.IsNullOrUndefined)
             {
                 if(v.ConvertTo<AbortSignal>(out var s)) {
                     this.Signal = s;

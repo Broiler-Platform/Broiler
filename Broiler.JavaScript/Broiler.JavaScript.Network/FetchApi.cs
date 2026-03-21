@@ -21,7 +21,7 @@ namespace YantraJS.Network
                 // build request ...
                 request = new Request(a);
             }
-            CancellationToken token;
+            CancellationToken token = CancellationToken.None;
             if (request.Signal != null)
             {
                 var ct = new CancellationTokenSource();
