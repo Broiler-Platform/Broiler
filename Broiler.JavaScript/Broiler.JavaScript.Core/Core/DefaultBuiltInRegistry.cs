@@ -29,8 +29,9 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
     public static Action<JSContext> AdditionalRegistrations { get; set; }
 
     /// <inheritdoc />
-    public void Register(JSContext context)
+    public void Register(IJSContext ctx)
     {
+        var context = (JSContext)ctx;
         context.RegisterGeneratedClasses();
 
         // Register built-in types from satellite assemblies.

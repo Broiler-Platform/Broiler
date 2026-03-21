@@ -33,7 +33,7 @@ public class EvalEventArgs : EventArgs
     public string Location { get; set; }
 }
 
-public partial class JSContext : JSObject, IDisposable
+public partial class JSContext : JSObject, IJSContext, IDisposable
 {
 
     private static long contextId = 1;
