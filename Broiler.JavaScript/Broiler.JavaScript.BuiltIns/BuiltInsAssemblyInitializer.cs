@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.BigInt;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Date;
 using Broiler.JavaScript.Core.Core.Debug;
@@ -47,6 +48,11 @@ internal static class BuiltInsAssemblyInitializer
         // and inspect decimal values without referencing the concrete type.
         JSValue.CreateDecimalFactory = static v => new JSDecimal(v);
         JSValue.CreateDecimalFromStringFactory = static s => new JSDecimal(s);
+
+        // Wire factory delegates for JSBigInt so Core/Compiler can create
+        // BigInt values without referencing the concrete type directly.
+        JSValue.CreateBigIntFromStringFactory = static s => new JSBigInt(s);
+        JSValue.CreateBigIntFactory = static v => new JSBigInt(v);
 
         // Wire factory delegate for JSConsole so DefaultBuiltInRegistry
         // does not directly reference the concrete type.

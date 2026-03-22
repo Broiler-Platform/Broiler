@@ -1,13 +1,13 @@
 ﻿using Broiler.JavaScript.Core.LambdaGen;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
-using Broiler.JavaScript.Core.Core.BigInt;
 using Broiler.JavaScript.Core.Core;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public class JSBigIntBuilder
 {
-    public static YExpression New(string value) => NewLambdaExpression.NewExpression<JSBigInt>(() => () => new JSBigInt("a"), YExpression.Constant(value));
+    public static YExpression New(string value) => NewLambdaExpression.StaticCallExpression<JSValue>(
+        () => () => JSValue.CreateBigIntFromString(""), YExpression.Constant(value));
 }
 
 public class JSDecimalBuilder

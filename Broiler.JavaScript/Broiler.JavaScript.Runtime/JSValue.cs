@@ -61,6 +61,32 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
     /// </summary>
     public static JSValue CreateDecimalFromString(string value) => CreateDecimalFromStringFactory(value);
 
+    /// <summary>
+    /// Factory delegate for creating a <c>JSBigInt</c> from a <c>string</c> value.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// Used by the Compiler for BigInt literal compilation.
+    /// </summary>
+    public static Func<string, JSValue> CreateBigIntFromStringFactory;
+
+    /// <summary>
+    /// Factory delegate for creating a <c>JSBigInt</c> from a <c>long</c> value.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// Used by JSGlobal for timer IDs.
+    /// </summary>
+    internal static Func<long, JSValue> CreateBigIntFactory;
+
+    /// <summary>
+    /// Creates a <c>JSBigInt</c> from a <c>string</c> value via the registered factory delegate.
+    /// Used by the Compiler for BigInt literal compilation.
+    /// </summary>
+    public static JSValue CreateBigIntFromString(string value) => CreateBigIntFromStringFactory(value);
+
+    /// <summary>
+    /// Creates a <c>JSBigInt</c> from a <c>long</c> value via the registered factory delegate.
+    /// Used by JSGlobal for timer IDs.
+    /// </summary>
+    public static JSValue CreateBigInt(long value) => CreateBigIntFactory(value);
+
     /// <summary>Gets whether this value is the <c>undefined</c> singleton.</summary>
     public bool IsUndefined
     {

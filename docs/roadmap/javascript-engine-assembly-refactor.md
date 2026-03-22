@@ -318,32 +318,33 @@ These types have been analyzed and confirmed extractable using the existing
 ### 7.1.1 M4 Evaluation — JSBigInt Extraction Feasibility
 
 **Status:** ✅ Evaluated (M4) — **Extractable** with factory delegate
+**Implementation:** ✅ **Complete (M4)** — Factory delegate wired, builder refactored, JSGlobal decoupled
 
 **Coupling audit results:**
 
-| Coupling Point | File | Lines | Severity |
-|----------------|------|-------|----------|
-| Compiler literal | `FastCompiler.VisitLiteral.cs` | 25–26 | Medium — uses `JSBigIntBuilder.New()` |
-| Compiler unary negate | `FastCompiler.VisitUnaryExpression.cs` | 35–36 | Medium — uses `JSBigIntBuilder.New("-" + ...)` |
-| LinqExpression builder | `JSBigIntBuilder.cs` | 10 | **High** — `NewExpression<JSBigInt>()` directly instantiates |
-| JSGlobal SetInterval | `JSGlobal.cs` | 130 | Low — `new JSBigInt(key)` for timer IDs |
-| JSGlobal SetTimeout | `JSGlobal.cs` | 154 | Low — `new JSBigInt(key)` for timer IDs |
-| JSGlobal StructuredClone | `JSGlobal.cs` | 190 | Low — `value is JSBigInt` type check |
+| Coupling Point | File | Lines | Severity | Resolution |
+|----------------|------|-------|----------|------------|
+| Compiler literal | `FastCompiler.VisitLiteral.cs` | 25–26 | Medium — uses `JSBigIntBuilder.New()` | ✅ Builder now uses factory delegate |
+| Compiler unary negate | `FastCompiler.VisitUnaryExpression.cs` | 35–36 | Medium — uses `JSBigIntBuilder.New("-" + ...)` | ✅ Builder now uses factory delegate |
+| LinqExpression builder | `JSBigIntBuilder.cs` | 10 | **High** — `NewExpression<JSBigInt>()` directly instantiates | ✅ Changed to `StaticCallExpression` via `JSValue.CreateBigIntFromString()` |
+| JSGlobal SetInterval | `JSGlobal.cs` | 130 | Low — `new JSBigInt(key)` for timer IDs | ✅ Changed to `JSValue.CreateBigInt(key)` |
+| JSGlobal SetTimeout | `JSGlobal.cs` | 154 | Low — `new JSBigInt(key)` for timer IDs | ✅ Changed to `JSValue.CreateBigInt(key)` |
+| JSGlobal StructuredClone | `JSGlobal.cs` | 190 | Low — `value is JSBigInt` type check | ✅ Changed to `value.TypeOf() == JSConstants.BigInt` |
 
 **Extraction strategy — Factory delegate (like JSDecimal):**
 
 The existing `JSDecimalBuilder` pattern demonstrates the solution:
 - `JSDecimalBuilder.New()` calls `JSValue.CreateDecimalFromString()` — a static
   method backed by a factory delegate, avoiding direct type references.
-- `JSBigIntBuilder` can be refactored similarly:
-  1. Add `Func<string, JSValue> CreateBigIntFromStringFactory` on `JSValue`
-  2. Add `JSValue.CreateBigIntFromString(string)` static method
-  3. Change `JSBigIntBuilder.New()` to use `StaticCallExpression` (like `JSDecimalBuilder`)
-  4. Wire factory in `BuiltInsAssemblyInitializer`
-- JSGlobal timer ID creation (`new JSBigInt(key)`) needs an additional
+- `JSBigIntBuilder` ~~can be~~ **has been** refactored similarly:
+  1. ✅ Added `Func<string, JSValue> CreateBigIntFromStringFactory` on `JSValue`
+  2. ✅ Added `JSValue.CreateBigIntFromString(string)` static method
+  3. ✅ Changed `JSBigIntBuilder.New()` to use `StaticCallExpression` (like `JSDecimalBuilder`)
+  4. ✅ Wired factory in `BuiltInsAssemblyInitializer`
+- ✅ JSGlobal timer ID creation uses `JSValue.CreateBigInt(key)` via
   `Func<long, JSValue> CreateBigIntFactory` for numeric construction.
-- The `value is JSBigInt` check in StructuredClone can use `value.TypeStringValue`
-  comparison against `"bigint"` instead.
+- ✅ The `value is JSBigInt` check in StructuredClone replaced with
+  `value.TypeOf() == JSConstants.BigInt` comparison.
 
 **Estimated effort:** Small (1–2 hours). Three-step change: factory delegate, builder
 refactor, JSGlobal decoupling.
@@ -468,6 +469,7 @@ practically extracted without fundamentally restructuring the engine:
 | 7 | Extract `JSMap`/`JSWeakMap` → BuiltIns | P3 | Medium | ✅ **Complete (M3)** |
 | 8 | Extract `JSSet`/`JSWeakSet` → BuiltIns | P3 | Medium | ✅ **Complete (M3)** |
 | 9 | Evaluate `JSBigInt` extraction feasibility | P4 | Small | ✅ **Complete (M4)** — Extractable via factory delegate (see §7.1.1) |
+| 9a | Implement `JSBigInt` factory delegate decoupling | P4 | Small | ✅ **Complete (M4)** — `JSBigIntBuilder`, `JSGlobal` decoupled via factory delegates |
 | 10 | Evaluate TypedArrays as separate assembly | P4 | Large | ✅ **Complete (M4)** — Feasible but deferred; Compiler has zero coupling (see §7.2.1) |
 
 ### 9.2 Infrastructure — Gaps
@@ -598,7 +600,7 @@ For each type, follow this pattern:
 | **M1 — CI & Test Foundation** | Tasks 11–13 | 2–3 days | Week 1 | ✅ **Complete** — see [milestone-1-plan.md](./milestone-1-plan.md) |
 | **M2 — Quick Wins** | Tasks 1, 4, 5, 6 (Proxy, Math, Reflect, Console) | 1–2 days | Week 2 | ✅ **Complete** — 4 types extracted, 93 tests passing |
 | **M3 — Medium Extractions** | Tasks 2, 3, 7, 8 (JSON, DataView, Map, Set) | 2–3 days | Week 3 | ✅ **Complete** — 8 types extracted, `StructuredCloneExtension` delegate added, 116 tests passing |
-| **M4 — Evaluation** | Tasks 9, 10 (BigInt, TypedArrays feasibility) | 1 day | Week 3 | ✅ **Complete** — JSBigInt extractable via factory delegate; TypedArrays feasible but deferred (zero Compiler coupling found) |
+| **M4 — Evaluation & Implementation** | Tasks 9, 9a, 10 (BigInt, TypedArrays feasibility + BigInt decoupling) | 1 day | Week 3 | ✅ **Complete** — JSBigInt decoupled via factory delegates (`CreateBigIntFromStringFactory`, `CreateBigIntFactory`); JSBigIntBuilder refactored to `StaticCallExpression`; JSGlobal decoupled; TypedArrays feasible but deferred (zero Compiler coupling found); 116 tests passing |
 | **M5 — Documentation** | Tasks 14–18 (TFM alignment, migration guide, docs) | 1–2 days | Week 4 | ✅ **Complete** — All projects aligned to net8.0; Directory.Build.props added; CI updated to 8.0.x; 116 tests passing |
 | **M6 — Final Validation** | Full regression testing, performance benchmarks | 1 day | Week 4 | Not started |
 
