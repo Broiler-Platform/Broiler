@@ -52,7 +52,10 @@ public class DefaultJSCompiler : IJSCompiler
             var assembly = Assembly.Load("Broiler.JavaScript.Compiler");
             RuntimeHelpers.RunModuleConstructor(assembly.ManifestModule.ModuleHandle);
         }
-        catch
+        catch (Exception ex) when (
+            ex is System.IO.FileNotFoundException
+            or System.IO.FileLoadException
+            or BadImageFormatException)
         {
             // Compiler assembly is not available.  _compileFunc remains null
             // and Compile() will throw an informative InvalidOperationException.
