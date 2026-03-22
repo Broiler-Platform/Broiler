@@ -96,7 +96,7 @@ carry high regression risk.
 - [x] Add build step for `Broiler.JavaScript/YantraJS.sln`
 - [x] Add test steps for each test project (existing + new)
 - [x] Add code coverage collection with coverlet
-- [ ] Validate CI workflow runs green on all platforms
+- [x] Validate CI workflow runs green on all platforms
 
 ### Task 12 — Create Unit Test Projects (P1, Large)
 
