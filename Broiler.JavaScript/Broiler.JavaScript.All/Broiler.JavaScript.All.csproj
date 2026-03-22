@@ -14,8 +14,6 @@
     <ProjectReference Include="..\Broiler.JavaScript.ModuleExtensions\Broiler.JavaScript.ModuleExtensions.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.BuiltIns\Broiler.JavaScript.BuiltIns.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Debugger\Broiler.JavaScript.Debugger.csproj" />
-    <ProjectReference Include="..\Broiler.JavaScript.Network\Broiler.JavaScript.Network.csproj" />
-    <ProjectReference Include="..\Broiler.JavaScript.NodePollyfill\Broiler.JavaScript.NodePollyfill.csproj" />
   </ItemGroup>
 
 </Project>
