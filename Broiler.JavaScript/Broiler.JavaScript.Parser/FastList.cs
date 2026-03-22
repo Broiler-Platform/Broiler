@@ -83,19 +83,6 @@ public class FastList<T> : IList<T>, IDisposable
         return copy;
     }
 
-    public ArraySpan<T> ToSpan()
-    {
-        var array = items;
-        var length = Count;
-        var a = new ArraySpan<T>(array, length);
-
-        items = null;
-        Count = 0;
-        size = 0;
-
-        return a;
-    }
-
     public bool Contains(T item)
     {
         if (items == null)

@@ -145,12 +145,4 @@ public readonly struct VariableDeclarator
         return list;
     }
 
-    public static Sequence<VariableDeclarator> From(in ArraySpan<AstExpression> nodes)
-    {
-        var r = new Sequence<VariableDeclarator>(nodes.Length);
-        for (int i = 0; i < nodes.Length; i++)
-            r.Add(new VariableDeclarator(nodes[i].ToPattern()));
-
-        return r;
-    }
 }

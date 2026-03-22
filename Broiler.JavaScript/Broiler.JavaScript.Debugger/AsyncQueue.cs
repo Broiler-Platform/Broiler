@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Broiler.JavaScript.Debugger;
 
@@ -31,7 +32,14 @@ public class AsyncQueue<T>: IDisposable
 
             CancellationTokenSource c;
             c = wait = new CancellationTokenSource();
-            await DelayTask.For(15000, c.Token);
+            try
+            {
+                await Task.Delay(15000, c.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when new items are enqueued or queue is disposed
+            }
         }
     }
 }
