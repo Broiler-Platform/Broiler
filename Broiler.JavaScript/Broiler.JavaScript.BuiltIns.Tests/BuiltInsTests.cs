@@ -49,13 +49,332 @@ public class BuiltInsTests
         Assert.NotNull(DefaultBuiltInRegistry.AdditionalRegistrations);
     }
 
+    // ── M2: JSMath tests ─────────────────────────────────────────────
+
+    [Fact]
+    public void Math_PI_ReturnsCorrectValue()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Math.PI");
+        Assert.Equal(Math.PI, result.DoubleValue, 10);
+    }
+
+    [Fact]
+    public void Math_Abs_NegativeNumber()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Math.abs(-42)");
+        Assert.Equal(42.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Math_Floor_ReturnsFloor()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Math.floor(4.7)");
+        Assert.Equal(4.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Math_Ceil_ReturnsCeiling()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Math.ceil(4.1)");
+        Assert.Equal(5.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Math_Round_RoundsCorrectly()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Math.round(4.5)");
+        Assert.Equal(5.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Math_Max_ReturnsLargest()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Math.max(1, 5, 3)");
+        Assert.Equal(5.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Math_Min_ReturnsSmallest()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Math.min(1, 5, 3)");
+        Assert.Equal(1.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Math_Sqrt_ReturnsSquareRoot()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Math.sqrt(25)");
+        Assert.Equal(5.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Math_Pow_ReturnsPower()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Math.pow(2, 10)");
+        Assert.Equal(1024.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Math_Random_ReturnsBetweenZeroAndOne()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Math.random()");
+        var value = result.DoubleValue;
+        Assert.InRange(value, 0.0, 1.0);
+    }
+
+    [Fact]
+    public void Math_Trunc_Truncates()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Math.trunc(42.84)");
+        Assert.Equal(42.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Math_Sign_ReturnsSign()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Math.sign(-5)");
+        Assert.Equal(-1.0, result.DoubleValue);
+    }
+
+    // ── M2: JSReflect tests ──────────────────────────────────────────
+
+    [Fact]
+    public void Reflect_TypeOf_IsObject()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("typeof Reflect");
+        Assert.Equal("object", result.ToString());
+    }
+
+    [Fact]
+    public void Reflect_Apply_CallsFunction()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Reflect.apply(Math.floor, undefined, [1.75])");
+        Assert.Equal(1.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Reflect_OwnKeys_ReturnsKeys()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("var obj = { a: 1, b: 2 }; Reflect.ownKeys(obj).length");
+        Assert.Equal(2.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Reflect_Has_ChecksProperty()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Reflect.has({ x: 0 }, 'x')");
+        Assert.True(result.BooleanValue);
+    }
+
+    [Fact]
+    public void Reflect_DefineProperty_Succeeds()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var obj = {};
+            Reflect.defineProperty(obj, 'x', { value: 7 });
+            obj.x;
+        ");
+        Assert.Equal(7.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Reflect_PreventExtensions_Works()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var obj = {};
+            Reflect.preventExtensions(obj);
+            Reflect.isExtensible(obj);
+        ");
+        Assert.False(result.BooleanValue);
+    }
+
+    [Fact]
+    public void Reflect_Get_ReturnsValue()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Reflect.get({ x: 42 }, 'x')");
+        Assert.Equal(42.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Reflect_Set_SetsValue()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var obj = {};
+            Reflect.set(obj, 'x', 99);
+            obj.x;
+        ");
+        Assert.Equal(99.0, result.DoubleValue);
+    }
+
+    // ── M2: JSProxy tests ────────────────────────────────────────────
+
+    [Fact]
+    public void Proxy_TypeOf_IsFunction()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("typeof Proxy");
+        Assert.Equal("function", result.ToString());
+    }
+
+    [Fact]
+    public void Proxy_GetTrap_Intercepts()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var handler = {
+                get: function(target, name) {
+                    return name in target ? target[name] : 37;
+                }
+            };
+            var p = new Proxy({}, handler);
+            p.a = 1;
+            p.b;
+        ");
+        Assert.Equal(37.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Proxy_SetTrap_Intercepts()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var log = [];
+            var handler = {
+                set: function(obj, prop, value) {
+                    log.push(prop);
+                    obj[prop] = value;
+                    return true;
+                }
+            };
+            var p = new Proxy({}, handler);
+            p.a = 1;
+            log.length;
+        ");
+        Assert.Equal(1.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Proxy_Construct_WithTargetAndHandler()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var target = { message: 'hello' };
+            var handler = {};
+            var p = new Proxy(target, handler);
+            p.message;
+        ");
+        Assert.Equal("hello", result.ToString());
+    }
+
+    // ── M2: JSConsole tests ──────────────────────────────────────────
+
+    [Fact]
+    public void Console_TypeOf_IsObject()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("typeof console");
+        Assert.Equal("object", result.ToString());
+    }
+
+    [Fact]
+    public void Console_Log_IsFunction()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("typeof console.log");
+        Assert.Equal("function", result.ToString());
+    }
+
+    [Fact]
+    public void Console_Warn_IsFunction()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("typeof console.warn");
+        Assert.Equal("function", result.ToString());
+    }
+
+    [Fact]
+    public void Console_Error_IsFunction()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("typeof console.error");
+        Assert.Equal("function", result.ToString());
+    }
+
+    [Fact]
+    public void Console_Log_ReturnsValue()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("console.log('test')");
+        Assert.Equal("test", result.ToString());
+    }
+
+    [Fact]
+    public void ConsoleFactory_WiredByModuleInitializer()
+    {
+        EnsureBuiltInsLoaded();
+        Assert.NotNull(DefaultBuiltInRegistry.ConsoleFactory);
+    }
+
     /// <summary>
-    /// Forces the BuiltIns assembly to load by referencing a type from it,
-    /// which triggers the ModuleInitializer.
+    /// Forces the BuiltIns and Clr assemblies to load by referencing types from them,
+    /// which triggers their ModuleInitializers.
     /// </summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void EnsureBuiltInsLoaded()
     {
+        // Load CLR assembly so JSContext.ClrInterop is properly configured
+        // (required for JSConsole marshalling via ClrProxy).
+        RuntimeHelpers.RunClassConstructor(
+            typeof(Broiler.JavaScript.Clr.DefaultClrInterop).TypeHandle);
         RuntimeHelpers.RunClassConstructor(
             typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
     }

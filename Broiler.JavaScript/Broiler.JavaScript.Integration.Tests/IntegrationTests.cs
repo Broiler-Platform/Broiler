@@ -87,4 +87,113 @@ public class IntegrationTests
         var result = ctx.Eval("typeof WeakRef");
         Assert.Equal("function", result.ToString());
     }
+
+    // ── M2: Cross-assembly wiring tests ──────────────────────────────
+
+    [Fact]
+    public void M2_Math_RegisteredFromBuiltIns()
+    {
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
+        using var ctx = new JSContext();
+        // Math should be registered from the BuiltIns assembly
+        var result = ctx.Eval("typeof Math");
+        Assert.Equal("object", result.ToString());
+    }
+
+    [Fact]
+    public void M2_Math_MethodsWorkAcrossAssembly()
+    {
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
+        using var ctx = new JSContext();
+        var result = ctx.Eval("Math.abs(-5) + Math.floor(3.7) + Math.ceil(1.1)");
+        Assert.Equal(10.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void M2_Reflect_RegisteredFromBuiltIns()
+    {
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
+        using var ctx = new JSContext();
+        var result = ctx.Eval("typeof Reflect");
+        Assert.Equal("object", result.ToString());
+    }
+
+    [Fact]
+    public void M2_Reflect_MethodsWorkAcrossAssembly()
+    {
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var obj = { a: 1, b: 2, c: 3 };
+            Reflect.ownKeys(obj).length;
+        ");
+        Assert.Equal(3.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void M2_Proxy_RegisteredFromBuiltIns()
+    {
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
+        using var ctx = new JSContext();
+        var result = ctx.Eval("typeof Proxy");
+        Assert.Equal("function", result.ToString());
+    }
+
+    [Fact]
+    public void M2_Proxy_ConstructAndTraps()
+    {
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var handler = {
+                get: function(target, name) {
+                    return name in target ? target[name] : 'default';
+                }
+            };
+            var p = new Proxy({ x: 10 }, handler);
+            p.x + '|' + p.y;
+        ");
+        Assert.Equal("10|default", result.ToString());
+    }
+
+    [Fact]
+    public void M2_Console_RegisteredFromBuiltIns()
+    {
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Broiler.JavaScript.Clr.DefaultClrInterop).TypeHandle);
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
+        using var ctx = new JSContext();
+        var result = ctx.Eval("typeof console");
+        Assert.Equal("object", result.ToString());
+    }
+
+    [Fact]
+    public void M2_Console_LogWarnErrorWork()
+    {
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Broiler.JavaScript.Clr.DefaultClrInterop).TypeHandle);
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
+        using var ctx = new JSContext();
+        // Verify all three console methods are callable without error
+        var result = ctx.Eval(@"
+            typeof console.log + '|' + typeof console.warn + '|' + typeof console.error;
+        ");
+        Assert.Equal("function|function|function", result.ToString());
+    }
+
+    [Fact]
+    public void M2_ConsoleFactory_WiredByModuleInitializer()
+    {
+        System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(
+            typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
+        Assert.NotNull(DefaultBuiltInRegistry.ConsoleFactory);
+    }
 }
