@@ -5,7 +5,6 @@ using System.Threading;
 using System.Collections.Generic;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.Core.Core.Array.Typed;
-using Broiler.JavaScript.Core.Core.BigInt;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
@@ -127,7 +126,7 @@ public partial class JSGlobalStatic
         var delay = timeout.IsUndefined ? 0 : timeout.IntValue;
         var key = JSContext.Current.SetInterval(delay, f, a);
 
-        return new JSBigInt(key);
+        return JSValue.CreateBigInt(key);
     }
 
     [JSExport("clearInterval", Length = 1)]
@@ -151,7 +150,7 @@ public partial class JSGlobalStatic
         var delay = timeout.IsUndefined ? 0 : timeout.IntValue;
         var key = context.PostTimeout(delay, f, a);
 
-        return new JSBigInt(key);
+        return JSValue.CreateBigInt(key);
     }
 
     [JSExport("clearTimeout", Length = 1)]
@@ -187,7 +186,7 @@ public partial class JSGlobalStatic
         if (value is JSNumber || value is JSString || value is JSBoolean)
             return value;
 
-        if (value is JSBigInt)
+        if (value.TypeOf() == JSConstants.BigInt)
             return value;
 
         // Functions cannot be cloned.
