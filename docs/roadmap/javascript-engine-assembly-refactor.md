@@ -579,10 +579,11 @@ For each type, follow this pattern:
    to separated assembly references. ✅ See §14.
 
 2. **Update `Broiler.JavaScript.All` meta-package** to include any new assemblies.
-   ✅ Already includes all assemblies (Core, Clr, Compiler, Modules, BuiltIns, Debugger).
+   ✅ All satellite assemblies included (Core, Clr, Compiler, Modules, ModuleExtensions,
+   BuiltIns, Debugger, Network, NodePollyfill).
 
 3. **Add XML documentation** to all public interfaces in Runtime.
-   ✅ Key public interfaces documented.
+   ✅ All public interfaces documented (including `ICodeCache`).
 
 4. **Align TFMs**: ✅ All projects standardized on `net8.0`. Main executable changed
    from `net9.0` to `net8.0`. CI workflow updated from `dotnet-version: 9.0.x`
@@ -731,4 +732,4 @@ Broiler.JavaScript.Core/
 
 ---
 
-*Last updated: 2026-03-22 — M5 complete (TFM alignment to net8.0, Directory.Build.props, CI update, migration guide)*
+*Last updated: 2026-03-22 — M5 complete (TFM alignment to net8.0, Directory.Build.props, CI update, migration guide, All meta-package updated, Runtime interface docs)*
