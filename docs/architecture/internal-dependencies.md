@@ -310,11 +310,74 @@ to set up a working JS context.
 
 ---
 
-## 9. Quick Reference — Adding a New Dependency
+## 9. Phase 2 — Planned Dependency Changes
+
+The [Phase 2 roadmap](../roadmap/javascript-engine-assembly-refactor.md#10-phase-2-deep-structural-refactoring)
+proposes structural changes that may affect the dependency graph. This section
+documents anticipated changes for planning purposes.
+
+### 9.1 Code-Generation Builder Isolation (M9)
+
+**Current state:** `LinqExpressions/` (33 files), `Emit/` (2), `CodeGen/` (2),
+`LambdaGen/` (1), `TypeQuery/` (1), `FastParser/Compiler/` (1), and
+`Debugger/` adapter (1) live in `Broiler.JavaScript.Core`.
+
+**Proposed change (preferred):** Move these 49 files into the `Compiler`
+assembly under a `Builders/` subdirectory. This adds no new project references
+because Compiler already references Core.
+
+**Alternative (if runtime callers found):** Create a new
+`Broiler.JavaScript.CodeGen` assembly.
+
+| Scenario | New Assembly? | Dependency Change |
+|----------|---------------|-------------------|
+| Move to Compiler | No | None |
+| New CodeGen assembly | Yes | `Compiler → CodeGen → Core` (CodeGen is new, sits between) |
+
+If a new assembly is created, update §1 matrix and §1.1 graph, and add
+CodeGen to the `Broiler.JavaScript.All` meta-package.
+
+### 9.2 Foundation Layer Dedup (M11)
+
+**Current state:** `CancellableDisposableAction` exists in both Runtime and
+Parser.
+
+**Proposed change:** Keep the Runtime copy. Parser would either:
+
+1. Add a project reference to Runtime (safe — Runtime is a peer foundation
+   assembly; no cycle because Parser → Ast ← Runtime, but Parser does not
+   currently reference Runtime directly), or
+2. If adding the reference is undesirable, extract the utility to
+   ExpressionCompiler (leaf dependency both Parser and Runtime already
+   reference).
+
+Either option eliminates the duplicate. Update §1 matrix if Parser gains a
+new reference.
+
+### 9.3 Types Remaining in Core After Phase 2
+
+After M9 (code-gen isolation), the Core assembly would contain ~115 files
+focused on:
+
+- **Runtime objects:** JSContext, JSGlobal, JSObject, JSArray, JSString,
+  JSNumber, JSBoolean, JSFunction, JSClass, JSSymbol, JSNull, JSUndefined
+- **Non-extractable built-ins:** RegExp (compiler coupling), Promise
+  (JSContext infrastructure)
+- **Property/prototype infrastructure:** DefaultBuiltInRegistry, JSPrototype,
+  scope management, property descriptors
+- **Extensions & utilities:** Type-checking helpers, collection extensions,
+  hash utilities
+- **CLR fallback stubs:** FallbackClrInterop, MarshalExtensions
+
+This is approximately a 22% reduction from the current 164 files.
+
+---
+
+## 10. Quick Reference — Adding a New Dependency
 
 Before adding a new project or package reference, verify:
 
-1. **Layer rule** — Does the reference flow downward? (§7.1 rule 1)
+1. **Layer rule** — Does the reference flow downward? (§7 rule 1)
 2. **Cycle check** — Run `dotnet build` to confirm no circular reference.
 3. **Factory delegate** — If the new code in a Feature assembly must be called
    from Core, add a delegate property to `DefaultBuiltInRegistry` or `JSValue`
