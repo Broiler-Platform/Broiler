@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Date;
+using Broiler.JavaScript.Core.Core.Debug;
 using Broiler.JavaScript.Core.Core.Decimal;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Global;
@@ -42,5 +43,9 @@ internal static class BuiltInsAssemblyInitializer
         // and inspect decimal values without referencing the concrete type.
         JSValue.CreateDecimalFactory = static v => new JSDecimal(v);
         JSValue.CreateDecimalFromStringFactory = static s => new JSDecimal(s);
+
+        // Wire factory delegate for JSConsole so DefaultBuiltInRegistry
+        // does not directly reference the concrete type.
+        DefaultBuiltInRegistry.ConsoleFactory = static ctx => new JSConsole(ctx);
     }
 }

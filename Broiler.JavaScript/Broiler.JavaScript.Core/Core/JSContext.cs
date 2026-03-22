@@ -9,7 +9,6 @@ using Broiler.JavaScript.Core.CodeGen;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.Core.Core.Storage;
-using Broiler.JavaScript.Core.Core.Debug;
 using Broiler.JavaScript.Core.Debugger;
 using Broiler.JavaScript.Core.Emit;
 using Broiler.JavaScript.Core.Core.Primitive;
