@@ -385,16 +385,15 @@ practically extracted without fundamentally restructuring the engine:
 
 | # | Task | Priority | Effort | Status |
 |---|------|----------|--------|--------|
-| 11 | Establish CI workflow for all assemblies | P1 | Medium | CI deleted — needs creation |
-| 12 | Create unit test projects for each assembly | P1 | Large | Solution references 12 test projects but directories/csproj files do not exist yet (pre-existing issue) |
-| 13 | Add integration test project | P2 | Medium | Referenced in solution but not created |
+| 11 | Establish CI workflow for all assemblies | P1 | Medium | **M1 planned** — see [milestone-1-plan.md](./milestone-1-plan.md) |
+| 12 | Create unit test projects for each assembly | P1 | Large | **M1 planned** — 11 test projects to create |
+| 13 | Add integration test project | P2 | Medium | **M1 planned** — 1 integration test project |
 | 14 | Align target frameworks (net8.0 vs net9.0) | P2 | Small | Main exe is net9.0; libraries are net8.0 |
 | 15 | Add `Directory.Build.props` in `Broiler.JavaScript/` for shared settings | P3 | Small | Not started |
 
-> **Note:** The solution file (`YantraJS.sln`) already contains entries for 12 test
-> projects, but none of the corresponding project directories or `.csproj` files
-> exist. Building the full solution fails with MSB3202 errors for these missing
-> projects. Non-test projects build successfully (0 errors, 497 warnings).
+> **Note:** The solution file (`YantraJS.sln`) does not currently include test project
+> entries. Test projects will be created and added to the solution as part of M1.
+> Non-test projects build successfully (0 errors, 531 warnings).
 
 ### 9.3 Documentation — Gaps
 
@@ -492,14 +491,14 @@ For each type, follow this pattern:
 
 ## 11. Milestones & Timeline
 
-| Milestone | Tasks | Estimated Effort | Target |
-|-----------|-------|-----------------|--------|
-| **M1 — CI & Test Foundation** | Tasks 11–13 | 2–3 days | Week 1 |
-| **M2 — Quick Wins** | Tasks 1, 4, 5, 6 (Math, Reflect, Console, DataView) | 1–2 days | Week 2 |
-| **M3 — Medium Extractions** | Tasks 2, 3, 7, 8 (Proxy, JSON, Map, Set) | 2–3 days | Week 3 |
-| **M4 — Evaluation** | Tasks 9, 10 (BigInt, TypedArrays feasibility) | 1 day | Week 3 |
-| **M5 — Documentation** | Tasks 14–18 (TFM alignment, migration guide, docs) | 1–2 days | Week 4 |
-| **M6 — Final Validation** | Full regression testing, performance benchmarks | 1 day | Week 4 |
+| Milestone | Tasks | Estimated Effort | Target | Status |
+|-----------|-------|-----------------|--------|--------|
+| **M1 — CI & Test Foundation** | Tasks 11–13 | 2–3 days | Week 1 | **Planning complete** — see [milestone-1-plan.md](./milestone-1-plan.md) |
+| **M2 — Quick Wins** | Tasks 1, 4, 5, 6 (Math, Reflect, Console, DataView) | 1–2 days | Week 2 | Not started |
+| **M3 — Medium Extractions** | Tasks 2, 3, 7, 8 (Proxy, JSON, Map, Set) | 2–3 days | Week 3 | Not started |
+| **M4 — Evaluation** | Tasks 9, 10 (BigInt, TypedArrays feasibility) | 1 day | Week 3 | Not started |
+| **M5 — Documentation** | Tasks 14–18 (TFM alignment, migration guide, docs) | 1–2 days | Week 4 | Not started |
+| **M6 — Final Validation** | Full regression testing, performance benchmarks | 1 day | Week 4 | Not started |
 
 **Total estimated effort:** 8–12 working days
 
