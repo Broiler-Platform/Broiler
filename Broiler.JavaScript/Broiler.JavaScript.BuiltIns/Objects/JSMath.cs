@@ -72,7 +72,7 @@ public partial class JSMath : JSObject
 
     /// <summary>
     /// We do not want to recreate new objects for standard known constants. 
-    /// Hence, we ned to check and return already existing constants.
+    /// Hence, we need to check and return already existing constants.
     /// 
     /// </summary>
     /// <param name="t"></param>
