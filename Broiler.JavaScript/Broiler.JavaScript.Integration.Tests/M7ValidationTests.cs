@@ -10,8 +10,9 @@ namespace Broiler.JavaScript.Integration.Tests;
 
 /// <summary>
 /// Milestone 7 (M7) — Future Extraction Candidates validation tests.
-/// These tests verify the coupling analysis assumptions for each extraction
-/// candidate and ensure the documented extraction plans remain valid.
+/// These tests verify that the TypedArrays and Iterator types have been
+/// successfully extracted from Core to BuiltIns, and that non-extractable
+/// candidates (RegExp, Promise) remain in Core.
 /// </summary>
 public class M7ValidationTests
 {
@@ -26,27 +27,25 @@ public class M7ValidationTests
             typeof(Broiler.JavaScript.Clr.DefaultClrInterop).TypeHandle);
     }
 
-    // ── 7.1: TypedArrays — Extractable ─────────────────────────────────
+    // ── 7.1: TypedArrays — Extracted to BuiltIns ──────────────────────
 
     [Fact]
-    public void M7_TypedArrays_ResideInCoreAssembly()
+    public void M7_TypedArrays_ExtractedToBuiltInsAssembly()
     {
-        // TypedArrays currently live in Core; this is the starting point
-        // for any future extraction.
+        // TypedArrays have been extracted from Core to BuiltIns.
         var arrayBufferAsm = typeof(JSArrayBuffer).Assembly.GetName().Name;
-        Assert.Equal("Broiler.JavaScript.Core", arrayBufferAsm);
+        Assert.Equal("Broiler.JavaScript.BuiltIns", arrayBufferAsm);
 
         var typedArrayAsm = typeof(JSTypedArray).Assembly.GetName().Name;
-        Assert.Equal("Broiler.JavaScript.Core", typedArrayAsm);
+        Assert.Equal("Broiler.JavaScript.BuiltIns", typedArrayAsm);
     }
 
     [Fact]
     public void M7_TypedArrays_NoCompilerCoupling()
     {
         // The Compiler assembly must NOT reference TypedArray types.
-        // This confirms they can be extracted without affecting compilation.
-        var compilerAssembly = AppDomain.CurrentDomain.GetAssemblies()
-            .First(a => a.GetName().Name == "Broiler.JavaScript.Compiler");
+        // This confirms extraction didn't introduce unwanted coupling.
+        var compilerAssembly = typeof(Broiler.JavaScript.Core.FastParser.Compiler.FastCompiler).Assembly;
 
         var compilerTypes = compilerAssembly.GetTypes()
             .SelectMany(t => t.GetMethods(
@@ -70,7 +69,7 @@ public class M7ValidationTests
     [Fact]
     public void M7_TypedArrays_FunctionalAfterAssemblyLoad()
     {
-        // TypedArrays must work end-to-end through eval.
+        // TypedArrays must work end-to-end through eval after extraction.
         EnsureAllAssembliesLoaded();
         using var ctx = new JSContext();
 
@@ -79,6 +78,25 @@ public class M7ValidationTests
 
         result = ctx.Eval("new Int32Array([1, 2, 3]).length");
         Assert.Equal(3.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void M7_TypedArrays_StructuredCloneDelegated()
+    {
+        // ArrayBuffer StructuredClone is now handled by the extension delegate
+        // in BuiltIns, not directly in Core's JSGlobal.
+        EnsureAllAssembliesLoaded();
+        using var ctx = new JSContext();
+
+        var result = ctx.Eval(@"
+            var buf = new ArrayBuffer(8);
+            var view = new Int32Array(buf);
+            view[0] = 42;
+            var cloned = structuredClone(buf);
+            var clonedView = new Int32Array(cloned);
+            clonedView[0];
+        ");
+        Assert.Equal(42.0, result.DoubleValue);
     }
 
     // ── 7.2: RegExp — NOT Extractable ──────────────────────────────────
@@ -104,8 +122,7 @@ public class M7ValidationTests
         Assert.NotNull(regExpBuilderType);
 
         // Confirm the Compiler assembly references Core (where JSRegExp lives).
-        var compilerAssembly = AppDomain.CurrentDomain.GetAssemblies()
-            .First(a => a.GetName().Name == "Broiler.JavaScript.Compiler");
+        var compilerAssembly = typeof(Broiler.JavaScript.Core.FastParser.Compiler.FastCompiler).Assembly;
         var compilerRefs = compilerAssembly.GetReferencedAssemblies()
             .Select(r => r.Name!)
             .ToHashSet();
@@ -115,20 +132,16 @@ public class M7ValidationTests
     [Fact]
     public void M7_RegExp_FunctionalWithStringMethods()
     {
-        // RegExp is tightly integrated with String prototype methods
-        // (match, replace, split, search, matchAll, replaceAll).
+        // RegExp is tightly integrated with String prototype methods.
         EnsureAllAssembliesLoaded();
         using var ctx = new JSContext();
 
-        // String.match with RegExp
         var result = ctx.Eval("'hello world'.match(/\\w+/g).length");
         Assert.Equal(2.0, result.DoubleValue);
 
-        // String.replace with RegExp
         result = ctx.Eval("'abc'.replace(/b/, 'x')");
         Assert.Equal("axc", result.ToString());
 
-        // String.split with RegExp
         result = ctx.Eval("'a,b,c'.split(/,/).length");
         Assert.Equal(3.0, result.DoubleValue);
     }
@@ -138,8 +151,6 @@ public class M7ValidationTests
     [Fact]
     public void M7_Promise_ResideInCoreAssembly()
     {
-        // Promise is infrastructure-level: JSContext owns PendingPromises
-        // and async functions create JSPromise instances directly.
         var promiseAsm = typeof(JSPromise).Assembly.GetName().Name;
         Assert.Equal("Broiler.JavaScript.Core", promiseAsm);
     }
@@ -147,8 +158,6 @@ public class M7ValidationTests
     [Fact]
     public void M7_Promise_TightlyCoupledToJSContext()
     {
-        // JSContext has a ConcurrentDictionary<long, JSPromise> field,
-        // making Promise non-extractable without major JSContext refactoring.
         var contextType = typeof(JSContext);
         var pendingField = contextType.GetField(
             "PendingPromises",
@@ -156,7 +165,6 @@ public class M7ValidationTests
             System.Reflection.BindingFlags.NonPublic);
         Assert.NotNull(pendingField);
 
-        // Verify the field type references JSPromise.
         var fieldType = pendingField!.FieldType;
         Assert.Contains("JSPromise", fieldType.GenericTypeArguments
             .Select(t => t.Name));
@@ -175,33 +183,29 @@ public class M7ValidationTests
         Assert.Equal("Promise", result.ToString());
     }
 
-    // ── 7.4: Iterator — Extractable ────────────────────────────────────
+    // ── 7.4: Iterator — Extracted to BuiltIns ──────────────────────────
 
     [Fact]
-    public void M7_Iterator_ResideInCoreAssembly()
+    public void M7_Iterator_ExtractedToBuiltInsAssembly()
     {
-        // Iterator helpers currently live in Core; they are extractable
-        // using the factory delegate pattern.
+        // Iterator helpers have been extracted from Core to BuiltIns.
         var iteratorAsm = typeof(JSIteratorObject).Assembly.GetName().Name;
-        Assert.Equal("Broiler.JavaScript.Core", iteratorAsm);
+        Assert.Equal("Broiler.JavaScript.BuiltIns", iteratorAsm);
     }
 
     [Fact]
     public void M7_Iterator_NoCompilerOrParserCoupling()
     {
         // Neither Compiler nor Parser reference JSIteratorObject.
-        // Use direct type references to get assemblies (avoids AppDomain timing).
         var compilerAssembly = typeof(Broiler.JavaScript.Core.FastParser.Compiler.FastCompiler).Assembly;
         var parserAssembly = typeof(Broiler.JavaScript.Parser.FastParser).Assembly;
 
-        // Check Compiler types don't reference Iterator namespace.
         var compilerTypeNames = compilerAssembly.GetTypes()
             .Select(t => t.FullName ?? "")
             .ToList();
         Assert.DoesNotContain(compilerTypeNames,
             n => n.Contains("JSIteratorObject"));
 
-        // Check Parser types don't reference Iterator namespace.
         var parserTypeNames = parserAssembly.GetTypes()
             .Select(t => t.FullName ?? "")
             .ToList();
@@ -210,19 +214,30 @@ public class M7ValidationTests
     }
 
     [Fact]
-    public void M7_Iterator_CoupledOnlyViaDefaultBuiltInRegistry()
+    public void M7_Iterator_DecoupledFromDefaultBuiltInRegistry()
     {
-        // The only coupling point is DefaultBuiltInRegistry, which
-        // hardcodes references to JSIteratorObject static methods.
-        // This can be replaced with factory delegates during extraction.
-        var registryType = typeof(DefaultBuiltInRegistry);
-        Assert.Equal("Broiler.JavaScript.Core",
-            registryType.Assembly.GetName().Name);
+        // DefaultBuiltInRegistry no longer has direct references to
+        // JSIteratorObject — it uses the IteratorPrototypeSetup delegate.
+        Assert.NotNull(DefaultBuiltInRegistry.IteratorPrototypeSetup);
 
-        // JSIteratorObject and DefaultBuiltInRegistry are in the same assembly,
-        // confirming the coupling is intra-assembly (not cross-assembly).
-        Assert.Equal(typeof(JSIteratorObject).Assembly,
-            registryType.Assembly);
+        // JSIteratorObject is in BuiltIns, DefaultBuiltInRegistry is in Core.
+        Assert.NotEqual(
+            typeof(JSIteratorObject).Assembly,
+            typeof(DefaultBuiltInRegistry).Assembly);
+    }
+
+    [Fact]
+    public void M7_Iterator_FunctionalEndToEnd()
+    {
+        // Iterator helpers must work through eval after extraction.
+        EnsureAllAssembliesLoaded();
+        using var ctx = new JSContext();
+
+        var result = ctx.Eval("[1, 2, 3, 4, 5].values().filter(x => x > 2).toArray().length");
+        Assert.Equal(3.0, result.DoubleValue);
+
+        result = ctx.Eval("[1, 2, 3].values().map(x => x * 2).toArray().join(',')");
+        Assert.Equal("2,4,6", result.ToString());
     }
 
     // ── 7.5: Intl — Already Extracted ──────────────────────────────────
@@ -230,8 +245,6 @@ public class M7ValidationTests
     [Fact]
     public void M7_Intl_AlreadyInBuiltInsAssembly()
     {
-        // JSIntl was extracted to BuiltIns as part of M3.
-        // This serves as the template pattern for future extractions.
         var intlAsm = typeof(JSIntl).Assembly.GetName().Name;
         Assert.Equal("Broiler.JavaScript.BuiltIns", intlAsm);
     }
@@ -239,8 +252,6 @@ public class M7ValidationTests
     [Fact]
     public void M7_Intl_CoreHasNoDirectReference()
     {
-        // Core must NOT reference BuiltIns (where JSIntl lives).
-        // Communication is via factory delegates wired at initialization.
         var coreRefs = typeof(JSContext).Assembly.GetReferencedAssemblies()
             .Select(r => r.Name!)
             .ToHashSet();
@@ -250,12 +261,8 @@ public class M7ValidationTests
     [Fact]
     public void M7_Intl_FactoryDelegatePattern()
     {
-        // Verify the Intl factory delegate is wired by the module initializer.
-        // This is the pattern that TypedArrays and Iterator should follow.
         EnsureAllAssembliesLoaded();
 
-        // JSGlobalStatic.IntlFactory should be wired by BuiltInsAssemblyInitializer.
-        // The class lives in namespace Broiler.JavaScript.Core.Core.Global.
         var globalStaticType = typeof(JSContext).Assembly
             .GetType("Broiler.JavaScript.Core.Core.Global.JSGlobalStatic");
         Assert.NotNull(globalStaticType);
@@ -266,7 +273,6 @@ public class M7ValidationTests
             System.Reflection.BindingFlags.NonPublic);
         Assert.NotNull(intlFactoryProp);
 
-        // After all assemblies are loaded, the factory should be wired.
         var factoryValue = intlFactoryProp!.GetValue(null);
         Assert.NotNull(factoryValue);
     }
@@ -276,14 +282,11 @@ public class M7ValidationTests
     [Fact]
     public void M7_ExtractionPattern_CoreDoesNotReferenceFeatureAssemblies()
     {
-        // The fundamental invariant: Core → Foundation only, never Core → Feature.
-        // Future extractions must maintain this property.
         var coreRefs = typeof(JSContext).Assembly.GetReferencedAssemblies()
             .Select(r => r.Name!)
             .Where(n => n.StartsWith("Broiler.JavaScript"))
             .ToHashSet();
 
-        // Core references only Foundation-layer assemblies.
         var allowedRefs = new HashSet<string>
         {
             "Broiler.JavaScript.Runtime",
@@ -302,25 +305,24 @@ public class M7ValidationTests
     public void M7_ExtractionPattern_AllCandidatesAccountedFor()
     {
         // Verify all 5 documented candidates exist in the expected locations.
-        // This test ensures the roadmap stays in sync with the code.
 
-        // TypedArrays — Core
-        Assert.Equal("Broiler.JavaScript.Core",
+        // TypedArrays — extracted to BuiltIns
+        Assert.Equal("Broiler.JavaScript.BuiltIns",
             typeof(JSArrayBuffer).Assembly.GetName().Name);
 
-        // RegExp — Core
+        // RegExp — remains in Core
         Assert.Equal("Broiler.JavaScript.Core",
             typeof(JSRegExp).Assembly.GetName().Name);
 
-        // Promise — Core
+        // Promise — remains in Core
         Assert.Equal("Broiler.JavaScript.Core",
             typeof(JSPromise).Assembly.GetName().Name);
 
-        // Iterator — Core
-        Assert.Equal("Broiler.JavaScript.Core",
+        // Iterator — extracted to BuiltIns
+        Assert.Equal("Broiler.JavaScript.BuiltIns",
             typeof(JSIteratorObject).Assembly.GetName().Name);
 
-        // Intl — BuiltIns (already extracted)
+        // Intl — already in BuiltIns (extracted in M3)
         Assert.Equal("Broiler.JavaScript.BuiltIns",
             typeof(JSIntl).Assembly.GetName().Name);
     }
