@@ -5,6 +5,8 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LambdaGen;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.Ast.Patterns;
+using Broiler.JavaScript.Ast.Misc;
 
 namespace Broiler.JavaScript.Core.FastParser.Compiler;
 

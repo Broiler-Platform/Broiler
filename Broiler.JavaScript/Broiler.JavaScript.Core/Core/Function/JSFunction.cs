@@ -10,6 +10,7 @@ using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.ExpressionCompiler.Runtime;
+using Broiler.JavaScript.Ast.Misc;
 
 namespace Broiler.JavaScript.Core.Core.Function;
 

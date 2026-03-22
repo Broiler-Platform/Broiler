@@ -1,4 +1,6 @@
-﻿using Broiler.JavaScript.Core.CodeGen;
+﻿using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Ast.Statements;
+using Broiler.JavaScript.Core.CodeGen;
 using System;
 
 using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;

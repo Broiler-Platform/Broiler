@@ -7,6 +7,7 @@ using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.Ast.Misc;
 
 namespace Broiler.JavaScript.Core.Core.Events;
 

@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Ast;
+using Broiler.JavaScript.Ast.Expressions;
+using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Ast.Statements;
 
 // Type forwarding for types moved to Broiler.JavaScript.Ast assembly.
 // These ensure binary compatibility for downstream consumers that reference

@@ -13,6 +13,8 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Ast.Expressions;
 
 namespace Broiler.JavaScript.Core.FastParser.Compiler;
 

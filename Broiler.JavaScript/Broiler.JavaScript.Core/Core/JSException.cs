@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Core.Function;
 

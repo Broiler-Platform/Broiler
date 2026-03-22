@@ -11,6 +11,9 @@ using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression
 using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.Ast.Statements;
+using Broiler.JavaScript.Ast.Expressions;
+using Broiler.JavaScript.Ast.Misc;
 
 namespace Broiler.JavaScript.Core.FastParser.Compiler;
 

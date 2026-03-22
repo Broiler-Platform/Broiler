@@ -1,4 +1,7 @@
-
+using Broiler.JavaScript.Ast.Expressions;
+using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Ast.Patterns;
+using Broiler.JavaScript.Ast.Statements;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using System.Runtime.CompilerServices;

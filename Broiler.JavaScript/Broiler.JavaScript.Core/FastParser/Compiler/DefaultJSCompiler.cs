@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.Ast.Misc;
 
 namespace Broiler.JavaScript.Core.FastParser.Compiler;
 

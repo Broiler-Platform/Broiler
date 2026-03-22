@@ -9,6 +9,7 @@ using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Core.Core.Array;
+using Broiler.JavaScript.Ast.Misc;
 
 namespace Broiler.JavaScript.Core;
 

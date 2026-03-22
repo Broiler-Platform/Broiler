@@ -17,7 +17,7 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Generator;
-using Broiler.JavaScript.Ast;
+using Broiler.JavaScript.Ast.Misc;
 
 namespace Broiler.JavaScript.Clr;
 

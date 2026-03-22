@@ -6,6 +6,7 @@ using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.Ast.Misc;
 
 namespace Broiler.JavaScript.Core.FastParser.Compiler;
 

@@ -1,0 +1,66 @@
+﻿using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Ast.Statements;
+using Broiler.JavaScript.ExpressionCompiler.Core;
+
+namespace Broiler.JavaScript.Ast;
+
+
+public enum FastVariableKind
+{
+    None,
+    Let,
+    Const,
+    Var,
+}
+
+public class AstVariableDeclaration : AstStatement
+{
+    public readonly IFastEnumerable<VariableDeclarator> Declarators;
+    public readonly FastVariableKind Kind;
+
+    /// <summary>
+    /// This declaration must be disposed at end of the containing scope.
+    /// </summary>
+    public readonly bool Using;
+
+    /// <summary>
+    /// This declaration must be disposed asynchronously at end of the containing scope.
+    /// </summary>
+    public readonly bool AwaitUsing;
+
+    public AstVariableDeclaration(FastToken begin, FastToken previousToken, in VariableDeclarator declarator, FastVariableKind kind = FastVariableKind.Var, bool @using = false,
+        bool @await = false) : base(begin, FastNodeType.VariableDeclaration, previousToken)
+    {
+        Declarators = new Sequence<VariableDeclarator>(1) { declarator };
+        Kind = kind;
+        Using = @using;
+        AwaitUsing = @await;
+    }
+
+    public AstVariableDeclaration(FastToken begin, FastToken previousToken, IFastEnumerable<VariableDeclarator> declarators, FastVariableKind kind = FastVariableKind.Var, 
+        bool @using = false, bool @await = false) : base(begin, FastNodeType.VariableDeclaration, previousToken)
+    {
+        Declarators = declarators;
+        Kind = kind;
+        Using = @using;
+        AwaitUsing = @await;
+    }
+
+    public override string ToString()
+    {
+        if (Using)
+        {
+            if (AwaitUsing)
+                return $"await using {Declarators.Join()}";
+
+            return $"using {Declarators.Join()}";
+        }
+
+        return Kind switch
+        {
+            FastVariableKind.Let => $"let {Declarators.Join()}",
+            FastVariableKind.Const => $"const {Declarators.Join()}",
+            _ => $"var {Declarators.Join()}",
+        };
+    }
+}

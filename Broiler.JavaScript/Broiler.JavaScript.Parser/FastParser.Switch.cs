@@ -1,4 +1,7 @@
 
+using Broiler.JavaScript.Ast.Expressions;
+using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Ast.Statements;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 
 namespace Broiler.JavaScript.Parser;
@@ -21,7 +24,7 @@ partial class FastParser
 
         stream.Expect(TokenTypes.CurlyBracketStart);
 
-        var nodes = new Sequence<AstCase>();
+        var nodes = new Sequence<Case>();
         var statements = new Sequence<AstStatement>();
         AstExpression test = null;
         bool hasDefault = false;
@@ -32,7 +35,7 @@ partial class FastParser
             {
                 if (test != null)
                 {
-                    nodes.Add(new AstCase(test, statements));
+                    nodes.Add(new Case(test, statements));
                     statements = [];
                 }
 
@@ -47,7 +50,7 @@ partial class FastParser
 
                 if (test != null)
                 {
-                    nodes.Add(new AstCase(test, statements));
+                    nodes.Add(new Case(test, statements));
                     statements = [];
                 }
 
@@ -59,7 +62,7 @@ partial class FastParser
         }
 
         if (test != null || hasDefault)
-            nodes.Add(new AstCase(test, statements));
+            nodes.Add(new Case(test, statements));
 
         node = new AstSwitchStatement(begin, PreviousToken, target, nodes);
         return true;

@@ -1,4 +1,5 @@
-﻿using Broiler.JavaScript.Core.LinqExpressions;
+﻿using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Core.LinqExpressions;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
 namespace Broiler.JavaScript.Core.FastParser.Compiler;

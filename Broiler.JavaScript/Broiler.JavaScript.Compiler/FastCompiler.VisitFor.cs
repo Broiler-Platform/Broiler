@@ -1,4 +1,6 @@
 ﻿#nullable enable
+using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Ast.Statements;
 using Broiler.JavaScript.Core.CodeGen;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions;

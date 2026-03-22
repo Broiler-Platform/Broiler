@@ -1,0 +1,41 @@
+﻿using Broiler.JavaScript.Ast.Misc;
+
+namespace Broiler.JavaScript.Ast.Expressions;
+
+public class AstUnaryExpression : AstExpression
+{
+    public readonly AstExpression Argument;
+    public readonly UnaryOperator Operator;
+    public readonly bool Prefix;
+
+    public AstUnaryExpression(FastToken token, AstExpression argument, UnaryOperator tokenType, bool prefix = true)
+        : base(token, FastNodeType.UnaryExpression, argument.End)
+    {
+        switch (tokenType)
+        {
+            case UnaryOperator.Increment:
+            case UnaryOperator.Decrement:
+                switch (argument.Type)
+                {
+                    case FastNodeType.Identifier:
+                    case FastNodeType.MemberExpression:
+                        break;
+                    default:
+                        throw new FastParseException(token, $"Invalid expression for update");
+                }
+                break;
+        }
+
+        Argument = argument;
+        Operator = tokenType;
+        Prefix = prefix;
+    }
+
+    public override string ToString()
+    {
+        if (Prefix)
+            return $"{Operator} {Argument}";
+
+        return $"{Argument} {Operator}";
+    }
+}

@@ -1,4 +1,4 @@
-using Broiler.JavaScript.Ast;
+using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Extensions;
 using System;

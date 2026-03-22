@@ -5,6 +5,7 @@ using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
 using Broiler.JavaScript.Core.Core.Generator;
+using Broiler.JavaScript.Ast.Misc;
 
 namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 

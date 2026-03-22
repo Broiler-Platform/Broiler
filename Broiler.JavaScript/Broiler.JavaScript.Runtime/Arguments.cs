@@ -1,9 +1,9 @@
 ﻿#nullable enable
 using System;
-using Broiler.JavaScript.Ast;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Broiler.JavaScript.Ast.Misc;
 
 namespace Broiler.JavaScript.Core.Core;
 
