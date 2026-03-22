@@ -82,6 +82,7 @@ For detailed architecture documentation see:
 - [Extraction Pattern](../docs/architecture/extraction-pattern.md)
 - [Module Initializers](../docs/architecture/module-initializers.md)
 - [Contributing: Adding Built-In Types](../docs/architecture/contributing-builtins.md)
+- [Internal Dependencies](../docs/architecture/internal-dependencies.md)
 - [Refactor Roadmap](../docs/roadmap/javascript-engine-assembly-refactor.md)
 
 # Mixed modules
