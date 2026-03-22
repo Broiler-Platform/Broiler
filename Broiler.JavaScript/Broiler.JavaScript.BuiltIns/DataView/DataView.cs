@@ -96,7 +96,7 @@ public partial class DataView : JSObject
         if (byteOffset < 0 || byteOffset > byteLength - 8)
             throw JSContext.NewRangeError($"Offset {byteOffset} is outside the bounds of DataView");
 
-        fixed (byte* ptr = &buffer.buffer[byteOffset + byteOffset])
+        fixed (byte* ptr = &buffer.buffer[this.byteOffset + byteOffset])
         {
             if (littleEndian)
             {

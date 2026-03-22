@@ -1,11 +1,15 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Date;
 using Broiler.JavaScript.Core.Core.Debug;
 using Broiler.JavaScript.Core.Core.Decimal;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Global;
 using Broiler.JavaScript.Core.Core.Intl;
+using Broiler.JavaScript.Core.Core.Map;
+using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Set;
 
 namespace Broiler.JavaScript.BuiltIns;
 
@@ -47,5 +51,34 @@ internal static class BuiltInsAssemblyInitializer
         // Wire factory delegate for JSConsole so DefaultBuiltInRegistry
         // does not directly reference the concrete type.
         DefaultBuiltInRegistry.ConsoleFactory = static ctx => new JSConsole(ctx);
+
+        // Wire structured clone extension for Map and Set types so that
+        // JSGlobal.StructuredClone works without Core referencing BuiltIns.
+        DefaultBuiltInRegistry.StructuredCloneExtension = static (value, seen, recurse) =>
+        {
+            if (value is JSMap map)
+            {
+                var clone = new JSMap(Arguments.Empty);
+                seen[value] = clone;
+                foreach (var entry in map.GetEntries())
+                {
+                    var clonedKey = recurse(entry[0], seen);
+                    var clonedVal = recurse(entry[1], seen);
+                    clone.Set(clonedKey, clonedVal);
+                }
+                return clone;
+            }
+
+            if (value is JSSet set)
+            {
+                var clone = new JSSet(Arguments.Empty);
+                seen[value] = clone;
+                foreach (var item in set.Keys())
+                    clone.Add(recurse(item, seen));
+                return clone;
+            }
+
+            return null;
+        };
     }
 }

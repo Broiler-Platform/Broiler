@@ -364,6 +364,260 @@ public class BuiltInsTests
         Assert.NotNull(DefaultBuiltInRegistry.ConsoleFactory);
     }
 
+    // ── M3: JSJSON tests ─────────────────────────────────────────────
+
+    [Fact]
+    public void JSON_Parse_ReturnsObject()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("JSON.parse('{\"a\":1}').a");
+        Assert.Equal(1.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void JSON_Stringify_ReturnsString()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("JSON.stringify({ a: 1 })");
+        Assert.Equal("{\"a\":1}", result.ToString());
+    }
+
+    [Fact]
+    public void JSON_Parse_WithReviver()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            JSON.parse('{""a"":1,""b"":2}', function(key, value) {
+                return typeof value === 'number' ? value * 2 : value;
+            }).a;
+        ");
+        Assert.Equal(2.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void JSON_Stringify_WithIndent()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("JSON.stringify({ a: 1 }, null, 2)");
+        Assert.Contains("\"a\"", result.ToString());
+    }
+
+    // ── M3: DataView tests ───────────────────────────────────────────
+
+    [Fact]
+    public void DataView_Construct_Succeeds()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("var buf = new ArrayBuffer(16); var dv = new DataView(buf); dv.byteLength;");
+        Assert.Equal(16.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void DataView_SetAndGetInt8()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var buf = new ArrayBuffer(4);
+            var dv = new DataView(buf);
+            dv.setInt8(0, 42);
+            dv.getInt8(0);
+        ");
+        Assert.Equal(42.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void DataView_SetAndGetFloat32()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var buf = new ArrayBuffer(4);
+            var dv = new DataView(buf);
+            dv.setFloat32(0, 3.14, true);
+            Math.round(dv.getFloat32(0, true) * 100) / 100;
+        ");
+        Assert.Equal(3.14, result.DoubleValue, 2);
+    }
+
+    // ── M3: JSMap tests ──────────────────────────────────────────────
+
+    [Fact]
+    public void Map_SetAndGet()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("var m = new Map(); m.set('key', 42); m.get('key');");
+        Assert.Equal(42.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Map_Size()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("var m = new Map(); m.set('a', 1); m.set('b', 2); m.size;");
+        Assert.Equal(2.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Map_Has_ReturnsTrue()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("var m = new Map(); m.set('x', 1); m.has('x');");
+        Assert.True(result.BooleanValue);
+    }
+
+    [Fact]
+    public void Map_Delete_RemovesEntry()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        // Verify delete returns true when key exists
+        var result = ctx.Eval("var m = new Map(); m.set('x', 1); m['delete']('x');");
+        Assert.True(result.BooleanValue);
+    }
+
+    [Fact]
+    public void Map_ForEach_Iterates()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var m = new Map();
+            m.set('a', 1);
+            m.set('b', 2);
+            var sum = 0;
+            m.forEach(function(k, v) { sum += v; });
+            sum;
+        ");
+        Assert.Equal(3.0, result.DoubleValue);
+    }
+
+    // ── M3: JSWeakMap tests ──────────────────────────────────────────
+
+    [Fact]
+    public void WeakMap_SetAndGet()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("var wm = new WeakMap(); var k = {}; wm.set(k, 99); wm.get(k);");
+        Assert.Equal(99.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void WeakMap_Has_ReturnsTrue()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("var wm = new WeakMap(); var k = {}; wm.set(k, 1); wm.has(k);");
+        Assert.True(result.BooleanValue);
+    }
+
+    // ── M3: JSSet tests ──────────────────────────────────────────────
+
+    [Fact]
+    public void Set_Add_And_Has()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("var s = new Set(); s.add(42); s.has(42);");
+        Assert.True(result.BooleanValue);
+    }
+
+    [Fact]
+    public void Set_Size()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("var s = new Set(); s.add(1); s.add(2); s.add(2); s.size;");
+        Assert.Equal(2.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Set_Delete()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        // Verify delete returns true when element exists
+        var result = ctx.Eval("var s = new Set(); s.add(1); s['delete'](1);");
+        Assert.True(result.BooleanValue);
+    }
+
+    [Fact]
+    public void Set_Union()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("var a = new Set([1,2]); var b = new Set([2,3]); a.union(b).size;");
+        Assert.Equal(3.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void Set_Intersection()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("var a = new Set([1,2,3]); var b = new Set([2,3,4]); a.intersection(b).size;");
+        Assert.Equal(2.0, result.DoubleValue);
+    }
+
+    // ── M3: JSWeakSet tests ──────────────────────────────────────────
+
+    [Fact]
+    public void WeakSet_Add_And_Has()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        // WeakSet.add returns the WeakSet itself per spec
+        var result = ctx.Eval("var ws = new WeakSet(); var o = {}; typeof ws.add(o);");
+        Assert.Equal("object", result.ToString());
+    }
+
+    [Fact]
+    public void WeakSet_Delete()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval("var ws = new WeakSet(); var o = {}; ws.add(o); ws['delete'](o);");
+        Assert.True(result.BooleanValue);
+    }
+
+    // ── M3: StructuredClone with Map/Set ─────────────────────────────
+
+    [Fact]
+    public void StructuredClone_Map()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var m = new Map();
+            m.set('a', 1);
+            var clone = structuredClone(m);
+            clone.get('a');
+        ");
+        Assert.Equal(1.0, result.DoubleValue);
+    }
+
+    [Fact]
+    public void StructuredClone_Set()
+    {
+        EnsureBuiltInsLoaded();
+        using var ctx = new JSContext();
+        var result = ctx.Eval(@"
+            var s = new Set([1, 2, 3]);
+            var clone = structuredClone(s);
+            clone.size;
+        ");
+        Assert.Equal(3.0, result.DoubleValue);
+    }
+
     /// <summary>
     /// Forces the BuiltIns and Clr assemblies to load by referencing types from them,
     /// which triggers their ModuleInitializers.

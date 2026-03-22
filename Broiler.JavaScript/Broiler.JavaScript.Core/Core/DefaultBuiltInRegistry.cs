@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Iterator;
+using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Storage;
 
 namespace Broiler.JavaScript.Core.Core;
@@ -33,6 +35,13 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
     /// does not directly reference the concrete JSConsole type.
     /// </summary>
     public static Func<JSContext, object> ConsoleFactory { get; set; }
+
+    /// <summary>
+    /// Extension delegate for structured clone support of satellite assembly types
+    /// (e.g., Map, Set). Returns a cloned value, or null if the type is not handled.
+    /// The third parameter is the recursive clone function.
+    /// </summary>
+    public static Func<JSValue, Dictionary<JSValue, JSValue>, Func<JSValue, Dictionary<JSValue, JSValue>, JSValue>, JSValue> StructuredCloneExtension { get; set; }
 
     /// <inheritdoc />
     public void Register(IJSContext ctx)
