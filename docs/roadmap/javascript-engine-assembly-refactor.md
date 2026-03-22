@@ -44,10 +44,11 @@ ExpressionCompiler ← Ast ← Storage
 - `IBuiltInRegistry` / `IClrInterop` / `IJSCompiler` interfaces in `Runtime`
 
 **Remaining work** centers on:
-1. Extracting additional built-in types from Core → BuiltIns (~13 candidates identified)
-2. Evaluating LinqExpressions for extraction into the Compiler assembly
-3. Establishing CI, tests, and documentation for the separated structure
-4. Aligning target frameworks across all library projects
+1. ~~Extracting additional built-in types from Core → BuiltIns~~ — 24 types extracted (M2/M3); 1 remaining extractable candidate (JSBigInt, deferred)
+2. ~~Evaluating LinqExpressions for extraction into the Compiler assembly~~ — Deferred (tightly coupled by design)
+3. ~~Establishing CI, tests, and documentation for the separated structure~~ — CI and 116 tests in place (M1)
+4. Aligning target frameworks across all library projects (M5)
+5. Final validation and performance benchmarks (M6)
 
 ---
 
@@ -311,8 +312,44 @@ These types have been analyzed and confirmed extractable using the existing
 | ~~`JSConsole`~~ | ~~1~~ | ~~Low~~ | ~~None~~ — **Extracted (M2)** via `ConsoleFactory` delegate |
 | ~~`JSMap` / `JSWeakMap`~~ | ~~2~~ | ~~Medium~~ | ~~May need factory delegates~~ — **Extracted (M3)** via `StructuredCloneExtension` delegate |
 | ~~`JSSet` / `JSWeakSet`~~ | ~~2~~ | ~~Medium~~ | ~~May need factory delegates~~ — **Extracted (M3)** via `StructuredCloneExtension` delegate |
-| `JSBigInt` | 1 | Medium | Referenced by Compiler for literal creation |
+| `JSBigInt` | 1 | Medium | Referenced by Compiler for literal creation — **Evaluated (M4): Extractable** via factory delegate (see §7.1.1) |
 | **Total** | **1 remaining** | | |
+
+### 7.1.1 M4 Evaluation — JSBigInt Extraction Feasibility
+
+**Status:** ✅ Evaluated (M4) — **Extractable** with factory delegate
+
+**Coupling audit results:**
+
+| Coupling Point | File | Lines | Severity |
+|----------------|------|-------|----------|
+| Compiler literal | `FastCompiler.VisitLiteral.cs` | 25–26 | Medium — uses `JSBigIntBuilder.New()` |
+| Compiler unary negate | `FastCompiler.VisitUnaryExpression.cs` | 35–36 | Medium — uses `JSBigIntBuilder.New("-" + ...)` |
+| LinqExpression builder | `JSBigIntBuilder.cs` | 10 | **High** — `NewExpression<JSBigInt>()` directly instantiates |
+| JSGlobal SetInterval | `JSGlobal.cs` | 130 | Low — `new JSBigInt(key)` for timer IDs |
+| JSGlobal SetTimeout | `JSGlobal.cs` | 154 | Low — `new JSBigInt(key)` for timer IDs |
+| JSGlobal StructuredClone | `JSGlobal.cs` | 190 | Low — `value is JSBigInt` type check |
+
+**Extraction strategy — Factory delegate (like JSDecimal):**
+
+The existing `JSDecimalBuilder` pattern demonstrates the solution:
+- `JSDecimalBuilder.New()` calls `JSValue.CreateDecimalFromString()` — a static
+  method backed by a factory delegate, avoiding direct type references.
+- `JSBigIntBuilder` can be refactored similarly:
+  1. Add `Func<string, JSValue> CreateBigIntFromStringFactory` on `JSValue`
+  2. Add `JSValue.CreateBigIntFromString(string)` static method
+  3. Change `JSBigIntBuilder.New()` to use `StaticCallExpression` (like `JSDecimalBuilder`)
+  4. Wire factory in `BuiltInsAssemblyInitializer`
+- JSGlobal timer ID creation (`new JSBigInt(key)`) needs an additional
+  `Func<long, JSValue> CreateBigIntFactory` for numeric construction.
+- The `value is JSBigInt` check in StructuredClone can use `value.TypeStringValue`
+  comparison against `"bigint"` instead.
+
+**Estimated effort:** Small (1–2 hours). Three-step change: factory delegate, builder
+refactor, JSGlobal decoupling.
+
+**Recommendation:** Extract in a future milestone if further Core slimming is desired.
+Not urgent — JSBigInt is a single file with low maintenance overhead in Core.
 
 ### 7.2 Potential New Assembly — TypedArrays
 
@@ -327,8 +364,56 @@ could form its own assembly (`Broiler.JavaScript.TypedArrays`):
 > file name in the codebase, which differs from the other TypedArray names.
 - `JSTypedArray` (base class), `TypedArrayParameters`
 
-**Blocker:** `JSTypedArray` extends `JSObject` (Core), and Compiler generates IL
-that constructs TypedArray instances. Factory delegates would be needed.
+**Previous assessment:** `JSTypedArray` extends `JSObject` (Core), and Compiler
+generates IL that constructs TypedArray instances. Factory delegates would be needed.
+
+### 7.2.1 M4 Evaluation — TypedArrays Extraction Feasibility
+
+**Status:** ✅ Evaluated (M4) — **Feasible but deferred** (low priority, moderate effort)
+
+**Coupling audit results:**
+
+| Coupling Point | References Found | Severity |
+|----------------|-----------------|----------|
+| Compiler IL generation | **0** — no TypedArray references in 42 Compiler files | ✅ None |
+| LinqExpressions builders | **0** — no TypedArray/ArrayBuffer references | ✅ None |
+| BuiltIns (DataView) | **3** — `DataView` constructor requires `JSArrayBuffer` | ⚠️ Low |
+| JSGlobal StructuredClone | **3** — `JSArrayBuffer` clone logic (lines 218–228) | ⚠️ Medium |
+| Source generator registration | Via `[JSClassGenerator]` attributes (auto-wired) | ✅ Compatible |
+
+**Key finding:** The original blocker ("Compiler generates IL that constructs
+TypedArray instances") is **incorrect**. The Compiler has **zero references** to any
+TypedArray or ArrayBuffer type. All TypedArray construction occurs at runtime through
+the source-generated `RegisterGeneratedClasses()` mechanism, not via compiler-emitted
+IL. This makes extraction significantly simpler than anticipated.
+
+**Remaining challenges for extraction:**
+
+1. **DataView → JSArrayBuffer dependency:** `DataView` (already in BuiltIns) has a
+   direct dependency on `JSArrayBuffer`. If TypedArrays move to a separate assembly,
+   BuiltIns would need to reference the new `Broiler.JavaScript.TypedArrays` assembly,
+   or `JSArrayBuffer` would need to remain in Core (splitting the cohesive subsystem).
+
+2. **JSGlobal StructuredClone:** `JSGlobal.StructuredClone` directly instantiates
+   `new JSArrayBuffer(byte[])` for cloning. Would need a factory delegate similar
+   to `StructuredCloneExtension`.
+
+3. **Volume:** 1,830 LOC across 14 files — moderate migration effort.
+
+**Extraction options:**
+
+| Option | Approach | Effort | Benefit |
+|--------|----------|--------|---------|
+| A | Move all TypedArrays → new `Broiler.JavaScript.TypedArrays` assembly | Medium | Clean subsystem boundary |
+| B | Move all TypedArrays → existing BuiltIns assembly | Small | Simpler dependency graph |
+| C | Keep in Core | None | No disruption |
+
+**Recommendation:** **Option C — Keep in Core.** The TypedArrays are a foundational
+data type used by DataView and the engine's binary data handling. The Compiler has no
+coupling (eliminating the assumed blocker), but extracting 1,830 LOC to save ~14 files
+in Core provides minimal benefit relative to the DataView dependency and StructuredClone
+factory delegate complexity. If Core slimming becomes a higher priority, Option B
+(move to BuiltIns) is the lowest-effort path.
 
 ### 7.3 Potential Extraction — LinqExpressions → Compiler
 
@@ -382,8 +467,8 @@ practically extracted without fundamentally restructuring the engine:
 | 6 | Extract `JSConsole` → BuiltIns | P3 | Small | ✅ **Complete (M2)** |
 | 7 | Extract `JSMap`/`JSWeakMap` → BuiltIns | P3 | Medium | ✅ **Complete (M3)** |
 | 8 | Extract `JSSet`/`JSWeakSet` → BuiltIns | P3 | Medium | ✅ **Complete (M3)** |
-| 9 | Evaluate `JSBigInt` extraction feasibility | P4 | Small | Not started |
-| 10 | Evaluate TypedArrays as separate assembly | P4 | Large | Not started |
+| 9 | Evaluate `JSBigInt` extraction feasibility | P4 | Small | ✅ **Complete (M4)** — Extractable via factory delegate (see §7.1.1) |
+| 10 | Evaluate TypedArrays as separate assembly | P4 | Large | ✅ **Complete (M4)** — Feasible but deferred; Compiler has zero coupling (see §7.2.1) |
 
 ### 9.2 Infrastructure — Gaps
 
@@ -463,26 +548,30 @@ For each type, follow this pattern:
 7. ~~`JSSet` / `JSWeakSet`~~ ✅ — wired via `StructuredCloneExtension` delegate
 8. ~~`JSJSON` / `JSJsonParser`~~ ✅ — Network already references BuiltIns
 
-### Phase 3 — Evaluation & Planning (P4)
+### Phase 3 — Evaluation & Planning (P4) ✅ Complete (M4)
 
 **Goal:** Assess remaining extraction candidates.
 
 1. **Audit Compiler IL generation** to determine which Core types are directly
    referenced in emitted IL (blocking extraction without factory delegates).
+   ✅ **Done** — JSBigInt is referenced via `JSBigIntBuilder` (2 call sites in
+   Compiler). TypedArrays have **zero** Compiler references (original blocker
+   was incorrect).
 
 2. **Evaluate TypedArrays** as a separate `Broiler.JavaScript.TypedArrays` assembly:
-   - Analyze `JSTypedArray` base class coupling to `JSObject`
-   - Check Compiler references to typed array constructors
-   - Estimate factory delegate complexity
+   - ✅ Analyze `JSTypedArray` base class coupling to `JSObject` — extends `JSObject`
+   - ✅ Check Compiler references to typed array constructors — **none found**
+   - ✅ Estimate factory delegate complexity — only needed for StructuredClone
+   - **Recommendation:** Keep in Core (see §7.2.1)
 
 3. **Evaluate `JSBigInt`** extraction:
-   - Check Compiler literal creation references
-   - Determine if a factory delegate is sufficient
+   - ✅ Check Compiler literal creation references — `JSBigIntBuilder.New()` (2 sites)
+   - ✅ Determine if a factory delegate is sufficient — **yes**, follows JSDecimal pattern
+   - **Recommendation:** Extractable; defer unless Core slimming is prioritized (see §7.1.1)
 
 4. **Evaluate LinqExpressions** extraction to Compiler:
-   - Catalog all `internal` Core members accessed by builders
-   - Estimate `[InternalsVisibleTo]` scope needed
-   - Determine if benefit justifies the risk
+   - Previously assessed in §7.3: **Deferred** — tightly coupled by design, not a
+     maintainability concern.
 
 ### Phase 4 — Documentation & Polish (P2–P3)
 
@@ -505,7 +594,7 @@ For each type, follow this pattern:
 | **M1 — CI & Test Foundation** | Tasks 11–13 | 2–3 days | Week 1 | ✅ **Complete** — see [milestone-1-plan.md](./milestone-1-plan.md) |
 | **M2 — Quick Wins** | Tasks 1, 4, 5, 6 (Proxy, Math, Reflect, Console) | 1–2 days | Week 2 | ✅ **Complete** — 4 types extracted, 93 tests passing |
 | **M3 — Medium Extractions** | Tasks 2, 3, 7, 8 (JSON, DataView, Map, Set) | 2–3 days | Week 3 | ✅ **Complete** — 8 types extracted, `StructuredCloneExtension` delegate added, 116 tests passing |
-| **M4 — Evaluation** | Tasks 9, 10 (BigInt, TypedArrays feasibility) | 1 day | Week 3 | Not started |
+| **M4 — Evaluation** | Tasks 9, 10 (BigInt, TypedArrays feasibility) | 1 day | Week 3 | ✅ **Complete** — JSBigInt extractable via factory delegate; TypedArrays feasible but deferred (zero Compiler coupling found) |
 | **M5 — Documentation** | Tasks 14–18 (TFM alignment, migration guide, docs) | 1–2 days | Week 4 | Not started |
 | **M6 — Final Validation** | Full regression testing, performance benchmarks | 1 day | Week 4 | Not started |
 
@@ -517,12 +606,12 @@ For each type, follow this pattern:
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|-----------|------------|
-| Extracting a type breaks Compiler IL generation | High | Medium | Audit Compiler references before extraction; use factory delegates |
+| Extracting a type breaks Compiler IL generation | High | Medium | Audit Compiler references before extraction; use factory delegates. **M4 finding:** TypedArrays have zero Compiler coupling; JSBigInt has 2 Compiler references (manageable via factory delegate) |
 | TypeForwardedTo attributes cause assembly loading issues | Medium | Low | Test on all target platforms (Windows, Linux, macOS) |
 | Source generator `Names.g.cs` conflicts between assemblies | Medium | Low | Already proven safe — Core and BuiltIns both have `Names` classes |
 | Performance regression from factory delegate indirection | Low | Low | Benchmark critical paths; delegates are one-time initialization |
 | Breaking change for downstream consumers | High | Low | TypeForwardedTo provides binary compatibility; document in migration guide |
-| No existing tests to catch regressions | ~~High~~ | ~~High~~ | ✅ Mitigated — 93 tests across 12 projects (M1/M2) |
+| No existing tests to catch regressions | ~~High~~ | ~~High~~ | ✅ Mitigated — 116 tests across 12 projects (M1–M3) |
 
 ---
 
@@ -582,6 +671,11 @@ Broiler.JavaScript.Core/
 > from Core after extraction to BuiltIns. A `StructuredCloneExtension` delegate
 > was added to `DefaultBuiltInRegistry` so `JSGlobal.StructuredClone` can clone
 > Map/Set values without Core referencing BuiltIns.
+>
+> **M4 Note:** Evaluation complete. JSBigInt (1 file in `BigInt/`) is extractable
+> via factory delegate pattern (like JSDecimal). TypedArrays (14 files in
+> `Array/Typed/`) have zero Compiler coupling — original blocker was incorrect —
+> but extraction is deferred due to DataView dependency and low ROI.
 
 ### Summary of Extraction Progress
 
@@ -598,4 +692,4 @@ Broiler.JavaScript.Core/
 
 ---
 
-*Last updated: 2026-03-22 — M3 complete*
+*Last updated: 2026-03-22 — M4 complete (evaluation of JSBigInt and TypedArrays)*
