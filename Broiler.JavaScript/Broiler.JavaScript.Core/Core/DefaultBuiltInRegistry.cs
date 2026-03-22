@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Broiler.JavaScript.Core.Core.Function;
-using Broiler.JavaScript.Core.Core.Iterator;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Storage;
 
@@ -38,10 +37,18 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
 
     /// <summary>
     /// Extension delegate for structured clone support of satellite assembly types
-    /// (e.g., Map, Set). Returns a cloned value, or null if the type is not handled.
-    /// The third parameter is the recursive clone function.
+    /// (e.g., Map, Set, ArrayBuffer). Returns a cloned value, or null if the type
+    /// is not handled. The third parameter is the recursive clone function.
     /// </summary>
     public static Func<JSValue, Dictionary<JSValue, JSValue>, Func<JSValue, Dictionary<JSValue, JSValue>, JSValue>, JSValue> StructuredCloneExtension { get; set; }
+
+    /// <summary>
+    /// Delegate for registering Iterator.prototype helper methods (map, filter,
+    /// take, drop, flatMap, reduce, toArray, forEach, some, every, find).
+    /// Wired by the BuiltIns assembly's module initializer so that Core does not
+    /// directly reference the concrete JSIteratorObject type.
+    /// </summary>
+    public static Action<JSObject> IteratorPrototypeSetup { get; set; }
 
     /// <inheritdoc />
     public void Register(IJSContext ctx)
@@ -63,7 +70,7 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
 
     private static void SetupIteratorPrototypeChain(JSContext context)
     {
-        if (context[Names.Iterator] is not JSFunction iteratorCtor)
+        if (context[KeyStrings.GetOrCreate("Iterator")] is not JSFunction iteratorCtor)
             return;
 
         var proto = iteratorCtor.prototype;
@@ -72,26 +79,20 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
         ref var symbols = ref proto.GetSymbols();
         symbols.Put(JSSymbol.iterator.Key) = JSProperty.Property(new JSFunction((in Arguments a) => a.This, "Symbol.iterator"), JSPropertyAttributes.ConfigurableValue);
 
-        // Register prototype helper methods so they work on any iterator
-        // (generators, user iterators, etc.) — not just JSIteratorObject.
-        AddProto(proto, "map", JSIteratorObject.StaticMap);
-        AddProto(proto, "filter", JSIteratorObject.StaticFilter);
-        AddProto(proto, "take", JSIteratorObject.StaticTake);
-        AddProto(proto, "drop", JSIteratorObject.StaticDrop);
-        AddProto(proto, "flatMap", JSIteratorObject.StaticFlatMap);
-        AddProto(proto, "reduce", JSIteratorObject.StaticReduce);
-        AddProto(proto, "toArray", JSIteratorObject.StaticToArray);
-        AddProto(proto, "forEach", JSIteratorObject.StaticForEach);
-        AddProto(proto, "some", JSIteratorObject.StaticSome);
-        AddProto(proto, "every", JSIteratorObject.StaticEvery);
-        AddProto(proto, "find", JSIteratorObject.StaticFind);
+        // Register prototype helper methods via delegate (wired by BuiltIns assembly)
+        // so they work on any iterator (generators, user iterators, etc.).
+        IteratorPrototypeSetup?.Invoke(proto);
 
         // Generator.prototype → Iterator.prototype (§2.1.14).
         if (context[Names.Generator] is JSFunction generatorCtor)
             generatorCtor.prototype.SetPrototypeOf(proto);
     }
 
-    private static void AddProto(JSObject proto, string name, JSFunctionDelegate fn)
+    /// <summary>
+    /// Registers a function as a configurable-value property on a prototype object.
+    /// Used by satellite assemblies to add prototype methods.
+    /// </summary>
+    public static void AddProto(JSObject proto, string name, JSFunctionDelegate fn)
     {
         proto.FastAddValue(KeyStrings.GetOrCreate(name), new JSFunction(fn, name, $"function {name}() {{ [native] }}", createPrototype: false), JSPropertyAttributes.ConfigurableValue);
     }

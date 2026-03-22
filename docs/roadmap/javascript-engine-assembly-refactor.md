@@ -233,19 +233,64 @@ Each feature assembly depends on Core and implements a specific capability:
   - Performance baseline (eval latency < 200ms, Map+Set 1000-element operations < 5s)
 - All 131 tests pass (116 existing + 15 new M6 validation tests)
 
-### Milestone 7: Future Extraction Candidates 🔲
+### Milestone 7: Future Extraction Candidates ✅
 
-**Objective:** Identify and plan extraction of remaining built-in types from Core.
+**Objective:** Identify, plan, and execute extraction of remaining built-in types from Core.
 
-Remaining candidates in `Broiler.JavaScript.Core/Core/` that could move to BuiltIns or new assemblies:
+Coupling analysis was performed for each candidate in `Broiler.JavaScript.Core/Core/`. Viable candidates (TypedArrays, Iterator) have been extracted; non-viable candidates (RegExp, Promise) remain in Core.
 
-| Candidate | Current Location | Extraction Notes |
-|-----------|-----------------|------------------|
-| TypedArrays | `Core/` | No compiler coupling; can extract when needed |
-| RegExp types | `Core/Regex/` | Tightly integrated with parser; needs careful analysis |
-| Promise internals | `Core/Promise/` | Core dependency; may remain in Core |
-| Iterator helpers | `Core/Iterator/` | Recently added (ES2025); evaluate after stabilization |
-| Intl stubs | `Core/Intl/` | Stubs in Core, full implementation in BuiltIns |
+| Step | Description | Status |
+|------|-------------|--------|
+| 7.1 | Analyze TypedArrays coupling (14 files in `Core/Array/Typed/`) | ✅ Done |
+| 7.2 | Analyze RegExp coupling (`Core/RegExp/`) | ✅ Done |
+| 7.3 | Analyze Promise coupling (`Core/Promise/`) | ✅ Done |
+| 7.4 | Analyze Iterator coupling (`Core/Iterator/`) | ✅ Done |
+| 7.5 | Confirm Intl extraction status (`BuiltIns/Intl/`) | ✅ Done |
+| 7.6 | Extract TypedArrays: move 14 files from Core to BuiltIns | ✅ Done |
+| 7.7 | Extract Iterator: move JSIteratorObject from Core to BuiltIns | ✅ Done |
+| 7.8 | Add IteratorPrototypeSetup delegate to DefaultBuiltInRegistry | ✅ Done |
+| 7.9 | Move ArrayBuffer StructuredClone to StructuredCloneExtension delegate | ✅ Done |
+| 7.10 | Extract KeyEnumerator to Core/Enumerators/ for cross-assembly use | ✅ Done |
+| 7.11 | Add 19 M7 validation tests in `M7ValidationTests.cs` | ✅ Done |
+| 7.12 | Verify: 150 tests pass across 12 projects | ✅ Done |
+
+**Candidate Analysis:**
+
+| Candidate | Verdict | Compiler Coupling | Parser Coupling | Core Coupling | Extraction Pattern |
+|-----------|---------|-------------------|-----------------|---------------|-------------------|
+| **TypedArrays** | ✅ Extracted | None | None | JSGlobal StructuredClone type checks | Extended `StructuredCloneExtension` delegate (same pattern as JSMap/JSSet) |
+| **RegExp** | ❌ Not extractable | JSRegExpBuilder in LinqExpressions (Compiler uses it for regex literals) | Light (RegExpValidator) | JSStringPrototype has 8+ hardcoded `is JSRegExp` checks | Would require Compiler→BuiltIns dependency; String prototype refactor too invasive |
+| **Promise** | ❌ Not extractable | None | None | `JSContext.PendingPromises` field is `ConcurrentDictionary<long, JSPromise>`; JSAsyncFunction creates instances | Infrastructure-level coupling; cannot abstract without major JSContext refactor |
+| **Iterator** | ✅ Extracted | None | None | `DefaultBuiltInRegistry` hardcodes 12 static method references | Replaced with `IteratorPrototypeSetup` delegate (same pattern as ConsoleFactory) |
+| **Intl** | ✅ Already extracted | None | None | Factory delegates (`IntlFactory`, `IntlDateFormatter`) | Template pattern — fully decoupled via BuiltInsAssemblyInitializer |
+
+**Extraction Implementation Details:**
+
+**TypedArrays** (14 files, ~2,240 LOC) — ✅ Completed
+1. Moved `JSArrayBuffer`, `JSTypedArray`, `JSTypedArray.prototype`, `TypedArrayParameters`, and 10 concrete typed array types from `Core/Array/Typed/` to `BuiltIns/Array/Typed/`
+2. Extended `StructuredCloneExtension` delegate in `BuiltInsAssemblyInitializer` to handle ArrayBuffer cloning (alongside Map/Set)
+3. Removed ArrayBuffer handling from `JSGlobal.StructuredCloneValue` — now delegated to BuiltIns
+4. Extracted shared `KeyEnumerator(int length)` struct to `Core/Enumerators/KeyEnumerator.cs` for cross-assembly use by JSString, JSArrayPrototype, and JSTypedArray
+5. TypedArray types registered automatically via `[JSClassGenerator]` source generation in BuiltIns
+6. Removed unused `using Broiler.JavaScript.Core.Typed` imports from JSString.cs and JSArrayPrototype.cs
+
+**Iterator Helpers** (1 file, ~587 LOC) — ✅ Completed
+1. Moved `JSIteratorObject` from `Core/Iterator/` to `BuiltIns/Iterator/`
+2. Added `IteratorPrototypeSetup` delegate property to `DefaultBuiltInRegistry`
+3. Made `AddProto` method public on `DefaultBuiltInRegistry` for satellite assembly use
+4. Wired 11 iterator helper methods (map, filter, take, drop, flatMap, reduce, toArray, forEach, some, every, find) via delegate in `BuiltInsAssemblyInitializer`
+5. Replaced `Names.Iterator` (source-generated) with `KeyStrings.GetOrCreate("Iterator")` in `DefaultBuiltInRegistry`
+6. Iterator type registered automatically via `[JSClassGenerator]` source generation in BuiltIns
+
+**Validation Details:**
+- 19 validation tests in `Broiler.JavaScript.Integration.Tests/M7ValidationTests.cs` covering:
+  - TypedArrays: extracted to BuiltIns, no compiler coupling, functional end-to-end, StructuredClone delegated (4 tests)
+  - RegExp: remains in Core, compiler coupling confirmed, functional with String methods (3 tests)
+  - Promise: remains in Core, JSContext coupling confirmed, functional end-to-end (3 tests)
+  - Iterator: extracted to BuiltIns, no compiler/parser coupling, decoupled from registry, functional end-to-end (4 tests)
+  - Intl: in BuiltIns, Core has no direct reference, factory delegate wired (3 tests)
+  - Extraction pattern invariants: Core→Foundation only, all candidates accounted for (2 tests)
+- All 150 tests pass (131 M6 baseline + 19 M7 validation tests)
 
 ### Milestone 8: Documentation & Developer Experience 🔲
 
@@ -264,7 +309,7 @@ Remaining candidates in `Broiler.JavaScript.Core/Core/` that could move to Built
 
 ### 5.1 Test Projects (Current State)
 
-Each assembly has a corresponding test project. The counts below reflect the current state after M6 completion (131 total tests):
+Each assembly has a corresponding test project. The counts below reflect the current state after M7 completion (150 total tests):
 
 | Test Project | Tests | Coverage Area |
 |-------------|-------|---------------|
@@ -279,7 +324,7 @@ Each assembly has a corresponding test project. The counts below reflect the cur
 | `Broiler.JavaScript.Debugger.Tests` | 3 | Debugging infrastructure |
 | `Broiler.JavaScript.Modules.Tests` | 3 | Module loading/resolution |
 | `Broiler.JavaScript.ModuleExtensions.Tests` | 3 | Module registration API |
-| `Broiler.JavaScript.Integration.Tests` | 31 | End-to-end engine scenarios, M6 validation |
+| `Broiler.JavaScript.Integration.Tests` | 50 | End-to-end engine scenarios, M6 validation, M7 extraction validation |
 
 ### 5.2 Testing Approach per Milestone
 
@@ -384,7 +429,14 @@ dotnet test Broiler.JavaScript/YantraJS.sln --collect:"XPlat Code Coverage"
 | M4 | ✅ Complete | Compiler-coupled type decoupling (JSBigInt) |
 | M5 | ✅ Complete | Target framework alignment (net8.0) |
 | M6 | ✅ Complete | Final validation |
-| M7 | 🔲 Pending | Future extraction candidates |
+| M7 | ✅ Complete | Future extraction candidates |
 | M8 | 🔲 Pending | Documentation & developer experience |
 
-**Current state:** 24 built-in types extracted to `Broiler.JavaScript.BuiltIns`. 71 types forwarded for backward compatibility. 6 module initializers wiring satellite assemblies. 131 tests passing across 12 test projects. Full CI running on 3 platforms.
+**Current state:**
+- 40 built-in types extracted to `Broiler.JavaScript.BuiltIns` (24 M1–M4 + 14 TypedArrays + 1 Iterator + 1 Intl)
+- 71 types forwarded for backward compatibility
+- 6 module initializers wiring satellite assemblies
+- TypedArrays and Iterator successfully extracted in M7
+- 2 candidates confirmed non-extractable (RegExp, Promise)
+- 150 tests passing across 12 test projects
+- Full CI running on 3 platforms

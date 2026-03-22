@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Array.Typed;
 using Broiler.JavaScript.Core.Core.BigInt;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Date;
@@ -8,6 +9,7 @@ using Broiler.JavaScript.Core.Core.Decimal;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Global;
 using Broiler.JavaScript.Core.Core.Intl;
+using Broiler.JavaScript.Core.Core.Iterator;
 using Broiler.JavaScript.Core.Core.Map;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Set;
@@ -58,7 +60,7 @@ internal static class BuiltInsAssemblyInitializer
         // does not directly reference the concrete type.
         DefaultBuiltInRegistry.ConsoleFactory = static ctx => new JSConsole(ctx);
 
-        // Wire structured clone extension for Map and Set types so that
+        // Wire structured clone extension for Map, Set, and ArrayBuffer types so that
         // JSGlobal.StructuredClone works without Core referencing BuiltIns.
         DefaultBuiltInRegistry.StructuredCloneExtension = static (value, seen, recurse) =>
         {
@@ -84,7 +86,37 @@ internal static class BuiltInsAssemblyInitializer
                 return clone;
             }
 
+            if (value is JSArrayBuffer arrayBuffer)
+            {
+                if (arrayBuffer.isDetached)
+                    throw JSContext.NewTypeError("structuredClone: cannot clone a detached ArrayBuffer");
+
+                var newBuf = new byte[arrayBuffer.buffer.Length];
+                System.Array.Copy(arrayBuffer.buffer, newBuf, arrayBuffer.buffer.Length);
+
+                var clone = new JSArrayBuffer(newBuf);
+                seen[value] = clone;
+                return clone;
+            }
+
             return null;
+        };
+
+        // Wire Iterator.prototype helper methods so DefaultBuiltInRegistry
+        // does not directly reference JSIteratorObject.
+        DefaultBuiltInRegistry.IteratorPrototypeSetup = static proto =>
+        {
+            DefaultBuiltInRegistry.AddProto(proto, "map", JSIteratorObject.StaticMap);
+            DefaultBuiltInRegistry.AddProto(proto, "filter", JSIteratorObject.StaticFilter);
+            DefaultBuiltInRegistry.AddProto(proto, "take", JSIteratorObject.StaticTake);
+            DefaultBuiltInRegistry.AddProto(proto, "drop", JSIteratorObject.StaticDrop);
+            DefaultBuiltInRegistry.AddProto(proto, "flatMap", JSIteratorObject.StaticFlatMap);
+            DefaultBuiltInRegistry.AddProto(proto, "reduce", JSIteratorObject.StaticReduce);
+            DefaultBuiltInRegistry.AddProto(proto, "toArray", JSIteratorObject.StaticToArray);
+            DefaultBuiltInRegistry.AddProto(proto, "forEach", JSIteratorObject.StaticForEach);
+            DefaultBuiltInRegistry.AddProto(proto, "some", JSIteratorObject.StaticSome);
+            DefaultBuiltInRegistry.AddProto(proto, "every", JSIteratorObject.StaticEvery);
+            DefaultBuiltInRegistry.AddProto(proto, "find", JSIteratorObject.StaticFind);
         };
     }
 }

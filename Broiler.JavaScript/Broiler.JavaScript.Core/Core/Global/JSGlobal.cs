@@ -4,7 +4,6 @@ using System;
 using System.Threading;
 using System.Collections.Generic;
 using Broiler.JavaScript.Core.Utils;
-using Broiler.JavaScript.Core.Core.Array.Typed;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
@@ -213,21 +212,7 @@ public partial class JSGlobalStatic
             return clone;
         }
 
-        // ArrayBuffer
-        if (value is JSArrayBuffer arrayBuffer)
-        {
-            if (arrayBuffer.isDetached)
-                throw JSContext.NewTypeError("structuredClone: cannot clone a detached ArrayBuffer");
-
-            var newBuf = new byte[arrayBuffer.buffer.Length];
-            System.Array.Copy(arrayBuffer.buffer, newBuf, arrayBuffer.buffer.Length);
-
-            var clone = new JSArrayBuffer(newBuf);
-            seen[value] = clone;
-            return clone;
-        }
-
-        // Map, Set, and other satellite assembly types
+        // Map, Set, ArrayBuffer, and other satellite assembly types
         var extResult = DefaultBuiltInRegistry.StructuredCloneExtension?.Invoke(value, seen, StructuredCloneValue);
         if (extResult != null) return extResult;
 

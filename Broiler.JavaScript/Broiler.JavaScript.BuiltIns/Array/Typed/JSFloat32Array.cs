@@ -13,7 +13,7 @@ public partial class JSFloat32Array : JSTypedArray
     internal static readonly int BYTES_PER_ELENENT = 4;
 
     [JSExport(Length = 3)]
-    public JSFloat32Array(in Arguments a) : base(new TypedArrayParameters(a, 1)) { }
+    public JSFloat32Array(in Arguments a) : base(new TypedArrayParameters(a, BYTES_PER_ELENENT)) { }
 
     private JSFloat32Array(TypedArrayParameters a) : base(a) { }
 
