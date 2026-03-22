@@ -8,7 +8,7 @@ public static partial class JSValueExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSValue InvokeMethod(this JSValue @this, JSValue name)
     {
-        var fx = @this[(IJSSymbol)name];
+        var fx = @this[name];
         if (fx.IsUndefined)
             throw JSContext.NewTypeError($"Method {name} not found on {@this}");
 
@@ -19,7 +19,7 @@ public static partial class JSValueExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSValue InvokeMethod(this JSValue @this, JSValue name, JSValue arg0)
     {
-        var fx = @this[(IJSSymbol)name];
+        var fx = @this[name];
         if (fx.IsUndefined)
             throw JSContext.NewTypeError($"Method {name} not found on {@this}");
 
@@ -30,7 +30,7 @@ public static partial class JSValueExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSValue InvokeMethod(this JSValue @this, JSValue name, JSValue arg0, JSValue arg1)
     {
-        var fx = @this[(IJSSymbol)name];
+        var fx = @this[name];
         if (fx.IsUndefined)
             throw JSContext.NewTypeError($"Method {name} not found on {@this}");
 
@@ -41,7 +41,7 @@ public static partial class JSValueExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSValue InvokeMethod(this JSValue @this, JSValue name, JSValue arg0, JSValue arg1, JSValue arg2)
     {
-        var fx = @this[(IJSSymbol)name];
+        var fx = @this[name];
         if (fx.IsUndefined)
             throw JSContext.NewTypeError($"Method {name} not found on {@this}");
 
@@ -52,7 +52,7 @@ public static partial class JSValueExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSValue InvokeMethod(this JSValue @this, JSValue name, JSValue arg0, JSValue arg1, JSValue arg2, JSValue arg3)
     {
-        var fx = @this[(IJSSymbol)name];
+        var fx = @this[name];
         if (fx.IsUndefined)
             throw JSContext.NewTypeError($"Method {name} not found on {@this}");
 
@@ -63,7 +63,7 @@ public static partial class JSValueExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSValue InvokeMethod(this JSValue @this, JSValue name, JSValue[] args)
     {
-        var fx = @this[(IJSSymbol)name];
+        var fx = @this[name];
         if (fx.IsUndefined)
             throw JSContext.NewTypeError($"Method {name} not found on {@this}");
 
@@ -141,7 +141,7 @@ public static partial class JSValueExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSValue InvokeMethodSpread(this JSValue @this, JSValue name, JSValue[] args)
     {
-        var fx = @this[(IJSSymbol)name];
+        var fx = @this[name];
         if (fx.IsUndefined)
             throw JSContext.NewTypeError($"Method {name} not found on {@this}");
 
