@@ -1,5 +1,4 @@
 using System;
-using Broiler.JavaScript.Core.Core.Debug;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Iterator;
 using Broiler.JavaScript.Core.Core.Storage;
@@ -28,6 +27,13 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
     /// </summary>
     public static Action<JSContext> AdditionalRegistrations { get; set; }
 
+    /// <summary>
+    /// Factory delegate for creating the console object.
+    /// Wired by the BuiltIns assembly's module initializer so that Core
+    /// does not directly reference the concrete JSConsole type.
+    /// </summary>
+    public static Func<JSContext, object> ConsoleFactory { get; set; }
+
     /// <inheritdoc />
     public void Register(IJSContext ctx)
     {
@@ -41,8 +47,9 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
         // Set up Iterator.prototype helpers and prototype chain (ES2025).
         SetupIteratorPrototypeChain(context);
 
-        // Register the console object.
-        context[KeyStrings.console] = JSContext.ClrInterop.Marshal(new JSConsole(context));
+        // Register the console object via factory delegate (wired by BuiltIns assembly).
+        if (ConsoleFactory != null)
+            context[KeyStrings.console] = JSContext.ClrInterop.Marshal(ConsoleFactory(context));
     }
 
     private static void SetupIteratorPrototypeChain(JSContext context)

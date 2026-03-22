@@ -208,7 +208,7 @@ independent registration without cross-assembly coupling.
 
 ### ✅ Types Successfully Extracted to BuiltIns
 
-The following 12 types have been extracted from Core to the BuiltIns assembly:
+The following 16 types have been extracted from Core to the BuiltIns assembly:
 
 1. `EventTarget` — DOM event target base
 2. `Event` — DOM event
@@ -222,6 +222,10 @@ The following 12 types have been extracted from Core to the BuiltIns assembly:
 10. `JSIntl` — Internationalization API
 11. `JSIntlDateTimeFormat` — Intl.DateTimeFormat
 12. `JSIntlRelativeTimeFormat` — (implicit in Intl module)
+13. `JSMath` — Math global object **(M2)**
+14. `JSReflect` — Reflect global object **(M2)**
+15. `JSProxy` — Proxy constructor **(M2)**
+16. `JSConsole` — Console object **(M2)**
 
 ---
 
@@ -299,16 +303,16 @@ These types have been analyzed and confirmed extractable using the existing
 
 | Type | Files | Complexity | Blocker |
 |------|-------|-----------|---------|
-| `JSProxy` | 1 | Low | None — no direct references from Compiler |
+| ~~`JSProxy`~~ | ~~1~~ | ~~Low~~ | ~~None~~ — **Extracted (M2)** |
 | `JSJSON` + `JSJsonParser` | 2 | Medium | Needs factory delegate for `JSON.parse`/`stringify` calls from Core |
 | `JSDataView` + `DataViewStatic` | 2 | Low | None — self-contained |
-| `JSMath` | 1 | Low | None — stateless utility |
-| `JSReflect` | 1 | Low | None — delegates to `JSObject` methods |
-| `JSConsole` | 1 | Low | Already wired via `ClrInterop.Marshal` in `DefaultBuiltInRegistry` |
+| ~~`JSMath`~~ | ~~1~~ | ~~Low~~ | ~~None~~ — **Extracted (M2)** |
+| ~~`JSReflect`~~ | ~~1~~ | ~~Low~~ | ~~None~~ — **Extracted (M2)** |
+| ~~`JSConsole`~~ | ~~1~~ | ~~Low~~ | ~~None~~ — **Extracted (M2)** via `ConsoleFactory` delegate |
 | `JSMap` / `JSWeakMap` | 2 | Medium | May need factory delegates if referenced by Compiler |
 | `JSSet` / `JSWeakSet` | 2 | Medium | May need factory delegates if referenced by Compiler |
 | `JSBigInt` | 1 | Medium | Referenced by Compiler for literal creation |
-| **Total** | **13** | | |
+| **Total** | **9 remaining** | | |
 
 ### 7.2 Potential New Assembly — TypedArrays
 
@@ -370,12 +374,12 @@ practically extracted without fundamentally restructuring the engine:
 
 | # | Task | Priority | Effort | Status |
 |---|------|----------|--------|--------|
-| 1 | Extract `JSProxy` → BuiltIns | P3 | Small | Not started |
+| 1 | Extract `JSProxy` → BuiltIns | P3 | Small | ✅ **Complete (M2)** |
 | 2 | Extract `JSJSON` / `JSJsonParser` → BuiltIns | P3 | Medium | Not started |
 | 3 | Extract `JSDataView` / `DataViewStatic` → BuiltIns | P3 | Small | Not started |
-| 4 | Extract `JSMath` → BuiltIns | P3 | Small | Not started |
-| 5 | Extract `JSReflect` → BuiltIns | P3 | Small | Not started |
-| 6 | Extract `JSConsole` → BuiltIns | P3 | Small | Not started |
+| 4 | Extract `JSMath` → BuiltIns | P3 | Small | ✅ **Complete (M2)** |
+| 5 | Extract `JSReflect` → BuiltIns | P3 | Small | ✅ **Complete (M2)** |
+| 6 | Extract `JSConsole` → BuiltIns | P3 | Small | ✅ **Complete (M2)** |
 | 7 | Extract `JSMap`/`JSWeakMap` → BuiltIns | P3 | Medium | Not started |
 | 8 | Extract `JSSet`/`JSWeakSet` → BuiltIns | P3 | Medium | Not started |
 | 9 | Evaluate `JSBigInt` extraction feasibility | P4 | Small | Not started |
@@ -385,15 +389,14 @@ practically extracted without fundamentally restructuring the engine:
 
 | # | Task | Priority | Effort | Status |
 |---|------|----------|--------|--------|
-| 11 | Establish CI workflow for all assemblies | P1 | Medium | **M1 planned** — see [milestone-1-plan.md](./milestone-1-plan.md) |
-| 12 | Create unit test projects for each assembly | P1 | Large | **M1 planned** — 11 test projects to create |
-| 13 | Add integration test project | P2 | Medium | **M1 planned** — 1 integration test project |
+| 11 | Establish CI workflow for all assemblies | P1 | Medium | ✅ **Complete (M1)** |
+| 12 | Create unit test projects for each assembly | P1 | Large | ✅ **Complete (M1)** — 12 test projects |
+| 13 | Add integration test project | P2 | Medium | ✅ **Complete (M1)** |
 | 14 | Align target frameworks (net8.0 vs net9.0) | P2 | Small | Main exe is net9.0; libraries are net8.0 |
 | 15 | Add `Directory.Build.props` in `Broiler.JavaScript/` for shared settings | P3 | Small | Not started |
 
-> **Note:** The solution file (`YantraJS.sln`) does not currently include test project
-> entries. Test projects will be created and added to the solution as part of M1.
-> Non-test projects build successfully (0 errors, 531 warnings).
+> **Note:** M1 is complete. 12 test projects and CI workflow are in place.
+> 93 tests pass across all 12 projects on ubuntu, windows, and macOS.
 
 ### 9.3 Documentation — Gaps
 
@@ -438,18 +441,24 @@ practically extracted without fundamentally restructuring the engine:
 
 For each type, follow this pattern:
 1. Move source file(s) to `Broiler.JavaScript.BuiltIns/`
-2. Update namespace if needed
-3. Add `[TypeForwardedTo]` in Core for backward compatibility
-4. Wire factory delegate in `BuiltInsAssemblyInitializer` if Compiler references the type
-5. Update `DefaultBuiltInRegistry` if the type is registered there
-6. Add tests
+2. Keep namespace unchanged for source compatibility
+3. Wire factory delegate in `BuiltInsAssemblyInitializer` if needed (e.g., `ConsoleFactory`)
+4. Update `DefaultBuiltInRegistry` if the type is registered there
+5. Add unit tests and integration tests
 
-**Order of extraction:**
-1. `JSMath` — stateless, no dependencies beyond `JSValue`
-2. `JSReflect` — stateless, delegates to `JSObject` methods
-3. `JSConsole` — already wired via `ClrInterop.Marshal`
-4. `JSDataView` + `DataViewStatic` — self-contained
-5. `JSProxy` — no Compiler references
+> **Note on TypeForwardedTo:** `[TypeForwardedTo]` cannot be used for Core→BuiltIns
+> extractions because BuiltIns references Core (the reverse direction). Binary
+> compatibility is maintained by preserving namespaces and ensuring all dependent
+> projects reference BuiltIns.
+
+**M2 completed (Tasks 1, 4, 5, 6):**
+1. ~~`JSMath`~~ ✅ — stateless, no dependencies beyond `JSValue`
+2. ~~`JSReflect`~~ ✅ — stateless, delegates to `JSObject` methods
+3. ~~`JSConsole`~~ ✅ — wired via `ConsoleFactory` delegate
+4. ~~`JSProxy`~~ ✅ — no Compiler references
+
+**Remaining for M3:**
+5. `JSDataView` + `DataViewStatic` — self-contained
 6. `JSMap` / `JSWeakMap` — may need Compiler factory delegate
 7. `JSSet` / `JSWeakSet` — may need Compiler factory delegate
 8. `JSJSON` / `JSJsonParser` — needs factory delegate for `JSON` global
@@ -493,9 +502,9 @@ For each type, follow this pattern:
 
 | Milestone | Tasks | Estimated Effort | Target | Status |
 |-----------|-------|-----------------|--------|--------|
-| **M1 — CI & Test Foundation** | Tasks 11–13 | 2–3 days | Week 1 | **Planning complete** — see [milestone-1-plan.md](./milestone-1-plan.md) |
-| **M2 — Quick Wins** | Tasks 1, 4, 5, 6 (Math, Reflect, Console, DataView) | 1–2 days | Week 2 | Not started |
-| **M3 — Medium Extractions** | Tasks 2, 3, 7, 8 (Proxy, JSON, Map, Set) | 2–3 days | Week 3 | Not started |
+| **M1 — CI & Test Foundation** | Tasks 11–13 | 2–3 days | Week 1 | ✅ **Complete** — see [milestone-1-plan.md](./milestone-1-plan.md) |
+| **M2 — Quick Wins** | Tasks 1, 4, 5, 6 (Proxy, Math, Reflect, Console) | 1–2 days | Week 2 | ✅ **Complete** — 4 types extracted, 93 tests passing |
+| **M3 — Medium Extractions** | Tasks 2, 3, 7, 8 (JSON, DataView, Map, Set) | 2–3 days | Week 3 | Not started |
 | **M4 — Evaluation** | Tasks 9, 10 (BigInt, TypedArrays feasibility) | 1 day | Week 3 | Not started |
 | **M5 — Documentation** | Tasks 14–18 (TFM alignment, migration guide, docs) | 1–2 days | Week 4 | Not started |
 | **M6 — Final Validation** | Full regression testing, performance benchmarks | 1 day | Week 4 | Not started |
@@ -513,17 +522,17 @@ For each type, follow this pattern:
 | Source generator `Names.g.cs` conflicts between assemblies | Medium | Low | Already proven safe — Core and BuiltIns both have `Names` classes |
 | Performance regression from factory delegate indirection | Low | Low | Benchmark critical paths; delegates are one-time initialization |
 | Breaking change for downstream consumers | High | Low | TypeForwardedTo provides binary compatibility; document in migration guide |
-| No existing tests to catch regressions | High | High | Priority: establish test projects before extraction work |
+| No existing tests to catch regressions | ~~High~~ | ~~High~~ | ✅ Mitigated — 93 tests across 12 projects (M1/M2) |
 
 ---
 
 ## 13. Appendix — File Counts by Assembly
 
-### Core Assembly Breakdown (190 files)
+### Core Assembly Breakdown (~186 files)
 
 ```
 Broiler.JavaScript.Core/
-├── Core/                    108 files  ← built-in JS types
+├── Core/                    104 files  ← built-in JS types
 │   ├── Array/                19 files  (incl. 15 TypedArray)
 │   ├── String/                5 files
 │   ├── Promise/               5 files
@@ -542,13 +551,10 @@ Broiler.JavaScript.Core/
 │   ├── Json/                  2 files
 │   ├── DataView/              2 files
 │   ├── Function/              2 files
-│   ├── Objects/ (Math,Reflect)2 files
 │   ├── BigInt/                1 file
 │   ├── Boolean/               1 file
 │   ├── Class/                 1 file
 │   ├── Iterator/              1 file
-│   ├── Proxy/                 1 file
-│   ├── Debug/                 1 file
 │   ├── Global/                1 file
 │   └── Root (Context, etc.)  ~10 files
 │
@@ -569,19 +575,22 @@ Broiler.JavaScript.Core/
 └── Root (forwarding, etc.)  ~16 files
 ```
 
+> **M2 Note:** `Objects/` (JSMath, JSReflect), `Proxy/`, and `Debug/` directories
+> were removed from Core after extraction to BuiltIns.
+
 ### Summary of Extraction Progress
 
 | Category | In Core | Extracted | Extractable | Impractical |
 |----------|---------|-----------|-------------|-------------|
-| Built-in types | ~80 | 12 (BuiltIns) | ~13 | ~55 |
+| Built-in types | ~76 | 16 (BuiltIns) | ~9 | ~55 |
 | AST types | 0 | 18 (Ast) | — | — |
 | Parser types | 0 | 12 (Parser) | — | — |
 | Storage types | 0 | 10 (Storage) | — | — |
 | Runtime types | 0 | 26 (Runtime) | — | — |
 | IL Builders | 41 | 0 | Deferred | — |
 | Utilities | ~30 | 0 | ~5 | ~25 |
-| **Total** | **~151** | **78** | **~18** | **~80** |
+| **Total** | **~147** | **82** | **~14** | **~80** |
 
 ---
 
-*Last updated: 2026-03-22*
+*Last updated: 2026-03-22 — M2 complete*

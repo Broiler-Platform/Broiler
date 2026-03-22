@@ -175,7 +175,6 @@ public partial class JSReflect : JSObject
         if (target is not JSObject @object)
             throw JSContext.NewTypeError($"Not an object");
         
-        // return @object.IsExtensible() ? JSBoolean.True : JSBoolean.False;
         var r = new JSArray();
         var een = @object.GetElementEnumerator();
         while (een.MoveNext(out var hasValue, out var value, out var index))
