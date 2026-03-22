@@ -477,8 +477,8 @@ practically extracted without fundamentally restructuring the engine:
 | 11 | Establish CI workflow for all assemblies | P1 | Medium | ✅ **Complete (M1)** |
 | 12 | Create unit test projects for each assembly | P1 | Large | ✅ **Complete (M1)** — 12 test projects |
 | 13 | Add integration test project | P2 | Medium | ✅ **Complete (M1)** |
-| 14 | Align target frameworks (net8.0 vs net9.0) | P2 | Small | Main exe is net9.0; libraries are net8.0 |
-| 15 | Add `Directory.Build.props` in `Broiler.JavaScript/` for shared settings | P3 | Small | Not started |
+| 14 | Align target frameworks (net8.0 vs net9.0) | P2 | Small | ✅ **Complete (M5)** — All projects aligned to net8.0; main exe changed from net9.0 |
+| 15 | Add `Directory.Build.props` in `Broiler.JavaScript/` for shared settings | P3 | Small | ✅ **Complete (M5)** — Shared TFM (net8.0) and LangVersion (latest) |
 
 > **Note:** M1 is complete. 12 test projects and CI workflow are in place.
 > 93 tests pass across all 12 projects on ubuntu, windows, and macOS.
@@ -487,9 +487,9 @@ practically extracted without fundamentally restructuring the engine:
 
 | # | Task | Priority | Effort | Status |
 |---|------|----------|--------|--------|
-| 16 | Document assembly architecture diagram | P2 | Small | This document |
-| 17 | Document migration guide for downstream consumers | P3 | Medium | Not started |
-| 18 | Document `[ModuleInitializer]` wiring patterns | P2 | Small | Documented in Section 4 |
+| 16 | Document assembly architecture diagram | P2 | Small | ✅ **Complete (M5)** — This document |
+| 17 | Document migration guide for downstream consumers | P3 | Medium | ✅ **Complete (M5)** — See §14 |
+| 18 | Document `[ModuleInitializer]` wiring patterns | P2 | Small | ✅ **Complete (M5)** — Documented in Section 4 |
 
 ---
 
@@ -573,17 +573,20 @@ For each type, follow this pattern:
    - Previously assessed in §7.3: **Deferred** — tightly coupled by design, not a
      maintainability concern.
 
-### Phase 4 — Documentation & Polish (P2–P3)
+### Phase 4 — Documentation & Polish (P2–P3) ✅ Complete (M5)
 
 1. **Create migration guide** for downstream consumers moving from monolithic
-   to separated assembly references.
+   to separated assembly references. ✅ See §14.
 
 2. **Update `Broiler.JavaScript.All` meta-package** to include any new assemblies.
+   ✅ Already includes all assemblies (Core, Clr, Compiler, Modules, BuiltIns, Debugger).
 
 3. **Add XML documentation** to all public interfaces in Runtime.
+   ✅ Key public interfaces documented.
 
-4. **Align TFMs**: Evaluate upgrading library projects from net8.0 to net9.0,
-   or multi-targeting `net8.0;net9.0` for broader compatibility.
+4. **Align TFMs**: ✅ All projects standardized on `net8.0`. Main executable changed
+   from `net9.0` to `net8.0`. CI workflow updated from `dotnet-version: 9.0.x`
+   to `8.0.x`. Shared `Directory.Build.props` added in `Broiler.JavaScript/`.
 
 ---
 
@@ -595,7 +598,7 @@ For each type, follow this pattern:
 | **M2 — Quick Wins** | Tasks 1, 4, 5, 6 (Proxy, Math, Reflect, Console) | 1–2 days | Week 2 | ✅ **Complete** — 4 types extracted, 93 tests passing |
 | **M3 — Medium Extractions** | Tasks 2, 3, 7, 8 (JSON, DataView, Map, Set) | 2–3 days | Week 3 | ✅ **Complete** — 8 types extracted, `StructuredCloneExtension` delegate added, 116 tests passing |
 | **M4 — Evaluation** | Tasks 9, 10 (BigInt, TypedArrays feasibility) | 1 day | Week 3 | ✅ **Complete** — JSBigInt extractable via factory delegate; TypedArrays feasible but deferred (zero Compiler coupling found) |
-| **M5 — Documentation** | Tasks 14–18 (TFM alignment, migration guide, docs) | 1–2 days | Week 4 | Not started |
+| **M5 — Documentation** | Tasks 14–18 (TFM alignment, migration guide, docs) | 1–2 days | Week 4 | ✅ **Complete** — All projects aligned to net8.0; Directory.Build.props added; CI updated to 8.0.x; 116 tests passing |
 | **M6 — Final Validation** | Full regression testing, performance benchmarks | 1 day | Week 4 | Not started |
 
 **Total estimated effort:** 8–12 working days
@@ -692,4 +695,40 @@ Broiler.JavaScript.Core/
 
 ---
 
-*Last updated: 2026-03-22 — M4 complete (evaluation of JSBigInt and TypedArrays)*
+## 14. Migration Guide — .NET 8.0 TFM Alignment (M5)
+
+### What Changed
+
+1. **Target Framework:** The main executable (`Broiler.JavaScript.csproj`) was
+   changed from `net9.0` to `net8.0`. All library and test projects were already
+   `net8.0` — no changes needed.
+
+2. **CI Workflow:** `.github/workflows/ci.yml` updated `dotnet-version` from
+   `9.0.x` to `8.0.x` to match the unified TFM.
+
+3. **Package Version:** `Microsoft.Extensions.DependencyModel` downgraded from
+   `9.0.6` to `8.0.2` for consistency with the net8.0 target.
+
+4. **Shared Build Properties:** A new `Broiler.JavaScript/Directory.Build.props`
+   was added with shared defaults:
+   - `TargetFramework` = `net8.0` (as a fallback; individual projects can override)
+   - `LangVersion` = `latest`
+
+### Breaking Changes
+
+- **Minimum runtime:** Applications must run on .NET 8.0 or later (previously
+  the main executable required .NET 9.0).
+- **No API changes:** All public APIs remain unchanged.
+- **No namespace changes:** All namespaces are preserved.
+
+### For Downstream Consumers
+
+- If you reference individual assemblies (e.g., `Broiler.JavaScript.Core`),
+  no changes are required — they were already `net8.0`.
+- If you reference the main executable or `Broiler.JavaScript.All` meta-package,
+  ensure your project targets `net8.0` or later.
+- The `[ModuleInitializer]` wiring pattern is unchanged (see Section 4).
+
+---
+
+*Last updated: 2026-03-22 — M5 complete (TFM alignment to net8.0, Directory.Build.props, CI update, migration guide)*
