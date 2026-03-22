@@ -3,6 +3,14 @@ using Broiler.JavaScript.Core.FastParser.Compiler;
 
 namespace Broiler.JavaScript.Compiler;
 
+/// <summary>
+/// Module initializer for the <c>Broiler.JavaScript.Compiler</c> assembly.
+/// The <see cref="Initialize"/> method is invoked automatically by the runtime
+/// when this assembly is loaded.  Because .NET loads assemblies lazily,
+/// <see cref="DefaultJSCompiler"/> proactively loads this assembly in its
+/// static constructor to guarantee that <see cref="Initialize"/> runs before
+/// the first compilation attempt.
+/// </summary>
 internal static class CompilerAssemblyInitializer
 {
     [ModuleInitializer]

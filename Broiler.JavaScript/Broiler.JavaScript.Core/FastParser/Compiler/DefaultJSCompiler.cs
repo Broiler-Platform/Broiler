@@ -2,16 +2,18 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Emit;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.Core.FastParser.Compiler;
 
 /// <summary>
 /// Default implementation of <see cref="IJSCompiler"/> that delegates to
-/// a registered compilation function.  When the
-/// <c>Broiler.JavaScript.Compiler</c> assembly is loaded, its module
-/// initializer calls <see cref="Register"/> to install the real
-/// <c>FastCompiler</c>-based pipeline.
+/// a registered compilation function.  The static constructor proactively
+/// loads the <c>Broiler.JavaScript.Compiler</c> assembly (if available) to
+/// trigger its <c>[ModuleInitializer]</c>, which calls <see cref="Register"/>
+/// to install the real <c>FastCompiler</c>-based pipeline.
 /// </summary>
 public class DefaultJSCompiler : IJSCompiler
 {
@@ -20,6 +22,45 @@ public class DefaultJSCompiler : IJSCompiler
     /// module initializer via <see cref="Register"/>.
     /// </summary>
     private static Func<StringSpan, string, IList<string>, ICodeCache, YExpression<JSFunctionDelegate>> _compileFunc;
+
+    /// <summary>
+    /// Static constructor that ensures the Compiler assembly is loaded and
+    /// its <c>[ModuleInitializer]</c> has run.  Without this, the assembly
+    /// may never be loaded by the runtime (assemblies are loaded lazily),
+    /// leaving <see cref="_compileFunc"/> null even when the Compiler
+    /// assembly is deployed alongside the application.
+    /// </summary>
+    static DefaultJSCompiler()
+    {
+        EnsureCompilerAssemblyLoaded();
+    }
+
+    /// <summary>
+    /// Attempts to load the <c>Broiler.JavaScript.Compiler</c> assembly and
+    /// run its module constructor so that the <c>[ModuleInitializer]</c>
+    /// registers the compilation pipeline via <see cref="Register"/>.
+    /// If the assembly is not available the failure is silently ignored;
+    /// <see cref="Compile"/> will throw an informative exception instead.
+    /// </summary>
+    private static void EnsureCompilerAssemblyLoaded()
+    {
+        if (_compileFunc != null)
+            return;
+
+        try
+        {
+            var assembly = Assembly.Load("Broiler.JavaScript.Compiler");
+            RuntimeHelpers.RunModuleConstructor(assembly.ManifestModule.ModuleHandle);
+        }
+        catch (Exception ex) when (
+            ex is System.IO.FileNotFoundException
+            or System.IO.FileLoadException
+            or BadImageFormatException)
+        {
+            // Compiler assembly is not available.  _compileFunc remains null
+            // and Compile() will throw an informative InvalidOperationException.
+        }
+    }
 
     /// <summary>
     /// Registers the compilation function.  Called by the Compiler assembly's
