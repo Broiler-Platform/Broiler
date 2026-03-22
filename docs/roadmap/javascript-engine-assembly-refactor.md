@@ -498,34 +498,61 @@ A deep audit of all 17 assemblies revealed additional refactoring opportunities 
 | **Shared Utilities** | Duplicate `CancellableDisposableAction`; generic `FastList`/`FastStack`/`FastPool` | Shared location (one canonical copy) | Medium | Eliminates code duplication and enables reuse of high-performance collections. |
 | **Parser Exception** | `Ast/Misc/FastParseException.cs` | `Parser` | Low | Minor misplacement; low risk, low impact. |
 
-### 10.2 Milestone 9: Code-Generation Builder Isolation (High Priority)
+### 10.2 Milestone 9: Code-Generation Builder Isolation — Analysis Complete ✅
 
 **Objective:** Move compilation-time expression builders and codegen helpers from Core to the Compiler assembly, reducing Core's file count and clarifying its role as a runtime-only assembly.
 
 **Scope:** The `LinqExpressions/` directory (33 files), `LinqExpressions/GeneratorsV2/` (8 files), `Emit/` (2 files), `CodeGen/` (2 files), `LambdaGen/` (1 file), `FastParser/Compiler/` (1 file), `TypeQuery/` (1 file), and `Debugger/` adapter (1 file) — totaling **49 files, ~3,670 LOC**.
 
-**Pre-requisites:** Coupling analysis to confirm these types are not invoked by Core at runtime. Preliminary grep analysis indicates they are consumed only by `FastCompiler` partial classes during script compilation, but a rigorous verification pass is required.
-
 | Step | Description | Status | Owner |
 |------|-------------|--------|-------|
-| 9.1 | **Coupling analysis:** For every type in `LinqExpressions/`, `Emit/`, `CodeGen/`, `LambdaGen/`, `TypeQuery/`, `FastParser/`, and `Debugger/` adapter — enumerate all call sites across Core, Compiler, and other assemblies. Classify each as "compilation-time only" or "runtime." | ⬜ Pending | — |
-| 9.2 | **Decide target:** If all builders are compilation-time only, move them into `Compiler/Builders/` (preferred — avoids a new assembly). If some have runtime callers, create a new `Broiler.JavaScript.CodeGen` assembly between Core and Compiler. | ⬜ Pending | — |
-| 9.3 | **Move files:** Relocate identified files to the target location. Preserve namespaces for source compatibility (e.g., `Broiler.JavaScript.Core.LinqExpressions.JSValueBuilder` keeps its namespace). | ⬜ Pending | — |
-| 9.4 | **Add type forwarding (if new assembly):** If a `Broiler.JavaScript.CodeGen` assembly is created, add `[TypeForwardedTo]` attributes in Core for any public types that moved. | ⬜ Pending | — |
-| 9.5 | **Update project references:** Ensure Compiler references the new location. Update `Broiler.JavaScript.All` if a new assembly is created. | ⬜ Pending | — |
-| 9.6 | **Verify:** All 158+ tests pass, no circular references, build succeeds on all platforms. | ⬜ Pending | — |
+| 9.1 | **Coupling analysis:** Rigorous verification of all call sites across Core, Compiler, and other assemblies. | ✅ Complete | — |
+| 9.2 | **Decision:** Keep LinqExpressions builders in Core. Runtime coupling prevents safe extraction (see analysis below). | ✅ Complete | — |
+| 9.3 | **Move files:** Not applicable — full extraction not feasible. | ⛔ Deferred | — |
+| 9.4 | **Add type forwarding:** Not applicable — no files moved. | ⛔ Deferred | — |
+| 9.5 | **Update project references:** Not applicable — no assembly changes. | ⛔ Deferred | — |
+| 9.6 | **Verify:** All 158 tests pass, no changes to project structure. | ✅ Verified | — |
 
-**Acceptance Criteria:**
-- Core assembly file count reduced by ~49 files (from 164 to ~115).
-- No new circular assembly references.
-- All existing tests pass without modification.
-- Namespace preservation: existing consumers compile without `using` changes.
+**Coupling Analysis Results (Step 9.1):**
 
-**Risks & Mitigation:**
-- *Risk:* Some builders may be referenced at runtime (e.g., `JSContext.Eval` may use expression builders to JIT-compile eval'd code). *Mitigation:* Step 9.1 coupling analysis will reveal these. If runtime references exist, keep those specific builders in Core and move only the compilation-time-only builders.
-- *Risk:* Type forwarding count increases if a new assembly is created. *Mitigation:* Prefer moving into Compiler (no new assembly) if coupling analysis permits.
+A rigorous analysis of all 49 candidate files classified each type as "compilation-time only" or "runtime":
 
-### 10.3 Milestone 10: Core Large-File Decomposition (Medium Priority)
+| Directory | Files | Classification | Runtime Callers | Can Move? |
+|-----------|-------|---------------|-----------------|-----------|
+| **LinqExpressions/** (all builders) | 34 | Mixed | `JSFunction.cs` uses `ClrProxyBuilder.Marshal()` and `ArgumentsBuilder.New()` at runtime for CLR delegate creation. `BinaryOperation.cs`, `ExpressionHelper.cs` reference builders for expression building. | ❌ No |
+| **LinqExpressions/GeneratorsV2/** | 7 | Compiler-only | None | ✅ Yes (but coupled to other builders) |
+| **Emit/** | 2 | Core runtime | `JSContext.CodeCache` set at instantiation; `CoreScriptCoreExtensions` wires `DictionaryCodeCache` via module initializer | ❌ No |
+| **CodeGen/LoopScope** | 1 | Compiler-only | None | ✅ Yes |
+| **CodeGen/ScriptInfo** | 1 | Core runtime | `JSContext.cs` delegate signature, `CallStackItem.cs` constructor parameter | ❌ No |
+| **LambdaGen/** | 1 | Compiler-only | None | ✅ Yes (but coupled to builders) |
+| **TypeQuery/** | 1 | Compiler-only | None | ✅ Yes (but coupled to builders) |
+| **FastParser/Compiler/** | 1 | Core runtime | Instantiated via `CoreScriptCoreExtensions` module initializer | ❌ No |
+| **Debugger/** | 1 | Core runtime | `JSDebugger.RaiseBreak()` invoked by compiled code at runtime | ❌ No |
+
+**Key Findings:**
+
+1. **Runtime coupling in `JSFunction.cs`** (lines 349, 357): The `CreateClrDelegate()` method uses `ClrProxyBuilder.Marshal()` to marshal CLR parameters and `ArgumentsBuilder.New()` to create argument wrappers. This is invoked at **runtime** when a JSFunction is converted to a .NET delegate — not at compile time.
+
+2. **`ScriptInfo` is a runtime data type** used as a parameter type in `JSContext.JSClosureFunctionDelegate` and in `CallStackItem`'s constructor. It cannot move to Compiler without creating a circular dependency.
+
+3. **`DictionaryCodeCache`** is set on `JSContext.CodeCache` at context instantiation time — a runtime operation. `JSDebugger.RaiseBreak()` is called by compiled IL code at runtime.
+
+4. **Moveable-but-coupled types**: `LoopScope`, `GeneratorsV2/`, `LambdaGen/`, and `TypeQuery/` are compiler-only, but they are tightly coupled to the LinqExpressions builders that must stay in Core. Moving them alone would split a cohesive subsystem across assemblies with no architectural benefit.
+
+5. **No new CodeGen assembly** is viable because builders reference Core types (`JSValue`, `JSContext`, etc.), so a CodeGen assembly would need to reference Core, and Core would need to reference CodeGen (for `JSFunction.cs`), creating a **circular dependency**.
+
+**Decision (Step 9.2):**
+
+Keep all LinqExpressions builders, CodeGen, LambdaGen, TypeQuery, Emit, FastParser/Compiler, and Debugger types in Core. The runtime coupling through `JSFunction.CreateClrDelegate()` and `ScriptInfo` data type usage prevents clean extraction to Compiler, and a new intermediate assembly would create a circular dependency. The 2–4 files that could theoretically move (LoopScope, BinaryOperation) provide insufficient benefit to justify the type-forwarding overhead and subsystem fragmentation.
+
+**Future Consideration:** If `JSFunction.CreateClrDelegate()` is refactored to use a delegate-based factory pattern (similar to `JSValue.CreateBigIntFactory`), the builder coupling could be broken. This would require:
+- A `Func<Expression, Expression>` delegate for `ClrProxyBuilder.Marshal`
+- A `Func<Expression, IEnumerable<Expression>, Expression>` delegate for `ArgumentsBuilder.New`
+- Wiring via a module initializer in the Compiler assembly
+
+This refactoring is deferred as the complexity-to-benefit ratio is unfavorable for 2 call sites.
+
+### 10.3 Milestone 10: Core Large-File Decomposition ✅
 
 **Objective:** Split oversized files in Core into smaller, semantically grouped partial files to improve readability, reduce merge conflicts, and lower cognitive load.
 
@@ -533,22 +560,24 @@ A deep audit of all 17 assemblies revealed additional refactoring opportunities 
 
 | Step | Description | Status | Owner |
 |------|-------------|--------|-------|
-| 10.1 | **Split `JSArrayPrototype.cs`** (1,066 lines) into 4 partial files: `JSArrayPrototype.Iteration.cs` (map, filter, reduce, forEach, every, some, find, findIndex), `JSArrayPrototype.Search.cs` (indexOf, lastIndexOf, includes), `JSArrayPrototype.Modification.cs` (push, pop, shift, unshift, splice, fill, copyWithin), `JSArrayPrototype.Utility.cs` (concat, join, reverse, sort, slice, flat, flatMap, at, toReversed, toSorted, toSpliced, with). | ⬜ Pending | — |
-| 10.2 | **Split `JSObject.cs`** (1,050 lines) into 3 partial files: `JSObject.PropertyStorage.cs` (descriptor access, defineProperty, hasOwnProperty), `JSObject.ProtoChain.cs` (prototype traversal, inheritance), `JSObject.DynamicDispatch.cs` (meta-object protocol, DynamicMetaObject). | ⬜ Pending | — |
-| 10.3 | **Split `JSDatePrototype.cs`** (994 lines) into 3 partial files: `JSDatePrototype.Getters.cs` (getTime, getFullYear, getMonth, getDate, getHours, etc.), `JSDatePrototype.Setters.cs` (setFullYear, setMonth, setHours, etc.), `JSDatePrototype.Formatters.cs` (toISOString, toUTCString, toLocaleDateString, toString). | ⬜ Pending | — |
-| 10.4 | **Split `JSStringPrototype.cs`** (583 lines) into 4 partial files: `JSStringPrototype.Search.cs` (indexOf, includes, startsWith, endsWith), `JSStringPrototype.Transform.cs` (toUpperCase, toLowerCase, trim, padStart, padEnd, repeat), `JSStringPrototype.Extract.cs` (slice, substring, charAt, charCodeAt, codePointAt, at), `JSStringPrototype.Pattern.cs` (match, matchAll, replace, replaceAll, split, search). | ⬜ Pending | — |
-| 10.5 | **Split `JSObjectStatic.cs`** (443 lines) into 2 partial files: `JSObjectStatic.Introspection.cs` (keys, values, entries, getOwnPropertyDescriptor, getOwnPropertyNames, getPrototypeOf), `JSObjectStatic.Construction.cs` (create, assign, defineProperty, defineProperties, freeze, seal, preventExtensions, fromEntries, groupBy, hasOwn). | ⬜ Pending | — |
-| 10.6 | **Verify:** All tests pass, no behavioral changes. | ⬜ Pending | — |
+| 10.1 | **Split `JSArrayPrototype.cs`** into 4 partial files: `JSArrayPrototype.Iteration.cs`, `JSArrayPrototype.Search.cs`, `JSArrayPrototype.Modification.cs`, `JSArrayPrototype.Utility.cs`. | ✅ Done | — |
+| 10.2 | **Split `JSObject.cs`** into 3 partial files: `JSObject.PropertyStorage.cs`, `JSObject.ProtoChain.cs`, `JSObject.DynamicDispatch.cs`. | ✅ Done | — |
+| 10.3 | **Split `JSDatePrototype.cs`** into 3 partial files: `JSDatePrototype.Getters.cs`, `JSDatePrototype.Setters.cs`, `JSDatePrototype.Formatters.cs`. | ✅ Done | — |
+| 10.4 | **Split `JSStringPrototype.cs`** into 4 partial files: `JSStringPrototype.Search.cs`, `JSStringPrototype.Transform.cs`, `JSStringPrototype.Extract.cs`, `JSStringPrototype.Pattern.cs`. | ✅ Done | — |
+| 10.5 | **Split `JSObjectStatic.cs`** into 2 partial files: `JSObjectStatic.Introspection.cs`, `JSObjectStatic.Construction.cs`. | ✅ Done | — |
+| 10.6 | **Verify:** All 158 tests pass, no behavioral changes. | ✅ Done | — |
 
-**Acceptance Criteria:**
-- No single file exceeds ~300 lines.
-- Each partial file has a clear semantic theme documented in its file name.
-- All existing tests pass without modification.
-- No changes to public API surface.
+**Decomposition Summary:**
 
-**Risks & Mitigation:**
-- *Risk:* Merge conflicts with in-flight PRs that modify the same files. *Mitigation:* Coordinate timing; perform splits as atomic commits.
-- *Risk:* Partial-class field/property ordering may cause confusion. *Mitigation:* Keep all fields and constructor logic in the primary file; partial files contain only methods.
+| Original File | Lines (before) | Partial Files Created | Primary File Lines (after) |
+|----------------|----------------|----------------------|---------------------------|
+| `JSArrayPrototype.cs` | 1,066 | `Iteration`, `Search`, `Modification`, `Utility` | 44 (fields + constructor) |
+| `JSObject.cs` | 1,050 | `PropertyStorage`, `ProtoChain`, `DynamicDispatch` | — (split across partials) |
+| `JSDatePrototype.cs` | 994 | `Getters`, `Setters`, `Formatters` | 95 (fields + constructor) |
+| `JSStringPrototype.cs` | 583 | `Search`, `Transform`, `Extract`, `Pattern` | 26 (declaration) |
+| `JSObjectStatic.cs` | 443 | `Introspection`, `Construction` | 39 (declaration) |
+
+All fields and constructor logic remain in the primary file; partial files contain only methods grouped by semantic theme.
 
 ### 10.4 Milestone 11: Foundation Layer Cleanup (Medium Priority)
 
@@ -570,7 +599,7 @@ A deep audit of all 17 assemblies revealed additional refactoring opportunities 
 - *Risk:* Parser currently has no reference to Runtime; adding one changes the dependency graph. *Mitigation:* Step 11.1 includes evaluating whether adding the reference is acceptable. If it violates layering rules (both are foundation-layer assemblies), extract the shared type to a lower common dependency instead.
 - *Risk:* Making `FastList`/`FastStack` public may expose internal implementation details. *Mitigation:* Step 11.3 evaluates the trade-off; if risk outweighs benefit, keep them internal and document.
 
-### 10.5 Milestone 12: Compiler Internal Organization (Lower Priority)
+### 10.5 Milestone 12: Compiler Internal Organization ✅
 
 **Objective:** Reorganize the Compiler assembly's flat directory structure into semantic subdirectories for improved navigability.
 
@@ -578,17 +607,20 @@ A deep audit of all 17 assemblies revealed additional refactoring opportunities 
 
 | Step | Description | Status | Owner |
 |------|-------------|--------|-------|
-| 12.1 | **Create subdirectory structure:** `Statements/` (FastCompiler.Statement.cs, FastCompiler.Block.cs, FastCompiler.IfStatement.cs, FastCompiler.ForStatement.cs, etc.), `Expressions/` (FastCompiler.Expression.cs, FastCompiler.SingleExpression.cs, FastCompiler.NextExpression.cs, etc.), `Declarations/` (FastCompiler.Function.cs, FastCompiler.Class.cs, FastCompiler.VariableDeclaration.cs, etc.), `Scope/` (FastFunctionScope.cs, StrictModeExtensions.cs), `Infrastructure/` (CompilerAssemblyInitializer.cs). | ⬜ Pending | — |
-| 12.2 | **Move files to subdirectories.** No namespace changes — partial classes remain in the same namespace regardless of folder. | ⬜ Pending | — |
-| 12.3 | **Verify:** All tests pass, no behavioral changes. | ⬜ Pending | — |
+| 12.1 | **Create subdirectory structure:** `Statements/`, `Expressions/`, `Declarations/`, `Scope/`, `Infrastructure/`. | ✅ Done | — |
+| 12.2 | **Move files to subdirectories.** No namespace changes — partial classes remain in the same namespace regardless of folder. | ✅ Done | — |
+| 12.3 | **Verify:** All 158 tests pass, no behavioral changes. | ✅ Done | — |
 
-**Acceptance Criteria:**
-- Compiler directory has clear semantic groupings.
-- No namespace changes.
-- All existing tests pass without modification.
+**Directory Organization:**
 
-**Risks & Mitigation:**
-- *Risk:* IDE tooling may have issues with partial classes in subdirectories. *Mitigation:* Verify with Visual Studio, VS Code, and Rider before committing.
+| Subdirectory | Files | Contents |
+|-------------|-------|---------|
+| **Statements/** | 14 | `VisitBlock`, `VisitBreakStatement`, `VisitDoWhileStatement`, `VisitFor`, `VisitIfStatement`, `VisitLabeledStatement`, `VisitReturnStatement`, `VisitSwitchStatement`, `VisitTryStatement`, `VisitVariableDeclaration`, `VisitWhileStatement`, `VisitExportStatement`, `VisitImportStatement`, `VisitProgram` |
+| **Expressions/** | 17 | `VisitArrayExpression`, `VisitAssignmentExpression`, `VisitAwaitExpression`, `VisitBinaryExpression`, `VisitCallExpression`, `VisitConditionalExpression`, `VisitIdentifier`, `VisitLiteral`, `VisitMemberExpression`, `VisitMeta`, `VisitNewExpression`, `VisitObjectLiteral`, `VisitObjectPattern`, `VisitSequenceExpression`, `VisitTaggedTemplateExpression`, `VisitTemplateExpression`, `VisitUnaryExpression` |
+| **Declarations/** | 3 | `CreateClass`, `CreateFunction`, `CreateMemberExpression` |
+| **Scope/** | 2 | `FastFunctionScope`, `StrictModeExtensions` |
+| **Infrastructure/** | 1 | `CompilerAssemblyInitializer` |
+| **Root** | 5 | `FastCompiler.cs` (main), `FastCompiler.Empty.cs`, `FastCompiler.InternalUpdateExpression.cs`, `FastCompiler.KeyOfName.cs`, `GlobalUsings.cs` |
 
 ### 10.6 Milestone 13: ExpressionCompiler Decomposition Assessment (Exploratory)
 
