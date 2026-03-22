@@ -675,7 +675,7 @@ Each milestone should be delivered as a separate PR for focused review:
 | Phase | Milestone | Estimated Effort | PR Scope |
 |-------|-----------|------------------|----------|
 | 2a | M9 — CodeGen Isolation | 2–3 days | File moves + project reference updates |
-| 2b | M10 — Large-File Decomposition | 1–2 days | Partial-file splits (5 files → ~16 files) |
+| 2b | M10 — Large-File Decomposition | 1–2 days | Partial-file splits (5 files → 16 partial files, replacing the original monolithic files) |
 | 2c | M11 — Foundation Cleanup | 1 day | Dedup + placement fixes |
 | 2d | M12 — Compiler Organization | 0.5–1 day | Subdirectory reorganization |
 | 2e | M13 — ExpressionCompiler Assessment | 1–2 days | Analysis + feasibility report |
@@ -687,7 +687,7 @@ Each milestone should be delivered as a separate PR for focused review:
 
 1. **M9 — Target for LinqExpressions:** Should builders move into the existing Compiler assembly or a new `Broiler.JavaScript.CodeGen` assembly? The Compiler-internal option is simpler (no new assembly) but may make Compiler too large. The new-assembly option is cleaner but adds a dependency to manage. **Recommendation:** Prefer Compiler-internal unless coupling analysis reveals runtime callers.
 
-2. **M11 — CancellableDisposableAction canonical location:** Runtime and Parser are both foundation-layer assemblies. Parser does not currently reference Runtime. Adding the reference is safe (Runtime is lower in the dependency graph — Parser already references Ast, and Runtime references Ast too), but it creates a new edge in the foundation layer. **Recommendation:** Add the reference if no cycle is created; otherwise extract to ExpressionCompiler (leaf dependency).
+2. **M11 — CancellableDisposableAction canonical location:** Runtime and Parser are both foundation-layer assemblies. Parser does not currently reference Runtime. Adding the reference is safe (Runtime is lower in the dependency graph — Parser already references Ast, and Runtime references Ast too), but it creates a new edge in the foundation layer. **Recommendation:** Add the reference if no cycle is created; otherwise extract to ExpressionCompiler (a common dependency that both Parser and Runtime already reference).
 
 3. **M13 — ExpressionCompiler viability:** The 150-file assembly is large, but its purpose is cohesive (expression tree → IL compilation). Splitting may not provide meaningful modularity gains. **Recommendation:** Treat M13 as exploratory and accept a no-go decision.
 

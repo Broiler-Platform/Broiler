@@ -348,8 +348,8 @@ Parser.
    assembly; no cycle because Parser → Ast ← Runtime, but Parser does not
    currently reference Runtime directly), or
 2. If adding the reference is undesirable, extract the utility to
-   ExpressionCompiler (leaf dependency both Parser and Runtime already
-   reference).
+   ExpressionCompiler (a common dependency that both Parser and Runtime
+   already reference).
 
 Either option eliminates the duplicate. Update §1 matrix if Parser gains a
 new reference.
