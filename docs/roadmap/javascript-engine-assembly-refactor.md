@@ -313,6 +313,8 @@ Coupling analysis was performed for each candidate in `Broiler.JavaScript.Core/C
 
 4. **[Contributing: Adding Built-In Types](../architecture/contributing-builtins.md)** — Developer guide covering new type creation, source generator attributes, factory delegate wiring, prototype chain setup, structured clone support, and a pre-PR checklist.
 
+5. **[Internal Dependencies](../architecture/internal-dependencies.md)** — Comprehensive reference for all assembly-to-assembly project references, NuGet package dependencies, factory-delegate and interface contracts, fallback behaviour, type forwarding summary, and circular reference prevention rules.
+
 ---
 
 ## 5. Test Strategy
@@ -448,6 +450,6 @@ dotnet test Broiler.JavaScript/YantraJS.sln --collect:"XPlat Code Coverage"
 - 6 module initializers wiring satellite assemblies
 - TypedArrays and Iterator successfully extracted in M7
 - 2 candidates confirmed non-extractable (RegExp, Promise)
-- Architecture documentation complete (extraction pattern, module initializers, contribution guide)
+- Architecture documentation complete (extraction pattern, module initializers, contribution guide, internal dependencies)
 - 158 tests passing across 12 test projects
 - Full CI running on 3 platforms
