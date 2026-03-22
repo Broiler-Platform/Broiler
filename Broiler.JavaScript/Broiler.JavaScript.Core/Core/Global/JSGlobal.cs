@@ -9,9 +9,7 @@ using Broiler.JavaScript.Core.Core.BigInt;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
-using Broiler.JavaScript.Core.Core.Map;
 using Broiler.JavaScript.Core.Core.Error;
-using Broiler.JavaScript.Core.Core.Set;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Core.Core.Array;
 
@@ -230,33 +228,9 @@ public partial class JSGlobalStatic
             return clone;
         }
 
-        // Map
-        if (value is JSMap map)
-        {
-            var clone = new JSMap(Arguments.Empty);
-            seen[value] = clone;
-
-            foreach (var entry in map.GetEntries())
-            {
-                var clonedKey = StructuredCloneValue(entry[0], seen);
-                var clonedVal = StructuredCloneValue(entry[1], seen);
-                clone.Set(clonedKey, clonedVal);
-            }
-
-            return clone;
-        }
-
-        // Set
-        if (value is JSSet set)
-        {
-            var clone = new JSSet(Arguments.Empty);
-            seen[value] = clone;
-
-            foreach (var item in set.Keys())
-                clone.Add(StructuredCloneValue(item, seen));
-
-            return clone;
-        }
+        // Map, Set, and other satellite assembly types
+        var extResult = DefaultBuiltInRegistry.StructuredCloneExtension?.Invoke(value, seen, StructuredCloneValue);
+        if (extResult != null) return extResult;
 
         // Error
         if (value is JSError error)
