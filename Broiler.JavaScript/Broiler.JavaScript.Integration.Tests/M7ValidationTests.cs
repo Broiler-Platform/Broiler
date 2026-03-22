@@ -56,8 +56,7 @@ public class M7ValidationTests
                 System.Reflection.BindingFlags.Static))
             .SelectMany(m =>
             {
-                var types = new List<Type>();
-                if (m.ReturnType != null) types.Add(m.ReturnType);
+                var types = new List<Type> { m.ReturnType };
                 types.AddRange(m.GetParameters().Select(p => p.ParameterType));
                 return types;
             })

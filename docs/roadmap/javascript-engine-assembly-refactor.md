@@ -425,4 +425,12 @@ dotnet test Broiler.JavaScript/YantraJS.sln --collect:"XPlat Code Coverage"
 | M7 | ✅ Complete | Future extraction candidates |
 | M8 | 🔲 Pending | Documentation & developer experience |
 
-**Current state:** 24 built-in types extracted to `Broiler.JavaScript.BuiltIns`. 71 types forwarded for backward compatibility. 6 module initializers wiring satellite assemblies. 2 additional candidates identified for future extraction (TypedArrays, Iterator). 2 candidates confirmed non-extractable (RegExp, Promise). 1 candidate already extracted (Intl). 148 tests passing across 12 test projects. Full CI running on 3 platforms.
+**Current state:**
+- 24 built-in types extracted to `Broiler.JavaScript.BuiltIns`
+- 71 types forwarded for backward compatibility
+- 6 module initializers wiring satellite assemblies
+- 2 additional candidates identified for future extraction (TypedArrays, Iterator)
+- 2 candidates confirmed non-extractable (RegExp, Promise)
+- 1 candidate already extracted (Intl)
+- 148 tests passing across 12 test projects
+- Full CI running on 3 platforms
