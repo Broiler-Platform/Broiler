@@ -48,6 +48,42 @@ Multi threaded shared object cache are difficult to achieve in Node, but YantraJ
 
 `*` Most JavaScript today is available in strict mode, we do not feel any need to support non strict mode as modules are strict by default.
 
+# Assembly Architecture
+
+The engine is split into **17 assemblies** organized in a layered architecture.
+Dependencies flow strictly downward — no circular references are allowed.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Application Layer                                          │
+│    Broiler.JavaScript (CLI REPL / Script Runner)            │
+├─────────────────────────────────────────────────────────────┤
+│  Integration Layer                                          │
+│    Broiler.JavaScript.All (meta-package)                    │
+├─────────────────────────────────────────────────────────────┤
+│  Feature Layer                                              │
+│    BuiltIns ── Compiler ── Clr ── Debugger                  │
+│    Modules ── ModuleExtensions ── Network ── NodePollyfill  │
+├─────────────────────────────────────────────────────────────┤
+│  Core Layer                                                 │
+│    Broiler.JavaScript.Core                                  │
+│    (JSContext, globals, scope, LINQ builders, registration) │
+├─────────────────────────────────────────────────────────────┤
+│  Foundation Layer                                           │
+│    Runtime ── Parser ── Ast ── Storage ── ExpressionCompiler│
+└─────────────────────────────────────────────────────────────┘
+```
+
+Satellite assemblies (BuiltIns, Compiler, Clr) register themselves with Core
+via **module initializers** that wire factory delegates at assembly load time.
+This allows Core to use built-in types without referencing them directly.
+
+For detailed architecture documentation see:
+- [Extraction Pattern](../docs/architecture/extraction-pattern.md)
+- [Module Initializers](../docs/architecture/module-initializers.md)
+- [Contributing: Adding Built-In Types](../docs/architecture/contributing-builtins.md)
+- [Refactor Roadmap](../docs/roadmap/javascript-engine-assembly-refactor.md)
+
 # Mixed modules
 Currently YantraJS supports Both CommonJS and ES modules without any extra work, with little trick, module resolution is `node like`. Module loader loads module asynchronously, so `import` will work without any extra effort. However, `require` will run `AsyncPump` to wait till the module is loaded correctly. Unless you do some multithreading, mixed modules will not lead to any deadlocks.
 

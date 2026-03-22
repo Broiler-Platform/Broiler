@@ -292,16 +292,26 @@ Coupling analysis was performed for each candidate in `Broiler.JavaScript.Core/C
   - Extraction pattern invariants: Core→Foundation only, all candidates accounted for (2 tests)
 - All 150 tests pass (131 M6 baseline + 19 M7 validation tests)
 
-### Milestone 8: Documentation & Developer Experience 🔲
+### Milestone 8: Documentation & Developer Experience ✅
 
 **Objective:** Ensure the architecture is well-documented for contributors.
 
 | Step | Description | Status |
 |------|-------------|--------|
-| 8.1 | Document the extraction pattern (move type, add type forwarding, wire factory delegate) | 🔲 Pending |
-| 8.2 | Add architecture diagram to README | 🔲 Pending |
-| 8.3 | Document module initializer chain and startup sequence | 🔲 Pending |
-| 8.4 | Add contribution guidelines for adding new built-in types | 🔲 Pending |
+| 8.1 | Document the extraction pattern (move type, add type forwarding, wire factory delegate) | ✅ Done |
+| 8.2 | Add architecture diagram to README | ✅ Done |
+| 8.3 | Document module initializer chain and startup sequence | ✅ Done |
+| 8.4 | Add contribution guidelines for adding new built-in types | ✅ Done |
+
+**Documentation Artifacts Created:**
+
+1. **[Extraction Pattern Guide](../architecture/extraction-pattern.md)** — Step-by-step checklist for extracting built-in types from Core to BuiltIns, with three real-world examples (JSMath, JSBigInt, JSIteratorObject), a decision tree for extract-vs-keep, and documentation of non-extractable types (RegExp, Promise).
+
+2. **Architecture Diagram in [Broiler.JavaScript/README.md](../../Broiler.JavaScript/README.md)** — ASCII diagram showing the 4-layer architecture (Foundation → Core → Feature → Application) with all 17 assemblies and links to detailed documentation.
+
+3. **[Module Initializer Chain](../architecture/module-initializers.md)** — Documents all 6 module initializers across 4 assemblies, their registration tables, the runtime startup sequence, and troubleshooting guidance for delegate-is-null and initialization-order issues.
+
+4. **[Contributing: Adding Built-In Types](../architecture/contributing-builtins.md)** — Developer guide covering new type creation, source generator attributes, factory delegate wiring, prototype chain setup, structured clone support, and a pre-PR checklist.
 
 ---
 
@@ -309,7 +319,7 @@ Coupling analysis was performed for each candidate in `Broiler.JavaScript.Core/C
 
 ### 5.1 Test Projects (Current State)
 
-Each assembly has a corresponding test project. The counts below reflect the current state after M7 completion (150 total tests):
+Each assembly has a corresponding test project. The counts below reflect the current state after M8 completion (158 total tests):
 
 | Test Project | Tests | Coverage Area |
 |-------------|-------|---------------|
@@ -324,7 +334,7 @@ Each assembly has a corresponding test project. The counts below reflect the cur
 | `Broiler.JavaScript.Debugger.Tests` | 3 | Debugging infrastructure |
 | `Broiler.JavaScript.Modules.Tests` | 3 | Module loading/resolution |
 | `Broiler.JavaScript.ModuleExtensions.Tests` | 3 | Module registration API |
-| `Broiler.JavaScript.Integration.Tests` | 50 | End-to-end engine scenarios, M6 validation, M7 extraction validation |
+| `Broiler.JavaScript.Integration.Tests` | 58 | End-to-end engine scenarios, M6/M7/M8 validation |
 
 ### 5.2 Testing Approach per Milestone
 
@@ -430,7 +440,7 @@ dotnet test Broiler.JavaScript/YantraJS.sln --collect:"XPlat Code Coverage"
 | M5 | ✅ Complete | Target framework alignment (net8.0) |
 | M6 | ✅ Complete | Final validation |
 | M7 | ✅ Complete | Future extraction candidates |
-| M8 | 🔲 Pending | Documentation & developer experience |
+| M8 | ✅ Complete | Documentation & developer experience |
 
 **Current state:**
 - 40 built-in types extracted to `Broiler.JavaScript.BuiltIns` (24 M1–M4 + 14 TypedArrays + 1 Iterator + 1 Intl)
@@ -438,5 +448,6 @@ dotnet test Broiler.JavaScript/YantraJS.sln --collect:"XPlat Code Coverage"
 - 6 module initializers wiring satellite assemblies
 - TypedArrays and Iterator successfully extracted in M7
 - 2 candidates confirmed non-extractable (RegExp, Promise)
-- 150 tests passing across 12 test projects
+- Architecture documentation complete (extraction pattern, module initializers, contribution guide)
+- 158 tests passing across 12 test projects
 - Full CI running on 3 platforms
