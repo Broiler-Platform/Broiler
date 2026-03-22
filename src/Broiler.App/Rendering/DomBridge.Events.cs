@@ -7,6 +7,7 @@ using System.Linq;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.App.Rendering;
 

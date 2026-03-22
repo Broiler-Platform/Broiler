@@ -10,6 +10,7 @@ using SkiaSharp;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.Cli;
 
