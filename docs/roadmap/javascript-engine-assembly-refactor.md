@@ -481,7 +481,7 @@ A deep audit of all 17 assemblies revealed additional refactoring opportunities 
 |---------|----------|---------|
 | **Duplicate utility** | `Runtime/CancellableDisposableAction.cs` + `Parser/CancellableDisposableAction.cs` | Identical utility type exists in two assemblies with different namespaces. |
 | **Misplaced type** | `Ast/Misc/FastParseException.cs` | Parser exception defined in the Ast assembly. Should live alongside the parser that throws it. |
-| **Non-reusable collections** | `Parser/FastList.cs`, `Parser/FastStack.cs`, `Parser/FastPool.cs` | Generic data structures useful beyond the parser but marked `internal` and inaccessible to other assemblies. |
+| **Non-reusable collections** | `Parser/FastList.cs`, `Parser/FastStack.cs`, `Parser/FastPool.cs` | Generic data structures already `public` and type-forwarded from Core. Evaluated in M11 — kept in Parser (no benefit to moving). |
 
 #### Feature Layer Findings
 
@@ -556,10 +556,10 @@ A deep audit of all 17 assemblies revealed additional refactoring opportunities 
 
 | Step | Description | Status | Owner |
 |------|-------------|--------|-------|
-| 11.1 | **Deduplicate `CancellableDisposableAction`:** The type exists in both `Broiler.JavaScript.Runtime` (`Core.Core` namespace) and `Broiler.JavaScript.Parser` (`Broiler.JavaScript.Parser` namespace). Keep the Runtime copy as the canonical version (it is already type-forwarded from Core). Remove the Parser copy and update Parser to reference Runtime's copy. If Parser does not reference Runtime, evaluate adding a minimal reference or extracting the type to a lower-layer shared location. | ⬜ Pending | — |
-| 11.2 | **Evaluate `FastParseException` placement:** Currently in `Ast/Misc/FastParseException.cs`. Determine whether moving it to Parser would require Ast to reference Parser (creating a cycle) or if the move is safe. If a cycle would be created, document the rationale for keeping it in Ast. | ⬜ Pending | — |
-| 11.3 | **Evaluate generic collection reuse:** `FastList<T>`, `FastStack<T>`, and `FastPool<T>` in Parser are `internal`. Determine whether making them `public` (or extracting to a shared location) would benefit other assemblies (e.g., ExpressionCompiler). If the benefit is marginal, document the decision and close. | ⬜ Pending | — |
-| 11.4 | **Verify:** All tests pass, no circular references. | ⬜ Pending | — |
+| 11.1 | **Deduplicate `CancellableDisposableAction`:** Deleted the Parser copy. Added a `Parser → Runtime` project reference (no cycle — Runtime does not reference Parser). Parser's `FastTokenStream.UndoMark()` now uses the canonical `Broiler.JavaScript.Core.Core.CancellableDisposableAction` from Runtime. The existing `TypeForwardedTo` in Core continues to work unchanged. | ✅ Complete | — |
+| 11.2 | **Evaluate `FastParseException` placement:** **Decision: keep in Ast.** Moving to Parser would create a circular dependency — Ast throws `FastParseException` (in `VariableDeclarator.cs` and `AstUnaryExpression.cs`), so Ast would need to reference Parser, but Parser already references Ast (Parser → Ast). The current placement in `Ast/Misc/` is correct: the exception type is defined alongside the AST nodes that throw it, and all consumers (Parser, Compiler, Runtime) already reference Ast. | ✅ Complete | — |
+| 11.3 | **Evaluate generic collection reuse:** **Decision: keep in Parser.** `FastList<T>`, `FastStack<T>`, and `FastPool<T>` are already `public` (not `internal` as originally assumed) and already type-forwarded from Core via `ParserTypeForwarding.cs`. They are accessible to any assembly that references Parser or Core. Moving them to a separate shared assembly would add a new project without meaningful benefit. No other assembly currently needs these collections outside the Parser/Core dependency chain. | ✅ Complete | — |
+| 11.4 | **Verify:** All 158 tests pass, no circular references. Build succeeds with 0 errors. | ✅ Complete | — |
 
 **Acceptance Criteria:**
 - No duplicate type definitions across assemblies.
@@ -664,7 +664,7 @@ Phase 2 milestones should be executed in the following order, with clear gates b
 |------|------------|--------|------------|
 | Runtime references found in LinqExpressions (M9) | Medium | High | Coupling analysis (9.1) before any file moves. Partial extraction is acceptable — move only compilation-time builders. |
 | Large-file splits cause merge conflicts (M10) | Medium | Low | Coordinate with active contributors. Perform splits as atomic PRs merged quickly. |
-| CancellableDisposableAction dedup introduces circular dependency (M11) | Low | Medium | Evaluate dependency graph before adding references. Extract to lower assembly if needed. |
+| CancellableDisposableAction dedup introduces circular dependency (M11) | Low | Medium | ✅ **Mitigated.** No cycle — added Parser → Runtime reference safely. |
 | ExpressionCompiler too coupled to split (M13) | High | Low | Milestone is explicitly exploratory. No-go is acceptable. |
 | Nerdbank.GitVersioning fails in shallow clones (CI) | Known | Low | Use `fetch-depth: 0` in CI workflows (already in place). |
 
@@ -687,7 +687,7 @@ Each milestone should be delivered as a separate PR for focused review:
 
 1. **M9 — Target for LinqExpressions:** Should builders move into the existing Compiler assembly or a new `Broiler.JavaScript.CodeGen` assembly? The Compiler-internal option is simpler (no new assembly) but may make Compiler too large. The new-assembly option is cleaner but adds a dependency to manage. **Recommendation:** Prefer Compiler-internal unless coupling analysis reveals runtime callers.
 
-2. **M11 — CancellableDisposableAction canonical location:** Runtime and Parser are both foundation-layer assemblies. Parser does not currently reference Runtime. Adding the reference is safe (Runtime is lower in the dependency graph — Parser already references Ast, and Runtime references Ast too), but it creates a new edge in the foundation layer. **Recommendation:** Add the reference if no cycle is created; otherwise extract to ExpressionCompiler (a common dependency that both Parser and Runtime already reference).
+2. **M11 — CancellableDisposableAction canonical location:** ✅ **Resolved.** Added Parser → Runtime project reference (no cycle exists — Runtime does not reference Parser). Deleted the duplicate Parser copy. Parser now uses the canonical `Broiler.JavaScript.Core.Core.CancellableDisposableAction` from Runtime.
 
 3. **M13 — ExpressionCompiler viability:** The 150-file assembly is large, but its purpose is cohesive (expression tree → IL compilation). Splitting may not provide meaningful modularity gains. **Recommendation:** Treat M13 as exploratory and accept a no-go decision.
 
@@ -716,7 +716,7 @@ Each milestone should be delivered as a separate PR for focused review:
 |-----------|--------|----------|-------------|
 | M9 | ⬜ Pending | High | Code-generation builder isolation (~49 files from Core) |
 | M10 | ⬜ Pending | Medium | Core large-file decomposition (5 files → ~16 partial files) |
-| M11 | ⬜ Pending | Medium | Foundation layer cleanup (dedup + placement fixes) |
+| M11 | ✅ Complete | Medium | Foundation layer cleanup (dedup + placement fixes) |
 | M12 | ⬜ Pending | Lower | Compiler internal organization (semantic subdirectories) |
 | M13 | ⬜ Pending | Exploratory | ExpressionCompiler decomposition assessment |
 | M14 | ⬜ Pending | Required | Phase 2 validation & documentation update |
