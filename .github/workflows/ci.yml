@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Build
+        run: dotnet build Broiler.JavaScript/YantraJS.sln --configuration Release
+
+      - name: Test Storage
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Storage.Tests/Broiler.JavaScript.Storage.Tests.csproj --configuration Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Test Ast
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Ast.Tests/Broiler.JavaScript.Ast.Tests.csproj --configuration Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Test Parser
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Parser.Tests/Broiler.JavaScript.Parser.Tests.csproj --configuration Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Test Runtime
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Runtime.Tests/Broiler.JavaScript.Runtime.Tests.csproj --configuration Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Test Core
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Core.Tests/Broiler.JavaScript.Core.Tests.csproj --configuration Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Test Compiler
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Compiler.Tests/Broiler.JavaScript.Compiler.Tests.csproj --configuration Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Test BuiltIns
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.BuiltIns.Tests/Broiler.JavaScript.BuiltIns.Tests.csproj --configuration Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Test Clr
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Clr.Tests/Broiler.JavaScript.Clr.Tests.csproj --configuration Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Test Debugger
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Debugger.Tests/Broiler.JavaScript.Debugger.Tests.csproj --configuration Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Test Modules
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Modules.Tests/Broiler.JavaScript.Modules.Tests.csproj --configuration Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Test ModuleExtensions
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.ModuleExtensions.Tests/Broiler.JavaScript.ModuleExtensions.Tests.csproj --configuration Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Test Integration
+        run: dotnet test Broiler.JavaScript/Broiler.JavaScript.Integration.Tests/Broiler.JavaScript.Integration.Tests.csproj --configuration Release --no-build --collect:"XPlat Code Coverage"

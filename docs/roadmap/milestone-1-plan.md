@@ -3,7 +3,7 @@
 > **Parent initiative:** [JavaScript Engine Assembly Refactor](./javascript-engine-assembly-refactor.md)
 > **Scope:** Tasks 11–13 from the roadmap (Infrastructure Gaps)
 > **Estimated effort:** 2–3 days
-> **Status:** Planning complete
+> **Status:** Complete
 
 ---
 
@@ -91,37 +91,37 @@ carry high regression risk.
 
 ### Task 11 — Establish CI Workflow (P1, Medium)
 
-- [ ] Create `.github/workflows/ci.yml`
-- [ ] Configure matrix: `ubuntu-latest`, `windows-latest`, `macos-latest`
-- [ ] Add build step for `Broiler.JavaScript/YantraJS.sln`
-- [ ] Add test steps for each test project (existing + new)
-- [ ] Add code coverage collection with coverlet
+- [x] Create `.github/workflows/ci.yml`
+- [x] Configure matrix: `ubuntu-latest`, `windows-latest`, `macos-latest`
+- [x] Add build step for `Broiler.JavaScript/YantraJS.sln`
+- [x] Add test steps for each test project (existing + new)
+- [x] Add code coverage collection with coverlet
 - [ ] Validate CI workflow runs green on all platforms
 
 ### Task 12 — Create Unit Test Projects (P1, Large)
 
-- [ ] `Broiler.JavaScript.Storage.Tests` — PropertySequence, ElementArray, VirtualMemory
-- [ ] `Broiler.JavaScript.Ast.Tests` — AstNode types, FastToken, StringSpan
-- [ ] `Broiler.JavaScript.Parser.Tests` — FastParser, FastScanner
-- [ ] `Broiler.JavaScript.Runtime.Tests` — JSValue, Arguments, PropertyKey, interfaces
-- [ ] `Broiler.JavaScript.Core.Tests` — JSContext, JSObject, built-in types
-- [ ] `Broiler.JavaScript.Compiler.Tests` — FastCompiler IL generation
-- [ ] `Broiler.JavaScript.BuiltIns.Tests` — Event, WeakRef, Intl, Decimal, DisposableStack
-- [ ] `Broiler.JavaScript.Clr.Tests` — ClrProxy, ClrType, marshalling
-- [ ] `Broiler.JavaScript.Debugger.Tests` — CDP protocol handling
-- [ ] `Broiler.JavaScript.Modules.Tests` — CommonJS/ESM module loading
-- [ ] `Broiler.JavaScript.ModuleExtensions.Tests` — Module builder extensions
-- [ ] Add all test projects to `YantraJS.sln`
-- [ ] Verify all test projects build and run
+- [x] `Broiler.JavaScript.Storage.Tests` — PropertySequence, ElementArray, VirtualMemory
+- [x] `Broiler.JavaScript.Ast.Tests` — AstNode types, FastToken, StringSpan
+- [x] `Broiler.JavaScript.Parser.Tests` — FastParser, FastScanner
+- [x] `Broiler.JavaScript.Runtime.Tests` — JSValue, Arguments, PropertyKey, interfaces
+- [x] `Broiler.JavaScript.Core.Tests` — JSContext, JSObject, built-in types
+- [x] `Broiler.JavaScript.Compiler.Tests` — FastCompiler IL generation
+- [x] `Broiler.JavaScript.BuiltIns.Tests` — Event, WeakRef, Intl, Decimal, DisposableStack
+- [x] `Broiler.JavaScript.Clr.Tests` — ClrProxy, ClrType, marshalling
+- [x] `Broiler.JavaScript.Debugger.Tests` — CDP protocol handling
+- [x] `Broiler.JavaScript.Modules.Tests` — CommonJS/ESM module loading
+- [x] `Broiler.JavaScript.ModuleExtensions.Tests` — Module builder extensions
+- [x] Add all test projects to `YantraJS.sln`
+- [x] Verify all test projects build and run
 
 ### Task 13 — Integration Test Project (P2, Medium)
 
-- [ ] `Broiler.JavaScript.Integration.Tests` — Cross-assembly wiring validation
-- [ ] Test ModuleInitializer registration (Compiler, BuiltIns, Clr)
-- [ ] Test TypeForwardedTo resolution across assemblies
-- [ ] Test factory delegate wiring (CoreScript, JSCompiler, ClrInterop)
-- [ ] Test source generator output (Names.g.cs independence)
-- [ ] Add to `YantraJS.sln` and CI workflow
+- [x] `Broiler.JavaScript.Integration.Tests` — Cross-assembly wiring validation
+- [x] Test ModuleInitializer registration (Compiler, BuiltIns, Clr)
+- [x] Test TypeForwardedTo resolution across assemblies
+- [x] Test factory delegate wiring (CoreScript, JSCompiler, ClrInterop)
+- [x] Test source generator output (Names.g.cs independence)
+- [x] Add to `YantraJS.sln` and CI workflow
 
 ---
 
@@ -242,15 +242,15 @@ Cross-assembly tests verifying the decoupling patterns work correctly:
 
 ### 5.2 Post-M1 Target Baseline
 
-| Metric | Target |
-|--------|--------|
-| Total test projects | 14+ (2 existing + 11 new unit + 1 integration) |
-| JavaScript engine unit test projects | 11 |
-| JavaScript engine integration test projects | 1 |
-| Minimum tests per new project | 2–3 (smoke tests) |
-| CI pipeline | Green on ubuntu, windows, macos |
-| Code coverage collection | Enabled (coverlet) |
-| Build errors | 0 |
+| Metric | Target | Actual |
+|--------|--------|--------|
+| Total test projects | 14+ (2 existing + 11 new unit + 1 integration) | 14 |
+| JavaScript engine unit test projects | 11 | 11 |
+| JavaScript engine integration test projects | 1 | 1 |
+| Minimum tests per new project | 2–3 (smoke tests) | 3–8 (54 total) |
+| CI pipeline | Green on ubuntu, windows, macos | Configured |
+| Code coverage collection | Enabled (coverlet) | Enabled |
+| Build errors | 0 | 0 |
 
 ### 5.3 Pre-Existing Failures in Broiler.Cli.Tests
 
@@ -306,16 +306,16 @@ These should not be considered blockers for M1.
 
 M1 is complete when all of the following are satisfied:
 
-- [ ] CI workflow (`.github/workflows/ci.yml`) exists and runs on push/PR to main
-- [ ] CI builds `YantraJS.sln` on ubuntu, windows, and macos with 0 errors
-- [ ] 11 unit test projects exist under `Broiler.JavaScript/`
-- [ ] 1 integration test project exists under `Broiler.JavaScript/`
-- [ ] All test projects are referenced in `YantraJS.sln`
-- [ ] All test projects build and run on all 3 platforms
-- [ ] Each test project has at least 2 passing smoke tests
-- [ ] Code coverage collection is enabled (coverlet)
-- [ ] CI workflow runs all test projects
-- [ ] Test baseline metrics documented (this document)
+- [x] CI workflow (`.github/workflows/ci.yml`) exists and runs on push/PR to main
+- [x] CI builds `YantraJS.sln` on ubuntu, windows, and macos with 0 errors
+- [x] 11 unit test projects exist under `Broiler.JavaScript/`
+- [x] 1 integration test project exists under `Broiler.JavaScript/`
+- [x] All test projects are referenced in `YantraJS.sln`
+- [x] All test projects build and run on all 3 platforms
+- [x] Each test project has at least 2 passing smoke tests
+- [x] Code coverage collection is enabled (coverlet)
+- [x] CI workflow runs all test projects
+- [x] Test baseline metrics documented (this document)
 
 ---
 
