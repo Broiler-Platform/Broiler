@@ -356,20 +356,27 @@ new reference.
 
 ### 9.3 Types Remaining in Core After Phase 2
 
-After M9 (code-gen isolation), the Core assembly would contain ~115 files
-focused on:
+After M9 coupling analysis, the Core assembly retains its ~180 files because the
+LinqExpressions builders could not be extracted due to runtime coupling (see
+roadmap M9 analysis). The Core assembly contains:
 
 - **Runtime objects:** JSContext, JSGlobal, JSObject, JSArray, JSString,
   JSNumber, JSBoolean, JSFunction, JSClass, JSSymbol, JSNull, JSUndefined
 - **Non-extractable built-ins:** RegExp (compiler coupling), Promise
   (JSContext infrastructure)
+- **Expression builders:** LinqExpressions/ (used at runtime by
+  `JSFunction.CreateClrDelegate()` via ClrProxyBuilder/ArgumentsBuilder)
+- **Code generation support:** CodeGen/, LambdaGen/, TypeQuery/, Emit/,
+  FastParser/Compiler/, Debugger/ (various runtime dependencies)
 - **Property/prototype infrastructure:** DefaultBuiltInRegistry, JSPrototype,
   scope management, property descriptors
 - **Extensions & utilities:** Type-checking helpers, collection extensions,
   hash utilities
 - **CLR fallback stubs:** FallbackClrInterop, MarshalExtensions
 
-This is approximately a 22% reduction from the current 164 files.
+The original M9 goal of reducing Core by ~49 files (~22%) was not achievable
+because the coupling analysis (M9 step 9.1) revealed runtime callers for the
+builder types. See the roadmap's M9 section for detailed analysis.
 
 ---
 

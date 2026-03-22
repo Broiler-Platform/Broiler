@@ -238,3 +238,41 @@ The following types were analyzed and determined to be non-extractable:
 - [Assembly Refactor Roadmap](../roadmap/javascript-engine-assembly-refactor.md)
 - [Module Initializer Chain](module-initializers.md)
 - [Contributing: Adding New Built-In Types](contributing-builtins.md)
+
+---
+
+## Appendix: Intra-Assembly File Splitting (M10 Pattern)
+
+When a single file within an assembly grows beyond ~300 lines, it should be
+split into partial files grouped by semantic theme. This pattern was used in M10
+to decompose 5 oversized Core files into 16 partial files.
+
+### Splitting Rules
+
+1. **Create a partial class per theme.** Name the file
+   `{ClassName}.{Theme}.cs` (e.g., `JSArray.Iteration.cs`).
+2. **Keep fields and constructors in the primary file.** The primary file
+   (`{ClassName}.cs`) retains all fields, properties, constructors, and any
+   initialization logic.
+3. **Partial files contain only methods.** Group related methods by
+   functionality (iteration, search, modification, formatting, etc.).
+4. **No namespace changes.** All partial files use the same namespace as the
+   primary file.
+5. **No public API changes.** The split is purely structural; consumers see
+   no difference.
+
+### Naming Conventions
+
+| File | Contents |
+|------|----------|
+| `JSArray.cs` | Fields, constructor, main file |
+| `JSArrayPrototype.Iteration.cs` | map, filter, reduce, forEach, every, some, find, findIndex |
+| `JSArrayPrototype.Search.cs` | indexOf, lastIndexOf, includes |
+| `JSArrayPrototype.Modification.cs` | push, pop, shift, unshift, splice, fill, copyWithin |
+| `JSArrayPrototype.Utility.cs` | concat, join, reverse, sort, slice, flat, flatMap, at |
+
+### When to Split
+
+- File exceeds ~300 lines
+- File contains logically distinct groups of methods (e.g., getters vs setters)
+- Multiple contributors frequently modify different sections
