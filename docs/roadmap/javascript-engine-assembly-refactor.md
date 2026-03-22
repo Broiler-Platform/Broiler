@@ -304,15 +304,15 @@ These types have been analyzed and confirmed extractable using the existing
 | Type | Files | Complexity | Blocker |
 |------|-------|-----------|---------|
 | ~~`JSProxy`~~ | ~~1~~ | ~~Low~~ | ~~None~~ — **Extracted (M2)** |
-| `JSJSON` + `JSJsonParser` | 2 | Medium | Needs factory delegate for `JSON.parse`/`stringify` calls from Core |
-| `JSDataView` + `DataViewStatic` | 2 | Low | None — self-contained |
+| ~~`JSJSON` + `JSJsonParser`~~ | ~~2~~ | ~~Medium~~ | ~~Needs factory delegate~~ — **Extracted (M3)** |
+| ~~`JSDataView` + `DataViewStatic`~~ | ~~2~~ | ~~Low~~ | ~~None~~ — **Extracted (M3)** |
 | ~~`JSMath`~~ | ~~1~~ | ~~Low~~ | ~~None~~ — **Extracted (M2)** |
 | ~~`JSReflect`~~ | ~~1~~ | ~~Low~~ | ~~None~~ — **Extracted (M2)** |
 | ~~`JSConsole`~~ | ~~1~~ | ~~Low~~ | ~~None~~ — **Extracted (M2)** via `ConsoleFactory` delegate |
-| `JSMap` / `JSWeakMap` | 2 | Medium | May need factory delegates if referenced by Compiler |
-| `JSSet` / `JSWeakSet` | 2 | Medium | May need factory delegates if referenced by Compiler |
+| ~~`JSMap` / `JSWeakMap`~~ | ~~2~~ | ~~Medium~~ | ~~May need factory delegates~~ — **Extracted (M3)** via `StructuredCloneExtension` delegate |
+| ~~`JSSet` / `JSWeakSet`~~ | ~~2~~ | ~~Medium~~ | ~~May need factory delegates~~ — **Extracted (M3)** via `StructuredCloneExtension` delegate |
 | `JSBigInt` | 1 | Medium | Referenced by Compiler for literal creation |
-| **Total** | **9 remaining** | | |
+| **Total** | **1 remaining** | | |
 
 ### 7.2 Potential New Assembly — TypedArrays
 
@@ -375,13 +375,13 @@ practically extracted without fundamentally restructuring the engine:
 | # | Task | Priority | Effort | Status |
 |---|------|----------|--------|--------|
 | 1 | Extract `JSProxy` → BuiltIns | P3 | Small | ✅ **Complete (M2)** |
-| 2 | Extract `JSJSON` / `JSJsonParser` → BuiltIns | P3 | Medium | Not started |
-| 3 | Extract `JSDataView` / `DataViewStatic` → BuiltIns | P3 | Small | Not started |
+| 2 | Extract `JSJSON` / `JSJsonParser` → BuiltIns | P3 | Medium | ✅ **Complete (M3)** |
+| 3 | Extract `JSDataView` / `DataViewStatic` → BuiltIns | P3 | Small | ✅ **Complete (M3)** |
 | 4 | Extract `JSMath` → BuiltIns | P3 | Small | ✅ **Complete (M2)** |
 | 5 | Extract `JSReflect` → BuiltIns | P3 | Small | ✅ **Complete (M2)** |
 | 6 | Extract `JSConsole` → BuiltIns | P3 | Small | ✅ **Complete (M2)** |
-| 7 | Extract `JSMap`/`JSWeakMap` → BuiltIns | P3 | Medium | Not started |
-| 8 | Extract `JSSet`/`JSWeakSet` → BuiltIns | P3 | Medium | Not started |
+| 7 | Extract `JSMap`/`JSWeakMap` → BuiltIns | P3 | Medium | ✅ **Complete (M3)** |
+| 8 | Extract `JSSet`/`JSWeakSet` → BuiltIns | P3 | Medium | ✅ **Complete (M3)** |
 | 9 | Evaluate `JSBigInt` extraction feasibility | P4 | Small | Not started |
 | 10 | Evaluate TypedArrays as separate assembly | P4 | Large | Not started |
 
@@ -458,10 +458,10 @@ For each type, follow this pattern:
 4. ~~`JSProxy`~~ ✅ — no Compiler references
 
 **Remaining for M3:**
-5. `JSDataView` + `DataViewStatic` — self-contained
-6. `JSMap` / `JSWeakMap` — may need Compiler factory delegate
-7. `JSSet` / `JSWeakSet` — may need Compiler factory delegate
-8. `JSJSON` / `JSJsonParser` — needs factory delegate for `JSON` global
+5. ~~`JSDataView` + `DataViewStatic`~~ ✅ — self-contained
+6. ~~`JSMap` / `JSWeakMap`~~ ✅ — wired via `StructuredCloneExtension` delegate
+7. ~~`JSSet` / `JSWeakSet`~~ ✅ — wired via `StructuredCloneExtension` delegate
+8. ~~`JSJSON` / `JSJsonParser`~~ ✅ — Network already references BuiltIns
 
 ### Phase 3 — Evaluation & Planning (P4)
 
@@ -504,7 +504,7 @@ For each type, follow this pattern:
 |-----------|-------|-----------------|--------|--------|
 | **M1 — CI & Test Foundation** | Tasks 11–13 | 2–3 days | Week 1 | ✅ **Complete** — see [milestone-1-plan.md](./milestone-1-plan.md) |
 | **M2 — Quick Wins** | Tasks 1, 4, 5, 6 (Proxy, Math, Reflect, Console) | 1–2 days | Week 2 | ✅ **Complete** — 4 types extracted, 93 tests passing |
-| **M3 — Medium Extractions** | Tasks 2, 3, 7, 8 (JSON, DataView, Map, Set) | 2–3 days | Week 3 | Not started |
+| **M3 — Medium Extractions** | Tasks 2, 3, 7, 8 (JSON, DataView, Map, Set) | 2–3 days | Week 3 | ✅ **Complete** — 8 types extracted, `StructuredCloneExtension` delegate added, 116 tests passing |
 | **M4 — Evaluation** | Tasks 9, 10 (BigInt, TypedArrays feasibility) | 1 day | Week 3 | Not started |
 | **M5 — Documentation** | Tasks 14–18 (TFM alignment, migration guide, docs) | 1–2 days | Week 4 | Not started |
 | **M6 — Final Validation** | Full regression testing, performance benchmarks | 1 day | Week 4 | Not started |
@@ -577,20 +577,25 @@ Broiler.JavaScript.Core/
 
 > **M2 Note:** `Objects/` (JSMath, JSReflect), `Proxy/`, and `Debug/` directories
 > were removed from Core after extraction to BuiltIns.
+>
+> **M3 Note:** `DataView/`, `Map/`, `Set/`, and `Json/` directories were removed
+> from Core after extraction to BuiltIns. A `StructuredCloneExtension` delegate
+> was added to `DefaultBuiltInRegistry` so `JSGlobal.StructuredClone` can clone
+> Map/Set values without Core referencing BuiltIns.
 
 ### Summary of Extraction Progress
 
 | Category | In Core | Extracted | Extractable | Impractical |
 |----------|---------|-----------|-------------|-------------|
-| Built-in types | ~76 | 16 (BuiltIns) | ~9 | ~55 |
+| Built-in types | ~68 | 24 (BuiltIns) | ~1 | ~55 |
 | AST types | 0 | 18 (Ast) | — | — |
 | Parser types | 0 | 12 (Parser) | — | — |
 | Storage types | 0 | 10 (Storage) | — | — |
 | Runtime types | 0 | 26 (Runtime) | — | — |
 | IL Builders | 41 | 0 | Deferred | — |
 | Utilities | ~30 | 0 | ~5 | ~25 |
-| **Total** | **~147** | **82** | **~14** | **~80** |
+| **Total** | **~139** | **90** | **~6** | **~80** |
 
 ---
 
-*Last updated: 2026-03-22 — M2 complete*
+*Last updated: 2026-03-22 — M3 complete*
