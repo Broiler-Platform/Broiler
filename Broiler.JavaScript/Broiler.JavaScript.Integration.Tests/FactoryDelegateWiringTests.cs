@@ -31,14 +31,18 @@ public class FactoryDelegateWiringTests : IDisposable
     /// <summary>
     /// Verifies that the Compiler assembly's module initializer has
     /// registered a compilation function via <see cref="DefaultJSCompiler"/>.
+    /// The static constructor on <see cref="DefaultJSCompiler"/> proactively
+    /// loads the Compiler assembly, so the delegate is available without
+    /// any explicit bootstrap.
     /// </summary>
     [Fact]
     public void CompilerDelegate_IsRegistered()
     {
         var compiler = new DefaultJSCompiler();
-        // If the delegate is not registered, Compile will throw.
-        // A simple expression should compile without error.
-        Assert.NotNull(compiler);
+        // If the delegate is not registered, Compile will throw
+        // InvalidOperationException. A simple expression must compile.
+        var result = compiler.Compile("1;");
+        Assert.NotNull(result);
     }
 
     /// <summary>
