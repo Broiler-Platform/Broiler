@@ -159,6 +159,11 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
     public JSContext(SynchronizationContext synchronizationContext = null)
     {
+        // Ensure the BuiltIns assembly is loaded before any JSFunction
+        // construction, so that factory delegates (CreateNumber, etc.) are
+        // available for JSFunction/JSSymbol.CreateClass calls below.
+        DefaultBuiltInRegistry.EnsureBuiltInsAssemblyLoaded();
+
         this.synchronizationContext = synchronizationContext ?? SynchronizationContext.Current;
 
         Current = this;
