@@ -147,15 +147,15 @@ public class M8ValidationTests
     [Fact]
     public void M8_ContributionGuide_NamespaceConventionHolds()
     {
-        // The contribution guide states that built-in types use
-        // Broiler.JavaScript.Core.Core.* namespaces even in the BuiltIns assembly.
+        // The contribution guide states that built-in types live in
+        // Broiler.JavaScript.BuiltIns.* namespaces in the BuiltIns assembly.
         var builtInsAssembly = typeof(Broiler.JavaScript.BuiltIns.Map.JSMap).Assembly;
         Assert.Equal("Broiler.JavaScript.BuiltIns", builtInsAssembly.GetName().Name);
 
-        // Verify several extracted types retain Core.Core.* namespaces:
-        Assert.StartsWith("Broiler.JavaScript.Core.Core",
+        // Verify several extracted types retain their expected namespaces:
+        Assert.StartsWith("Broiler.JavaScript.BuiltIns",
             typeof(Broiler.JavaScript.BuiltIns.Map.JSMap).Namespace);
-        Assert.StartsWith("Broiler.JavaScript.Core.Core",
+        Assert.StartsWith("Broiler.JavaScript.BuiltIns",
             typeof(Broiler.JavaScript.BuiltIns.Set.JSSet).Namespace);
         Assert.StartsWith("Broiler.JavaScript.Core.Core",
             typeof(Broiler.JavaScript.Core.Core.BigInt.JSBigInt).Namespace);
