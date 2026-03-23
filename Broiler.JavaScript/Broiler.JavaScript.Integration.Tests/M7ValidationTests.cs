@@ -262,14 +262,13 @@ public class M7ValidationTests
     {
         EnsureAllAssembliesLoaded();
 
-        var globalStaticType = typeof(JSContext).Assembly
-            .GetType("Broiler.JavaScript.Core.Core.Global.JSGlobalStatic");
-        Assert.NotNull(globalStaticType);
-
-        var intlFactoryProp = globalStaticType!.GetProperty(
+        // IntlFactory was moved to DefaultBuiltInRegistry when JSGlobalStatic
+        // was extracted from Core to the Globals assembly.
+        var registryType = typeof(DefaultBuiltInRegistry);
+        var intlFactoryProp = registryType.GetProperty(
             "IntlFactory",
             System.Reflection.BindingFlags.Static |
-            System.Reflection.BindingFlags.NonPublic);
+            System.Reflection.BindingFlags.Public);
         Assert.NotNull(intlFactoryProp);
 
         var factoryValue = intlFactoryProp!.GetValue(null);
