@@ -7,6 +7,7 @@ using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Disposable;
+using Broiler.JavaScript.BuiltIns.Symbol;
 
 namespace Broiler.JavaScript.BuiltIns.Disposable;
 
@@ -51,7 +52,7 @@ public class JSDisposableStack : IJSDisposableStack, IDisposable, IAsyncDisposab
 
             try
             {
-                v.InvokeMethod(JSSymbol.dispose);
+                v.InvokeMethod((IJSSymbol)JSSymbol.dispose);
             }
             catch (Exception ex)
             {
@@ -72,12 +73,12 @@ public class JSDisposableStack : IJSDisposableStack, IDisposable, IAsyncDisposab
             {
                 if (a)
                 {
-                    var r = v.InvokeMethod(JSSymbol.asyncDispose);
+                    var r = v.InvokeMethod((IJSSymbol)JSSymbol.asyncDispose);
                     await JSPromise.Await(r);
                 }
                 else
                 {
-                    v.InvokeMethod(JSSymbol.dispose);
+                    v.InvokeMethod((IJSSymbol)JSSymbol.dispose);
                 }
             }
             catch (Exception ex)

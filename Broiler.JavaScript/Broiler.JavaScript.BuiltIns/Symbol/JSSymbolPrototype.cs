@@ -1,7 +1,8 @@
-﻿using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.BuiltIns.Symbol;
 
 public partial class JSSymbol
 {

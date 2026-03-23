@@ -34,7 +34,7 @@ namespace YantraJS.NodePollyfill
         private string ToKey(JSValue value)
             => value.IsString
                 ? "key:" + value.ToString()
-                : ((value is JSSymbol symbol)
+                : ((value is IJSSymbol symbol)
                     ? "symbol:" + symbol.Key
                     : throw JSContext.NewTypeError("Key can only be string or symbol"));
 

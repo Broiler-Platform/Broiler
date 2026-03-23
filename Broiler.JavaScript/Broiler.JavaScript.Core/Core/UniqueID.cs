@@ -7,7 +7,7 @@ internal static class UniqueID
         JSValue v when v.IsString => $"string:{v.StringValue}",
         JSValue n when n.IsNumber => $"number:{n.DoubleValue}",
         JSObject @object => $"id:{@object.UniqueID}",
-        JSSymbol symbol => $"symbol:{symbol.Key}",
+        IJSSymbol symbol => $"symbol:{symbol.Key}",
         _ => value.ToString(),
     };
 }

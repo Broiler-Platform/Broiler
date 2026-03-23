@@ -99,7 +99,7 @@ public partial class JSObject
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void FastAddValue(JSSymbol key, JSValue value, JSPropertyAttributes attributes)
+    public void FastAddValue(IJSSymbol key, JSValue value, JSPropertyAttributes attributes)
     {
         ref var pr = ref GetSymbols();
         pr.Put(key.Key) = new JSProperty(key.Key, value, attributes);
@@ -107,7 +107,7 @@ public partial class JSObject
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void FastAddProperty(JSSymbol key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes)
+    public void FastAddProperty(IJSSymbol key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes)
     {
         ref var pr = ref GetSymbols();
         pr.Put(key.Key) = new JSProperty(key.Key, getter, setter, getter, attributes);
@@ -129,7 +129,7 @@ public partial class JSObject
                 return;
 
             default:
-                FastAddValue((JSSymbol)k.Symbol, value, attributes);
+                FastAddValue(k.Symbol, value, attributes);
                 return;
         }
     }
@@ -150,7 +150,7 @@ public partial class JSObject
                 return;
 
             default:
-                FastAddProperty((JSSymbol)k.Symbol, getter, setter, attributes);
+                FastAddProperty(k.Symbol, getter, setter, attributes);
                 return;
         }
     }
@@ -302,10 +302,10 @@ public partial class JSObject
 
     internal protected override bool SetValue(IJSSymbol name, JSValue value, JSValue receiver, bool throwError = true)
     {
-        if ((JSSymbol)name == JSSymbol.iterator)
+        if (name.Key == JSValue.SymbolIterator.Key)
             HasIterator = true;
 
-        var p = GetInternalProperty((JSSymbol)name);
+        var p = GetInternalProperty(name);
         if (p.IsProperty)
         {
             if (p.set != null)
@@ -326,7 +326,7 @@ public partial class JSObject
         }
 
         symbols.Put(name.Key) = JSProperty.Property(value);
-        PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, (JSSymbol)name));
+        PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, name));
         return true;
     }
 
@@ -370,12 +370,12 @@ public partial class JSObject
             KeyType.Empty => JSValue.BooleanFalse,
             KeyType.UInt => DefineProperty(k.Index, propertyDescription),
             KeyType.String => DefineProperty(k.KeyString, propertyDescription),
-            KeyType.Symbol => DefineProperty((JSSymbol)k.Symbol, propertyDescription),
+            KeyType.Symbol => DefineProperty(k.Symbol, propertyDescription),
             _ => JSValue.BooleanFalse,
         };
     }
 
-    public JSValue DefineProperty(JSSymbol name, JSObject pd)
+    public JSValue DefineProperty(IJSSymbol name, JSObject pd)
     {
         var key = name.Key;
         var old = symbols[key];
@@ -505,7 +505,7 @@ public partial class JSObject
 
         if (symbols.RemoveAt(symbol.Key))
         {
-            PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, (JSSymbol)symbol));
+            PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, symbol));
             return JSValue.BooleanTrue;
         }
 
@@ -586,7 +586,7 @@ public partial class JSObject
     {
         if (HasIterator)
         {
-            var v = this.GetValue(symbols[JSSymbol.iterator.Key]);
+            var v = this.GetValue(symbols[JSValue.SymbolIterator.Key]);
             return new JSIterator(v.InvokeFunction(new Arguments(this)));
         }
 

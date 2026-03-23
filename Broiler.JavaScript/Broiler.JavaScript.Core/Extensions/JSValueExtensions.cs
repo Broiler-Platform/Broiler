@@ -153,9 +153,9 @@ public static partial class JSValueExtensions
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue InvokeMethod(this JSValue @this, JSSymbol name, in Arguments a)
+    public static JSValue InvokeMethod(this JSValue @this, IJSSymbol name, in Arguments a)
     {
-        var fx = @this[(IJSSymbol)name];
+        var fx = @this[name];
         if (fx.IsUndefined)
             throw JSContext.NewTypeError($"Method {name} not found on {@this}");
 
@@ -170,7 +170,7 @@ public static partial class JSValueExtensions
             return @this.InvokeMethod(key.Index, a);
 
         if (key.IsSymbol)
-            return @this.InvokeMethod((JSSymbol)key.Symbol, a);
+            return @this.InvokeMethod(key.Symbol, a);
 
         return @this.InvokeMethod(in key.KeyString, a);
     }

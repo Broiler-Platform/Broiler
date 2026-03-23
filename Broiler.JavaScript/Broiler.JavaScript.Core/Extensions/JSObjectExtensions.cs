@@ -31,7 +31,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void FastAddSetter(JSObject target, JSSymbol key, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
+    public static void FastAddSetter(JSObject target, IJSSymbol key, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
     {
         ref var pr = ref target.GetSymbols();
         ref var existing = ref pr.Put(key.Key);
@@ -41,7 +41,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void FastAddGetter(JSObject target, JSSymbol key, JSFunction getter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
+    public static void FastAddGetter(JSObject target, IJSSymbol key, JSFunction getter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
     {
         ref var pr = ref target.GetSymbols();
         ref var existing = ref pr.Put(key.Key);
@@ -86,7 +86,7 @@ public static class JSObjectExtensions
                 FastAddSetter(target, k.Index, setter, attributes);
                 return;
             case KeyType.Symbol:
-                FastAddSetter(target, (JSSymbol)k.Symbol, setter, attributes);
+                FastAddSetter(target, k.Symbol, setter, attributes);
                 return;
             default:
                 throw new NotSupportedException();
@@ -106,7 +106,7 @@ public static class JSObjectExtensions
                 FastAddGetter(target, k.Index, getter, attributes);
                 return;
             case KeyType.Symbol:
-                FastAddGetter(target, (JSSymbol)k.Symbol, getter, attributes);
+                FastAddGetter(target, k.Symbol, getter, attributes);
                 return;
             default:
                 throw new NotSupportedException();
@@ -158,14 +158,14 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static JSObject AddProperty(this JSObject target, JSSymbol key, JSValue value, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue)
+    public static JSObject AddProperty(this JSObject target, IJSSymbol key, JSValue value, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue)
     {
         target.GetSymbols().Put(key.Key) = JSProperty.Property(value, attributes);
         return target;
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static JSObject AddProperty(this JSObject target, JSSymbol key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
+    public static JSObject AddProperty(this JSObject target, IJSSymbol key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
     {
         ref var ownProperties = ref target.GetSymbols();
         ref var p = ref ownProperties.GetRefOrDefault(key.Key, ref JSProperty.Empty);
@@ -184,7 +184,7 @@ public static class JSObjectExtensions
     {
         var key = name.ToKey();
         if (key.IsSymbol)
-            return AddProperty(target, (JSSymbol)key.Symbol, value, attributes);
+            return AddProperty(target, key.Symbol, value, attributes);
 
         if (key.IsUInt)
             return target.AddProperty(key.Index, value, attributes);
@@ -197,7 +197,7 @@ public static class JSObjectExtensions
     {
         var key = name.ToKey();
         if (key.IsSymbol)
-            return AddProperty(target, (JSSymbol)key.Symbol, getter, setter, attributes);
+            return AddProperty(target, key.Symbol, getter, setter, attributes);
 
         if (key.IsUInt)
             return target.AddProperty(key.Index, getter, setter, attributes);

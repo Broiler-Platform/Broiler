@@ -143,6 +143,49 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
     /// </summary>
     public static JSValue CreateArray(uint length) => CreateArrayWithLengthFactory(length);
 
+    // ── JSSymbol factory infrastructure ──
+    // Wired by the BuiltIns assembly's ModuleInitializer so that Core and
+    // other assemblies can work with symbols without depending on the
+    // concrete JSSymbol type.
+
+    /// <summary>
+    /// Well-known <c>Symbol.iterator</c> singleton.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static IJSSymbol SymbolIterator;
+
+    /// <summary>
+    /// Well-known <c>Symbol.dispose</c> singleton.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static IJSSymbol SymbolDispose;
+
+    /// <summary>
+    /// Well-known <c>Symbol.asyncDispose</c> singleton.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static IJSSymbol SymbolAsyncDispose;
+
+    /// <summary>
+    /// Factory delegate for creating a new <c>JSSymbol</c> from a name string.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static Func<string, JSValue> CreateSymbolFactory;
+
+    /// <summary>
+    /// Factory delegate for registering the <c>Symbol</c> constructor on a
+    /// <see cref="JSContext"/>.  Mirrors <c>JSSymbol.CreateClass</c>.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static Func<IJSContext, bool, JSValue> CreateSymbolClassFactory;
+
+    /// <summary>
+    /// Factory delegate for looking up a well-known symbol by name.
+    /// Mirrors <c>JSSymbol.GlobalSymbol</c>.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static Func<string, IJSSymbol> GetGlobalSymbolFactory;
+
     /// <summary>Gets whether this value is the <c>undefined</c> singleton.</summary>
     public bool IsUndefined
     {

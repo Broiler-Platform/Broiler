@@ -2,6 +2,7 @@
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Boolean;
+using Broiler.JavaScript.BuiltIns.Symbol;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Object;
@@ -99,7 +100,7 @@ public partial class JSReflect : JSObject
 
         if (key.IsSymbol)
         {
-            p = @object.GetInternalProperty((JSSymbol)key.Symbol);
+            p = @object.GetInternalProperty(key.Symbol);
         }
         else
         {
@@ -142,7 +143,7 @@ public partial class JSReflect : JSObject
         JSProperty p;
         if (key.IsSymbol)
         {
-            p = @object.GetInternalProperty((JSSymbol)key.Symbol);
+            p = @object.GetInternalProperty(key.Symbol);
         }
         else
         {
@@ -221,7 +222,7 @@ public partial class JSReflect : JSObject
         if (key.IsSymbol)
         {
             var symbol = key.Symbol;
-            var p = @object.GetInternalProperty((JSSymbol)symbol, false);
+            var p = @object.GetInternalProperty(symbol, false);
         
             if (p.IsProperty)
             {

@@ -27,7 +27,7 @@ public class JSArguments: JSObject
         properties.Put(KeyStrings.callee, Callee, Callee, JSPropertyAttributes.Property);
 
         ref var symbols = ref GetSymbols();
-        symbols.Put(JSSymbol.iterator.Key) = JSProperty.Property(new JSFunction(Values), JSPropertyAttributes.ConfigurableValue);
+        symbols.Put(JSValue.SymbolIterator.Key) = JSProperty.Property(new JSFunction(Values), JSPropertyAttributes.ConfigurableValue);
         ref var elements = ref CreateElements();
         
         for (int i = 0; i < args.Length; i++)

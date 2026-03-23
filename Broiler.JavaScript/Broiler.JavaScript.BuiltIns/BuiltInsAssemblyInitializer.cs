@@ -11,6 +11,7 @@ using Broiler.JavaScript.BuiltIns.Map;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.Set;
 using Broiler.JavaScript.BuiltIns.String;
+using Broiler.JavaScript.BuiltIns.Symbol;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.BigInt;
 using Broiler.JavaScript.BuiltIns.Boolean;
@@ -114,6 +115,21 @@ internal static class BuiltInsAssemblyInitializer
         // Initialize JSStringBuilder with the concrete JSString type so the
         // Compiler can build string expression trees without a direct reference.
         JSStringBuilder.Initialize(typeof(JSString));
+
+        // Wire JSSymbol well-known singletons and factory delegates so Core
+        // and other assemblies can work with symbols without referencing the
+        // concrete JSSymbol type directly.
+        JSValue.SymbolIterator = JSSymbol.iterator;
+        JSValue.SymbolDispose = JSSymbol.dispose;
+        JSValue.SymbolAsyncDispose = JSSymbol.asyncDispose;
+        JSValue.CreateSymbolFactory = static name => new JSSymbol(name);
+        JSValue.CreateSymbolClassFactory = static (ctx, register) =>
+            JSSymbol.CreateClass((JSContext)ctx, register);
+        JSValue.GetGlobalSymbolFactory = static name => JSSymbol.GlobalSymbol(name);
+
+        // Initialize JSSymbolBuilder with the concrete JSSymbol type so the
+        // ClassGenerator can emit symbol lookups without a direct reference.
+        JSSymbolBuilder.Initialize(typeof(JSSymbol));
 
         // Wire JSConstants with concrete JSString instances.
         JSConstants.Decimal = new JSString("decimal");
