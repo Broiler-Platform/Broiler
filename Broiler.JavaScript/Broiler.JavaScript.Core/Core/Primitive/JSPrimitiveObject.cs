@@ -31,8 +31,8 @@ public class JSPrimitiveObject : JSObject
     {
         if (key.Key == KeyStrings.length.Key)
         {
-            if (value is JSString @string)
-                return JSValue.CreateNumber(@string.Length);
+            if (value.IsString)
+                return JSValue.CreateNumber(value.Length);
         }
 
         return base.GetValue(key, receiver, throwError);
@@ -51,9 +51,9 @@ public class JSPrimitiveObject : JSObject
         }
         set
         {
-            if (value is JSString @string)
+            if (value.IsString)
             {
-                if (name < @string.Length)
+                if (name < value.Length)
                     return;
             }
 

@@ -27,7 +27,7 @@ internal sealed class FallbackClrInterop : IClrInterop
         {
             TypeCode.Boolean => (bool)value ? JSValue.BooleanTrue : JSValue.BooleanFalse,
             TypeCode.Byte => JSValue.CreateNumber((byte)value),
-            TypeCode.Char => new JSString(value.ToString()),
+            TypeCode.Char => JSValue.CreateString(value.ToString()),
             TypeCode.DateTime => JSValue.CreateDate(new DateTimeOffset((DateTime)value)),
             TypeCode.DBNull => JSValue.NullValue,
             TypeCode.Decimal => JSValue.CreateNumber((double)(decimal)value),
@@ -37,7 +37,7 @@ internal sealed class FallbackClrInterop : IClrInterop
             TypeCode.Int64 => JSValue.CreateNumber((long)value),
             TypeCode.SByte => JSValue.CreateNumber((sbyte)value),
             TypeCode.Single => JSValue.CreateNumber((float)value),
-            TypeCode.String => new JSString((string)value),
+            TypeCode.String => JSValue.CreateString((string)value),
             TypeCode.UInt16 => JSValue.CreateNumber((ushort)value),
             TypeCode.UInt32 => JSValue.CreateNumber((uint)value),
             TypeCode.UInt64 => JSValue.CreateNumber((long)value),

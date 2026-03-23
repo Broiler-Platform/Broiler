@@ -15,7 +15,7 @@ public class TypeConverter
         float f1 => JSValue.CreateNumber(f1),
         double d1 => JSValue.CreateNumber(d1),
         decimal d2 => JSValue.CreateNumber((double)d2),
-        string str => new JSString(str),
+        string str => JSValue.CreateString(str),
         _ => throw new NotSupportedException(),
     };
 }

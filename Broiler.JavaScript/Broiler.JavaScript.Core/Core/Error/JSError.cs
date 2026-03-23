@@ -64,7 +64,7 @@ public partial class JSError : JSObject
     public new JSValue ToString(in Arguments a)
     {
         var name = prototypeChain.Object[KeyStrings.constructor][KeyStrings.name];
-        return new JSString($"{name}: {Message}");
+        return JSValue.CreateString($"{name}: {Message}");
     }
 
     public override string ToString() => ToString(Arguments.Empty).ToString();

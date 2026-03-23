@@ -1,7 +1,9 @@
-﻿using Broiler.JavaScript.Core.Core.Primitive;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core.Core.String;
+namespace Broiler.JavaScript.BuiltIns.String;
 
 internal static class JSStringExtensions
 {

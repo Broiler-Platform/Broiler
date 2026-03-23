@@ -36,7 +36,7 @@ internal class JSDynamicMetaData : DynamicMetaObject
                 float f => JSValue.CreateNumber(f),
                 decimal ds => JSValue.CreateNumber((double)ds),
                 bool b => b ? JSValue.BooleanTrue : JSValue.BooleanFalse,
-                string s => new JSString(s),
+                string s => JSValue.CreateString(s),
                 JSValue v => v,
                 _ => throw new NotSupportedException($"Cannot convert type {p.GetType()} to JSValue"),
             };
@@ -57,7 +57,7 @@ internal class JSDynamicMetaData : DynamicMetaObject
             case decimal d1: return value[(uint)d1];
             case float f1: return value[(uint)f1];
             case JSValue jn when jn.IsNumber: return value[(uint)jn.DoubleValue];
-            case JSString js:
+            case JSValue js when js.IsString:
                 var key = js.ToKey();
                 return key.IsUInt ? value[key.Index] : value[key.KeyString];
         }
@@ -79,7 +79,7 @@ internal class JSDynamicMetaData : DynamicMetaObject
             case decimal d1: return target[(uint)d1] = value;
             case float f1: return target[(uint)f1] = value;
             case JSValue jn when jn.IsNumber: return target[(uint)jn.DoubleValue] = value;
-            case JSString js:
+            case JSValue js when js.IsString:
                 var key = js.ToKey();
                 if (key.IsSymbol)
                 {

@@ -100,7 +100,7 @@ public class V8RemoteObject
         if (id.IsUndefined)
         {
             var idStr = GCHandle.ToIntPtr(GCHandle.Alloc(v, GCHandleType.Normal)).ToInt64().ToString();
-            v[(IJSSymbol)systemID] = new JSString(idStr);
+            v[(IJSSymbol)systemID] = JSValue.CreateString(idStr);
             ObjectId = idStr;
         }
         else

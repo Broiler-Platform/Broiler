@@ -10,6 +10,7 @@ using Broiler.JavaScript.BuiltIns.Iterator;
 using Broiler.JavaScript.BuiltIns.Map;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.Set;
+using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.BigInt;
 using Broiler.JavaScript.BuiltIns.Boolean;
@@ -102,6 +103,31 @@ internal static class BuiltInsAssemblyInitializer
         // value without referencing the concrete type directly.
         JSValue.NullValue = JSNull.Value;
         JSNullBuilder.Initialize(typeof(JSNull));
+
+        // Wire JSString factory delegates and cached empty-string value
+        // so Core/Runtime can create string values without referencing
+        // the concrete type directly.
+        JSValue.CreateString = static v => new JSString(v);
+        JSValue.EmptyString = JSString.Empty;
+        JSValue.CreateStringWithKey = static (s, k) => new JSString(s, k);
+
+        // Initialize JSStringBuilder with the concrete JSString type so the
+        // Compiler can build string expression trees without a direct reference.
+        JSStringBuilder.Initialize(typeof(JSString));
+
+        // Wire JSConstants with concrete JSString instances.
+        JSConstants.Decimal = new JSString("decimal");
+        JSConstants.Arguments = new JSString("arguments");
+        JSConstants.BigInt = new JSString("bigint");
+        JSConstants.Undefined = new JSString("undefined");
+        JSConstants.Boolean = new JSString("boolean");
+        JSConstants.String = new JSString("string");
+        JSConstants.Object = new JSString("object");
+        JSConstants.Number = new JSString("number");
+        JSConstants.Function = new JSString("function");
+        JSConstants.Symbol = new JSString("symbol");
+        JSConstants.Infinity = new JSString("Infinity");
+        JSConstants.NegativeInfinity = new JSString("-Infinity");
 
         // Wire factory delegate for JSConsole so DefaultBuiltInRegistry
         // does not directly reference the concrete type.

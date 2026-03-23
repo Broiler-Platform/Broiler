@@ -1,11 +1,11 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.String;
+using Broiler.JavaScript.Core;
 using System;
 using System.Text;
 using Broiler.JavaScript.ExpressionCompiler;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.BuiltIns.String;
 
 public partial class JSString
 {
@@ -90,7 +90,7 @@ public partial class JSString
         if (limitMax < splitStrings.Length)
         {
             var splitStrings2 = new string[limitMax];
-            Array.Copy(splitStrings, splitStrings2, (int)limitMax);
+            System.Array.Copy(splitStrings, splitStrings2, (int)limitMax);
             splitStrings = splitStrings2;
         }
 

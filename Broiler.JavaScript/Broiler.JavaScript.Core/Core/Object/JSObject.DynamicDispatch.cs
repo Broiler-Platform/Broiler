@@ -75,8 +75,8 @@ public partial class JSObject
         if (ReferenceEquals(this, value))
             return true;
 
-        if (value is JSString str)
-            if (str.value.Equals(ToString()))
+        if (value.IsString)
+            if (value.StringValue.Equals(ToString()))
                 return true;
 
         if (DoubleValue == value.DoubleValue)
@@ -97,7 +97,7 @@ public partial class JSObject
     {
         switch (value)
         {
-            case JSString strValue:
+            case JSValue strValue when strValue.IsString:
                 if (ToString().CompareTo(strValue.ToString()) < 0)
                     return true;
                 break;
@@ -113,7 +113,7 @@ public partial class JSObject
 
         return value switch
         {
-            JSString strValue when ToString().CompareTo(strValue.ToString()) <= 0 => true,
+            JSValue strValue when strValue.IsString && ToString().CompareTo(strValue.ToString()) <= 0 => true,
             _ => false,
         };
     }
@@ -122,7 +122,7 @@ public partial class JSObject
     {
         return value switch
         {
-            JSString strValue when ToString().CompareTo(strValue.ToString()) > 0 => true,
+            JSValue strValue when strValue.IsString && ToString().CompareTo(strValue.ToString()) > 0 => true,
             _ => false,
         };
     }
@@ -134,7 +134,7 @@ public partial class JSObject
 
         return value switch
         {
-            JSString strValue when ToString().CompareTo(strValue.ToString()) >= 0 => true,
+            JSValue strValue when strValue.IsString && ToString().CompareTo(strValue.ToString()) >= 0 => true,
             _ => false,
         };
     }

@@ -87,7 +87,7 @@ public class JSException : Exception
                 top = top.Parent;
             }
 
-            return new JSString(sb.ToString());
+            return JSValue.CreateString(sb.ToString());
         }
     }
 
