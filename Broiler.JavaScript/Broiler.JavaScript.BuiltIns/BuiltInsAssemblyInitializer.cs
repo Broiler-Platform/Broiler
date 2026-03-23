@@ -10,7 +10,7 @@ using Broiler.JavaScript.BuiltIns.Iterator;
 using Broiler.JavaScript.BuiltIns.Map;
 using Broiler.JavaScript.BuiltIns.Set;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.BigInt;
+using Broiler.JavaScript.BuiltIns.BigInt;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Global;

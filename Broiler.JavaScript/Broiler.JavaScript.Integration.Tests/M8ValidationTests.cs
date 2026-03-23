@@ -157,8 +157,8 @@ public class M8ValidationTests
             typeof(Broiler.JavaScript.BuiltIns.Map.JSMap).Namespace);
         Assert.StartsWith("Broiler.JavaScript.BuiltIns",
             typeof(Broiler.JavaScript.BuiltIns.Set.JSSet).Namespace);
-        Assert.StartsWith("Broiler.JavaScript.Core.Core",
-            typeof(Broiler.JavaScript.Core.Core.BigInt.JSBigInt).Namespace);
+        Assert.StartsWith("Broiler.JavaScript.BuiltIns",
+            typeof(Broiler.JavaScript.BuiltIns.BigInt.JSBigInt).Namespace);
     }
 
     [Fact]
