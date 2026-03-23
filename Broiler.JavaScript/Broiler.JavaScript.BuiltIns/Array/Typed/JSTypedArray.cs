@@ -12,6 +12,7 @@ using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Typed;
+using Broiler.JavaScript.BuiltIns.Number;
 
 namespace Broiler.JavaScript.BuiltIns.Array.Typed;
 

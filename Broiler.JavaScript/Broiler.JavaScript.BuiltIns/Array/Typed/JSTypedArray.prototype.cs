@@ -10,6 +10,7 @@ using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.Core;
+using Broiler.JavaScript.BuiltIns.Number;
 
 namespace Broiler.JavaScript.BuiltIns.Array.Typed;
 

@@ -4,6 +4,7 @@ using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
 using System;
 using System.Globalization;
+using Broiler.JavaScript.BuiltIns.Number;
 
 namespace Broiler.JavaScript.BuiltIns.Date;
 
