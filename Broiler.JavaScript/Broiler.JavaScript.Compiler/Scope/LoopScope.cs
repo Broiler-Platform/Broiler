@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Core.CodeGen;
+namespace Broiler.JavaScript.Compiler;
 
 public class LoopScope(YLabelTarget breakTarget, YLabelTarget continueTarget, bool isSwitch = false, string name = null) : LinkedStackItem<LoopScope>
 {

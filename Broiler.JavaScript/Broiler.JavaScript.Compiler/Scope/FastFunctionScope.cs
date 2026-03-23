@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Threading;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
-using Broiler.JavaScript.Core.CodeGen;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;

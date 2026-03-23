@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Broiler.JavaScript.Core.Core.Array;
+namespace Broiler.JavaScript.Core.Core;
 
 public class JSSpreadValue(JSValue value) : JSValue(null)
 {

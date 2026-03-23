@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.ComponentModel;
-using Broiler.JavaScript.Core.CodeGen;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.Core.Debugger;

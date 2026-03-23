@@ -1,6 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core;
-
-namespace Broiler.JavaScript.Core.CodeGen;
+﻿namespace Broiler.JavaScript.Core.Core;
 
 public class ScriptInfo
 {

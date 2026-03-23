@@ -522,8 +522,8 @@ A rigorous analysis of all 49 candidate files classified each type as "compilati
 | **LinqExpressions/** (all builders) | 34 | Mixed | `JSFunction.cs` uses `ClrProxyBuilder.Marshal()` and `ArgumentsBuilder.New()` at runtime for CLR delegate creation. `BinaryOperation.cs`, `ExpressionHelper.cs` reference builders for expression building. | ❌ No |
 | **LinqExpressions/GeneratorsV2/** | 7 | Compiler-only | None | ✅ Yes (but coupled to other builders) |
 | **Emit/** | 2 | Core runtime | `JSContext.CodeCache` set at instantiation; `CoreScriptCoreExtensions` wires `DictionaryCodeCache` via module initializer | ❌ No |
-| **CodeGen/LoopScope** | 1 | Compiler-only | None | ✅ Yes |
-| **CodeGen/ScriptInfo** | 1 | Core runtime | `JSContext.cs` delegate signature, `CallStackItem.cs` constructor parameter | ❌ No |
+| **CodeGen/LoopScope** | 1 | Compiler-only | None | ✅ Moved to Compiler/Scope/ |
+| **CodeGen/ScriptInfo** | 1 | Runtime data type | `JSContext.cs` delegate signature, `CallStackItem.cs` constructor parameter | ✅ Moved to Runtime/ |
 | **LambdaGen/** | 1 | Compiler-only | None | ✅ Yes (but coupled to builders) |
 | **TypeQuery/** | 1 | Compiler-only | None | ✅ Yes (but coupled to builders) |
 | **FastParser/Compiler/** | 1 | Core runtime | Instantiated via `CoreScriptCoreExtensions` module initializer | ❌ No |
@@ -533,17 +533,17 @@ A rigorous analysis of all 49 candidate files classified each type as "compilati
 
 1. **Runtime coupling in `JSFunction.cs`** (lines 349, 357): The `CreateClrDelegate()` method uses `ClrProxyBuilder.Marshal()` to marshal CLR parameters and `ArgumentsBuilder.New()` to create argument wrappers. This is invoked at **runtime** when a JSFunction is converted to a .NET delegate — not at compile time.
 
-2. **`ScriptInfo` is a runtime data type** used as a parameter type in `JSContext.JSClosureFunctionDelegate` and in `CallStackItem`'s constructor. It cannot move to Compiler without creating a circular dependency.
+2. **`ScriptInfo` is a runtime data type** used as a parameter type in `JSContext.JSClosureFunctionDelegate` and in `CallStackItem`'s constructor. It was moved to the Runtime assembly (namespace `Broiler.JavaScript.Core.Core`) alongside `JSValue` and `Arguments`.
 
 3. **`DictionaryCodeCache`** is set on `JSContext.CodeCache` at context instantiation time — a runtime operation. `JSDebugger.RaiseBreak()` is called by compiled IL code at runtime.
 
-4. **Moveable-but-coupled types**: `LoopScope`, `GeneratorsV2/`, `LambdaGen/`, and `TypeQuery/` are compiler-only, but they are tightly coupled to the LinqExpressions builders that must stay in Core. Moving them alone would split a cohesive subsystem across assemblies with no architectural benefit.
+4. **Moveable-but-coupled types**: `GeneratorsV2/`, `LambdaGen/`, and `TypeQuery/` are compiler-only, but they are tightly coupled to the LinqExpressions builders that must stay in Core. `LoopScope` was moved to the Compiler assembly since it is only used by compiler code. `JSSpreadValue` was moved to the Runtime assembly as it extends `JSValue`.
 
 5. **No new CodeGen assembly** is viable because builders reference Core types (`JSValue`, `JSContext`, etc.), so a CodeGen assembly would need to reference Core, and Core would need to reference CodeGen (for `JSFunction.cs`), creating a **circular dependency**.
 
 **Decision (Step 9.2):**
 
-Keep all LinqExpressions builders, CodeGen, LambdaGen, TypeQuery, Emit, FastParser/Compiler, and Debugger types in Core. The runtime coupling through `JSFunction.CreateClrDelegate()` and `ScriptInfo` data type usage prevents clean extraction to Compiler, and a new intermediate assembly would create a circular dependency. The 2–4 files that could theoretically move (LoopScope, BinaryOperation) provide insufficient benefit to justify the type-forwarding overhead and subsystem fragmentation.
+Keep all LinqExpressions builders, LambdaGen, TypeQuery, Emit, FastParser/Compiler, and Debugger types in Core. The runtime coupling through `JSFunction.CreateClrDelegate()` prevents clean extraction of builders to Compiler, and a new intermediate assembly would create a circular dependency. `LoopScope` was moved to Compiler (compiler-only usage), `ScriptInfo` to Runtime (runtime data type), and `JSSpreadValue` to Runtime (extends `JSValue`).
 
 **Future Consideration:** If `JSFunction.CreateClrDelegate()` is refactored to use a delegate-based factory pattern (similar to `JSValue.CreateBigIntFactory`), the builder coupling could be broken. This would require:
 - A `Func<Expression, Expression>` delegate for `ClrProxyBuilder.Marshal`
@@ -683,7 +683,7 @@ Added `Broiler.JavaScript.ExpressionCompiler/README.md` documenting:
 **Validation Test Summary:**
 
 19 tests in `Broiler.JavaScript.Integration.Tests/Phase2ValidationTests.cs`:
-- M9 (4 tests): Builders remain in Core, ScriptInfo in Core, DictionaryCodeCache in Core, no circular Compiler↔Core dependency
+- M9 (4 tests): Builders remain in Core, ScriptInfo moved to Runtime, DictionaryCodeCache in Core, no circular Compiler↔Core dependency
 - M10 (5 tests): JSArray/JSDate/JSString partial file splits verified, JSObject/JSObjectStatic splits verified
 - M12 (3 tests): FastCompiler partial class merging works, initializer accessible, namespaces unchanged
 - M13 (2 tests): ExpressionCompiler remains monolithic, is leaf dependency

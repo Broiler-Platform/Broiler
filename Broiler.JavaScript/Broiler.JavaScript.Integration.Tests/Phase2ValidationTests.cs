@@ -39,12 +39,13 @@ public class Phase2ValidationTests
     }
 
     [Fact]
-    public void M9_RuntimeCoupling_ScriptInfoInCore()
+    public void M9_RuntimeCoupling_ScriptInfoInRuntime()
     {
-        // ScriptInfo must remain in Core because JSContext uses it as a delegate
-        // parameter type. Verify it exists in Core assembly.
-        var coreAssembly = typeof(JSContext).Assembly;
-        var scriptInfoType = coreAssembly.GetTypes()
+        // ScriptInfo is a runtime data type used in JSContext delegate signatures
+        // and CallStackItem constructors. It now lives in the Runtime assembly
+        // alongside JSValue, Arguments, and other core runtime types.
+        var runtimeAssembly = typeof(JSValue).Assembly;
+        var scriptInfoType = runtimeAssembly.GetTypes()
             .FirstOrDefault(t => t.Name == "ScriptInfo");
         Assert.NotNull(scriptInfoType);
     }
