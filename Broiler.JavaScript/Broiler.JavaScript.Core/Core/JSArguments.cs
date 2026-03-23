@@ -1,6 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Core.Generator;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Core.Core;
@@ -27,7 +26,7 @@ public class JSArguments: JSObject
         properties.Put(KeyStrings.callee, Callee, Callee, JSPropertyAttributes.Property);
 
         ref var symbols = ref GetSymbols();
-        symbols.Put(JSValue.SymbolIterator.Key) = JSProperty.Property(new JSFunction(Values), JSPropertyAttributes.ConfigurableValue);
+        symbols.Put(JSValue.SymbolIterator.Key) = JSProperty.Property(JSValue.CreateFunction(Values), JSPropertyAttributes.ConfigurableValue);
         ref var elements = ref CreateElements();
         
         for (int i = 0; i < args.Length; i++)

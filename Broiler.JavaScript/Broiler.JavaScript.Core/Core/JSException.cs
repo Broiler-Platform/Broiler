@@ -5,7 +5,6 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Core.Core.Error;
-using Broiler.JavaScript.Core.Core.Function;
 
 namespace Broiler.JavaScript.Core.Core;
 
@@ -107,7 +106,7 @@ public class JSException : Exception
     public static JSValue ThrowSyntaxError(string value) => throw JSContext.NewSyntaxError(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSFunction ThrowNotFunction(JSValue value) => throw JSContext.NewTypeError($"{value} is not a function");
+    internal static JSValue ThrowNotFunction(JSValue value) => throw JSContext.NewTypeError($"{value} is not a function");
 
     public static JSException FromValue(JSValue value)
     {

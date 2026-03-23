@@ -41,7 +41,6 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
             sb = sb.AppendLine("using System.Collections.Generic;")
                 .AppendLine("using System.Runtime.CompilerServices;")
                 .AppendLine("using Broiler.JavaScript.Core.Core;")
-            .AppendLine("using Broiler.JavaScript.Core.Core.Function;")
                         .AppendLine("using Broiler.JavaScript.Core.Utils;")
         .AppendLine("using Broiler.JavaScript.Core.Core.Primitive;")
 
@@ -74,7 +73,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
                 }
                 else
                 {
-                    sb = sb.AppendLine($"protected override JSValue GetCurrentPrototype() => (JSContext.Current?[{names.GetOrCreateName(className)}] as JSFunction)?.prototype;");
+                    sb = sb.AppendLine($"protected override JSValue GetCurrentPrototype() => JSContext.Current?[{names.GetOrCreateName(className)}]?.FunctionPrototype;");
                 }
 
                 sb = sb.AppendLine($"internal protected {type.Name}(JSObject prototype = null): base(prototype) {{}}");
@@ -82,7 +81,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
                 // sb = sb.AppendLine($"protected {type.Name}(JSObject prototype): base(prototype ?? throw new System.ArgumentException(\"Prototype not specified...\")) {{}}");
             }
 
-            var createClassReturnType = "JSFunction";
+            var createClassReturnType = "JSValue";
             if (type.InternalClass || type.Globals)
             {
                 createClassReturnType = "JSObject";
@@ -122,33 +121,33 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
                 }
                 var fxToString = $"function {className}() {{ [native code] }}";
 
-                var clrFunctionType = type.GenerateClass ? "JSClassFunction" : "JSFunction";
+                var clrFactoryMethod = type.GenerateClass ? "CreateClassFunction" : "CreateFunction";
 
                 if (type.ConstructorMethod == null)
                 {
 
                     sb.AppendLine($@"
-                        var @class = new {clrFunctionType}((in Arguments a) => new {type.Name}(in a)
+                        var @class = (JSObject)JSValue.{clrFactoryMethod}((in Arguments a) => new {type.Name}(in a)
                             , ""{className}""
                             , ""{fxToString}""
                             {l});
                         if (register) {{
                             context[Names.{className}] = @class;
                         }}
-                        var prototype = @class.prototype;
+                        var prototype = (JSObject)@class.FunctionPrototype;
                         ");
                 }
                 else
                 {
                     sb.AppendLine($@"
-                        var @class = new {clrFunctionType}({type.Name}.{type.ConstructorMethod}
+                        var @class = (JSObject)JSValue.{clrFactoryMethod}({type.Name}.{type.ConstructorMethod}
                             , ""{className}""
                             , ""{fxToString}""
                             {l});
                         if (register) {{
                             context[Names.{className}] = @class;
                         }}
-                        var prototype = @class.prototype;
+                        var prototype = (JSObject)@class.FunctionPrototype;
                         ");
 
                 }
@@ -158,11 +157,11 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
             {
                 if (type.BaseJSClassName != "Object")
                 {
-                    sb.AppendLine($" var @base = context[\"{type.BaseJSClassName}\"] as JSFunction;");
+                    sb.AppendLine($" var @base = (JSObject)context[\"{type.BaseJSClassName}\"];");
                     sb = sb.AppendLine($"@class.SetPrototypeOf(@base);");
                     if (!type.InternalClass)
                     {
-                        sb = sb.AppendLine($"prototype.SetPrototypeOf(@base.prototype);");
+                        sb = sb.AppendLine($"prototype.SetPrototypeOf((JSObject)@base.FunctionPrototype);");
                     }
                 }
             }
@@ -249,14 +248,14 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
 
         if (!method.IsStatic)
         {
-            getter = @$"new JSFunction((in Arguments a) =>
+            getter = @$"(JSObject)JSValue.CreateFunction((in Arguments a) =>
                     a.This is {type.Name} @this
                         ? {clrProxyMarshal}
                         : {t} ,
                 ""get {name}"")";
             if (!method.IsReadOnly)
             {
-                setter = @$"new JSFunction((in Arguments a) => {{
+                setter = @$"(JSObject)JSValue.CreateFunction((in Arguments a) => {{
                     if(a.This is {type.Name} @this) {{
                          {access} = {toClr};
                     }}
@@ -268,12 +267,12 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
         }
         else
         {
-            getter = @$"new JSFunction((in Arguments a) =>
+            getter = @$"(JSObject)JSValue.CreateFunction((in Arguments a) =>
                     {clrProxyMarshal},
                 ""get {name}"")";
             if (!method.IsReadOnly)
             {
-                setter = @$"new JSFunction((in Arguments a) => {{
+                setter = @$"(JSObject)JSValue.CreateFunction((in Arguments a) => {{
                     {access} = {toClr};
                     return JSUndefined.Value;
                 }},
@@ -311,14 +310,14 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
 
         if (!method.IsStatic)
         {
-            getter = @$"new JSFunction((in Arguments a) =>
+            getter = @$"(JSObject)JSValue.CreateFunction((in Arguments a) =>
                     a.This is {type.Name} @this
                         ? {clrProxyMarshal}
                         : {t} ,
                 ""get {name}"")";
             if (!method.IsReadOnly)
             {
-                setter = @$"new JSFunction((in Arguments a) => {{
+                setter = @$"(JSObject)JSValue.CreateFunction((in Arguments a) => {{
                     if(a.This is {type.Name} @this) {{
                          {access} = {toClr};
                     }}
@@ -330,12 +329,12 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
         }
         else
         {
-            getter = @$"new JSFunction((in Arguments a) =>
+            getter = @$"(JSObject)JSValue.CreateFunction((in Arguments a) =>
                     {clrProxyMarshal},
                 ""get {name}"")";
             if (!method.IsReadOnly)
             {
-                setter = @$"new JSFunction((in Arguments a) => {{
+                setter = @$"(JSObject)JSValue.CreateFunction((in Arguments a) => {{
                     {access} = {toClr};
                     return JSUndefined.Value;
                 }},
@@ -388,19 +387,16 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
     {
         var method = e.Method!;
 
-        var l = $",\"function {name}() {{ [native] }}\", createPrototype: false";
-        if (e?.Length != null && e.Length.Length > 0)
-        {
-            l += ", length: " + e.Length;
-        }
+        var lengthVal = (e?.Length != null && e.Length.Length > 0) ? e.Length : "0";
+        var l = $",\"function {name}() {{ [native] }}\", {lengthVal}, false";
 
         var t = $"throw JSContext.NewTypeError(\"Failed to convert this to {type.Name}\")";
         if (method.IsJSFunction())
         {
-            var fx = $"new JSFunction({type.Name}.{method.Name}, \"{name}\" {l})";
+            var fx = $"(JSObject)JSValue.CreateFunction({type.Name}.{method.Name}, \"{name}\" {l})";
             if (!method.IsStatic)
             {
-                fx = @$"new JSFunction((in Arguments a) =>
+                fx = @$"(JSObject)JSValue.CreateFunction((in Arguments a) =>
                     a.This is {type.Name} @this
                         ? @this.{method.Name}(in a)
                         : {t}
@@ -448,7 +444,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
         }
         fb.AppendLine("}");
 
-        var body = @$"new JSFunction({fb.ToString().Replace("\n", "\n\t\t\t")},
+        var body = @$"(JSObject)JSValue.CreateFunction({fb.ToString().Replace("\n", "\n\t\t\t")},
                 ""{method.Name}""
                 {l}
             )";

@@ -2,14 +2,14 @@
 using Broiler.JavaScript.Core.Core.Clr;
 using System;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.ExpressionCompiler;
 
 namespace Broiler.JavaScript.Core.Utils;
 
 [JSBaseClass("Function")]
 [JSFunctionGenerator("Assert")]
-public partial class JSAssert : JSFunction
+public partial class JSAssert : JSObject
 {
     [JSExport(IsConstructor = true)]
     public static JSValue Assert(in Arguments args)

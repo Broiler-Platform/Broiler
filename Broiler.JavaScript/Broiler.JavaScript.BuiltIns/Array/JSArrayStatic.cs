@@ -3,7 +3,7 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Error;
-using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.BuiltIns.Function;
 using System;
 using Broiler.JavaScript.BuiltIns.Number;
 

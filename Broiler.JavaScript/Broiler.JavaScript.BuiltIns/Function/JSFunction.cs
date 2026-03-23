@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
@@ -12,8 +12,10 @@ using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.ExpressionCompiler.Runtime;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Storage;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core;
 
-namespace Broiler.JavaScript.Core.Core.Function;
+namespace Broiler.JavaScript.BuiltIns.Function;
 
 
 [JSBaseClass("Object")]
@@ -48,6 +50,23 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
 
     public override JSValue TypeOf() => JSConstants.Function;
 
+    /// <summary>
+    /// Gets or sets the function's <c>prototype</c> object.
+    /// </summary>
+    public override JSValue FunctionPrototype
+    {
+        get => prototype;
+        set => prototype = value as JSObject;
+    }
+
+    /// <summary>
+    /// Gets or sets the underlying <see cref="JSFunctionDelegate"/> for this function.
+    /// </summary>
+    public override JSFunctionDelegate FunctionDelegate
+    {
+        get => f;
+        set => f = value;
+    }
 
     /// <summary>
     /// Used as specific type constructor.

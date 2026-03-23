@@ -5,6 +5,7 @@ using Broiler.JavaScript.BuiltIns.Date;
 using Broiler.JavaScript.BuiltIns.Debug;
 using Broiler.JavaScript.BuiltIns.Decimal;
 using Broiler.JavaScript.BuiltIns.Disposable;
+using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.BuiltIns.Intl;
 using Broiler.JavaScript.BuiltIns.Iterator;
 using Broiler.JavaScript.BuiltIns.Map;
@@ -47,6 +48,26 @@ internal static class BuiltInsAssemblyInitializer
         // Wire factory delegate for the Intl global object so JSGlobalStatic
         // does not directly reference JSIntl.
         JSGlobalStatic.IntlFactory = static () => JSContext.ClrInterop.GetClrType(typeof(JSIntl));
+
+        // Wire factory delegates for JSFunction, JSClassFunction, and JSClass so Core
+        // and other assemblies can create function values without referencing the
+        // concrete types directly.
+        JSValue.CreateFunctionFactory = static (f, name, source, length, createPrototype) =>
+            new JSFunction(f, name, source, length, createPrototype);
+        JSValue.CreateClassFunctionFactory = static (f, name, source, length) =>
+            new JSClassFunction(f, name, source, length);
+        JSValue.CreateClassFactory = static (fx, super_, name, code) =>
+            new JSClass(fx, (JSFunction)super_, name, code);
+
+        // Initialize JSFunctionBuilder and JSClassBuilder with the concrete types so the
+        // Compiler can build expression trees without a direct reference.
+        JSFunctionBuilder.Initialize(typeof(JSFunction));
+        JSClassBuilder.Initialize(typeof(JSClass));
+
+        // Wire factory delegate for JSFunction.CreateClass so JSContext can bootstrap
+        // the Function built-in without referencing the concrete type.
+        JSValue.CreateFunctionClassFactory = static (ctx, register) =>
+            JSFunction.CreateClass((JSContext)ctx, register);
 
         // Wire factory delegate for JSDate so Core/Clr can create
         // Date values without referencing the concrete type directly.

@@ -10,7 +10,6 @@ using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.Core.Debugger;
 using Broiler.JavaScript.Core.Emit;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Storage;
 
@@ -94,11 +93,11 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
     public CallStackItem Top;
 
-    public static JSFunction NewTarget => Current.Top.NewTarget;
+    public static JSValue NewTarget => Current.Top.NewTarget;
 
-    public static JSObject NewTargetPrototype => Current.Top?.NewTarget?.prototype;
+    public static JSObject NewTargetPrototype => (JSObject)Current.Top?.NewTarget?.FunctionPrototype;
 
-    internal JSFunction CurrentNewTarget;
+    internal JSValue CurrentNewTarget;
 
 
     public event EventHandler<EvalEventArgs> EvalEvent;
@@ -120,7 +119,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
     public readonly JSObject FunctionPrototype;
     public new readonly JSObject ObjectPrototype;
-    public readonly JSFunction Object;
+    public readonly JSObject Object;
     public event LogEventHandler Log;
     public event ErrorEventHandler Error;
     public event ConsoleEvent ConsoleEvent;
@@ -158,9 +157,9 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
     public JSContext(SynchronizationContext synchronizationContext = null)
     {
-        // Ensure the BuiltIns assembly is loaded before any JSFunction
+        // Ensure the BuiltIns assembly is loaded before any
         // construction, so that factory delegates (CreateNumber, etc.) are
-        // available for JSFunction CreateClass calls below.
+        // available for CreateFunctionClassFactory calls below.
         DefaultBuiltInRegistry.EnsureBuiltInsAssemblyLoaded();
 
         this.synchronizationContext = synchronizationContext ?? SynchronizationContext.Current;
@@ -170,12 +169,12 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
         ref var ownProperties = ref GetOwnProperties();
 
-        var func = JSFunction.CreateClass(this, false);
+        var func = JSValue.CreateFunctionClassFactory(this, false);
         this[Names.Function] = func;
-        FunctionPrototype = func.prototype;
-        Object = CreateClass(this, false);
+        FunctionPrototype = (JSObject)func.FunctionPrototype;
+        Object = (JSObject)CreateClass(this, false);
         this[Names.Object] = Object;
-        ObjectPrototype = Object.prototype;
+        ObjectPrototype = (JSObject)Object.FunctionPrototype;
         ObjectPrototype.BasePrototypeObject = null;
 
         func.BasePrototypeObject = Object;
@@ -185,7 +184,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
         // the BuiltIns assembly's RegisterBuiltInClasses pipeline.
         BuiltInRegistry.Register(this);
 
-        this[KeyStrings.debug] = new JSFunction(Debug);
+        this[KeyStrings.debug] = JSValue.CreateFunction(Debug);
 
     }
 
@@ -237,7 +236,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
     }
 
 
-    static readonly ConcurrentUInt32Map<JSFunction> cache = ConcurrentUInt32Map<JSFunction>.Create();
+    static readonly ConcurrentUInt32Map<JSValue> cache = ConcurrentUInt32Map<JSValue>.Create();
     internal readonly SynchronizationContext synchronizationContext;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -273,7 +272,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
     private static long nextTimeout = 1;
     private static long nextInterval = 1;
 
-    internal long PostTimeout(int delay, JSFunction f, in Arguments a)
+    internal long PostTimeout(int delay, JSValue f, in Arguments a)
     {
         var ctx = synchronizationContext ?? throw NewTypeError($"Synchronization context must be present to set timeout");
         var key = Interlocked.Increment(ref nextTimeout);
@@ -311,7 +310,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
         return key;
     }
-    internal long SetInterval(int delay, JSFunction f, in Arguments a)
+    internal long SetInterval(int delay, JSValue f, in Arguments a)
     {
         var ctx = synchronizationContext ?? throw NewTypeError($"Synchronization context must be present to set timeout");
         var key = Interlocked.Increment(ref nextInterval);
@@ -407,14 +406,14 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
         promise = new JSPromise((resolve, reject) =>
         {
-            var resolveF = new JSFunction((in Arguments a) =>
+            var resolveF = JSValue.CreateFunction((in Arguments a) =>
             {
                 var a1 = a.Get1();
                 resolve(a1);
                 return a1;
             });
 
-            var rejectF = new JSFunction((in Arguments a) =>
+            var rejectF = JSValue.CreateFunction((in Arguments a) =>
             {
                 var a1 = a.Get1();
                 reject(a1);

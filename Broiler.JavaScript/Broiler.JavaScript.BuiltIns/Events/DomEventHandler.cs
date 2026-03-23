@@ -1,6 +1,6 @@
 ﻿#nullable enable
 using Broiler;
-using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.BuiltIns.Function;
 
 namespace Broiler.JavaScript.BuiltIns.Events;
 

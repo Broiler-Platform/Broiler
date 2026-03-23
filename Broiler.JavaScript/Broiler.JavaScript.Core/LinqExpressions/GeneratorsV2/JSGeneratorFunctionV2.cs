@@ -1,7 +1,6 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using System;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
 using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Ast.Misc;
@@ -10,15 +9,18 @@ namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 
 public delegate GeneratorState JSGeneratorDelegateV2(ClrGeneratorV2 generator, in Arguments a, int nextJump, JSValue nextValue, Exception ex);
 
-public class JSGeneratorFunctionV2 : JSFunction
+public class JSGeneratorFunctionV2 : JSObject
 {
     readonly JSGeneratorDelegateV2 @delegate;
+    public readonly string name;
 
-    public JSGeneratorFunctionV2(JSGeneratorDelegateV2 @delegate, in StringSpan name, in StringSpan code) : base(null, name, code)
+    public JSGeneratorFunctionV2(JSGeneratorDelegateV2 @delegate, in StringSpan name, in StringSpan code) : base()
     {
         this.@delegate = @delegate;
-        f = InvokeFunction;
+        this.name = name.Value ?? "anonymous";
     }
+
+    public override bool IsFunction => true;
 
     public override JSValue InvokeFunction(in Arguments a) => new JSGenerator(new ClrGeneratorV2(this, @delegate, a));
 }

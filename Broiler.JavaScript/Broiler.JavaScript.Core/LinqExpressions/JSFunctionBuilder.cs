@@ -3,28 +3,50 @@ using System.Reflection;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LambdaGen;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public class JSFunctionBuilder
 {
-    static Type type = typeof(JSFunction);
+    static Type type;
 
-    public static FieldInfo _prototype = type.PublicField(nameof(JSFunction.prototype));
+    public static FieldInfo _prototype;
+
+    private static FieldInfo _f;
+
+    private static MethodInfo invokeFunction;
+
+    private static MethodInfo _invokeSuperConstructor;
+
+    private static ConstructorInfo _newFull;
+
+    /// <summary>
+    /// Initializes the builder with the concrete JSFunction type.
+    /// Called by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static void Initialize(Type functionType)
+    {
+        type = functionType;
+        _prototype = type.GetField("prototype");
+        _f = type.GetField("f", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        invokeFunction = typeof(JSValue).GetMethod(nameof(JSValue.InvokeFunction), [typeof(Arguments).MakeByRefType()]);
+        _invokeSuperConstructor = type.GetMethod("InvokeSuperConstructor",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
+            null, [typeof(JSValue), typeof(JSValue), typeof(Arguments).MakeByRefType()], null);
+        _newFull = type.GetConstructor([typeof(JSFunctionDelegate), typeof(string), typeof(string), typeof(int), typeof(bool)]);
+    }
 
     public static Expression Prototype(Expression target) => Expression.Field(target, _prototype);
 
-    private static FieldInfo _f = type.InternalField(nameof(JSFunction.f));
-
-    private static MethodInfo invokeFunction = typeof(JSValue).InternalMethod(nameof(JSFunction.InvokeFunction), ArgumentsBuilder.refType);
-
-    private static MethodInfo _invokeSuperConstructor = typeof(JSFunction).PublicMethod(nameof(JSFunction.InvokeSuperConstructor),
-            typeof(JSValue), typeof(JSValue), typeof(Arguments).MakeByRefType());
-
-    public static Expression InvokeSuperConstructor(Expression super, Expression returnValue, Expression args) => Expression.Assign(returnValue,
-            super.CallExpression<JSFunction, JSValue>(() => (x) => x.InvokeSuper(Arguments.Empty), args));
+    public static Expression InvokeSuperConstructor(Expression super, Expression returnValue, Expression args)
+    {
+        // InvokeSuper is an instance method on JSFunction
+        var invokeSuperMethod = type.GetMethod("InvokeSuper",
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance,
+            null, [typeof(Arguments).MakeByRefType()], null);
+        return Expression.Assign(returnValue, Expression.Call(super, invokeSuperMethod, args));
+    }
 
     public static Expression InvokeFunction(Expression target, Expression args, bool coalesce = false)
     {
@@ -34,12 +56,12 @@ public class JSFunctionBuilder
             var pe = pes[0];
 
             return Expression.Block(pes.AsSequence(), Expression.Assign(pe, target), Expression.Condition(JSValueBuilder.IsNullOrUndefined(pe),
-                JSUndefinedBuilder.Value, pe.CallExpression<JSFunction, Arguments, JSValue>(() => (x, a) => x.InvokeFunction(a), args)));
+                JSUndefinedBuilder.Value, Expression.Call(pe, invokeFunction, args)));
         }
 
-        return target.CallExpression<JSFunction, Arguments, JSValue>(() => (x, a) => x.InvokeFunction(a), args);
+        return Expression.Call(target, invokeFunction, args);
     }
 
     public static Expression New(Expression del, Expression name, Expression code, int length) =>
-        NewLambdaExpression.NewExpression<JSFunction>(() => () => new JSFunction(null, "", "", 0, false), del, name, code, Expression.Constant(length), Expression.Constant(true));
+        Expression.New(_newFull, del, name, code, Expression.Constant(length), Expression.Constant(true));
 }
