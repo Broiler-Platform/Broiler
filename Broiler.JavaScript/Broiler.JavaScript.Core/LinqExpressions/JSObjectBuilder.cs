@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler.Core;
@@ -14,26 +13,42 @@ namespace Broiler.JavaScript.Core.LinqExpressions;
 public class JSObjectBuilder
 {
     readonly static Type type = typeof(JSObject);
-    readonly static Type typeExtensions = typeof(JSObjectExtensions);
+    static Type typeExtensions;
     readonly static ConstructorInfo _New = type.Constructor();
 
-    readonly static MethodInfo _FastAddSetterUInt =
-        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddSetter), typeof(JSObject), typeof(uint), typeof(JSFunction), typeof(JSPropertyAttributes));
+    static MethodInfo _FastAddSetterUInt;
+    static MethodInfo _FastAddGetterUInt;
+    static MethodInfo _FastAddSetterKeyString;
+    static MethodInfo _FastAddGetterKeyString;
+    static MethodInfo _FastAddSetterValue;
+    static MethodInfo _FastAddGetterValue;
 
-    readonly static MethodInfo _FastAddGetterUInt =
-        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddGetter), typeof(JSObject), typeof(uint), typeof(JSFunction), typeof(JSPropertyAttributes));
+    /// <summary>
+    /// Initializes the builder with the concrete JSObjectExtensions type.
+    /// Called by the Extensions assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static void Initialize(Type extensionsType)
+    {
+        typeExtensions = extensionsType;
 
-    readonly static MethodInfo _FastAddSetterKeyString =
-        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddSetter), typeof(JSObject), typeof(KeyString), typeof(JSFunction), typeof(JSPropertyAttributes));
+        _FastAddSetterUInt =
+            extensionsType.GetMethod("FastAddSetter", [typeof(JSObject), typeof(uint), typeof(JSFunction), typeof(JSPropertyAttributes)]);
 
-    readonly static MethodInfo _FastAddGetterKeyString =
-        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddGetter), typeof(JSObject), typeof(KeyString), typeof(JSFunction), typeof(JSPropertyAttributes));
+        _FastAddGetterUInt =
+            extensionsType.GetMethod("FastAddGetter", [typeof(JSObject), typeof(uint), typeof(JSFunction), typeof(JSPropertyAttributes)]);
 
-    readonly static MethodInfo _FastAddSetterValue =
-        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddSetter), typeof(JSObject), typeof(JSValue), typeof(JSFunction), typeof(JSPropertyAttributes));
+        _FastAddSetterKeyString =
+            extensionsType.GetMethod("FastAddSetter", [typeof(JSObject), typeof(KeyString), typeof(JSFunction), typeof(JSPropertyAttributes)]);
 
-    readonly static MethodInfo _FastAddGetterValue =
-        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddGetter), typeof(JSObject), typeof(JSValue), typeof(JSFunction), typeof(JSPropertyAttributes));
+        _FastAddGetterKeyString =
+            extensionsType.GetMethod("FastAddGetter", [typeof(JSObject), typeof(KeyString), typeof(JSFunction), typeof(JSPropertyAttributes)]);
+
+        _FastAddSetterValue =
+            extensionsType.GetMethod("FastAddSetter", [typeof(JSObject), typeof(JSValue), typeof(JSFunction), typeof(JSPropertyAttributes)]);
+
+        _FastAddGetterValue =
+            extensionsType.GetMethod("FastAddGetter", [typeof(JSObject), typeof(JSValue), typeof(JSFunction), typeof(JSPropertyAttributes)]);
+    }
 
     readonly static MethodInfo _FastAddValueUInt =
         type.PublicMethod(nameof(JSObject.FastAddValue), typeof(uint), typeof(JSValue), typeof(JSPropertyAttributes));

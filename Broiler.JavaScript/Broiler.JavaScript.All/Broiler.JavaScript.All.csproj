@@ -13,6 +13,7 @@
     <ProjectReference Include="..\Broiler.JavaScript.Modules\Broiler.JavaScript.Modules.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.ModuleExtensions\Broiler.JavaScript.ModuleExtensions.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.BuiltIns\Broiler.JavaScript.BuiltIns.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.Extensions\Broiler.JavaScript.Extensions.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Debugger\Broiler.JavaScript.Debugger.csproj" />
   </ItemGroup>
 
