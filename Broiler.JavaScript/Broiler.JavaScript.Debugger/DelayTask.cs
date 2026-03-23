@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Debugger;
 
 public class DelayTask
 {

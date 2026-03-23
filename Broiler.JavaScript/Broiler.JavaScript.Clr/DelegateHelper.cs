@@ -5,7 +5,7 @@ using System;
 using System.Reflection;
 using Broiler.JavaScript.ExpressionCompiler;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Clr;
 
 public static class DelegateHelper
 {
