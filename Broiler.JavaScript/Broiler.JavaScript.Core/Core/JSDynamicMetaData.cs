@@ -5,7 +5,6 @@ using System.Dynamic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using Broiler.JavaScript.Core.Core.Boolean;
 
 namespace Broiler.JavaScript.Core.Core;
 
@@ -37,7 +36,7 @@ internal class JSDynamicMetaData : DynamicMetaObject
                 int i => new JSNumber(i),
                 float f => new JSNumber(f),
                 decimal ds => new JSNumber((double)ds),
-                bool b => b ? JSBoolean.True : JSBoolean.False,
+                bool b => b ? JSValue.BooleanTrue : JSValue.BooleanFalse,
                 string s => new JSString(s),
                 JSValue v => v,
                 _ => throw new NotSupportedException($"Cannot convert type {p.GetType()} to JSValue"),

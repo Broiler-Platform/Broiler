@@ -6,7 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Boolean;
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.BuiltIns.Array;

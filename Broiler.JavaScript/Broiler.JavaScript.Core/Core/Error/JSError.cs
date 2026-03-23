@@ -1,4 +1,3 @@
-﻿using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.ExpressionCompiler;
@@ -58,7 +57,7 @@ public partial class JSError : JSObject
     internal static JSValue IsError(in Arguments a)
     {
         var arg = a.Get1();
-        return arg is JSError ? JSBoolean.True : JSBoolean.False;
+        return arg is JSError ? JSValue.BooleanTrue : JSValue.BooleanFalse;
     }
 
     [JSExport("toString")]

@@ -1,7 +1,6 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Primitive;
 using System;
-using Broiler.JavaScript.Core.Core.Boolean;
 
 namespace Broiler.JavaScript.Core.Utils;
 
@@ -11,7 +10,7 @@ public class TypeConverter
     {
         null => JSNull.Value,
         JSValue jv => jv,
-        bool b1 => b1 ? JSBoolean.True : JSBoolean.False,
+        bool b1 => b1 ? JSValue.BooleanTrue : JSValue.BooleanFalse,
         uint ui1 => new JSNumber(ui1),
         int i1 => new JSNumber(i1),
         float f1 => new JSNumber(f1),

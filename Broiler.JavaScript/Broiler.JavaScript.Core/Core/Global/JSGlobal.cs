@@ -4,7 +4,6 @@ using System.Threading;
 using System.Collections.Generic;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.ExpressionCompiler;
@@ -77,8 +76,8 @@ public partial class JSGlobalStatic
 
     [JSExport("isNaN", Length = 1)]
     public static JSValue IsNaN(in Arguments a) => double.IsNaN(a.Get1().DoubleValue)
-            ? JSBoolean.True
-            : JSBoolean.False;
+            ? JSValue.BooleanTrue
+            : JSValue.BooleanFalse;
 
     [JSExport("parseFloat", Length = 1)]
     public static JSValue ParseFloat(in Arguments a) => JSNumber.ParseFloat(a);
@@ -180,7 +179,7 @@ public partial class JSGlobalStatic
         if (value == null || value.IsNullOrUndefined)
             return value;
 
-        if (value is JSNumber || value is JSString || value is JSBoolean)
+        if (value is JSNumber || value is JSString || value.IsBoolean)
             return value;
 
         if (value.TypeOf() == JSConstants.BigInt)

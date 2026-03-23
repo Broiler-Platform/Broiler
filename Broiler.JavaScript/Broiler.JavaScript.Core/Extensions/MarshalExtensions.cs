@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Core.Extensions;
@@ -22,7 +21,7 @@ public static class MarshalExtensions
     public static JSValue Marshal(this string value) => new JSString(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue Marshal(this bool value) => value ? JSBoolean.True : JSBoolean.False;
+    public static JSValue Marshal(this bool value) => value ? JSValue.BooleanTrue : JSValue.BooleanFalse;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSValue Marshal(this int value) => new JSNumber(value);

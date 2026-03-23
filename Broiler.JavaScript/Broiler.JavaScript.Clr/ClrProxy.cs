@@ -11,7 +11,6 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Ast.Misc;
 
@@ -77,7 +76,7 @@ public partial class ClrProxy : JSObject
     public static JSValue Marshal(ulong value) => new JSNumber(value);
     public static JSValue Marshal(string value) => new JSString(value);
     public static JSValue Marshal(in StringSpan value) => new JSString(value);
-    public static JSValue Marshal(bool value) => value ? JSBoolean.True : JSBoolean.False;
+    public static JSValue Marshal(bool value) => value ? JSValue.BooleanTrue : JSValue.BooleanFalse;
     public static JSValue Marshal(short value) => new JSNumber(value);
     public static JSValue Marshal(ushort value) => new JSNumber(value);
     public static JSValue Marshal(byte value) => new JSNumber(value);
@@ -112,7 +111,7 @@ public partial class ClrProxy : JSObject
 
         return t switch
         {
-            TypeCode.Boolean => (bool)value ? JSBoolean.True : JSBoolean.False,
+            TypeCode.Boolean => (bool)value ? JSValue.BooleanTrue : JSValue.BooleanFalse,
             TypeCode.Byte => new JSNumber((byte)value),
             TypeCode.Char => new JSString((char)value),
             TypeCode.DateTime => JSValue.CreateDate(new DateTimeOffset((DateTime)value)),

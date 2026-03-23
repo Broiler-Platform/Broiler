@@ -1,3 +1,4 @@
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using System.Runtime.CompilerServices;
@@ -623,6 +624,13 @@ public class BuiltInsTests
     /// which triggers their ModuleInitializers.
     /// </summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
+    [Fact]
+    public void JSBoolean_TrueAndFalse()
+    {
+        Assert.True(JSBoolean.True.BooleanValue);
+        Assert.False(JSBoolean.False.BooleanValue);
+    }
+
     private static void EnsureBuiltInsLoaded()
     {
         // Load CLR assembly so JSContext.ClrInterop is properly configured

@@ -1,4 +1,3 @@
-﻿using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Extensions;
@@ -43,7 +42,7 @@ public partial class JSGenerator : JSObject
         done = true;
         this.value = JSUndefined.Value;
 
-        return NewWithProperties().AddProperty(KeyStrings.value, value).AddProperty(KeyStrings.done, done ? JSBoolean.True : JSBoolean.False);
+        return NewWithProperties().AddProperty(KeyStrings.value, value).AddProperty(KeyStrings.done, done ? JSValue.BooleanTrue : JSValue.BooleanFalse);
     }
 
     public JSValue Throw(JSValue value)
@@ -52,7 +51,7 @@ public partial class JSGenerator : JSObject
         return value;
     }
 
-    public JSValue ValueObject => NewWithProperties().AddProperty(KeyStrings.value, value).AddProperty(KeyStrings.done, done ? JSBoolean.True : JSBoolean.False);
+    public JSValue ValueObject => NewWithProperties().AddProperty(KeyStrings.value, value).AddProperty(KeyStrings.done, done ? JSValue.BooleanTrue : JSValue.BooleanFalse);
 
     public bool MoveNext(JSValue replaceOld, out JSValue item)
     {
