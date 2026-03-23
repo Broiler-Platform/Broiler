@@ -229,7 +229,7 @@ public class ClrType : JSFunction
 
         if (disposableType.IsAssignableFrom(type) && type.GetInterfaceMap(disposableType).InterfaceMethods.Length != 0)
         {
-            target.FastAddValue(JSSymbol.dispose, new JSFunction((in Arguments a) =>
+            target.FastAddValue(JSValue.SymbolDispose, new JSFunction((in Arguments a) =>
             {
                 if (a.This is ClrProxy p && p.value is IDisposable d)
                     d.Dispose();
@@ -240,7 +240,7 @@ public class ClrType : JSFunction
 
         if (asyncDisposableType.IsAssignableFrom(type) && type.GetInterfaceMap(typeof(IAsyncDisposable)).InterfaceMethods.Length != 0)
         {
-            target.FastAddValue(JSSymbol.asyncDispose, new JSFunction((in Arguments a) =>
+            target.FastAddValue(JSValue.SymbolAsyncDispose, new JSFunction((in Arguments a) =>
             {
                 if (a.This is ClrProxy p && p.value is IAsyncDisposable d)
                     return ClrProxy.From(d.DisposeAsync().AsTask());

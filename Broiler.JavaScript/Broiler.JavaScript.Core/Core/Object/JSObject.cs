@@ -13,7 +13,7 @@ using System.Threading;
 namespace Broiler.JavaScript.Core;
 
 
-internal delegate void PropertyChangedEventHandler(JSObject sender, (uint keyString, uint index, JSSymbol symbol) index);
+internal delegate void PropertyChangedEventHandler(JSObject sender, (uint keyString, uint index, IJSSymbol symbol) index);
 
 [JSBaseClass("Object")]
 [JSFunctionGenerator("Object", Register = false)]

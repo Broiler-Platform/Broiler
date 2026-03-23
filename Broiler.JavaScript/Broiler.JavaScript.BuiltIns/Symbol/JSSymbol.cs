@@ -1,9 +1,10 @@
-﻿using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.ExpressionCompiler;
 using System;
 using System.Threading;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.BuiltIns.Symbol;
 
 [JSBaseClass("Object")]
 [JSFunctionGenerator("Symbol")]

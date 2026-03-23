@@ -59,7 +59,7 @@ public partial class JSObject
         return new JSProperty();
     }
 
-    internal JSProperty GetInternalProperty(JSSymbol key, bool inherited = true)
+    internal JSProperty GetInternalProperty(IJSSymbol key, bool inherited = true)
     {
         if (symbols.TryGetValue(key.Key, out var r))
             return r;

@@ -42,7 +42,7 @@ public class JSObjectBuilder
         type.PublicMethod(nameof(JSObject.FastAddValue), typeof(KeyString), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddValueKeySymbol =
-        type.PublicMethod(nameof(JSObject.FastAddValue), typeof(JSSymbol), typeof(JSValue), typeof(JSPropertyAttributes));
+        type.PublicMethod(nameof(JSObject.FastAddValue), typeof(IJSSymbol), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddValueKeyValue =
         type.PublicMethod(nameof(JSObject.FastAddValue), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes));
@@ -54,7 +54,7 @@ public class JSObjectBuilder
         type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(KeyString), typeof(JSFunction), typeof(JSFunction), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddPropertySymbol =
-        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(JSSymbol), typeof(JSFunction), typeof(JSFunction), typeof(JSPropertyAttributes));
+        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(IJSSymbol), typeof(JSFunction), typeof(JSFunction), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddPropertyValue =
         type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(JSValue), typeof(JSFunction), typeof(JSFunction), typeof(JSPropertyAttributes));

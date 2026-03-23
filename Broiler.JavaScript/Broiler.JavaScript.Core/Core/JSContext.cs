@@ -161,7 +161,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
     {
         // Ensure the BuiltIns assembly is loaded before any JSFunction
         // construction, so that factory delegates (CreateNumber, etc.) are
-        // available for JSFunction/JSSymbol.CreateClass calls below.
+        // available for JSFunction CreateClass calls below.
         DefaultBuiltInRegistry.EnsureBuiltInsAssemblyLoaded();
 
         this.synchronizationContext = synchronizationContext ?? SynchronizationContext.Current;
@@ -171,7 +171,6 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
         ref var ownProperties = ref GetOwnProperties();
 
-        this[Names.Symbol] = JSSymbol.CreateClass(this, false);
         var func = JSFunction.CreateClass(this, false);
         this[Names.Function] = func;
         FunctionPrototype = func.prototype;
@@ -183,6 +182,8 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
         func.BasePrototypeObject = Object;
         FunctionPrototype.BasePrototypeObject = ObjectPrototype;
 
+        // Symbol and all other built-in types are registered here via
+        // the BuiltIns assembly's RegisterBuiltInClasses pipeline.
         BuiltInRegistry.Register(this);
 
         this[KeyStrings.debug] = new JSFunction(Debug);

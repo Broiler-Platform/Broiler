@@ -16,7 +16,7 @@ public class V8RemoteObject
     public string Description { get; set; }
     public string SubType { get; set; }
 
-    private static JSSymbol systemID = new("Debugger.ObjectID");
+    private static readonly IJSSymbol systemID = (IJSSymbol)JSValue.CreateSymbolFactory("Debugger.ObjectID");
 
     public static List<V8RemoteObject> From(in Arguments a)
     {
@@ -96,11 +96,11 @@ public class V8RemoteObject
         }
 
         Type = "object";
-        var id = v[(IJSSymbol)systemID];
+        var id = v[systemID];
         if (id.IsUndefined)
         {
             var idStr = GCHandle.ToIntPtr(GCHandle.Alloc(v, GCHandleType.Normal)).ToInt64().ToString();
-            v[(IJSSymbol)systemID] = JSValue.CreateString(idStr);
+            v[systemID] = JSValue.CreateString(idStr);
             ObjectId = idStr;
         }
         else

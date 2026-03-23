@@ -109,7 +109,7 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
 
         // Iterator.prototype[Symbol.iterator] returns `this`.
         ref var symbols = ref proto.GetSymbols();
-        symbols.Put(JSSymbol.iterator.Key) = JSProperty.Property(new JSFunction((in Arguments a) => a.This, "Symbol.iterator"), JSPropertyAttributes.ConfigurableValue);
+        symbols.Put(JSValue.SymbolIterator.Key) = JSProperty.Property(new JSFunction((in Arguments a) => a.This, "Symbol.iterator"), JSPropertyAttributes.ConfigurableValue);
 
         // Register prototype helper methods via delegate (wired by BuiltIns assembly)
         // so they work on any iterator (generators, user iterators, etc.).

@@ -94,7 +94,7 @@ public class JSPrototype : IJSPrototype
     }
 
     JSValue IJSPrototype.Object => @object;
-    JSProperty IJSPrototype.GetInternalProperty(IJSSymbol symbol) => GetInternalProperty((JSSymbol)symbol);
+    JSProperty IJSPrototype.GetInternalProperty(IJSSymbol symbol) => GetInternalProperty(symbol);
     JSProperty IJSPrototype.GetInternalProperty(in KeyString name) => GetInternalProperty(name);
     JSProperty IJSPrototype.GetInternalProperty(uint name) => GetInternalProperty(name);
     JSFunctionDelegate IJSPrototype.GetMethod(in KeyString key) => GetMethod(key);
@@ -102,7 +102,7 @@ public class JSPrototype : IJSPrototype
 
     internal void Dirty() => dirty = true;
 
-    private void @object_PropertyChanged(JSObject sender, (uint keyString, uint index, JSSymbol symbol) index) => dirty = true;
+    private void @object_PropertyChanged(JSObject sender, (uint keyString, uint index, IJSSymbol symbol) index) => dirty = true;
 
     internal JSProperty GetInternalProperty(in KeyString name)
     {
@@ -118,7 +118,7 @@ public class JSPrototype : IJSPrototype
         return propertySet.elements[name].property;
     }
 
-    internal JSProperty GetInternalProperty(JSSymbol symbol)
+    internal JSProperty GetInternalProperty(IJSSymbol symbol)
     {
         Build();
         return propertySet.symbols[symbol.Key].property;
