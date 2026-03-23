@@ -186,54 +186,6 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
     /// </summary>
     internal static Func<string, IJSSymbol> GetGlobalSymbolFactory;
 
-    // ── JSFunction factory infrastructure ──
-    // Wired by the BuiltIns assembly's ModuleInitializer so that Core and
-    // other assemblies can create JSFunction/JSClass/JSClassFunction instances
-    // without depending on the concrete types directly.
-
-    /// <summary>
-    /// Factory delegate for creating a <c>JSFunction</c> from a delegate, name, source, length, and createPrototype flag.
-    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
-    /// </summary>
-    internal static Func<JSFunctionDelegate, string, string, int, bool, JSValue> CreateFunctionFactory;
-
-    /// <summary>
-    /// Factory delegate for creating a <c>JSClassFunction</c> from a delegate, name, source, and length.
-    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
-    /// </summary>
-    internal static Func<JSFunctionDelegate, string, string, int, JSValue> CreateClassFunctionFactory;
-
-    /// <summary>
-    /// Factory delegate for creating a <c>JSClass</c> from a delegate, super function, name, and code.
-    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
-    /// </summary>
-    internal static Func<JSFunctionDelegate, JSValue, string, string, JSValue> CreateClassFactory;
-
-    /// <summary>
-    /// Creates a <c>JSFunction</c> via the registered factory delegate.
-    /// </summary>
-    public static JSValue CreateFunction(JSFunctionDelegate f, string name = "native", string source = null, int length = 0, bool createPrototype = true)
-        => CreateFunctionFactory(f, name, source, length, createPrototype);
-
-    /// <summary>
-    /// Creates a <c>JSClassFunction</c> via the registered factory delegate.
-    /// </summary>
-    public static JSValue CreateClassFunction(JSFunctionDelegate f, string name, string source, int length = 0)
-        => CreateClassFunctionFactory(f, name, source, length);
-
-    /// <summary>
-    /// Creates a <c>JSClass</c> via the registered factory delegate.
-    /// </summary>
-    public static JSValue CreateClass(JSFunctionDelegate fx, JSValue super, string name, string code = "")
-        => CreateClassFactory(fx, super, name, code);
-
-    /// <summary>
-    /// Factory delegate for bootstrapping the <c>Function</c> built-in class.
-    /// Mirrors <c>JSFunction.CreateClass</c>.
-    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
-    /// </summary>
-    internal static Func<IJSContext, bool, JSValue> CreateFunctionClassFactory;
-
     /// <summary>Gets whether this value is the <c>undefined</c> singleton.</summary>
     public bool IsUndefined
     {
@@ -286,28 +238,6 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
 
     /// <summary>Gets whether this value is a JavaScript function.</summary>
     public virtual bool IsFunction => false;
-
-    /// <summary>
-    /// Gets or sets the function's <c>prototype</c> object.
-    /// Overridden by <c>JSFunction</c> in the BuiltIns assembly.
-    /// Returns <c>null</c> by default for non-function values.
-    /// </summary>
-    public virtual JSValue FunctionPrototype
-    {
-        get => null;
-        set { }
-    }
-
-    /// <summary>
-    /// Gets or sets the underlying <see cref="JSFunctionDelegate"/> for this function.
-    /// Overridden by <c>JSFunction</c> in the BuiltIns assembly.
-    /// Returns <c>null</c> by default for non-function values.
-    /// </summary>
-    public virtual JSFunctionDelegate FunctionDelegate
-    {
-        get => null;
-        set { }
-    }
 
     /// <summary>Gets whether this value is a JavaScript <c>Decimal</c> (ES2025 Decimal128).</summary>
     public virtual bool IsDecimal => false;

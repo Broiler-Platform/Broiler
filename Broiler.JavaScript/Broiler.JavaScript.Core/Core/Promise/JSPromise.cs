@@ -1,5 +1,6 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Error;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.ExpressionCompiler;
@@ -43,8 +44,8 @@ public partial class JSPromise : JSObject
 
     private Sequence<Reaction> thenList;
     private Sequence<Reaction> rejectList;
-    JSValue resolveFunction;
-    JSValue rejectFunction;
+    JSFunction resolveFunction;
+    JSFunction rejectFunction;
     internal JSValue result = JSUndefined.Value;
 
     static long nextPromiseID = 1;
@@ -134,13 +135,13 @@ public partial class JSPromise : JSObject
 
         RegisterPromise();
 
-        resolveFunction = JSValue.CreateFunction((in Arguments a) =>
+        resolveFunction = new JSFunction((in Arguments a) =>
         {
             Resolve(a.Get1());
             return JSUndefined.Value;
         });
 
-        rejectFunction = JSValue.CreateFunction((in Arguments a) =>
+        rejectFunction = new JSFunction((in Arguments a) =>
         {
             Reject(a.Get1());
             return JSUndefined.Value;

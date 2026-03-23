@@ -1,4 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Core.Core.Object;
 using Broiler.JavaScript.Core.Core.Primitive;
@@ -78,7 +79,7 @@ public partial class JSObject
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void FastAddProperty(uint index, JSValue getter, JSValue setter, JSPropertyAttributes attributes) => elements.Put(index) = new JSProperty(index, getter, setter, getter, attributes);
+    public void FastAddProperty(uint index, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes) => elements.Put(index) = new JSProperty(index, getter, setter, getter, attributes);
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -90,7 +91,7 @@ public partial class JSObject
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void FastAddProperty(KeyString key, JSValue getter, JSValue setter, JSPropertyAttributes attributes)
+    public void FastAddProperty(KeyString key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes)
     {
         ref var pr = ref GetOwnProperties(true);
         pr.Put(key.Key) = new JSProperty(key, getter, setter, attributes);
@@ -106,7 +107,7 @@ public partial class JSObject
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void FastAddProperty(IJSSymbol key, JSValue getter, JSValue setter, JSPropertyAttributes attributes)
+    public void FastAddProperty(IJSSymbol key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes)
     {
         ref var pr = ref GetSymbols();
         pr.Put(key.Key) = new JSProperty(key.Key, getter, setter, getter, attributes);
@@ -135,7 +136,7 @@ public partial class JSObject
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void FastAddProperty(JSValue key, JSValue getter, JSValue setter, JSPropertyAttributes attributes)
+    public void FastAddProperty(JSValue key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes)
     {
         var k = key.ToKey(true);
         switch (k.Type)
@@ -216,7 +217,7 @@ public partial class JSObject
         {
             if (p.set != null)
             {
-                ((JSValue)p.set).FunctionDelegate(new Arguments(receiver ?? this, value));
+                ((JSFunction)p.set).f(new Arguments(receiver ?? this, value));
                 return true;
             }
 
@@ -272,7 +273,7 @@ public partial class JSObject
         {
             if (p.set != null)
             {
-                ((JSValue)p.set).FunctionDelegate(new Arguments(receiver ?? this, value));
+                ((JSFunction)p.set).f(new Arguments(receiver ?? this, value));
                 return true;
             }
 
@@ -309,7 +310,7 @@ public partial class JSObject
         {
             if (p.set != null)
             {
-                ((JSValue)p.set).FunctionDelegate(new Arguments(receiver ?? this, value));
+                ((JSFunction)p.set).f(new Arguments(receiver ?? this, value));
                 return true;
             }
 
@@ -355,7 +356,7 @@ public partial class JSObject
             if (p.IsValue)
                 return (JSValue)p.value;
 
-            return ((JSValue)p.get).InvokeFunction(new Arguments(receiver ?? this));
+            return ((JSFunction)p.get).InvokeFunction(new Arguments(receiver ?? this));
         }
 
         return base.GetValue(key, receiver, throwError);
@@ -428,12 +429,12 @@ public partial class JSObject
 
     internal JSProperty ToProperty(uint key)
     {
-        JSValue pget = null;
-        JSValue pset = null;
+        JSFunction pget = null;
+        JSFunction pset = null;
         JSValue pvalue = null;
         var value = this[KeyStrings.value];
-        var get = this[KeyStrings.get];
-        var set = this[KeyStrings.set];
+        var get = this[KeyStrings.get] as JSFunction;
+        var set = this[KeyStrings.set] as JSFunction;
         var pt = JSPropertyAttributes.Empty;
 
         if (this[KeyStrings.configurable].BooleanValue)
@@ -445,19 +446,19 @@ public partial class JSObject
         if (!this[KeyStrings.writable].BooleanValue)
             pt |= JSPropertyAttributes.Readonly;
 
-        if (get.IsFunction)
+        if (get != null)
         {
             pt |= JSPropertyAttributes.Property;
             pget = get;
         }
 
-        if (set.IsFunction)
+        if (set != null)
         {
             pt |= JSPropertyAttributes.Property;
             pset = set;
         }
 
-        if (!get.IsFunction && !set.IsFunction)
+        if (get == null && set == null)
         {
             pt |= JSPropertyAttributes.Value;
             pvalue = value;

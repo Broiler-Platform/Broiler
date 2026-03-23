@@ -1,5 +1,6 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Function;
 
 namespace Broiler.JavaScript.Core;
 
@@ -11,27 +12,27 @@ public partial class JSPromise
     {
         var (success, fail) = a.Get2();
 
-        if (!success.IsFunction)
+        if (success is not JSFunction successFx)
             throw JSContext.NewTypeError($"Parameter for then is not a function");
 
         if (!fail.IsUndefined)
         {
-            if (!fail.IsFunction)
+            if (fail is not JSFunction failFx)
                 throw JSContext.NewTypeError($"Parameter for then is not a function");
 
-            return Then(success.FunctionDelegate, fail.FunctionDelegate);
+            return Then(successFx.f, failFx.f);
         }
 
-        return Then(success.FunctionDelegate, null);
+        return Then(successFx.f, null);
     }
 
     [JSExport("catch")]
-    public JSValue Catch(JSValue fx)
+    public JSValue Catch(JSFunction fx)
     {
-        Then(null, fx.FunctionDelegate);
+        Then(null, fx.f);
         return this;
     }
 
     [JSExport("finally")]
-    public JSValue Finally(JSValue fx) => Then(fx.FunctionDelegate, fx.FunctionDelegate);
+    public JSValue Finally(JSFunction fx) => Then(fx.f, fx.f);
 }

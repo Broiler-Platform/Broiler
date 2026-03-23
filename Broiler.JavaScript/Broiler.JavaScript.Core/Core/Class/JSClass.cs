@@ -1,9 +1,8 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core.Function;
 
-namespace Broiler.JavaScript.BuiltIns.Function;
+namespace Broiler.JavaScript.Core.Core.Class;
 
 public class JSClass : JSFunction
 {

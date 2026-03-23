@@ -1,6 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using System.ComponentModel;
 using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Ast.Misc;
 
 namespace Broiler.JavaScript.Core.Core;
@@ -54,7 +55,7 @@ public class CallStackItem
     }
 
     public CallStackItem Parent;
-    public JSValue NewTarget;
+    public JSFunction NewTarget;
     public StringSpan Function;
     public int Line;
     public int Column;

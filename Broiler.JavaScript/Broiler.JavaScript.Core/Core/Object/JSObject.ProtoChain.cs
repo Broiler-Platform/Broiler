@@ -1,4 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Object;
 using Broiler.JavaScript.Core.Core.Storage;
 using System.Runtime.CompilerServices;
@@ -75,13 +76,13 @@ public partial class JSObject
             ref var p = ref ownProperties.GetValue(key.Key);
             if (p.IsValue)
             {
-                var g = p.get;
+                var g = (JSFunction)p.get;
                 if (g != null)
-                    return ((JSValue)g).FunctionDelegate;
+                    return g.f;
             }
 
             if (p.IsProperty)
-                return ((JSValue)p.get).FunctionDelegate;
+                return ((JSFunction)p.get).f;
         }
 
         return prototypeChain?.GetMethod(key);

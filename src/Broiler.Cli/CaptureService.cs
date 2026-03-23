@@ -12,6 +12,7 @@ using Broiler.JavaScript.Core;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Storage;
+using Broiler.JavaScript.BuiltIns.String;
 
 namespace Broiler.Cli;
 

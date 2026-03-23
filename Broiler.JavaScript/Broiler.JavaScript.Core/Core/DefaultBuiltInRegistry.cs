@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Storage;
 
@@ -101,24 +102,22 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
 
     private static void SetupIteratorPrototypeChain(JSContext context)
     {
-        if (!context[KeyStrings.GetOrCreate("Iterator")].IsFunction)
+        if (context[KeyStrings.GetOrCreate("Iterator")] is not JSFunction iteratorCtor)
             return;
 
-        var iteratorCtor = context[KeyStrings.GetOrCreate("Iterator")];
-        var proto = (JSObject)iteratorCtor.FunctionPrototype;
+        var proto = iteratorCtor.prototype;
 
         // Iterator.prototype[Symbol.iterator] returns `this`.
         ref var symbols = ref proto.GetSymbols();
-        symbols.Put(JSValue.SymbolIterator.Key) = JSProperty.Property(JSValue.CreateFunction((in Arguments a) => a.This, "Symbol.iterator"), JSPropertyAttributes.ConfigurableValue);
+        symbols.Put(JSValue.SymbolIterator.Key) = JSProperty.Property(new JSFunction((in Arguments a) => a.This, "Symbol.iterator"), JSPropertyAttributes.ConfigurableValue);
 
         // Register prototype helper methods via delegate (wired by BuiltIns assembly)
         // so they work on any iterator (generators, user iterators, etc.).
         IteratorPrototypeSetup?.Invoke(proto);
 
         // Generator.prototype → Iterator.prototype (§2.1.14).
-        var generatorCtor = context[Names.Generator];
-        if (generatorCtor.IsFunction)
-            ((JSObject)generatorCtor.FunctionPrototype).SetPrototypeOf(proto);
+        if (context[Names.Generator] is JSFunction generatorCtor)
+            generatorCtor.prototype.SetPrototypeOf(proto);
     }
 
     /// <summary>
@@ -127,6 +126,6 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
     /// </summary>
     public static void AddProto(JSObject proto, string name, JSFunctionDelegate fn)
     {
-        proto.FastAddValue(KeyStrings.GetOrCreate(name), JSValue.CreateFunction(fn, name, $"function {name}() {{ [native] }}", 0, false), JSPropertyAttributes.ConfigurableValue);
+        proto.FastAddValue(KeyStrings.GetOrCreate(name), new JSFunction(fn, name, $"function {name}() {{ [native] }}", createPrototype: false), JSPropertyAttributes.ConfigurableValue);
     }
 }

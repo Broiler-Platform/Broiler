@@ -4,6 +4,7 @@ using System;
 using System.Reflection;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 
 
@@ -33,7 +34,7 @@ public class JSContextBuilder
     private static PropertyInfo _Index = type.IndexProperty(typeof(KeyString));
     public static Expression Index(Expression key) => Expression.MakeIndex(Current, _Index, [key]);
 
-    public static Expression NewTarget() => Current.FieldExpression<JSContext, CallStackItem>(() => (x) => x.Top).FieldExpression<CallStackItem, JSValue>(() => (x) => x.NewTarget);
+    public static Expression NewTarget() => Current.FieldExpression<JSContext, CallStackItem>(() => (x) => x.Top).FieldExpression<CallStackItem, JSFunction>(() => (x) => x.NewTarget);
 
     public static Expression Register(ParameterExpression lScope, ParameterExpression variable) => lScope.CallExpression<JSContext, JSVariable, JSValue>(() => (x, a) => x.Register(a), variable);
 }

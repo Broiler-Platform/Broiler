@@ -2,13 +2,14 @@
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using System;
 using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Error;
 
 namespace Broiler.JavaScript.Core.Core.Generator;
 
 public class JSAsyncFunction
 {
-    public static JSValue Create(JSGeneratorFunctionV2 gf)
+    public static JSFunction Create(JSGeneratorFunctionV2 gf)
     {
         JSValue ToAsync(in Arguments a)
         {
@@ -16,7 +17,7 @@ public class JSAsyncFunction
             return ToPromise(gen!, JSUndefined.Value);
         }
 
-        return JSValue.CreateFunction(ToAsync, gf.name, 0);
+        return new JSFunction(ToAsync, gf.name, gf.Length);
     }
 
     private static JSValue ToPromise(JSGenerator gen, JSValue lastResult)
@@ -30,11 +31,11 @@ public class JSAsyncFunction
             if (then.IsUndefined)
                 return new JSPromise(r, JSPromise.PromiseState.Resolved);
 
-            r = r.InvokeMethod(in KeyStrings.then, JSValue.CreateFunction((in Arguments a) =>
+            r = r.InvokeMethod(in KeyStrings.then, new JSFunction((in Arguments a) =>
             {
                 return ToPromise(gen, a.Get1());
             }), 
-            JSValue.CreateFunction((in Arguments a) =>
+            new JSFunction((in Arguments a) =>
             {
                 gen.Throw(a.Get1());
                 return a.Get1();

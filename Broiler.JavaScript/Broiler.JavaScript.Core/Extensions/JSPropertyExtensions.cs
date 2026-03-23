@@ -1,4 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Storage;
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core.Primitive;
@@ -13,7 +14,7 @@ public static class JSPropertyExtensions
         if (p.IsEmpty)
             return JSUndefined.Value;
 
-        return !p.IsProperty ? (JSValue)p.value : ((JSValue)p.get).FunctionDelegate(new Arguments(target));
+        return !p.IsProperty ? (JSValue)p.value : ((JSFunction)p.get).f(new Arguments(target));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

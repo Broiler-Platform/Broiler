@@ -1,6 +1,7 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Error;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
 using System;
 using System.Threading.Tasks;
@@ -25,9 +26,9 @@ public partial class JSPromise
 
         return new JSPromise((resolve, reject) => then.Call(value, ToFunction(resolve), ToFunction(reject))).Task;
 
-        static JSValue ToFunction(Action<JSValue> action)
+        static JSFunction ToFunction(Action<JSValue> action)
         {
-            return JSValue.CreateFunction((in Arguments a) =>
+            return new JSFunction((in Arguments a) =>
             {
                 action(a[0]);
                 return JSUndefined.Value;
