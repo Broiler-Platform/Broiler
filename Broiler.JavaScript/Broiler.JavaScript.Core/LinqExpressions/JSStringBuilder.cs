@@ -18,7 +18,8 @@ public class JSStringBuilder
     internal static void Initialize(Type stringType)
     {
         type = stringType;
-        _ctor = type.GetConstructor([typeof(string)]);
+        _ctor = type.GetConstructor([typeof(string)])
+            ?? throw new InvalidOperationException($"JSString type {stringType.FullName} does not have a (string) constructor.");
     }
 
     public static Expression New(Expression exp)
