@@ -20,14 +20,8 @@ public partial class JSGlobalStatic
     [JSExport("NaN")]
     public static JSValue NaN = JSValue.NumberNaN;
 
-    /// <summary>
-    /// Factory delegate for creating the Intl global object.
-    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
-    /// </summary>
-    internal static Func<JSValue> IntlFactory { get; set; }
-
     [JSExport("Intl")]
-    public static JSValue Intl => IntlFactory?.Invoke() ?? JSUndefined.Value;
+    public static JSValue Intl => DefaultBuiltInRegistry.IntlFactory?.Invoke() ?? JSUndefined.Value;
 
     [JSExport("decodeURI", Length = 1)]
     public static JSValue DecodeURI(in Arguments a)

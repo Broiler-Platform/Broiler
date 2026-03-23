@@ -19,7 +19,6 @@ using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Disposable;
-using Broiler.JavaScript.Core.Core.Global;
 using Broiler.JavaScript.Core.LinqExpressions;
 
 namespace Broiler.JavaScript.BuiltIns;
@@ -45,9 +44,9 @@ internal static class BuiltInsAssemblyInitializer
         // instances via the IJSDisposableStack interface without referencing BuiltIns.
         IJSDisposableStack.CreateNew = static () => new JSDisposableStack();
 
-        // Wire factory delegate for the Intl global object so JSGlobalStatic
+        // Wire factory delegate for the Intl global object so the Globals assembly
         // does not directly reference JSIntl.
-        JSGlobalStatic.IntlFactory = static () => JSContext.ClrInterop.GetClrType(typeof(JSIntl));
+        DefaultBuiltInRegistry.IntlFactory = static () => JSContext.ClrInterop.GetClrType(typeof(JSIntl));
 
         // Wire factory delegate for JSDate so Core/Clr can create
         // Date values without referencing the concrete type directly.
