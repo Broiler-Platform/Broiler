@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.Core.Utils;
@@ -17,10 +16,10 @@ public partial class JSNumber
         if (a.Get1() is JSNumber n)
         {
             if (!double.IsNaN(n.value) && n.value > double.NegativeInfinity && n.value < double.PositiveInfinity)
-                return JSBoolean.True;
+                return JSValue.BooleanTrue;
         }
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     [JSExport("isInteger")]
@@ -34,11 +33,11 @@ public partial class JSNumber
             if (!double.IsInfinity(v))
             {
                 if (Math.Floor(v) == v)
-                    return JSBoolean.True;
+                    return JSValue.BooleanTrue;
             }
         }
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     [JSExport("isNaN")]
@@ -47,9 +46,9 @@ public partial class JSNumber
     {
         var first = a.GetAt(0);
         if (first.IsNumber)
-            return double.IsNaN(first.DoubleValue) ? JSBoolean.True : JSBoolean.False;
+            return double.IsNaN(first.DoubleValue) ? JSValue.BooleanTrue : JSValue.BooleanFalse;
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     [JSExport("isSafeInteger")]
@@ -61,11 +60,11 @@ public partial class JSNumber
             if (!double.IsInfinity(v))
             {
                 if (Math.Floor(v) == v && v >= MinSafeInteger && v <= MaxSafeInteger)
-                    return JSBoolean.True;
+                    return JSValue.BooleanTrue;
             }
         }
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     [JSExport("parseFloat")]

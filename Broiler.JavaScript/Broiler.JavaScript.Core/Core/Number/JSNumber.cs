@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
@@ -354,8 +353,7 @@ public sealed partial class JSNumber : JSPrimitive
                 when this.value == 0D:
                 return true;
 
-            case JSBoolean boolean
-                when this.value == (boolean._value ? 1D : 0D):
+            case JSValue boolVal when boolVal.IsBoolean && this.value == (boolVal.BooleanValue ? 1D : 0D):
                 return true;
         }
 
@@ -414,20 +412,20 @@ public sealed partial class JSNumber : JSPrimitive
 
     public override JSValue InvokeFunction(in Arguments a) => throw JSContext.NewTypeError($"{value} is not a function");
 
-    internal override JSBoolean Is(JSValue value)
+    internal override JSValue Is(JSValue value)
     {
         if (value is JSNumber number)
         {
             if (this.value == 0 || number.value == 0)
-                return BitConverter.DoubleToInt64Bits(this.value) == BitConverter.DoubleToInt64Bits(number.value) ? JSBoolean.True : JSBoolean.False;
+                return BitConverter.DoubleToInt64Bits(this.value) == BitConverter.DoubleToInt64Bits(number.value) ? JSValue.BooleanTrue : JSValue.BooleanFalse;
 
             if (double.IsNaN(this.value))
-                return double.IsNaN(number.value) ? JSBoolean.True : JSBoolean.False;
+                return double.IsNaN(number.value) ? JSValue.BooleanTrue : JSValue.BooleanFalse;
 
             if (this.value == number.value)
-                return JSBoolean.True;
+                return JSValue.BooleanTrue;
         }
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 }

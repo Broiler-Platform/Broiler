@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
 
@@ -16,8 +15,6 @@ internal static class JSValueCoreExtensions
     {
         JSValue.UndefinedValue = JSUndefined.Value;
         JSValue.NullValue = JSNull.Value;
-        JSValue.BooleanTrue = JSBoolean.True;
-        JSValue.BooleanFalse = JSBoolean.False;
         JSValue.NumberOne = JSNumber.One;
         JSValue.NumberNaN = JSNumber.NaN;
         JSValue.CreateNumber = v => new JSNumber(v);

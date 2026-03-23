@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Primitive;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -259,7 +258,7 @@ public static partial class JSValueExtensions
         }
     }
 
-    public static JSBoolean InstanceOf(this JSValue target, JSValue value)
+    public static JSValue InstanceOf(this JSValue target, JSValue value)
     {
         if (value.IsUndefined)
             throw JSContext.NewTypeError("Right side of instanceof is undefined");
@@ -272,19 +271,19 @@ public static partial class JSValueExtensions
 
         var p = (target.prototypeChain as JSPrototype)?.@object;
         if (p == null)
-            return JSBoolean.False;
+            return JSValue.BooleanFalse;
 
         var c = p[KeyStrings.constructor];
         if (c.IsUndefined)
-            return JSBoolean.False;
+            return JSValue.BooleanFalse;
 
         if (c.StrictEquals(value))
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
 
         return p.InstanceOf(value);
     }
 
-    public static JSBoolean IsIn(this JSValue target, JSValue value)
+    public static JSValue IsIn(this JSValue target, JSValue value)
     {
         if (value is not JSObject tx)
             throw JSContext.NewTypeError($"Cannot use 'in' operator to search for '{target}' in {value}");
@@ -294,15 +293,15 @@ public static partial class JSValueExtensions
         {
             var p = tx.GetInternalProperty(key.Index);
             if (!p.IsEmpty)
-                return JSBoolean.True;
+                return JSValue.BooleanTrue;
 
-            return JSBoolean.False;
+            return JSValue.BooleanFalse;
         }
 
         var p1 = tx.GetInternalProperty(in key.KeyString);
         if (!p1.IsEmpty)
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 }

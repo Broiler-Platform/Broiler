@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.ExpressionCompiler;
@@ -29,17 +28,17 @@ public partial class JSObject
     public static JSValue PropertyIsEnumerable(in Arguments a)
     {
         if(!a.This.TryAsObjectThrowIfNullOrUndefined(out var @object))
-            return JSBoolean.False;
+            return JSValue.BooleanFalse;
 
         if (a.Length > 0)
         {
             var text = a.Get1().ToString();
             var px = @object.GetInternalProperty(text, false);
             if (!px.IsEmpty && px.IsEnumerable)
-                return JSBoolean.True;
+                return JSValue.BooleanTrue;
         }
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     /// <summary>
@@ -68,7 +67,7 @@ public partial class JSObject
     internal static JSValue HasOwnProperty(in Arguments a)
     {
         if (!a.This.TryAsObjectThrowIfNullOrUndefined(out var @object))
-            return JSBoolean.False;
+            return JSValue.BooleanFalse;
 
         var first = a.Get1();
         var key = first.ToKey(false);
@@ -77,24 +76,24 @@ public partial class JSObject
             ref var elements = ref @object.GetElements();
             ref var property = ref elements.Get(key.Index);
             if (!property.IsEmpty)
-                return JSBoolean.True;
+                return JSValue.BooleanTrue;
 
-            return JSBoolean.False;
+            return JSValue.BooleanFalse;
         }
 
         if (key.IsSymbol)
         {
             ref var symbols = ref @object.GetSymbols();
             if (symbols.HasKey(key.Symbol.Key))
-                return JSBoolean.True;
-            return JSBoolean.False;
+                return JSValue.BooleanTrue;
+            return JSValue.BooleanFalse;
         }
 
         ref var op = ref @object.GetOwnProperties(false);
         if (op.HasKey(key.KeyString.Key))
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     [JSPrototypeMethod]
@@ -105,13 +104,13 @@ public partial class JSObject
     internal static JSValue IsPrototypeOf(in Arguments a)
     {
         if (!a.This.TryAsObjectThrowIfNullOrUndefined(out var @this))
-            return JSBoolean.False;
+            return JSValue.BooleanFalse;
 
         var first = a.Get1();
         while (true)
         {
             if (@this == (first.prototypeChain as JSPrototype)?.@object)
-                return JSBoolean.True;
+                return JSValue.BooleanTrue;
 
             if ((first.prototypeChain as JSPrototype)?.@object == first || (first.prototypeChain as JSPrototype)?.@object == null)
                 break;
@@ -119,6 +118,6 @@ public partial class JSObject
             first = (first.prototypeChain as JSPrototype)?.@object;
         }
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 }

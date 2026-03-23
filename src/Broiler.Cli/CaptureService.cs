@@ -8,7 +8,7 @@ using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Storage;
 using SkiaSharp;
 using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core.Boolean;
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Storage;
 

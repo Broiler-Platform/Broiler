@@ -1,6 +1,6 @@
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Boolean;
+
 
 namespace Broiler.JavaScript.Core.Tests;
 
@@ -48,8 +48,8 @@ public class CoreTests
     [Fact]
     public void JSBoolean_TrueAndFalse()
     {
-        Assert.True(JSBoolean.True.BooleanValue);
-        Assert.False(JSBoolean.False.BooleanValue);
+        Assert.True(JSValue.BooleanTrue.BooleanValue);
+        Assert.False(JSValue.BooleanFalse.BooleanValue);
     }
 
     [Fact]

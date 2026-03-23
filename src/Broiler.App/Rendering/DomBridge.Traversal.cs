@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core.Boolean;
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Storage;
 
@@ -45,7 +45,7 @@ public sealed partial class DomBridge
             // callbacks must propagate to the caller — they must NOT be swallowed.
             var result = filterFn.InvokeFunction(new Arguments(filterFn, ToJSObject(el)));
             // Handle boolean return: true → 1 (ACCEPT), false → 2 (REJECT)
-            if (result is JSBoolean)
+            if (result.IsBoolean)
                 return result.BooleanValue ? 1 : 2;
             return (int)result.DoubleValue;
         }
