@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
+using Broiler.JavaScript.Core.Core.Class;
 using Broiler.JavaScript.BuiltIns.Date;
 using Broiler.JavaScript.BuiltIns.Debug;
 using Broiler.JavaScript.BuiltIns.Decimal;
@@ -130,6 +131,10 @@ internal static class BuiltInsAssemblyInitializer
         // Initialize JSSymbolBuilder with the concrete JSSymbol type so the
         // ClassGenerator can emit symbol lookups without a direct reference.
         JSSymbolBuilder.Initialize(typeof(JSSymbol));
+
+        // Initialize JSClassBuilder with the concrete JSClass type so the
+        // Compiler can build class expression trees without a direct reference.
+        JSClassBuilder.Initialize(typeof(JSClass));
 
         // Wire JSConstants with concrete JSString instances.
         JSConstants.Decimal = new JSString("decimal");
