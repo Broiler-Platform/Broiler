@@ -5,7 +5,6 @@ using System.Threading;
 using System.Collections.Generic;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.ExpressionCompiler;
 
@@ -146,7 +145,7 @@ public partial class JSGlobalStatic
         var @this = a.This;
         var fx = a.Get1();
 
-        if (fx is not JSFunction f)
+        if (!fx.IsFunction)
             throw JSContext.NewTypeError("Argument is not a function");
 
         var c = JSContext.Current;
@@ -154,7 +153,7 @@ public partial class JSGlobalStatic
         {
             try
             {
-                f.f(new Arguments(_1 as JSValue));
+                fx.FunctionDelegate(new Arguments(_1 as JSValue));
             }
             catch (Exception ex)
             {
@@ -171,11 +170,11 @@ public partial class JSGlobalStatic
         var @this = a.This;
         var (fx, timeout) = a.Get2();
 
-        if (fx is not JSFunction f)
+        if (!fx.IsFunction)
             throw JSContext.NewTypeError("Argument is not a function");
 
         var delay = timeout.IsUndefined ? 0 : timeout.IntValue;
-        var key = JSContext.Current.SetInterval(delay, f, a);
+        var key = JSContext.Current.SetInterval(delay, fx, a);
 
         return JSValue.CreateBigInt(key);
     }
@@ -195,11 +194,11 @@ public partial class JSGlobalStatic
         var (fx, timeout) = a.Get2();
         var current = JSContext.Current;
 
-        if (fx is not JSFunction f)
+        if (!fx.IsFunction)
             throw JSContext.NewTypeError("Argument is not a function");
 
         var delay = timeout.IsUndefined ? 0 : timeout.IntValue;
-        var key = context.PostTimeout(delay, f, a);
+        var key = context.PostTimeout(delay, fx, a);
 
         return JSValue.CreateBigInt(key);
     }
@@ -241,7 +240,7 @@ public partial class JSGlobalStatic
             return value;
 
         // Functions cannot be cloned.
-        if (value is JSFunction)
+        if (value.IsFunction)
             throw JSContext.NewTypeError("structuredClone: function values cannot be cloned");
 
         // Check for circular references.

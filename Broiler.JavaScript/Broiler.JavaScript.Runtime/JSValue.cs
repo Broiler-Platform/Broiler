@@ -227,6 +227,13 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
     public static JSValue CreateClass(JSFunctionDelegate fx, JSValue super, string name, string code = "")
         => CreateClassFactory(fx, super, name, code);
 
+    /// <summary>
+    /// Factory delegate for bootstrapping the <c>Function</c> built-in class.
+    /// Mirrors <c>JSFunction.CreateClass</c>.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static Func<IJSContext, bool, JSValue> CreateFunctionClassFactory;
+
     /// <summary>Gets whether this value is the <c>undefined</c> singleton.</summary>
     public bool IsUndefined
     {

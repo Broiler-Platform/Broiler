@@ -2,7 +2,6 @@
 using Broiler.JavaScript.Core.Core.Storage;
 using System;
 using System.ComponentModel;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Core.Extensions;
@@ -11,7 +10,7 @@ namespace Broiler.JavaScript.Core.Extensions;
 public static class JSObjectExtensions
 {
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void FastAddSetter(JSObject target, KeyString key, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
+    public static void FastAddSetter(JSObject target, KeyString key, JSValue setter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
     {
         ref var pr = ref target.GetOwnProperties();
         ref var existing = ref pr.Put(key.Key);
@@ -21,7 +20,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void FastAddGetter(JSObject target, KeyString key, JSFunction getter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
+    public static void FastAddGetter(JSObject target, KeyString key, JSValue getter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
     {
         ref var pr = ref target.GetOwnProperties();
         ref var existing = ref pr.Put(key.Key);
@@ -31,7 +30,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void FastAddSetter(JSObject target, IJSSymbol key, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
+    public static void FastAddSetter(JSObject target, IJSSymbol key, JSValue setter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
     {
         ref var pr = ref target.GetSymbols();
         ref var existing = ref pr.Put(key.Key);
@@ -41,7 +40,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void FastAddGetter(JSObject target, IJSSymbol key, JSFunction getter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
+    public static void FastAddGetter(JSObject target, IJSSymbol key, JSValue getter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
     {
         ref var pr = ref target.GetSymbols();
         ref var existing = ref pr.Put(key.Key);
@@ -50,7 +49,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void FastAddSetter(JSObject target, uint key, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
+    public static void FastAddSetter(JSObject target, uint key, JSValue setter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
     {
         ref var pr = ref target.GetElements(true);
         ref var existing = ref pr.Put(key);
@@ -62,7 +61,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void FastAddGetter(JSObject target, uint key, JSFunction getter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
+    public static void FastAddGetter(JSObject target, uint key, JSValue getter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
     {
         ref var pr = ref target.GetElements(true);
         ref var existing = ref pr.Put(key);
@@ -74,7 +73,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void FastAddSetter(JSObject target, JSValue key, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
+    public static void FastAddSetter(JSObject target, JSValue key, JSValue setter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
     {
         var k = key.ToKey();
         switch (k.Type)
@@ -94,7 +93,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void FastAddGetter(JSObject target, JSValue key, JSFunction getter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
+    public static void FastAddGetter(JSObject target, JSValue key, JSValue getter, JSPropertyAttributes attributes = JSPropertyAttributes.ConfigurableProperty)
     {
         var k = key.ToKey();
         switch (k.Type)
@@ -121,7 +120,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static JSObject AddProperty(this JSObject target, in KeyString key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
+    public static JSObject AddProperty(this JSObject target, in KeyString key, JSValue getter, JSValue setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
     {
         ref var ownProperties = ref target.GetOwnProperties();
         ref var p = ref ownProperties.GetValue(key.Key);
@@ -143,7 +142,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static JSObject AddProperty(this JSObject target, uint key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
+    public static JSObject AddProperty(this JSObject target, uint key, JSValue getter, JSValue setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
     {
         ref var ownProperties = ref target.GetElements();
         ref var p = ref ownProperties.Get(key);
@@ -165,7 +164,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static JSObject AddProperty(this JSObject target, IJSSymbol key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
+    public static JSObject AddProperty(this JSObject target, IJSSymbol key, JSValue getter, JSValue setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
     {
         ref var ownProperties = ref target.GetSymbols();
         ref var p = ref ownProperties.GetRefOrDefault(key.Key, ref JSProperty.Empty);
@@ -193,7 +192,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static JSObject AddProperty(this JSObject target, JSValue name, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
+    public static JSObject AddProperty(this JSObject target, JSValue name, JSValue getter, JSValue setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
     {
         var key = name.ToKey();
         if (key.IsSymbol)

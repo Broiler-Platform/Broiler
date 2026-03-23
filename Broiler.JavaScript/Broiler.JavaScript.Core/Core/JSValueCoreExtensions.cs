@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
 
 namespace Broiler.JavaScript.Core.Core;
@@ -28,7 +27,7 @@ internal static class JSValueCoreExtensions
             }
             return null;
         };
-        JSValue.InvokePropertyGetter = (getter, receiver) => ((JSFunction)getter).InvokeFunction(new Arguments(receiver));
+        JSValue.InvokePropertyGetter = (getter, receiver) => ((JSValue)getter).InvokeFunction(new Arguments(receiver));
         JSValue.CreatePrototypeObject = value => (value as JSObject)?.PrototypeObject;
         Arguments.Empty = new Arguments(JSUndefined.Value);
         Arguments.ForApplyImpl = ArgumentsCoreExtensions.ForApplyCore;
