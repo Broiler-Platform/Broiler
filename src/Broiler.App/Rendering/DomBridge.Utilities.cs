@@ -11,6 +11,7 @@ using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Storage;
+using Broiler.JavaScript.BuiltIns.Array;
 
 namespace Broiler.App.Rendering;
 
