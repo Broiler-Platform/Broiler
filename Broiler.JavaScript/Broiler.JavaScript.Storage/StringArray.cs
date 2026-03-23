@@ -1,8 +1,7 @@
 ﻿using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.ExpressionCompiler.Core;
-using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Storage;
 
 public class StringArray
 {

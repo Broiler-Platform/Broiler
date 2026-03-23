@@ -1,6 +1,4 @@
-using Broiler.JavaScript.ExpressionCompiler.Expressions;
-
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public class ExpressionHolder
 {

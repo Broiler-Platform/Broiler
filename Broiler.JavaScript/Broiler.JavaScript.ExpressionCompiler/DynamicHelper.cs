@@ -1,8 +1,7 @@
 ﻿using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.ExpressionCompiler;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.ExpressionCompiler;
 
 internal static class DynamicHelper
 {
