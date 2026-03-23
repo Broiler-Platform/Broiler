@@ -277,7 +277,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
     {
         var ctx = synchronizationContext ?? throw NewTypeError($"Synchronization context must be present to set timeout");
         var key = Interlocked.Increment(ref nextTimeout);
-        JSValue[] args = JSArguments.Empty;
+        JSValue[] args = System.Array.Empty<JSValue>();
 
         if (a.Length > 2)
         {
@@ -315,7 +315,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
     {
         var ctx = synchronizationContext ?? throw NewTypeError($"Synchronization context must be present to set timeout");
         var key = Interlocked.Increment(ref nextInterval);
-        JSValue[] args = JSArguments.Empty;
+        JSValue[] args = System.Array.Empty<JSValue>();
 
         if (a.Length > 2)
         {
