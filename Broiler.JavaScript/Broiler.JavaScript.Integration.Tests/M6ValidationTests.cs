@@ -26,7 +26,7 @@ public class M6ValidationTests
     private static void EnsureAllAssembliesLoaded()
     {
         RuntimeHelpers.RunClassConstructor(
-            typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
+            typeof(Broiler.JavaScript.BuiltIns.Weak.JSWeakRef).TypeHandle);
         RuntimeHelpers.RunClassConstructor(
             typeof(Broiler.JavaScript.Clr.DefaultClrInterop).TypeHandle);
     }
