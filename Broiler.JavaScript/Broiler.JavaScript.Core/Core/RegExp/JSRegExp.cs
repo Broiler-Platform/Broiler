@@ -198,7 +198,7 @@ public partial class JSRegExp : JSObject
                     parameters[i] = new JSString(match.Groups[i].Value);
             }
 
-            parameters[match.Groups.Count] = new JSNumber(match.Index);
+            parameters[match.Groups.Count] = JSValue.CreateNumber(match.Index);
             parameters[match.Groups.Count + 1] = new JSString(input);
 
             var a = new Arguments(JSNull.Value, parameters);

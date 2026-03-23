@@ -32,10 +32,10 @@ internal class JSDynamicMetaData : DynamicMetaObject
 
             return p switch
             {
-                double d => new JSNumber(d),
-                int i => new JSNumber(i),
-                float f => new JSNumber(f),
-                decimal ds => new JSNumber((double)ds),
+                double d => JSValue.CreateNumber(d),
+                int i => JSValue.CreateNumber(i),
+                float f => JSValue.CreateNumber(f),
+                decimal ds => JSValue.CreateNumber((double)ds),
                 bool b => b ? JSValue.BooleanTrue : JSValue.BooleanFalse,
                 string s => new JSString(s),
                 JSValue v => v,
@@ -57,7 +57,7 @@ internal class JSDynamicMetaData : DynamicMetaObject
             case double d: return value[(uint)d];
             case decimal d1: return value[(uint)d1];
             case float f1: return value[(uint)f1];
-            case JSNumber jn: return value[(uint)jn.value];
+            case JSValue jn when jn.IsNumber: return value[(uint)jn.DoubleValue];
             case JSString js:
                 var key = js.ToKey();
                 return key.IsUInt ? value[key.Index] : value[key.KeyString];
@@ -79,7 +79,7 @@ internal class JSDynamicMetaData : DynamicMetaObject
             case double d: return target[(uint)d] = value;
             case decimal d1: return target[(uint)d1] = value;
             case float f1: return target[(uint)f1] = value;
-            case JSNumber jn: return target[(uint)jn.value] = value;
+            case JSValue jn when jn.IsNumber: return target[(uint)jn.DoubleValue] = value;
             case JSString js:
                 var key = js.ToKey();
                 if (key.IsSymbol)

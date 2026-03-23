@@ -73,7 +73,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
         ownProperties.Put(KeyStrings.prototype.Key) = JSProperty.Property(KeyStrings.prototype, prototype);
 
         FastAddValue(KeyStrings.name, name.IsEmpty ? new JSString("native") : new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
-        FastAddValue(KeyStrings.length, new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        FastAddValue(KeyStrings.length, JSValue.CreateNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
 
         constructor = this;
     }
@@ -100,7 +100,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
 
         ownProperties.Put(KeyStrings.prototype, prototype);
         ownProperties.Put(KeyStrings.name, name.IsEmpty ? new JSString("native") : new JSString(name));
-        ownProperties.Put(KeyStrings.length, JSNumber.Zero);
+        ownProperties.Put(KeyStrings.length, JSValue.NumberZero);
 
         constructor = this;
     }
@@ -130,7 +130,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
         }
 
         ownProperties.Put(KeyStrings.name, name.IsEmpty ? new JSString("native") : new JSString(name));
-        ownProperties.Put(KeyStrings.length, new JSNumber(length));
+        ownProperties.Put(KeyStrings.length, JSValue.CreateNumber(length));
 
         constructor = this;
     }
@@ -153,7 +153,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
         }
 
         ownProperties.Put(KeyStrings.name, name.IsEmpty ? new JSString("native") : new JSString(name), JSPropertyAttributes.ConfigurableValue);
-        ownProperties.Put(KeyStrings.length, new JSNumber(length), JSPropertyAttributes.ConfigurableValue);
+        ownProperties.Put(KeyStrings.length, JSValue.CreateNumber(length), JSPropertyAttributes.ConfigurableValue);
 
         constructor = this;
     }

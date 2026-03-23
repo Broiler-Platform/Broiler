@@ -26,21 +26,21 @@ internal sealed class FallbackClrInterop : IClrInterop
         return t switch
         {
             TypeCode.Boolean => (bool)value ? JSValue.BooleanTrue : JSValue.BooleanFalse,
-            TypeCode.Byte => new JSNumber((byte)value),
+            TypeCode.Byte => JSValue.CreateNumber((byte)value),
             TypeCode.Char => new JSString(value.ToString()),
             TypeCode.DateTime => JSValue.CreateDate(new DateTimeOffset((DateTime)value)),
             TypeCode.DBNull => JSNull.Value,
-            TypeCode.Decimal => new JSNumber((double)(decimal)value),
-            TypeCode.Double => new JSNumber((double)value),
-            TypeCode.Int16 => new JSNumber((short)value),
-            TypeCode.Int32 => new JSNumber((int)value),
-            TypeCode.Int64 => new JSNumber((long)value),
-            TypeCode.SByte => new JSNumber((sbyte)value),
-            TypeCode.Single => new JSNumber((float)value),
+            TypeCode.Decimal => JSValue.CreateNumber((double)(decimal)value),
+            TypeCode.Double => JSValue.CreateNumber((double)value),
+            TypeCode.Int16 => JSValue.CreateNumber((short)value),
+            TypeCode.Int32 => JSValue.CreateNumber((int)value),
+            TypeCode.Int64 => JSValue.CreateNumber((long)value),
+            TypeCode.SByte => JSValue.CreateNumber((sbyte)value),
+            TypeCode.Single => JSValue.CreateNumber((float)value),
             TypeCode.String => new JSString((string)value),
-            TypeCode.UInt16 => new JSNumber((ushort)value),
-            TypeCode.UInt32 => new JSNumber((uint)value),
-            TypeCode.UInt64 => new JSNumber((long)value),
+            TypeCode.UInt16 => JSValue.CreateNumber((ushort)value),
+            TypeCode.UInt32 => JSValue.CreateNumber((uint)value),
+            TypeCode.UInt64 => JSValue.CreateNumber((long)value),
             _ => JSUndefined.Value
         };
     }

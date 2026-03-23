@@ -105,7 +105,7 @@ public partial class JSString
         pos = Math.Min(Math.Max(pos, 0), @this.Length);
 
         var index = @this.IndexOf(searchStr.ToString(), pos);
-        return new JSNumber(index);
+        return JSValue.CreateNumber(index);
     }
 
     [JSPrototypeMethod]
@@ -123,12 +123,12 @@ public partial class JSString
         if (startIndex < 0)
         {
             if (@this == string.Empty && searchStr.Length == 0)
-                return JSNumber.Zero;
+                return JSValue.NumberZero;
 
-            return JSNumber.MinusOne;
+            return JSValue.NumberMinusOne;
         }
 
-        return new JSNumber(@this.LastIndexOf(searchStr.ToString(), startIndex, StringComparison.Ordinal));
+        return JSValue.CreateNumber(@this.LastIndexOf(searchStr.ToString(), startIndex, StringComparison.Ordinal));
     }
 
     [JSPrototypeMethod]
@@ -144,7 +144,7 @@ public partial class JSString
 
         CultureInfo culture = locale.IsNullOrUndefined ? CultureInfo.CurrentCulture : CultureInfo.GetCultureInfo(locale.ToString());
 
-        return new JSNumber(string.Compare(@this.ToString(), str, culture, 0));
+        return JSValue.CreateNumber(string.Compare(@this.ToString(), str, culture, 0));
     }
 
     [JSPrototypeMethod]
@@ -156,7 +156,7 @@ public partial class JSString
 
         //search string not defined
         if (search.IsUndefined)
-            return JSNumber.Zero;
+            return JSValue.NumberZero;
 
         // is Regex?
         if (search is JSRegExp jSRegExp)
@@ -164,12 +164,12 @@ public partial class JSString
             var reg = jSRegExp.value.Match(@this);
 
             if (!reg.Success)
-                return JSNumber.MinusOne;
-            return new JSNumber(reg.Index);
+                return JSValue.NumberMinusOne;
+            return JSValue.CreateNumber(reg.Index);
         }
 
         //is String
         var index = @this.IndexOf(search.ToString());
-        return new JSNumber(index);
+        return JSValue.CreateNumber(index);
     }
 }

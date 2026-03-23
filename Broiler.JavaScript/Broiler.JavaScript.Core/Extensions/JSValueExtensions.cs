@@ -234,7 +234,7 @@ public static partial class JSValueExtensions
                         continue;
                 }
 
-                yield return (new JSNumber(Key), value.GetValue(in Value));
+                yield return (JSValue.CreateNumber(Key), value.GetValue(in Value));
             }
         }
 

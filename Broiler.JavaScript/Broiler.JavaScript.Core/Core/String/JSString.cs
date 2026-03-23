@@ -50,7 +50,7 @@ public partial class JSString : JSPrimitive
 
     public override JSValue AddValue(double value)
     {
-        var numStr = JSNumber.ToECMAString(value);
+        var numStr = JSValue.NumberToECMAString(value);
 
         if (this.value.IsEmpty())
             return new JSString(numStr);
@@ -205,9 +205,10 @@ public partial class JSString : JSPrimitive
                     return true;
                 return false;
 
-            case JSNumber number
-                when (DoubleValue == number.value)
-                    || (this.value.CompareTo(number.value.ToString()) == 0):
+            case JSValue number
+                when number.IsNumber
+                    && (DoubleValue == number.DoubleValue
+                        || this.value.CompareTo(number.DoubleValue.ToString()) == 0):
                 return true;
 
             case JSValue boolVal when boolVal.IsBoolean && DoubleValue == (boolVal.BooleanValue ? 1D : 0D):

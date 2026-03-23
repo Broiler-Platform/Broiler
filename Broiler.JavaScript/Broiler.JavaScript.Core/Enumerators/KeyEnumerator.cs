@@ -17,7 +17,7 @@ public struct KeyEnumerator(int length) : IElementEnumerator
         {
             hasValue = true;
             index = (uint)this.index;
-            value = new JSNumber(index);
+            value = JSValue.CreateNumber(index);
             return true;
         }
         hasValue = false;
@@ -30,7 +30,7 @@ public struct KeyEnumerator(int length) : IElementEnumerator
     {
         if (++index < length)
         {
-            value = new JSNumber(index);
+            value = JSValue.CreateNumber(index);
             return true;
         }
         value = JSUndefined.Value;
@@ -41,7 +41,7 @@ public struct KeyEnumerator(int length) : IElementEnumerator
     {
         if (++index < length)
         {
-            value = new JSNumber(index);
+            value = JSValue.CreateNumber(index);
             return true;
         }
         value = @default;
@@ -52,7 +52,7 @@ public struct KeyEnumerator(int length) : IElementEnumerator
     {
         if (++index < length)
         {
-            return new JSNumber(index);
+            return JSValue.CreateNumber(index);
         }
         return @default;
     }

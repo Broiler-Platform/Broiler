@@ -24,21 +24,21 @@ public static class MarshalExtensions
     public static JSValue Marshal(this bool value) => value ? JSValue.BooleanTrue : JSValue.BooleanFalse;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue Marshal(this int value) => new JSNumber(value);
+    public static JSValue Marshal(this int value) => JSValue.CreateNumber(value);
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue Marshal(this uint value) => new JSNumber(value);
+    public static JSValue Marshal(this uint value) => JSValue.CreateNumber(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue Marshal(this double value) => new JSNumber(value);
+    public static JSValue Marshal(this double value) => JSValue.CreateNumber(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue Marshal(this float value) => new JSNumber(value);
+    public static JSValue Marshal(this float value) => JSValue.CreateNumber(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue Marshal(this short value) => new JSNumber(value);
+    public static JSValue Marshal(this short value) => JSValue.CreateNumber(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue Marshal(this byte value) => new JSNumber(value);
+    public static JSValue Marshal(this byte value) => JSValue.CreateNumber(value);
 
     internal static bool TryUnmarshal(this JSObject @object, Type type, out object result) => cache[type](@object, out result);
 
