@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.BuiltIns.Boolean;
+using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Storage;
 

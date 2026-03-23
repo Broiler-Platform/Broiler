@@ -16,6 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Broiler.JavaScript.Debugger\Broiler.JavaScript.Debugger.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.BuiltIns\Broiler.JavaScript.BuiltIns.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

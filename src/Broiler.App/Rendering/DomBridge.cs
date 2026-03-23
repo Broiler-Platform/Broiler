@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using Broiler.JavaScript.Core;
+using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Core.Core.Function;
 
 namespace Broiler.App.Rendering;

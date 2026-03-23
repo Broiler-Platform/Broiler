@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Text;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.BuiltIns.Boolean;
+using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Storage;
