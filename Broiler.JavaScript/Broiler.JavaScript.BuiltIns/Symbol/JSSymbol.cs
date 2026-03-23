@@ -30,7 +30,7 @@ public partial class JSSymbol: JSValue, IJSSymbol
 
     public static implicit operator PropertyKey(JSSymbol key) => PropertyKey.FromSymbol(key);
 
-    public JSSymbol(string name) : base(JSContext.Current.ObjectPrototype)
+    public JSSymbol(string name) : base(JSContext.Current?.ObjectPrototype)
     {
         this.name = name;
         Key = (uint)Interlocked.Increment(ref SymbolID);
