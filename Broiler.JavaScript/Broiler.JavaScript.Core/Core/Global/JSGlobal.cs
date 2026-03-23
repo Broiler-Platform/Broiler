@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Date;
 using System;
 using System.Threading;
 using System.Collections.Generic;
@@ -195,14 +194,6 @@ public partial class JSGlobalStatic
         // Check for circular references.
         if (seen.TryGetValue(value, out var existing))
             return existing;
-
-        // Date
-        if (value is JSDate date)
-        {
-            var clone = new JSDate(date.value);
-            seen[value] = clone;
-            return clone;
-        }
 
         // RegExp
         if (value is JSRegExp regex)

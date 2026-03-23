@@ -1,6 +1,6 @@
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Date;
+namespace Broiler.JavaScript.BuiltIns.Date;
 
 /// <summary>
 /// ECMAScript date math helpers per ECMA-262 § 21.4.1.

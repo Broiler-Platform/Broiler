@@ -2,7 +2,6 @@
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Promise;
-using Broiler.JavaScript.Core.Core.Date;
 using Broiler.JavaScript.Core.Enumerators;
 using Broiler.JavaScript.Core.Utils;
 using System;
@@ -83,8 +82,8 @@ public partial class ClrProxy : JSObject
     public static JSValue Marshal(ushort value) => new JSNumber(value);
     public static JSValue Marshal(byte value) => new JSNumber(value);
     public static JSValue Marshal(sbyte value) => new JSNumber(value);
-    public static JSValue Marshal(DateTime value) => new JSDate(value);
-    public static JSValue Marshal(DateTimeOffset value) => new JSDate(value);
+    public static JSValue Marshal(DateTime value) => JSValue.CreateDate(new DateTimeOffset(value));
+    public static JSValue Marshal(DateTimeOffset value) => JSValue.CreateDate(value);
     public static JSValue Marshal(double value) => new JSNumber(value);
     public static JSValue Marshal(float value) => new JSNumber(value);
     public static JSValue Marshal(Task task) => task.ToPromise();
@@ -116,7 +115,7 @@ public partial class ClrProxy : JSObject
             TypeCode.Boolean => (bool)value ? JSBoolean.True : JSBoolean.False,
             TypeCode.Byte => new JSNumber((byte)value),
             TypeCode.Char => new JSString((char)value),
-            TypeCode.DateTime => new JSDate((DateTime)value),
+            TypeCode.DateTime => JSValue.CreateDate(new DateTimeOffset((DateTime)value)),
             TypeCode.DBNull => JSNull.Value,
             TypeCode.Decimal => new JSNumber((double)(decimal)value),
             TypeCode.Double => new JSNumber((double)value),
@@ -132,7 +131,7 @@ public partial class ClrProxy : JSObject
             _ => value switch
             {
                 JSValue jsValue => jsValue,
-                DateTimeOffset dateTimeOffset => new JSDate(dateTimeOffset),
+                DateTimeOffset dateTimeOffset => JSValue.CreateDate(dateTimeOffset),
                 Type valueType => ClrType.From(valueType),
                 Task<JSValue> task => task.ToPromise(),
                 Task task => task.ToPromise(),

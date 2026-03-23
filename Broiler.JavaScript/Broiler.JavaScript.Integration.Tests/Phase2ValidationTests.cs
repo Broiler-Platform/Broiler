@@ -119,11 +119,16 @@ public class Phase2ValidationTests
     [Fact]
     public void M10_JSDatePrototype_PartialFilesExist()
     {
+        // JSDate was moved from Core to BuiltIns as part of the JSDate extraction.
         // JSDate's prototype methods were split into partial files:
         // JSDatePrototype.Getters.cs, .Setters.cs, .Formatters.cs
         // The class is JSDate (partial), with prototype methods in separate files.
-        var type = typeof(JSContext).Assembly.GetTypes()
-            .FirstOrDefault(t => t.Name == "JSDate" && t.Namespace == "Broiler.JavaScript.Core.Core.Date");
+        var builtInsAssembly = AppDomain.CurrentDomain.GetAssemblies()
+            .FirstOrDefault(a => a.GetName().Name == "Broiler.JavaScript.BuiltIns");
+        Assert.NotNull(builtInsAssembly);
+
+        var type = builtInsAssembly!.GetTypes()
+            .FirstOrDefault(t => t.Name == "JSDate" && t.Namespace == "Broiler.JavaScript.BuiltIns.Date");
         Assert.NotNull(type);
 
         // Verify getter methods exist (from JSDatePrototype.Getters.cs):

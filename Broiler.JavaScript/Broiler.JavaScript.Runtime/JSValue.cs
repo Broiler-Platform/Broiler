@@ -87,6 +87,18 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
     /// </summary>
     public static JSValue CreateBigInt(long value) => CreateBigIntFactory(value);
 
+    /// <summary>
+    /// Factory delegate for creating a <c>JSDate</c> from a <c>DateTimeOffset</c>.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// Used by Core and Clr for DateTime/DateTimeOffset marshaling.
+    /// </summary>
+    internal static Func<DateTimeOffset, JSValue> CreateDateFactory;
+
+    /// <summary>
+    /// Creates a <c>JSDate</c> from a <c>DateTimeOffset</c> via the registered factory delegate.
+    /// </summary>
+    public static JSValue CreateDate(DateTimeOffset value) => CreateDateFactory(value);
+
     /// <summary>Gets whether this value is the <c>undefined</c> singleton.</summary>
     public bool IsUndefined
     {

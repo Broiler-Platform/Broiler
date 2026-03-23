@@ -1,7 +1,6 @@
 using System;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Date;
 
 namespace Broiler.JavaScript.Core.Core.Clr;
 
@@ -30,7 +29,7 @@ internal sealed class FallbackClrInterop : IClrInterop
             TypeCode.Boolean => (bool)value ? JSBoolean.True : JSBoolean.False,
             TypeCode.Byte => new JSNumber((byte)value),
             TypeCode.Char => new JSString(value.ToString()),
-            TypeCode.DateTime => new JSDate((DateTime)value),
+            TypeCode.DateTime => JSValue.CreateDate(new DateTimeOffset((DateTime)value)),
             TypeCode.DBNull => JSNull.Value,
             TypeCode.Decimal => new JSNumber((double)(decimal)value),
             TypeCode.Double => new JSNumber((double)value),
