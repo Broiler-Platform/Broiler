@@ -63,7 +63,7 @@ public partial class JSRegExp
             } 
             else
             {
-                result[(uint)i] = new JSString(group.Value);
+                result[(uint)i] = JSValue.CreateString(group.Value);
             }
         }
 
@@ -86,7 +86,7 @@ public partial class JSRegExp
                     hasNamedGroups = true;
                     var g = match.Groups[name];
                     namedGroups[name] = g.Success
-                        ? new JSString(g.Value)
+                        ? JSValue.CreateString(g.Value)
                         : JSUndefined.Value;
                 }
             }

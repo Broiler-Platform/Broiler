@@ -28,7 +28,7 @@ public partial class JSObject
                 continue;
 
             var entry = JSValue.CreateArray();
-            entry.AddArrayItem(new JSString(index.ToString()));
+            entry.AddArrayItem(JSValue.CreateString(index.ToString()));
             entry.AddArrayItem(item);
             r.AddArrayItem(entry);
         }

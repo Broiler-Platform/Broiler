@@ -35,7 +35,7 @@ public partial class JSRegExp : JSObject
             sb.Append(c);
         }
 
-        return new JSString(sb.ToString());
+        return JSValue.CreateString(sb.ToString());
     }
 
     [JSExport("source")]
@@ -104,7 +104,7 @@ public partial class JSRegExp : JSObject
         // Construct the array to return.
         var matchValues = JSValue.CreateArray((uint)matches.Count);
         for (int i = 0; i < matches.Count; i++)
-            matchValues[(uint)i] = new JSString(matches[i].Value);
+            matchValues[(uint)i] = JSValue.CreateString(matches[i].Value);
 
         return matchValues;
     }
@@ -142,7 +142,7 @@ public partial class JSRegExp : JSObject
 
             // Add the match results to the array.
             var element = input.Substring(startIndex, match.Index - startIndex);
-            results.AddArrayItem(new JSString(element));
+            results.AddArrayItem(JSValue.CreateString(element));
 
             if (results.Length >= limit)
                 return results;
@@ -155,7 +155,7 @@ public partial class JSRegExp : JSObject
                 if (group.Captures.Count == 0)
                     results.AddArrayItem(JSUndefined.Value);       // Non-capturing groups return "undefined".
                 else
-                    results.AddArrayItem(new JSString(match.Groups[i].Value));
+                    results.AddArrayItem(JSValue.CreateString(match.Groups[i].Value));
 
                 if (results.Length >= limit)
                     return results;
@@ -168,7 +168,7 @@ public partial class JSRegExp : JSObject
             match = match.NextMatch();
         }
         var ele = input.Substring(startIndex, input.Length - startIndex);
-        results.AddArrayItem(new JSString(ele));
+        results.AddArrayItem(JSValue.CreateString(ele));
         return results;
     }
 
@@ -195,11 +195,11 @@ public partial class JSRegExp : JSObject
                 if (match.Groups[i].Success == false)
                     parameters[i] = JSUndefined.Value;
                 else
-                    parameters[i] = new JSString(match.Groups[i].Value);
+                    parameters[i] = JSValue.CreateString(match.Groups[i].Value);
             }
 
             parameters[match.Groups.Count] = JSValue.CreateNumber(match.Index);
-            parameters[match.Groups.Count + 1] = new JSString(input);
+            parameters[match.Groups.Count + 1] = JSValue.CreateString(input);
 
             var a = new Arguments(JSValue.NullValue, parameters);
             return replaceFunction.InvokeFunction(a).ToString();

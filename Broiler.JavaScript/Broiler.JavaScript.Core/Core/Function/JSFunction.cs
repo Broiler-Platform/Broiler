@@ -72,7 +72,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
         prototype.FastAddValue(KeyStrings.constructor, type, JSPropertyAttributes.EnumerableConfigurableValue);
         ownProperties.Put(KeyStrings.prototype.Key) = JSProperty.Property(KeyStrings.prototype, prototype);
 
-        FastAddValue(KeyStrings.name, name.IsEmpty ? new JSString("native") : new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
+        FastAddValue(KeyStrings.name, name.IsEmpty ? JSValue.CreateString("native") : JSValue.CreateString(name.Value), JSPropertyAttributes.EnumerableConfigurableValue);
         FastAddValue(KeyStrings.length, JSValue.CreateNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
 
         constructor = this;
@@ -99,7 +99,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
         prototype.GetOwnProperties(true).Put(KeyStrings.constructor, this);
 
         ownProperties.Put(KeyStrings.prototype, prototype);
-        ownProperties.Put(KeyStrings.name, name.IsEmpty ? new JSString("native") : new JSString(name));
+        ownProperties.Put(KeyStrings.name, name.IsEmpty ? JSValue.CreateString("native") : JSValue.CreateString(name.Value));
         ownProperties.Put(KeyStrings.length, JSValue.NumberZero);
 
         constructor = this;
@@ -129,7 +129,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
             ownProperties.Put(KeyStrings.prototype, prototype, JSPropertyAttributes.ConfigurableValue);
         }
 
-        ownProperties.Put(KeyStrings.name, name.IsEmpty ? new JSString("native") : new JSString(name));
+        ownProperties.Put(KeyStrings.name, name.IsEmpty ? JSValue.CreateString("native") : JSValue.CreateString(name.Value));
         ownProperties.Put(KeyStrings.length, JSValue.CreateNumber(length));
 
         constructor = this;
@@ -152,7 +152,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
             ownProperties.Put(KeyStrings.prototype, prototype, JSPropertyAttributes.ConfigurableValue);
         }
 
-        ownProperties.Put(KeyStrings.name, name.IsEmpty ? new JSString("native") : new JSString(name), JSPropertyAttributes.ConfigurableValue);
+        ownProperties.Put(KeyStrings.name, name.IsEmpty ? JSValue.CreateString("native") : JSValue.CreateString(name.Value), JSPropertyAttributes.ConfigurableValue);
         ownProperties.Put(KeyStrings.length, JSValue.CreateNumber(length), JSPropertyAttributes.ConfigurableValue);
 
         constructor = this;
@@ -248,12 +248,12 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
         
         var source = fx.source;
         if (source.IsEmpty)
-            return new JSString(string.Empty);
+            return JSValue.CreateString(string.Empty);
 
         if (source.Source.Length != source.Length || source.Offset != 0)
             source = source.Value;
 
-        return new JSString(source.Source);
+        return JSValue.CreateString(source.Source);
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
@@ -292,7 +292,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
             }
         }
 
-        var bodyText = body is JSString @string ? @string.value : body.ToString();
+        var bodyText = body.IsString ? body.StringValue : body.ToString();
         string location = null;
         var context = JSContext.Current;
         context.DispatchEvalEvent(ref bodyText, ref location);

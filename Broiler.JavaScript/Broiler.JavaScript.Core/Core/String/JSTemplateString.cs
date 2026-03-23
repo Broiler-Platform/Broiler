@@ -24,6 +24,6 @@ public class JSTemplateString(int size)
 
     public override string ToString() => sb.ToString();
 
-    public JSValue ToJSString() => new JSString(sb.ToString());
+    public JSValue ToJSString() => JSValue.CreateString(sb.ToString());
 
 }

@@ -7,7 +7,7 @@ namespace Broiler.JavaScript.Core.Core;
 /// <summary>
 /// Core-dependent implementations for <see cref="Arguments"/> factory delegates.
 /// These methods were extracted from Arguments when it moved to Runtime because
-/// they depend on Core-only types (JSString, JSArguments, JSException).
+/// they depend on Core-only types (JSArguments, JSException) and JSValue factory delegates.
 /// </summary>
 internal static class ArgumentsCoreExtensions
 {
@@ -73,7 +73,7 @@ internal static class ArgumentsCoreExtensions
     }
 
     internal static StringSpan GetStringCore(JSValue item, string name, string function, string filePath, int line) =>
-        item is JSString s ? s.value : throw new JSException(name + " is required", function, filePath, line);
+        item.IsString ? item.StringValue : throw new JSException(name + " is required", function, filePath, line);
 
     internal static JSValue GetSpreadTargetCore(JSValue a) =>
         ((JSSpreadValue)a).Value;

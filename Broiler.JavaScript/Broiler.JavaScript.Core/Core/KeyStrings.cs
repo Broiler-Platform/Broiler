@@ -6,25 +6,25 @@ namespace Broiler.JavaScript.Core.Core;
 /// Extension methods and Core-dependent helpers for <see cref="KeyString"/>
 /// and <see cref="KeyStrings"/>.  The bulk of the KeyString/KeyStrings
 /// implementation lives in the Storage assembly; this file retains only
-/// the methods that depend on Core types (JSString, JSValue).
+/// the methods that depend on Core types (JSValue).
 /// </summary>
 public static class KeyStringCoreExtensions
 {
     /// <summary>
     /// Converts a <see cref="KeyString"/> to its <see cref="JSValue"/>
-    /// representation (a <see cref="JSString"/>).
+    /// representation (a string value).
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue ToJSValue(this KeyString ks) => new JSString(KeyStrings.GetNameString(ks.Key), ks);
+    public static JSValue ToJSValue(this KeyString ks) => JSValue.CreateStringWithKey(ks.ToString(), ks);
 
     /// <summary>
-    /// Returns the <see cref="JSString"/> for the given key ID.
+    /// Returns the <see cref="JSValue"/> string for the given key ID.
     /// Equivalent to the former <c>KeyStrings.GetJSString</c> method.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSString GetJSString(uint id)
+    internal static JSValue GetJSString(uint id)
     {
         var name = KeyStrings.GetName(id);
-        return new JSString(name.Value, name);
+        return JSValue.CreateStringWithKey(name.ToString(), name);
     }
 }

@@ -34,7 +34,7 @@ public partial class JSGenerator : JSObject
     public override string ToString() => $"[object {name}]";
 
     [JSExport("toString")]
-    public new JSValue ToString(in Arguments a) => new JSString(ToString());
+    public new JSValue ToString(in Arguments a) => JSValue.CreateString(ToString());
 
 
     public JSValue Return(JSValue value)

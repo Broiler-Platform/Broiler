@@ -1,11 +1,28 @@
-﻿using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+﻿using System;
+using System.Reflection;
+using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.LambdaGen;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 
 
 public class JSStringBuilder
 {
-    public static Expression New(Expression exp) => Expression.TypeAs(NewLambdaExpression.NewExpression<JSString>(() => () => new JSString(""), exp), typeof(JSValue));
+    private static Type type;
+    private static ConstructorInfo _ctor;
+
+    /// <summary>
+    /// Initializes the builder with the concrete JSString type.
+    /// Called by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static void Initialize(Type stringType)
+    {
+        type = stringType;
+        _ctor = type.GetConstructor([typeof(string)]);
+    }
+
+    public static Expression New(Expression exp)
+    {
+        return Expression.TypeAs(Expression.New(_ctor, exp), typeof(JSValue));
+    }
 }

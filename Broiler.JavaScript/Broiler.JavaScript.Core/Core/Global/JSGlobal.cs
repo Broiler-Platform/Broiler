@@ -33,14 +33,14 @@ public partial class JSGlobalStatic
     public static JSValue DecodeURI(in Arguments a)
     {
         var f = a.Get1().ToString();
-        return new JSString(UriHelper.DecodeURI(f));
+        return JSValue.CreateString(UriHelper.DecodeURI(f));
     }
 
     [JSExport("decodeURIComponent", Length = 1)]
     public static JSValue DecodeURIComponent(in Arguments a)
     {
         var f = a.Get1().ToString();
-        return new JSString(Uri.UnescapeDataString(f));
+        return JSValue.CreateString(Uri.UnescapeDataString(f));
     }
 
     [JSExport("eval", Length = 1)]
@@ -51,7 +51,7 @@ public partial class JSGlobalStatic
         if (!f.IsString)
             return f;
 
-        var text = (f as JSString).value;
+        var text = f.StringValue;
         string location = null;
 
         JSContext.Current.DispatchEvalEvent(ref text, ref location);
@@ -62,14 +62,14 @@ public partial class JSGlobalStatic
     public static JSValue EncodeURI(in Arguments a)
     {
         var f = a.Get1().ToString();
-        return new JSString(Uri.EscapeUriString(f));
+        return JSValue.CreateString(Uri.EscapeUriString(f));
     }
 
     [JSExport("encodeURIComponent", Length = 1)]
     public static JSValue EncodeURIComponent(in Arguments a)
     {
         var f = a.Get1().ToString();
-        return new JSString(Uri.EscapeDataString(f));
+        return JSValue.CreateString(Uri.EscapeDataString(f));
     }
 
     [JSExport("isFinite", Length = 1)]
@@ -234,7 +234,7 @@ public partial class JSGlobalStatic
         if (value == null || value.IsNullOrUndefined)
             return value;
 
-        if (value.IsNumber || value is JSString || value.IsBoolean)
+        if (value.IsNumber || value.IsString || value.IsBoolean)
             return value;
 
         if (value.TypeOf() == JSConstants.BigInt)
@@ -263,7 +263,7 @@ public partial class JSGlobalStatic
         // Error
         if (value is JSError error)
         {
-            var clone = new JSError(new Arguments(JSUndefined.Value, new JSString(error.Message)));
+            var clone = new JSError(new Arguments(JSUndefined.Value, JSValue.CreateString(error.Message)));
             seen[value] = clone;
             return clone;
         }

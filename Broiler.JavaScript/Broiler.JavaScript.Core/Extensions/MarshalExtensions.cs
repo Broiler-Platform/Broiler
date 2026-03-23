@@ -18,7 +18,7 @@ public static class MarshalExtensions
 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue Marshal(this string value) => new JSString(value);
+    public static JSValue Marshal(this string value) => JSValue.CreateString(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSValue Marshal(this bool value) => value ? JSValue.BooleanTrue : JSValue.BooleanFalse;

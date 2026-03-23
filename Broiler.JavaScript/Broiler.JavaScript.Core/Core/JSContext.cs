@@ -242,23 +242,23 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewTypeError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
-        new JSTypeError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
+        new JSTypeError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewSyntaxError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
-        new JSSyntaxError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
+        new JSSyntaxError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewURIError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
-        new JSURIError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
+        new JSURIError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewRangeError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
-        new JSRangeError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
+        new JSRangeError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
-        new JSError(new Arguments(JSUndefined.Value, new JSString(message)), function: function, filePath: filePath, line: line).Exception;
+        new JSError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
 
     partial void OnError(Exception ex);
 

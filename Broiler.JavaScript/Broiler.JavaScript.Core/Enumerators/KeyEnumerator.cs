@@ -5,7 +5,7 @@ namespace Broiler.JavaScript.Core.Typed;
 
 /// <summary>
 /// A simple integer-key enumerator that yields sequential numbers from 0 to length-1.
-/// Used by JSString, JSArrayPrototype, and JSTypedArray for key enumeration.
+/// Used by string values, JSArrayPrototype, and JSTypedArray for key enumeration.
 /// </summary>
 public struct KeyEnumerator(int length) : IElementEnumerator
 {

@@ -15,7 +15,6 @@ internal static class JSValueCoreExtensions
     {
         JSValue.UndefinedValue = JSUndefined.Value;
 
-        JSValue.CreateString = v => new JSString(v);
         JSValue.NewTypeError = msg => JSContext.NewTypeError(msg);
         JSValue.CreateDynamicMetaObject = (param, value) => new JSDynamicMetaData(param, value);
         JSValue.ForceConvertHelper = (jsValue, type, _) =>

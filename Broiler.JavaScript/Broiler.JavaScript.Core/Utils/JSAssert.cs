@@ -17,7 +17,7 @@ public partial class JSAssert : JSFunction
         var (test, message) = args.Get2();
         if (!test.BooleanValue)
         {
-            message = message.IsUndefined ? new JSString($"Assert failed, no message, {test}") : message;
+            message = message.IsUndefined ? JSValue.CreateString($"Assert failed, no message, {test}") : message;
             throw new JSException(message);
         }
 
