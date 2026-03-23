@@ -1,13 +1,13 @@
 ﻿using Broiler.JavaScript.Ast.Statements;
 using Broiler.JavaScript.Core.Core;
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Exp VisitBreakStatement(AstBreakStatement breakStatement)
+    protected override YExpression VisitBreakStatement(AstBreakStatement breakStatement)
     {
         var ls = LoopScope;
         string name = breakStatement.Label?.Name.Value;
@@ -15,12 +15,12 @@ partial class FastCompiler
         if (name != null)
         {
             var target = LoopScope.Get(name);
-            return target == null ? throw JSContext.NewSyntaxError($"No label found for {name}") : Exp.Break(target.Break);
+            return target == null ? throw JSContext.NewSyntaxError($"No label found for {name}") : YExpression.Break(target.Break);
         }
 
         if (ls.IsSwitch)
-            return Exp.Goto(ls.Break);
+            return YExpression.Goto(ls.Break);
 
-        return Exp.Break(ls.Break);
+        return YExpression.Break(ls.Break);
     }
 }

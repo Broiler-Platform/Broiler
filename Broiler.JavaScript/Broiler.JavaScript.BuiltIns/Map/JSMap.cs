@@ -1,4 +1,6 @@
-﻿using Broiler.JavaScript.Core.Core.Array;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Error;
@@ -7,7 +9,7 @@ using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.ExpressionCompiler;
 using System.Collections.Generic;
 
-namespace Broiler.JavaScript.Core.Core.Map;
+namespace Broiler.JavaScript.BuiltIns.Map;
 
 [JSClassGenerator("Map")]
 public partial class JSMap : JSObject

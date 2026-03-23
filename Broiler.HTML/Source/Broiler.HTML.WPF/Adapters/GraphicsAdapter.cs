@@ -55,9 +55,9 @@ internal sealed class GraphicsAdapter : RGraphics
         _g.PushClip(geometry);
     }
 
-    public override Object SetAntiAliasSmoothingMode() => null;
+    public override object SetAntiAliasSmoothingMode() => null;
 
-    public override void ReturnPreviousSmoothingMode(Object prevMode)
+    public override void ReturnPreviousSmoothingMode(object prevMode)
     { }
 
     public override SizeF MeasureString(string str, RFont font)

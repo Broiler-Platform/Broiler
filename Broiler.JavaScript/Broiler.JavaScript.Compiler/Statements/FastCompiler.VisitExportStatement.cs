@@ -5,9 +5,9 @@ using Broiler.JavaScript.Ast.Statements;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using System.Runtime.CompilerServices;
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
@@ -58,20 +58,20 @@ partial class FastCompiler
         return list;
     }
 
-    protected override Exp VisitExportStatement(AstExportStatement exportStatement)
+    protected override YExpression VisitExportStatement(AstExportStatement exportStatement)
     {
         var exports = scope.Top.GetVariable("exports");
         var top = scope.Top;
         var declaration = exportStatement.Declaration;
-        Exp left;
+        YExpression left;
 
         if (exportStatement.IsDefault)
         {
             var defExports = JSValueBuilder.Index(exports.Expression, KeyOfName("default"));
-            return Exp.Assign(defExports, Visit(declaration));
+            return YExpression.Assign(defExports, Visit(declaration));
         }
 
-        var list = new Sequence<Exp>();
+        var list = new Sequence<YExpression>();
 
         try
         {
@@ -88,10 +88,10 @@ partial class FastCompiler
                     {
                         left = JSValueBuilder.Index(exports.Expression, KeyOfName(name));
                         var right = top.GetVariable(name);
-                        list.Add(Exp.Assign(left, right.Expression));
+                        list.Add(YExpression.Assign(left, right.Expression));
                     }
 
-                    return Exp.Block(list);
+                    return YExpression.Block(list);
 
                 case FastNodeType.Identifier:
                     var id = exportStatement.Declaration as AstIdentifier;
@@ -104,7 +104,7 @@ partial class FastCompiler
                     if (fd.Id != null)
                     {
                         left = JSValueBuilder.Index(exports.Expression, KeyOfName(fd.Id.Name));
-                        return Exp.Assign(left, fe);
+                        return YExpression.Assign(left, fe);
                     }
 
                     break;
@@ -116,7 +116,7 @@ partial class FastCompiler
                     if (cd.Id != null)
                     {
                         left = JSValueBuilder.Index(exports.Expression, KeyOfName(cd.Id.Name));
-                        return Exp.Assign(left, ce);
+                        return YExpression.Assign(left, ce);
                     }
 
                     break;

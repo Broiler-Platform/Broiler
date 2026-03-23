@@ -1,18 +1,16 @@
 ﻿using System;
 
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Ast.Misc;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Expression VisitObjectLiteral(AstObjectLiteral objectExpression)
+    protected override YExpression VisitObjectLiteral(AstObjectLiteral objectExpression)
     {
         var elements = new Sequence<YElementInit>();
         var en = objectExpression.Properties.GetFastEnumerator();
@@ -35,8 +33,8 @@ partial class FastCompiler
 
             AstClassProperty p = pn as AstClassProperty;
 
-            Exp key = null;
-            Exp value = null;
+            YExpression key = null;
+            YExpression value = null;
             var pKey = p.Key;
 
             value = VisitExpression(p.Init);
@@ -44,7 +42,7 @@ partial class FastCompiler
             if (p.Computed)
             {
                 // there is a possibility of numeric index
-                var keyExp = pKey.IsUIntLiteral(out var num) ? Exp.Constant(num) : Visit(pKey);
+                var keyExp = pKey.IsUIntLiteral(out var num) ? YExpression.Constant(num) : Visit(pKey);
 
                 if (p.Kind == AstPropertyKind.Get)
                 {
@@ -82,7 +80,7 @@ partial class FastCompiler
                     {
                         if (NumberParser.TryCoerceToUInt32(l.StringValue, out var ui))
                         {
-                            key = Exp.Constant(ui);
+                            key = YExpression.Constant(ui);
 
                         }
                         else
@@ -92,7 +90,7 @@ partial class FastCompiler
                     }
                     else if (l.TokenType == TokenTypes.Number)
                     {
-                        key = Exp.Constant((uint)l.NumericValue);
+                        key = YExpression.Constant((uint)l.NumericValue);
                     }
                     else
                         throw new NotSupportedException();

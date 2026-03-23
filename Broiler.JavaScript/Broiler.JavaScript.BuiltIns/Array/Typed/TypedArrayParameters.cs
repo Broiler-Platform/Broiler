@@ -1,6 +1,8 @@
-﻿using Broiler.JavaScript.Core.Core.Function;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Function;
 
-namespace Broiler.JavaScript.Core.Core.Array.Typed;
+namespace Broiler.JavaScript.BuiltIns.Array.Typed;
 
 public readonly struct TypedArrayParameters
 {

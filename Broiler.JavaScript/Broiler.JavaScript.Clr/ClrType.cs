@@ -6,11 +6,10 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Runtime;
 using Broiler.JavaScript.Storage;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.Clr;
 
@@ -342,9 +341,9 @@ public class ClrType : JSFunction
 
     public JSFunction CreateConstuctorDelegate(ConstructorInfo c)
     {
-        var pe = Expression.Parameter(ArgumentsBuilder.refType);
+        var pe = YExpression.Parameter(ArgumentsBuilder.refType);
         var name = this.name.Value;
-        JSFunctionDelegate newDelegate = Expression.Lambda<JSFunctionDelegate>(name, ClrProxyBuilder.From(Expression.New(c, pe)), pe).Compile();
+        JSFunctionDelegate newDelegate = YExpression.Lambda<JSFunctionDelegate>(name, ClrProxyBuilder.From(YExpression.New(c, pe)), pe).Compile();
 
         return new JSFunction(newDelegate, name);
     }

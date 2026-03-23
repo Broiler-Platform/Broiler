@@ -1,7 +1,11 @@
 ﻿#nullable enable
+using Broiler;
+using Broiler.JavaScript.Core.Core;
+
+#nullable enable
 using Broiler.JavaScript.Core.Core.Clr;
 
-namespace Broiler.JavaScript.Core.Core.Events;
+namespace Broiler.JavaScript.BuiltIns.Events;
 
 public class CustomEvent : Event
 {

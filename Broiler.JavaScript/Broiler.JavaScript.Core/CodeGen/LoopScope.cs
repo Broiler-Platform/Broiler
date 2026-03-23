@@ -1,12 +1,12 @@
 ﻿using Broiler.JavaScript.ExpressionCompiler.Core;
-using LabelTarget = Broiler.JavaScript.ExpressionCompiler.Expressions.YLabelTarget;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.Core.CodeGen;
 
-public class LoopScope(LabelTarget breakTarget, LabelTarget continueTarget, bool isSwitch = false, string name = null) : LinkedStackItem<LoopScope>
+public class LoopScope(YLabelTarget breakTarget, YLabelTarget continueTarget, bool isSwitch = false, string name = null) : LinkedStackItem<LoopScope>
 {
-    public readonly LabelTarget Break = breakTarget;
-    public readonly LabelTarget Continue = continueTarget;
+    public readonly YLabelTarget Break = breakTarget;
+    public readonly YLabelTarget Continue = continueTarget;
     public readonly string Name = name;
     public readonly bool IsSwitch = isSwitch;
 

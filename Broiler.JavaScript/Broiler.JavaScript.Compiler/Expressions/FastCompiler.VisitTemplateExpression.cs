@@ -2,16 +2,15 @@ using Broiler.JavaScript.Ast.Expressions;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Expression VisitTemplateExpression(AstTemplateExpression templateExpression)
+    protected override YExpression VisitTemplateExpression(AstTemplateExpression templateExpression)
     {
-        var items = new Sequence<Exp>(templateExpression.Parts.Count);
+        var items = new Sequence<YExpression>(templateExpression.Parts.Count);
         var e = templateExpression.Parts.GetFastEnumerator();
         int size = 0;
 
@@ -23,7 +22,7 @@ partial class FastCompiler
                 var txt = l.TokenType == TokenTypes.TemplatePart ? l.Start.CookedText : l.StringValue;
 
                 size += txt.Length;
-                items.Add(Exp.Constant(txt));
+                items.Add(YExpression.Constant(txt));
             }
             else
             {

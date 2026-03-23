@@ -1,5 +1,4 @@
-﻿using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Function;
 using System.Reflection;
@@ -28,7 +27,7 @@ internal class JSMethodInfo
     public delegate JSValue InstanceDelegate<T>(T @this, in Arguments a);
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public JSFunction ToInstanceJSFunctionDelegate<T>() => new(Method.CompileToJSFunctionDelegate(), Name);//if (Method.IsStatic)//{//    var staticDel = (JSFunctionDelegate)Method.CreateDelegate(typeof(JSFunctionDelegate));//    return new JSFunction((in Arguments a) =>//    {//        return staticDel(a);//    }, Name);//}//var del = (InstanceDelegate<T>)Method.CreateDelegate(typeof(InstanceDelegate<T>));//var type = typeof(T);//return new JSFunction((in Arguments a) =>//{//    var @this = (T)a.This.ForceConvert(type);//    return del(@this, a);//}, Name);
+    public JSFunction ToInstanceJSFunctionDelegate<T>() => new(Method.CompileToJSFunctionDelegate(), Name);
 
     public JSFunctionDelegate GenerateMethod() => Method.CompileToJSFunctionDelegate();
 

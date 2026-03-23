@@ -16,7 +16,7 @@ public partial class JSNumber
     {
         if (a.Get1() is JSNumber n)
         {
-            if (!double.IsNaN(n.value) && n.value > Double.NegativeInfinity && n.value < double.PositiveInfinity)
+            if (!double.IsNaN(n.value) && n.value > double.NegativeInfinity && n.value < double.PositiveInfinity)
                 return JSBoolean.True;
         }
 

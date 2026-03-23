@@ -4,7 +4,7 @@ using System.Drawing;
 
 namespace Broiler.HTML.Core.Core.Entities;
 
-public delegate void HtmlImageLoadCallback(string path, Object image, RectangleF imageRectangle, Uri baseUrl);
+public delegate void HtmlImageLoadCallback(string path, object image, RectangleF imageRectangle, Uri baseUrl);
 
 public sealed class HtmlImageLoadEventArgs : EventArgs
 {
@@ -45,7 +45,7 @@ public sealed class HtmlImageLoadEventArgs : EventArgs
         _callback(path, null, new RectangleF((float)x, (float)y, (float)width, (float)height), BaseUri);
     }
 
-    public void Callback(Object image)
+    public void Callback(object image)
     {
         ArgumentNullException.ThrowIfNull(image);
 
@@ -53,7 +53,7 @@ public sealed class HtmlImageLoadEventArgs : EventArgs
         _callback(null, image, RectangleF.Empty, BaseUri);
     }
 
-    public void Callback(Object image, double x, double y, double width, double height)
+    public void Callback(object image, double x, double y, double width, double height)
     {
         ArgumentNullException.ThrowIfNull(image);
 

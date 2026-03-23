@@ -1,15 +1,5 @@
 ﻿using System;
-using System.Text;
-using System.Globalization;
-using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Storage;
-using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Boolean;
-using Broiler.JavaScript.Core.Core.Function;
-using Broiler.JavaScript.Core.Typed;
-using Broiler.JavaScript.ExpressionCompiler;
-using Broiler.JavaScript.Core.Core.Generator;
 
 namespace Broiler.JavaScript.Core.Core.Array;
 
@@ -28,7 +18,7 @@ public partial class JSArray
         if (a.Length == 1 && arg.IsNumber)
         {
             double val = arg.DoubleValue;
-            if (double.IsNaN(val) || val < 0 || val > UInt32.MaxValue || Math.Floor(val) != val)
+            if (double.IsNaN(val) || val < 0 || val > uint.MaxValue || Math.Floor(val) != val)
                 throw JSContext.NewRangeError($"Invalid array length");
             return new JSArray((uint)arg.DoubleValue);
         }

@@ -1,12 +1,12 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions;
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Exp VisitMeta(AstMeta astMeta)
+    protected override YExpression VisitMeta(AstMeta astMeta)
     {
         // only new.target is supported....
         if (!(astMeta.Identifier.Name.Equals("new") && astMeta.Property.Name.Equals("target")))

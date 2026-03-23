@@ -193,7 +193,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
         set { }
     }
 
-    public virtual double DoubleValue => Double.NaN;
+    public virtual double DoubleValue => double.NaN;
 
     public abstract bool BooleanValue { get; }
 
@@ -780,7 +780,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
         if (a1 == 0)
             return NumberOne;
 
-        if (a1 == Double.PositiveInfinity || a1 == Double.NegativeInfinity)
+        if (a1 == double.PositiveInfinity || a1 == double.NegativeInfinity)
         {
             if (v == 1 || v == -1)
                 return NumberNaN;

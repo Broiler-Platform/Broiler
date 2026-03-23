@@ -1,8 +1,10 @@
 ﻿using Broiler.JavaScript.Core.Core.Clr;
 using System;
 using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 
-namespace Broiler.JavaScript.Core.Core.Array.Typed;
+namespace Broiler.JavaScript.BuiltIns.Array.Typed;
 
 [JSClassGenerator("ArrayBuffer")]
 public partial class JSArrayBuffer : JSObject
@@ -27,7 +29,7 @@ public partial class JSArrayBuffer : JSObject
 
     public override bool BooleanValue => true;
 
-    public override double DoubleValue => Double.NaN;
+    public override double DoubleValue => double.NaN;
 
     public override bool Equals(JSValue value) => ReferenceEquals(this, value);
 

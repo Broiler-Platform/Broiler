@@ -5,13 +5,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Array.Typed;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Core.Core.Array;
+using Broiler.JavaScript.Core;
 
-namespace Broiler.JavaScript.Core.Typed;
+namespace Broiler.JavaScript.BuiltIns.Array.Typed;
 
 partial class JSTypedArray
 {
@@ -388,13 +388,13 @@ partial class JSTypedArray
     {
         var src = buffer.buffer;
         var temp = new byte[src.Length];
-        Array.Copy(src, temp, src.Length);
+        System.Array.Copy(src, temp, src.Length);
         int bytesPerElement = this.bytesPerElement;
         int length = Length;
         for (int i = 0; i < length; i++)
         {
             var y = length - i - 1;
-            Array.Copy(temp, byteOffset + (i * bytesPerElement),
+            System.Array.Copy(temp, byteOffset + (i * bytesPerElement),
                 src,
                 byteOffset + (y * bytesPerElement),
                 bytesPerElement);
@@ -431,7 +431,7 @@ partial class JSTypedArray
                 for (int i = source.Length - 1; i >= 0; i--)
                 {
                     var y = relativeStart + i;
-                    Array.Copy(src, typedArray.byteOffset + (i * sourceBytesPerElement),
+                    System.Array.Copy(src, typedArray.byteOffset + (i * sourceBytesPerElement),
                         target,
                         byteOffset + (y * targetBytesPerElement),
                         sourceBytesPerElement);
@@ -442,7 +442,7 @@ partial class JSTypedArray
                 for (int i = 0; i < source.Length; i++)
                 {
                     var y = relativeStart + i;
-                    Array.Copy(src, typedArray.byteOffset + (i * sourceBytesPerElement),
+                    System.Array.Copy(src, typedArray.byteOffset + (i * sourceBytesPerElement),
                         target,
                         byteOffset + (y * targetBytesPerElement),
                         sourceBytesPerElement);
@@ -484,7 +484,7 @@ partial class JSTypedArray
         for (int i = begin; i < end; i++)
         {
             var y = i - begin;
-            Array.Copy(src, byteOffset + (i * bytesPerElement), target, y * bytesPerElement, bytesPerElement);
+            System.Array.Copy(src, byteOffset + (i * bytesPerElement), target, y * bytesPerElement, bytesPerElement);
         }
 
         return r;

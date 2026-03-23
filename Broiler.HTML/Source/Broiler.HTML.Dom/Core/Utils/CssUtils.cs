@@ -12,7 +12,7 @@ internal static class CssUtils
     {
         double w = box.ActualFont.GetWhitespaceWidth(g);
 
-        if (!(String.IsNullOrEmpty(box.WordSpacing) || box.WordSpacing == CssConstants.Normal))
+        if (!(string.IsNullOrEmpty(box.WordSpacing) || box.WordSpacing == CssConstants.Normal))
             w += CssValueParser.ParseLength(box.WordSpacing, 0, box.GetEmHeight(), true);
 
         return w;

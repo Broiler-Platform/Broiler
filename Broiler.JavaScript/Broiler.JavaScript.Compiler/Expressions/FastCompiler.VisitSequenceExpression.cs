@@ -1,22 +1,21 @@
 using Broiler.JavaScript.Ast.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Expression VisitSequenceExpression(AstSequenceExpression sequenceExpression)
+    protected override YExpression VisitSequenceExpression(AstSequenceExpression sequenceExpression)
     {
-        var list = new Sequence<Exp>();
+        var list = new Sequence<YExpression>();
         var e = sequenceExpression.Expressions.GetFastEnumerator();
         while (e.MoveNext(out var exp))
         {
             if (exp != null) list.Add(Visit(exp));
         }
 
-        var r = Exp.Block(list);
+        var r = YExpression.Block(list);
         return r;
     }
 }

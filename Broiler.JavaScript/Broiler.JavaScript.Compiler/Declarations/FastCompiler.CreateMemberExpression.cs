@@ -2,14 +2,14 @@ using Broiler.JavaScript.Ast.Expressions;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Core.LinqExpressions;
 using System;
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    private Exp CreateMemberExpression(Exp target, AstExpression property, bool computed)
+    private YExpression CreateMemberExpression(YExpression target, AstExpression property, bool computed)
     {
         switch (property.Type)
         {

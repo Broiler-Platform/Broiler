@@ -4,13 +4,13 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
 using System;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Expression VisitBinaryExpression(AstBinaryExpression binaryExpression)
+    protected override YExpression VisitBinaryExpression(AstBinaryExpression binaryExpression)
     {
         var @operator = binaryExpression.Operator;
 
@@ -24,7 +24,7 @@ partial class FastCompiler
         {
             case TokenTypes.Plus:
                 if (isLeftNumber && isRightNumber)
-                    return JSNumberBuilder.New(Expression.Add(left, right));
+                    return JSNumberBuilder.New(YExpression.Add(left, right));
 
                 if (isLeftString && isRightString)
                     return JSStringBuilder.New(ClrStringBuilder.Concat(left, right));
@@ -43,7 +43,7 @@ partial class FastCompiler
                     // to do
                     // Add cocering...
                     if (isRightNumber)
-                        return JSBooleanBuilder.NewFromCLRBoolean(Expression.Equal(left, right));
+                        return JSBooleanBuilder.NewFromCLRBoolean(YExpression.Equal(left, right));
                 }
 
                 if (isLeftString)
@@ -60,7 +60,7 @@ partial class FastCompiler
                     // to do
                     // Add cocering...
                     if (isRightNumber)
-                        return JSBooleanBuilder.NewFromCLRBoolean(Expression.NotEqual(left, right));
+                        return JSBooleanBuilder.NewFromCLRBoolean(YExpression.NotEqual(left, right));
                 }
 
                 if (isLeftString)
@@ -77,7 +77,7 @@ partial class FastCompiler
                     // to do
                     // Add cocering...
                     if (isRightNumber)
-                        return JSBooleanBuilder.NewFromCLRBoolean(Expression.Equal(left, right));
+                        return JSBooleanBuilder.NewFromCLRBoolean(YExpression.Equal(left, right));
                 }
 
                 if (isLeftString)
@@ -94,7 +94,7 @@ partial class FastCompiler
                     // to do
                     // Add cocering...
                     if (isRightNumber)
-                        return JSBooleanBuilder.NewFromCLRBoolean(Expression.NotEqual(left, right));
+                        return JSBooleanBuilder.NewFromCLRBoolean(YExpression.NotEqual(left, right));
                 }
 
                 if (isLeftString)
@@ -110,7 +110,7 @@ partial class FastCompiler
         return be ?? throw new FastParseException(binaryExpression.Start, $"Undefined binary operation {@operator}");
     }
 
-    public static Expression ToJSValueExpression(Expression exp)
+    public static YExpression ToJSValueExpression(YExpression exp)
     {
         if (typeof(JSValue).IsAssignableFrom(exp.Type))
             return exp;
@@ -124,17 +124,17 @@ partial class FastCompiler
         throw new NotImplementedException();
     }
 
-    public (bool isString, bool isNumber, Expression exp) ToNativeExpression(AstExpression ast)
+    public (bool isString, bool isNumber, YExpression exp) ToNativeExpression(AstExpression ast)
     {
         if (ast.Type == FastNodeType.Literal && ast is AstLiteral a)
         {
             switch (a.TokenType)
             {
                 case TokenTypes.String:
-                    return (true, false, Expression.Constant(a.StringValue));
+                    return (true, false, YExpression.Constant(a.StringValue));
 
                 case TokenTypes.Number:
-                    return (false, true, Expression.Constant(a.NumericValue));
+                    return (false, true, YExpression.Constant(a.NumericValue));
             }
         }
         return (false, false, Visit(ast));

@@ -516,7 +516,7 @@ internal static class CssLayoutEngine
     {
         if (box.Words.Count > 0)
         {
-            double x = Single.MaxValue, y = Single.MaxValue, r = Single.MinValue, b = Single.MinValue;
+            double x = float.MaxValue, y = float.MaxValue, r = float.MinValue, b = float.MinValue;
             List<CssRect> words = line.WordsOf(box);
 
             if (words.Count <= 0)
@@ -630,7 +630,7 @@ internal static class CssLayoutEngine
 
     private static void ApplyVerticalAlignment(RGraphics g, CssLineBox lineBox)
     {
-        double baseline = Single.MinValue;
+        double baseline = float.MinValue;
         foreach (var box in lineBox.Rectangles.Keys)
             baseline = Math.Max(baseline, lineBox.Rectangles[box].Top);
 
@@ -677,7 +677,7 @@ internal static class CssLayoutEngine
                     // with the baseline plus half the x-height of the parent.
                     // x-height ≈ 0.5 × font height for Latin fonts; half of
                     // that is 0.25 × font height.
-                    if (lineBox.Rectangles.ContainsKey(box) && baseline > Single.MinValue)
+                    if (lineBox.Rectangles.ContainsKey(box) && baseline > float.MinValue)
                     {
                         double boxHeight = lineBox.Rectangles[box].Height;
                         double parentFontHeight = box.ParentBox?.ActualFont.Height ?? 0;

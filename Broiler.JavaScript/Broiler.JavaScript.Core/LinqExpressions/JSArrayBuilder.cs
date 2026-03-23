@@ -3,7 +3,6 @@ using System.Linq;
 using System.Reflection;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Enumerators;
 using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;

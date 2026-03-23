@@ -1,6 +1,6 @@
 ﻿using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Core;
 

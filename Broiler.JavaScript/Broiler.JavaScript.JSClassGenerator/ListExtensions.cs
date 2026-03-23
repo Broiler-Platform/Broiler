@@ -100,8 +100,8 @@ internal static class ListExtensions
             for (i = 0; i < length; i++)
             {
                 var ch = *startOffset++;
-                d[i] = Char.ToLower(ch);
-                if (!Char.IsUpper(ch))
+                d[i] = char.ToLower(ch);
+                if (!char.IsUpper(ch))
                 {
                     i++;
                     break;

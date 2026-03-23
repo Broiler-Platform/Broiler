@@ -51,7 +51,7 @@ internal sealed class BordersDrawHandler : IBordersDrawHandler
         if (borderPath != null)
         {
             // rounded border need special path
-            Object prevMode = null;
+            object prevMode = null;
             if (!box.AvoidGeometryAntialias && box.IsRounded)
                 prevMode = g.SetAntiAliasSmoothingMode();
 

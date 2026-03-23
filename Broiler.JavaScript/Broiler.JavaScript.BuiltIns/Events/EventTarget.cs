@@ -8,8 +8,11 @@ using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.BuiltIns.Events;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core;
 
-namespace Broiler.JavaScript.Core.Core.Events;
+namespace Broiler.JavaScript.BuiltIns.Events;
 
 
 public delegate JSValue DomEventHandlerDelegate(Event e);

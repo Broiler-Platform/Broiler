@@ -2,15 +2,13 @@
 using Broiler.JavaScript.Ast.Statements;
 using Broiler.JavaScript.Core.CodeGen;
 using System;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Expression VisitLabeledStatement(AstLabeledStatement labeledStatement)
+    protected override YExpression VisitLabeledStatement(AstLabeledStatement labeledStatement)
     {
         switch (labeledStatement.Body.Type)
         {
@@ -31,10 +29,10 @@ partial class FastCompiler
 
             default:
                 {
-                    var breakTarget = Exp.Label();
+                    var breakTarget = YExpression.Label();
                     var label = labeledStatement.Label.Span.Value;
                     using var s = scope.Top.Loop.Push(new LoopScope(breakTarget, null, false, label));
-                    return Exp.Block(VisitStatement(labeledStatement.Body), Exp.Label(breakTarget));
+                    return YExpression.Block(VisitStatement(labeledStatement.Body), YExpression.Label(breakTarget));
                 }
         }
 

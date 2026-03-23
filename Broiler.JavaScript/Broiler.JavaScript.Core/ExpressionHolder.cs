@@ -1,17 +1,13 @@
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.Core;
 
-/// <summary>
-/// Holds a compiled expression tree entry representing a class or object
-/// member (property, getter, setter, or spread element).
-/// </summary>
 public class ExpressionHolder
 {
     public bool Static;
-    public Exp Key;
-    public Exp Value;
-    public Exp Getter;
-    public Exp Setter;
+    public YExpression Key;
+    public YExpression Value;
+    public YExpression Getter;
+    public YExpression Setter;
     public bool Spread;
 }

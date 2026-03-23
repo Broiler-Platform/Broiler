@@ -258,7 +258,7 @@ public struct StringMap<T>
 
         while (en.MoveNext(out var ch))
         {
-            Int32 uch = ch;
+            int uch = ch;
             for (; uch > 0; uch >>= Bits)
             {
                 var index = start + uch & Mask;

@@ -6,18 +6,16 @@ using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using Broiler.JavaScript.Core.Utils;
 using System;
 using System.Collections.Generic;
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Ast.Statements;
 using Broiler.JavaScript.Ast.Expressions;
 using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Core;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
-public partial class FastCompiler : AstMapVisitor<Expression>
+public partial class FastCompiler : AstMapVisitor<YExpression>
 {
     private readonly FastPool pool;
 
@@ -27,7 +25,7 @@ public partial class FastCompiler : AstMapVisitor<Expression>
     public LoopScope LoopScope => scope.Top.Loop.Top;
 
     private StringArray _keyStrings = new();
-    private ParameterExpression scriptInfo;
+    private YParameterExpression scriptInfo;
 
     public YExpression<JSFunctionDelegate> Method { get; }
 
@@ -65,12 +63,12 @@ public partial class FastCompiler : AstMapVisitor<Expression>
             jScript.HoistingScope = list;
         }
 
-        scriptInfo = Exp.Parameter(typeof(ScriptInfo));
+        scriptInfo = YExpression.Parameter(typeof(ScriptInfo));
 
         var args = fx.ArgumentsExpression;
         var te = ArgumentsBuilder.This(args);
         var stackItem = fx.StackItem;
-        var vList = new Sequence<ParameterExpression>() { scriptInfo, lScope, stackItem };
+        var vList = new Sequence<YParameterExpression>() { scriptInfo, lScope, stackItem };
 
         if (argsList != null)
         {
@@ -84,13 +82,13 @@ public partial class FastCompiler : AstMapVisitor<Expression>
 
         var l = fx.ReturnLabel;
         var script = Visit(jScript);
-        var sList = new Sequence<Exp>()
+        var sList = new Sequence<YExpression>()
         {
-            Exp.Assign(scriptInfo, ScriptInfoBuilder.New(location,code.Value)),
-            Exp.Assign(lScope, JSContextBuilder.Current)
+            YExpression.Assign(scriptInfo, ScriptInfoBuilder.New(location,code.Value)),
+            YExpression.Assign(lScope, JSContextBuilder.Current)
         };
 
-        JSContextStackBuilder.Push(sList, lScope, stackItem, Exp.Constant(location), StringSpanBuilder.Empty, 0, 0);
+        JSContextStackBuilder.Push(sList, lScope, stackItem, YExpression.Constant(location), StringSpanBuilder.Empty, 0, 0);
         sList.Add(ScriptInfoBuilder.Build(scriptInfo, _keyStrings));
 
         vList.AddRange(fx.VariableParameters);
@@ -111,10 +109,10 @@ public partial class FastCompiler : AstMapVisitor<Expression>
             }
         }
 
-        sList.Add(Exp.Return(l, script.ToJSValue()));
-        sList.Add(Exp.Label(l, JSUndefinedBuilder.Value));
+        sList.Add(YExpression.Return(l, script.ToJSValue()));
+        sList.Add(YExpression.Label(l, JSUndefinedBuilder.Value));
 
-        script = Exp.Block(vList, Exp.TryFinally(Exp.Block(sList), JSContextStackBuilder.Pop(stackItem, lScope)));
+        script = YExpression.Block(vList, YExpression.TryFinally(YExpression.Block(sList), JSContextStackBuilder.Pop(stackItem, lScope)));
 
         if (jScript.IsAsync)
         {
@@ -122,51 +120,51 @@ public partial class FastCompiler : AstMapVisitor<Expression>
                 replaceContext: fx.Context, replaceScriptInfo: scriptInfo);
 
             var jsf = JSAsyncFunctionBuilder.Create(JSGeneratorFunctionBuilderV2.New(g, StringSpanBuilder.New("vm"), StringSpanBuilder.New(code.Value)));
-            var np = Expression.Parameter(ArgumentsBuilder.refType, "a");
+            var np = YExpression.Parameter(ArgumentsBuilder.refType, "a");
 
             jsf = JSFunctionBuilder.InvokeFunction(jsf, np);
 
-            Method = Exp.Lambda<JSFunctionDelegate>("vm", jsf, [np]);
+            Method = YExpression.Lambda<JSFunctionDelegate>("vm", jsf, [np]);
             return;
         }
 
-        var lambda = Exp.Lambda<JSFunctionDelegate>("body", script, fx.Arguments);
+        var lambda = YExpression.Lambda<JSFunctionDelegate>("body", script, fx.Arguments);
         Method = lambda;
     }
 
-    private Expression VisitExpression(AstExpression exp) => Visit(exp);
+    private YExpression VisitExpression(AstExpression exp) => Visit(exp);
 
-    private Expression VisitStatement(AstStatement exp) => Visit(exp);
+    private YExpression VisitStatement(AstStatement exp) => Visit(exp);
 
-    protected override Expression VisitClassStatement(AstClassExpression classStatement) => CreateClass(classStatement.Identifier, classStatement.Base, classStatement);
+    protected override YExpression VisitClassStatement(AstClassExpression classStatement) => CreateClass(classStatement.Identifier, classStatement.Base, classStatement);
 
-    protected override Expression VisitContinueStatement(AstContinueStatement continueStatement)
+    protected override YExpression VisitContinueStatement(AstContinueStatement continueStatement)
     {
         string name = continueStatement.Label?.Name.Value;
         if (name != null)
         {
             var target = LoopScope.Get(name);
-            return target == null ? throw JSContext.NewSyntaxError($"No label found for {name}") : Exp.Continue(target.Break);
+            return target == null ? throw JSContext.NewSyntaxError($"No label found for {name}") : YExpression.Continue(target.Break);
         }
 
-        return Exp.Continue(scope.Top.Loop.Top.Continue);
+        return YExpression.Continue(scope.Top.Loop.Top.Continue);
     }
 
-    protected override Expression VisitDebuggerStatement(AstDebuggerStatement debuggerStatement) => JSDebuggerBuilder.RaiseBreak();
+    protected override YExpression VisitDebuggerStatement(AstDebuggerStatement debuggerStatement) => JSDebuggerBuilder.RaiseBreak();
 
-    protected override Expression VisitEmptyExpression(AstEmptyExpression emptyExpression) => Exp.Empty;
+    protected override YExpression VisitEmptyExpression(AstEmptyExpression emptyExpression) => YExpression.Empty;
 
-    protected override Expression VisitExpressionStatement(AstExpressionStatement expressionStatement) => Visit(expressionStatement.Expression);
+    protected override YExpression VisitExpressionStatement(AstExpressionStatement expressionStatement) => Visit(expressionStatement.Expression);
 
-    protected override Expression VisitFunctionExpression(AstFunctionExpression functionExpression) => CreateFunction(functionExpression);
+    protected override YExpression VisitFunctionExpression(AstFunctionExpression functionExpression) => CreateFunction(functionExpression);
 
-    protected override Expression VisitSpreadElement(AstSpreadElement spreadElement) => throw new NotImplementedException();
+    protected override YExpression VisitSpreadElement(AstSpreadElement spreadElement) => throw new NotImplementedException();
 
-    protected override Expression VisitThrowStatement(AstThrowStatement throwStatement) => JSExceptionBuilder.Throw(VisitExpression(throwStatement.Argument));
+    protected override YExpression VisitThrowStatement(AstThrowStatement throwStatement) => JSExceptionBuilder.Throw(VisitExpression(throwStatement.Argument));
 
-    protected override Expression VisitYieldExpression(AstYieldExpression yieldExpression)
+    protected override YExpression VisitYieldExpression(AstYieldExpression yieldExpression)
     {
         var target = VisitExpression(yieldExpression.Argument);
-        return Expression.Yield(target, yieldExpression.Delegate);
+        return YExpression.Yield(target, yieldExpression.Delegate);
     }
 }

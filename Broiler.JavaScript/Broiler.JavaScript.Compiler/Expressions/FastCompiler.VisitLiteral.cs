@@ -2,15 +2,13 @@
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Core.LinqExpressions;
 using System;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Expression VisitLiteral(AstLiteral literal)
+    protected override YExpression VisitLiteral(AstLiteral literal)
     {
         switch (literal.TokenType)
         {
@@ -21,7 +19,7 @@ partial class FastCompiler
                 return JSBooleanBuilder.False;
 
             case TokenTypes.String:
-                return JSStringBuilder.New(Exp.Constant(literal.StringValue));
+                return JSStringBuilder.New(YExpression.Constant(literal.StringValue));
 
             case TokenTypes.BigInt:
                 return JSBigIntBuilder.New(literal.StringValue);
@@ -30,7 +28,7 @@ partial class FastCompiler
                 return JSDecimalBuilder.New(literal.StringValue);
 
             case TokenTypes.RegExLiteral:
-                return JSRegExpBuilder.New(Exp.Constant(literal.Regex.Pattern),Exp.Constant(literal.Regex.Flags));
+                return JSRegExpBuilder.New(YExpression.Constant(literal.Regex.Pattern), YExpression.Constant(literal.Regex.Flags));
             
             case TokenTypes.Null:
                 return JSNullBuilder.Value;
@@ -50,7 +48,7 @@ partial class FastCompiler
                 if (n == 0 && n != -0)
                     return JSNumberBuilder.Zero;
 
-                return JSNumberBuilder.New(Exp.Constant(n));
+                return JSNumberBuilder.New(YExpression.Constant(n));
         }
 
         throw new NotImplementedException();

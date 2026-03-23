@@ -167,7 +167,7 @@ internal sealed class DomParser
                 box.Display = CssConstants.Block;
         }
 
-        if (box.TextDecoration != String.Empty && box.Text.IsEmpty)
+        if (box.TextDecoration != string.Empty && box.Text.IsEmpty)
         {
             foreach (var childBox in box.Boxes)
                 childBox.TextDecoration = box.TextDecoration;

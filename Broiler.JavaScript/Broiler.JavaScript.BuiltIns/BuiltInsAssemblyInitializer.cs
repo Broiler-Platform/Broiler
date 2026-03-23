@@ -1,18 +1,19 @@
 using System.Runtime.CompilerServices;
+using Broiler.JavaScript.BuiltIns.Array.Typed;
+using Broiler.JavaScript.BuiltIns.Debug;
+using Broiler.JavaScript.BuiltIns.Decimal;
+using Broiler.JavaScript.BuiltIns.Disposable;
+using Broiler.JavaScript.BuiltIns.Intl;
+using Broiler.JavaScript.BuiltIns.Iterator;
+using Broiler.JavaScript.BuiltIns.Map;
+using Broiler.JavaScript.BuiltIns.Set;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array.Typed;
 using Broiler.JavaScript.Core.Core.BigInt;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Date;
-using Broiler.JavaScript.Core.Core.Debug;
-using Broiler.JavaScript.Core.Core.Decimal;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Global;
-using Broiler.JavaScript.Core.Core.Intl;
-using Broiler.JavaScript.Core.Core.Iterator;
-using Broiler.JavaScript.Core.Core.Map;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Set;
 
 namespace Broiler.JavaScript.BuiltIns;
 

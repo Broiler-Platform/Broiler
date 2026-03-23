@@ -1,12 +1,12 @@
 
 using Broiler.JavaScript.Ast.Statements;
 using Broiler.JavaScript.Core.LinqExpressions;
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Exp VisitReturnStatement(AstReturnStatement returnStatement) => 
-        Exp.Return(scope.Top.ReturnLabel, returnStatement.Argument != null ? VisitExpression(returnStatement.Argument) : JSUndefinedBuilder.Value);
+    protected override YExpression VisitReturnStatement(AstReturnStatement returnStatement) =>
+        YExpression.Return(scope.Top.ReturnLabel, returnStatement.Argument != null ? VisitExpression(returnStatement.Argument) : JSUndefinedBuilder.Value);
 }

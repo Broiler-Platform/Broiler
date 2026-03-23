@@ -1,5 +1,4 @@
-﻿using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+﻿using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LambdaGen;
@@ -8,15 +7,15 @@ using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Ast.Patterns;
 using Broiler.JavaScript.Ast.Misc;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Expression VisitVariableDeclaration(AstVariableDeclaration variableDeclaration)
+    protected override YExpression VisitVariableDeclaration(AstVariableDeclaration variableDeclaration)
     {
         var dispose = variableDeclaration.Using;
         var async = variableDeclaration.AwaitUsing;
-        var list = new Sequence<Exp>();
+        var list = new Sequence<YExpression>();
         var top = scope.Top;
         var newScope = variableDeclaration.Kind == FastVariableKind.Const || variableDeclaration.Kind == FastVariableKind.Let;
         var ed = variableDeclaration.Declarators.GetFastEnumerator();
@@ -33,13 +32,13 @@ partial class FastCompiler
                     }
                     else
                     {
-                        list.Add(Exp.Assign(v.Expression, Visit(d.Init)));
+                        list.Add(YExpression.Assign(v.Expression, Visit(d.Init)));
                     }
 
                     if (dispose)
                     {
                         list.Add(top.Disposable.CallExpression<IJSDisposableStack, JSValue, bool>(() => (j, v, b) => 
-                        j.AddDisposableResource(v, b), v.Expression, Expression.Constant(async)));
+                        j.AddDisposableResource(v, b), v.Expression, YExpression.Constant(async)));
                     }
                     break;
 
@@ -48,14 +47,14 @@ partial class FastCompiler
                     using (var temp = top.GetTempVariable())
                     {
                         if (d.Init != null)
-                            list.Add(Exp.Assign(temp.Variable, Visit(d.Init)));
+                            list.Add(YExpression.Assign(temp.Variable, Visit(d.Init)));
 
                         list.Add(CreateAssignment(objectPattern, temp.Expression, true, newScope));
 
                         if (dispose)
                         {
                             list.Add(top.Disposable.CallExpression<IJSDisposableStack, JSValue, bool>(() => (j, v, b) => 
-                            j.AddDisposableResource(v, b), temp.Variable, Expression.Constant(async)));
+                            j.AddDisposableResource(v, b), temp.Variable, YExpression.Constant(async)));
                         }
                     }
                     break;
@@ -65,13 +64,13 @@ partial class FastCompiler
                     using (var temp = scope.Top.GetTempVariable())
                     {
                         if (d.Init != null)
-                            list.Add(Exp.Assign(temp.Variable, Visit(d.Init)));
+                            list.Add(YExpression.Assign(temp.Variable, Visit(d.Init)));
 
                         list.Add(CreateAssignment(arrayPattern, temp.Expression, true, newScope));
                         if (dispose)
                         {
                             list.Add(top.Disposable.CallExpression<IJSDisposableStack, JSValue, bool>(() => (j, v, b) => 
-                            j.AddDisposableResource(v, b), temp.Variable, Expression.Constant(async)));
+                            j.AddDisposableResource(v, b), temp.Variable, YExpression.Constant(async)));
                         }
                     }
                     break;
@@ -86,7 +85,7 @@ partial class FastCompiler
             var e = list[0];
             return e;
         }
-        var r = Exp.Block(list);
+        var r = YExpression.Block(list);
         return r;
     }
 }

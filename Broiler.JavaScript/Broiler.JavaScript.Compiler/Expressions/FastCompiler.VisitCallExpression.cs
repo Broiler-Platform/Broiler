@@ -1,25 +1,25 @@
 ﻿using Broiler.JavaScript.Ast.Expressions;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.FastParser.Compiler;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using System;
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Exp VisitCallExpression(AstCallExpression callExpression)
+    protected override YExpression VisitCallExpression(AstCallExpression callExpression)
     {
         var ce = VisitCallExpression(callExpression.Callee, callExpression.Arguments, callExpression.Coalesce);
         return ce;
     }
 
-    protected (IFastEnumerable<Expression> args, bool hasSpread) VisitArguments(IFastEnumerable<AstExpression> arguments)
+    protected (IFastEnumerable<YExpression> args, bool hasSpread) VisitArguments(IFastEnumerable<AstExpression> arguments)
     {
-        var args = new Sequence<Exp>(arguments.Count);
+        var args = new Sequence<YExpression>(arguments.Count);
         bool hasSpread = false;
         var e = arguments.GetFastEnumerator();
 
@@ -37,13 +37,13 @@ partial class FastCompiler
             hasSpread = true;
         }
 
-        var result = args.Any() ? (args, hasSpread) : (Sequence<Exp>.Empty, false);
+        var result = args.Any() ? (args, hasSpread) : (Sequence<YExpression>.Empty, false);
         return result;
     }
 
-    protected Expression VisitArguments(Expression? thisArg, IFastEnumerable<AstExpression> arguments, Expression? newTarget = null)
+    protected YExpression VisitArguments(YExpression? thisArg, IFastEnumerable<AstExpression> arguments, YExpression? newTarget = null)
     {
-        var args = new Sequence<Exp>(arguments.Count);
+        var args = new Sequence<YExpression>(arguments.Count);
         bool hasSpread = false;
         var e = arguments.GetFastEnumerator();
 
@@ -80,11 +80,11 @@ partial class FastCompiler
         return result;
     }
 
-    protected Exp VisitCallExpression(AstExpression callee, IFastEnumerable<AstExpression> arguments, bool coalesce = false)
+    protected YExpression VisitCallExpression(AstExpression callee, IFastEnumerable<AstExpression> arguments, bool coalesce = false)
     {
         if (callee.Type == FastNodeType.MemberExpression && callee is AstMemberExpression me)
         {
-            Exp name;
+            YExpression name;
 
             switch (me.Property.Type)
             {
@@ -98,7 +98,7 @@ partial class FastCompiler
                     if (l.TokenType == TokenTypes.String)
                         name = KeyOfName(l.Start.CookedText);
                     else if (l.TokenType == TokenTypes.Number)
-                        name = Exp.Constant((uint)l.NumericValue);
+                        name = YExpression.Constant((uint)l.NumericValue);
                     else
                         throw new NotImplementedException();
                     break;
@@ -148,11 +148,11 @@ partial class FastCompiler
                 // initialized members.. and super has been called...
                 if (members?.Any() ?? false)
                 {
-                    var initList = new Sequence<Exp>() { JSFunctionBuilder.InvokeSuperConstructor(super, @this, paramArray1) };
+                    var initList = new Sequence<YExpression>() { JSFunctionBuilder.InvokeSuperConstructor(super, @this, paramArray1) };
                     InitMembers(initList, top);
                     top.MemberInits = null;
 
-                    return Exp.Block(initList);
+                    return YExpression.Block(initList);
                 }
                 
                 return JSFunctionBuilder.InvokeSuperConstructor(super, @this, paramArray1);

@@ -1,13 +1,10 @@
 ﻿using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.Core.Core.Date;
-using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Enumerators;
 using Broiler.JavaScript.Core.Utils;
-using Broiler.JavaScript.Storage;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -114,52 +111,35 @@ public partial class ClrProxy : JSObject
 
         var t = Type.GetTypeCode(type);
 
-        switch (t)
+        return t switch
         {
-            case TypeCode.Boolean:
-                return (bool)value ? JSBoolean.True : JSBoolean.False;
-            case TypeCode.Byte:
-                return new JSNumber((byte)value);
-            case TypeCode.Char:
-                return new JSString((char)value);
-            case TypeCode.DateTime:
-                return new JSDate((DateTime)value);
-            case TypeCode.DBNull:
-                return JSNull.Value;
-            case TypeCode.Decimal:
-                return new JSNumber((double)(decimal)value);
-            case TypeCode.Double:
-                return new JSNumber((double)value);
-            case TypeCode.Int16:
-                return new JSNumber((short)value);
-            case TypeCode.Int32:
-                return new JSNumber((int)value);
-            case TypeCode.Int64:
-                return new JSNumber((long)value);
-            case TypeCode.SByte:
-                return new JSNumber((sbyte)value);
-            case TypeCode.Single:
-                return new JSNumber((float)value);
-            case TypeCode.String:
-                return new JSString((string)value);
-            case TypeCode.UInt16:
-                return new JSNumber((ushort)value);
-            case TypeCode.UInt32:
-                return new JSNumber((uint)value);
-            case TypeCode.UInt64:
-                return new JSNumber((long)value);
-        }
-
-        return value switch
-        {
-            JSValue jsValue => jsValue,
-            DateTimeOffset dateTimeOffset => new JSDate(dateTimeOffset),
-            Type valueType => ClrType.From(valueType),
-            Task<JSValue> task => task.ToPromise(),
-            Task task => task.ToPromise(),
-            IJavaScriptObject obj => From(obj),
-            IEnumerable<JSValue> en => new JSGenerator(new ClrEnumerableElementEnumerator(en), "Clr Iterator"),
-            _ => From(value),
+            TypeCode.Boolean => (bool)value ? JSBoolean.True : JSBoolean.False,
+            TypeCode.Byte => new JSNumber((byte)value),
+            TypeCode.Char => new JSString((char)value),
+            TypeCode.DateTime => new JSDate((DateTime)value),
+            TypeCode.DBNull => JSNull.Value,
+            TypeCode.Decimal => new JSNumber((double)(decimal)value),
+            TypeCode.Double => new JSNumber((double)value),
+            TypeCode.Int16 => new JSNumber((short)value),
+            TypeCode.Int32 => new JSNumber((int)value),
+            TypeCode.Int64 => new JSNumber((long)value),
+            TypeCode.SByte => new JSNumber((sbyte)value),
+            TypeCode.Single => new JSNumber((float)value),
+            TypeCode.String => new JSString((string)value),
+            TypeCode.UInt16 => new JSNumber((ushort)value),
+            TypeCode.UInt32 => new JSNumber((uint)value),
+            TypeCode.UInt64 => new JSNumber((long)value),
+            _ => value switch
+            {
+                JSValue jsValue => jsValue,
+                DateTimeOffset dateTimeOffset => new JSDate(dateTimeOffset),
+                Type valueType => ClrType.From(valueType),
+                Task<JSValue> task => task.ToPromise(),
+                Task task => task.ToPromise(),
+                IJavaScriptObject obj => From(obj),
+                IEnumerable<JSValue> en => new JSGenerator(new ClrEnumerableElementEnumerator(en), "Clr Iterator"),
+                _ => From(value),
+            },
         };
     }
 

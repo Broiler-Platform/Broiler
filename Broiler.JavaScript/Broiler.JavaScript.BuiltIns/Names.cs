@@ -2,7 +2,7 @@
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.ExpressionCompiler;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.BuiltIns;
 
 /// <summary>
 /// Source-generated registration class for built-in types in the BuiltIns assembly.

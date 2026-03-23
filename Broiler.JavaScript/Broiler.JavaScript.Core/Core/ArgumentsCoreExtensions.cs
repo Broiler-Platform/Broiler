@@ -1,7 +1,6 @@
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Primitive;
-using System.Runtime.CompilerServices;
 
 namespace Broiler.JavaScript.Core.Core;
 

@@ -7,7 +7,7 @@ public static class CharExtensions
 {
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static string FromCodePoint(this int cp) => Char.ConvertFromUtf32(cp);
+    internal static string FromCodePoint(this int cp) => char.ConvertFromUtf32(cp);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static int HexValue(this char ch)

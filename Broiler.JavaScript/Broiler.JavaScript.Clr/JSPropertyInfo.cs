@@ -5,7 +5,7 @@ using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler.Runtime;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 using System;
 using System.Reflection;
@@ -53,26 +53,26 @@ internal class JSPropertyInfo
 
     internal Func<object, uint, JSValue> GenerateIndexedGetter()
     {
-        var @this = Expression.Parameter(typeof(object));
-        var index = Expression.Parameter(typeof(uint));
+        var @this = YExpression.Parameter(typeof(object));
+        var index = YExpression.Parameter(typeof(uint));
         var indexParameter = Property.GetMethod.GetParameters()[0];
 
-        Expression indexAccess = index.Type != indexParameter.ParameterType ? Expression.Convert(index, indexParameter.ParameterType) : index;
-        Expression indexExpression;
-        Expression convertThis = Expression.TypeAs(@this, Property.DeclaringType);
+        YExpression indexAccess = index.Type != indexParameter.ParameterType ? YExpression.Convert(index, indexParameter.ParameterType) : index;
+        YExpression indexExpression;
+        YExpression convertThis = YExpression.TypeAs(@this, Property.DeclaringType);
 
         if (Property.DeclaringType.IsArray)
         {
             // this is direct array.. cast and get.. 
-            indexExpression = Expression.ArrayIndex(convertThis, indexAccess);
+            indexExpression = YExpression.ArrayIndex(convertThis, indexAccess);
         }
         else
         {
-            indexExpression = Expression.MakeIndex(convertThis, Property, [indexAccess]);
+            indexExpression = YExpression.MakeIndex(convertThis, Property, [indexAccess]);
         }
 
-        Expression body = JSExceptionBuilder.Wrap(ClrProxyBuilder.Marshal(indexExpression));
-        var lambda = Expression.Lambda<Func<object, uint, JSValue>>($"set {Property.Name}", body, @this, index);
+        YExpression body = JSExceptionBuilder.Wrap(ClrProxyBuilder.Marshal(indexExpression));
+        var lambda = YExpression.Lambda<Func<object, uint, JSValue>>($"set {Property.Name}", body, @this, index);
 
         return lambda.Compile();
     }
@@ -85,27 +85,27 @@ internal class JSPropertyInfo
         var type = Property.DeclaringType;
         var elementType = type.GetElementTypeOrGeneric() ?? Property.PropertyType;
 
-        var @this = Expression.Parameter(typeof(object));
-        var index = Expression.Parameter(typeof(uint));
-        var value = Expression.Parameter(typeof(object));
+        var @this = YExpression.Parameter(typeof(object));
+        var index = YExpression.Parameter(typeof(uint));
+        var value = YExpression.Parameter(typeof(object));
         var indexParameter = Property.SetMethod.GetParameters()[0];
 
-        Expression indexAccess = index.Type != indexParameter.ParameterType ? Expression.Convert(index, indexParameter.ParameterType) : index;
-        Expression indexExpression;
-        Expression convertThis = Expression.TypeAs(@this, Property.DeclaringType);
+        YExpression indexAccess = index.Type != indexParameter.ParameterType ? YExpression.Convert(index, indexParameter.ParameterType) : index;
+        YExpression indexExpression;
+        YExpression convertThis = YExpression.TypeAs(@this, Property.DeclaringType);
 
         if (Property.DeclaringType.IsArray)
         {
             // this is direct array.. cast and get.. 
-            indexExpression = Expression.ArrayIndex(convertThis, indexAccess);
+            indexExpression = YExpression.ArrayIndex(convertThis, indexAccess);
         }
         else
         {
-            indexExpression = Expression.MakeIndex(convertThis, Property, [indexAccess]);
+            indexExpression = YExpression.MakeIndex(convertThis, Property, [indexAccess]);
         }
 
-        Expression body = Expression.Block(JSExceptionBuilder.Wrap(Expression.Assign(indexExpression, Expression.TypeAs(value, elementType)).ToJSValue()));
-        var lambda = Expression.Lambda<Func<object, uint, object, JSValue>>("get " + Property.Name, body, @this, index, value);
+        YExpression body = YExpression.Block(JSExceptionBuilder.Wrap(YExpression.Assign(indexExpression, YExpression.TypeAs(value, elementType)).ToJSValue()));
+        var lambda = YExpression.Lambda<Func<object, uint, object, JSValue>>("get " + Property.Name, body, @this, index, value);
         
         return lambda.Compile();
     }

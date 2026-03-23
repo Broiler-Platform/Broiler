@@ -1,10 +1,12 @@
-﻿using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Typed;
 using Broiler.JavaScript.ExpressionCompiler;
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Array.Typed;
+namespace Broiler.JavaScript.BuiltIns.Array.Typed;
 
 [JSClassGenerator("Int16Array"), JSBaseClass("TypedArray")]
 public partial class JSInt16Array : JSTypedArray
@@ -28,7 +30,7 @@ public partial class JSInt16Array : JSTypedArray
     {
         if (index < 0 || index >= length)
             return false;
-        System.Array.Copy(BitConverter.GetBytes((Int16)value.IntValue), 0, buffer.buffer, byteOffset + index * 2, 2);
+        System.Array.Copy(BitConverter.GetBytes((short)value.IntValue), 0, buffer.buffer, byteOffset + index * 2, 2);
         return true;
     }
 

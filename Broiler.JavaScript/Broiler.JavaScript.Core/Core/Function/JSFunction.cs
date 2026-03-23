@@ -11,6 +11,7 @@ using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.ExpressionCompiler.Runtime;
 using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Core.Core.Function;
 

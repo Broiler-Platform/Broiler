@@ -1,21 +1,17 @@
-﻿using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
-using LambdaExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YLambdaExpression;
+﻿using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using System.Reflection;
-using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using Broiler.JavaScript.Core.LinqExpressions;
-using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Ast.Expressions;
+using Broiler.JavaScript.Core.FastParser.Compiler;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    private Exp CreateFunction(AstFunctionExpression functionDeclaration, Exp super = null, bool createClass = false, string className = null,
+    private YExpression CreateFunction(AstFunctionExpression functionDeclaration, YExpression super = null, bool createClass = false, string className = null,
         IFastEnumerable<AstClassProperty> memberInits = null)
     {
         var node = functionDeclaration;
@@ -37,9 +33,9 @@ partial class FastCompiler
         var nodeCode = node.Code;
 
         var code = StringSpanBuilder.New(ScriptInfoBuilder.Code(scriptInfo), nodeCode.Offset, nodeCode.Length);
-        var sList = new Sequence<Exp>();
-        var bodyInits = new Sequence<Exp>();
-        var vList = new Sequence<ParameterExpression>();
+        var sList = new Sequence<YExpression>();
+        var bodyInits = new Sequence<YExpression>();
+        var vList = new Sequence<YParameterExpression>();
 
         var current = scope.Top.RootScope;
         var cs = scope.Push(new FastFunctionScope(pool, functionDeclaration, previousThis, super, memberInits: memberInits, previous: functionDeclaration.IsArrowFunction ? current : null));
@@ -48,14 +44,14 @@ partial class FastCompiler
 
             vList.Add(cs.Context);
             vList.Add(cs.StackItem);
-            sList.Add(Exp.Assign(cs.Context, JSContextBuilder.Current));
+            sList.Add(YExpression.Assign(cs.Context, JSContextBuilder.Current));
 
             FastFunctionScope.VariableScope jsFVarScope = null;
 
             // BROILER-PATCH: For function declarations, look up name in parent scope
             // to bind the function. For function expressions, the name is local to
             // the function body and must not leak to the parent scope (ES3 §13).
-            ParameterExpression fexprNameParam = null;
+            YParameterExpression fexprNameParam = null;
             if (functionName != null && functionDeclaration.IsStatement)
             {
                 jsFVarScope = previousScope.GetVariable(functionName);
@@ -65,7 +61,7 @@ partial class FastCompiler
                 // BROILER-PATCH: For function expressions, create a closure variable
                 // in the parent scope that the function body captures. This variable
                 // holds the function reference and is marked read-only.
-                fexprNameParam = Exp.Parameter(typeof(JSVariable), functionName);
+                fexprNameParam = YExpression.Parameter(typeof(JSVariable), functionName);
                 var fexprVarScope = new FastFunctionScope.VariableScope
                 {
                     Name = functionName,
@@ -83,8 +79,8 @@ partial class FastCompiler
             var stackItem = cs.StackItem;
             var r = s.ReturnLabel;
 
-            Exp fxName;
-            Exp localFxName;
+            YExpression fxName;
+            YExpression localFxName;
             int nameOffset;
             int nameLength;
 
@@ -109,7 +105,7 @@ partial class FastCompiler
 
             var point = node.Start.Start;
 
-            sList.Add(Exp.Assign(stackItem, CallStackItemBuilder.New(cs.Context, scriptInfo, nameOffset, nameLength, point.Line, point.Column)));
+            sList.Add(YExpression.Assign(stackItem, CallStackItemBuilder.New(cs.Context, scriptInfo, nameOffset, nameLength, point.Line, point.Column)));
 
             var argumentElements = args;
 
@@ -125,7 +121,7 @@ partial class FastCompiler
                 CreateAssignment(bodyInits, v.Identifier, JSVariableBuilder.FromArgumentOptional(argumentElements, i, VisitExpression(v.Init)), true, true);
             }
 
-            Exp lambdaBody = VisitStatement(functionDeclaration.Body);
+            YExpression lambdaBody = VisitStatement(functionDeclaration.Body);
 
             vList.AddRange(s.VariableParameters);
             sList.AddRange(s.InitList);
@@ -137,22 +133,22 @@ partial class FastCompiler
             sList.Add(lambdaBody);
 
             if (createClass)
-                sList.Add(Exp.Return(r, Exp.Coalesce(s.ThisExpression, JSExceptionBuilder.Throw("this cannot be null"))));
+                sList.Add(YExpression.Return(r, YExpression.Coalesce(s.ThisExpression, JSExceptionBuilder.Throw("this cannot be null"))));
 
-            sList.Add(Exp.Label(r, JSUndefinedBuilder.Value));
+            sList.Add(YExpression.Label(r, JSUndefinedBuilder.Value));
 
-            var block = Exp.Block(vList, sList);
+            var block = YExpression.Block(vList, sList);
 
             // adding lexical scope pending...
 
             functionName = functionName ?? "inline";
 
-            static Exp ToDelegate(LambdaExpression e1) => e1;
+            static YExpression ToDelegate(YLambdaExpression e1) => e1;
 
             var scriptFunctionName = new FunctionName(functionName, location, point.Line, point.Column);
 
-            LambdaExpression lambda;
-            Exp jsf;
+            YLambdaExpression lambda;
+            YExpression jsf;
 
             if (functionDeclaration.Generator)
             {
@@ -171,7 +167,7 @@ partial class FastCompiler
             }
             else
             {
-                lambda = Exp.Lambda(typeof(JSFunctionDelegate), block, in scriptFunctionName, [cs.Arguments]);
+                lambda = YExpression.Lambda(typeof(JSFunctionDelegate), block, in scriptFunctionName, [cs.Arguments]);
                 jsf = JSFunctionBuilder.New(ToDelegate(lambda), fxName, code, functionDeclaration.Params.Count);
             }
 
@@ -189,11 +185,11 @@ partial class FastCompiler
             if (fexprNameParam != null)
             {
                 var isReadOnlyField = typeof(JSVariable).GetField("IsReadOnly", BindingFlags.Instance | BindingFlags.NonPublic);
-                var fexprVars = new Sequence<ParameterExpression> { fexprNameParam };
+                var fexprVars = new Sequence<YParameterExpression> { fexprNameParam };
 
-                return Exp.Block(fexprVars, 
-                    Exp.Assign(fexprNameParam, JSVariableBuilder.New(jsf, functionName)), 
-                    Exp.Assign(Exp.Field(fexprNameParam, isReadOnlyField), Exp.Constant(true)), 
+                return YExpression.Block(fexprVars,
+                    YExpression.Assign(fexprNameParam, JSVariableBuilder.New(jsf, functionName)),
+                    YExpression.Assign(YExpression.Field(fexprNameParam, isReadOnlyField), YExpression.Constant(true)), 
                     JSVariable.ValueExpression(fexprNameParam));
             }
 
@@ -201,7 +197,7 @@ partial class FastCompiler
         }
     }
 
-    private void InitMembers(Sequence<Expression> sList, FastFunctionScope s)
+    private void InitMembers(Sequence<YExpression> sList, FastFunctionScope s)
     {
         var @this = s.ThisExpression;
         var en = s.MemberInits.GetFastEnumerator();
@@ -212,7 +208,7 @@ partial class FastCompiler
             var value = member.Init == null ? JSUndefinedBuilder.Value : Visit(member.Init);
             var init = JSObjectBuilder.AddValue(name, value, JSPropertyAttributes.ConfigurableValue);
 
-            sList.Add(Exp.Call(@this, init.Member as MethodInfo, init.Arguments));
+            sList.Add(YExpression.Call(@this, init.Member as MethodInfo, init.Arguments));
         }
     }
 }

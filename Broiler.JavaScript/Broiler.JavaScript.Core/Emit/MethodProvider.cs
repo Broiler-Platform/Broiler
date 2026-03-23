@@ -1,4 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core.Storage;
+﻿using Broiler.JavaScript.Storage;
 using System;
 using System.Linq.Expressions;
 using System.Reflection;

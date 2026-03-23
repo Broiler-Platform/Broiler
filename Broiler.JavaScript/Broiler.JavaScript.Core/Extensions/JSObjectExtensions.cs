@@ -4,6 +4,7 @@ using Broiler.JavaScript.Core.Core.Storage;
 using System;
 using System.ComponentModel;
 using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Core.Extensions;
 

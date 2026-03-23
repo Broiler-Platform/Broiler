@@ -1,4 +1,6 @@
-﻿namespace Broiler.JavaScript.Core.Core.Debug;
+﻿using Broiler.JavaScript.Core.Core;
+
+namespace Broiler.JavaScript.BuiltIns.Debug;
 
 public class JSConsole(JSContext context)
 {

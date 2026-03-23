@@ -1,12 +1,12 @@
 ﻿using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Core.LinqExpressions;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    public Expression KeyOfName(string name)
+    public YExpression KeyOfName(string name)
     {
         // search for variable...
         if (KeyStringsBuilder.Fields.TryGetValue(name, out var fx))
@@ -16,7 +16,7 @@ partial class FastCompiler
         return ScriptInfoBuilder.KeyString(scriptInfo, (int)i);
     }
 
-    public Expression KeyOfName(in StringSpan name)
+    public YExpression KeyOfName(in StringSpan name)
     {
         // search for variable...
         if (KeyStringsBuilder.Fields.TryGetValue(name, out var fx))

@@ -2,14 +2,13 @@
 using Broiler.JavaScript.Ast.Statements;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Expression VisitIfStatement(AstIfStatement ifStatement)
+    protected override YExpression VisitIfStatement(AstIfStatement ifStatement)
     {
         var test = JSValueBuilder.BooleanValue(VisitExpression(ifStatement.Test));
         var trueCase = VisitStatement(ifStatement.True).ToJSValue();
@@ -17,9 +16,9 @@ partial class FastCompiler
         if (ifStatement.False != null)
         {
             var elseCase = VisitStatement(ifStatement.False).ToJSValue();
-            return Exp.Condition(test, trueCase, elseCase);
+            return YExpression.Condition(test, trueCase, elseCase);
         }
 
-        return Exp.Condition(test, trueCase, JSUndefinedBuilder.Value);
+        return YExpression.Condition(test, trueCase, JSUndefinedBuilder.Value);
     }
 }

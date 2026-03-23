@@ -1,11 +1,12 @@
 
 using Broiler.JavaScript.Core.LinqExpressions;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Expression VisitIdentifier(AstIdentifier identifier)
+    protected override YExpression VisitIdentifier(AstIdentifier identifier)
     {
         if (identifier.Name.Equals("undefined"))
             return JSUndefinedBuilder.Value;

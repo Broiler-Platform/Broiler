@@ -3,13 +3,13 @@ using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
 using System;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Expression VisitMemberExpression(AstMemberExpression memberExpression)
+    protected override YExpression VisitMemberExpression(AstMemberExpression memberExpression)
     {
         var isSuper = memberExpression.Object?.Type == FastNodeType.Super;
         var target = isSuper ? scope.Top.ThisExpression : VisitExpression(memberExpression.Object);

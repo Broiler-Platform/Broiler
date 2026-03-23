@@ -1,5 +1,4 @@
-﻿using Broiler.JavaScript.Core.Extensions;
-using System;
+﻿using System;
 
 namespace Broiler.JavaScript.Core.Core.Primitive;
 

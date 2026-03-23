@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array.Typed;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Enumerators;
@@ -11,8 +10,10 @@ using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Core.Core.Array;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Typed;
 
-namespace Broiler.JavaScript.Core.Typed;
+namespace Broiler.JavaScript.BuiltIns.Array.Typed;
 
 
 [JSClassGenerator("TypedArray")]

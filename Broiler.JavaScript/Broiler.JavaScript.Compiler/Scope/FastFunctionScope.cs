@@ -1,14 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
-using LabelTarget = Broiler.JavaScript.ExpressionCompiler.Expressions.YLabelTarget;
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.Core.CodeGen;
 using Broiler.JavaScript.Core.Core.Disposable;
-using Broiler.JavaScript.Core.Core.Storage;
-using Broiler.JavaScript.Core.LambdaGen;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using Broiler.JavaScript.Core.LinqExpressions;
@@ -16,7 +11,7 @@ using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Ast.Expressions;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 
 public class SharedParserStringMap<T>
@@ -122,11 +117,11 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
 {
     public class VariableScope : IDisposable
     {
-        public ParameterExpression Variable { get; internal set; }
-        public Exp Expression { get; internal set; }
+        public YParameterExpression Variable { get; internal set; }
+        public YExpression Expression { get; internal set; }
         public string Name { get; internal set; }
         public bool Create { get; internal set; }
-        public Expression Init { get; private set; }
+        public YExpression Init { get; private set; }
 
         /// <summary>
         /// Create Variable first and then assign it, in next step.
@@ -134,12 +129,12 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
         /// This is required for recursive function as name/instance of function
         /// is null when it is being created and accessed at the same time
         /// </summary>
-        public Expression PostInit { get; private set; }
+        public YExpression PostInit { get; private set; }
         public bool InUse { get; internal set; }
         public bool IsTemp { get; internal set; }
         public void Dispose() => InUse = false;
 
-        public void SetPostInit(Expression exp)
+        public void SetPostInit(YExpression exp)
         {
             if (exp == null)
             {
@@ -151,15 +146,15 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
             {
                 if (exp.Type == typeof(JSVariable))
                 {
-                    PostInit = Exp.Assign(Variable, exp);
+                    PostInit = YExpression.Assign(Variable, exp);
                     return;
                 }
             }
 
-            PostInit = Exp.Assign(Expression, exp);
+            PostInit = YExpression.Assign(Expression, exp);
         }
 
-        public void SetInit(Expression exp)
+        public void SetInit(YExpression exp)
         {
             if (Variable.Type == typeof(JSVariable))
             {
@@ -167,23 +162,23 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
                 {
                     if (typeof(JSValue).IsAssignableFrom(exp.Type))
                     {
-                        Init = Exp.Assign(Variable, JSVariableBuilder.New(exp, Name));
+                        Init = YExpression.Assign(Variable, JSVariableBuilder.New(exp, Name));
                     }
                     else
                     {
-                        Init = Exp.Assign(Variable, exp);
+                        Init = YExpression.Assign(Variable, exp);
                     }
                 }
                 else
                 {
-                    Init = Exp.Assign(Variable, JSVariableBuilder.New(Name));
+                    Init = YExpression.Assign(Variable, JSVariableBuilder.New(Name));
                 }
             }
             else
             {
                 if (exp != null)
                 {
-                    Init = Exp.Assign(Variable, exp);
+                    Init = YExpression.Assign(Variable, exp);
                 }
             }
         }
@@ -198,28 +193,28 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
 
     public AstFunctionExpression Function { get; }
 
-    public Expression ThisExpression => field ??= GetVariable("this", true).Expression;
+    public YExpression ThisExpression => field ??= GetVariable("this", true).Expression;
 
     // public Expression NewTarget => Expression.Field(ArgumentsExpression, nameof(Broiler.JavaScript.Core.Arguments.NewTarget));
 
     public bool HasDisposable => _dispoable != null;
 
-    private ParameterExpression _dispoable;
-    public ParameterExpression Disposable => _dispoable ??= Expression.Parameter(typeof(IJSDisposableStack));
+    private YParameterExpression _dispoable;
+    public YParameterExpression Disposable => _dispoable ??= YExpression.Parameter(typeof(IJSDisposableStack));
 
-    public Expression ArgumentsExpression { get; }
+    public YExpression ArgumentsExpression { get; }
 
-    public ParameterExpression Arguments { get; }
+    public YParameterExpression Arguments { get; }
 
-    public ParameterExpression Context { get; }
+    public YParameterExpression Context { get; }
 
-    public ParameterExpression StackItem { get; }
+    public YParameterExpression StackItem { get; }
 
     public bool IsRoot => Function == null;
 
     public LinkedStack<LoopScope> Loop;
 
-    public Expression Super { get; set; }
+    public YExpression Super { get; set; }
 
     public IEnumerable<VariableScope> Variables
     {
@@ -234,7 +229,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
         }
     }
 
-    public IEnumerable<ParameterExpression> VariableParameters
+    public IEnumerable<YParameterExpression> VariableParameters
     {
         get
         {
@@ -247,7 +242,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
         }
     }
 
-    public IEnumerable<Expression> InitList
+    public IEnumerable<YExpression> InitList
     {
         get
         {
@@ -267,13 +262,13 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
         }
     }
 
-    public LabelTarget ReturnLabel { get; }
+    public YLabelTarget ReturnLabel { get; }
 
     public readonly FastFunctionScope TopScope;
 
-    public ParameterExpression Generator { get; set; }
+    public YParameterExpression Generator { get; set; }
 
-    public ParameterExpression Awaiter { get; set; }
+    public YParameterExpression Awaiter { get; set; }
 
     private static int scopeID = 0;
 
@@ -281,7 +276,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
 
     public readonly FastFunctionScope RootScope;
 
-    public FastFunctionScope(FastPool pool, AstFunctionExpression fx, Expression previousThis = null, Expression super = null, bool isAsync = false,
+    public FastFunctionScope(FastPool pool, AstFunctionExpression fx, YExpression previousThis = null, YExpression super = null, bool isAsync = false,
         IFastEnumerable<AstClassProperty> memberInits = null, FastFunctionScope previous = null)
     {
         RootScope = previous ?? this;
@@ -293,7 +288,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
 
         if (fx?.Generator ?? false)
         {
-            Generator = Expression.Parameter(typeof(ClrGeneratorV2), "clrGenerator");
+            Generator = YExpression.Parameter(typeof(ClrGeneratorV2), "clrGenerator");
         }
         else
         {
@@ -301,12 +296,12 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
         }
 
         if (fx?.Async ?? true)
-            Generator = Expression.Parameter(typeof(ClrGeneratorV2), "clrGenerator");
+            Generator = YExpression.Parameter(typeof(ClrGeneratorV2), "clrGenerator");
 
         if (isAsync && Generator == null)
-            Generator = Expression.Parameter(typeof(ClrGeneratorV2), "clrGenerator");
+            Generator = YExpression.Parameter(typeof(ClrGeneratorV2), "clrGenerator");
 
-        Arguments = (fx?.Generator ?? false) ? Expression.Parameter(typeof(Arguments), $"a-{sID}") : Expression.Parameter(typeof(Arguments).MakeByRefType(), $"a-{sID}");
+        Arguments = (fx?.Generator ?? false) ? YExpression.Parameter(typeof(Arguments), $"a-{sID}") : YExpression.Parameter(typeof(Arguments).MakeByRefType(), $"a-{sID}");
         ArgumentsExpression = Arguments;
 
         if (previousThis == null)
@@ -317,12 +312,12 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
             ThisExpression = t.Expression;
         }
 
-        Context = Expression.Parameter(typeof(JSContext), $"{nameof(Context)}{sID}");
-        StackItem = Expression.Parameter(typeof(CallStackItem), $"{nameof(StackItem)}{sID}");
+        Context = YExpression.Parameter(typeof(JSContext), $"{nameof(Context)}{sID}");
+        StackItem = YExpression.Parameter(typeof(CallStackItem), $"{nameof(StackItem)}{sID}");
 
         Loop = new LinkedStack<LoopScope>();
         TempVariables = [];
-        ReturnLabel = Expression.Label(typeof(JSValue));
+        ReturnLabel = YExpression.Label(typeof(JSValue));
     }
 
     public FastFunctionScope(FastFunctionScope p)
@@ -342,11 +337,11 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
         ReturnLabel = p.ReturnLabel;
     }
 
-    public Exp this[string name] => GetVariable(name).Expression;
+    public YExpression this[string name] => GetVariable(name).Expression;
 
     public VariableScope CreateException(string name)
     {
-        var v = new VariableScope { Variable = Exp.Parameter(typeof(Exception), name + "Exp") };
+        var v = new VariableScope { Variable = YExpression.Parameter(typeof(Exception), name + "Exp") };
         variableScopeList[name + DateTime.UtcNow.Ticks] = v;
         v.Expression = v.Variable;
 
@@ -371,7 +366,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
             }
         }
 
-        var tp = Exp.Variable(type, "#Temp" + type.Name + id++);
+        var tp = YExpression.Variable(type, "#Temp" + type.Name + id++);
         var temp = new VariableScope
         {
             Create = true,
@@ -388,7 +383,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
 
     public bool IsFunctionScope => Parent?.Function != Function;
 
-    public VariableScope CreateVariable(in StringSpan name, Exp init = null, bool newScope = false, Type type = null)
+    public VariableScope CreateVariable(in StringSpan name, YExpression init = null, bool newScope = false, Type type = null)
     {
         var v = variableScopeList[name];
         if (v != null)
@@ -409,7 +404,7 @@ public class FastFunctionScope : LinkedStackItem<FastFunctionScope>
         }
 
         // we need to move variable in top scope...
-        var pe = Expression.Parameter(type ?? typeof(JSVariable), name.Value);
+        var pe = YExpression.Parameter(type ?? typeof(JSVariable), name.Value);
         var ve = JSVariable.ValueExpression(pe);
         
         v = new VariableScope

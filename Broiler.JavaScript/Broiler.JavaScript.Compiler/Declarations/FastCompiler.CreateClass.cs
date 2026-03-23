@@ -1,11 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
 using Broiler.JavaScript.Core.Core.Class;
-using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
@@ -14,12 +8,14 @@ using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Ast.Statements;
 using Broiler.JavaScript.Ast.Expressions;
 using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.FastParser.Compiler;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    private Exp GetName(AstClassProperty property)
+    private YExpression GetName(AstClassProperty property)
     {
         var exp = property.Key;
         var computed = property.Computed;
@@ -39,7 +35,7 @@ partial class FastCompiler
         }
     }
 
-    private Exp CreateClass(AstIdentifier id, AstExpression super, AstClassExpression body)
+    private YExpression CreateClass(AstIdentifier id, AstExpression super, AstClassExpression body)
     {
         var scope = pool.NewScope();
         var tempVar = this.scope.Top.GetTempVariable(typeof(JSClass));
@@ -47,11 +43,9 @@ partial class FastCompiler
         var prototypeElements = new Sequence<YElementInit>();
         var staticElements = new Sequence<YBinding>();
 
-        Dictionary<string, string> added = [];
-
         // need to save super..
         // create a super variable...
-        Exp superExp;
+        YExpression superExp;
         if (super != null)
         {
             superExp = VisitExpression(super);
@@ -61,16 +55,16 @@ partial class FastCompiler
             superExp = JSContextBuilder.Object;
         }
 
-        var superVar = Exp.Parameter(typeof(JSFunction));
-        var superPrototypeVar = Exp.Parameter(typeof(JSObject));
+        var superVar = YExpression.Parameter(typeof(JSFunction));
+        var superPrototypeVar = YExpression.Parameter(typeof(JSObject));
 
-        var stmts = new Sequence<Exp>(body.Members.Count)
+        var stmts = new Sequence<YExpression>(body.Members.Count)
         {
-            Exp.Assign(superVar, Exp.TypeAs(superExp, typeof(JSFunction))),
-            Exp.Assign(superPrototypeVar, JSFunctionBuilder.Prototype(superVar))
+            YExpression.Assign(superVar, YExpression.TypeAs(superExp, typeof(JSFunction))),
+            YExpression.Assign(superPrototypeVar, JSFunctionBuilder.Prototype(superVar))
         };
 
-        Exp retValue = tempVar.Variable;
+        YExpression retValue = tempVar.Variable;
 
         var memberInits = new Sequence<AstClassProperty>();
         AstFunctionExpression constructor = null;
@@ -78,7 +72,7 @@ partial class FastCompiler
         var en = body.Members.GetFastEnumerator();
         while (en.MoveNext(out var property))
         {
-            Exp name;
+            YExpression name;
             // var el = property.IsStatic ? staticElements : prototypeElements;
             switch (property.Kind)
             {
@@ -159,15 +153,15 @@ partial class FastCompiler
                 using var s = this.scope.Push(new FastFunctionScope(null, null, memberInits: memberInits));
                 var args = s.Arguments;
                 var @this = s.ThisExpression;
-                var inits = new Sequence<Exp>() { };
+                var inits = new Sequence<YExpression>() { };
 
                 inits.AddRange(s.InitList);
-                inits.Add(Exp.Assign(@this, JSFunctionBuilder.InvokeFunction(superVar, args)));
+                inits.Add(YExpression.Assign(@this, JSFunctionBuilder.InvokeFunction(superVar, args)));
 
                 InitMembers(inits, s);
                 inits.Add(@this);
 
-                var lambda = Exp.Lambda<JSFunctionDelegate>(className, Exp.Block(s.VariableParameters.AsSequence(), inits), args);
+                var lambda = YExpression.Lambda<JSFunctionDelegate>(className, YExpression.Block(s.VariableParameters.AsSequence(), inits), args);
                 var fx = JSFunctionBuilder.New(lambda, StringSpanBuilder.New(className), StringSpanBuilder.Empty, 1);
 
                 staticElements.Add(JSClassBuilder.AddConstructor(fx));
@@ -179,21 +173,21 @@ partial class FastCompiler
         if (prototypeElements.Any())
             staticElements.Add(new YMemberElementInit(JSFunctionBuilder._prototype, prototypeElements));
 
-        Expression retVal = staticElements.Any() ? Expression.MemberInit(_new, staticElements) : _new;
+        YExpression retVal = staticElements.Any() ? YExpression.MemberInit(_new, staticElements) : _new;
 
-        stmts.Add(Expression.Assign(retValue, retVal));
+        stmts.Add(YExpression.Assign(retValue, retVal));
 
         if (id?.Name != null)
         {
             var v = this.scope.Top.CreateVariable(id.Name);
-            stmts.Add(Exp.Assign(v.Expression, retValue));
+            stmts.Add(YExpression.Assign(v.Expression, retValue));
         }
         else
         {
             stmts.Add(retValue);
         }
 
-        var result = Exp.Block(new Sequence<ParameterExpression> { superVar, superPrototypeVar }, stmts);
+        var result = YExpression.Block(new Sequence<YParameterExpression> { superVar, superPrototypeVar }, stmts);
         scope.Dispose();
         return result;
     }

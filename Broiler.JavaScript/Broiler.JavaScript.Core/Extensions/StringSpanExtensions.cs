@@ -1,6 +1,5 @@
 ﻿#nullable enable
 using Broiler.JavaScript.Ast.Misc;
-using System;
 using System.Text;
 
 namespace Broiler.JavaScript.Core.Extensions;
@@ -29,7 +28,7 @@ public static class StringSpanExtensions
             if (char.IsUpper(ch))
             {
                 sb.Append('-');
-                sb.Append(Char.ToLower(ch));
+                sb.Append(char.ToLower(ch));
                 continue;
             }
             sb.Append(ch);

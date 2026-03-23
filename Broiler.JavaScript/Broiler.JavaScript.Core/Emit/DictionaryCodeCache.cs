@@ -1,6 +1,6 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.ExpressionCompiler.Runtime;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Core.Emit;
 

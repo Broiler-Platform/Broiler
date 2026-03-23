@@ -1,21 +1,7 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array;
-using Broiler.JavaScript.Core.Core.Boolean;
-using Broiler.JavaScript.Core.Core.Function;
-using Broiler.JavaScript.Core.Core.Generator;
-using Broiler.JavaScript.Core.Core.Object;
-using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Storage;
-using Broiler.JavaScript.Core.Enumerators;
 using Broiler.JavaScript.Core.Extensions;
-using Broiler.JavaScript.Core.Utils;
-using Broiler.JavaScript.ExpressionCompiler;
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using System.Text;
-using System.Threading;
 namespace Broiler.JavaScript.Core;
 
 public partial class JSObject

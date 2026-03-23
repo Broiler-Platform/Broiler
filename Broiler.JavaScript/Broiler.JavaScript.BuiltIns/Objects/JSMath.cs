@@ -1,8 +1,10 @@
-﻿using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.ExpressionCompiler;
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Objects;
+namespace Broiler.JavaScript.BuiltIns.Objects;
 
 [JSClassGenerator("Math"), JSInternalObject]
 public partial class JSMath : JSObject

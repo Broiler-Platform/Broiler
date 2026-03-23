@@ -1,4 +1,6 @@
-﻿using Broiler.JavaScript.Core.Core.Array;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Function;
@@ -8,7 +10,7 @@ using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.ExpressionCompiler;
 
-namespace Broiler.JavaScript.Core.Core.Objects;
+namespace Broiler.JavaScript.BuiltIns.Objects;
 
 [JSClassGenerator("Reflect"), JSInternalObject]
 public partial class JSReflect : JSObject

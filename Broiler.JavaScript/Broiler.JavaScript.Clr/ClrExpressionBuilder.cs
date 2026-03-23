@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Broiler.JavaScript.Core.Core;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.Clr;
 
@@ -51,32 +50,32 @@ internal static class ClrExpressionBuilder
         _from = d;
     }
 
-    public static Expression Marshal(Expression target)
+    public static YExpression Marshal(YExpression target)
     {
         if (_marshal.TryGetValue(target.Type, out var m))
-            return Expression.Call(null, m, target);
+            return YExpression.Call(null, m, target);
 
         if (target.Type.IsValueType)
-            return Expression.Call(null, _marshal[typeof(object)], Expression.Box(target));
+            return YExpression.Call(null, _marshal[typeof(object)], YExpression.Box(target));
 
-        return Expression.Call(null, _marshal[typeof(object)], target);
+        return YExpression.Call(null, _marshal[typeof(object)], target);
     }
 
-    public static Expression From(Expression target)
+    public static YExpression From(YExpression target)
     {
         var targetType = target.Type;
         if (_from.TryGetValue(targetType, out var m))
-            return Expression.Call(null, m, target);
+            return YExpression.Call(null, m, target);
 
         if (targetType.IsValueType)
-            return Expression.Call(null, _from[typeof(object)], Expression.Box(target));
+            return YExpression.Call(null, _from[typeof(object)], YExpression.Box(target));
 
         foreach (var pair in _from)
         {
             if (pair.Key.IsAssignableFrom(targetType))
-                return Expression.Call(null, pair.Value, target);
+                return YExpression.Call(null, pair.Value, target);
         }
 
-        return Expression.Call(null, _from[typeof(object)], target);
+        return YExpression.Call(null, _from[typeof(object)], target);
     }
 }

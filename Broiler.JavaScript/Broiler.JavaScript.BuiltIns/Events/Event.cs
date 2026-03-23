@@ -2,8 +2,10 @@
 using Broiler.JavaScript.Core.Core.Clr;
 using System;
 using Broiler.JavaScript.Core.Core.Boolean;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 
-namespace Broiler.JavaScript.Core.Core.Events;
+namespace Broiler.JavaScript.BuiltIns.Events;
 
 public class Event : JavaScriptObject
 {

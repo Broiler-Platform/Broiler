@@ -1,4 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core.Storage;
+﻿using Broiler.JavaScript.Storage;
 using System;
 
 namespace Broiler.JavaScript.Core.Core;

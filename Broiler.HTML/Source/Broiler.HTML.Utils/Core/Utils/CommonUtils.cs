@@ -56,7 +56,7 @@ internal static class CommonUtils
         "ア", "イ", "ウ", "エ", "オ", "カ", "キ", "ク", "ケ", "コ", "サ", "シ", "ス", "セ", "ソ", "タ", "チ", "ツ", "テ", "ト", "ナ", "ニ", "ヌ", "ネ", "ノ", "ハ", "ヒ", "フ", "ヘ", "ホ", "マ", "ミ", "ム", "メ", "モ", "ヤ", "ユ", "ヨ", "ラ", "リ", "ル", "レ", "ロ", "ワ", "ヰ", "ヱ", "ヲ", "ン"
     ];
 
-    public static String _tempPath;
+    public static string _tempPath;
 
     public static bool IsAsianCharecter(char ch) => ch >= 0x4e00 && ch <= 0xFA2D;
 
@@ -186,13 +186,13 @@ internal static class CommonUtils
 
     public static int GetNextSubString(string str, int idx, out int length)
     {
-        while (idx < str.Length && Char.IsWhiteSpace(str[idx]))
+        while (idx < str.Length && char.IsWhiteSpace(str[idx]))
             idx++;
 
         if (idx < str.Length)
         {
             var endIdx = idx + 1;
-            while (endIdx < str.Length && !Char.IsWhiteSpace(str[endIdx]))
+            while (endIdx < str.Length && !char.IsWhiteSpace(str[endIdx]))
                 endIdx++;
             length = endIdx - idx;
             return idx;
@@ -209,7 +209,7 @@ internal static class CommonUtils
 
         for (int i = 0; i < length; i++)
         {
-            if (Char.ToLowerInvariant(str[idx + i]) != Char.ToLowerInvariant(str2[i]))
+            if (char.ToLowerInvariant(str[idx + i]) != char.ToLowerInvariant(str2[i]))
                 return false;
         }
 
@@ -281,12 +281,12 @@ internal static class CommonUtils
             var n = number % 26 - 1;
             if (n >= 0)
             {
-                sb = (Char)(alphStart + n) + sb;
+                sb = (char)(alphStart + n) + sb;
                 number = number / 26;
             }
             else
             {
-                sb = (Char)(alphStart + 25) + sb;
+                sb = (char)(alphStart + 25) + sb;
                 number = (number - 1) / 26;
             }
         }
@@ -304,12 +304,12 @@ internal static class CommonUtils
                 n++;
             if (n >= 0)
             {
-                sb = (Char)(945 + n) + sb;
+                sb = (char)(945 + n) + sb;
                 number = number / 24;
             }
             else
             {
-                sb = (Char)(945 + 24) + sb;
+                sb = (char)(945 + 24) + sb;
                 number = (number - 1) / 25;
             }
         }

@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core.Storage;
-using Broiler.JavaScript.Core.Enumerators;
 using Broiler.JavaScript.Core.Core.Primitive;
 
 namespace Broiler.JavaScript.Core.Core.Object;

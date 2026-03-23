@@ -1,4 +1,4 @@
-﻿namespace Broiler.JavaScript.Core.FastParser.Compiler;
+﻿namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {

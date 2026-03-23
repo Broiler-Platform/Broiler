@@ -7,23 +7,21 @@ using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using System;
 using System.Linq;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.Core;
 
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using LabelTarget = Broiler.JavaScript.ExpressionCompiler.Expressions.YLabelTarget;
-
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
     class SwitchInfo(FastPool.Scope scope)
     {
-        public Sequence<Exp> Tests = [];
-        public Sequence<Exp> Body;
-        public readonly LabelTarget Label = Exp.Label("case-start");
+        public Sequence<YExpression> Tests = [];
+        public Sequence<YExpression> Body;
+        public readonly YLabelTarget Label = YExpression.Label("case-start");
     }
 
-    protected override Expression VisitSwitchStatement(AstSwitchStatement switchStatement)
+    protected override YExpression VisitSwitchStatement(AstSwitchStatement switchStatement)
     {
         bool allStrings = true;
         bool allNumbers = true;
@@ -34,9 +32,9 @@ partial class FastCompiler
         try
         {
 
-            Sequence<Exp> defBody = null;
+            Sequence<YExpression> defBody = null;
             var @continue = this.scope.Top.Loop?.Top?.Continue;
-            var @break = Exp.Label();
+            var @break = YExpression.Label();
             var ls = new LoopScope(@break, @continue, true);
             var cases = new Sequence<SwitchInfo>(switchStatement.Cases.Count + 2);
             using var bt = this.scope.Top.Loop.Push(ls);
@@ -45,7 +43,7 @@ partial class FastCompiler
 
             while (casesEn.MoveNext(out var c))
             {
-                var body = new Sequence<Exp>(c.Statements.Count);
+                var body = new Sequence<YExpression>(c.Statements.Count);
                 var en = c.Statements.GetFastEnumerator();
 
                 while (en.MoveNext(out var es))
@@ -69,7 +67,7 @@ partial class FastCompiler
                     continue;
                 }
 
-                Exp test = null;
+                YExpression test = null;
                 switch (c.Test.Type)
                 {
                     case FastNodeType.UnaryExpression:
@@ -94,7 +92,7 @@ partial class FastCompiler
                                         if (unary.Operator == UnaryOperator.Minus)
                                             ln = -ln;
 
-                                        test = Exp.Constant(ln);
+                                        test = YExpression.Constant(ln);
                                         isTestSet = true;
                                         break;
                                     }
@@ -121,7 +119,7 @@ partial class FastCompiler
                             case TokenTypes.String:
                                 allNumbers = false;
                                 // allStrings = allStrings && true ;
-                                test = Exp.Constant(literal.StringValue);
+                                test = YExpression.Constant(literal.StringValue);
                                 break;
 
                             case TokenTypes.Number:
@@ -129,7 +127,7 @@ partial class FastCompiler
                                 if ((n % 1) != 0)
                                     allIntegers = false;
 
-                                test = Exp.Constant(literal.NumericValue);
+                                test = YExpression.Constant(literal.NumericValue);
                                 break;
 
                             case TokenTypes.True:
@@ -165,7 +163,7 @@ partial class FastCompiler
                 if (body.Count > 0)
                 {
                     cases.Add(lastCase);
-                    body.Insert(0, Exp.Label(lastCase.Label));
+                    body.Insert(0, YExpression.Label(lastCase.Label));
                     lastCase.Body = body;
                     lastCase = new SwitchInfo(scope);
                 }
@@ -177,7 +175,7 @@ partial class FastCompiler
             foreach (var @case in cases)
             {
                 // if last one is not break statement... make it fall through...
-                last?.Body.Add(Exp.Goto(@case.Label));
+                last?.Body.Add(YExpression.Goto(@case.Label));
                 last = @case;
 
                 if (allNumbers)
@@ -231,21 +229,21 @@ partial class FastCompiler
                 }
             }
 
-            Exp d = null;
+            YExpression d = null;
             var lastLine = switchStatement.Start.Start.Line;
 
             if (defBody != null)
             {
-                var defLabel = Exp.Label($"default-start-{lastLine}");
-                last?.Body.Add(Exp.Goto(defLabel));
+                var defLabel = YExpression.Label($"default-start-{lastLine}");
+                last?.Body.Add(YExpression.Goto(defLabel));
 
-                defBody.Insert(0, Exp.Label(defLabel));
-                d = Exp.Block(defBody);
+                defBody.Insert(0, YExpression.Label(defLabel));
+                d = YExpression.Block(defBody);
             }
 
-            var r = Exp.Block(
-                Exp.Switch(testTarget, d.ToJSValue() ?? JSUndefinedBuilder.Value, equalsMethod, [.. cases.Select(x =>
-                Exp.SwitchCase(Exp.Block(x.Body).ToJSValue(), x.Tests))]), Exp.Label(@break));
+            var r = YExpression.Block(
+                YExpression.Switch(testTarget, d.ToJSValue() ?? JSUndefinedBuilder.Value, equalsMethod, [.. cases.Select(x =>
+                YExpression.SwitchCase(YExpression.Block(x.Body).ToJSValue(), x.Tests))]), YExpression.Label(@break));
             return r;
         }
         finally

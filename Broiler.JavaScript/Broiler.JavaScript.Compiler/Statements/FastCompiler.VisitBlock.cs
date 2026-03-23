@@ -1,18 +1,18 @@
-﻿using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+﻿using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Expression VisitBlock(AstBlock block)
+    protected override YExpression VisitBlock(AstBlock block)
     {
         int count = block.Statements.Count;
         if (count == 0)
-            return Expression.Empty;
+            return YExpression.Empty;
 
-        var blockList = new Sequence<Expression>(count);
+        var blockList = new Sequence<YExpression>(count);
         var hoistingScope = block.HoistingScope;
         var scope = this.scope.Push(new FastFunctionScope(this.scope.Top));
         

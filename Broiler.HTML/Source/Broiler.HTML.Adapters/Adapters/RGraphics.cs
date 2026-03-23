@@ -26,13 +26,13 @@ public abstract class RGraphics : IDisposable
     public abstract void PushClip(RectangleF rect);
     public abstract void PushClipExclude(RectangleF rect);
 
-    public abstract Object SetAntiAliasSmoothingMode();
-    public abstract void ReturnPreviousSmoothingMode(Object prevMode);
+    public abstract object SetAntiAliasSmoothingMode();
+    public abstract void ReturnPreviousSmoothingMode(object prevMode);
     public abstract RBrush GetTextureBrush(RImage image, RectangleF dstRect, PointF translateTransformLocation);
     public abstract RGraphicsPath GetGraphicsPath();
     public abstract SizeF MeasureString(string str, RFont font);
     public abstract void MeasureString(string str, RFont font, double maxWidth, out int charFit, out double charFitWidth);
-    public abstract void DrawString(String str, RFont font, Color color, PointF point, SizeF size, bool rtl);
+    public abstract void DrawString(string str, RFont font, Color color, PointF point, SizeF size, bool rtl);
     public abstract void DrawLine(RPen pen, double x1, double y1, double x2, double y2);
     public abstract void DrawRectangle(RPen pen, double x, double y, double width, double height);
     public abstract void DrawRectangle(RBrush brush, double x, double y, double width, double height);

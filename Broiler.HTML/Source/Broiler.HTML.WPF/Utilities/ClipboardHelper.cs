@@ -20,7 +20,7 @@ EndSelection:<<<<<<<<4";
 
     public static DataObject CreateDataObject(string html, string plainText)
     {
-        html = html ?? String.Empty;
+        html = html ?? string.Empty;
         var htmlFragment = GetHtmlDataString(html);
 
         // re-encode the string so it will work correctly (fixed in CLR 4.0)

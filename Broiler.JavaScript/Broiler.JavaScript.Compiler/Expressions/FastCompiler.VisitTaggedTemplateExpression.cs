@@ -1,7 +1,5 @@
 ﻿using System;
 
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
@@ -9,17 +7,17 @@ using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Ast.Expressions;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Exp VisitTaggedTemplateExpression(AstTaggedTemplateExpression template)
+    protected override YExpression VisitTaggedTemplateExpression(AstTaggedTemplateExpression template)
     {
         var callee = template.Tag;
 
-        var args = new Sequence<Expression>(template.Arguments.Count);
+        var args = new Sequence<YExpression>(template.Arguments.Count);
         var parts = new Sequence<YElementInit>(template.Arguments.Count);
-        var raw = new Sequence<Expression>(template.Arguments.Count);
+        var raw = new Sequence<YExpression>(template.Arguments.Count);
 
         var e = template.Arguments.GetFastEnumerator();
         args.Add(null);
@@ -40,8 +38,8 @@ partial class FastCompiler
                     if (r.EndsWith("${"))
                         r = r.Substring(0, r.Length - 2);
 
-                    raw.Add(JSStringBuilder.New(Expression.Constant(r)));
-                    parts.Add(new YElementInit(JSArrayBuilder._Add, JSStringBuilder.New(Expression.Constant(l.StringValue))));
+                    raw.Add(JSStringBuilder.New(YExpression.Constant(r)));
+                    parts.Add(new YElementInit(JSArrayBuilder._Add, JSStringBuilder.New(YExpression.Constant(l.StringValue))));
                     continue;
                 }
             }
@@ -58,7 +56,7 @@ partial class FastCompiler
 
         if (callee.Type == FastNodeType.MemberExpression && callee is AstMemberExpression me)
         {
-            Exp name;
+            YExpression name;
 
             switch (me.Property.Type)
             {
@@ -72,7 +70,7 @@ partial class FastCompiler
                     if (l.TokenType == TokenTypes.String)
                         name = KeyOfName(l.Start.CookedText);
                     else if (l.TokenType == TokenTypes.Number)
-                        name = Exp.Constant((uint)l.NumericValue);
+                        name = YExpression.Constant((uint)l.NumericValue);
                     else
                         throw new NotImplementedException();
                     break;

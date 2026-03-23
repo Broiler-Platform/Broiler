@@ -1,11 +1,10 @@
-﻿using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler.Runtime;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using System.Reflection;
 
 namespace Broiler.JavaScript.Clr;
@@ -31,11 +30,11 @@ internal readonly struct JSFieldInfo
         var field = this.field;
         return new JSFunction(() =>
         {
-            var args = Expression.Parameter(typeof(Arguments).MakeByRefType());
-            Expression convertedThis = field.IsStatic ? null : JSValueToClrConverter.Get(ArgumentsBuilder.This(args), field.DeclaringType, "this");
+            var args = YExpression.Parameter(typeof(Arguments).MakeByRefType());
+            YExpression convertedThis = field.IsStatic ? null : JSValueToClrConverter.Get(ArgumentsBuilder.This(args), field.DeclaringType, "this");
 
-            var body = ClrProxyBuilder.Marshal(Expression.Field(convertedThis, field));
-            var lambda = Expression.Lambda<JSFunctionDelegate>(name, body, args);
+            var body = ClrProxyBuilder.Marshal(YExpression.Field(convertedThis, field));
+            var lambda = YExpression.Lambda<JSFunctionDelegate>(name, body, args);
 
             return lambda.Compile();
         }, name);
@@ -47,19 +46,19 @@ internal readonly struct JSFieldInfo
         var field = this.field;
         return new JSFunction(() =>
         {
-            var args = Expression.Parameter(typeof(Arguments).MakeByRefType());
+            var args = YExpression.Parameter(typeof(Arguments).MakeByRefType());
             var a1 = ArgumentsBuilder.Get1(args);
             var convert = field.IsStatic ? null : JSValueToClrConverter.Get(ArgumentsBuilder.This(args), field.DeclaringType, "this");
 
             var clrArg1 = JSValueToClrConverter.Get(a1, field.FieldType, "value");
-            var fieldExp = Expression.Field(convert, field);
+            var fieldExp = YExpression.Field(convert, field);
 
             // todo
             // not working for `char`
-            var assign = Expression.Assign(fieldExp, clrArg1).ToJSValue();
+            var assign = YExpression.Assign(fieldExp, clrArg1).ToJSValue();
 
             var body = assign;
-            var lambda = Expression.Lambda<JSFunctionDelegate>(name, body, args);
+            var lambda = YExpression.Lambda<JSFunctionDelegate>(name, body, args);
 
             return lambda.Compile();
         }, name);

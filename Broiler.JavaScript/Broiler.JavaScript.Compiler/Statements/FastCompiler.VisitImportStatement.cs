@@ -1,23 +1,23 @@
 ﻿using Broiler.JavaScript.Ast.Statements;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.FastParser.Compiler;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    protected override Exp VisitImportStatement(AstImportStatement importStatement)
+    protected override YExpression VisitImportStatement(AstImportStatement importStatement)
     {
-        var tempRequire = Exp.Parameter(typeof(JSValue));
+        var tempRequire = YExpression.Parameter(typeof(JSValue));
         var require = scope.Top.GetVariable("import");
         var source = VisitExpression(importStatement.Source);
         var args = ArgumentsBuilder.New(JSUndefinedBuilder.Value, source);
-        var stmts = new Sequence<Exp>
+        var stmts = new Sequence<YExpression>
         {
-            Exp.Assign(tempRequire, Expression.Yield(JSFunctionBuilder.InvokeFunction(require.Expression, args)))
+            YExpression.Assign(tempRequire, YExpression.Yield(JSFunctionBuilder.InvokeFunction(require.Expression, args)))
         };
 
         FastFunctionScope.VariableScope imported;
@@ -26,14 +26,14 @@ partial class FastCompiler
         if (all != null)
         {
             imported = scope.Top.CreateVariable(all.Name);
-            stmts.Add(Exp.Assign(imported.Expression, tempRequire));
+            stmts.Add(YExpression.Assign(imported.Expression, tempRequire));
         }
 
         if (importStatement.Default != null)
         {
             imported = scope.Top.CreateVariable(importStatement.Default.Name);
             var prop = JSValueBuilder.Index(tempRequire, KeyOfName("default"));
-            stmts.Add(Exp.Assign(imported.Expression, prop));
+            stmts.Add(YExpression.Assign(imported.Expression, prop));
         }
 
         if (importStatement.Members != null)
@@ -43,11 +43,11 @@ partial class FastCompiler
             {
                 imported = scope.Top.CreateVariable(item.asName);
                 var prop = JSValueBuilder.Index(tempRequire, KeyOfName(item.name));
-                stmts.Add(Exp.Assign(imported.Expression, prop));
+                stmts.Add(YExpression.Assign(imported.Expression, prop));
             }
         }
 
-        var importExp = Exp.Block(tempRequire.AsSequence(), stmts);
+        var importExp = YExpression.Block(tempRequire.AsSequence(), stmts);
         return importExp;
     }
 

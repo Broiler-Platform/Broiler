@@ -3,8 +3,10 @@ using System;
 using System.Collections.Concurrent;
 using System.Globalization;
 using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 
-namespace Broiler.JavaScript.Core.Core.Intl;
+namespace Broiler.JavaScript.BuiltIns.Intl;
 
 public class JSIntl
 {

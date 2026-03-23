@@ -4,7 +4,7 @@ namespace Broiler.JavaScript.Core.Core.Array;
 
 public class JSSpreadValue(JSValue value) : JSValue(null)
 {
-    private int _length = value.Length;
+    private readonly int _length = value.Length;
 
     internal override bool IsSpread => true;
 

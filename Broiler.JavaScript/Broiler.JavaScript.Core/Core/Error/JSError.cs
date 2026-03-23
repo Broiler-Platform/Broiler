@@ -1,8 +1,8 @@
 ﻿using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Storage;
 using System;
 using System.Runtime.CompilerServices;
 using System.Text;

@@ -1,4 +1,6 @@
-﻿using Broiler.JavaScript.Core.Core.Array;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
@@ -6,7 +8,7 @@ using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.ExpressionCompiler;
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Map;
+namespace Broiler.JavaScript.BuiltIns.Map;
 
 internal delegate void UnregisterWeakValue(in HashedString key);
 

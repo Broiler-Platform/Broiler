@@ -1,4 +1,6 @@
 ﻿using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
@@ -11,7 +13,7 @@ using System.CodeDom.Compiler;
 using System.IO;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core.Core.Json;
+namespace Broiler.JavaScript.BuiltIns.Json;
 
 public delegate JSValue JsonParserReceiver((string key, JSValue value) property);
 

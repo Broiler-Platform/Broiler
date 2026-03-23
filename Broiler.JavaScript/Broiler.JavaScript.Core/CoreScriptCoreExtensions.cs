@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.Core.Emit;

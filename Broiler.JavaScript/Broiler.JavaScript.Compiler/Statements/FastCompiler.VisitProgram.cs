@@ -1,22 +1,19 @@
 ﻿using System;
 using System.Linq;
-
-using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LambdaGen;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Compiler;
 
 partial class FastCompiler
 {
-    private Expression Scoped(FastFunctionScope scope, IFastEnumerable<Expression> body)
+    private YExpression Scoped(FastFunctionScope scope, IFastEnumerable<YExpression> body)
     {
-        var list = new Sequence<Exp>();
+        var list = new Sequence<YExpression>();
         list.AddRange(scope.InitList);
         list.AddRange(body);
 
@@ -24,16 +21,16 @@ partial class FastCompiler
             throw new InvalidOperationException();
 
         if (!list.Any())
-            return Exp.Empty;
+            return YExpression.Empty;
 
-        var r = Exp.Block(scope.VariableParameters.AsSequence(), list);
+        var r = YExpression.Block(scope.VariableParameters.AsSequence(), list);
 
         if (scope.HasDisposable)
         {
             list =
             [
                 // create new disposable via factory delegate ...
-                Expression.Assign(scope.Disposable,
+                YExpression.Assign(scope.Disposable,
                     NewLambdaExpression.StaticCallExpression<IJSDisposableStack>(() => () => IJSDisposableStack.New()))
             ];
 
@@ -42,23 +39,23 @@ partial class FastCompiler
             if (scope.Function.Async)
             {
                 // we will move everything inside await dispose...
-                list.Add(Exp.TryFinally(r, Exp.Yield(dispose)));
+                list.Add(YExpression.TryFinally(r, YExpression.Yield(dispose)));
             }
             else
             {
-                list.Add(Exp.TryFinally(r, dispose));
+                list.Add(YExpression.TryFinally(r, dispose));
             }
 
-            return Exp.Block(new Sequence<ParameterExpression> { scope.Disposable }, list);
+            return YExpression.Block(new Sequence<YParameterExpression> { scope.Disposable }, list);
         }
 
         return r;
     }
 
 
-    protected override Expression VisitProgram(AstProgram program)
+    protected override YExpression VisitProgram(AstProgram program)
     {
-        var blockList = new Sequence<Expression>(program.Statements.Count);
+        var blockList = new Sequence<YExpression>(program.Statements.Count);
         ref var hoistingScope = ref program.HoistingScope;
         var scope = this.scope.Push(new FastFunctionScope(this.scope.Top));
 

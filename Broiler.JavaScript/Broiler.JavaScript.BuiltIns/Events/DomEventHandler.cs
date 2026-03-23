@@ -1,7 +1,8 @@
 ﻿#nullable enable
+using Broiler;
 using Broiler.JavaScript.Core.Core.Function;
 
-namespace Broiler.JavaScript.Core.Core.Events;
+namespace Broiler.JavaScript.BuiltIns.Events;
 
 public readonly struct DomEventHandler
 {
