@@ -53,7 +53,7 @@ public partial class JSObject
     [JSExport("__proto__")]
     internal JSValue ObjectPrototype
     {
-        get => (prototypeChain as JSPrototype)?.@object ?? JSNull.Value;
+        get => (prototypeChain as JSPrototype)?.@object ?? JSValue.NullValue;
         set
         {
             if (value is JSObject o)

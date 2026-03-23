@@ -1,4 +1,3 @@
-using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Utils;
 using System;
 using System.Dynamic;
@@ -28,7 +27,7 @@ internal class JSDynamicMetaData : DynamicMetaObject
         var alist = args.Select((p) =>
         {
             if (p == null)
-                return JSNull.Value;
+                return JSValue.NullValue;
 
             return p switch
             {

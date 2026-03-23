@@ -13,10 +13,10 @@ using Broiler.JavaScript.BuiltIns.Set;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.BigInt;
 using Broiler.JavaScript.BuiltIns.Boolean;
+using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Global;
-using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.LinqExpressions;
 
 namespace Broiler.JavaScript.BuiltIns;
@@ -97,6 +97,11 @@ internal static class BuiltInsAssemblyInitializer
         // values without referencing the concrete type directly.
         JSValue.BooleanTrue = JSBoolean.True;
         JSValue.BooleanFalse = JSBoolean.False;
+
+        // Wire JSNull singleton so Core/Runtime can access the null
+        // value without referencing the concrete type directly.
+        JSValue.NullValue = JSNull.Value;
+        JSNullBuilder.Initialize(typeof(JSNull));
 
         // Wire factory delegate for JSConsole so DefaultBuiltInRegistry
         // does not directly reference the concrete type.

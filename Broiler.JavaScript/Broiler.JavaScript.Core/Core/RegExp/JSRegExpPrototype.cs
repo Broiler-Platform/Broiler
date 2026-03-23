@@ -44,7 +44,7 @@ public partial class JSRegExp
             if (globalSearch == true)
                 lastIndex = 0;
 
-            return JSNull.Value;
+            return JSValue.NullValue;
         }
 
         if (globalSearch)
