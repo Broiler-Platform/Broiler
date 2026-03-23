@@ -1,6 +1,5 @@
 ﻿using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.Core.Enumerators;
 using Broiler.JavaScript.Core.Utils;
@@ -100,7 +99,7 @@ public partial class ClrProxy : JSObject
     public static JSValue Marshal(object value)
     {
         if (value == null)
-            return JSNull.Value;
+            return JSValue.NullValue;
 
         var type = value.GetType();
 
@@ -115,7 +114,7 @@ public partial class ClrProxy : JSObject
             TypeCode.Byte => JSValue.CreateNumber((byte)value),
             TypeCode.Char => new JSString((char)value),
             TypeCode.DateTime => JSValue.CreateDate(new DateTimeOffset((DateTime)value)),
-            TypeCode.DBNull => JSNull.Value,
+            TypeCode.DBNull => JSValue.NullValue,
             TypeCode.Decimal => JSValue.CreateNumber((double)(decimal)value),
             TypeCode.Double => JSValue.CreateNumber((double)value),
             TypeCode.Int16 => JSValue.CreateNumber((short)value),
@@ -259,7 +258,7 @@ public partial class ClrProxy : JSObject
     public static JSValue From(object value)
     {
         if (value == null)
-            return JSNull.Value;
+            return JSValue.NullValue;
 
         if (value is IJavaScriptObject scriptObject)
             return From(scriptObject);
@@ -271,7 +270,7 @@ public partial class ClrProxy : JSObject
     public static JSValue From(object value, JSObject prototype)
     {
         if (value == null)
-            return JSNull.Value;
+            return JSValue.NullValue;
 
         if (value is IJavaScriptObject javaScriptObject)
         {

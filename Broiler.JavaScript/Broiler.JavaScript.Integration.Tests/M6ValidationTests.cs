@@ -9,6 +9,7 @@ using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Debugger;
 using Broiler.JavaScript.Core.Emit;
 using Broiler.JavaScript.Core.FastParser.Compiler;
+using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.Parser;
 using Broiler.JavaScript.Storage;
 

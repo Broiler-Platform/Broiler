@@ -189,7 +189,7 @@ public static partial class JSValueExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSValue NullIfUndefinedOrNull(JSValue value)
     {
-        if (value == JSNull.Value || value == JSUndefined.Value)
+        if (value == JSValue.NullValue || value == JSUndefined.Value)
             return null;
 
         return value;

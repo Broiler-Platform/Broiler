@@ -1,8 +1,9 @@
 using System;
 using System.Globalization;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Error;
 
-namespace Broiler.JavaScript.Core.Core.Primitive;
+namespace Broiler.JavaScript.BuiltIns.Null;
 
 public sealed class JSNull : JSValue
 {

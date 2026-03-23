@@ -99,7 +99,7 @@ public partial class JSRegExp : JSObject
         // Otherwise, find all matches.
         var matches = value.Matches(input.ToString());
         if (matches.Count == 0)
-            return JSNull.Value;
+            return JSValue.NullValue;
 
         // Construct the array to return.
         var matchValues = JSValue.CreateArray((uint)matches.Count);
@@ -201,7 +201,7 @@ public partial class JSRegExp : JSObject
             parameters[match.Groups.Count] = JSValue.CreateNumber(match.Index);
             parameters[match.Groups.Count + 1] = new JSString(input);
 
-            var a = new Arguments(JSNull.Value, parameters);
+            var a = new Arguments(JSValue.NullValue, parameters);
             return replaceFunction.InvokeFunction(a).ToString();
         }, globalSearch == true ? int.MaxValue : 1);
     }

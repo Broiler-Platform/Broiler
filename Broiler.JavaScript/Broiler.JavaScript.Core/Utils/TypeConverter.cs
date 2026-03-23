@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Primitive;
 using System;
 
 namespace Broiler.JavaScript.Core.Utils;
@@ -8,7 +7,7 @@ public class TypeConverter
 {
     public static JSValue FromBasic(object value) => value switch
     {
-        null => JSNull.Value,
+        null => JSValue.NullValue,
         JSValue jv => jv,
         bool b1 => b1 ? JSValue.BooleanTrue : JSValue.BooleanFalse,
         uint ui1 => JSValue.CreateNumber(ui1),

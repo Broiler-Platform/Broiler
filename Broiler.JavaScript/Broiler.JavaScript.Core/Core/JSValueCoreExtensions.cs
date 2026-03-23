@@ -14,7 +14,7 @@ internal static class JSValueCoreExtensions
     internal static void InitializeFactories()
     {
         JSValue.UndefinedValue = JSUndefined.Value;
-        JSValue.NullValue = JSNull.Value;
+
         JSValue.CreateString = v => new JSString(v);
         JSValue.NewTypeError = msg => JSContext.NewTypeError(msg);
         JSValue.CreateDynamicMetaObject = (param, value) => new JSDynamicMetaData(param, value);

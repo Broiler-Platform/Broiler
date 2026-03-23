@@ -16,7 +16,7 @@ internal sealed class FallbackClrInterop : IClrInterop
     public JSValue Marshal(object value)
     {
         if (value == null)
-            return JSNull.Value;
+            return JSValue.NullValue;
 
         if (value is JSValue jsv)
             return jsv;
@@ -29,7 +29,7 @@ internal sealed class FallbackClrInterop : IClrInterop
             TypeCode.Byte => JSValue.CreateNumber((byte)value),
             TypeCode.Char => new JSString(value.ToString()),
             TypeCode.DateTime => JSValue.CreateDate(new DateTimeOffset((DateTime)value)),
-            TypeCode.DBNull => JSNull.Value,
+            TypeCode.DBNull => JSValue.NullValue,
             TypeCode.Decimal => JSValue.CreateNumber((double)(decimal)value),
             TypeCode.Double => JSValue.CreateNumber((double)value),
             TypeCode.Int16 => JSValue.CreateNumber((short)value),
