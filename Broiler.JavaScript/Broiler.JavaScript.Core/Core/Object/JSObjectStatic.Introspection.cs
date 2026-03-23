@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Error;
@@ -19,10 +18,9 @@ public partial class JSObject
             throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
 
         if (!target.IsObject)
-            return new JSArray();
+            return JSValue.CreateArray();
 
-        var r = new JSArray();
-        ref var rElements = ref r.CreateElements();
+        var r = JSValue.CreateArray();
         var ownEntries = target.GetElementEnumerator();
 
         while (ownEntries.MoveNext(out var hasValue, out var item, out var index))
@@ -30,12 +28,20 @@ public partial class JSObject
             if (!hasValue)
                 continue;
 
-            rElements.Put(r._length++, new JSArray(new JSString(index.ToString()), item));
+            var entry = JSValue.CreateArray();
+            entry.AddArrayItem(new JSString(index.ToString()));
+            entry.AddArrayItem(item);
+            r.AddArrayItem(entry);
         }
 
         var en = (target as JSObject).GetOwnProperties(false).GetEnumerator();
         while (en.MoveNext(out var key, out var property))
-            rElements.Put(r._length++, new JSArray(key.ToJSValue(), target.GetValue(property)));
+        {
+            var entry = JSValue.CreateArray();
+            entry.AddArrayItem(key.ToJSValue());
+            entry.AddArrayItem(target.GetValue(property));
+            r.AddArrayItem(entry);
+        }
 
         return r;
     }
@@ -83,16 +89,15 @@ public partial class JSObject
             throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
-            return new JSArray();
+            return JSValue.CreateArray();
 
         var en = jobj.GetAllKeys(true, false);
-        var r = new JSArray();
-        ref var e = ref r.GetElements();
+        var r = JSValue.CreateArray();
 
         while (en.MoveNext(out var hasValue, out var value, out var index))
         {
             if (hasValue)
-                e.Put(r._length++, value);
+                r.AddArrayItem(value);
         }
 
         return r;
@@ -107,10 +112,9 @@ public partial class JSObject
             throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject target)
-            return new JSArray();
+            return JSValue.CreateArray();
 
-        var r = new JSArray();
-        ref var rElements = ref r.CreateElements();
+        var r = JSValue.CreateArray();
         var ownEntries = target.GetElementEnumerator();
 
         while (ownEntries.MoveNext(out var hasValue, out var item, out var index))
@@ -118,12 +122,12 @@ public partial class JSObject
             if (!hasValue)
                 continue;
 
-            rElements.Put(r._length++, item);
+            r.AddArrayItem(item);
         }
 
         var en = target.GetOwnProperties(false).GetEnumerator();
         while (en.MoveNext(out var property))
-            rElements.Put(r._length++, target.GetValue(property));
+            r.AddArrayItem(target.GetValue(property));
 
         return r;
     }
@@ -151,7 +155,7 @@ public partial class JSObject
             throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
-            return new JSArray();
+            return JSValue.CreateArray();
 
         var r = new JSObject();
         ref var p = ref r.GetOwnProperties(true);
@@ -179,9 +183,15 @@ public partial class JSObject
             throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
-            return new JSArray();
+            return JSValue.CreateArray();
 
-        var r = new JSArray(jobj.GetAllKeys(false, false));
+        var en = jobj.GetAllKeys(false, false);
+        var r = JSValue.CreateArray();
+        while (en.MoveNext(out var hasValue, out var value, out var index))
+        {
+            if (hasValue)
+                r.AddArrayItem(value);
+        }
         return r;
     }
 
@@ -193,12 +203,14 @@ public partial class JSObject
             throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
-            return new JSArray();
+            return JSValue.CreateArray();
 
         ref var symbols = ref jobj.GetSymbols();
-        var keys = symbols.AllValues().Select(x => KeyStringCoreExtensions.GetJSString(x.Value.key));
+        var r = JSValue.CreateArray();
+        foreach (var x in symbols.AllValues())
+            r.AddArrayItem(KeyStringCoreExtensions.GetJSString(x.Value.key));
 
-        return new JSArray(keys);
+        return r;
     }
 
     [JSExport("getPrototypeOf")]

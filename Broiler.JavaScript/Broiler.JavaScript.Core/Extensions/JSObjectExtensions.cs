@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Storage;
 using System;
 using System.ComponentModel;
@@ -56,8 +55,7 @@ public static class JSObjectExtensions
         ref var pr = ref target.GetElements(true);
         ref var existing = ref pr.Put(key);
 
-        if (target is JSArray a)
-            a._length = a._length > key ? a._length : key + 1;
+        target.UpdateArrayLengthIfNeeded(key);
         
         var getter = existing.get;
         existing = new JSProperty(key, getter, setter, existing.value, attributes);
@@ -69,8 +67,7 @@ public static class JSObjectExtensions
         ref var pr = ref target.GetElements(true);
         ref var existing = ref pr.Put(key);
 
-        if (target is JSArray a)
-            a._length = a._length > key ? a._length : key + 1;
+        target.UpdateArrayLengthIfNeeded(key);
         
         var setter = existing.set;
         existing = new JSProperty(key, getter, setter, existing.value, attributes);

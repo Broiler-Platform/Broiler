@@ -99,6 +99,29 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
     /// </summary>
     public static JSValue CreateDate(DateTimeOffset value) => CreateDateFactory(value);
 
+    /// <summary>
+    /// Factory delegate for creating an empty <c>JSArray</c>.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// Used by Core when it needs to create arrays without referencing the concrete type.
+    /// </summary>
+    internal static Func<JSValue> CreateArrayFactory;
+
+    /// <summary>
+    /// Factory delegate for creating a <c>JSArray</c> with a specified length.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static Func<uint, JSValue> CreateArrayWithLengthFactory;
+
+    /// <summary>
+    /// Creates an empty <c>JSArray</c> via the registered factory delegate.
+    /// </summary>
+    public static JSValue CreateArray() => CreateArrayFactory();
+
+    /// <summary>
+    /// Creates a <c>JSArray</c> with the specified length via the registered factory delegate.
+    /// </summary>
+    public static JSValue CreateArray(uint length) => CreateArrayWithLengthFactory(length);
+
     /// <summary>Gets whether this value is the <c>undefined</c> singleton.</summary>
     public bool IsUndefined
     {
@@ -130,6 +153,18 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
 
     /// <summary>Gets whether this value is a JavaScript <c>Array</c>.</summary>
     public virtual bool IsArray => false;
+
+    /// <summary>
+    /// Updates the internal array length when a numeric key is set.
+    /// Overridden by <c>JSArray</c> in the BuiltIns assembly.
+    /// </summary>
+    internal virtual void UpdateArrayLengthIfNeeded(uint key) { }
+
+    /// <summary>
+    /// Appends an item to this array.
+    /// Overridden by <c>JSArray</c> in the BuiltIns assembly.
+    /// </summary>
+    public virtual void AddArrayItem(JSValue item) { }
 
     /// <summary>Gets whether this value is a JavaScript string.</summary>
     public virtual bool IsString => false;

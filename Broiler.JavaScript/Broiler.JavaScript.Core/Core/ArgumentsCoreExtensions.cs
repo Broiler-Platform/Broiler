@@ -1,36 +1,36 @@
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.Core.Array;
 
 namespace Broiler.JavaScript.Core.Core;
 
 /// <summary>
 /// Core-dependent implementations for <see cref="Arguments"/> factory delegates.
 /// These methods were extracted from Arguments when it moved to Runtime because
-/// they depend on Core-only types (JSArray, JSString, JSArguments, JSException).
+/// they depend on Core-only types (JSString, JSArguments, JSException).
 /// </summary>
 internal static class ArgumentsCoreExtensions
 {
     internal static Arguments ForApplyCore(JSValue @this, JSValue args)
     {
-        if (args.IsArray && args is JSArray argArray)
+        if (args.IsArray)
         {
-            var length = argArray._length;
+            var length = (uint)args.Length;
             switch (length)
             {
                 case 0:
                     return new Arguments(@this);
                 case 1:
-                    return new Arguments(@this, argArray[0u]);
+                    return new Arguments(@this, args[0u]);
                 case 2:
-                    return new Arguments(@this, argArray[0u], argArray[1u]);
+                    return new Arguments(@this, args[0u], args[1u]);
                 case 3:
-                    return new Arguments(@this, argArray[0u], argArray[1u], argArray[2u]);
+                    return new Arguments(@this, args[0u], args[1u], args[2u]);
                 case 4:
-                    return new Arguments(@this, argArray[0u], argArray[1u], argArray[2u], argArray[3u]);
+                    return new Arguments(@this, args[0u], args[1u], args[2u], args[3u]);
                 default:
-                    var argList = new JSValue[argArray._length];
-                    var ee = argArray.GetElementEnumerator();
+                    var argList = new JSValue[length];
+                    var ee = args.GetElementEnumerator();
                     while (ee.MoveNext(out var hasValue, out var value, out var index))
                         argList[index] = hasValue ? value : JSUndefined.Value;
                     return new Arguments(@this, argList);
@@ -66,13 +66,9 @@ internal static class ArgumentsCoreExtensions
 
     internal static JSValue RestFromCore(Arguments self, uint index)
     {
-        var a = new JSArray();
-        ref var ae = ref a.GetElements(true);
-        uint ai;
-        uint i;
-        for (ai = 0, i = index; i < self.Length; i++, ai++)
-            ae.Put(ai, self.GetAt((int)i));
-        a._length = ai;
+        var a = JSValue.CreateArray();
+        for (uint i = index; i < self.Length; i++)
+            a.AddArrayItem(self.GetAt((int)i));
         return a;
     }
 

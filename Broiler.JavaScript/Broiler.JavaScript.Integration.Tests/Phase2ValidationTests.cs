@@ -82,11 +82,12 @@ public class Phase2ValidationTests
     [Fact]
     public void M10_JSArrayPrototype_PartialFilesExist()
     {
-        // JSArray's prototype methods were split into partial files:
+        // JSArray was moved to the BuiltIns assembly (Broiler.JavaScript.BuiltIns.Array namespace).
+        // Its prototype methods are split into partial files:
         // JSArrayPrototype.Iteration.cs, .Search.cs, .Modification.cs, .Utility.cs
-        // The class is JSArray (partial), with prototype methods in separate files.
-        var type = typeof(JSContext).Assembly.GetTypes()
-            .FirstOrDefault(t => t.Name == "JSArray" && t.Namespace == "Broiler.JavaScript.Core.Core.Array");
+        var builtInsAssembly = typeof(Broiler.JavaScript.BuiltIns.Array.Typed.JSArrayBuffer).Assembly;
+        var type = builtInsAssembly.GetTypes()
+            .FirstOrDefault(t => t.Name == "JSArray" && t.Namespace == "Broiler.JavaScript.BuiltIns.Array");
         Assert.NotNull(type);
 
         // Verify key methods exist from each partial file category.

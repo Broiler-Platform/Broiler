@@ -3,7 +3,6 @@ using System.Linq;
 using System.Reflection;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 
@@ -11,12 +10,25 @@ namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public class JSArrayBuilder
 {
-    private static Type type = typeof(JSArray);
+    private static Type type;
 
-    public static ConstructorInfo _New = type.GetConstructor([]);
-    private static readonly ConstructorInfo _NewFromElementEnumerator = type.GetConstructor([typeof(IElementEnumerator)]);
-    public static MethodInfo _Add = type.GetMethod(nameof(JSArray.Add), [typeof(JSValue)]);
-    public static MethodInfo _AddRange = type.GetMethod(nameof(JSArray.AddRange), [typeof(JSValue)]);
+    public static ConstructorInfo _New;
+    private static ConstructorInfo _NewFromElementEnumerator;
+    public static MethodInfo _Add;
+    public static MethodInfo _AddRange;
+
+    /// <summary>
+    /// Initializes the builder with the concrete JSArray type.
+    /// Called by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static void Initialize(Type arrayType)
+    {
+        type = arrayType;
+        _New = type.GetConstructor([]);
+        _NewFromElementEnumerator = type.GetConstructor([typeof(IElementEnumerator)]);
+        _Add = type.GetMethod("Add", [typeof(JSValue)]);
+        _AddRange = type.GetMethod("AddRange", [typeof(JSValue)]);
+    }
 
     public static Expression New()
     {

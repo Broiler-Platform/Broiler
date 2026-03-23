@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Generator;
@@ -403,11 +402,7 @@ public partial class JSObject
         }
 
         elements.Put(key) = pd.ToProperty(key);
-        if (this is JSArray array)
-        {
-            if (array._length <= key)
-                array._length = key + 1;
-        }
+        this.UpdateArrayLengthIfNeeded(key);
 
         PropertyChanged?.Invoke(this, (uint.MaxValue, key, null));
         return JSUndefined.Value;

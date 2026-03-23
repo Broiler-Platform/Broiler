@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Broiler.JavaScript.Core.Core.Array;
+namespace Broiler.JavaScript.BuiltIns.Array;
 
 internal class Comparer<T>(Comparison<T> cx) : IComparer<T>
 {

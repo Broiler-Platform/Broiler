@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.BuiltIns.Date;
 using Broiler.JavaScript.BuiltIns.Debug;
@@ -14,6 +15,7 @@ using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Global;
 using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.LinqExpressions;
 
 namespace Broiler.JavaScript.BuiltIns;
 
@@ -45,6 +47,15 @@ internal static class BuiltInsAssemblyInitializer
         // Wire factory delegate for JSDate so Core/Clr can create
         // Date values without referencing the concrete type directly.
         JSValue.CreateDateFactory = static v => new JSDate(v);
+
+        // Wire factory delegates for JSArray so Core can create
+        // array values without referencing the concrete type directly.
+        JSValue.CreateArrayFactory = static () => new JSArray();
+        JSValue.CreateArrayWithLengthFactory = static count => new JSArray(count);
+
+        // Initialize JSArrayBuilder with the concrete JSArray type so the
+        // Compiler can build array expression trees without a direct reference.
+        JSArrayBuilder.Initialize(typeof(JSArray));
 
         // Wire factory delegate for Intl date formatting so JSDatePrototype
         // does not directly reference JSIntlDateTimeFormat.
