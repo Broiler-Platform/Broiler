@@ -143,7 +143,7 @@ public partial class V8Runtime(V8InspectorProtocol inspectorContext) : V8Protoco
         if (a.ThrowOnSideEffect && a.Expression == "(async function(){ await 1; })()")
         {
             // return an error...
-            return new JSEvalError(new Arguments(JSUndefined.Value, new JSString("Has Side Effects")));
+            return new JSEvalError(new Arguments(JSUndefined.Value, JSValue.CreateString("Has Side Effects")));
         }
 
         if (!inspectorContext.Contexts.TryGetValue(a.ContextId, out var c))

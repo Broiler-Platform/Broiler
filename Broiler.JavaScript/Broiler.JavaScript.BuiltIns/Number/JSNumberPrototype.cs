@@ -109,7 +109,7 @@ partial class JSNumber
 
     [JSPrototypeMethod]
     [JSExport("toExponential", Length = 1)]
-    public static JSString ToExponential(in Arguments a)
+    public static JSValue ToExponential(in Arguments a)
     {
         var n = a.This.ToNumber();
         var nv = n.value;
@@ -153,7 +153,7 @@ partial class JSNumber
 
     [JSPrototypeMethod]
     [JSExport("toFixed", Length = 1)]
-    public static JSString ToFixed(in Arguments a)
+    public static JSValue ToFixed(in Arguments a)
     {
         var n = a.This.ToNumber();
         var nv = n.value;
@@ -189,7 +189,7 @@ partial class JSNumber
 
     [JSPrototypeMethod]
     [JSExport("toPrecision", Length = 1)]
-    public static JSString ToPrecision(in Arguments a)
+    public static JSValue ToPrecision(in Arguments a)
     {
         var n = a.This.ToNumber();
 

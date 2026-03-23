@@ -366,7 +366,7 @@ public class JSModuleContext : JSContext
             module,
             module.Import,
             module.Id,
-            new JSString(module.dirPath)
+            JSValue.CreateString(module.dirPath)
         ])) is JSPromise result)
         {
             await result.Task;

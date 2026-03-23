@@ -197,7 +197,7 @@ public abstract class V8InspectorProtocol : JSDebugger, IDisposable
         }
         catch (Exception ex)
         {
-            ReportException(new JSString(ex.ToString()));
+            ReportException(JSValue.CreateString(ex.ToString()));
         }
     }
 }

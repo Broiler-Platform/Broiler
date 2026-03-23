@@ -73,8 +73,8 @@ public partial class ClrProxy : JSObject
     public static JSValue Marshal(uint value) => JSValue.CreateNumber(value);
     public static JSValue Marshal(long value) => JSValue.CreateNumber(value);
     public static JSValue Marshal(ulong value) => JSValue.CreateNumber(value);
-    public static JSValue Marshal(string value) => new JSString(value);
-    public static JSValue Marshal(in StringSpan value) => new JSString(value);
+    public static JSValue Marshal(string value) => JSValue.CreateString(value);
+    public static JSValue Marshal(in StringSpan value) => JSValue.CreateString(value.Value);
     public static JSValue Marshal(bool value) => value ? JSValue.BooleanTrue : JSValue.BooleanFalse;
     public static JSValue Marshal(short value) => JSValue.CreateNumber(value);
     public static JSValue Marshal(ushort value) => JSValue.CreateNumber(value);
@@ -104,7 +104,7 @@ public partial class ClrProxy : JSObject
         var type = value.GetType();
 
         if (type.IsEnum)
-            return new JSString(value.ToString());
+            return JSValue.CreateString(value.ToString());
 
         var t = Type.GetTypeCode(type);
 
@@ -112,7 +112,7 @@ public partial class ClrProxy : JSObject
         {
             TypeCode.Boolean => (bool)value ? JSValue.BooleanTrue : JSValue.BooleanFalse,
             TypeCode.Byte => JSValue.CreateNumber((byte)value),
-            TypeCode.Char => new JSString((char)value),
+            TypeCode.Char => JSValue.CreateString(((char)value).ToString()),
             TypeCode.DateTime => JSValue.CreateDate(new DateTimeOffset((DateTime)value)),
             TypeCode.DBNull => JSValue.NullValue,
             TypeCode.Decimal => JSValue.CreateNumber((double)(decimal)value),
@@ -122,7 +122,7 @@ public partial class ClrProxy : JSObject
             TypeCode.Int64 => JSValue.CreateNumber((long)value),
             TypeCode.SByte => JSValue.CreateNumber((sbyte)value),
             TypeCode.Single => JSValue.CreateNumber((float)value),
-            TypeCode.String => new JSString((string)value),
+            TypeCode.String => JSValue.CreateString((string)value),
             TypeCode.UInt16 => JSValue.CreateNumber((ushort)value),
             TypeCode.UInt32 => JSValue.CreateNumber((uint)value),
             TypeCode.UInt64 => JSValue.CreateNumber((long)value),
@@ -186,7 +186,7 @@ public partial class ClrProxy : JSObject
                     return true;
                 break;
 
-            case JSString @string when @string.StringValue.Equals(this.value):
+            case var @string when @string.IsString && @string.StringValue.Equals(this.value):
                 return true;
 
             case JSValue number when number.IsNumber:

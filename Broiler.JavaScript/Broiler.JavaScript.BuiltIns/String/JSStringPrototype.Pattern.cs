@@ -90,7 +90,7 @@ public partial class JSString
         if (limitMax < splitStrings.Length)
         {
             var splitStrings2 = new string[limitMax];
-            Array.Copy(splitStrings, splitStrings2, (int)limitMax);
+            System.Array.Copy(splitStrings, splitStrings2, (int)limitMax);
             splitStrings = splitStrings2;
         }
 
