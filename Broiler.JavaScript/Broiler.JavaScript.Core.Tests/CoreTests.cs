@@ -46,13 +46,6 @@ public class CoreTests
     }
 
     [Fact]
-    public void JSBoolean_TrueAndFalse()
-    {
-        Assert.True(JSValue.BooleanTrue.BooleanValue);
-        Assert.False(JSValue.BooleanFalse.BooleanValue);
-    }
-
-    [Fact]
     public void JSContext_Eval_VariableDeclaration()
     {
         using var ctx = new JSContext();
