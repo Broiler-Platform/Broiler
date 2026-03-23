@@ -8,7 +8,6 @@ using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.ExpressionCompiler;
-using Broiler.JavaScript.Core.Core.Array;
 
 namespace Broiler.JavaScript.Core.Core.Global;
 
@@ -216,18 +215,18 @@ public partial class JSGlobalStatic
         }
 
         // Array
-        if (value is JSArray arr)
+        if (value.IsArray)
         {
-            var clone = new JSArray();
+            var clone = JSValue.CreateArray();
             seen[value] = clone;
-            var en = arr.GetElementEnumerator();
+            var en = value.GetElementEnumerator();
             
             while (en.MoveNext(out var hasValue, out var item, out var _))
             {
                 if (!hasValue)
                     continue;
 
-                clone.Add(StructuredCloneValue(item, seen));
+                clone.AddArrayItem(StructuredCloneValue(item, seen));
             }
 
             return clone;

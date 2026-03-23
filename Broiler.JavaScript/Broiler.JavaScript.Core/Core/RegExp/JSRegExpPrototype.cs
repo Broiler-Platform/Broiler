@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
@@ -54,7 +53,7 @@ public partial class JSRegExp
 
         var groups = match.Groups;
         var c = groups.Count;
-        JSArray result = new((uint)c);
+        var result = JSValue.CreateArray((uint)c);
 
         for (int i = 0; i < c; i++)
         {

@@ -5,7 +5,6 @@ using System.Text.RegularExpressions;
 using System;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.ExpressionCompiler;
-using Broiler.JavaScript.Core.Core.Array;
 
 namespace Broiler.JavaScript.Core;
 
@@ -103,7 +102,7 @@ public partial class JSRegExp : JSObject
             return JSNull.Value;
 
         // Construct the array to return.
-        JSArray matchValues = new((uint)matches.Count);
+        var matchValues = JSValue.CreateArray((uint)matches.Count);
         for (int i = 0; i < matches.Count; i++)
             matchValues[(uint)i] = new JSString(matches[i].Value);
 
@@ -120,13 +119,13 @@ public partial class JSRegExp : JSObject
     {
         // Return an empty array if limit = 0.
         if (limit == 0)
-            return new JSArray();
+            return JSValue.CreateArray();
 
         // Find the first match.
         Match match = value.Match(input, 0);
 
 
-        var results = new JSArray();
+        var results = JSValue.CreateArray();
         int startIndex = 0;
         Match lastMatch = null;
 
@@ -143,7 +142,7 @@ public partial class JSRegExp : JSObject
 
             // Add the match results to the array.
             var element = input.Substring(startIndex, match.Index - startIndex);
-            results.Add(new JSString(element));
+            results.AddArrayItem(new JSString(element));
 
             if (results.Length >= limit)
                 return results;
@@ -154,9 +153,9 @@ public partial class JSRegExp : JSObject
             {
                 var group = match.Groups[i];
                 if (group.Captures.Count == 0)
-                    results.Add(JSUndefined.Value);       // Non-capturing groups return "undefined".
+                    results.AddArrayItem(JSUndefined.Value);       // Non-capturing groups return "undefined".
                 else
-                    results.Add(new JSString(match.Groups[i].Value));
+                    results.AddArrayItem(new JSString(match.Groups[i].Value));
 
                 if (results.Length >= limit)
                     return results;
@@ -169,7 +168,7 @@ public partial class JSRegExp : JSObject
             match = match.NextMatch();
         }
         var ele = input.Substring(startIndex, input.Length - startIndex);
-        results.Add(new JSString(ele));
+        results.AddArrayItem(new JSString(ele));
         return results;
     }
 

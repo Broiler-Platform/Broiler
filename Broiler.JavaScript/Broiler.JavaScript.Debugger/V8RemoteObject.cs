@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -121,7 +120,7 @@ public class V8RemoteObject
                 Description = "Error";
                 break;
 
-            case JSArray:
+            case var _ when v.IsArray:
                 SubType = "array";
                 Description = "Array";
                 break;

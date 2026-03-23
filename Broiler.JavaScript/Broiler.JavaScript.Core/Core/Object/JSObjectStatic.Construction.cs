@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Core.Object;
@@ -108,18 +107,28 @@ public partial class JSObject
         if (a[0] is not JSObject obj)
             throw JSContext.NewTypeError(JSTypeError.NotIterable("undefined"));
 
-        var r = new JSArray();
+        var r = JSValue.CreateArray();
 
         var es = obj.GetElementEnumerator();
         while (es.MoveNext(out var hasValue, out var value, out var index))
         {
             if (hasValue)
-                r[r._length++] = new JSArray(new JSNumber(index), value);
+            {
+                var entry = JSValue.CreateArray();
+                entry.AddArrayItem(new JSNumber(index));
+                entry.AddArrayItem(value);
+                r.AddArrayItem(entry);
+            }
         }
 
         var vp = new PropertyValueEnumerator(obj, false);
         while (vp.MoveNext(out var value, out var key))
-            r[r._length++] = new JSArray(key.ToJSValue(), value);
+        {
+            var entry = JSValue.CreateArray();
+            entry.AddArrayItem(key.ToJSValue());
+            entry.AddArrayItem(value);
+            r.AddArrayItem(entry);
+        }
 
         return r;
     }
@@ -135,17 +144,18 @@ public partial class JSObject
             throw JSContext.NewTypeError(JSTypeError.NotIterable("undefined"));
 
         var r = new JSObject();
-        if (v is JSArray va)
+        if (v.IsArray && v is JSObject va)
         {
             ref var vaElements = ref va.GetElements();
-            for (uint i = 0; i < va._length; i++)
+            for (uint i = 0; i < (uint)v.Length; i++)
             {
                 var vi = vaElements[i];
-                if (vi.value is not JSArray ia)
+                var iaValue = vi.value as JSValue;
+                if (iaValue == null || !iaValue.IsArray)
                     throw JSContext.NewTypeError(JSTypeError.NotEntry(vi));
 
-                var first = ia[0];
-                var second = ia[1];
+                var first = iaValue[0];
+                var second = iaValue[1];
                 r.FastAddValue(first, second, JSPropertyAttributes.EnumerableConfigurableValue);
             }
         }
@@ -210,11 +220,11 @@ public partial class JSObject
 
             if (group.IsNullOrUndefined)
             {
-                group = new JSArray();
+                group = JSValue.CreateArray();
                 result.FastAddValue(keyStr, group, JSPropertyAttributes.EnumerableConfigurableValue);
             }
 
-            (group as JSArray)?.Add(item);
+            group.AddArrayItem(item);
             index++;
         }
 

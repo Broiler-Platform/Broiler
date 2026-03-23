@@ -1,6 +1,6 @@
 ﻿using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array;
+using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Enumerators;

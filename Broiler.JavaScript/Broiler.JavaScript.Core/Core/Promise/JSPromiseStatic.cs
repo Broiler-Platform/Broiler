@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Array;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Core.Function;
@@ -87,7 +86,7 @@ public partial class JSPromise
     {
         var f = a.Get1();
         var en = f.GetElementEnumerator();
-        var result = new JSArray();
+        var result = JSValue.CreateArray();
         uint i = 0;
 
         return new JSPromise((resolve, reject) =>
@@ -129,7 +128,7 @@ public partial class JSPromise
             }
 
             if (empty)
-                sc.Post((o) => resolve(new JSArray()), null);
+                sc.Post((o) => resolve(JSValue.CreateArray()), null);
         });
     }
 }

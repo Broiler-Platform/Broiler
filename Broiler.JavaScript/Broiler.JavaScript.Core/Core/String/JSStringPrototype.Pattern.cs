@@ -4,7 +4,6 @@ using Broiler.JavaScript.Core.Core.String;
 using System;
 using System.Text;
 using Broiler.JavaScript.ExpressionCompiler;
-using Broiler.JavaScript.Core.Core.Array;
 
 namespace Broiler.JavaScript.Core;
 
@@ -76,7 +75,7 @@ public partial class JSString
             return jSRegExp.Split(@this, limitMax);
 
         var separator = _separator.ToString();
-        var result = new JSArray();
+        var result = JSValue.CreateArray();
         if (string.IsNullOrEmpty(separator))
         {
             for (int i = 0; i < @this.Length; i++)
@@ -96,7 +95,7 @@ public partial class JSString
         }
 
         foreach (var item in splitStrings)
-            result.Add(new JSString(item));
+            result.AddArrayItem(new JSString(item));
 
         return result;
     }

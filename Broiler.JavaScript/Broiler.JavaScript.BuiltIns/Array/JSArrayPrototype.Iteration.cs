@@ -1,4 +1,6 @@
-﻿using Broiler.JavaScript.Core.Core.Primitive;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
@@ -6,7 +8,7 @@ using Broiler.JavaScript.Core.Typed;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Core.Core.Generator;
 
-namespace Broiler.JavaScript.Core.Core.Array;
+namespace Broiler.JavaScript.BuiltIns.Array;
 
 public partial class JSArray
 {

@@ -1,12 +1,14 @@
 ﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.ExpressionCompiler;
 
-namespace Broiler.JavaScript.Core.Core.Array;
+namespace Broiler.JavaScript.BuiltIns.Array;
 
 [JSBaseClass("Object")]
 [JSFunctionGenerator("Array")]
@@ -59,6 +61,14 @@ public partial class JSArray : JSObject
     public override string ToDetailString() => $"[{ToString()}]";
 
     public override bool IsArray => true;
+
+    internal override void UpdateArrayLengthIfNeeded(uint key)
+    {
+        if (_length <= key)
+            _length = key + 1;
+    }
+
+    public override void AddArrayItem(JSValue item) => Add(item);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public IEnumerable<(uint index, JSValue value)> GetArrayElements(bool withHoles = true)

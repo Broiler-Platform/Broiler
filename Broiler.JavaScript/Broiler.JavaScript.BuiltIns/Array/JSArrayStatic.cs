@@ -1,10 +1,12 @@
-﻿using Broiler.JavaScript.Core.Core.Boolean;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Core.Function;
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Array;
+namespace Broiler.JavaScript.BuiltIns.Array;
 
 
 public partial class JSArray
