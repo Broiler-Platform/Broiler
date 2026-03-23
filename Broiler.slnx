@@ -32,6 +32,8 @@
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Storage/Broiler.JavaScript.Storage.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Runtime/Broiler.JavaScript.Runtime.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.ExpressionCompiler/Broiler.JavaScript.ExpressionCompiler.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Extensions/Broiler.JavaScript.Extensions.csproj" />
+    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Globals/Broiler.JavaScript.Globals.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.JSClassGenerator/Broiler.JavaScript.JSClassGenerator.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.BuiltIns/Broiler.JavaScript.BuiltIns.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.All/Broiler.JavaScript.All.csproj" />
