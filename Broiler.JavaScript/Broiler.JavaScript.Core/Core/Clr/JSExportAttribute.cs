@@ -1,14 +1,3 @@
-﻿#nullable enable
-using System;
-
-namespace Broiler.JavaScript.Core.Core.Clr;
-
-public class JSExportAttribute(string? name = null) : Attribute 
-{
-    public readonly string? Name = name;
-    public bool AsCamel = true;
-
-    public int Length { get; set; }
-    public bool Pure { get; set; }
-    public bool IsConstructor { get; set; }
-}
+// JSExportAttribute has been moved to Broiler.JavaScript.Runtime.
+// The type forward in ClrTypeForwarding.cs ensures binary compatibility.
+// See: Broiler.JavaScript.Runtime/JSExportAttribute.cs
