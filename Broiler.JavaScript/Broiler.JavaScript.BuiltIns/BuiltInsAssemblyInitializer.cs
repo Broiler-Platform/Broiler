@@ -8,6 +8,7 @@ using Broiler.JavaScript.BuiltIns.Disposable;
 using Broiler.JavaScript.BuiltIns.Intl;
 using Broiler.JavaScript.BuiltIns.Iterator;
 using Broiler.JavaScript.BuiltIns.Map;
+using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.Set;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.BigInt;
@@ -72,6 +73,25 @@ internal static class BuiltInsAssemblyInitializer
         // BigInt values without referencing the concrete type directly.
         JSValue.CreateBigIntFromStringFactory = static s => new JSBigInt(s);
         JSValue.CreateBigIntFactory = static v => new JSBigInt(v);
+
+        // Wire JSNumber singletons and factory delegates so Core/Compiler can
+        // create and inspect number values without referencing the concrete type directly.
+        JSValue.NumberOne = JSNumber.One;
+        JSValue.NumberNaN = JSNumber.NaN;
+        JSValue.NumberZero = JSNumber.Zero;
+        JSValue.NumberMinusOne = JSNumber.MinusOne;
+        JSValue.NumberTwo = JSNumber.Two;
+        JSValue.NumberNegativeZero = JSNumber.NegativeZero;
+        JSValue.NumberPositiveInfinity = JSNumber.PositiveInfinity;
+        JSValue.NumberNegativeInfinity = JSNumber.NegativeInfinity;
+        JSValue.CreateNumber = static v => new JSNumber(v);
+        JSValue.NumberToECMAString = JSNumber.ToECMAString;
+        JSValue.IsPositiveZeroCheck = JSNumber.IsPositiveZero;
+        JSValue.IsNegativeZeroCheck = JSNumber.IsNegativeZero;
+
+        // Initialize JSNumberBuilder with the concrete JSNumber type so the
+        // Compiler can build number expression trees without a direct reference.
+        JSNumberBuilder.Initialize(typeof(JSNumber));
 
         // Wire JSBoolean singletons so Core/Runtime can access boolean
         // values without referencing the concrete type directly.

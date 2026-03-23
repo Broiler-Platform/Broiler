@@ -15,12 +15,8 @@ internal static class JSValueCoreExtensions
     {
         JSValue.UndefinedValue = JSUndefined.Value;
         JSValue.NullValue = JSNull.Value;
-        JSValue.NumberOne = JSNumber.One;
-        JSValue.NumberNaN = JSNumber.NaN;
-        JSValue.CreateNumber = v => new JSNumber(v);
         JSValue.CreateString = v => new JSString(v);
         JSValue.NewTypeError = msg => JSContext.NewTypeError(msg);
-        JSValue.NumberToECMAString = JSNumber.ToECMAString;
         JSValue.CreateDynamicMetaObject = (param, value) => new JSDynamicMetaData(param, value);
         JSValue.ForceConvertHelper = (jsValue, type, _) =>
         {
