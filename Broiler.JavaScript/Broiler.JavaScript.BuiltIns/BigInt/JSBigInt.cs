@@ -7,6 +7,7 @@ using Broiler.JavaScript.ExpressionCompiler;
 using System;
 using System.Globalization;
 using System.Numerics;
+using Broiler.JavaScript.BuiltIns.Number;
 
 namespace Broiler.JavaScript.BuiltIns.BigInt;
 

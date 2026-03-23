@@ -23,7 +23,7 @@ public class JSArguments: JSObject
     {
         // arguments = args;
         ref var properties = ref GetOwnProperties(true);
-        properties.Put(KeyStrings.length, new JSNumber(args.Length), JSPropertyAttributes.ConfigurableValue);
+        properties.Put(KeyStrings.length, JSValue.CreateNumber(args.Length), JSPropertyAttributes.ConfigurableValue);
         properties.Put(KeyStrings.callee, Callee, Callee, JSPropertyAttributes.Property);
 
         ref var symbols = ref GetSymbols();

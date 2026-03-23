@@ -3,6 +3,7 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.ExpressionCompiler;
 using System;
+using Broiler.JavaScript.BuiltIns.Number;
 
 namespace Broiler.JavaScript.BuiltIns.Objects;
 

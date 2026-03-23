@@ -32,7 +32,7 @@ public class JSPrimitiveObject : JSObject
         if (key.Key == KeyStrings.length.Key)
         {
             if (value is JSString @string)
-                return new JSNumber(@string.Length);
+                return JSValue.CreateNumber(@string.Length);
         }
 
         return base.GetValue(key, receiver, throwError);

@@ -12,6 +12,7 @@ using System;
 using System.CodeDom.Compiler;
 using System.IO;
 using System.Runtime.CompilerServices;
+using Broiler.JavaScript.BuiltIns.Number;
 
 namespace Broiler.JavaScript.BuiltIns.Json;
 

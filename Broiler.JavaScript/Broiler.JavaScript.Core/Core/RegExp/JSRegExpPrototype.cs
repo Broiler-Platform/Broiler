@@ -67,7 +67,7 @@ public partial class JSRegExp
             }
         }
 
-        result[KeyStrings.index] = new JSNumber(match.Index);
+        result[KeyStrings.index] = JSValue.CreateNumber(match.Index);
         result[KeyStrings.input] = a.Get1();
 
         // Populate named groups (§2.7 — duplicate named capture groups support).

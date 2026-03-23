@@ -60,7 +60,7 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
     /// the nullable delegate checks in <see cref="Register"/> will skip the
     /// satellite registrations gracefully.
     /// </summary>
-    private static void EnsureBuiltInsAssemblyLoaded()
+    internal static void EnsureBuiltInsAssemblyLoaded()
     {
         if (AdditionalRegistrations != null)
             return;

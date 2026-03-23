@@ -14,8 +14,8 @@ public static class JSValueToClrConverter
 
     public static string ToString(JSValue value, string name) => value.HasValue() ? value.ToString() : throw new JSException($"{name} is required");
 
-    public static JSNumber ToJSNumber(this JSValue value, string name) =>
-        value is JSNumber n ? n : (value is JSPrimitiveObject po ? po.value.ToJSNumber(name) : throw new JSException($"{name} is not a number"));
+    public static JSValue ToJSNumber(this JSValue value, string name) =>
+        value.IsNumber ? value : (value is JSPrimitiveObject po ? po.value.ToJSNumber(name) : throw new JSException($"{name} is not a number"));
 
     public static bool ToBoolean(JSValue value, string name) => value.HasValue() ? value.BooleanValue : throw new JSException($"{name} is required");
     public static bool? ToNullableBoolean(JSValue value, string name) => value.IsNullOrUndefined ? null : value.BooleanValue;

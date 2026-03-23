@@ -1,4 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Extensions;
 using System;
 using System.Threading;
 using System.Collections.Generic;
@@ -14,10 +15,10 @@ namespace Broiler.JavaScript.Core.Core.Global;
 public partial class JSGlobalStatic
 {
     [JSExport("Infinity")]
-    public static JSNumber Infinity = JSNumber.PositiveInfinity;
+    public static JSValue Infinity = JSValue.NumberPositiveInfinity;
 
     [JSExport("NaN")]
-    public static JSNumber NaN = JSNumber.NaN;
+    public static JSValue NaN = JSValue.NumberNaN;
 
     /// <summary>
     /// Factory delegate for creating the Intl global object.
@@ -72,7 +73,17 @@ public partial class JSGlobalStatic
     }
 
     [JSExport("isFinite", Length = 1)]
-    public static JSValue IsFinite(in Arguments a) => JSNumber.IsFinite(a);
+    public static JSValue IsFinite(in Arguments a)
+    {
+        var first = a.Get1();
+        if (first.IsNumber)
+        {
+            var v = first.DoubleValue;
+            if (!double.IsNaN(v) && v > double.NegativeInfinity && v < double.PositiveInfinity)
+                return JSValue.BooleanTrue;
+        }
+        return JSValue.BooleanFalse;
+    }
 
     [JSExport("isNaN", Length = 1)]
     public static JSValue IsNaN(in Arguments a) => double.IsNaN(a.Get1().DoubleValue)
@@ -80,10 +91,54 @@ public partial class JSGlobalStatic
             : JSValue.BooleanFalse;
 
     [JSExport("parseFloat", Length = 1)]
-    public static JSValue ParseFloat(in Arguments a) => JSNumber.ParseFloat(a);
+    public static JSValue ParseFloat(in Arguments a)
+    {
+        var result = NumberParser.ParseFloat(a.Get1().ToString());
+        return JSValue.CreateNumber(result);
+    }
 
     [JSExport("parseInt", Length = 2)]
-    public static JSValue ParseInt(in Arguments a) => JSNumber.ParseInt(a);
+    public static JSValue ParseInt(in Arguments a)
+    {
+        var nan = JSValue.NumberNaN;
+
+        if (a.Length <= 0)
+            return nan;
+
+        var p = a.Get1();
+        if (p.IsNumber)
+            return p;
+
+        if (p.IsNull || p.IsUndefined)
+            return nan;
+
+        var text = p.JSTrim();
+        if (text.Length == 0)
+            return nan;
+
+        var radix = 0;
+        if (a.Length > 1)
+        {
+            var (_, a1) = a.Get2();
+            if (a1.IsNull || a1.IsUndefined)
+            {
+                radix = 0;
+            }
+            else
+            {
+                var n = a1.DoubleValue;
+                if (!double.IsNaN(n))
+                {
+                    radix = a1.IntValue;
+                    if (radix < 0 || radix == 1 || radix > 36)
+                        return nan;
+                }
+            }
+        }
+
+        var d = NumberParser.ParseInt(text.Trim(), radix, false);
+        return JSValue.CreateNumber(d);
+    }
 
     [JSExport("setImmediate", Length = 1)]
     public static JSValue SetImmediate(in Arguments a)
@@ -179,7 +234,7 @@ public partial class JSGlobalStatic
         if (value == null || value.IsNullOrUndefined)
             return value;
 
-        if (value is JSNumber || value is JSString || value.IsBoolean)
+        if (value.IsNumber || value is JSString || value.IsBoolean)
             return value;
 
         if (value.TypeOf() == JSConstants.BigInt)

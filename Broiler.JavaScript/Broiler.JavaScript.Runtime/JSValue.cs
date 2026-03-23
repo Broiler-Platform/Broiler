@@ -28,7 +28,15 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
     internal static JSValue BooleanFalse;
     internal static JSValue NumberOne;
     internal static JSValue NumberNaN;
+    internal static JSValue NumberZero;
+    internal static JSValue NumberMinusOne;
+    internal static JSValue NumberTwo;
+    internal static JSValue NumberNegativeZero;
+    internal static JSValue NumberPositiveInfinity;
+    internal static JSValue NumberNegativeInfinity;
     internal static Func<double, JSValue> CreateNumber;
+    internal static Func<double, bool> IsPositiveZeroCheck;
+    internal static Func<double, bool> IsNegativeZeroCheck;
     internal static Func<string, JSValue> CreateString;
     internal static Func<string, Exception> NewTypeError;
     internal static Func<JSValue, object, bool, object> ForceConvertHelper;

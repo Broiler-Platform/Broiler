@@ -25,7 +25,9 @@ internal static class ListExtensions
             case "JSNumber":
             case "Broiler.JavaScript.Core.JSNumber":
             case "Broiler.JavaScript.Core.JSNumber?":
-                return $"JSValueToClrConverter.ToJSNumber({name}, \"{parameter}\")";
+            case "Broiler.JavaScript.BuiltIns.Number.JSNumber":
+            case "Broiler.JavaScript.BuiltIns.Number.JSNumber?":
+                return $"(JSNumber)JSValueToClrConverter.ToJSNumber({name}, \"{parameter}\")";
             case "JSObject":
             case "Broiler.JavaScript.Core.JSObject":
                 return $"{name} is JSObject obj{parameter} ? obj{parameter} : throw new JSException(\"{parameter} is not an object\")";

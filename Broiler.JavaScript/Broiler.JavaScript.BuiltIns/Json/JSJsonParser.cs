@@ -6,6 +6,7 @@ using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core;
+using Broiler.JavaScript.BuiltIns.Number;
 
 namespace Broiler.JavaScript.BuiltIns.Json;
 

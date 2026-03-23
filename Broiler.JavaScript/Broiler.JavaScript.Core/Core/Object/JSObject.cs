@@ -152,7 +152,7 @@ public partial class JSObject : JSValue
                 throw JSContext.NewTypeError($"Cannot modify property length of {this}");
 
             ref var ownp = ref GetOwnProperties();
-            ownp.Put(KeyStrings.length, new JSNumber(value));
+            ownp.Put(KeyStrings.length, JSValue.CreateNumber(value));
             PropertyChanged?.Invoke(this, (KeyStrings.length.Key, uint.MaxValue, null));
         }
     }

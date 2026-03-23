@@ -115,7 +115,7 @@ public partial class JSObject
             if (hasValue)
             {
                 var entry = JSValue.CreateArray();
-                entry.AddArrayItem(new JSNumber(index));
+                entry.AddArrayItem(JSValue.CreateNumber(index));
                 entry.AddArrayItem(value);
                 r.AddArrayItem(entry);
             }
@@ -214,7 +214,7 @@ public partial class JSObject
             if (!hasValue)
                 continue;
 
-            var key = callbackfn.Call(JSUndefined.Value, item, new JSNumber(index));
+            var key = callbackfn.Call(JSUndefined.Value, item, JSValue.CreateNumber(index));
             var keyStr = key.ToString();
             var group = result[keyStr];
 

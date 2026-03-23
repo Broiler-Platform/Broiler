@@ -7,6 +7,7 @@ using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Typed;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Core.Core.Generator;
+using Broiler.JavaScript.BuiltIns.Number;
 
 namespace Broiler.JavaScript.BuiltIns.Array;
 
