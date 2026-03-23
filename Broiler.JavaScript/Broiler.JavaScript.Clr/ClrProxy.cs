@@ -70,21 +70,21 @@ public partial class ClrProxy : JSObject
         return (input) => Marshal(input);
     }
 
-    public static JSValue Marshal(int value) => new JSNumber(value);
-    public static JSValue Marshal(uint value) => new JSNumber(value);
-    public static JSValue Marshal(long value) => new JSNumber(value);
-    public static JSValue Marshal(ulong value) => new JSNumber(value);
+    public static JSValue Marshal(int value) => JSValue.CreateNumber(value);
+    public static JSValue Marshal(uint value) => JSValue.CreateNumber(value);
+    public static JSValue Marshal(long value) => JSValue.CreateNumber(value);
+    public static JSValue Marshal(ulong value) => JSValue.CreateNumber(value);
     public static JSValue Marshal(string value) => new JSString(value);
     public static JSValue Marshal(in StringSpan value) => new JSString(value);
     public static JSValue Marshal(bool value) => value ? JSValue.BooleanTrue : JSValue.BooleanFalse;
-    public static JSValue Marshal(short value) => new JSNumber(value);
-    public static JSValue Marshal(ushort value) => new JSNumber(value);
-    public static JSValue Marshal(byte value) => new JSNumber(value);
-    public static JSValue Marshal(sbyte value) => new JSNumber(value);
+    public static JSValue Marshal(short value) => JSValue.CreateNumber(value);
+    public static JSValue Marshal(ushort value) => JSValue.CreateNumber(value);
+    public static JSValue Marshal(byte value) => JSValue.CreateNumber(value);
+    public static JSValue Marshal(sbyte value) => JSValue.CreateNumber(value);
     public static JSValue Marshal(DateTime value) => JSValue.CreateDate(new DateTimeOffset(value));
     public static JSValue Marshal(DateTimeOffset value) => JSValue.CreateDate(value);
-    public static JSValue Marshal(double value) => new JSNumber(value);
-    public static JSValue Marshal(float value) => new JSNumber(value);
+    public static JSValue Marshal(double value) => JSValue.CreateNumber(value);
+    public static JSValue Marshal(float value) => JSValue.CreateNumber(value);
     public static JSValue Marshal(Task task) => task.ToPromise();
     public static JSValue Marshal(Task<JSValue> task) => new JSPromise(task);
     public static JSValue Marshal<T>(Task<T> task) => task.ToPromise();
@@ -112,21 +112,21 @@ public partial class ClrProxy : JSObject
         return t switch
         {
             TypeCode.Boolean => (bool)value ? JSValue.BooleanTrue : JSValue.BooleanFalse,
-            TypeCode.Byte => new JSNumber((byte)value),
+            TypeCode.Byte => JSValue.CreateNumber((byte)value),
             TypeCode.Char => new JSString((char)value),
             TypeCode.DateTime => JSValue.CreateDate(new DateTimeOffset((DateTime)value)),
             TypeCode.DBNull => JSNull.Value,
-            TypeCode.Decimal => new JSNumber((double)(decimal)value),
-            TypeCode.Double => new JSNumber((double)value),
-            TypeCode.Int16 => new JSNumber((short)value),
-            TypeCode.Int32 => new JSNumber((int)value),
-            TypeCode.Int64 => new JSNumber((long)value),
-            TypeCode.SByte => new JSNumber((sbyte)value),
-            TypeCode.Single => new JSNumber((float)value),
+            TypeCode.Decimal => JSValue.CreateNumber((double)(decimal)value),
+            TypeCode.Double => JSValue.CreateNumber((double)value),
+            TypeCode.Int16 => JSValue.CreateNumber((short)value),
+            TypeCode.Int32 => JSValue.CreateNumber((int)value),
+            TypeCode.Int64 => JSValue.CreateNumber((long)value),
+            TypeCode.SByte => JSValue.CreateNumber((sbyte)value),
+            TypeCode.Single => JSValue.CreateNumber((float)value),
             TypeCode.String => new JSString((string)value),
-            TypeCode.UInt16 => new JSNumber((ushort)value),
-            TypeCode.UInt32 => new JSNumber((uint)value),
-            TypeCode.UInt64 => new JSNumber((long)value),
+            TypeCode.UInt16 => JSValue.CreateNumber((ushort)value),
+            TypeCode.UInt32 => JSValue.CreateNumber((uint)value),
+            TypeCode.UInt64 => JSValue.CreateNumber((long)value),
             _ => value switch
             {
                 JSValue jsValue => jsValue,
@@ -190,20 +190,20 @@ public partial class ClrProxy : JSObject
             case JSString @string when @string.StringValue.Equals(this.value):
                 return true;
 
-            case JSNumber number:
+            case JSValue number when number.IsNumber:
                 switch (this.value)
                 {
-                    case int @int when @int == (int)number.NumberValue:
+                    case int @int when @int == (int)number.DoubleValue:
                         return true;
-                    case uint @uint when @uint == (uint)number.NumberValue:
+                    case uint @uint when @uint == (uint)number.DoubleValue:
                         return true;
-                    case long @long when @long == (long)number.NumberValue:
+                    case long @long when @long == (long)number.DoubleValue:
                         return true;
-                    case ulong @ulong when @ulong == (ulong)number.NumberValue:
+                    case ulong @ulong when @ulong == (ulong)number.DoubleValue:
                         return true;
-                    case double @double when @double == number.NumberValue:
+                    case double @double when @double == number.DoubleValue:
                         return true;
-                    case float @float when @float == (float)number.NumberValue:
+                    case float @float when @float == (float)number.DoubleValue:
                         return true;
                 }
                 break;
