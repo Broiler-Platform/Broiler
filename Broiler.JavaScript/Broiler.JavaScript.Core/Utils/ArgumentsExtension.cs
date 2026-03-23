@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Date;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.LinqExpressions;
 using System;
@@ -43,16 +42,16 @@ public static class JSValueToClrConverter
     public static decimal? ToNullableDecimal(JSValue value, string name) => value.IsNullOrUndefined ? null : (decimal)value.DoubleValue;
 
     public static DateTime ToDateTime(JSValue value, string name) =>
-        value.HasValue() ? (value is JSDate date ? date.DateTime : DateTime.Parse(value.ToString())) : throw new ArgumentException($"{name} is required");
+        value.HasValue() ? (value.ConvertTo(typeof(DateTime), out var dt) ? (DateTime)dt : DateTime.Parse(value.ToString())) : throw new ArgumentException($"{name} is required");
 
     public static DateTime? ToNullableDateTime(JSValue value, string name) =>
-        value.HasValue() ? (value is JSDate date ? date.DateTime : DateTime.Parse(value.ToString())) : null;
+        value.HasValue() ? (value.ConvertTo(typeof(DateTime), out var dt) ? (DateTime)dt : DateTime.Parse(value.ToString())) : null;
 
     public static DateTimeOffset ToDateTimeOffset(JSValue value, string name) =>
-        value.HasValue() ? (value is JSDate date ? date.DateTime : DateTime.Parse(value.ToString())) : throw new ArgumentException($"{name} is required");
+        value.HasValue() ? (value.ConvertTo(typeof(DateTimeOffset), out var dto) ? (DateTimeOffset)dto : DateTime.Parse(value.ToString())) : throw new ArgumentException($"{name} is required");
 
     public static DateTimeOffset? ToNullableDateTimeOffset(JSValue value, string name) =>
-        value.HasValue() ? (value is JSDate date ? date.DateTime : DateTime.Parse(value.ToString())) : null;
+        value.HasValue() ? (value.ConvertTo(typeof(DateTimeOffset), out var dto) ? (DateTimeOffset)dto : DateTime.Parse(value.ToString())) : null;
 
     private static readonly Dictionary<Type, MethodInfo> methods = [];
     private static readonly MethodInfo GetAsGeneric = typeof(JSValueToClrConverter).GetMethod(nameof(GetAs));

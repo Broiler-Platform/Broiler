@@ -1,6 +1,5 @@
 ﻿using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Date;
 using Broiler.JavaScript.Core.Extensions;
 using System;
 
@@ -51,8 +50,8 @@ public static class ClrModule
     {
         var a1 = a.Get1();
 
-        if (a1 is JSDate date)
-            return ClrProxy.From(date.Value);
+        if (a1.ConvertTo(typeof(DateTimeOffset), out var dto))
+            return ClrProxy.From((DateTimeOffset)dto);
 
         throw JSContext.NewTypeError($"Not a Date");
     }

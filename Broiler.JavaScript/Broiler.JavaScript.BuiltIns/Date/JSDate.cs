@@ -1,7 +1,9 @@
-﻿using Broiler.JavaScript.ExpressionCompiler;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.ExpressionCompiler;
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Date;
+namespace Broiler.JavaScript.BuiltIns.Date;
 
 [JSFunctionGenerator("Date")]
 public partial class JSDate: JSObject

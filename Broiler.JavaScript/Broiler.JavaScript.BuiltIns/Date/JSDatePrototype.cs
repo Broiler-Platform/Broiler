@@ -1,9 +1,11 @@
-﻿using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Utils;
 using System;
 using System.Globalization;
 
-namespace Broiler.JavaScript.Core.Core.Date;
+namespace Broiler.JavaScript.BuiltIns.Date;
 
 public partial class JSDate
 {

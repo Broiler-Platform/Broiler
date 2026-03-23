@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
+using Broiler.JavaScript.BuiltIns.Date;
 using Broiler.JavaScript.BuiltIns.Debug;
 using Broiler.JavaScript.BuiltIns.Decimal;
 using Broiler.JavaScript.BuiltIns.Disposable;
@@ -10,7 +11,6 @@ using Broiler.JavaScript.BuiltIns.Set;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.BigInt;
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Date;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Global;
 using Broiler.JavaScript.Core.Core.Primitive;
@@ -42,6 +42,10 @@ internal static class BuiltInsAssemblyInitializer
         // does not directly reference JSIntl.
         JSGlobalStatic.IntlFactory = static () => JSContext.ClrInterop.GetClrType(typeof(JSIntl));
 
+        // Wire factory delegate for JSDate so Core/Clr can create
+        // Date values without referencing the concrete type directly.
+        JSValue.CreateDateFactory = static v => new JSDate(v);
+
         // Wire factory delegate for Intl date formatting so JSDatePrototype
         // does not directly reference JSIntlDateTimeFormat.
         JSDate.IntlDateFormatter = static (culture, value, options) =>
@@ -61,10 +65,17 @@ internal static class BuiltInsAssemblyInitializer
         // does not directly reference the concrete type.
         DefaultBuiltInRegistry.ConsoleFactory = static ctx => new JSConsole(ctx);
 
-        // Wire structured clone extension for Map, Set, and ArrayBuffer types so that
+        // Wire structured clone extension for Date, Map, Set, and ArrayBuffer types so that
         // JSGlobal.StructuredClone works without Core referencing BuiltIns.
         DefaultBuiltInRegistry.StructuredCloneExtension = static (value, seen, recurse) =>
         {
+            if (value is JSDate date)
+            {
+                var clone = new JSDate(date.value);
+                seen[value] = clone;
+                return clone;
+            }
+
             if (value is JSMap map)
             {
                 var clone = new JSMap(Arguments.Empty);
