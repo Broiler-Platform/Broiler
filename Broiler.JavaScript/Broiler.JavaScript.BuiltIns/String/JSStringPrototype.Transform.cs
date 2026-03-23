@@ -1,11 +1,11 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.String;
+using Broiler.JavaScript.Core;
 using System.Globalization;
 using System.Text;
 using Broiler.JavaScript.ExpressionCompiler;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.BuiltIns.String;
 
 public partial class JSString
 {

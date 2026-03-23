@@ -38,6 +38,19 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
     internal static Func<double, bool> IsPositiveZeroCheck;
     internal static Func<double, bool> IsNegativeZeroCheck;
     internal static Func<string, JSValue> CreateString;
+
+    /// <summary>
+    /// Cached empty-string value.  Wired by the BuiltIns assembly.
+    /// </summary>
+    internal static JSValue EmptyString;
+
+    /// <summary>
+    /// Factory delegate for creating a <c>JSString</c> that already has
+    /// a pre-computed <see cref="KeyString"/>.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static Func<string, KeyString, JSValue> CreateStringWithKey;
+
     internal static Func<string, Exception> NewTypeError;
     internal static Func<JSValue, object, bool, object> ForceConvertHelper;
     internal static Func<Expression, JSValue, DynamicMetaObject> CreateDynamicMetaObject;
