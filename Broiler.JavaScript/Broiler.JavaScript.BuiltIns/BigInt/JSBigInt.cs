@@ -1,4 +1,6 @@
-﻿using Broiler.JavaScript.Core.Core.Clr;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.ExpressionCompiler;
@@ -6,7 +8,7 @@ using System;
 using System.Globalization;
 using System.Numerics;
 
-namespace Broiler.JavaScript.Core.Core.BigInt;
+namespace Broiler.JavaScript.BuiltIns.BigInt;
 
 static class JSBigIntExtensions
 {
@@ -142,7 +144,7 @@ public partial class JSBigInt : JSPrimitive
 
     public override JSValue BitwiseOr(JSValue value) => new JSBigInt(this.value | value.AsBigIntegerOnly());
 
-    public override JSValue BitwiseXor(JSValue value) => new JSBigInt(this.value | value.AsBigIntegerOnly());
+    public override JSValue BitwiseXor(JSValue value) => new JSBigInt(this.value ^ value.AsBigIntegerOnly());
 
     public override JSValue LeftShift(JSValue value) => new JSBigInt(this.value << (int)value.AsBigIntegerOnly());
 
