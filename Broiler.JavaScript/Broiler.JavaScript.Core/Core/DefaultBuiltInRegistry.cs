@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Storage;
@@ -50,9 +52,39 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
     /// </summary>
     public static Action<JSObject> IteratorPrototypeSetup { get; set; }
 
+    /// <summary>
+    /// Attempts to load the <c>Broiler.JavaScript.BuiltIns</c> assembly and
+    /// run its module constructor so that the <c>[ModuleInitializer]</c>
+    /// registers factory delegates and additional built-in type registrations.
+    /// If the assembly is not available the failure is silently ignored;
+    /// the nullable delegate checks in <see cref="Register"/> will skip the
+    /// satellite registrations gracefully.
+    /// </summary>
+    private static void EnsureBuiltInsAssemblyLoaded()
+    {
+        if (AdditionalRegistrations != null)
+            return;
+
+        try
+        {
+            var assembly = Assembly.Load("Broiler.JavaScript.BuiltIns");
+            RuntimeHelpers.RunModuleConstructor(assembly.ManifestModule.ModuleHandle);
+        }
+        catch (Exception ex) when (
+            ex is System.IO.FileNotFoundException
+            or System.IO.FileLoadException
+            or BadImageFormatException)
+        {
+            // BuiltIns assembly is not available.  Delegates remain null and
+            // Register() will skip satellite registrations gracefully.
+        }
+    }
+
     /// <inheritdoc />
     public void Register(IJSContext ctx)
     {
+        EnsureBuiltInsAssemblyLoaded();
+
         var context = ctx as JSContext
             ?? throw new ArgumentException("Expected JSContext instance", nameof(ctx));
         context.RegisterGeneratedClasses();

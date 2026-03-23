@@ -630,6 +630,6 @@ public class BuiltInsTests
         RuntimeHelpers.RunClassConstructor(
             typeof(Broiler.JavaScript.Clr.DefaultClrInterop).TypeHandle);
         RuntimeHelpers.RunClassConstructor(
-            typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
+            typeof(Broiler.JavaScript.BuiltIns.Weak.JSWeakRef).TypeHandle);
     }
 }

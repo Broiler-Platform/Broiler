@@ -16,7 +16,7 @@ public class Phase2ValidationTests
     private static void EnsureAllAssembliesLoaded()
     {
         RuntimeHelpers.RunClassConstructor(
-            typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
+            typeof(Broiler.JavaScript.BuiltIns.Weak.JSWeakRef).TypeHandle);
         RuntimeHelpers.RunClassConstructor(
             typeof(Broiler.JavaScript.Clr.DefaultClrInterop).TypeHandle);
     }
@@ -64,7 +64,7 @@ public class Phase2ValidationTests
     public void M9_CompilerStillReferencesCore()
     {
         // Verify that Compiler assembly references Core (not the other way around).
-        var compilerAssembly = typeof(Broiler.JavaScript.Core.FastParser.Compiler.FastCompiler).Assembly;
+        var compilerAssembly = typeof(Broiler.JavaScript.Compiler.FastCompiler).Assembly;
         var coreAssembly = typeof(JSContext).Assembly;
 
         var compilerRefs = compilerAssembly.GetReferencedAssemblies()
@@ -172,7 +172,7 @@ public class Phase2ValidationTests
     {
         // Moving files to subdirectories should not affect partial class merging.
         // Verify FastCompiler has visitor methods from all subdirectories.
-        var compilerType = typeof(Broiler.JavaScript.Core.FastParser.Compiler.FastCompiler);
+        var compilerType = typeof(Broiler.JavaScript.Compiler.FastCompiler);
         Assert.NotNull(compilerType);
 
         var methods = compilerType.GetMethods(
@@ -191,7 +191,7 @@ public class Phase2ValidationTests
         // after being moved to Infrastructure/ subdirectory.
         EnsureAllAssembliesLoaded();
 
-        var compilerAssembly = typeof(Broiler.JavaScript.Core.FastParser.Compiler.FastCompiler).Assembly;
+        var compilerAssembly = typeof(Broiler.JavaScript.Compiler.FastCompiler).Assembly;
         var initializerType = compilerAssembly.GetTypes()
             .FirstOrDefault(t => t.Name == "CompilerAssemblyInitializer");
         Assert.NotNull(initializerType);
@@ -201,7 +201,7 @@ public class Phase2ValidationTests
     public void M12_CompilerAssembly_NamespacesUnchanged()
     {
         // Subdirectory reorganization must NOT change namespaces.
-        var compilerType = typeof(Broiler.JavaScript.Core.FastParser.Compiler.FastCompiler);
+        var compilerType = typeof(Broiler.JavaScript.Compiler.FastCompiler);
         Assert.Equal("Broiler.JavaScript.Core.FastParser.Compiler", compilerType.Namespace);
     }
 

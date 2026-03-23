@@ -16,7 +16,7 @@ public class M8ValidationTests
     private static void EnsureAllAssembliesLoaded()
     {
         RuntimeHelpers.RunClassConstructor(
-            typeof(Broiler.JavaScript.Core.Core.Weak.JSWeakRef).TypeHandle);
+            typeof(Broiler.JavaScript.BuiltIns.Weak.JSWeakRef).TypeHandle);
         RuntimeHelpers.RunClassConstructor(
             typeof(Broiler.JavaScript.Clr.DefaultClrInterop).TypeHandle);
     }
@@ -58,7 +58,7 @@ public class M8ValidationTests
     {
         // Verify the documented 4-layer architecture by checking assembly references.
         // Feature layer (BuiltIns) must reference Core layer but not vice versa.
-        var builtInsAssembly = typeof(Broiler.JavaScript.Core.Core.Map.JSMap).Assembly;
+        var builtInsAssembly = typeof(Broiler.JavaScript.BuiltIns.Map.JSMap).Assembly;
         var coreAssembly = typeof(JSContext).Assembly;
 
         Assert.Equal("Broiler.JavaScript.BuiltIns", builtInsAssembly.GetName().Name);
@@ -127,12 +127,12 @@ public class M8ValidationTests
         Assert.Contains("PropertySequenceCoreExtensions", coreTypes);
 
         // BuiltIns assembly — 1 initializer:
-        var builtInsAssembly = typeof(Broiler.JavaScript.Core.Core.Map.JSMap).Assembly;
+        var builtInsAssembly = typeof(Broiler.JavaScript.BuiltIns.Map.JSMap).Assembly;
         var builtInsTypes = builtInsAssembly.GetTypes().Select(t => t.Name).ToList();
         Assert.Contains("BuiltInsAssemblyInitializer", builtInsTypes);
 
         // Compiler assembly — 1 initializer:
-        var compilerAssembly = typeof(Broiler.JavaScript.Core.FastParser.Compiler.FastCompiler).Assembly;
+        var compilerAssembly = typeof(Broiler.JavaScript.Compiler.FastCompiler).Assembly;
         var compilerTypes = compilerAssembly.GetTypes().Select(t => t.Name).ToList();
         Assert.Contains("CompilerAssemblyInitializer", compilerTypes);
 
@@ -147,16 +147,16 @@ public class M8ValidationTests
     [Fact]
     public void M8_ContributionGuide_NamespaceConventionHolds()
     {
-        // The contribution guide states that built-in types use
-        // Broiler.JavaScript.Core.Core.* namespaces even in the BuiltIns assembly.
-        var builtInsAssembly = typeof(Broiler.JavaScript.Core.Core.Map.JSMap).Assembly;
+        // The contribution guide states that built-in types live in
+        // Broiler.JavaScript.BuiltIns.* namespaces in the BuiltIns assembly.
+        var builtInsAssembly = typeof(Broiler.JavaScript.BuiltIns.Map.JSMap).Assembly;
         Assert.Equal("Broiler.JavaScript.BuiltIns", builtInsAssembly.GetName().Name);
 
-        // Verify several extracted types retain Core.Core.* namespaces:
-        Assert.StartsWith("Broiler.JavaScript.Core.Core",
-            typeof(Broiler.JavaScript.Core.Core.Map.JSMap).Namespace);
-        Assert.StartsWith("Broiler.JavaScript.Core.Core",
-            typeof(Broiler.JavaScript.Core.Core.Set.JSSet).Namespace);
+        // Verify several extracted types retain their expected namespaces:
+        Assert.StartsWith("Broiler.JavaScript.BuiltIns",
+            typeof(Broiler.JavaScript.BuiltIns.Map.JSMap).Namespace);
+        Assert.StartsWith("Broiler.JavaScript.BuiltIns",
+            typeof(Broiler.JavaScript.BuiltIns.Set.JSSet).Namespace);
         Assert.StartsWith("Broiler.JavaScript.Core.Core",
             typeof(Broiler.JavaScript.Core.Core.BigInt.JSBigInt).Namespace);
     }
