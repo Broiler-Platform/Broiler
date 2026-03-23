@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Core.Primitive;
@@ -57,27 +56,27 @@ public partial class JSObject
     internal static JSValue IsExtensible(in Arguments a)
     {
         if (a.Get1() is JSObject @object && @object.IsExtensible())
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     [JSExport("isFrozen")]
     internal static JSValue IsFrozen(in Arguments a)
     {
         if ((a.Get1() is JSObject @object) && @object.IsFrozen())
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     [JSExport("isSealed")]
     internal static JSValue IsSealed(in Arguments a)
     {
         if ((a.Get1() is JSObject @object) && @object.IsSealed())
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     [JSExport("keys")]

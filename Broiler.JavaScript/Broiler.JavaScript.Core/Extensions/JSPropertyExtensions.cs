@@ -3,7 +3,6 @@ using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Storage;
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Boolean;
 
 namespace Broiler.JavaScript.Core.Extensions;
 
@@ -21,8 +20,8 @@ public static class JSPropertyExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static JSValue ToJSValue(in this JSProperty px)
     {
-        var t = JSBoolean.True;
-        var f = JSBoolean.False;
+        var t = JSValue.BooleanTrue;
+        var f = JSValue.BooleanFalse;
         JSObject obj;
 
         if (px.IsValue)

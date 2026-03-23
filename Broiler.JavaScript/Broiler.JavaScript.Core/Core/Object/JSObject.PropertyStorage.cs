@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Core.Core.Object;
@@ -368,11 +367,11 @@ public partial class JSObject
         var k = key.ToKey();
         return k.Type switch
         {
-            KeyType.Empty => JSBoolean.False,
+            KeyType.Empty => JSValue.BooleanFalse,
             KeyType.UInt => DefineProperty(k.Index, propertyDescription),
             KeyType.String => DefineProperty(k.KeyString, propertyDescription),
             KeyType.Symbol => DefineProperty((JSSymbol)k.Symbol, propertyDescription),
-            _ => JSBoolean.False,
+            _ => JSValue.BooleanFalse,
         };
     }
 
@@ -477,10 +476,10 @@ public partial class JSObject
         if (ownProperties.RemoveAt(key.Key))
         {
             PropertyChanged?.Invoke(this, (key.Key, uint.MaxValue, null));
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
         }
 
-        return JSBoolean.True;
+        return JSValue.BooleanTrue;
     }
 
     public override JSValue Delete(uint key)
@@ -493,10 +492,10 @@ public partial class JSObject
         if (elements.RemoveAt(key))
         {
             PropertyChanged?.Invoke(this, (uint.MaxValue, key, null));
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
         }
 
-        return JSBoolean.True;
+        return JSValue.BooleanTrue;
     }
 
     public override JSValue Delete(IJSSymbol symbol)
@@ -507,10 +506,10 @@ public partial class JSObject
         if (symbols.RemoveAt(symbol.Key))
         {
             PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, (JSSymbol)symbol));
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
         }
 
-        return JSBoolean.True;
+        return JSValue.BooleanTrue;
     }
     internal override bool TryGetValue(uint i, out JSProperty value) => elements.TryGetValue(i, out value);
 

@@ -11,6 +11,7 @@ using Broiler.JavaScript.BuiltIns.Map;
 using Broiler.JavaScript.BuiltIns.Set;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.BigInt;
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Global;
@@ -71,6 +72,11 @@ internal static class BuiltInsAssemblyInitializer
         // BigInt values without referencing the concrete type directly.
         JSValue.CreateBigIntFromStringFactory = static s => new JSBigInt(s);
         JSValue.CreateBigIntFactory = static v => new JSBigInt(v);
+
+        // Wire JSBoolean singletons so Core/Runtime can access boolean
+        // values without referencing the concrete type directly.
+        JSValue.BooleanTrue = JSBoolean.True;
+        JSValue.BooleanFalse = JSBoolean.False;
 
         // Wire factory delegate for JSConsole so DefaultBuiltInRegistry
         // does not directly reference the concrete type.

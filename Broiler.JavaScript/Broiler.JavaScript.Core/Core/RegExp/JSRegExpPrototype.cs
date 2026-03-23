@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
 using System.Runtime.CompilerServices;
@@ -25,10 +24,10 @@ public partial class JSRegExp
             if (globalSearch)
                 lastIndex = match.Index + match.Length;
 
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
         }
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     [JSExport("exec")]

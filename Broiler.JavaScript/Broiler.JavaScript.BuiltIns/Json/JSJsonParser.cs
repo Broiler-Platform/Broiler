@@ -2,7 +2,7 @@
 using System.Text.Json;
 using System.Text;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Boolean;
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core;

@@ -6,7 +6,6 @@ using Broiler.JavaScript.Core.Typed;
 using Broiler.JavaScript.Core.Utils;
 using System;
 using System.Globalization;
-using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Ast.Misc;
@@ -211,8 +210,7 @@ public partial class JSString : JSPrimitive
                     || (this.value.CompareTo(number.value.ToString()) == 0):
                 return true;
 
-            case JSBoolean boolean
-                when DoubleValue == (boolean._value ? 1D : 0D):
+            case JSValue boolVal when boolVal.IsBoolean && DoubleValue == (boolVal.BooleanValue ? 1D : 0D):
                 return true;
         }
 
@@ -284,12 +282,12 @@ public partial class JSString : JSPrimitive
 
     public override JSValue InvokeFunction(in Arguments a) => throw new NotImplementedException($"\"{value}\" is not a function");
 
-    internal override JSBoolean Is(JSValue value)
+    internal override JSValue Is(JSValue value)
     {
         if (value is JSString @string && this.value == @string.value)
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     public override IElementEnumerator GetElementEnumerator() => new ElementEnumerator(value);

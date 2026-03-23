@@ -4,7 +4,6 @@ using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.String;
 using System;
 using System.Globalization;
-using Broiler.JavaScript.Core.Core.Boolean;
 using Broiler.JavaScript.ExpressionCompiler;
 
 namespace Broiler.JavaScript.Core;
@@ -22,9 +21,9 @@ public partial class JSString
         position = Math.Min(Math.Max(0, position), @this.Length);
 
         if (@this.IndexOf(arg, position) >= 0)
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     [JSPrototypeMethod]
@@ -41,17 +40,17 @@ public partial class JSString
         var fs = f.ToString();
 
         if (endPosition == int.MaxValue)
-            return @this.EndsWith(fs) ? JSBoolean.True : JSBoolean.False;
+            return @this.EndsWith(fs) ? JSValue.BooleanTrue : JSValue.BooleanFalse;
 
         endPosition = Math.Min(Math.Max(0, endPosition), @this.Length);
 
         if (fs.Length > endPosition)
-            return JSBoolean.False;
+            return JSValue.BooleanFalse;
 
         if (string.Compare(@this, endPosition - fs.Length, fs, 0, fs.Length) == 0)
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     [JSPrototypeMethod]
@@ -67,17 +66,17 @@ public partial class JSString
 
         var search = searchStr.ToString();
         if (pos == 0)
-            return @this.StartsWith(search) ? JSBoolean.True : JSBoolean.False;
+            return @this.StartsWith(search) ? JSValue.BooleanTrue : JSValue.BooleanFalse;
 
         pos = Math.Min(Math.Max(0, pos), @this.Length);
         if (pos + search.Length > @this.Length)
-            return JSBoolean.False;
+            return JSValue.BooleanFalse;
 
         int index = @this.IndexOf(search);
         if (index == pos)
-            return JSBoolean.True;
+            return JSValue.BooleanTrue;
 
-        return JSBoolean.False;
+        return JSValue.BooleanFalse;
     }
 
     [JSPrototypeMethod]
@@ -92,7 +91,7 @@ public partial class JSString
             throw JSContext.NewTypeError("Substring argument must not be a regular expression.");
 
         pos = Math.Min(Math.Max(pos, 0), @this.Length);
-        return @this.IndexOf(searchStr.ToString(), pos) >= 0 ? JSBoolean.True : JSBoolean.False;
+        return @this.IndexOf(searchStr.ToString(), pos) >= 0 ? JSValue.BooleanTrue : JSValue.BooleanFalse;
     }
 
     [JSPrototypeMethod]

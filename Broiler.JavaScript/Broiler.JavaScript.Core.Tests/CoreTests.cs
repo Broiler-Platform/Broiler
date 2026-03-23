@@ -1,6 +1,6 @@
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Boolean;
+
 
 namespace Broiler.JavaScript.Core.Tests;
 
@@ -43,13 +43,6 @@ public class CoreTests
         var str = new JSString("test");
         Assert.Equal("test", str.ToString());
         Assert.True(str.IsString);
-    }
-
-    [Fact]
-    public void JSBoolean_TrueAndFalse()
-    {
-        Assert.True(JSBoolean.True.BooleanValue);
-        Assert.False(JSBoolean.False.BooleanValue);
     }
 
     [Fact]
