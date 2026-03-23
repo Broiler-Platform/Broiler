@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Ast.Statements;
-using Broiler.JavaScript.Core.CodeGen;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 

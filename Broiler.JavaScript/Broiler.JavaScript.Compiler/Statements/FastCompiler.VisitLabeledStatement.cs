@@ -1,6 +1,5 @@
 ﻿using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Ast.Statements;
-using Broiler.JavaScript.Core.CodeGen;
 using System;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 

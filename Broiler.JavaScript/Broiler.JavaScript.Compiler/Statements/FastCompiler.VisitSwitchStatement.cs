@@ -1,7 +1,6 @@
 ﻿using Broiler.JavaScript.Ast.Expressions;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Ast.Statements;
-using Broiler.JavaScript.Core.CodeGen;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler.Core;
