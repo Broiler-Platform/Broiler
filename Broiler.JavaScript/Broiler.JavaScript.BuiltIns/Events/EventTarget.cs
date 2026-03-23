@@ -4,7 +4,7 @@ using Broiler.JavaScript.Core.Core.Storage;
 using System;
 using System.Collections.Generic;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Ast.Misc;
