@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
+using Broiler.JavaScript.Core.Core.Class;
 using Broiler.JavaScript.BuiltIns.Date;
 using Broiler.JavaScript.BuiltIns.Debug;
 using Broiler.JavaScript.BuiltIns.Decimal;
@@ -18,7 +19,6 @@ using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Disposable;
-using Broiler.JavaScript.Core.Core.Global;
 using Broiler.JavaScript.Core.LinqExpressions;
 
 namespace Broiler.JavaScript.BuiltIns;
@@ -44,9 +44,9 @@ internal static class BuiltInsAssemblyInitializer
         // instances via the IJSDisposableStack interface without referencing BuiltIns.
         IJSDisposableStack.CreateNew = static () => new JSDisposableStack();
 
-        // Wire factory delegate for the Intl global object so JSGlobalStatic
+        // Wire factory delegate for the Intl global object so the Globals assembly
         // does not directly reference JSIntl.
-        JSGlobalStatic.IntlFactory = static () => JSContext.ClrInterop.GetClrType(typeof(JSIntl));
+        DefaultBuiltInRegistry.IntlFactory = static () => JSContext.ClrInterop.GetClrType(typeof(JSIntl));
 
         // Wire factory delegate for JSDate so Core/Clr can create
         // Date values without referencing the concrete type directly.
@@ -130,6 +130,10 @@ internal static class BuiltInsAssemblyInitializer
         // Initialize JSSymbolBuilder with the concrete JSSymbol type so the
         // ClassGenerator can emit symbol lookups without a direct reference.
         JSSymbolBuilder.Initialize(typeof(JSSymbol));
+
+        // Initialize JSClassBuilder with the concrete JSClass type so the
+        // Compiler can build class expression trees without a direct reference.
+        JSClassBuilder.Initialize(typeof(JSClass));
 
         // Wire JSConstants with concrete JSString instances.
         JSConstants.Decimal = new JSString("decimal");

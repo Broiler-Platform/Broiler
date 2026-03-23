@@ -1,5 +1,4 @@
 ﻿using System;
-using Broiler.JavaScript.Core.Core.Class;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
@@ -38,7 +37,7 @@ partial class FastCompiler
     private YExpression CreateClass(AstIdentifier id, AstExpression super, AstClassExpression body)
     {
         var scope = pool.NewScope();
-        var tempVar = this.scope.Top.GetTempVariable(typeof(JSClass));
+        var tempVar = this.scope.Top.GetTempVariable(JSClassBuilder.Type);
 
         var prototypeElements = new Sequence<YElementInit>();
         var staticElements = new Sequence<YBinding>();

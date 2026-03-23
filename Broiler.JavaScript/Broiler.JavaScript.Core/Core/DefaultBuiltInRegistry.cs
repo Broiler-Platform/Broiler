@@ -45,6 +45,13 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
     public static Func<JSValue, Dictionary<JSValue, JSValue>, Func<JSValue, Dictionary<JSValue, JSValue>, JSValue>, JSValue> StructuredCloneExtension { get; set; }
 
     /// <summary>
+    /// Factory delegate for creating the Intl global object.
+    /// Wired by the BuiltIns assembly's module initializer so that the
+    /// Globals assembly does not directly reference JSIntl.
+    /// </summary>
+    public static Func<JSValue> IntlFactory { get; set; }
+
+    /// <summary>
     /// Delegate for registering Iterator.prototype helper methods (map, filter,
     /// take, drop, flatMap, reduce, toArray, forEach, some, every, find).
     /// Wired by the BuiltIns assembly's module initializer so that Core does not
@@ -53,10 +60,11 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
     public static Action<JSObject> IteratorPrototypeSetup { get; set; }
 
     /// <summary>
-    /// Attempts to load the <c>Broiler.JavaScript.BuiltIns</c> assembly and
-    /// run its module constructor so that the <c>[ModuleInitializer]</c>
-    /// registers factory delegates and additional built-in type registrations.
-    /// If the assembly is not available the failure is silently ignored;
+    /// Attempts to load satellite assemblies (<c>Broiler.JavaScript.BuiltIns</c>,
+    /// <c>Broiler.JavaScript.Globals</c>, <c>Broiler.JavaScript.Extensions</c>)
+    /// and run their module constructors so that <c>[ModuleInitializer]</c> methods
+    /// register factory delegates and additional built-in type registrations.
+    /// If an assembly is not available, the failure is silently ignored;
     /// the nullable delegate checks in <see cref="Register"/> will skip the
     /// satellite registrations gracefully.
     /// </summary>
@@ -65,9 +73,16 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
         if (AdditionalRegistrations != null)
             return;
 
+        TryLoadAssembly("Broiler.JavaScript.BuiltIns");
+        TryLoadAssembly("Broiler.JavaScript.Globals");
+        TryLoadAssembly("Broiler.JavaScript.Extensions");
+    }
+
+    private static void TryLoadAssembly(string name)
+    {
         try
         {
-            var assembly = Assembly.Load("Broiler.JavaScript.BuiltIns");
+            var assembly = Assembly.Load(name);
             RuntimeHelpers.RunModuleConstructor(assembly.ManifestModule.ModuleHandle);
         }
         catch (Exception ex) when (
@@ -75,7 +90,7 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
             or System.IO.FileLoadException
             or BadImageFormatException)
         {
-            // BuiltIns assembly is not available.  Delegates remain null and
+            // Assembly is not available. Delegates remain null and
             // Register() will skip satellite registrations gracefully.
         }
     }
