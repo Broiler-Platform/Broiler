@@ -5,7 +5,6 @@ using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Storage;
 
@@ -18,22 +17,22 @@ public class JSObjectBuilder
     readonly static ConstructorInfo _New = type.Constructor();
 
     readonly static MethodInfo _FastAddSetterUInt =
-        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddSetter), typeof(JSObject), typeof(uint), typeof(JSFunction), typeof(JSPropertyAttributes));
+        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddSetter), typeof(JSObject), typeof(uint), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddGetterUInt =
-        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddGetter), typeof(JSObject), typeof(uint), typeof(JSFunction), typeof(JSPropertyAttributes));
+        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddGetter), typeof(JSObject), typeof(uint), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddSetterKeyString =
-        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddSetter), typeof(JSObject), typeof(KeyString), typeof(JSFunction), typeof(JSPropertyAttributes));
+        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddSetter), typeof(JSObject), typeof(KeyString), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddGetterKeyString =
-        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddGetter), typeof(JSObject), typeof(KeyString), typeof(JSFunction), typeof(JSPropertyAttributes));
+        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddGetter), typeof(JSObject), typeof(KeyString), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddSetterValue =
-        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddSetter), typeof(JSObject), typeof(JSValue), typeof(JSFunction), typeof(JSPropertyAttributes));
+        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddSetter), typeof(JSObject), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddGetterValue =
-        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddGetter), typeof(JSObject), typeof(JSValue), typeof(JSFunction), typeof(JSPropertyAttributes));
+        typeExtensions.PublicMethod(nameof(JSObjectExtensions.FastAddGetter), typeof(JSObject), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddValueUInt =
         type.PublicMethod(nameof(JSObject.FastAddValue), typeof(uint), typeof(JSValue), typeof(JSPropertyAttributes));
@@ -48,16 +47,16 @@ public class JSObjectBuilder
         type.PublicMethod(nameof(JSObject.FastAddValue), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddPropertyUInt =
-        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(uint), typeof(JSFunction), typeof(JSFunction), typeof(JSPropertyAttributes));
+        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(uint), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddPropertyKeyString =
-        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(KeyString), typeof(JSFunction), typeof(JSFunction), typeof(JSPropertyAttributes));
+        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(KeyString), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddPropertySymbol =
-        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(IJSSymbol), typeof(JSFunction), typeof(JSFunction), typeof(JSPropertyAttributes));
+        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(IJSSymbol), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddPropertyValue =
-        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(JSValue), typeof(JSFunction), typeof(JSFunction), typeof(JSPropertyAttributes));
+        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(JSValue), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes));
 
     public readonly static MethodInfo _FastAddRange =
         type.PublicMethod(nameof(JSObject.FastAddRange), typeof(JSValue));
