@@ -35,5 +35,10 @@ internal static class JSValueCoreExtensions
         Arguments.RestFromImpl = ArgumentsCoreExtensions.RestFromCore;
         Arguments.GetStringImpl = ArgumentsCoreExtensions.GetStringCore;
         Arguments.GetSpreadTarget = ArgumentsCoreExtensions.GetSpreadTargetCore;
+
+        // Proactively load the BuiltIns assembly so that its ModuleInitializer
+        // wires string/number/boolean factories (JSValue.CreateString, etc.)
+        // before any user code runs—even without a JSContext being created.
+        DefaultBuiltInRegistry.EnsureBuiltInsAssemblyLoaded();
     }
 }

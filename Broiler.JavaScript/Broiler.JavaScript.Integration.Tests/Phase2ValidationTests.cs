@@ -145,12 +145,11 @@ public class Phase2ValidationTests
     {
         // JSString's prototype methods were split into partial files:
         // JSStringPrototype.Search.cs, .Transform.cs, .Extract.cs, .Pattern.cs
-        // The class is JSString (partial), with prototype methods in separate files.
-        var type = typeof(JSContext).Assembly.GetTypes()
-            .FirstOrDefault(t => t.Name == "JSString" && t.Namespace == "Broiler.JavaScript.Core");
+        // The class is JSString (partial), now in the BuiltIns assembly.
+        var type = typeof(Broiler.JavaScript.BuiltIns.String.JSString);
         Assert.NotNull(type);
 
-        var allMethods = type!.GetMethods(
+        var allMethods = type.GetMethods(
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic |
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static);
         Assert.True(allMethods.Length > 5,

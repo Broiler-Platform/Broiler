@@ -1,5 +1,6 @@
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.ModuleExtensions;
 
 namespace Broiler.JavaScript.ModuleExtensions.Tests;

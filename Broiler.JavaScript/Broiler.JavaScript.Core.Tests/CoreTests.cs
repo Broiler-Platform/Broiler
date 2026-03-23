@@ -1,6 +1,7 @@
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.Number;
+using Broiler.JavaScript.BuiltIns.String;
 
 
 namespace Broiler.JavaScript.Core.Tests;
