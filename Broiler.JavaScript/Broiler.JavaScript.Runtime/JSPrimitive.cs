@@ -15,14 +15,14 @@ public abstract class JSPrimitive: JSValue
         }
     }
 
-    protected abstract JSObject GetPrototype();
+    protected abstract JSValue GetPrototype();
 
     protected JSPrimitive() : base(null)
     {
 
     }
 
-    protected JSPrimitive(JSObject prototype): base(prototype)
+    protected JSPrimitive(JSValue prototype): base(prototype)
     {
 
     }
@@ -32,12 +32,12 @@ public abstract class JSPrimitive: JSValue
         {
             ResolvePrototype();
             if (prototypeChain == null)
-                return JSUndefined.Value;
+                return UndefinedValue;
             var px = prototypeChain.GetInternalProperty(symbol);
             if (px.IsEmpty)
             {
                 // throw JSContext.Current.NewTypeError($"{name} property not found on {this.GetType().Name}:{this}");
-                return JSUndefined.Value;
+                return UndefinedValue;
             }
             return this.GetValue(px);
         }
@@ -50,12 +50,12 @@ public abstract class JSPrimitive: JSValue
         {
             ResolvePrototype();
             if (prototypeChain == null)
-                return JSUndefined.Value;
+                return UndefinedValue;
             var px = prototypeChain.GetInternalProperty(name);
             if (px.IsEmpty)
             {
                 // throw JSContext.Current.NewTypeError($"{name} property not found on {this.GetType().Name}:{this}");
-                return JSUndefined.Value;
+                return UndefinedValue;
             }
             return this.GetValue(px);
         }
