@@ -446,13 +446,13 @@ public partial class JSObject
         if (!this[KeyStrings.writable].BooleanValue)
             pt |= JSPropertyAttributes.Readonly;
 
-        if (get != null && get.IsFunction)
+        if (get is IJSFunction)
         {
             pt |= JSPropertyAttributes.Property;
             pget = get;
         }
 
-        if (set != null && set.IsFunction)
+        if (set is IJSFunction)
         {
             pt |= JSPropertyAttributes.Property;
             pset = set;

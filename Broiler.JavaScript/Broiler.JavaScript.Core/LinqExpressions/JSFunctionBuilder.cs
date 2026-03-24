@@ -27,11 +27,15 @@ public class JSFunctionBuilder
     internal static void Initialize(Type functionType)
     {
         type = functionType;
-        _prototype = type.PublicField("prototype");
-        _f = type.InternalField("f");
-        invokeFunction = typeof(JSValue).InternalMethod("InvokeFunction", ArgumentsBuilder.refType);
+        _prototype = type.PublicField("prototype")
+            ?? throw new InvalidOperationException($"prototype field not found on {type.FullName}");
+        _f = type.InternalField("f")
+            ?? throw new InvalidOperationException($"f field not found on {type.FullName}");
+        invokeFunction = typeof(JSValue).InternalMethod("InvokeFunction", ArgumentsBuilder.refType)
+            ?? throw new InvalidOperationException("InvokeFunction method not found on JSValue");
         _invokeSuperConstructor = type.PublicMethod("InvokeSuperConstructor",
-            typeof(JSValue), typeof(JSValue), typeof(Arguments).MakeByRefType());
+            typeof(JSValue), typeof(JSValue), typeof(Arguments).MakeByRefType())
+            ?? throw new InvalidOperationException($"InvokeSuperConstructor method not found on {type.FullName}");
     }
 
     public static Expression Prototype(Expression target) => Expression.Field(target, _prototype);
