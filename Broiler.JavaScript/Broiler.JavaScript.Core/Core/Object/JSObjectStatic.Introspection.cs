@@ -1,6 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Runtime;
 
@@ -13,7 +12,7 @@ public partial class JSObject
     {
         var target = a.Get1();
         if (target.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (!target.IsObject)
             return JSValue.CreateArray();
@@ -84,7 +83,7 @@ public partial class JSObject
         var first = a.Get1();
 
         if (first.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
             return JSValue.CreateArray();
@@ -107,7 +106,7 @@ public partial class JSObject
         var first = a.Get1();
 
         if (first.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject target)
             return JSValue.CreateArray();
@@ -136,7 +135,7 @@ public partial class JSObject
         var (first, name) = a.Get2();
 
         if (first.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
             return JSUndefined.Value;
@@ -150,7 +149,7 @@ public partial class JSObject
         var first = a.Get1();
 
         if (first.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
             return JSValue.CreateArray();
@@ -178,7 +177,7 @@ public partial class JSObject
         var first = a.Get1();
 
         if (first.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
             return JSValue.CreateArray();
@@ -198,7 +197,7 @@ public partial class JSObject
     {
         var first = a.Get1();
         if (first.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
             return JSValue.CreateArray();

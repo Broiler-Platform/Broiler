@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Promise;
@@ -113,7 +112,7 @@ public partial class JSPromise : JSObject
         }
         catch (Exception ex)
         {
-            rejectFunction.InvokeFunction(new Arguments(JSUndefined.Value, JSError.From(ex)));
+            rejectFunction.InvokeFunction(new Arguments(JSUndefined.Value, JSException.JSErrorFrom(ex)));
         }
     }
 
@@ -126,7 +125,7 @@ public partial class JSPromise : JSObject
         }
         catch (Exception ex)
         {
-            rejectFunction.InvokeFunction(new Arguments(JSUndefined.Value, JSError.From(ex)));
+            rejectFunction.InvokeFunction(new Arguments(JSUndefined.Value, JSException.JSErrorFrom(ex)));
         }
     }
 
@@ -185,7 +184,7 @@ public partial class JSPromise : JSObject
                     }
                     catch (Exception ex)
                     {
-                        Reject(JSError.From(ex));
+                        Reject(JSException.JSErrorFrom(ex));
                     }
                 });
                 return;
@@ -318,7 +317,7 @@ public partial class JSPromise : JSObject
             }
             catch (Exception ex)
             {
-                reaction.Promise.Reject(JSError.From(ex));
+                reaction.Promise.Reject(JSException.JSErrorFrom(ex));
             }
         }
         else if (reaction.Type == ReactionType.Resolve)

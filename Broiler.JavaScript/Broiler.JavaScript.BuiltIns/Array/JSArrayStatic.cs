@@ -2,7 +2,7 @@
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Error;
+using Broiler.JavaScript.BuiltIns.Error;
 using Broiler.JavaScript.Core.Core.Function;
 using System;
 using Broiler.JavaScript.BuiltIns.Number;
@@ -66,7 +66,7 @@ public partial class JSArray
         var (items, mapFn, thisArg) = a.Get3();
 
         if (items.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         bool hasMap = mapFn.IsFunction;
 

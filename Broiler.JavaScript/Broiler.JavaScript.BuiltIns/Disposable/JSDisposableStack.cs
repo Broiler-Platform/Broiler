@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Broiler.JavaScript.Core.Core.Error;
+using Broiler.JavaScript.BuiltIns.Error;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;

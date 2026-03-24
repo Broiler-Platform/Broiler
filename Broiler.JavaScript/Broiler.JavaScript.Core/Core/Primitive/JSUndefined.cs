@@ -1,4 +1,3 @@
-using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using System;
@@ -50,9 +49,9 @@ public sealed class JSUndefined : JSValue
 
     internal override JSFunctionDelegate GetMethod(in KeyString key) => throw JSContext.NewTypeError($"Cannot get property {key} of undefined");
 
-    public override JSValue Delete(in KeyString key) => throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+    public override JSValue Delete(in KeyString key) => throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
-    public override JSValue Delete(uint key) => throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+    public override JSValue Delete(uint key) => throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
     public override bool Equals(JSValue value) => value.IsNullOrUndefined;//if (value.IsUndefined)//    return true;//return false;
 

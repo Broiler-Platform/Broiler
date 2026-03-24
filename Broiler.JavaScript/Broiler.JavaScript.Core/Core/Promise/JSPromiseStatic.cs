@@ -1,6 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Runtime;
@@ -60,11 +59,11 @@ public partial class JSPromise
         }
         catch (JSException ex)
         {
-            return new JSPromise(ex.Error ?? JSError.From(ex), PromiseState.Rejected);
+            return new JSPromise(ex.Error ?? JSException.JSErrorFrom(ex), PromiseState.Rejected);
         }
         catch (Exception ex)
         {
-            return new JSPromise(JSError.From(ex), PromiseState.Rejected);
+            return new JSPromise(JSException.JSErrorFrom(ex), PromiseState.Rejected);
         }
     }
 

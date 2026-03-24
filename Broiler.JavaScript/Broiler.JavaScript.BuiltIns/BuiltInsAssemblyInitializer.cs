@@ -5,6 +5,7 @@ using Broiler.JavaScript.BuiltIns.Date;
 using Broiler.JavaScript.BuiltIns.Debug;
 using Broiler.JavaScript.BuiltIns.Decimal;
 using Broiler.JavaScript.BuiltIns.Disposable;
+using Broiler.JavaScript.BuiltIns.Error;
 using Broiler.JavaScript.BuiltIns.Intl;
 using Broiler.JavaScript.BuiltIns.Iterator;
 using Broiler.JavaScript.BuiltIns.Map;
@@ -147,6 +148,22 @@ internal static class BuiltInsAssemblyInitializer
         // Wire factory delegate for JSPrototype so Core can create prototype
         // instances without referencing the concrete type directly.
         JSObject.CreatePrototype = static obj => new JSPrototype(obj);
+
+        // Wire factory delegates for JSError types so Core can create
+        // error instances without referencing the concrete types directly.
+        JSContext.CreateTypeError = static (message, function, filePath, line) =>
+            new JSTypeError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
+        JSContext.CreateSyntaxError = static (message, function, filePath, line) =>
+            new JSSyntaxError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
+        JSContext.CreateURIError = static (message, function, filePath, line) =>
+            new JSURIError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
+        JSContext.CreateRangeError = static (message, function, filePath, line) =>
+            new JSRangeError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
+        JSContext.CreateError = static (message, function, filePath, line) =>
+            new JSError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
+        JSException.CreateJSError = static (ex, msg) => new JSError(ex, msg);
+        JSException.CreateJSErrorWithPrototype = static (ex, prototype) => new JSError(ex, prototype);
+        JSException.JSErrorFrom = static (ex) => JSError.From(ex);
 
         // Wire JSConstants with concrete JSString instances.
         JSConstants.Decimal = new JSString("decimal");

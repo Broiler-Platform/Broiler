@@ -4,7 +4,6 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Storage;
 
@@ -12,12 +11,25 @@ namespace Broiler.JavaScript.Core.Core;
 
 public class JSException : Exception
 {
+    // Factory delegates for creating JSError instances, wired by BuiltInsAssemblyInitializer.
+    internal static Func<JSException, string, JSValue> CreateJSError;
+    internal static Func<JSException, JSObject, JSValue> CreateJSErrorWithPrototype;
+    internal static Func<Exception, JSValue> JSErrorFrom;
+
+    // Error message constants (moved from JSError for Core accessibility)
+    public const string Cannot_convert_undefined_or_null_to_object = "Cannot convert undefined or null to object";
+    public const string Parameter_is_not_an_object = "Parameter is not an object";
+
+    // Helper methods (moved from JSTypeError for Core accessibility)
+    public static string NotIterable(object name) => $"{name} is not iterable";
+    public static string NotEntry(object name) => $"Iterator value {name} is an entry object";
+
     public override string Message
     {
         get
         {
-            if (Error is JSError error)
-                return error[KeyStrings.message].ToString();
+            if (Error is IJSError)
+                return Error[KeyStrings.message].ToString();
 
             return Error.ToString();
         }
@@ -46,7 +58,7 @@ public class JSException : Exception
         if (function != null)
             trace.Add((function, filePath ?? "Unknown", line, 1));
 
-        Error = new JSError(this, message);
+        Error = CreateJSError(this, message);
     }
 
     public JSException(string message, JSObject prototype, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) : base(message)
@@ -54,7 +66,7 @@ public class JSException : Exception
         if (function != null)
             trace.Add((function, filePath ?? "Unknown", line, 1));
 
-        Error = new JSError(this, prototype);
+        Error = CreateJSErrorWithPrototype(this, prototype);
     }
 
     public JSValue JSStackTrace
@@ -100,7 +112,7 @@ public class JSException : Exception
         Console.Error.WriteLine($"  Function: {function}, File: {filePath}, Line: {line}");
         Console.Error.WriteLine(st.ToString());
 #endif
-        throw value is JSError jse ? jse.Exception : new JSException(value);
+        throw value is IJSError jse ? (JSException)jse.Exception : new JSException(value);
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
@@ -112,8 +124,8 @@ public class JSException : Exception
 
     public static JSException FromValue(JSValue value)
     {
-        if (value is JSError error)
-            return error.Exception;
+        if (value is IJSError error)
+            return (JSException)error.Exception;
 
         var ex = new JSException(value.ToString());
         return ex;
@@ -160,7 +172,7 @@ public class JSException : Exception
             }
 
             // add internal stack..
-            if (Error is JSError error)
+            if (Error is IJSError error)
                 sb.AppendLine(error.Stack);
 
             return sb.ToString();

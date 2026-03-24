@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Error;
+using Broiler.JavaScript.BuiltIns.Error;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns;

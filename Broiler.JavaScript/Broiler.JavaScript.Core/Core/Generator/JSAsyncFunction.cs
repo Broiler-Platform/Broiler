@@ -3,7 +3,6 @@ using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using System;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Function;
-using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 
@@ -47,7 +46,7 @@ public class JSAsyncFunction
         } 
         catch (Exception ex)
         {
-            return new JSPromise(JSError.From(ex), JSPromise.PromiseState.Rejected);
+            return new JSPromise(JSException.JSErrorFrom(ex), JSPromise.PromiseState.Rejected);
         }
     }
 }

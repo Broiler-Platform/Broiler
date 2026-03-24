@@ -1,3 +1,5 @@
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;
@@ -6,14 +8,15 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace Broiler.JavaScript.Core.Core.Error;
-
+namespace Broiler.JavaScript.BuiltIns.Error;
 
 [JSClassGenerator("Error")]
-public partial class JSError : JSObject
+public partial class JSError : JSObject, IJSError
 {
     public string Message { get; private set; }
     public string Stack { get; private set; }
+
+    Exception IJSError.Exception => Exception;
 
     private string CreateStack()
     {
@@ -71,10 +74,6 @@ public partial class JSError : JSObject
 
     public override string ToDetailString() => ToString(Arguments.Empty).ToString() + "\r\n" + Exception.JSStackTrace.ToString();
 
-    public const string Cannot_convert_undefined_or_null_to_object = "Cannot convert undefined or null to object";
-
-    public const string Parameter_is_not_an_object = "Parameter is not an object";
-
     public JSException Exception { get; }
 
     internal protected JSError(JSException ex, JSObject prototype = null) : base(prototype)
@@ -112,9 +111,6 @@ public partial class JSTypeError : JSError
     public JSTypeError(in Arguments a, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) :
         base(in a, function: function, filePath: filePath, line: line)
     { }
-
-    public static string NotIterable(object name) => $"{name} is not iterable";
-    public static string NotEntry(object name) => $"Iterator value {name} is an entry object";
 }
 
 [JSClassGenerator("SyntaxError"), JSBaseClass("Error")]
