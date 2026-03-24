@@ -1,6 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 
+// Moved from Broiler.JavaScript.Core to Broiler.JavaScript.Parser.
+// Rationale: ErrorHandler is parser infrastructure (tolerant error
+// recording/throwing during parsing) and logically belongs with the
+// parser implementation. Namespace preserved for binary compatibility.
+
 namespace Broiler.JavaScript.Core.Parser;
 
 public class Error(string message) : Exception(message)

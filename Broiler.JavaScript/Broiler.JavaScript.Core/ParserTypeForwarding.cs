@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Broiler.JavaScript.Core.Parser;
 using Broiler.JavaScript.Parser;
 
 // Type forwarding for types moved to Broiler.JavaScript.Parser assembly.
@@ -17,3 +18,5 @@ using Broiler.JavaScript.Parser;
 [assembly: TypeForwardedTo(typeof(FastStack<>))]
 [assembly: TypeForwardedTo(typeof(QueueExtensions))]
 [assembly: TypeForwardedTo(typeof(CharExtensions))]
+[assembly: TypeForwardedTo(typeof(Error))]
+[assembly: TypeForwardedTo(typeof(ErrorHandler))]

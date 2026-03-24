@@ -1,10 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
+
+// Moved from Broiler.JavaScript.Core to Broiler.JavaScript.BuiltIns.
+// Rationale: DefaultBuiltInRegistry is responsible for orchestrating the
+// registration of built-in JavaScript objects (Array, String, Number, etc.)
+// and logically belongs with the built-in type implementations. The assembly-
+// loading bootstrap logic was extracted to JSContext so that Core can load
+// satellite assemblies without a circular dependency.
 
 namespace Broiler.JavaScript.Core.Core;
 
@@ -59,50 +64,18 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
     /// </summary>
     public static Action<JSObject> IteratorPrototypeSetup { get; set; }
 
-    /// <summary>
-    /// Attempts to load satellite assemblies (<c>Broiler.JavaScript.BuiltIns</c>,
-    /// <c>Broiler.JavaScript.Globals</c>, <c>Broiler.JavaScript.Extensions</c>)
-    /// and run their module constructors so that <c>[ModuleInitializer]</c> methods
-    /// register factory delegates and additional built-in type registrations.
-    /// If an assembly is not available, the failure is silently ignored;
-    /// the nullable delegate checks in <see cref="Register"/> will skip the
-    /// satellite registrations gracefully.
-    /// </summary>
-    internal static void EnsureBuiltInsAssemblyLoaded()
-    {
-        if (AdditionalRegistrations != null)
-            return;
-
-        TryLoadAssembly("Broiler.JavaScript.BuiltIns");
-        TryLoadAssembly("Broiler.JavaScript.Globals");
-        TryLoadAssembly("Broiler.JavaScript.Extensions");
-    }
-
-    private static void TryLoadAssembly(string name)
-    {
-        try
-        {
-            var assembly = Assembly.Load(name);
-            RuntimeHelpers.RunModuleConstructor(assembly.ManifestModule.ModuleHandle);
-        }
-        catch (Exception ex) when (
-            ex is System.IO.FileNotFoundException
-            or System.IO.FileLoadException
-            or BadImageFormatException)
-        {
-            // Assembly is not available. Delegates remain null and
-            // Register() will skip satellite registrations gracefully.
-        }
-    }
-
     /// <inheritdoc />
     public void Register(IJSContext ctx)
     {
-        EnsureBuiltInsAssemblyLoaded();
+        JSContext.EnsureBuiltInsAssemblyLoaded();
 
         var context = ctx as JSContext
             ?? throw new ArgumentException("Expected JSContext instance", nameof(ctx));
-        context.RegisterGeneratedClasses();
+
+        // Invoke Core's source-generated class registration via the delegate
+        // wired by CoreAssemblyInitializer. This replaces the direct call to
+        // context.RegisterGeneratedClasses() which is internal to Core.
+        JSContext.CoreClassRegistrations?.Invoke(context);
 
         // Register built-in types from satellite assemblies.
         AdditionalRegistrations?.Invoke(context);

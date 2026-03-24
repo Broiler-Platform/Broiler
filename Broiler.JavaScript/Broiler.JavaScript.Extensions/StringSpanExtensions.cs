@@ -1,6 +1,12 @@
-﻿#nullable enable
+#nullable enable
 using Broiler.JavaScript.Ast.Misc;
 using System.Text;
+
+// Moved from Broiler.JavaScript.Core to Broiler.JavaScript.Extensions.
+// Rationale: StringSpanExtensions provides utility extension methods for
+// StringSpan (which lives in the Ast assembly) and logically belongs with
+// the other extension helper classes in the Extensions assembly.
+// Namespace preserved for binary compatibility.
 
 namespace Broiler.JavaScript.Core.Extensions;
 
