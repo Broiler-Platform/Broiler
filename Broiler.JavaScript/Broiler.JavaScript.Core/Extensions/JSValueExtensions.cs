@@ -217,49 +217,6 @@ public static partial class JSValueExtensions
         return value;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static IEnumerable<(JSValue Key, JSValue Value)> GetAllEntries(this JSValue value, bool showEnumerableOnly = true)
-    {
-        if (value is not JSObject @object)
-            yield break;
-
-        var elements = @object.GetElements();
-        if (!elements.IsNull)
-        {
-            var len = elements.Length;
-            for (uint Key = 0; Key < len; Key++)
-            {
-                var Value = elements[Key];
-                if (showEnumerableOnly)
-                {
-                    if (!Value.IsEnumerable)
-                        continue;
-                }
-
-                yield return (JSValue.CreateNumber(Key), value.GetValue(in Value));
-            }
-        }
-
-        var en = @object.GetOwnProperties(false).GetEnumerator();
-        while (en.MoveNext(out var p))
-        {
-            if (showEnumerableOnly)
-            {
-                if (!p.IsEnumerable)
-                    continue;
-            }
-
-            yield return (KeyStringCoreExtensions.GetJSString(p.key), value.GetValue(in p));
-        }
-
-        var @base = (value.prototypeChain as IJSPrototype)?.Object as JSObject;
-        if (@base != value && @base != null)
-        {
-            foreach (var bp in @base.GetAllEntries(showEnumerableOnly))
-                yield return bp;
-        }
-    }
-
     public static JSValue InstanceOf(this JSValue target, JSValue value)
     {
         if (value.IsUndefined)
