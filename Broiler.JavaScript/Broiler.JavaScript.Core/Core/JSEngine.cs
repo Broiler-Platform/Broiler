@@ -132,6 +132,12 @@ public static class JSEngine
     /// </summary>
     internal static Func<JSObject, bool, JSValue> CreateFunctionClass;
 
+    /// <summary>
+    /// Factory delegate for creating the Object class.
+    /// Wired by Core's module initializer from the source-generated code.
+    /// </summary>
+    internal static Func<JSObject, bool, JSValue> CreateObjectClass;
+
     // ── new.target helpers ──────────────────────────────────────────
 
     public static JSValue NewTarget => Current?.Top?.NewTarget;

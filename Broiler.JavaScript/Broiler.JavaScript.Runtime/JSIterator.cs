@@ -8,7 +8,7 @@ public struct JSIterator(JSValue iterator) : IElementEnumerator
 
     public bool MoveNext(out bool hasValue, out JSValue value, out uint index)
     {
-        value = iterator.InvokeMethod(KeyStrings.next);
+        value = JSObjectCoreExtensions.InvokeMethodOn(iterator, KeyStrings.next);
         var done = value[KeyStrings.done];
         value = value[KeyStrings.value];
         
@@ -26,7 +26,7 @@ public struct JSIterator(JSValue iterator) : IElementEnumerator
 
     public readonly bool MoveNext(out JSValue value)
     {
-        value = iterator.InvokeMethod(KeyStrings.next);
+        value = JSObjectCoreExtensions.InvokeMethodOn(iterator, KeyStrings.next);
         var done = value[KeyStrings.done];
         value = value[KeyStrings.value];
         
@@ -38,7 +38,7 @@ public struct JSIterator(JSValue iterator) : IElementEnumerator
 
     public readonly bool MoveNextOrDefault(out JSValue value, JSValue @default)
     {
-        value = iterator.InvokeMethod(KeyStrings.next);
+        value = JSObjectCoreExtensions.InvokeMethodOn(iterator, KeyStrings.next);
         var done = value[KeyStrings.done];
 
         if (done.BooleanValue)
@@ -53,7 +53,7 @@ public struct JSIterator(JSValue iterator) : IElementEnumerator
 
     public readonly JSValue NextOrDefault(JSValue @default)
     {
-        var value = iterator.InvokeMethod(KeyStrings.next);
+        var value = JSObjectCoreExtensions.InvokeMethodOn(iterator, KeyStrings.next);
         var done = value[KeyStrings.done];
 
         if (done.BooleanValue)

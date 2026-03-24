@@ -12,16 +12,16 @@ public static class JSObjectStatic
             return @object;
 
         if (value.IsNullOrUndefined)
-            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw JSObject.NewTypeError(JSObject.Cannot_convert_undefined_or_null_to_object);
 
-        throw JSEngine.NewTypeError(JSException.Parameter_is_not_an_object);
+        throw JSObject.NewTypeError(JSObject.Parameter_is_not_an_object);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool TryAsObjectThrowIfNullOrUndefined(this JSValue value, out JSObject @object)
     {
         if (value.IsNullOrUndefined)
-            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw JSObject.NewTypeError(JSObject.Cannot_convert_undefined_or_null_to_object);
 
         @object = value as JSObject;
         return @object != null;
