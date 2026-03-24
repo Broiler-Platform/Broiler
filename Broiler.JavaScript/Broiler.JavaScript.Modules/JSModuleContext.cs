@@ -1,5 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core.Promise;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
@@ -8,6 +7,7 @@ using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core;
@@ -272,7 +272,7 @@ public class JSModuleContext : JSContext
             throw new KeyNotFoundException($"{exportedFunctionName} not found on the module");
         
         var rv = exported.InvokeFunction(a);
-        if (rv is JSPromise promise)
+        if (rv is IJSPromise promise)
             return await promise.Task;
 
         if (m.WaitTask != null)
@@ -369,7 +369,7 @@ public class JSModuleContext : JSContext
             module.Import,
             module.Id,
             JSValue.CreateString(module.dirPath)
-        ])) is JSPromise result)
+        ])) is IJSPromise result)
         {
             await result.Task;
         }

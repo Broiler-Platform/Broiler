@@ -11,7 +11,6 @@ using Broiler.JavaScript.Core.Debugger;
 using Broiler.JavaScript.Core.Emit;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Function;
-using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 
@@ -241,25 +240,32 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
     static readonly ConcurrentUInt32Map<JSFunction> cache = ConcurrentUInt32Map<JSFunction>.Create();
     internal readonly SynchronizationContext synchronizationContext;
 
+    // Factory delegates for error creation, wired by BuiltInsAssemblyInitializer.
+    internal static Func<string, string, string, int, JSException> CreateTypeError;
+    internal static Func<string, string, string, int, JSException> CreateSyntaxError;
+    internal static Func<string, string, string, int, JSException> CreateURIError;
+    internal static Func<string, string, string, int, JSException> CreateRangeError;
+    internal static Func<string, string, string, int, JSException> CreateError;
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewTypeError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
-        new JSTypeError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
+        CreateTypeError(message, function, filePath, line);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewSyntaxError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
-        new JSSyntaxError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
+        CreateSyntaxError(message, function, filePath, line);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewURIError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
-        new JSURIError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
+        CreateURIError(message, function, filePath, line);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewRangeError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
-        new JSRangeError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
+        CreateRangeError(message, function, filePath, line);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewError(string message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) =>
-        new JSError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
+        CreateError(message, function, filePath, line);
 
     partial void OnError(Exception ex);
 
@@ -352,7 +358,11 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
     public ICodeCache CodeCache { get; set; } = DictionaryCodeCache.Current;
 
-    internal ConcurrentDictionary<long, JSPromise> PendingPromises = new();
+    // Factory delegates for creating JSPromise instances, wired by BuiltInsAssemblyInitializer.
+    internal static Func<JSValue, bool, JSValue> CreateResolvedOrRejectedPromise;
+    internal static Func<JSPromiseDelegate, IJSPromise> CreatePromiseFromDelegate;
+
+    internal ConcurrentDictionary<long, JSValue> PendingPromises = new();
 
     /// <summary>
     /// Quickly evaluates the code, does not wait for promises and timeouts/intervals.
@@ -396,7 +406,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
         if (wt != null)
             await wt;
 
-        if (r is JSPromise promise)
+        if (r is IJSPromise promise)
             return await promise.Task;
 
         if (r is not JSObject @object)
@@ -406,7 +416,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
         if (!then.IsFunction)
             return r;
 
-        promise = new JSPromise((resolve, reject) =>
+        var promiseObj = CreatePromiseFromDelegate((resolve, reject) =>
         {
             var resolveF = new JSFunction((in Arguments a) =>
             {
@@ -426,7 +436,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
             then.InvokeFunction(a);
         });
 
-        return await promise.Task;
+        return await promiseObj.Task;
     }
 
 

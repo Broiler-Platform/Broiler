@@ -1,6 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Core.Object;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Runtime;
@@ -31,7 +30,7 @@ public partial class JSObject
     {
         var first = a.Get1();
         if (first.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject firstObject)
             return first;
@@ -54,7 +53,7 @@ public partial class JSObject
 
         var pds = a1;
         if (pds.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (pds is not JSObject pdObject)
             return target;
@@ -104,7 +103,7 @@ public partial class JSObject
     internal static JSValue GetEntries(in Arguments a)
     {
         if (a[0] is not JSObject obj)
-            throw JSContext.NewTypeError(JSTypeError.NotIterable("undefined"));
+            throw JSContext.NewTypeError(JSException.NotIterable("undefined"));
 
         var r = JSValue.CreateArray();
 
@@ -140,7 +139,7 @@ public partial class JSObject
     {
         var v = a.Get1();
         if (v.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSTypeError.NotIterable("undefined"));
+            throw JSContext.NewTypeError(JSException.NotIterable("undefined"));
 
         var r = new JSObject();
         if (v.IsArray && v is JSObject va)
@@ -151,7 +150,7 @@ public partial class JSObject
                 var vi = vaElements[i];
                 var iaValue = vi.value as JSValue;
                 if (iaValue == null || !iaValue.IsArray)
-                    throw JSContext.NewTypeError(JSTypeError.NotEntry(vi));
+                    throw JSContext.NewTypeError(JSException.NotEntry(vi));
 
                 var first = iaValue[0];
                 var second = iaValue[1];
@@ -199,7 +198,7 @@ public partial class JSObject
         var (items, callbackfn) = a.Get2();
 
         if (items.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSError.Cannot_convert_undefined_or_null_to_object);
+            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (!callbackfn.IsFunction)
             throw JSContext.NewTypeError("CallbackFn must be a function");

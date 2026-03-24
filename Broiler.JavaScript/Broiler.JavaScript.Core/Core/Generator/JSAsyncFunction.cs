@@ -3,9 +3,9 @@ using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using System;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Function;
-using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
+using Broiler.JavaScript.Core.Core;
 
 namespace Broiler.JavaScript.Core.Core.Generator;
 
@@ -27,11 +27,11 @@ public class JSAsyncFunction
         try
         {
             if(!gen.MoveNext(lastResult, out var r))
-                return new JSPromise(r, JSPromise.PromiseState.Resolved);
+                return JSContext.CreateResolvedOrRejectedPromise(r, true);
 
             var then = r[KeyStrings.then];
             if (then.IsUndefined)
-                return new JSPromise(r, JSPromise.PromiseState.Resolved);
+                return JSContext.CreateResolvedOrRejectedPromise(r, true);
 
             r = r.InvokeMethod(in KeyStrings.then, new JSFunction((in Arguments a) =>
             {
@@ -47,7 +47,7 @@ public class JSAsyncFunction
         } 
         catch (Exception ex)
         {
-            return new JSPromise(JSError.From(ex), JSPromise.PromiseState.Rejected);
+            return JSContext.CreateResolvedOrRejectedPromise(JSException.JSErrorFrom(ex), false);
         }
     }
 }

@@ -1,10 +1,11 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Threading.Tasks;
-using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.ExpressionCompiler;
 
-namespace Broiler.JavaScript.Core.Core.Promise;
+namespace Broiler.JavaScript.BuiltIns.Promise;
 
 public static class JSPromiseExtensions
 {

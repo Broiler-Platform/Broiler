@@ -4,6 +4,7 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.BuiltIns.Intl;
 using Broiler.JavaScript.BuiltIns.Iterator;
+using Broiler.JavaScript.BuiltIns.Promise;
 
 namespace Broiler.JavaScript.Integration.Tests;
 
@@ -151,7 +152,7 @@ public class M7ValidationTests
     public void M7_Promise_ResideInCoreAssembly()
     {
         var promiseAsm = typeof(JSPromise).Assembly.GetName().Name;
-        Assert.Equal("Broiler.JavaScript.Core", promiseAsm);
+        Assert.Equal("Broiler.JavaScript.BuiltIns", promiseAsm);
     }
 
     [Fact]
@@ -165,7 +166,7 @@ public class M7ValidationTests
         Assert.NotNull(pendingField);
 
         var fieldType = pendingField!.FieldType;
-        Assert.Contains("JSPromise", fieldType.GenericTypeArguments
+        Assert.Contains("JSValue", fieldType.GenericTypeArguments
             .Select(t => t.Name));
     }
 
@@ -312,8 +313,8 @@ public class M7ValidationTests
         Assert.Equal("Broiler.JavaScript.Core",
             typeof(JSRegExp).Assembly.GetName().Name);
 
-        // Promise — remains in Core
-        Assert.Equal("Broiler.JavaScript.Core",
+        // Promise — extracted to BuiltIns
+        Assert.Equal("Broiler.JavaScript.BuiltIns",
             typeof(JSPromise).Assembly.GetName().Name);
 
         // Iterator — extracted to BuiltIns
