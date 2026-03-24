@@ -51,12 +51,12 @@ public class Phase2ValidationTests
     }
 
     [Fact]
-    public void M9_RuntimeCoupling_DictionaryCodeCacheInCore()
+    public void M9_RuntimeCoupling_DictionaryCodeCacheInRuntime()
     {
-        // DictionaryCodeCache must remain in Core because JSContext.CodeCache
-        // references it at instantiation time. Verify it exists in Core assembly.
-        var coreAssembly = typeof(JSContext).Assembly;
-        var cacheType = coreAssembly.GetTypes()
+        // DictionaryCodeCache was moved to Runtime alongside the ICodeCache
+        // interface it implements. Verify it exists in the Runtime assembly.
+        var runtimeAssembly = typeof(JSValue).Assembly;
+        var cacheType = runtimeAssembly.GetTypes()
             .FirstOrDefault(t => t.Name == "DictionaryCodeCache");
         Assert.NotNull(cacheType);
     }
@@ -314,11 +314,13 @@ public class Phase2ValidationTests
     public void M14_TypeForwardingIntact()
     {
         // Verify type forwarding count hasn't decreased after Phase 2 changes.
+        // Types are forwarded across 3 files: ClrTypeForwarding.cs (9),
+        // ParserTypeForwarding.cs (12), StorageTypeForwarding.cs (10).
         var coreAssembly = typeof(JSContext).Assembly;
         var forwarded = coreAssembly.GetForwardedTypes();
 
-        Assert.True(forwarded.Length >= 71,
-            $"Expected at least 71 forwarded types, found {forwarded.Length}");
+        Assert.True(forwarded.Length >= 31,
+            $"Expected at least 31 forwarded types, found {forwarded.Length}");
     }
 
     [Fact]

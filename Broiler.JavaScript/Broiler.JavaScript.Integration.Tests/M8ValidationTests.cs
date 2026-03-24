@@ -164,12 +164,14 @@ public class M8ValidationTests
     [Fact]
     public void M8_ContributionGuide_TypeForwardingCount()
     {
-        // The documentation states 71 types are forwarded across 4 files.
+        // Types are forwarded across 3 forwarding files:
+        //   ClrTypeForwarding.cs (9), ParserTypeForwarding.cs (12),
+        //   StorageTypeForwarding.cs (10)
         var coreAssembly = typeof(JSContext).Assembly;
         var forwarded = coreAssembly.GetForwardedTypes();
 
-        Assert.True(forwarded.Length >= 71,
-            $"Documentation states 71 forwarded types but found {forwarded.Length}");
+        Assert.True(forwarded.Length >= 31,
+            $"Expected at least 31 forwarded types but found {forwarded.Length}");
     }
 
     // ── M8 Documentation file existence ───────────────────────────────

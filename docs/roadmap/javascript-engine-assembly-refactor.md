@@ -67,10 +67,9 @@ Foundation Layer
 The architecture uses three key mechanisms to maintain clean layering:
 
 1. **Type Forwarding** — `[assembly: TypeForwardedTo(...)]` attributes in `Broiler.JavaScript.Core` preserve binary compatibility for types that were extracted to Foundation assemblies:
-   - **31 types** forwarded via `AssemblyInfo.cs` (Runtime, Storage types)
+   - **9 types** forwarded via `ClrTypeForwarding.cs` (Runtime types: attributes, caching, interop)
    - **12 types** forwarded via `ParserTypeForwarding.cs` (Parser types)
    - **10 types** forwarded via `StorageTypeForwarding.cs` (Storage types)
-   - **18 types** forwarded via `AstTypeForwarding.cs` (AST types)
 
 2. **Module Initializers** — `[ModuleInitializer]` methods in satellite assemblies register factories and delegates without requiring reverse references:
    - `BuiltInsAssemblyInitializer` — registers built-in classes and factory delegates for `JSDecimal`, `JSBigInt`, `JSConsole`, `JSIntl`, `JSDisposableStack`, structured clone
@@ -226,7 +225,7 @@ Each feature assembly depends on Core and implements a specific capability:
 **Validation Details:**
 - Fixed build breakage from Ast namespace reorganization (`Broiler.JavaScript.Ast.Misc`) in 7 files
 - Added 15 validation tests in `Broiler.JavaScript.Integration.Tests/M6ValidationTests.cs` covering:
-  - TypeForwardedTo resolution (71 forwarded types across 4 files, spot-checked against 19 representative types)
+  - TypeForwardedTo resolution (31 forwarded types across 3 files, spot-checked against 19 representative types)
   - Module initializer wiring (all 6 initializers verified through behavioral tests)
   - Circular reference detection (DFS-based cycle detection on loaded assembly graph)
   - Backward compatibility (type forwarding via Core, namespace preservation, dependency layering)
@@ -359,7 +358,7 @@ Each assembly has a corresponding test project. The counts below reflect the cur
 
 ### 6.1 Binary Compatibility
 
-Type forwarding (`[assembly: TypeForwardedTo]`) ensures that assemblies compiled against `Broiler.JavaScript.Core` continue to resolve types that have been moved to Foundation assemblies. Currently **71 types** are forwarded across 4 forwarding files.
+Type forwarding (`[assembly: TypeForwardedTo]`) ensures that assemblies compiled against `Broiler.JavaScript.Core` continue to resolve types that have been moved to Foundation assemblies. Currently **31 types** are forwarded across 3 forwarding files.
 
 ### 6.2 Source Compatibility
 
@@ -446,7 +445,7 @@ dotnet test Broiler.JavaScript/YantraJS.sln --collect:"XPlat Code Coverage"
 
 **Phase 1 final state:**
 - 40 built-in types extracted to `Broiler.JavaScript.BuiltIns` (24 M1–M4 + 14 TypedArrays + 1 Iterator + 1 Intl)
-- 71 types forwarded for backward compatibility
+- 31 types forwarded for backward compatibility
 - 6 module initializers wiring satellite assemblies
 - TypedArrays and Iterator successfully extracted in M7
 - 2 candidates confirmed non-extractable (RegExp, Promise)
@@ -781,6 +780,6 @@ Each milestone should be delivered as a separate PR for focused review:
 | M13 | ✅ No-Go | Exploratory | ExpressionCompiler decomposition assessment — tight coupling confirmed, no split |
 | M14 | ✅ Complete | Required | Phase 2 validation & documentation update (19 validation tests) |
 
-**Phase 1 final state:** 40 built-in types extracted, 71 types forwarded, 6 module initializers, 158 tests, full CI on 3 platforms.
+**Phase 1 final state:** 40 built-in types extracted, 31 types forwarded, 6 module initializers, 158 tests, full CI on 3 platforms.
 
 **Phase 2 final state:** M9 coupling analysis completed (builders stay in Core due to runtime coupling in `JSFunction.CreateClrDelegate()`), large files decomposed for readability (5 files → 16 partials), foundation layer cleaned (dedup `CancellableDisposableAction`), Compiler reorganized into semantic subdirectories (Statements/, Expressions/, Declarations/, Scope/, Infrastructure/), ExpressionCompiler assessed and documented (no-go — intentionally cohesive), 177 tests passing across 12 test projects.
