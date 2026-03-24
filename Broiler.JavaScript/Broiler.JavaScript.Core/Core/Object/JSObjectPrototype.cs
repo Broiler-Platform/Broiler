@@ -54,7 +54,7 @@ public partial class JSObject
     [JSExport("__proto__")]
     internal JSValue ObjectPrototype
     {
-        get => (prototypeChain as JSPrototype)?.@object ?? JSValue.NullValue;
+        get => (prototypeChain as IJSPrototype)?.Object ?? JSValue.NullValue;
         set
         {
             if (value is JSObject o)
@@ -110,13 +110,13 @@ public partial class JSObject
         var first = a.Get1();
         while (true)
         {
-            if (@this == (first.prototypeChain as JSPrototype)?.@object)
+            if (@this == (first.prototypeChain as IJSPrototype)?.Object)
                 return JSValue.BooleanTrue;
 
-            if ((first.prototypeChain as JSPrototype)?.@object == first || (first.prototypeChain as JSPrototype)?.@object == null)
+            if ((first.prototypeChain as IJSPrototype)?.Object == first || (first.prototypeChain as IJSPrototype)?.Object == null)
                 break;
 
-            first = (first.prototypeChain as JSPrototype)?.@object;
+            first = (first.prototypeChain as IJSPrototype)?.Object;
         }
 
         return JSValue.BooleanFalse;

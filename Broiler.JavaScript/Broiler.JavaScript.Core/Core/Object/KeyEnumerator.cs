@@ -32,7 +32,7 @@ public class PropertyEnumerator
 
             if (inherited)
             {
-                var @base = (target.prototypeChain as JSPrototype)?.@object;
+                var @base = (target.prototypeChain as IJSPrototype)?.Object as JSObject;
                 if (@base != null && @base != target)
                     parent = new PropertyEnumerator(@base, showEnumerableOnly, inherited);
             }
@@ -62,7 +62,7 @@ public class PropertyEnumerator
             
             if (inherited)
             {
-                var @base = (target.prototypeChain as JSPrototype)?.@object;
+                var @base = (target.prototypeChain as IJSPrototype)?.Object as JSObject;
                 if (@base != null && @base != target)
                     parent = new PropertyEnumerator(@base, showEnumerableOnly, inherited);
             }
@@ -117,7 +117,7 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
 
             if (inherited)
             {
-                var @base = (jSObject.prototypeChain as JSPrototype)?.@object;
+                var @base = (jSObject.prototypeChain as IJSPrototype)?.Object as JSObject;
                 if (@base != null && @base != jSObject)
                     parent = new KeyEnumerator(@base, showEnumerableOnly, inherited);
             }
@@ -162,7 +162,7 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
 
             if (inherited)
             {
-                var @base = (jSObject.prototypeChain as JSPrototype)?.@object;
+                var @base = (jSObject.prototypeChain as IJSPrototype)?.Object as JSObject;
                 if (@base != null && @base != jSObject)
                     parent = new KeyEnumerator(@base, showEnumerableOnly, inherited);
             }
@@ -205,7 +205,7 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
 
             if (inherited)
             {
-                var @base = (jSObject.prototypeChain as JSPrototype)?.@object;
+                var @base = (jSObject.prototypeChain as IJSPrototype)?.Object as JSObject;
                 if (@base != null && @base != jSObject)
                     parent = new KeyEnumerator(@base, showEnumerableOnly, inherited);
             }
@@ -242,7 +242,7 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
 
             if (inherited)
             {
-                var @base = (jSObject.prototypeChain as JSPrototype)?.@object;
+                var @base = (jSObject.prototypeChain as IJSPrototype)?.Object as JSObject;
                 if (@base != null && @base != jSObject)
                     parent = new KeyEnumerator(@base, showEnumerableOnly, inherited);
             }

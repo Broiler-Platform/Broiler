@@ -22,6 +22,7 @@ using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.BuiltIns.Class;
+using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.BuiltIns;
@@ -142,6 +143,10 @@ internal static class BuiltInsAssemblyInitializer
         // generator instances without a direct type reference.
         JSGeneratorBuilder.CreateFromEnumerator = static (en, name) => new JSGenerator(en, name);
         JSGeneratorBuilder.CreateFromClrV2 = static g => new JSGenerator(g);
+
+        // Wire factory delegate for JSPrototype so Core can create prototype
+        // instances without referencing the concrete type directly.
+        JSObject.CreatePrototype = static obj => new JSPrototype(obj);
 
         // Wire JSConstants with concrete JSString instances.
         JSConstants.Decimal = new JSString("decimal");
