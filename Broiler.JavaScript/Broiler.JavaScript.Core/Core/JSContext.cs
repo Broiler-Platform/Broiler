@@ -193,7 +193,17 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
         // Symbol and all other built-in types are registered here via
         // the BuiltIns assembly's RegisterBuiltInClasses pipeline.
-        BuiltInRegistry?.Register(this);
+        // After EnsureBuiltInsAssemblyLoaded(), BuiltInRegistry is typically
+        // set by the BuiltIns module initializer. If the BuiltIns assembly
+        // is unavailable, fall back to Core's own class registration.
+        if (BuiltInRegistry != null)
+        {
+            BuiltInRegistry.Register(this);
+        }
+        else
+        {
+            CoreClassRegistrations?.Invoke(this);
+        }
 
         this[KeyStrings.debug] = new JSFunction(Debug);
 
