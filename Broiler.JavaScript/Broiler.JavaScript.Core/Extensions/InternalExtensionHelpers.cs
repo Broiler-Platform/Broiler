@@ -92,11 +92,11 @@ internal static class InternalExtensionHelpers
 
     // ── MarshalExtensions (TryUnmarshal) ────────────────────────────
 
-    internal static bool TryUnmarshal(this JSObject @object, Type type, out object result) => unmarshalCache[type](@object, out result);
+    internal static bool TryUnmarshal(this JSObject @object, Type type, out object result) => cache[type](@object, out result);
 
     delegate bool UnmarshalDelegate(JSObject @object, out object result);
 
-    static readonly ConcurrentTypeTrie<UnmarshalDelegate> unmarshalCache = new(UnmarshalDelegateFactory);
+    static readonly ConcurrentTypeTrie<UnmarshalDelegate> cache = new(UnmarshalDelegateFactory);
 
     static UnmarshalDelegate UnmarshalDelegateFactory(Type type)
     {
