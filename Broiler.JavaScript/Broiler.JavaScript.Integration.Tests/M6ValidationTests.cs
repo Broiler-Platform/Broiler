@@ -41,11 +41,12 @@ public class M6ValidationTests
         var coreAssembly = typeof(JSContext).Assembly;
         var forwarded = coreAssembly.GetForwardedTypes();
 
-        // The refactored architecture forwards 71 types across 4 forwarding files:
-        //   AssemblyInfo.cs (31), AstTypeForwarding.cs (18),
-        //   ParserTypeForwarding.cs (12), StorageTypeForwarding.cs (10)
-        Assert.True(forwarded.Length >= 71,
-            $"Expected at least 71 forwarded types but found {forwarded.Length}");
+        // The refactored architecture forwards 75 types across 4 forwarding files:
+        //   AssemblyInfo.cs (31), ClrTypeForwarding.cs (9),
+        //   ParserTypeForwarding.cs (12), StorageTypeForwarding.cs (10),
+        //   plus remaining forwarded types
+        Assert.True(forwarded.Length >= 75,
+            $"Expected at least 75 forwarded types but found {forwarded.Length}");
 
         // Verify every forwarded type can be loaded and is not null.
         foreach (var type in forwarded)

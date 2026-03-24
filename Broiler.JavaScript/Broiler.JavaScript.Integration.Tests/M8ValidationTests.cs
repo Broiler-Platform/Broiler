@@ -164,12 +164,14 @@ public class M8ValidationTests
     [Fact]
     public void M8_ContributionGuide_TypeForwardingCount()
     {
-        // The documentation states 71 types are forwarded across 4 files.
+        // The documentation states 75 types are forwarded across 4 files
+        // (increased from 71 after DictionaryCodeCache, MethodProvider,
+        // ListMethodProvider, and IJavaScriptObject moved to Runtime).
         var coreAssembly = typeof(JSContext).Assembly;
         var forwarded = coreAssembly.GetForwardedTypes();
 
-        Assert.True(forwarded.Length >= 71,
-            $"Documentation states 71 forwarded types but found {forwarded.Length}");
+        Assert.True(forwarded.Length >= 75,
+            $"Documentation states 75 forwarded types but found {forwarded.Length}");
     }
 
     // ── M8 Documentation file existence ───────────────────────────────

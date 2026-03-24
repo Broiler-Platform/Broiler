@@ -239,7 +239,7 @@ When optional satellite assemblies are not loaded, Core degrades gracefully.
 
 ## 6. Type Forwarding Summary
 
-**71 `[assembly: TypeForwardedTo(…)]`** attributes in Core ensure backward
+**75 `[assembly: TypeForwardedTo(…)]`** attributes in Core ensure backward
 compatibility after types were moved to Foundation-layer assemblies.
 Consumers that reference Core by assembly name continue to resolve these types
 without recompilation.
@@ -247,6 +247,7 @@ without recompilation.
 | Forwarding File | Target Assembly | Types Forwarded (count) | Examples |
 |-----------------|-----------------|------------------------|----------|
 | `AssemblyInfo.cs` | Runtime | 35 | `JSValue`, `Arguments`, `KeyString`, `PropertySequence`, `JSFunctionDelegate`, `IJSPrototype`, `IClrInterop`, `IDebugger` |
+| `ClrTypeForwarding.cs` | Runtime | 9 | `JSExportAttribute`, `ClrMemberNamingConvention`, `DictionaryCodeCache`, `MethodProvider`, `ListMethodProvider`, `IJavaScriptObject` |
 | `ParserTypeForwarding.cs` | Parser | 12 | `FastParser`, `FastScanner`, `FastKeywordMap`, `FastTokenStream`, `FastScope`, `FastPool`, `FastList<>` |
 | `StorageTypeForwarding.cs` | Storage | 10 | `VirtualMemory<>`, `StringMap<>`, `ConcurrentNameMap`, `SAUint32Map<>`, `ConcurrentStringMap<>` |
 | `AstTypeForwarding.cs` | Ast | 14 | `AstNode`, `AstExpression`, `AstStatement`, `AstProgram`, `FastNodeType`, `StringSpan`, `SpanLocation` |
