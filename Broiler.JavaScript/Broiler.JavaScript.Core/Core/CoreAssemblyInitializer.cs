@@ -8,6 +8,7 @@ internal static class CoreAssemblyInitializer
     internal static void Initialize()
     {
         JSEngine.CoreClassRegistrations = static ctx => ctx.RegisterGeneratedClasses();
+        JSEngine.CreateObjectClass = ObjectClassFactory.CreateObjectClass;
 
         // Wire JSObject factory delegates for Core dependencies
         JSObject.NewTypeError = static msg => JSEngine.NewTypeError(msg);

@@ -24,17 +24,17 @@ public partial class JSObject
         {
             case KeyType.String:
                 if (ownProperties.TryGetValue(key.KeyString.Key, out var p))
-                    return p.ToJSValue();
+                    return JSObjectCoreExtensions.PropertyToJSValue(in p);
                 return JSValue.UndefinedValue;
 
             case KeyType.UInt:
                 if (elements.TryGetValue(key.Index, out var p1))
-                    return p1.ToJSValue();
+                    return JSObjectCoreExtensions.PropertyToJSValue(in p1);
                 return JSValue.UndefinedValue;
 
             case KeyType.Symbol:
                 if (symbols.TryGetValue(key.Symbol.Key, out var p3))
-                    return p3.ToJSValue();
+                    return JSObjectCoreExtensions.PropertyToJSValue(in p3);
                 return JSValue.UndefinedValue;
         }
 

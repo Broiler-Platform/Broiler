@@ -35,7 +35,7 @@ public partial class JSObject
         while (en.MoveNext(out var key, out var property))
         {
             var entry = JSValue.CreateArray();
-            entry.AddArrayItem(key.ToJSValue());
+            entry.AddArrayItem(JSObjectCoreExtensions.KeyStringToJSValue(key));
             entry.AddArrayItem(target.GetValue(property));
             r.AddArrayItem(entry);
         }

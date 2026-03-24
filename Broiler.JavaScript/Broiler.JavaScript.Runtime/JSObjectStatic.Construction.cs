@@ -123,7 +123,7 @@ public partial class JSObject
         while (vp.MoveNext(out var value, out var key))
         {
             var entry = JSValue.CreateArray();
-            entry.AddArrayItem(key.ToJSValue());
+            entry.AddArrayItem(JSObjectCoreExtensions.KeyStringToJSValue(key));
             entry.AddArrayItem(value);
             r.AddArrayItem(entry);
         }
@@ -212,7 +212,7 @@ public partial class JSObject
             if (!hasValue)
                 continue;
 
-            var key = callbackfn.Call(JSValue.UndefinedValue, item, JSValue.CreateNumber(index));
+            var key = JSObjectCoreExtensions.CallWith(callbackfn, JSValue.UndefinedValue, item, JSValue.CreateNumber(index));
             var keyStr = key.ToString();
             var group = result[keyStr];
 

@@ -16,7 +16,7 @@ internal static class JSObjectCoreExtensions
     // ── JSProperty.ToJSValue ────────────────────────────────────────
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSValue ToJSValue(in this JSProperty px)
+    internal static JSValue PropertyToJSValue(in JSProperty px)
     {
         var t = JSValue.BooleanTrue;
         var f = JSValue.BooleanFalse;
@@ -52,7 +52,7 @@ internal static class JSObjectCoreExtensions
     // ── KeyString.ToJSValue ─────────────────────────────────────────
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSValue ToJSValue(this KeyString ks) => JSValue.CreateStringWithKey(ks.ToString(), ks);
+    internal static JSValue KeyStringToJSValue(KeyString ks) => JSValue.CreateStringWithKey(ks.ToString(), ks);
 
     // ── KeyStringCoreExtensions.GetJSString ─────────────────────────
 
@@ -66,7 +66,7 @@ internal static class JSObjectCoreExtensions
     // ── JSValue.Call ────────────────────────────────────────────────
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSValue Call(this JSValue fx, JSValue @this, JSValue arg0, JSValue arg1)
+    internal static JSValue CallWith(JSValue fx, JSValue @this, JSValue arg0, JSValue arg1)
     {
         var a = new Arguments(@this, arg0, arg1);
         return fx.InvokeFunction(in a);
@@ -75,7 +75,7 @@ internal static class JSObjectCoreExtensions
     // ── JSValue.InvokeMethod ────────────────────────────────────────
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSValue InvokeMethod(this JSValue @this, in KeyString name)
+    internal static JSValue InvokeMethodOn(JSValue @this, in KeyString name)
     {
         var fx = @this.GetMethod(name) ?? throw JSValue.NewTypeError($"Method {name} not found in {@this}");
         var a = new Arguments(@this);

@@ -118,7 +118,7 @@ public class JSContext : JSObject, IJSExecutionContext, IDisposable
         var func = JSEngine.CreateFunctionClass(this, false);
         this[functionKey] = func;
         FunctionPrototype = ((IJSFunction)func).Prototype as JSObject;
-        Object = CreateClass(this, false);
+        Object = JSEngine.CreateObjectClass(this, false);
         this[objectKey] = Object;
         ObjectPrototype = ((IJSFunction)Object).Prototype as JSObject;
         ObjectPrototype.BasePrototypeObject = null;
