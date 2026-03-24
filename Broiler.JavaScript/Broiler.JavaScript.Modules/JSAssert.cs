@@ -5,8 +5,9 @@ using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Core;
 
-namespace Broiler.JavaScript.Core.Utils;
+namespace Broiler.JavaScript.Modules;
 
 [JSBaseClass("Function")]
 [JSFunctionGenerator("Assert")]

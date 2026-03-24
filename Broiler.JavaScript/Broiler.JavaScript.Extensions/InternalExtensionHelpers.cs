@@ -11,16 +11,24 @@ using System.Runtime.CompilerServices;
 namespace Broiler.JavaScript.Core.Internal;
 
 /// <summary>
-/// Minimal internal helpers for Core call sites that cannot reference the
-/// Broiler.JavaScript.Extensions assembly.  The full
-/// <c>InternalExtensionHelpers</c> class has been moved to Extensions.
+/// Backward-compatible helpers that maintain the <c>Broiler.JavaScript.Core.Internal</c>
+/// namespace for internal extension points now housed in the Extensions assembly.
 /// </summary>
-internal static class CoreInternalHelpers
+public static class InternalExtensionHelpers
 {
+    // ── JSObjectExtensions (AddProperty) ────────────────────────────
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static JSObject AddProperty(this JSObject target, in KeyString key, JSValue value, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue)
+    {
+        target.GetOwnProperties().Put(in key, value, attributes);
+        return target;
+    }
+
     // ── JSPropertyExtensions (ToJSValue) ────────────────────────────
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSValue ToJSValue(in this JSProperty px)
+    public static JSValue ToJSValue(in this JSProperty px)
     {
         var t = JSValue.BooleanTrue;
         var f = JSValue.BooleanFalse;
@@ -46,13 +54,6 @@ internal static class CoreInternalHelpers
         return obj;
     }
 
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    private static JSObject AddProperty(this JSObject target, in KeyString key, JSValue value, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue)
-    {
-        target.GetOwnProperties().Put(in key, value, attributes);
-        return target;
-    }
-
     // ── ClrProxyExtensions (TryGetClrEnumerator) ────────────────────
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -62,7 +63,7 @@ internal static class CoreInternalHelpers
         return Activator.CreateInstance(type, target);
     }
 
-    internal static bool TryGetClrEnumerator(this JSValue value, Type type, out object clrObject)
+    public static bool TryGetClrEnumerator(this JSValue value, Type type, out object clrObject)
     {
         if (type.IsConstructedGenericType)
         {
@@ -86,7 +87,7 @@ internal static class CoreInternalHelpers
 
     // ── MarshalExtensions (TryUnmarshal) ────────────────────────────
 
-    internal static bool TryUnmarshal(this JSObject @object, Type type, out object result) => cache[type](@object, out result);
+    public static bool TryUnmarshal(this JSObject @object, Type type, out object result) => cache[type](@object, out result);
 
     delegate bool UnmarshalDelegate(JSObject @object, out object result);
 

@@ -19,8 +19,14 @@ internal delegate void PropertyChangedEventHandler(JSObject sender, (uint keyStr
 [JSFunctionGenerator("Object", Register = false)]
 public partial class JSObject : JSValue
 {
-    private JSPrototype currentPrototype;
+    private IJSPrototype currentPrototype;
     protected bool HasIterator = false;
+
+    /// <summary>
+    /// Factory delegate for creating prototype instances.
+    /// Wired by BuiltInsAssemblyInitializer at startup.
+    /// </summary>
+    internal static Func<JSObject, IJSPrototype> CreatePrototype;
 
     public override JSValue BasePrototypeObject
     {
@@ -32,10 +38,10 @@ public partial class JSObject : JSValue
         }
     }
 
-    internal JSPrototype PrototypeObject
+    internal IJSPrototype PrototypeObject
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => currentPrototype ??= new JSPrototype(this);
+        get => currentPrototype ??= CreatePrototype(this);
     }
 
     internal void Dirty() => PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, null));

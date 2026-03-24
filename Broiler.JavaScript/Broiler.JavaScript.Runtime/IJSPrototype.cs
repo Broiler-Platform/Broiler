@@ -5,7 +5,7 @@ namespace Broiler.JavaScript.Core.Core;
 /// <summary>
 /// Abstraction over the prototype chain, allowing Runtime types
 /// to traverse prototypes without depending on the concrete
-/// <c>JSPrototype</c> class in Core.
+/// <c>JSPrototype</c> class in BuiltIns.
 /// </summary>
 public interface IJSPrototype
 {
@@ -26,4 +26,7 @@ public interface IJSPrototype
 
     /// <summary>Marks the prototype as dirty (needs rebuild).</summary>
     void Dirty();
+
+    /// <summary>Tries to remove an element at the given index from the prototype chain.</summary>
+    bool TryRemove(uint i, out JSProperty p);
 }

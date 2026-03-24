@@ -578,7 +578,7 @@ public partial class JSObject
         }
 
         if (prototypeChain != null)
-            return ((JSPrototype)prototypeChain).TryRemove(i, out p);
+            return ((IJSPrototype)prototypeChain).TryRemove(i, out p);
 
         return false;
     }
