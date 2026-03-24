@@ -12,7 +12,7 @@ public partial class JSObject
     {
         var target = a.Get1();
         if (target.IsNullOrUndefined)
-            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw NewTypeError(Cannot_convert_undefined_or_null_to_object);
 
         if (!target.IsObject)
             return JSValue.CreateArray();
@@ -83,7 +83,7 @@ public partial class JSObject
         var first = a.Get1();
 
         if (first.IsNullOrUndefined)
-            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw NewTypeError(Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
             return JSValue.CreateArray();
@@ -106,7 +106,7 @@ public partial class JSObject
         var first = a.Get1();
 
         if (first.IsNullOrUndefined)
-            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw NewTypeError(Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject target)
             return JSValue.CreateArray();
@@ -135,10 +135,10 @@ public partial class JSObject
         var (first, name) = a.Get2();
 
         if (first.IsNullOrUndefined)
-            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw NewTypeError(Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
-            return JSUndefined.Value;
+            return JSValue.UndefinedValue;
 
         return jobj.GetOwnPropertyDescriptor(name);
     }
@@ -149,7 +149,7 @@ public partial class JSObject
         var first = a.Get1();
 
         if (first.IsNullOrUndefined)
-            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw NewTypeError(Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
             return JSValue.CreateArray();
@@ -177,7 +177,7 @@ public partial class JSObject
         var first = a.Get1();
 
         if (first.IsNullOrUndefined)
-            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw NewTypeError(Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
             return JSValue.CreateArray();
@@ -197,7 +197,7 @@ public partial class JSObject
     {
         var first = a.Get1();
         if (first.IsNullOrUndefined)
-            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw NewTypeError(Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject jobj)
             return JSValue.CreateArray();
@@ -205,7 +205,7 @@ public partial class JSObject
         ref var symbols = ref jobj.GetSymbols();
         var r = JSValue.CreateArray();
         foreach (var x in symbols.AllValues())
-            r.AddArrayItem(KeyStringCoreExtensions.GetJSString(x.Value.key));
+            r.AddArrayItem(JSObjectCoreExtensions.GetJSString(x.Value.key));
 
         return r;
     }

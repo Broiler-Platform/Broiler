@@ -1,6 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Internal;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using System;
@@ -94,7 +93,7 @@ public partial class JSObject
 
     public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
-    public override JSValue InvokeFunction(in Arguments a) => throw JSEngine.NewTypeError($"{this} is not a function");
+    public override JSValue InvokeFunction(in Arguments a) => throw NewTypeError($"{this} is not a function");
 
     public override bool Less(JSValue value)
     {
@@ -143,7 +142,7 @@ public partial class JSObject
     }
     public override bool ConvertTo(Type type, out object value)
     {
-        if (this.TryGetClrEnumerator(type, out value))
+        if (TryGetClrEnumeratorFunc?.Invoke(this, type, out value) ?? false)
             return true;
 
         if (type == typeof(object))
@@ -155,7 +154,7 @@ public partial class JSObject
         if (type != typeof(Type))
         {
             // if type has default constructor...
-            if (this.TryUnmarshal(type, out value))
+            if (TryUnmarshalObject?.Invoke(this, type, out value) ?? false)
                 return true;
         }
 

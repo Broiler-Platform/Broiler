@@ -3,8 +3,6 @@
 using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Core.Core.Object;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Internal;
-using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using System;
@@ -27,20 +25,20 @@ public partial class JSObject
             case KeyType.String:
                 if (ownProperties.TryGetValue(key.KeyString.Key, out var p))
                     return p.ToJSValue();
-                return JSUndefined.Value;
+                return JSValue.UndefinedValue;
 
             case KeyType.UInt:
                 if (elements.TryGetValue(key.Index, out var p1))
                     return p1.ToJSValue();
-                return JSUndefined.Value;
+                return JSValue.UndefinedValue;
 
             case KeyType.Symbol:
                 if (symbols.TryGetValue(key.Symbol.Key, out var p3))
                     return p3.ToJSValue();
-                return JSUndefined.Value;
+                return JSValue.UndefinedValue;
         }
 
-        return JSUndefined.Value;
+        return JSValue.UndefinedValue;
     }
 
     public override JSValue GetOwnProperty(in KeyString name)
@@ -222,7 +220,7 @@ public partial class JSObject
             }
 
             if (throwError)
-                throw JSEngine.NewTypeError($"Cannot modify property {name} of {this} which has only a getter");
+                throw NewTypeError($"Cannot modify property {name} of {this} which has only a getter");
 
             return false;
         }
@@ -232,7 +230,7 @@ public partial class JSObject
             if (throwError)
             {
                 // Only in Strict Mode ..
-                throw JSEngine.NewTypeError($"Cannot modify property {name} of {this}");
+                throw NewTypeError($"Cannot modify property {name} of {this}");
             }
 
             return false;
@@ -241,7 +239,7 @@ public partial class JSObject
         if (IsFrozen())
         {
             if (throwError)
-                throw JSEngine.NewTypeError($"Cannot modify property {name} of {this}");
+                throw NewTypeError($"Cannot modify property {name} of {this}");
 
             return false;
         }
@@ -249,7 +247,7 @@ public partial class JSObject
         if (p.IsEmpty && !IsExtensible())
         {
             if (throwError)
-                throw JSEngine.NewTypeError($"Cannot add property {name} to {this}");
+                throw NewTypeError($"Cannot add property {name} to {this}");
 
             return false;
         }
@@ -283,7 +281,7 @@ public partial class JSObject
         if (IsFrozen())
         {
             if (throwError)
-                throw JSEngine.NewTypeError($"Cannot modify property {name} of {this}");
+                throw NewTypeError($"Cannot modify property {name} of {this}");
 
             return false;
         }
@@ -320,7 +318,7 @@ public partial class JSObject
         if (IsFrozen())
         {
             if (throwError)
-                throw JSEngine.NewTypeError($"Cannot modify property {name} of {this}");
+                throw NewTypeError($"Cannot modify property {name} of {this}");
 
             return false;
         }
@@ -387,7 +385,7 @@ public partial class JSObject
 
         symbols.Put(key) = pd.ToProperty(key);
         PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, name));
-        return JSUndefined.Value;
+        return JSValue.UndefinedValue;
     }
 
     public JSValue DefineProperty(uint key, JSObject pd)
@@ -404,7 +402,7 @@ public partial class JSObject
         this.UpdateArrayLengthIfNeeded(key);
 
         PropertyChanged?.Invoke(this, (uint.MaxValue, key, null));
-        return JSUndefined.Value;
+        return JSValue.UndefinedValue;
     }
 
     public JSValue DefineProperty(in KeyString name, JSObject pd)
@@ -423,7 +421,7 @@ public partial class JSObject
         // p.key = name;
         ownProperties.Put(key) = pd.ToProperty(key);
         PropertyChanged?.Invoke(this, (name.Key, uint.MaxValue, null));
-        return JSUndefined.Value;
+        return JSValue.UndefinedValue;
     }
     public override IElementEnumerator GetAllKeys(bool showEnumerableOnly = true, bool inherited = true) => new KeyEnumerator(this, showEnumerableOnly, inherited);//var elements = this.elements;//if (elements != null)//{//    foreach (var (Key, Value) in elements.AllValues)//    {//        if (showEnumerableOnly)//        {//            if (!Value.IsEnumerable)//                continue;//        }//        yield return new JSNumber(Key);//    }//}//var ownProperties = this.ownProperties;//if (ownProperties != null)//{//    var en = new PropertySequence.Enumerator(ownProperties);//    while(en.MoveNext())//    {//        var p = en.Current;//        if (showEnumerableOnly)//        {//            if (!p.IsEnumerable)//                continue;//        }//        yield return p.ToJSValue();//    }//}//if (inherited)//{//    var @base = this.prototypeChain;//    if (@base != this && @base != null)//    {//        foreach (var i in @base.GetAllKeys(showEnumerableOnly))//            yield return i;//    }//}
 
@@ -471,7 +469,7 @@ public partial class JSObject
     public override JSValue Delete(in KeyString key)
     {
         if (IsSealedOrFrozen())
-            throw JSEngine.NewTypeError($"Cannot delete property {key} of {this}");
+            throw NewTypeError($"Cannot delete property {key} of {this}");
 
         if (ownProperties.RemoveAt(key.Key))
         {
@@ -485,7 +483,7 @@ public partial class JSObject
     public override JSValue Delete(uint key)
     {
         if (IsSealedOrFrozen())
-            throw JSEngine.NewTypeError($"Cannot delete property {key} of {this}");
+            throw NewTypeError($"Cannot delete property {key} of {this}");
 
         ref var element = ref elements.Get(key);
 
@@ -501,7 +499,7 @@ public partial class JSObject
     public override JSValue Delete(IJSSymbol symbol)
     {
         if (IsSealedOrFrozen())
-            throw JSEngine.NewTypeError($"Cannot delete property {symbol} of {this}");
+            throw NewTypeError($"Cannot delete property {symbol} of {this}");
 
         if (symbols.RemoveAt(symbol.Key))
         {
@@ -609,7 +607,7 @@ public partial class JSObject
             }
 
             hasValue = false;
-            value = JSUndefined.Value;
+            value = JSValue.UndefinedValue;
             index = 0;
             return false;
         }
@@ -623,7 +621,7 @@ public partial class JSObject
                 return true;
             }
 
-            value = JSUndefined.Value;
+            value = JSValue.UndefinedValue;
             return false;
         }
 

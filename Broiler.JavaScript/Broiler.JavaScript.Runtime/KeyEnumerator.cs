@@ -176,7 +176,7 @@ public class KeyEnumerator(JSObject jSObject, bool showEnumerableOnly, bool inhe
             parent = null;
         }
 
-        value = JSUndefined.Value;
+        value = JSValue.UndefinedValue;
         return false;
     }
 
