@@ -9,7 +9,7 @@ namespace Broiler.JavaScript.Core.Extensions;
 public static class ClrProxyExtensions
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static object CreateClrEnumerator(JSValue target, Type elementType) 
+    private static object CreateClrEnumerator(JSValue target, Type elementType) 
     {
         Type type = typeof(ClrObjectEnumerator<>).MakeGenericType(elementType);
         return Activator.CreateInstance(type, target);

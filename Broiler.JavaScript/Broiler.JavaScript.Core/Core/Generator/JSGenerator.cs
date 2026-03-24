@@ -1,6 +1,6 @@
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.Core.Internal;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using Broiler.JavaScript.ExpressionCompiler;
 using System;
