@@ -1,7 +1,7 @@
-﻿using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Runtime;
@@ -12,14 +12,12 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.BuiltIns.Promise;
 
 
-
-public delegate void JSPromiseDelegate(Action<JSValue> resolve, Action<JSValue> reject);
 
 [JSFunctionGenerator("Promise")]
-public partial class JSPromise : JSObject
+public partial class JSPromise : JSObject, IJSPromise
 {
     internal enum PromiseState
     {
@@ -52,7 +50,7 @@ public partial class JSPromise : JSObject
     static long nextPromiseID = 1;
 
     long promiseID;
-    ConcurrentDictionary<long, JSPromise> pending;
+    ConcurrentDictionary<long, JSValue> pending;
 
     /// <summary>
     /// .Net removes promises aggressively via

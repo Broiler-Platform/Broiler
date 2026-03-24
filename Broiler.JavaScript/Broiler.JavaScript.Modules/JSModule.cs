@@ -74,7 +74,7 @@ public partial class JSModule : JSObject
     public Task<JSValue> ImportAsync(string name)
     {
         var result = Import.InvokeFunction(new Arguments(JSUndefined.Value, JSValue.CreateString(name)));
-        return (result as JSPromise).Task;
+        return (result as IJSPromise).Task;
     }
 
     [JSPrototypeMethod]
@@ -89,7 +89,7 @@ public partial class JSModule : JSObject
         exports = new JSObject();
 
         var result = Compile.InvokeFunction(new Arguments(this));
-        if (result is JSPromise promise)
+        if (result is IJSPromise promise)
             await promise.Task;
     }
 }

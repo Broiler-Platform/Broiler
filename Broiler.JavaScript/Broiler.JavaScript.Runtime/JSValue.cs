@@ -8,6 +8,7 @@ using System.Dynamic;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 
 namespace Broiler.JavaScript.Core.Core;
 
@@ -119,6 +120,26 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
     /// Creates a <c>JSDate</c> from a <c>DateTimeOffset</c> via the registered factory delegate.
     /// </summary>
     public static JSValue CreateDate(DateTimeOffset value) => CreateDateFactory(value);
+
+    /// <summary>
+    /// Factory delegate for creating a <c>JSPromise</c> from a <c>Task&lt;JSValue&gt;</c>.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// Used by Clr for Task marshaling without referencing the concrete JSPromise type.
+    /// </summary>
+    internal static Func<Task<JSValue>, JSValue> CreatePromiseFromTask;
+
+    /// <summary>
+    /// Factory delegate for creating a <c>JSPromise</c> from a <c>Task</c> (non-generic).
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// Used by Clr for Task marshaling without referencing the concrete JSPromise type.
+    /// </summary>
+    internal static Func<Task, JSValue> CreatePromiseFromUntypedTask;
+
+    /// <summary>
+    /// Factory delegate for creating a <c>JSPromise</c> from a generic <c>Task&lt;T&gt;</c>.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static Func<Task, JSValue> CreatePromiseFromGenericTask;
 
     /// <summary>
     /// Factory delegate for creating an empty <c>JSArray</c>.

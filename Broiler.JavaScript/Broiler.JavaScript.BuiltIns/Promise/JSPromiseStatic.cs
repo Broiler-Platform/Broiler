@@ -1,12 +1,14 @@
-﻿using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.BuiltIns.Error;
 using Broiler.JavaScript.Runtime;
 using System;
 using System.Threading.Tasks;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.BuiltIns.Promise;
 
 
 public partial class JSPromise

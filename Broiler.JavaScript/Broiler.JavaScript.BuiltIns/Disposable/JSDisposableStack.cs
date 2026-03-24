@@ -1,4 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core.Promise;
+﻿using Broiler.JavaScript.BuiltIns.Promise;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;

@@ -358,7 +358,11 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
     public ICodeCache CodeCache { get; set; } = DictionaryCodeCache.Current;
 
-    internal ConcurrentDictionary<long, JSPromise> PendingPromises = new();
+    // Factory delegates for creating JSPromise instances, wired by BuiltInsAssemblyInitializer.
+    internal static Func<JSValue, bool, JSValue> CreateResolvedOrRejectedPromise;
+    internal static Func<JSPromiseDelegate, IJSPromise> CreatePromiseFromDelegate;
+
+    internal ConcurrentDictionary<long, JSValue> PendingPromises = new();
 
     /// <summary>
     /// Quickly evaluates the code, does not wait for promises and timeouts/intervals.
@@ -402,7 +406,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
         if (wt != null)
             await wt;
 
-        if (r is JSPromise promise)
+        if (r is IJSPromise promise)
             return await promise.Task;
 
         if (r is not JSObject @object)
@@ -412,7 +416,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
         if (!then.IsFunction)
             return r;
 
-        promise = new JSPromise((resolve, reject) =>
+        var promiseObj = CreatePromiseFromDelegate((resolve, reject) =>
         {
             var resolveF = new JSFunction((in Arguments a) =>
             {
@@ -432,7 +436,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
             then.InvokeFunction(a);
         });
 
-        return await promise.Task;
+        return await promiseObj.Task;
     }
 
 

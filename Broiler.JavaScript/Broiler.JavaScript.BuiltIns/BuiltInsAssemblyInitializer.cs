@@ -10,6 +10,7 @@ using Broiler.JavaScript.BuiltIns.Intl;
 using Broiler.JavaScript.BuiltIns.Iterator;
 using Broiler.JavaScript.BuiltIns.Map;
 using Broiler.JavaScript.BuiltIns.Number;
+using Broiler.JavaScript.BuiltIns.Promise;
 using Broiler.JavaScript.BuiltIns.Set;
 using Broiler.JavaScript.BuiltIns.Symbol;
 using Broiler.JavaScript.Core.Core;
@@ -248,5 +249,14 @@ internal static class BuiltInsAssemblyInitializer
             DefaultBuiltInRegistry.AddProto(proto, "every", JSIteratorObject.StaticEvery);
             DefaultBuiltInRegistry.AddProto(proto, "find", JSIteratorObject.StaticFind);
         };
+
+        // Wire factory delegates for JSPromise so Core can create
+        // promise instances without referencing the concrete type directly.
+        JSContext.CreateResolvedOrRejectedPromise = static (value, isResolved) =>
+            new JSPromise(value, isResolved ? JSPromise.PromiseState.Resolved : JSPromise.PromiseState.Rejected);
+        JSContext.CreatePromiseFromDelegate = static (d) => new JSPromise(d);
+        JSValue.CreatePromiseFromTask = static (task) => new JSPromise(task);
+        JSValue.CreatePromiseFromUntypedTask = static (task) => task.ToPromise();
+        JSValue.CreatePromiseFromGenericTask = static (task) => task.ToPromise();
     }
 }

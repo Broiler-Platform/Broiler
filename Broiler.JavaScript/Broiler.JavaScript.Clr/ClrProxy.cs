@@ -1,6 +1,5 @@
 ﻿using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.Core.Enumerators;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
@@ -85,9 +84,9 @@ public partial class ClrProxy : JSObject
     public static JSValue Marshal(DateTimeOffset value) => JSValue.CreateDate(value);
     public static JSValue Marshal(double value) => JSValue.CreateNumber(value);
     public static JSValue Marshal(float value) => JSValue.CreateNumber(value);
-    public static JSValue Marshal(Task task) => task.ToPromise();
-    public static JSValue Marshal(Task<JSValue> task) => new JSPromise(task);
-    public static JSValue Marshal<T>(Task<T> task) => task.ToPromise();
+    public static JSValue Marshal(Task task) => JSValue.CreatePromiseFromUntypedTask(task);
+    public static JSValue Marshal(Task<JSValue> task) => JSValue.CreatePromiseFromTask(task);
+    public static JSValue Marshal<T>(Task<T> task) => JSValue.CreatePromiseFromGenericTask(task);
     public static JSValue Marshal(IJavaScriptObject javaScriptObject) => From(javaScriptObject);
     public static JSValue Marshal(IElementEnumerator en) => JSGeneratorBuilder.CreateFromEnumerator(en, "Clr Iterator");
     public static JSValue Marshal(IEnumerable<JSValue> en) => JSGeneratorBuilder.CreateFromEnumerator(new ClrEnumerableElementEnumerator(en), "Clr Iterator");
@@ -132,8 +131,8 @@ public partial class ClrProxy : JSObject
                 JSValue jsValue => jsValue,
                 DateTimeOffset dateTimeOffset => JSValue.CreateDate(dateTimeOffset),
                 Type valueType => ClrType.From(valueType),
-                Task<JSValue> task => task.ToPromise(),
-                Task task => task.ToPromise(),
+                Task<JSValue> task => JSValue.CreatePromiseFromTask(task),
+                Task task => JSValue.CreatePromiseFromUntypedTask(task),
                 IJavaScriptObject obj => From(obj),
                 IEnumerable<JSValue> en => JSGeneratorBuilder.CreateFromEnumerator(new ClrEnumerableElementEnumerator(en), "Clr Iterator"),
                 _ => From(value),
