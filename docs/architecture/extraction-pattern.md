@@ -64,11 +64,9 @@ Ast, Parser), add to the appropriate forwarding file in Core:
 ```
 
 Forwarding files:
-- `AssemblyInfo.cs` — Runtime/Storage types (35 types)
 - `ClrTypeForwarding.cs` — Runtime types (9 types: attributes, caching, interop)
 - `ParserTypeForwarding.cs` — Parser types (12 types)
 - `StorageTypeForwarding.cs` — Storage types (10 types)
-- `AstTypeForwarding.cs` — AST types (18 types)
 
 ### 4. Wire Factory Delegate (If Core Instantiates the Type)
 
