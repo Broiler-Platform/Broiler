@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.LinqExpressions\Broiler.JavaScript.LinqExpressions.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Engine\Broiler.JavaScript.Engine.csproj" />
   </ItemGroup>
 

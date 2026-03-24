@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.Runtime\Broiler.JavaScript.Runtime.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.ExpressionCompiler\Broiler.JavaScript.ExpressionCompiler.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.Storage\Broiler.JavaScript.Storage.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.Ast\Broiler.JavaScript.Ast.csproj" />
+  </ItemGroup>
+
+</Project>
