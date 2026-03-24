@@ -62,7 +62,7 @@ public partial class JSPromise : JSObject, IJSPromise
     {
         promiseID = Interlocked.Increment(ref nextPromiseID);
 
-        pending = (JSEngine.Current as JSContext).PendingPromises;
+        pending = (JSEngine.Current as JSContext)?.PendingPromises;
         pending.TryAdd(promiseID, this);
     }
 
@@ -79,7 +79,7 @@ public partial class JSPromise : JSObject, IJSPromise
     /// <param name="value"></param>
     public JSPromise(Task<JSValue> value) : this()
     {
-        sc = (JSEngine.Current as JSContext).synchronizationContext;
+        sc = (JSEngine.Current as JSContext)?.synchronizationContext;
         RegisterPromise();
         value.ContinueWith((t) =>
         {
@@ -130,7 +130,7 @@ public partial class JSPromise : JSObject, IJSPromise
     private void InitPromise()
     {
         // to improve speed of promise, we will add then/catch here...
-        sc = (JSEngine.Current as JSContext).synchronizationContext;
+        sc = (JSEngine.Current as JSContext)?.synchronizationContext;
 
         RegisterPromise();
 

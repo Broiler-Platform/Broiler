@@ -107,7 +107,7 @@ public partial class JSDecimal : JSPrimitive
     public override bool EqualsLiteral(string value) => this.value.ToString() == value;
     public override bool EqualsLiteral(double value) => (double)this.value == value;
     public override JSValue TypeOf() => JSConstants.Decimal;
-    protected override JSValue GetPrototype() => ((JSEngine.Current as JSObject)[Names.Decimal] as JSFunction).prototype;
+    protected override JSValue GetPrototype() => ((JSEngine.Current as JSObject)?[Names.Decimal] as JSFunction).prototype;
     internal override PropertyKey ToKey(bool create = true) => (uint)value;
 
     public override bool ConvertTo(Type type, out object value)

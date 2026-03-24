@@ -93,7 +93,7 @@ public partial class JSPromise
 
         return new JSPromise((resolve, reject) =>
         {
-            var sc = (JSEngine.Current as JSContext).synchronizationContext ?? throw JSEngine.NewTypeError($"Cannot use promise without Synchronization Context");
+            var sc = (JSEngine.Current as JSContext)?.synchronizationContext ?? throw JSEngine.NewTypeError($"Cannot use promise without Synchronization Context");
             uint total = 0;
 
             bool empty = true;

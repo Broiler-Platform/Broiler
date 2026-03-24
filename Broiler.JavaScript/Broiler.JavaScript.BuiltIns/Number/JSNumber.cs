@@ -77,7 +77,7 @@ public sealed partial class JSNumber : JSPrimitive
 
     public override JSValue TypeOf() => JSConstants.Number;
 
-    protected override JSValue GetPrototype() => ((JSEngine.Current as JSObject)[Names.Number] as JSFunction).prototype;
+    protected override JSValue GetPrototype() => ((JSEngine.Current as JSObject)?[Names.Number] as JSFunction).prototype;
 
     internal override PropertyKey ToKey(bool create = false)
     {
