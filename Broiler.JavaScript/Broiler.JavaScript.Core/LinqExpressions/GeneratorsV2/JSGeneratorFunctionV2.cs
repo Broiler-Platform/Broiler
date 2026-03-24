@@ -55,7 +55,7 @@ public class ClrGeneratorV2(JSGeneratorFunctionV2 generator, JSGeneratorDelegate
 
     public JSValue LastValue;
 
-    public JSContext Context = JSContext.Current;
+    public IJSExecutionContext Context = JSEngine.Current;
 
     public bool IsFinished;
     public int NextJump;

@@ -1,4 +1,4 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 using System.ComponentModel;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Ast.Misc;
@@ -18,9 +18,9 @@ public class CallStackItem
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public CallStackItem(JSContext context, ScriptInfo scriptInfo, int nameOffset, int nameLength, int line, int column)
+    public CallStackItem(IJSExecutionContext context, ScriptInfo scriptInfo, int nameOffset, int nameLength, int line, int column)
     {
-        context = context ?? JSContext.Current;
+        context = context ?? JSEngine.Current;
         context.EnsureSufficientExecutionStack();
         this.context = context;
         var ctx = context.CurrentNewTarget;
@@ -40,9 +40,9 @@ public class CallStackItem
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public CallStackItem(JSContext context, string fileName, in StringSpan function, int line, int column)
+    public CallStackItem(IJSExecutionContext context, string fileName, in StringSpan function, int line, int column)
     {
-        context = context ?? JSContext.Current;
+        context = context ?? JSEngine.Current;
         context.EnsureSufficientExecutionStack();
         this.context = context;
         FileName = fileName;
@@ -58,7 +58,7 @@ public class CallStackItem
     public StringSpan Function;
     public int Line;
     public int Column;
-    private readonly JSContext context;
+    private readonly IJSExecutionContext context;
     public string FileName;
 
     public void Update() => System.Diagnostics.Debug.WriteLine($"{Function} at {Line}, {Column}");
@@ -71,9 +71,9 @@ public class CallStackItem
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Pop(JSContext context)
+    public void Pop(IJSExecutionContext context)
     {
-        context = context ?? JSContext.Current;
+        context = context ?? JSEngine.Current;
         context.Top = Parent;
         Parent = null;
     }
