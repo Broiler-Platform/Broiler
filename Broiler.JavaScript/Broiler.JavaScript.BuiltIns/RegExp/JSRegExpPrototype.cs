@@ -1,11 +1,12 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.BuiltIns.RegExp;
 
 public partial class JSRegExp
 {

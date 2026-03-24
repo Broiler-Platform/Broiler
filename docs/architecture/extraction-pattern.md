@@ -209,9 +209,9 @@ without referencing the concrete type.
 
 ```
 Is the type referenced by the Compiler's expression-tree builders?
-├─ YES → Can the reference be replaced with a factory delegate?
-│        ├─ YES → Extract (follow JSBigInt pattern)
-│        └─ NO  → Keep in Core (e.g., RegExp — JSRegExpBuilder is too tightly coupled)
+├─ YES → Can the reference be replaced with a factory delegate or Initialize(Type) pattern?
+│        ├─ YES → Extract (follow JSBigInt or JSRegExp pattern)
+│        └─ NO  → Keep in Core
 └─ NO  → Is the type stored as a field on JSContext or a Core infrastructure class?
          ├─ YES → Can the field be replaced with an interface or delegate?
          │        ├─ YES → Extract (follow JSConsole/JSDisposableStack pattern)
@@ -227,8 +227,13 @@ The following types were analyzed and determined to be non-extractable:
 
 | Type | Reason |
 |------|--------|
-| **RegExp** | `JSRegExpBuilder` in `LinqExpressions/` (Compiler uses it for regex literals); `JSStringPrototype` has 8+ hardcoded `is JSRegExp` type checks |
 | **Promise** | `JSContext.PendingPromises` field is `ConcurrentDictionary<long, JSPromise>`; `JSAsyncFunction` creates instances directly — infrastructure-level coupling |
+
+## Successfully Extracted Types (formerly non-extractable)
+
+| Type | Approach | Notes |
+|------|----------|-------|
+| **RegExp** | `Initialize(Type)` pattern for `JSRegExpBuilder`; `IJSRegExp` interface in Runtime; `is IJSRegExp` for assemblies without BuiltIns reference | Previously blocked by `JSRegExpBuilder` compile-time coupling; resolved by switching to runtime `Initialize(Type)` pattern (same as `JSArrayBuilder`, `JSStringBuilder`) |
 
 ---
 

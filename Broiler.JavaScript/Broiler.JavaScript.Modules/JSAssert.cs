@@ -5,7 +5,6 @@ using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Core;
 
 namespace Broiler.JavaScript.Modules;
 
@@ -136,10 +135,10 @@ public partial class JSAssert : JSFunction
     public static JSValue Match(in Arguments a)
     {
         var (text, regex, msgObj) = a.Get3();
-        if (regex is not JSRegExp match)
+        if (regex is not IJSRegExp match)
             throw new JSException($"Second parameter must be regex");
 
-        if (!match.value.IsMatch(text.ToString()))
+        if (!match.Value.IsMatch(text.ToString()))
         {
             var msg = !msgObj.IsUndefined ? msgObj.ToString() : $"Regex match failed of {text} with {regex}";
             throw new JSException(msg);

@@ -5,14 +5,14 @@ using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.BuiltIns.Intl;
 using Broiler.JavaScript.BuiltIns.Iterator;
 using Broiler.JavaScript.BuiltIns.Promise;
+using Broiler.JavaScript.BuiltIns.RegExp;
 
 namespace Broiler.JavaScript.Integration.Tests;
 
 /// <summary>
 /// Milestone 7 (M7) — Future Extraction Candidates validation tests.
-/// These tests verify that the TypedArrays and Iterator types have been
-/// successfully extracted from Core to BuiltIns, and that non-extractable
-/// candidates (RegExp, Promise) remain in Core.
+/// These tests verify that the TypedArrays, Iterator, and RegExp types have
+/// been successfully extracted from Core to BuiltIns.
 /// </summary>
 public class M7ValidationTests
 {
@@ -99,29 +99,29 @@ public class M7ValidationTests
         Assert.Equal(42.0, result.DoubleValue);
     }
 
-    // ── 7.2: RegExp — NOT Extractable ──────────────────────────────────
+    // ── 7.2: RegExp — Extracted to BuiltIns ──────────────────────────────
 
     [Fact]
-    public void M7_RegExp_ResideInCoreAssembly()
+    public void M7_RegExp_ResideInBuiltInsAssembly()
     {
-        // RegExp must remain in Core due to tight integration with
-        // String prototype and Compiler.
+        // RegExp has been extracted to BuiltIns using the Initialize(Type)
+        // pattern for JSRegExpBuilder, and IJSRegExp interface in Runtime.
         var regExpAsm = typeof(JSRegExp).Assembly.GetName().Name;
-        Assert.Equal("Broiler.JavaScript.Core", regExpAsm);
+        Assert.Equal("Broiler.JavaScript.BuiltIns", regExpAsm);
     }
 
     [Fact]
-    public void M7_RegExp_HasCompilerCoupling()
+    public void M7_RegExp_CompilerDecoupledViaInitialize()
     {
-        // The Compiler assembly uses JSRegExpBuilder (in Core/LinqExpressions)
-        // which directly references JSRegExp. This coupling means RegExp
-        // cannot be extracted to BuiltIns without creating a circular dependency.
+        // JSRegExpBuilder remains in Core/LinqExpressions and uses the
+        // Initialize(Type) pattern — the Compiler no longer has a
+        // compile-time dependency on the concrete JSRegExp type.
         var coreAssembly = typeof(JSContext).Assembly;
         var regExpBuilderType = coreAssembly.GetType(
             "Broiler.JavaScript.Core.LinqExpressions.JSRegExpBuilder");
         Assert.NotNull(regExpBuilderType);
 
-        // Confirm the Compiler assembly references Core (where JSRegExp lives).
+        // Confirm the Compiler assembly references Core (for JSRegExpBuilder).
         var compilerAssembly = typeof(Broiler.JavaScript.Compiler.FastCompiler).Assembly;
         var compilerRefs = compilerAssembly.GetReferencedAssemblies()
             .Select(r => r.Name!)
@@ -309,8 +309,8 @@ public class M7ValidationTests
         Assert.Equal("Broiler.JavaScript.BuiltIns",
             typeof(JSArrayBuffer).Assembly.GetName().Name);
 
-        // RegExp — remains in Core
-        Assert.Equal("Broiler.JavaScript.Core",
+        // RegExp — extracted to BuiltIns
+        Assert.Equal("Broiler.JavaScript.BuiltIns",
             typeof(JSRegExp).Assembly.GetName().Name);
 
         // Promise — extracted to BuiltIns
