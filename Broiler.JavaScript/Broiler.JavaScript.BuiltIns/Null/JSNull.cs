@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Error;
+using Broiler.JavaScript.Core.Core.Primitive;
 
 namespace Broiler.JavaScript.BuiltIns.Null;
 
