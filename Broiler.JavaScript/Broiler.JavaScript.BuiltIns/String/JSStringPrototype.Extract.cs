@@ -4,7 +4,7 @@ using Broiler.JavaScript.Core;
 using System;
 using System.Text;
 using Broiler.JavaScript.ExpressionCompiler;
-using Broiler.JavaScript.Core.Core.Generator;
+using Broiler.JavaScript.BuiltIns.Generator;
 
 namespace Broiler.JavaScript.BuiltIns.String;
 

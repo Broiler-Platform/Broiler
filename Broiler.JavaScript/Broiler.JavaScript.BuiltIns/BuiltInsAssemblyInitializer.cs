@@ -17,6 +17,7 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.BuiltIns.BigInt;
 using Broiler.JavaScript.BuiltIns.Boolean;
+using Broiler.JavaScript.BuiltIns.Generator;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Disposable;
@@ -137,6 +138,11 @@ internal static class BuiltInsAssemblyInitializer
         // Initialize JSClassBuilder with the concrete JSClass type so the
         // Compiler can build class expression trees without a direct reference.
         JSClassBuilder.Initialize(typeof(JSClass), typeof(JSFunction), typeof(JSFunctionDelegate));
+
+        // Wire factory delegates for JSGenerator so Core and Clr can create
+        // generator instances without a direct type reference.
+        JSGeneratorBuilder.CreateFromEnumerator = static (en, name) => new JSGenerator(en, name);
+        JSGeneratorBuilder.CreateFromClrV2 = static g => new JSGenerator(g);
 
         // Wire JSConstants with concrete JSString instances.
         JSConstants.Decimal = new JSString("decimal");

@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.Core.Core.Storage;
-using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Core.Core;
@@ -10,7 +10,7 @@ public class JSArguments: JSObject
 {
     public static JSValue Callee(in Arguments a) => throw JSContext.NewTypeError($"Cannot access callee in strict mode");
 
-    public new JSValue Values(in Arguments a) => new JSGenerator(GetElementEnumerator(), "Arguments");
+    public new JSValue Values(in Arguments a) => JSGeneratorBuilder.CreateFromEnumerator(GetElementEnumerator(), "Arguments");
 
     public static JSValue[] Empty = [];
 

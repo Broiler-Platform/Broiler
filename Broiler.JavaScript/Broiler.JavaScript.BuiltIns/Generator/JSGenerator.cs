@@ -1,14 +1,17 @@
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Internal;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using Broiler.JavaScript.ExpressionCompiler;
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Generator;
+namespace Broiler.JavaScript.BuiltIns.Generator;
 
 [JSClassGenerator("Generator")]
-public partial class JSGenerator : JSObject
+public partial class JSGenerator : JSObject, IJSGenerator
 {
     readonly IElementEnumerator en;
     private ClrGeneratorV2 cg;

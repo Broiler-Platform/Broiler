@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace Broiler.JavaScript.Core.Core.Generator;
+namespace Broiler.JavaScript.BuiltIns.Generator;
 
 public struct JSGeneratorEnumerator(JSGenerator g) : IEnumerator<(uint Key, JSProperty Value)>
 {

@@ -13,14 +13,14 @@ public class JSAsyncFunction
     {
         JSValue ToAsync(in Arguments a)
         {
-            var gen = gf.InvokeFunction(in a) as JSGenerator;
+            var gen = gf.InvokeFunction(in a) as IJSGenerator;
             return ToPromise(gen!, JSUndefined.Value);
         }
 
         return new JSFunction(ToAsync, gf.name, gf.Length);
     }
 
-    private static JSValue ToPromise(JSGenerator gen, JSValue lastResult)
+    private static JSValue ToPromise(IJSGenerator gen, JSValue lastResult)
     {
         try
         {
