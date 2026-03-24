@@ -18,7 +18,7 @@ public static class JSPropertyExtensions
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSValue ToJSValue(in this JSProperty px)
+    public static JSValue ToJSValue(in this JSProperty px)
     {
         var t = JSValue.BooleanTrue;
         var f = JSValue.BooleanFalse;

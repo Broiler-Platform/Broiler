@@ -1,5 +1,4 @@
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Storage;
 using System;
@@ -49,8 +48,8 @@ public partial class JSError : JSObject
         Message = message;
         Stack = CreateStack();
 
-        FastAddValue(KeyStrings.message, message.Marshal(), JSPropertyAttributes.ConfigurableValue);
-        FastAddValue(KeyStrings.stack, Stack.Marshal(), JSPropertyAttributes.ConfigurableValue);
+        FastAddValue(KeyStrings.message, JSValue.CreateString(message), JSPropertyAttributes.ConfigurableValue);
+        FastAddValue(KeyStrings.stack, JSValue.CreateString(Stack), JSPropertyAttributes.ConfigurableValue);
     }
 
     [JSExport("isError")]
@@ -82,7 +81,7 @@ public partial class JSError : JSObject
         Exception = ex;
         ex.Error ??= this;
 
-        FastAddValue(KeyStrings.message, ex.Message.Marshal(), JSPropertyAttributes.ConfigurableValue);
+        FastAddValue(KeyStrings.message, JSValue.CreateString(ex.Message), JSPropertyAttributes.ConfigurableValue);
         FastAddValue(KeyStrings.stack, ex.JSStackTrace, JSPropertyAttributes.ConfigurableValue);
     }
 
@@ -92,7 +91,7 @@ public partial class JSError : JSObject
         ex.Error ??= this;
         Message = msg;
 
-        FastAddValue(KeyStrings.message, msg.Marshal(), JSPropertyAttributes.ConfigurableValue);
+        FastAddValue(KeyStrings.message, JSValue.CreateString(msg), JSPropertyAttributes.ConfigurableValue);
         FastAddValue(KeyStrings.stack, ex.JSStackTrace, JSPropertyAttributes.ConfigurableValue);
     }
 

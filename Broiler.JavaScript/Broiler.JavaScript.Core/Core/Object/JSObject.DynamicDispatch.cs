@@ -1,5 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.Core.Internal;
 using System;
 using System.Text;
 namespace Broiler.JavaScript.Core;
