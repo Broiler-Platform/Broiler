@@ -9,5 +9,6 @@
 [assembly: InternalsVisibleTo("Broiler.JavaScript.Extensions")]
 [assembly: InternalsVisibleTo("Broiler.JavaScript.Globals")]
 [assembly: InternalsVisibleTo("Broiler.JavaScript.Modules")]
+[assembly: InternalsVisibleTo("Broiler.JavaScript.LinqExpressions")]
 [assembly: InternalsVisibleTo("WebAtoms.XF")]
 #endif

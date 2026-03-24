@@ -1,6 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.LinqExpressions;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -11,6 +10,9 @@ namespace Broiler.JavaScript.Core.Utils;
 public static class JSValueToClrConverter
 {
     private static bool HasValue(this JSValue value) => value == null ? false : !value.IsNullOrUndefined;
+
+    internal static Func<YExpression, int, YExpression> GetAtExpression;
+    internal static Func<YExpression, YExpression> LengthExpression;
 
     public static string ToString(JSValue value, string name) => value.HasValue() ? value.ToString() : throw new JSException($"{name} is required");
 
@@ -76,16 +78,16 @@ public static class JSValueToClrConverter
         if (methods.TryGetValue(type, out var method))
         {
             if (defaultValue == null)
-                return YExpression.Call(null, method, ArgumentsBuilder.GetAt(args, index), YExpression.Constant(name));
+                return YExpression.Call(null, method, GetAtExpression(args, index), YExpression.Constant(name));
 
-            return YExpression.Condition(YExpression.Binary(ArgumentsBuilder.Length(args), YOperator.Greater, YExpression.Constant(index)),
-                YExpression.Call(null, method, ArgumentsBuilder.GetAt(args, index), YExpression.Constant(name)), defaultValue);
+            return YExpression.Condition(YExpression.Binary(LengthExpression(args), YOperator.Greater, YExpression.Constant(index)),
+                YExpression.Call(null, method, GetAtExpression(args, index), YExpression.Constant(name)), defaultValue);
         }
 
         if (typeof(JSValue).IsAssignableFrom(type))
-            return ArgumentsBuilder.GetAt(args, index);
+            return GetAtExpression(args, index);
 
-        return Get(ArgumentsBuilder.GetAt(args, index), type, defaultValue, $"{name} is required");
+        return Get(GetAtExpression(args, index), type, defaultValue, $"{name} is required");
     }
 
     public static YExpression Get(YExpression target, Type type, string name)
