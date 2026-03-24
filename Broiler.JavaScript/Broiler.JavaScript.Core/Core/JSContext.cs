@@ -13,6 +13,7 @@ using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Storage;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Core.Core;
 

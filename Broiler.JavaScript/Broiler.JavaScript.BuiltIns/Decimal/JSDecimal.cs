@@ -7,6 +7,7 @@ using Broiler.JavaScript.ExpressionCompiler;
 using System;
 using System.Globalization;
 using Broiler.JavaScript.BuiltIns.Number;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.BuiltIns.Decimal;
 

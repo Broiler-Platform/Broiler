@@ -5,8 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Storage;
+using Broiler.JavaScript.Core;
 
-namespace Broiler.JavaScript.Core.Extensions;
+namespace Broiler.JavaScript.Extensions;
 
 public static class MarshalExtensions
 {

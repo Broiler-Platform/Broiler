@@ -1,7 +1,7 @@
 ﻿using System;
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.BuiltIns.Array;
 

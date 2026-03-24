@@ -1,3 +1,4 @@
+using Broiler.JavaScript.Storage;
 using System.Runtime.CompilerServices;
 
 namespace Broiler.JavaScript.Core.Core;

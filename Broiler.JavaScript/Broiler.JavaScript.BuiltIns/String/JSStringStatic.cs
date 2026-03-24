@@ -1,6 +1,7 @@
 ﻿using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Runtime;
 using System.Text;
 
 namespace Broiler.JavaScript.BuiltIns.String;

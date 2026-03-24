@@ -6,6 +6,7 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LambdaGen;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 

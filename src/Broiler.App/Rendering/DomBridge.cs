@@ -9,6 +9,8 @@ using System.Text.RegularExpressions;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.App.Rendering;
 

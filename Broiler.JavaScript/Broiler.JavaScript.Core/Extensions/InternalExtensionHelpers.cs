@@ -1,8 +1,5 @@
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Object;
-using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Enumerators;
 using Broiler.JavaScript.Storage;
 using System;

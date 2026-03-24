@@ -4,8 +4,9 @@ using System;
 using System.ComponentModel;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Storage;
+using Broiler.JavaScript.Core;
 
-namespace Broiler.JavaScript.Core.Extensions;
+namespace Broiler.JavaScript.Extensions;
 
 
 /// <summary>

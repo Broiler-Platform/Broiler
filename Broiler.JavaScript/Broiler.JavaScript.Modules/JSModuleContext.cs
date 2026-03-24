@@ -10,8 +10,11 @@ using System.Threading.Tasks;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.Core.Module;
+namespace Broiler.JavaScript.Modules;
 
 public delegate Task JSModuleDelegate(JSModule module);
 

@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Storage;
 
 
 public enum KeyType

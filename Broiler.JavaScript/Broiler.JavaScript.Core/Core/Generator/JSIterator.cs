@@ -1,4 +1,6 @@
-﻿namespace Broiler.JavaScript.Core.Core.Generator;
+﻿using Broiler.JavaScript.Storage;
+
+namespace Broiler.JavaScript.Core.Core.Generator;
 
 public struct JSIterator(JSValue iterator) : IElementEnumerator
 {

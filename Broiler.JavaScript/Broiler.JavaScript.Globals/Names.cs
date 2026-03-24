@@ -2,7 +2,7 @@
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.ExpressionCompiler;
 
-namespace Broiler.JavaScript.Core.Core.Global;
+namespace Broiler.JavaScript.Globals;
 
 /// <summary>
 /// Source-generated registration class for global types in the Globals assembly.

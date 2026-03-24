@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core.Extensions;
+namespace Broiler.JavaScript.Extensions;
 
 public static class JSStringExtensions
 {

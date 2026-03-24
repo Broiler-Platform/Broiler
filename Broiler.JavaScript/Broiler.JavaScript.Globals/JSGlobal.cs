@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Extensions;
 using System;
 using System.Threading;
 using System.Collections.Generic;
@@ -8,8 +7,12 @@ using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Extensions;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.Core.Global;
+namespace Broiler.JavaScript.Globals;
 
 [JSFunctionGenerator("Globals", Globals = true)]
 public partial class JSGlobalStatic

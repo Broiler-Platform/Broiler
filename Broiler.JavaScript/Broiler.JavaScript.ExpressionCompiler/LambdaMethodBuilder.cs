@@ -2,10 +2,10 @@
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using Broiler.JavaScript.Generator;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
+using Broiler.JavaScript.ExpressionCompiler.Generator;
 
 namespace Broiler.JavaScript.ExpressionCompiler;
 

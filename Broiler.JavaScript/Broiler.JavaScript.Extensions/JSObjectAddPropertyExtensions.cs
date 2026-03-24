@@ -1,10 +1,10 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Storage;
 using System.ComponentModel;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Storage;
+using Broiler.JavaScript.Core;
 
-namespace Broiler.JavaScript.Core.Extensions;
+namespace Broiler.JavaScript.Extensions;
 
 
 public static class JSObjectExtensions

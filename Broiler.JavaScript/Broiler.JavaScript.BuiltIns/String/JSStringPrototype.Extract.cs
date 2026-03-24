@@ -1,10 +1,10 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core;
 using System;
 using System.Text;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.BuiltIns.Generator;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.BuiltIns.String;
 

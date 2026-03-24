@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Global;
 
 namespace Broiler.JavaScript.Globals;
 

@@ -2,7 +2,7 @@
 using System.IO;
 using System.Reflection.Emit;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
-using Broiler.JavaScript.Generator;
+using Broiler.JavaScript.ExpressionCompiler.Generator;
 
 namespace Broiler.JavaScript.ExpressionCompiler.Runtime;
 

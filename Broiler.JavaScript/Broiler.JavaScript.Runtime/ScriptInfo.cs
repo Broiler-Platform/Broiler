@@ -1,4 +1,6 @@
-﻿namespace Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Storage;
+
+namespace Broiler.JavaScript.Core.Core;
 
 public class ScriptInfo
 {

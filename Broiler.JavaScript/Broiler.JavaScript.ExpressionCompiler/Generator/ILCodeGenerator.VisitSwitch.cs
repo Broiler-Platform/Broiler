@@ -2,11 +2,9 @@
 using System.Reflection;
 using System.Reflection.Emit;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
-using Broiler.JavaScript.ExpressionCompiler.Generator;
-using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 
-namespace Broiler.JavaScript.Generator;
+namespace Broiler.JavaScript.ExpressionCompiler.Generator;
 
 public class ActionList : IDisposable
 {

@@ -5,6 +5,7 @@ using Broiler.JavaScript.Core.Utils;
 using System;
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.BuiltIns.Number;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.BuiltIns.Date;
 

@@ -2,9 +2,8 @@
 using System;
 using System.Reflection.Emit;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
-using Broiler.JavaScript.ExpressionCompiler.Generator;
 
-namespace Broiler.JavaScript.Generator;
+namespace Broiler.JavaScript.ExpressionCompiler.Generator;
 
 public readonly struct DataSource(YExpression? exp, int index = -1)
 {

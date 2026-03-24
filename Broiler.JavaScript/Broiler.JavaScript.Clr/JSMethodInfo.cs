@@ -4,6 +4,7 @@ using Broiler.JavaScript.Core.Core.Function;
 using System.Reflection;
 using System.ComponentModel;
 using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Clr;
 

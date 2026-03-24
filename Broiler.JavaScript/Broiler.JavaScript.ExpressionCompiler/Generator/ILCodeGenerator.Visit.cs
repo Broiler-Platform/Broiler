@@ -1,6 +1,6 @@
 ﻿using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Generator;
+namespace Broiler.JavaScript.ExpressionCompiler.Generator;
 
 public struct CodeInfo(bool success)
 {

@@ -1,3 +1,5 @@
+using Broiler.JavaScript.Runtime;
+
 namespace Broiler.JavaScript.Core.Core;
 
 /// <summary>

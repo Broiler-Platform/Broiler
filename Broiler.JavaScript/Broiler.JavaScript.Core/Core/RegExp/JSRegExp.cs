@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using System;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Core;
 

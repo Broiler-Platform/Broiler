@@ -1,4 +1,6 @@
-﻿namespace Broiler.JavaScript.Core.Core.Primitive;
+﻿using Broiler.JavaScript.Storage;
+
+namespace Broiler.JavaScript.Core.Core.Primitive;
 
 /// <summary>
 /// JSPrimitive class does not hold prototype, prototype is only resolved from

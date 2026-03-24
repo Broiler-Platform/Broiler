@@ -4,12 +4,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection.Emit;
-using Broiler.JavaScript.ExpressionCompiler.Generator;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
-using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 
-namespace Broiler.JavaScript.Generator;
+namespace Broiler.JavaScript.ExpressionCompiler.Generator;
 
 
 public partial class ILCodeGenerator
@@ -26,7 +24,7 @@ public partial class ILCodeGenerator
     private readonly TextWriter? expressionWriter;
 
     private readonly Dictionary<YParameterExpression,(Type type, int localIndex)> uninitialized
-        = new(ExpressionCompiler.Core.ReferenceEqualityComparer.Instance);
+        = new(Core.ReferenceEqualityComparer.Instance);
 
     public Sequence<ILDebugInfo> SequencePoints { get; }
         = [];

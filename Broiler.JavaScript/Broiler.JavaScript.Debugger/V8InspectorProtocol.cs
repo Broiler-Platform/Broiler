@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using System.Text.Json.Serialization;
 using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Debugger;
 

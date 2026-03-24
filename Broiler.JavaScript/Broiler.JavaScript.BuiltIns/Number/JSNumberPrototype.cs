@@ -3,6 +3,7 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Runtime;
 using System;
 using System.Globalization;
 using System.Runtime.CompilerServices;

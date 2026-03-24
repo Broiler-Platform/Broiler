@@ -1,5 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core.Storage;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 
 namespace Broiler.JavaScript.BuiltIns.Generator;

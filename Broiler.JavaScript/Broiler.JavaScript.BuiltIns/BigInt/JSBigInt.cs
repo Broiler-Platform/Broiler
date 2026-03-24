@@ -8,6 +8,7 @@ using System;
 using System.Globalization;
 using System.Numerics;
 using Broiler.JavaScript.BuiltIns.Number;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.BuiltIns.BigInt;
 

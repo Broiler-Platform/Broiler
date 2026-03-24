@@ -1,6 +1,6 @@
 namespace Broiler.HTML.Core.Core.Dom;
 
-internal enum CssUnit
+public enum CssUnit
 {
     None,
     Ems,

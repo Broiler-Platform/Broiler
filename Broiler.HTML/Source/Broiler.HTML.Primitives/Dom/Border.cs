@@ -1,6 +1,6 @@
 namespace Broiler.HTML.Core.Core.Dom;
 
-internal enum Border
+public enum Border
 {
     Top,
     Right,

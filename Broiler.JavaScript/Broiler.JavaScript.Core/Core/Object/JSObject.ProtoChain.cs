@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Object;
-using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Storage;
 using System.Runtime.CompilerServices;
 namespace Broiler.JavaScript.Core;
 

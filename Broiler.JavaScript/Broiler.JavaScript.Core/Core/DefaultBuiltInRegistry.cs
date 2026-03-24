@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core.Function;
-using Broiler.JavaScript.Core.Core.Storage;
+using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Core.Core;

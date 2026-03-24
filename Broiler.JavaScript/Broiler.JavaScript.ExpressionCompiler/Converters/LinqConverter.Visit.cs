@@ -2,7 +2,7 @@
 using System.Linq.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Converters;
+namespace Broiler.JavaScript.ExpressionCompiler.Converters;
 
 
 public partial class LinqConverter

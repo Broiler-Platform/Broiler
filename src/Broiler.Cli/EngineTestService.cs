@@ -1,7 +1,6 @@
 using Broiler.App.Rendering;
 using Broiler.HTML.Core.Core.Entities;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.BuiltIns.Number;
 
 namespace Broiler.Cli;

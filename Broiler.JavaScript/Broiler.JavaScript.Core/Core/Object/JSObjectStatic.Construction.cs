@@ -3,8 +3,7 @@ using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Core.Object;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Storage;
-using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using System;
 

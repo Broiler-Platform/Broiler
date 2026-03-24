@@ -1,5 +1,4 @@
 ﻿using Microsoft.CodeAnalysis;
-using System;
 using System.Collections.Generic;
 
 namespace Broiler.JavaScript.JSClassGenerator;

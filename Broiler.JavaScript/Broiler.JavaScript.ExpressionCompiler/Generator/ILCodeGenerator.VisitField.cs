@@ -1,8 +1,7 @@
 ﻿using System.Reflection.Emit;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
-using Broiler.JavaScript.ExpressionCompiler.Generator;
 
-namespace Broiler.JavaScript.Generator;
+namespace Broiler.JavaScript.ExpressionCompiler.Generator;
 
 public partial class ILCodeGenerator
 {

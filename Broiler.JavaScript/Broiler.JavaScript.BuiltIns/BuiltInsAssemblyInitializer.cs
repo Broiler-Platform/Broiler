@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
-using Broiler.JavaScript.Core.Core.Class;
 using Broiler.JavaScript.BuiltIns.Date;
 using Broiler.JavaScript.BuiltIns.Debug;
 using Broiler.JavaScript.BuiltIns.Decimal;
@@ -11,7 +10,6 @@ using Broiler.JavaScript.BuiltIns.Iterator;
 using Broiler.JavaScript.BuiltIns.Map;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.Set;
-using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.BuiltIns.Symbol;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Primitive;
@@ -19,11 +17,12 @@ using Broiler.JavaScript.BuiltIns.BigInt;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Generator;
 using Broiler.JavaScript.BuiltIns.Null;
-using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.BuiltIns.Class;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.BuiltIns;
 

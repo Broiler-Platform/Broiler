@@ -2,9 +2,8 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core.Core.Storage;
+namespace Broiler.JavaScript.Storage;
 
 [StructLayout(LayoutKind.Sequential)]
 [DebuggerDisplay("{key}={get},{set},{value}")]

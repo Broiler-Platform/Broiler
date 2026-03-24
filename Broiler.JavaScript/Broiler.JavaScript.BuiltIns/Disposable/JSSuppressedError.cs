@@ -4,6 +4,7 @@ using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.Runtime;
 using System.Runtime.CompilerServices;
 
 namespace Broiler.JavaScript.BuiltIns.Disposable;

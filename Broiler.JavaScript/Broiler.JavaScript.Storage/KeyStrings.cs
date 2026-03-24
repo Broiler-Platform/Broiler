@@ -1,9 +1,8 @@
 ﻿using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Storage;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Storage;
 
 /// <summary>
 /// KeyStrings is a collection of frequently used string, KeyString is created with

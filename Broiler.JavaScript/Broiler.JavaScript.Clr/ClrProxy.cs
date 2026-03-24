@@ -12,6 +12,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Clr;
 

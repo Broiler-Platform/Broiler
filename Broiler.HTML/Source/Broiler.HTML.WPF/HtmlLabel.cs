@@ -1,6 +1,5 @@
 ﻿using Broiler.HTML.Orchestration.Core;
 using Broiler.HTML.WPF.Adapters;
-using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Media;

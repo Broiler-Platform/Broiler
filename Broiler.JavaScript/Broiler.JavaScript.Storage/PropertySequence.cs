@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core.Core.Storage;
+namespace Broiler.JavaScript.Storage;
 
 public struct JSObjectProperty
 {

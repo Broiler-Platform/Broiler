@@ -2,8 +2,7 @@
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Error;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Extensions;
-using System.Linq;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Core;
 

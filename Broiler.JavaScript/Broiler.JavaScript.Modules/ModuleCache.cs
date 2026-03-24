@@ -1,9 +1,8 @@
 ﻿using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core.Core.Storage;
 using System;
 using System.Collections.Generic;
 
-namespace Broiler.JavaScript.Core.Core.Module;
+namespace Broiler.JavaScript.Modules;
 
 public struct ModuleCache(bool v)
 {
