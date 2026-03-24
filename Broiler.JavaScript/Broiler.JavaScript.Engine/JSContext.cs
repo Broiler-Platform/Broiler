@@ -51,7 +51,7 @@ public class JSContext : JSObject, IJSExecutionContext, IDisposable
 
     public event EventHandler<EvalEventArgs> EvalEvent;
 
-    internal void DispatchEvalEvent(ref string script, ref string location)
+    public void DispatchEvalEvent(ref string script, ref string location)
     {
         var ee = EvalEvent;
         if (ee == null)
@@ -252,18 +252,19 @@ public class JSContext : JSObject, IJSExecutionContext, IDisposable
 
         var timer = new Timer((_) =>
         {
-            ctx.Post(f, (x) =>
+            ctx.Post((x) =>
             {
+                var f = x as JSValue;
                 try
                 {
-                    x.InvokeFunction(new Arguments(JSUndefined.Value, args));
+                    f.InvokeFunction(new Arguments(JSUndefined.Value, args));
                 }
                 catch (Exception ex)
                 {
                     ReportError(ex);
                 }
                 ClearInterval(key);
-            });
+            }, f);
         }, f, delay, Timeout.Infinite);
 
         timers.AddOrUpdate(key, timer, (a1, a2) => a2);

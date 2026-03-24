@@ -85,7 +85,7 @@ public partial class JSObject : JSValue
         }
     }
 
-    public JSObject(IEnumerable<JSProperty> entries) : this(JSContext.Current?.ObjectPrototype)
+    public JSObject(IEnumerable<JSProperty> entries) : this(JSEngine.Current?.ObjectPrototype)
     {
         foreach (var p in entries)
             ownProperties.Put(p.key) = p;
@@ -155,7 +155,7 @@ public partial class JSObject : JSValue
         set
         {
             if (IsSealedOrFrozenOrNonExtensible())
-                throw JSContext.NewTypeError($"Cannot modify property length of {this}");
+                throw JSEngine.NewTypeError($"Cannot modify property length of {this}");
 
             ref var ownp = ref GetOwnProperties();
             ownp.Put(KeyStrings.length, JSValue.CreateNumber(value));

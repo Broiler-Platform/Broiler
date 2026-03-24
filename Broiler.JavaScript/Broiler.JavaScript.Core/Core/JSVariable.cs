@@ -57,9 +57,10 @@ public class JSVariable
             if (key.Value == null)
                 key = KeyStrings.GetOrCreate(Name);
 
-            var old = JSContext.Current[key];
+            var ctx = JSEngine.Current as JSObject;
+            var old = ctx[key];
             if (old != value && !value.IsUndefined)
-                JSContext.Current[key] = value;
+                ctx[key] = value;
         }
     }
 

@@ -10,7 +10,7 @@ internal static class ListExtensions
         {
             return target;
         }
-        return $"JSContext.ClrInterop.Marshal({target})";
+        return $"JSEngine.ClrInterop.Marshal({target})";
     }
 
     public static string ToJSValueFromClr(this string name, ITypeSymbol type, string parameter)

@@ -11,7 +11,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         var a = new Arguments(@this);
         return fx.InvokeFunction(a);
@@ -22,7 +22,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         var a = new Arguments(@this, arg0);
         return fx.InvokeFunction(a);
@@ -33,7 +33,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         var a = new Arguments(@this, arg0, arg1);
         return fx.InvokeFunction(a);
@@ -44,7 +44,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         var a = new Arguments(@this, arg0, arg1, arg2);
         return fx.InvokeFunction(a);
@@ -55,7 +55,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         var a = new Arguments(@this, arg0, arg1, arg2, arg3);
         return fx.InvokeFunction(a);
@@ -66,7 +66,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         var a = new Arguments(@this, args);
         return fx.InvokeFunction(a);
@@ -77,7 +77,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         var a = new Arguments(@this);
         return fx.InvokeFunction(a);
@@ -89,7 +89,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         var a = new Arguments(@this, arg0);
         return fx.InvokeFunction(a);
@@ -100,7 +100,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         var a = new Arguments(@this, arg0, arg1);
         return fx.InvokeFunction(a);
@@ -111,7 +111,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         var a = new Arguments(@this, arg0, arg1, arg2);
         return fx.InvokeFunction(a);
@@ -122,7 +122,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         var a = new Arguments(@this, arg0, arg1, arg2, arg3);
         return fx.InvokeFunction(a);
@@ -133,7 +133,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         var a = new Arguments(@this, args);
         return fx.InvokeFunction(a);
@@ -144,7 +144,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         var length = 0;
         foreach (var item in args)

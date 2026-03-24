@@ -31,4 +31,7 @@ public interface IJSExecutionContext : IJSContext
 
     /// <summary>Registers a global variable in this context.</summary>
     JSValue Register(JSVariable variable);
+
+    /// <summary>Dispatches an eval event if any handlers are registered.</summary>
+    void DispatchEvalEvent(ref string script, ref string location);
 }

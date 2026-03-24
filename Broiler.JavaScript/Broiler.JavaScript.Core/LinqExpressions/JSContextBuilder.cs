@@ -27,7 +27,8 @@ public class JSContextStackBuilder
 
 public class JSContextBuilder
 {
-    public static Expression Current = NewLambdaExpression.StaticFieldExpression<JSEngine>(() => () => JSEngine.Current);
+    private static readonly FieldInfo _CurrentField = typeof(JSEngine).GetField(nameof(JSEngine.Current));
+    public static Expression Current = Expression.Field(null, _CurrentField);
     public static Expression Object = Current.PropertyExpression<IJSExecutionContext, JSValue>(() => (x) => x.Object);
 
     private static PropertyInfo _Index = typeof(JSObject).IndexProperty(typeof(KeyString));

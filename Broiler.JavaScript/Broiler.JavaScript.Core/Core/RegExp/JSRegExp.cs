@@ -18,7 +18,7 @@ public partial class JSRegExp : JSObject
     {
         var input = a.Get1();
         if (input.IsNullOrUndefined)
-            throw JSContext.NewTypeError("RegExp.escape called on null or undefined");
+            throw JSEngine.NewTypeError("RegExp.escape called on null or undefined");
 
         var str = input.ToString();
         var sb = new StringBuilder(str.Length + 4);
@@ -58,7 +58,7 @@ public partial class JSRegExp : JSObject
     [JSExport]
     public int lastIndex = 0;
 
-    public JSRegExp(in Arguments a) : base(JSContext.NewTargetPrototype)
+    public JSRegExp(in Arguments a) : base(JSEngine.NewTargetPrototype)
     {
         var pattern = "";
         var flags = "";
@@ -325,27 +325,27 @@ public partial class JSRegExp : JSObject
             if (flag == 'g')
             {
                 if (globalSearch == true)
-                    throw JSContext.NewSyntaxError("The 'g' flag cannot be specified twice");
+                    throw JSEngine.NewSyntaxError("The 'g' flag cannot be specified twice");
                 globalSearch = true;
             }
             else if (flag == 'i')
             {
                 if ((options & RegexOptions.IgnoreCase) == RegexOptions.IgnoreCase)
-                    throw JSContext.NewSyntaxError("The 'i' flag cannot be specified twice");
+                    throw JSEngine.NewSyntaxError("The 'i' flag cannot be specified twice");
                 options |= RegexOptions.IgnoreCase;
                 ignoreCase = true;
             }
             else if (flag == 'm')
             {
                 if ((options & RegexOptions.Multiline) == RegexOptions.Multiline)
-                    throw JSContext.NewSyntaxError("The 'm' flag cannot be specified twice");
+                    throw JSEngine.NewSyntaxError("The 'm' flag cannot be specified twice");
                 options |= RegexOptions.Multiline;
                 multiline = true;
             }
             else if (flag == 's')
             {
                 if (dotAll)
-                    throw JSContext.NewSyntaxError("The 's' flag cannot be specified twice");
+                    throw JSEngine.NewSyntaxError("The 's' flag cannot be specified twice");
                 dotAll = true;
                 // Singleline makes . match \n as well.
                 // We remove ECMAScript mode because it does not support Singleline.
@@ -358,7 +358,7 @@ public partial class JSRegExp : JSObject
             }
             else
             {
-                throw JSContext.NewSyntaxError($"Unknown flag {flag}");
+                throw JSEngine.NewSyntaxError($"Unknown flag {flag}");
             }
         }
 

@@ -139,7 +139,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
         constructor = this;
     }
 
-    public JSFunction(JSFunctionDelegate f, in StringSpan name, in StringSpan source, int length = 0, bool createPrototype = true) : base(JSContext.Current?.FunctionPrototype)
+    public JSFunction(JSFunctionDelegate f, in StringSpan name, in StringSpan source, int length = 0, bool createPrototype = true) : base(JSEngine.Current?.FunctionPrototype)
     {
         ref var ownProperties = ref GetOwnProperties();
         this.f = f;
@@ -178,11 +178,11 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
     public override JSValue CreateInstance(in Arguments a)
     {
         if (prototype == null)
-            throw JSContext.NewTypeError($"{name} is not a constructor");
+            throw JSEngine.NewTypeError($"{name} is not a constructor");
 
         JSValue obj = new JSObject { BasePrototypeObject = prototype };
         var a1 = a.OverrideThis(obj);
-        JSContext.Current.CurrentNewTarget = this;
+        JSEngine.Current.CurrentNewTarget = this;
         var r = f(a1);
 
         if (r.IsObject)
@@ -248,7 +248,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
     public new static JSValue ToString(in Arguments a)
     {
         if (a.This is not JSFunction fx)
-            throw JSContext.NewTypeError($"Function.prototype.toString cannot be called with non function");
+            throw JSEngine.NewTypeError($"Function.prototype.toString cannot be called with non function");
         
         var source = fx.source;
         if (source.IsEmpty)
@@ -298,7 +298,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
 
         var bodyText = body.IsString ? body.StringValue : body.ToString();
         string location = null;
-        var context = JSContext.Current;
+        var context = JSEngine.Current;
         context.DispatchEvalEvent(ref bodyText, ref location);
 
         var fx = new JSFunction(empty, "internal", bodyText);

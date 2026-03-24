@@ -17,9 +17,9 @@ public partial class JSObject
         if (p is not JSObject proto)
         {
             if (!p.IsNull)
-                throw JSContext.NewTypeError("Object prototype may only be an Object or null");
+                throw JSEngine.NewTypeError("Object prototype may only be an Object or null");
 
-            proto = JSContext.Current.ObjectPrototype;
+            proto = JSEngine.Current.ObjectPrototype;
         }
 
         return new JSObject(proto);
@@ -30,7 +30,7 @@ public partial class JSObject
     {
         var first = a.Get1();
         if (first.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (first is not JSObject firstObject)
             return first;
@@ -49,17 +49,17 @@ public partial class JSObject
     {
         var (a0, a1) = a.Get2();
         if (a0 is not JSObject target)
-            throw JSContext.NewTypeError("Object.defineProperty called on non-object");
+            throw JSEngine.NewTypeError("Object.defineProperty called on non-object");
 
         var pds = a1;
         if (pds.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (pds is not JSObject pdObject)
             return target;
 
         if (!target.IsExtensible())
-            throw JSContext.NewTypeError("Object is not extensible");
+            throw JSEngine.NewTypeError("Object is not extensible");
 
         var ownElements = pdObject.GetElementEnumerator();
         while (ownElements.MoveNext(out var hasValue, out var item, out var index))
@@ -88,13 +88,13 @@ public partial class JSObject
         var (target, key, desc) = a.Get3();
 
         if (target is not JSObject targetObject)
-            throw JSContext.NewTypeError("Object.defineProperty called on non-object");
+            throw JSEngine.NewTypeError("Object.defineProperty called on non-object");
 
         if (!targetObject.IsExtensible())
-            throw JSContext.NewTypeError("Object is not extensible");
+            throw JSEngine.NewTypeError("Object is not extensible");
 
         if (desc is not JSObject pd)
-            throw JSContext.NewTypeError("Property Description must be an object");
+            throw JSEngine.NewTypeError("Property Description must be an object");
 
         return targetObject.DefineProperty(key, pd);
     }
@@ -103,7 +103,7 @@ public partial class JSObject
     internal static JSValue GetEntries(in Arguments a)
     {
         if (a[0] is not JSObject obj)
-            throw JSContext.NewTypeError(JSException.NotIterable("undefined"));
+            throw JSEngine.NewTypeError(JSException.NotIterable("undefined"));
 
         var r = JSValue.CreateArray();
 
@@ -139,7 +139,7 @@ public partial class JSObject
     {
         var v = a.Get1();
         if (v.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSException.NotIterable("undefined"));
+            throw JSEngine.NewTypeError(JSException.NotIterable("undefined"));
 
         var r = new JSObject();
         if (v.IsArray && v is JSObject va)
@@ -150,7 +150,7 @@ public partial class JSObject
                 var vi = vaElements[i];
                 var iaValue = vi.value as JSValue;
                 if (iaValue == null || !iaValue.IsArray)
-                    throw JSContext.NewTypeError(JSException.NotEntry(vi));
+                    throw JSEngine.NewTypeError(JSException.NotEntry(vi));
 
                 var first = iaValue[0];
                 var second = iaValue[1];
@@ -198,10 +198,10 @@ public partial class JSObject
         var (items, callbackfn) = a.Get2();
 
         if (items.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (!callbackfn.IsFunction)
-            throw JSContext.NewTypeError("CallbackFn must be a function");
+            throw JSEngine.NewTypeError("CallbackFn must be a function");
 
         var result = new JSObject();
         var en = items.GetElementEnumerator();

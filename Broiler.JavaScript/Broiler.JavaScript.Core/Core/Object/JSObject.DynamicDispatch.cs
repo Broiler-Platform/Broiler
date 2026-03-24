@@ -94,7 +94,7 @@ public partial class JSObject
 
     public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
-    public override JSValue InvokeFunction(in Arguments a) => throw JSContext.NewTypeError($"{this} is not a function");
+    public override JSValue InvokeFunction(in Arguments a) => throw JSEngine.NewTypeError($"{this} is not a function");
 
     public override bool Less(JSValue value)
     {

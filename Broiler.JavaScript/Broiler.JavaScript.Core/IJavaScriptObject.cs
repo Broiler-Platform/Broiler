@@ -16,7 +16,7 @@ public abstract class JavaScriptObject(in Arguments a) : IJavaScriptObject
 
     public static implicit operator JSValue(JavaScriptObject @object)
     {
-        var handle = @object.handle ??= JSContext.ClrInterop.Marshal(@object);
+        var handle = @object.handle ??= JSEngine.ClrInterop.Marshal(@object);
         return handle;
     }
 }

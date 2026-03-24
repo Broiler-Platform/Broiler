@@ -12,7 +12,7 @@ public static partial class JSValueExtensions
 {
     public static bool ConvertTo<T>(this JSValue @this, out T value)
     {
-        if (JSContext.ClrInterop.TryUnwrapClrObject(@this, out var clrObj) && clrObj is T t)
+        if (JSEngine.ClrInterop.TryUnwrapClrObject(@this, out var clrObj) && clrObj is T t)
         {
             value = t;
             return true;
@@ -57,7 +57,7 @@ public static partial class JSValueExtensions
     public static JSValue InvokeMethod(this JSValue @this, in KeyString name, in Arguments a)
     {
         var fx = @this.GetMethod(in name);
-        return fx == null ? throw JSContext.NewTypeError($"Method {name} not found in {@this}") : fx(a.OverrideThis(@this));
+        return fx == null ? throw JSEngine.NewTypeError($"Method {name} not found in {@this}") : fx(a.OverrideThis(@this));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -149,7 +149,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         return fx.InvokeFunction(a.OverrideThis(@this));
     }
@@ -159,7 +159,7 @@ public static partial class JSValueExtensions
     {
         var fx = @this[name];
         if (fx.IsUndefined)
-            throw JSContext.NewTypeError($"Method {name} not found on {@this}");
+            throw JSEngine.NewTypeError($"Method {name} not found on {@this}");
 
         return fx.InvokeFunction(a.OverrideThis(@this));
     }
@@ -263,13 +263,13 @@ public static partial class JSValueExtensions
     public static JSValue InstanceOf(this JSValue target, JSValue value)
     {
         if (value.IsUndefined)
-            throw JSContext.NewTypeError("Right side of instanceof is undefined");
+            throw JSEngine.NewTypeError("Right side of instanceof is undefined");
 
         if (value.IsNull)
-            throw JSContext.NewTypeError("Right side of instanceof is null");
+            throw JSEngine.NewTypeError("Right side of instanceof is null");
 
         if (!value.IsFunction)
-            throw JSContext.NewTypeError("Right side of instanceof is not a function");
+            throw JSEngine.NewTypeError("Right side of instanceof is not a function");
 
         var p = (target.prototypeChain as IJSPrototype)?.Object as JSObject;
         if (p == null)
@@ -288,7 +288,7 @@ public static partial class JSValueExtensions
     public static JSValue IsIn(this JSValue target, JSValue value)
     {
         if (value is not JSObject tx)
-            throw JSContext.NewTypeError($"Cannot use 'in' operator to search for '{target}' in {value}");
+            throw JSEngine.NewTypeError($"Cannot use 'in' operator to search for '{target}' in {value}");
 
         var key = target.ToKey(false);
         if (key.IsUInt)
