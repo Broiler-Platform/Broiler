@@ -104,11 +104,11 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
     public CallStackItem Top;
 
-    public static JSFunction NewTarget => Current.Top.NewTarget;
+    public static JSValue NewTarget => Current.Top.NewTarget;
 
-    public static JSObject NewTargetPrototype => Current.Top?.NewTarget?.prototype;
+    public static JSObject NewTargetPrototype => (Current.Top?.NewTarget as IJSFunction)?.Prototype as JSObject;
 
-    internal JSFunction CurrentNewTarget;
+    internal JSValue CurrentNewTarget;
 
 
     public event EventHandler<EvalEventArgs> EvalEvent;
@@ -130,7 +130,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
     public readonly JSObject FunctionPrototype;
     public new readonly JSObject ObjectPrototype;
-    public readonly JSFunction Object;
+    public readonly JSValue Object;
     public event LogEventHandler Log;
     public event ErrorEventHandler Error;
     public event ConsoleEvent ConsoleEvent;
@@ -166,6 +166,12 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
     internal void FillStackTrace(StringBuilder sb) { }
 
+    /// <summary>
+    /// Factory delegate for creating the Function class.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static Func<JSContext, bool, JSValue> CreateFunctionClass;
+
     public JSContext(SynchronizationContext synchronizationContext = null)
     {
         // Ensure the BuiltIns assembly is loaded before any JSFunction
@@ -180,12 +186,12 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
         ref var ownProperties = ref GetOwnProperties();
 
-        var func = JSFunction.CreateClass(this, false);
+        var func = CreateFunctionClass(this, false);
         this[Names.Function] = func;
-        FunctionPrototype = func.prototype;
+        FunctionPrototype = ((IJSFunction)func).Prototype as JSObject;
         Object = CreateClass(this, false);
         this[Names.Object] = Object;
-        ObjectPrototype = Object.prototype;
+        ObjectPrototype = ((IJSFunction)Object).Prototype as JSObject;
         ObjectPrototype.BasePrototypeObject = null;
 
         func.BasePrototypeObject = Object;
@@ -205,7 +211,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
             CoreClassRegistrations?.Invoke(this);
         }
 
-        this[KeyStrings.debug] = new JSFunction(Debug);
+        this[KeyStrings.debug] = JSValue.CreateFunction(Debug);
 
     }
 
@@ -291,7 +297,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
     }
 
 
-    static readonly ConcurrentUInt32Map<JSFunction> cache = ConcurrentUInt32Map<JSFunction>.Create();
+    static readonly ConcurrentUInt32Map<JSValue> cache = ConcurrentUInt32Map<JSValue>.Create();
     internal readonly SynchronizationContext synchronizationContext;
 
     // Factory delegates for error creation, wired by BuiltInsAssemblyInitializer.
@@ -334,7 +340,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
     private static long nextTimeout = 1;
     private static long nextInterval = 1;
 
-    internal long PostTimeout(int delay, JSFunction f, in Arguments a)
+    internal long PostTimeout(int delay, JSValue f, in Arguments a)
     {
         var ctx = synchronizationContext ?? throw NewTypeError($"Synchronization context must be present to set timeout");
         var key = Interlocked.Increment(ref nextTimeout);
@@ -372,7 +378,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
         return key;
     }
-    internal long SetInterval(int delay, JSFunction f, in Arguments a)
+    internal long SetInterval(int delay, JSValue f, in Arguments a)
     {
         var ctx = synchronizationContext ?? throw NewTypeError($"Synchronization context must be present to set timeout");
         var key = Interlocked.Increment(ref nextInterval);
@@ -472,14 +478,14 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
         var promiseObj = CreatePromiseFromDelegate((resolve, reject) =>
         {
-            var resolveF = new JSFunction((in Arguments a) =>
+            var resolveF = JSValue.CreateFunction((in Arguments a) =>
             {
                 var a1 = a.Get1();
                 resolve(a1);
                 return a1;
             });
 
-            var rejectF = new JSFunction((in Arguments a) =>
+            var rejectF = JSValue.CreateFunction((in Arguments a) =>
             {
                 var a1 = a.Get1();
                 reject(a1);

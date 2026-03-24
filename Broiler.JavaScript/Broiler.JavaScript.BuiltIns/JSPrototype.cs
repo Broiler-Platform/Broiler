@@ -134,11 +134,11 @@ public class JSPrototype : IJSPrototype
         if(p.IsValue)
         {
             if (p.get != null)
-                return ((JSFunction)p.get).f;
+                return ((IJSFunction)p.get).Delegate;
         }
         
         if (p.IsProperty)
-            return ((JSFunction)p.get).f;
+            return ((IJSFunction)p.get).Delegate;
         
         return null;
     }

@@ -145,6 +145,20 @@ internal static class BuiltInsAssemblyInitializer
         // Compiler can build class expression trees without a direct reference.
         JSClassBuilder.Initialize(typeof(JSClass), typeof(JSFunction), typeof(JSFunctionDelegate));
 
+        // Initialize JSFunctionBuilder with the concrete JSFunction type so the
+        // Compiler can build function expression trees without a direct reference.
+        JSFunctionBuilder.Initialize(typeof(JSFunction));
+
+        // Wire factory delegates for JSFunction so Core can create
+        // function instances without referencing the concrete type directly.
+        JSValue.CreateFunctionFactory = static d => new JSFunction(d);
+        JSValue.CreateFunctionFullFactory = static (d, name, source, length, createProto) =>
+            new JSFunction(d, name, source, length, createProto);
+
+        // Wire factory delegate for JSFunction.CreateClass so JSContext can
+        // build the Function constructor without referencing JSFunction directly.
+        JSContext.CreateFunctionClass = static (ctx, register) => JSFunction.CreateClass(ctx, register);
+
         // Wire factory delegates for JSGenerator so Core and Clr can create
         // generator instances without a direct type reference.
         JSGeneratorBuilder.CreateFromEnumerator = static (en, name) => new JSGenerator(en, name);

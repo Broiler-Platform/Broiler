@@ -17,7 +17,7 @@ namespace Broiler.JavaScript.Core.Core;
 /// boolean, object, function, symbol, null, undefined) derives from this
 /// class and overrides the relevant virtual members.
 /// </summary>
-public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyValue
+public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyAccessor
 {
     // ── Factory infrastructure ──
     // Initialized by Core's ModuleInitializer so that Runtime types can
@@ -140,6 +140,29 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyVal
     /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
     /// </summary>
     internal static Func<Task, JSValue> CreatePromiseFromGenericTask;
+
+    /// <summary>
+    /// Factory delegate for creating a <c>JSFunction</c> from a delegate.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static Func<JSFunctionDelegate, JSValue> CreateFunctionFactory;
+
+    /// <summary>
+    /// Factory delegate for creating a <c>JSFunction</c> with full parameters.
+    /// Wired by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
+    /// </summary>
+    internal static Func<JSFunctionDelegate, string, string, int, bool, JSValue> CreateFunctionFullFactory;
+
+    /// <summary>
+    /// Creates a <c>JSFunction</c> from a delegate via the registered factory.
+    /// </summary>
+    public static JSValue CreateFunction(JSFunctionDelegate f) => CreateFunctionFactory(f);
+
+    /// <summary>
+    /// Creates a <c>JSFunction</c> with full parameters via the registered factory.
+    /// </summary>
+    public static JSValue CreateFunction(JSFunctionDelegate f, string name, string source = null, int length = 0, bool createPrototype = true)
+        => CreateFunctionFullFactory(f, name, source, length, createPrototype);
 
     /// <summary>
     /// Factory delegate for creating an empty <c>JSArray</c>.
