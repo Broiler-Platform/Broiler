@@ -23,7 +23,7 @@ public class JSPrototype : IJSPrototype
     private bool dirty = true;
 
 
-    public JSPrototype(JSObject @object)
+    internal JSPrototype(JSObject @object)
     {
         this.@object = @object;
         Build();
