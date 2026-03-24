@@ -1,9 +1,10 @@
 ﻿using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.BuiltIns;
 
 
 public class JSPrototype : IJSPrototype
