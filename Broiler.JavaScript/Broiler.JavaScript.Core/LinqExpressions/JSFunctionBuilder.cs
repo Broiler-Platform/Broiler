@@ -3,7 +3,6 @@ using System.Reflection;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LambdaGen;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Runtime;
 
@@ -11,21 +10,37 @@ namespace Broiler.JavaScript.Core.LinqExpressions;
 
 public class JSFunctionBuilder
 {
-    static Type type = typeof(JSFunction);
+    static Type type;
 
-    public static FieldInfo _prototype = type.PublicField(nameof(JSFunction.prototype));
+    public static FieldInfo _prototype;
+
+    private static FieldInfo _f;
+
+    private static MethodInfo invokeFunction;
+
+    private static MethodInfo _invokeSuperConstructor;
+
+    /// <summary>
+    /// Initializes the builder with the concrete JSFunction type.
+    /// Called from BuiltInsAssemblyInitializer.
+    /// </summary>
+    internal static void Initialize(Type functionType)
+    {
+        type = functionType;
+        _prototype = type.PublicField("prototype");
+        _f = type.InternalField("f");
+        invokeFunction = typeof(JSValue).InternalMethod("InvokeFunction", ArgumentsBuilder.refType);
+        _invokeSuperConstructor = type.PublicMethod("InvokeSuperConstructor",
+            typeof(JSValue), typeof(JSValue), typeof(Arguments).MakeByRefType());
+    }
 
     public static Expression Prototype(Expression target) => Expression.Field(target, _prototype);
 
-    private static FieldInfo _f = type.InternalField(nameof(JSFunction.f));
-
-    private static MethodInfo invokeFunction = typeof(JSValue).InternalMethod(nameof(JSFunction.InvokeFunction), ArgumentsBuilder.refType);
-
-    private static MethodInfo _invokeSuperConstructor = typeof(JSFunction).PublicMethod(nameof(JSFunction.InvokeSuperConstructor),
-            typeof(JSValue), typeof(JSValue), typeof(Arguments).MakeByRefType());
-
-    public static Expression InvokeSuperConstructor(Expression super, Expression returnValue, Expression args) => Expression.Assign(returnValue,
-            super.CallExpression<JSFunction, JSValue>(() => (x) => x.InvokeSuper(Arguments.Empty), args));
+    public static Expression InvokeSuperConstructor(Expression super, Expression returnValue, Expression args)
+    {
+        return Expression.Assign(returnValue,
+            Expression.Call(super, type.PublicMethod("InvokeSuper", typeof(Arguments).MakeByRefType()), args));
+    }
 
     public static Expression InvokeFunction(Expression target, Expression args, bool coalesce = false)
     {
@@ -35,12 +50,12 @@ public class JSFunctionBuilder
             var pe = pes[0];
 
             return Expression.Block(pes.AsSequence(), Expression.Assign(pe, target), Expression.Condition(JSValueBuilder.IsNullOrUndefined(pe),
-                JSUndefinedBuilder.Value, pe.CallExpression<JSFunction, Arguments, JSValue>(() => (x, a) => x.InvokeFunction(a), args)));
+                JSUndefinedBuilder.Value, Expression.Call(pe, invokeFunction, args)));
         }
 
-        return target.CallExpression<JSFunction, Arguments, JSValue>(() => (x, a) => x.InvokeFunction(a), args);
+        return Expression.Call(target, invokeFunction, args);
     }
 
     public static Expression New(Expression del, Expression name, Expression code, int length) =>
-        NewLambdaExpression.NewExpression<JSFunction>(() => () => new JSFunction(null, "", "", 0, false), del, name, code, Expression.Constant(length), Expression.Constant(true));
+        NewLambdaExpression.NewExpression(type, del, name, code, Expression.Constant(length), Expression.Constant(true));
 }

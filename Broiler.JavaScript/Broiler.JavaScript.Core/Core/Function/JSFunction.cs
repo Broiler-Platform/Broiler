@@ -45,6 +45,9 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
         set => f = value;
     }
 
+    /// <inheritdoc />
+    JSValue IJSFunction.Prototype => prototype;
+
     public override bool IsFunction => true;
 
     public override JSValue TypeOf() => JSConstants.Function;
@@ -71,7 +74,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
         prototype = type.prototype;
 
         prototype.FastAddValue(KeyStrings.constructor, type, JSPropertyAttributes.EnumerableConfigurableValue);
-        ownProperties.Put(KeyStrings.prototype.Key) = JSProperty.Property(KeyStrings.prototype, prototype);
+        ownProperties.Put(KeyStrings.prototype.Key) = JSProperty.Property(KeyStrings.prototype, (IPropertyValue)prototype);
 
         FastAddValue(KeyStrings.name, name.IsEmpty ? JSValue.CreateString("native") : JSValue.CreateString(name.Value), JSPropertyAttributes.EnumerableConfigurableValue);
         FastAddValue(KeyStrings.length, JSValue.CreateNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);

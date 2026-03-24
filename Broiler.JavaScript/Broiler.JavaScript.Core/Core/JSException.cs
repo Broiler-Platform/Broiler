@@ -120,7 +120,7 @@ public class JSException : Exception
     public static JSValue ThrowSyntaxError(string value) => throw JSContext.NewSyntaxError(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSFunction ThrowNotFunction(JSValue value) => throw JSContext.NewTypeError($"{value} is not a function");
+    internal static JSValue ThrowNotFunction(JSValue value) => throw JSContext.NewTypeError($"{value} is not a function");
 
     public static JSException FromValue(JSValue value)
     {

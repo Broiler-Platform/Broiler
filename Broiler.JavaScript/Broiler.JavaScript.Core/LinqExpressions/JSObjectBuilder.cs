@@ -4,7 +4,6 @@ using System.Reflection;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Storage;
 
@@ -32,22 +31,22 @@ public class JSObjectBuilder
         typeExtensions = extensionsType;
 
         _FastAddSetterUInt =
-            extensionsType.GetMethod("FastAddSetter", [typeof(JSObject), typeof(uint), typeof(JSFunction), typeof(JSPropertyAttributes)]);
+            extensionsType.GetMethod("FastAddSetter", [typeof(JSObject), typeof(uint), typeof(JSValue), typeof(JSPropertyAttributes)]);
 
         _FastAddGetterUInt =
-            extensionsType.GetMethod("FastAddGetter", [typeof(JSObject), typeof(uint), typeof(JSFunction), typeof(JSPropertyAttributes)]);
+            extensionsType.GetMethod("FastAddGetter", [typeof(JSObject), typeof(uint), typeof(JSValue), typeof(JSPropertyAttributes)]);
 
         _FastAddSetterKeyString =
-            extensionsType.GetMethod("FastAddSetter", [typeof(JSObject), typeof(KeyString), typeof(JSFunction), typeof(JSPropertyAttributes)]);
+            extensionsType.GetMethod("FastAddSetter", [typeof(JSObject), typeof(KeyString), typeof(JSValue), typeof(JSPropertyAttributes)]);
 
         _FastAddGetterKeyString =
-            extensionsType.GetMethod("FastAddGetter", [typeof(JSObject), typeof(KeyString), typeof(JSFunction), typeof(JSPropertyAttributes)]);
+            extensionsType.GetMethod("FastAddGetter", [typeof(JSObject), typeof(KeyString), typeof(JSValue), typeof(JSPropertyAttributes)]);
 
         _FastAddSetterValue =
-            extensionsType.GetMethod("FastAddSetter", [typeof(JSObject), typeof(JSValue), typeof(JSFunction), typeof(JSPropertyAttributes)]);
+            extensionsType.GetMethod("FastAddSetter", [typeof(JSObject), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes)]);
 
         _FastAddGetterValue =
-            extensionsType.GetMethod("FastAddGetter", [typeof(JSObject), typeof(JSValue), typeof(JSFunction), typeof(JSPropertyAttributes)]);
+            extensionsType.GetMethod("FastAddGetter", [typeof(JSObject), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes)]);
     }
 
     readonly static MethodInfo _FastAddValueUInt =
@@ -63,16 +62,16 @@ public class JSObjectBuilder
         type.PublicMethod(nameof(JSObject.FastAddValue), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddPropertyUInt =
-        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(uint), typeof(JSFunction), typeof(JSFunction), typeof(JSPropertyAttributes));
+        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(uint), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddPropertyKeyString =
-        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(KeyString), typeof(JSFunction), typeof(JSFunction), typeof(JSPropertyAttributes));
+        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(KeyString), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddPropertySymbol =
-        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(IJSSymbol), typeof(JSFunction), typeof(JSFunction), typeof(JSPropertyAttributes));
+        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(IJSSymbol), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes));
 
     readonly static MethodInfo _FastAddPropertyValue =
-        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(JSValue), typeof(JSFunction), typeof(JSFunction), typeof(JSPropertyAttributes));
+        type.PublicMethod(nameof(JSObject.FastAddProperty), typeof(JSValue), typeof(JSValue), typeof(JSValue), typeof(JSPropertyAttributes));
 
     public readonly static MethodInfo _FastAddRange =
         type.PublicMethod(nameof(JSObject.FastAddRange), typeof(JSValue));

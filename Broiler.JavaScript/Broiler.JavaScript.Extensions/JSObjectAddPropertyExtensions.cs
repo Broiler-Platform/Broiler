@@ -1,6 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using System.ComponentModel;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Core;
 
@@ -17,7 +16,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static JSObject AddProperty(this JSObject target, in KeyString key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
+    public static JSObject AddProperty(this JSObject target, in KeyString key, JSValue getter, JSValue setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
     {
         ref var ownProperties = ref target.GetOwnProperties();
         ref var p = ref ownProperties.GetValue(key.Key);
@@ -39,7 +38,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static JSObject AddProperty(this JSObject target, uint key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
+    public static JSObject AddProperty(this JSObject target, uint key, JSValue getter, JSValue setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
     {
         ref var ownProperties = ref target.GetElements();
         ref var p = ref ownProperties.Get(key);
@@ -61,7 +60,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static JSObject AddProperty(this JSObject target, IJSSymbol key, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
+    public static JSObject AddProperty(this JSObject target, IJSSymbol key, JSValue getter, JSValue setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
     {
         ref var ownProperties = ref target.GetSymbols();
         ref var p = ref ownProperties.GetRefOrDefault(key.Key, ref JSProperty.Empty);
@@ -89,7 +88,7 @@ public static class JSObjectExtensions
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static JSObject AddProperty(this JSObject target, JSValue name, JSFunction getter, JSFunction setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
+    public static JSObject AddProperty(this JSObject target, JSValue name, JSValue getter, JSValue setter, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableProperty)
     {
         var key = name.ToKey();
         if (key.IsSymbol)
