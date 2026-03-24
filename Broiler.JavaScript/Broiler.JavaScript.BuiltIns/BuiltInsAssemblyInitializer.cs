@@ -20,7 +20,9 @@ using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Disposable;
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.BuiltIns;
 
@@ -134,7 +136,7 @@ internal static class BuiltInsAssemblyInitializer
 
         // Initialize JSClassBuilder with the concrete JSClass type so the
         // Compiler can build class expression trees without a direct reference.
-        JSClassBuilder.Initialize(typeof(JSClass));
+        JSClassBuilder.Initialize(typeof(JSClass), typeof(JSFunction), typeof(JSFunctionDelegate));
 
         // Wire JSConstants with concrete JSString instances.
         JSConstants.Decimal = new JSString("decimal");
