@@ -18,10 +18,10 @@ public partial class JSFinalizationRegistry : JSObject
 
     private readonly JSFunction finalizer;
 
-    public JSFinalizationRegistry(in Arguments a) : base(JSContext.NewTargetPrototype)
+    public JSFinalizationRegistry(in Arguments a) : base(JSEngine.NewTargetPrototype)
     {
         if (a[0] is not JSFunction fx)
-            throw JSContext.NewTypeError($"Argument is not a function");
+            throw JSEngine.NewTypeError($"Argument is not a function");
 
         finalizer = fx;
     }
@@ -44,7 +44,7 @@ public partial class JSFinalizationRegistry : JSObject
     public JSValue Unregister(in Arguments a)
     {
         if (a[0] is not JSObject)
-            throw JSContext.NewTypeError($"Argument is not an object");
+            throw JSEngine.NewTypeError($"Argument is not an object");
 
         Unregister(a[0]);
         return JSUndefined.Value;
@@ -54,11 +54,11 @@ public partial class JSFinalizationRegistry : JSObject
     public JSValue Register(in Arguments a)
     {
         if (a[0] is not JSObject obj)
-            throw JSContext.NewTypeError($"Argument is not an object");
+            throw JSEngine.NewTypeError($"Argument is not an object");
 
         var token = a[1];
         if (token?.IsNullOrUndefined ?? false)
-            throw JSContext.NewTypeError($"Token is required");
+            throw JSEngine.NewTypeError($"Token is required");
 
         Register(obj, token);
         return JSUndefined.Value;
@@ -84,7 +84,7 @@ public partial class JSWeakRef : JSObject
 {
     internal WeakReference<JSValue> weak;
     public JSWeakRef(JSValue value) : this() => weak = new WeakReference<JSValue>(value);
-    public JSWeakRef(in Arguments a) : base(JSContext.NewTargetPrototype) => weak = new WeakReference<JSValue>(a[0] ?? throw new JSException($"argument is missing"));
+    public JSWeakRef(in Arguments a) : base(JSEngine.NewTargetPrototype) => weak = new WeakReference<JSValue>(a[0] ?? throw new JSException($"argument is missing"));
 
     [JSExport]
     public JSValue Deref(in Arguments a)

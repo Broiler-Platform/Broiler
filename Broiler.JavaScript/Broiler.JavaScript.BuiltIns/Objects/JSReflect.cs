@@ -81,7 +81,7 @@ public partial class JSReflect : JSObject
     {
         var (target, propertyKey, receiver) = a.Get3();
         if (target is not JSObject @object)
-            throw JSContext.NewTypeError($"Not an object");
+            throw JSEngine.NewTypeError($"Not an object");
 
         receiver = receiver.IsUndefined ? target : receiver;
         return target.GetValue(propertyKey, receiver, false);
@@ -92,7 +92,7 @@ public partial class JSReflect : JSObject
     {
         var (target, propertyKey) = a.Get2();
         if (target is not JSObject @object)
-            throw JSContext.NewTypeError($"Not an object");
+            throw JSEngine.NewTypeError($"Not an object");
 
         var key = propertyKey.ToKey();
         JSProperty p;
@@ -122,7 +122,7 @@ public partial class JSReflect : JSObject
     {
         var target = a.Get1();
         if (target is not JSObject)
-            throw JSContext.NewTypeError($"Not an object");
+            throw JSEngine.NewTypeError($"Not an object");
 
         var p = target.prototypeChain?.Object;
         if (p == target || p == null)
@@ -136,7 +136,7 @@ public partial class JSReflect : JSObject
     {
         var (target, propertyKey, receiver) = a.Get3();
         if (target is not JSObject @object)
-            throw JSContext.NewTypeError($"Not an object");
+            throw JSEngine.NewTypeError($"Not an object");
 
         var key = propertyKey.ToKey();
         JSProperty p;
@@ -167,7 +167,7 @@ public partial class JSReflect : JSObject
     {
         var target = a.Get1();
         if (target is not JSObject @object)
-            throw JSContext.NewTypeError($"Not an object");
+            throw JSEngine.NewTypeError($"Not an object");
         
         return @object.IsExtensible() ? JSBoolean.True : JSBoolean.False;
     }
@@ -177,7 +177,7 @@ public partial class JSReflect : JSObject
     {
         var target = a.Get1();
         if (target is not JSObject @object)
-            throw JSContext.NewTypeError($"Not an object");
+            throw JSEngine.NewTypeError($"Not an object");
         
         var r = new JSArray();
         var een = @object.GetElementEnumerator();
@@ -203,7 +203,7 @@ public partial class JSReflect : JSObject
     {
         var target = a.Get1();
         if (target is not JSObject @object)
-            throw JSContext.NewTypeError($"Not an object");
+            throw JSEngine.NewTypeError($"Not an object");
 
         @object.status |= ObjectStatus.NonExtensible;
         return JSBoolean.True;
@@ -214,7 +214,7 @@ public partial class JSReflect : JSObject
     {
         var (target, propertyKey, value, receiver) = a.Get4();
         if (target is not JSObject @object)
-            throw JSContext.NewTypeError($"Not an object");
+            throw JSEngine.NewTypeError($"Not an object");
 
         receiver = receiver.IsUndefined ? target : receiver;
         var key = propertyKey.ToKey();
@@ -269,10 +269,10 @@ public partial class JSReflect : JSObject
     {
         var (target, p) = a.Get2();
         if (target is not JSObject)
-            throw JSContext.NewTypeError($"Not an object");
+            throw JSEngine.NewTypeError($"Not an object");
 
         if (p is not JSObject prototype)
-            throw JSContext.NewTypeError($"Not an object");
+            throw JSEngine.NewTypeError($"Not an object");
 
         target.BasePrototypeObject = prototype;
         return p;

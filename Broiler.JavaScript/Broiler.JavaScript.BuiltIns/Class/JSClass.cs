@@ -22,8 +22,8 @@ public class JSClass : JSFunction
 
     public override JSValue InvokeFunction(in Arguments a)
     {
-        if (JSContext.NewTarget == null && JSContext.Current.CurrentNewTarget == null)
-            throw JSContext.NewTypeError($"{this} is not a function");
+        if (JSEngine.NewTarget == null && JSEngine.Current.CurrentNewTarget == null)
+            throw JSEngine.NewTypeError($"{this} is not a function");
 
         return f(a);
     }
@@ -33,7 +33,7 @@ public class JSClass : JSFunction
     {
         var @object = new JSObject() { BasePrototypeObject = prototype };
         var ao = a.OverrideThis(@object);
-        JSContext.Current.CurrentNewTarget = this;
+        JSEngine.Current.CurrentNewTarget = this;
         var @this = f(ao);
         
         if (!@this.IsUndefined)

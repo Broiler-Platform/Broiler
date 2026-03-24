@@ -12,10 +12,10 @@ namespace Broiler.JavaScript.BuiltIns.Intl;
 public class JSIntl
 {
     [JSExportSameName]
-    public static JSValue DateTimeFormat => JSContext.ClrInterop.GetClrType(typeof(JSIntlDateTimeFormat));
+    public static JSValue DateTimeFormat => JSEngine.ClrInterop.GetClrType(typeof(JSIntlDateTimeFormat));
 
     [JSExportSameName]
-    public static JSValue RelativeTimeFormat => JSContext.ClrInterop.GetClrType(typeof(JSIntlRelativeTimeFormat));
+    public static JSValue RelativeTimeFormat => JSEngine.ClrInterop.GetClrType(typeof(JSIntlRelativeTimeFormat));
 
 }
 

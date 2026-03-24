@@ -18,7 +18,7 @@ public partial class V8Runtime
             if (ObjectId != null)
                 return V8RemoteObject.From(ObjectId);
 
-            return JSContext.ClrInterop.Marshal(Value);
+            return JSEngine.ClrInterop.Marshal(Value);
         }
     }
 }

@@ -238,7 +238,7 @@ public partial class ClrProxy : JSObject
         if (value is IEnumerable en)
             return new EnumerableElementEnumerable(en.GetEnumerator());
 
-        throw JSContext.NewTypeError($"{this} is not an iterable");
+        throw JSEngine.NewTypeError($"{this} is not an iterable");
     }
 
     public static ClrProxy From(int value) => new(value);

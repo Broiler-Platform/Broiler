@@ -17,11 +17,11 @@ public partial class JSProxy : JSObject
     readonly JSObject target;
     private readonly JSObject handler;
 
-    protected JSProxy((JSObject target, JSObject handler) p) : base(JSContext.Current.ObjectPrototype)
+    protected JSProxy((JSObject target, JSObject handler) p) : base(JSEngine.Current.ObjectPrototype)
     {
         var (target, handler) = p;
         if (target == null || handler == null)
-            throw JSContext.NewTypeError("Cannot create proxy with a non-object as target or handler");
+            throw JSEngine.NewTypeError("Cannot create proxy with a non-object as target or handler");
 
         this.target = target;
         this.handler = handler;

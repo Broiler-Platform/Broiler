@@ -633,7 +633,7 @@ public class BuiltInsTests
 
     private static void EnsureBuiltInsLoaded()
     {
-        // Load CLR assembly so JSContext.ClrInterop is properly configured
+        // Load CLR assembly so JSEngine.ClrInterop is properly configured
         // (required for JSConsole marshalling via ClrProxy).
         RuntimeHelpers.RunClassConstructor(
             typeof(Broiler.JavaScript.Clr.DefaultClrInterop).TypeHandle);

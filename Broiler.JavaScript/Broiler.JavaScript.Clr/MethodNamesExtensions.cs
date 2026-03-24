@@ -59,7 +59,7 @@ internal static class MethodNamesExtensions
                 return (method, values);
         }
 
-        throw JSContext.NewTypeError($"No matching parameters found for {name}");
+        throw JSEngine.NewTypeError($"No matching parameters found for {name}");
     }
 
     public static (T method, ParameterInfo[] parameters)[] ToPairs<T>(this IEnumerable<T> methods)

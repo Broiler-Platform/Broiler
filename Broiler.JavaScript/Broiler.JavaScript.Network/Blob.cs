@@ -35,7 +35,7 @@ namespace YantraJS.Network
 
             // DataView is pending...
 
-            throw JSContext.NewTypeError($"Failed to convert {value} to ArrayBuffer");
+            throw JSEngine.NewTypeError($"Failed to convert {value} to ArrayBuffer");
         }
     }
 
@@ -44,9 +44,9 @@ namespace YantraJS.Network
     {
         public readonly byte[] Buffer;
 
-        public Blob(in Arguments a) : base(JSContext.NewTargetPrototype)
+        public Blob(in Arguments a) : base(JSEngine.NewTargetPrototype)
         {
-            var array = a[0] ?? throw JSContext.NewTypeError("array is required");
+            var array = a[0] ?? throw JSEngine.NewTypeError("array is required");
             if(a.TryGetAt(1, out var options))
             {
                 var p = options[Names.type];
@@ -91,7 +91,7 @@ namespace YantraJS.Network
         [JSExport]
         public JSValue Stream(in Arguments a)
         {
-            throw JSContext.NewTypeError("Not supported yet");
+            throw JSEngine.NewTypeError("Not supported yet");
         }
 
         private JSValue Slice(int offset, int length, JSValue type)

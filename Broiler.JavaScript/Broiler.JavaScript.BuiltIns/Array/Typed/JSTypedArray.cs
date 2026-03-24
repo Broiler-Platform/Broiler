@@ -41,7 +41,7 @@ public partial class JSTypedArray: JSObject
     
     public override int Length { get => length; set => throw new NotSupportedException(); }
 
-    public JSTypedArray(in Arguments a) : this(JSContext.NewTargetPrototype) => throw new NotSupportedException();
+    public JSTypedArray(in Arguments a) : this(JSEngine.NewTargetPrototype) => throw new NotSupportedException();
 
     public JSTypedArray(in TypedArrayParameters p): this(p.prototype) 
     {
@@ -70,11 +70,11 @@ public partial class JSTypedArray: JSObject
                 }
 
                 if (l < 0 || ((byteOffset + l) > buffer.buffer.Length))
-                    throw JSContext.NewRangeError($"Start offset {byteOffset} is outside the bounds of the buffer");
+                    throw JSEngine.NewRangeError($"Start offset {byteOffset} is outside the bounds of the buffer");
 
                 if (((l - byteOffset) % bytesPerElement) != 0)
                 {
-                    throw JSContext.NewRangeError($"byte length of TypedArray should be multiple of {bytesPerElement}");
+                    throw JSEngine.NewRangeError($"byte length of TypedArray should be multiple of {bytesPerElement}");
                 }
 
             }
@@ -178,7 +178,7 @@ public partial class JSTypedArray: JSObject
     public override double DoubleValue => double.NaN;
     public override bool Equals(JSValue value) => ReferenceEquals(this, value);
 
-    public override JSValue InvokeFunction(in Arguments a) => throw JSContext.NewTypeError($"{this} is not a function");
+    public override JSValue InvokeFunction(in Arguments a) => throw JSEngine.NewTypeError($"{this} is not a function");
 
     public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 

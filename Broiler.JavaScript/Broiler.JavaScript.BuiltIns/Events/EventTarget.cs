@@ -19,7 +19,7 @@ public delegate JSValue DomEventHandlerDelegate(Event e);
 [JSClassGenerator]
 public partial class EventTarget : JSObject
 {
-    public EventTarget(in Arguments a) : this(JSContext.NewTargetPrototype) { }
+    public EventTarget(in Arguments a) : this(JSEngine.NewTargetPrototype) { }
     private static readonly ConcurrentNameMap eventNames = new();
 
     private SAUint32Map<List<DomEventHandler>> captureHandlers;

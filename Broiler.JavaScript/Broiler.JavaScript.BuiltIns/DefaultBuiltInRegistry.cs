@@ -67,7 +67,7 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
     /// <inheritdoc />
     public void Register(IJSContext ctx)
     {
-        JSContext.EnsureBuiltInsAssemblyLoaded();
+        JSEngine.EnsureBuiltInsAssemblyLoaded();
 
         var context = ctx as JSContext
             ?? throw new ArgumentException("Expected JSContext instance", nameof(ctx));
@@ -75,7 +75,7 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
         // Invoke Core's source-generated class registration via the delegate
         // wired by CoreAssemblyInitializer. This replaces the direct call to
         // context.RegisterGeneratedClasses() which is internal to Core.
-        JSContext.CoreClassRegistrations?.Invoke(context);
+        JSEngine.CoreClassRegistrations?.Invoke(context);
 
         // Register built-in types from satellite assemblies.
         AdditionalRegistrations?.Invoke(context);
@@ -85,7 +85,7 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
 
         // Register the console object via factory delegate (wired by BuiltIns assembly).
         if (ConsoleFactory != null)
-            context[KeyStrings.console] = JSContext.ClrInterop.Marshal(ConsoleFactory(context));
+            context[KeyStrings.console] = JSEngine.ClrInterop.Marshal(ConsoleFactory(context));
     }
 
     private static void SetupIteratorPrototypeChain(JSContext context)

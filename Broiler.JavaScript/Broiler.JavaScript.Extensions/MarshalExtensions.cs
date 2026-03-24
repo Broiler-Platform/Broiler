@@ -12,10 +12,10 @@ namespace Broiler.JavaScript.Extensions;
 public static class MarshalExtensions
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue Marshal(this object value) => JSContext.ClrInterop.Marshal(value);
+    public static JSValue Marshal(this object value) => JSEngine.ClrInterop.Marshal(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue Marshal(this Type type) => JSContext.ClrInterop.GetClrType(type);
+    public static JSValue Marshal(this Type type) => JSEngine.ClrInterop.GetClrType(type);
 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

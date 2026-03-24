@@ -43,7 +43,7 @@ public partial class JSString
             int codePoint = (int)codePointDouble;
 
             if (codePoint < 0 || codePoint > 0x10FFFF || codePoint != codePointDouble)
-                throw JSContext.NewRangeError($"Invalid code point {codePointDouble}");
+                throw JSEngine.NewRangeError($"Invalid code point {codePointDouble}");
 
             if (codePoint <= 65535)
                 result.Append((char)codePoint);
@@ -63,11 +63,11 @@ public partial class JSString
     {
         var template = a.Get1();
         if (template is not JSObject)
-            throw JSContext.NewTypeError($"Cannot convert undefined or null to object");
+            throw JSEngine.NewTypeError($"Cannot convert undefined or null to object");
 
         var raw = template[KeyStrings.raw];
         if (!(raw.IsString || raw.IsArray))
-            throw JSContext.NewTypeError($"Cannot convert undefined or null to object");
+            throw JSEngine.NewTypeError($"Cannot convert undefined or null to object");
 
         var len = raw.Length;
         if (len <= 0)

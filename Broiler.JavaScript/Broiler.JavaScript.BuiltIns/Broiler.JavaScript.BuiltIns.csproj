@@ -26,6 +26,7 @@
     <ProjectReference Include="..\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Extensions\Broiler.JavaScript.Extensions.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.JSClassGenerator\Broiler.JavaScript.JSClassGenerator.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+    <ProjectReference Include="..\Broiler.JavaScript.Engine\Broiler.JavaScript.Engine.csproj" />
   </ItemGroup>
 
 </Project>

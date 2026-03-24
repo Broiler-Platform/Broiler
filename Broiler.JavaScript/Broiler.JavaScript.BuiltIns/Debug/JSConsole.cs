@@ -16,7 +16,7 @@ public class JSConsole(JSContext context)
     public JSValue Warn(in Arguments a)
     {
         var f = a.Get1();
-        JSContext.Current.ReportLog(f);
+        (JSEngine.Current as JSContext)?.ReportLog(f);
         context.FireConsoleEvent("warn", a);
         return f;
     }
@@ -24,7 +24,7 @@ public class JSConsole(JSContext context)
     public JSValue Error(in Arguments a)
     {
         var f = a.Get1();
-        JSContext.Current.ReportLog(f);
+        (JSEngine.Current as JSContext)?.ReportLog(f);
         context.FireConsoleEvent("error", a);
         return f;
     }

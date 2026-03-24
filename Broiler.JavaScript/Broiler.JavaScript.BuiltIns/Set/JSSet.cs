@@ -21,7 +21,7 @@ public partial class JSSet : JSObject
     [JSExport]
     public int Size => store?.Count ?? 0;
 
-    public JSSet(in Arguments a) : base(JSContext.NewTargetPrototype)
+    public JSSet(in Arguments a) : base(JSEngine.NewTargetPrototype)
     {
         if (a[0] is not JSArray array)
             return;
@@ -82,7 +82,7 @@ public partial class JSSet : JSObject
     {
         var fx = a.Get1();
         if (!fx.IsFunction)
-            throw JSContext.NewTypeError($"Function parameter expected");
+            throw JSEngine.NewTypeError($"Function parameter expected");
 
         var @this = a.This ?? this;
         if (store == null)
@@ -132,7 +132,7 @@ public partial class JSSet : JSObject
     {
         var other = a.Get1();
         if (other is not JSSet otherSet)
-            throw JSContext.NewTypeError("Set.prototype.union requires a Set argument");
+            throw JSEngine.NewTypeError("Set.prototype.union requires a Set argument");
 
         var result = new JSSet(Arguments.Empty);
         if (store != null)
@@ -155,7 +155,7 @@ public partial class JSSet : JSObject
     {
         var other = a.Get1();
         if (other is not JSSet otherSet)
-            throw JSContext.NewTypeError("Set.prototype.intersection requires a Set argument");
+            throw JSEngine.NewTypeError("Set.prototype.intersection requires a Set argument");
 
         var result = new JSSet(Arguments.Empty);
         if (store != null)
@@ -176,7 +176,7 @@ public partial class JSSet : JSObject
     {
         var other = a.Get1();
         if (other is not JSSet otherSet)
-            throw JSContext.NewTypeError("Set.prototype.difference requires a Set argument");
+            throw JSEngine.NewTypeError("Set.prototype.difference requires a Set argument");
 
         var result = new JSSet(Arguments.Empty);
         if (store == null)
@@ -197,7 +197,7 @@ public partial class JSSet : JSObject
     {
         var other = a.Get1();
         if (other is not JSSet otherSet)
-            throw JSContext.NewTypeError("Set.prototype.symmetricDifference requires a Set argument");
+            throw JSEngine.NewTypeError("Set.prototype.symmetricDifference requires a Set argument");
 
         var result = new JSSet(Arguments.Empty);
         if (store != null)
@@ -228,7 +228,7 @@ public partial class JSSet : JSObject
     {
         var other = a.Get1();
         if (other is not JSSet otherSet)
-            throw JSContext.NewTypeError("Set.prototype.isSubsetOf requires a Set argument");
+            throw JSEngine.NewTypeError("Set.prototype.isSubsetOf requires a Set argument");
 
         if (store == null)
             return JSBoolean.True;
@@ -248,7 +248,7 @@ public partial class JSSet : JSObject
     {
         var other = a.Get1();
         if (other is not JSSet otherSet)
-            throw JSContext.NewTypeError("Set.prototype.isSupersetOf requires a Set argument");
+            throw JSEngine.NewTypeError("Set.prototype.isSupersetOf requires a Set argument");
 
         if (otherSet.store == null)
             return JSBoolean.True;
@@ -268,7 +268,7 @@ public partial class JSSet : JSObject
     {
         var other = a.Get1();
         if (other is not JSSet otherSet)
-            throw JSContext.NewTypeError("Set.prototype.isDisjointFrom requires a Set argument");
+            throw JSEngine.NewTypeError("Set.prototype.isDisjointFrom requires a Set argument");
 
         if (store != null)
         {

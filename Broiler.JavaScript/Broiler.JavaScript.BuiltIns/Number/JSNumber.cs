@@ -77,7 +77,7 @@ public sealed partial class JSNumber : JSPrimitive
 
     public override JSValue TypeOf() => JSConstants.Number;
 
-    protected override JSValue GetPrototype() => (JSContext.Current[Names.Number] as JSFunction).prototype;
+    protected override JSValue GetPrototype() => ((JSEngine.Current as JSObject)[Names.Number] as JSFunction).prototype;
 
     internal override PropertyKey ToKey(bool create = false)
     {
@@ -413,7 +413,7 @@ public sealed partial class JSNumber : JSPrimitive
 
     public override bool StrictEqualsLiteral(double value) => this.value == value;
 
-    public override JSValue InvokeFunction(in Arguments a) => throw JSContext.NewTypeError($"{value} is not a function");
+    public override JSValue InvokeFunction(in Arguments a) => throw JSEngine.NewTypeError($"{value} is not a function");
 
     internal override JSValue Is(JSValue value)
     {

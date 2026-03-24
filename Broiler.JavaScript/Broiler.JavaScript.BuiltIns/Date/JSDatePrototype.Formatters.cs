@@ -111,7 +111,7 @@ public partial class JSDate
                 }
                 else
                 {
-                    throw JSContext.NewTypeError("Options not supported, use .Net String Formats");
+                    throw JSEngine.NewTypeError("Options not supported, use .Net String Formats");
                 }
             }
         }
@@ -147,7 +147,7 @@ public partial class JSDate
                 }
                 else
                 {
-                    throw JSContext.NewTypeError("Options not supported, use .Net String Formats");
+                    throw JSEngine.NewTypeError("Options not supported, use .Net String Formats");
                 }
             }
         }

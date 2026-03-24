@@ -62,7 +62,7 @@ public partial class JSPromise : JSObject, IJSPromise
     {
         promiseID = Interlocked.Increment(ref nextPromiseID);
 
-        pending = JSContext.Current.PendingPromises;
+        pending = (JSEngine.Current as JSContext).PendingPromises;
         pending.TryAdd(promiseID, this);
     }
 
@@ -79,7 +79,7 @@ public partial class JSPromise : JSObject, IJSPromise
     /// <param name="value"></param>
     public JSPromise(Task<JSValue> value) : this()
     {
-        sc = JSContext.Current.synchronizationContext;
+        sc = (JSEngine.Current as JSContext).synchronizationContext;
         RegisterPromise();
         value.ContinueWith((t) =>
         {
@@ -100,7 +100,7 @@ public partial class JSPromise : JSObject, IJSPromise
         });
     }
 
-    public JSPromise(in Arguments a) : base(JSContext.NewTargetPrototype)
+    public JSPromise(in Arguments a) : base(JSEngine.NewTargetPrototype)
     {
         InitPromise();
         JSValue @delegate = a[0];
@@ -130,7 +130,7 @@ public partial class JSPromise : JSObject, IJSPromise
     private void InitPromise()
     {
         // to improve speed of promise, we will add then/catch here...
-        sc = JSContext.Current.synchronizationContext;
+        sc = (JSEngine.Current as JSContext).synchronizationContext;
 
         RegisterPromise();
 
@@ -161,7 +161,7 @@ public partial class JSPromise : JSObject, IJSPromise
 
         if (value == this)
         {
-            Reject(JSContext.NewTypeError("A promise cannot be resolved with itself").Error);
+            Reject(JSEngine.NewTypeError("A promise cannot be resolved with itself").Error);
             return;
         }
 

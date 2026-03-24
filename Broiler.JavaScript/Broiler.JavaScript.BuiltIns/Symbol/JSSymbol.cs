@@ -21,17 +21,17 @@ public partial class JSSymbol: JSValue, IJSSymbol
 
     public override bool IsSymbol => true;
 
-    public override double DoubleValue => throw JSContext.NewTypeError("Cannot convert a Symbol value to a number.");
+    public override double DoubleValue => throw JSEngine.NewTypeError("Cannot convert a Symbol value to a number.");
 
-    public override string StringValue => throw JSContext.NewTypeError("Cannot convert a Symbol value to a string.");
+    public override string StringValue => throw JSEngine.NewTypeError("Cannot convert a Symbol value to a string.");
 
-    public override uint UIntValue => throw JSContext.NewTypeError("Cannot convert a Symbol value to a uint32.");
+    public override uint UIntValue => throw JSEngine.NewTypeError("Cannot convert a Symbol value to a uint32.");
 
     internal override PropertyKey ToKey(bool create = true) => this;
 
     public static implicit operator PropertyKey(JSSymbol key) => PropertyKey.FromSymbol(key);
 
-    public JSSymbol(string name) : base(JSContext.Current?.ObjectPrototype)
+    public JSSymbol(string name) : base(JSEngine.Current?.ObjectPrototype)
     {
         this.name = name;
         Key = (uint)Interlocked.Increment(ref SymbolID);

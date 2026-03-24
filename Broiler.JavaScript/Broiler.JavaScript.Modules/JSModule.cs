@@ -57,7 +57,7 @@ public partial class JSModule : JSObject
         set
         {
             if (value == null || value.IsNullOrUndefined)
-                throw JSContext.NewTypeError("Exports cannot be set to null or undefined");
+                throw JSEngine.NewTypeError("Exports cannot be set to null or undefined");
 
             exports = value;
         }

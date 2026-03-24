@@ -36,7 +36,7 @@ internal static class BuiltInsAssemblyInitializer
     {
         // Set the default built-in registry on JSContext.
         // DefaultBuiltInRegistry now lives in this assembly (BuiltIns).
-        JSContext.BuiltInRegistry ??= DefaultBuiltInRegistry.Instance;
+        JSEngine.BuiltInRegistry ??= DefaultBuiltInRegistry.Instance;
 
         // Register BuiltIns assembly types into the built-in registration pipeline.
         // This appends to any existing additional registrations so that multiple
@@ -56,7 +56,7 @@ internal static class BuiltInsAssemblyInitializer
 
         // Wire factory delegate for the Intl global object so the Globals assembly
         // does not directly reference JSIntl.
-        DefaultBuiltInRegistry.IntlFactory = static () => JSContext.ClrInterop.GetClrType(typeof(JSIntl));
+        DefaultBuiltInRegistry.IntlFactory = static () => JSEngine.ClrInterop.GetClrType(typeof(JSIntl));
 
         // Wire factory delegate for JSDate so Core/Clr can create
         // Date values without referencing the concrete type directly.
@@ -157,7 +157,7 @@ internal static class BuiltInsAssemblyInitializer
 
         // Wire factory delegate for JSFunction.CreateClass so JSContext can
         // build the Function constructor without referencing JSFunction directly.
-        JSContext.CreateFunctionClass = static (ctx, register) => JSFunction.CreateClass(ctx, register);
+        JSEngine.CreateFunctionClass = static (ctx, register) => JSFunction.CreateClass(ctx, register);
 
         // Wire factory delegates for JSGenerator so Core and Clr can create
         // generator instances without a direct type reference.
@@ -170,15 +170,15 @@ internal static class BuiltInsAssemblyInitializer
 
         // Wire factory delegates for JSError types so Core can create
         // error instances without referencing the concrete types directly.
-        JSContext.CreateTypeError = static (message, function, filePath, line) =>
+        JSEngine.CreateTypeError = static (message, function, filePath, line) =>
             new JSTypeError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
-        JSContext.CreateSyntaxError = static (message, function, filePath, line) =>
+        JSEngine.CreateSyntaxError = static (message, function, filePath, line) =>
             new JSSyntaxError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
-        JSContext.CreateURIError = static (message, function, filePath, line) =>
+        JSEngine.CreateURIError = static (message, function, filePath, line) =>
             new JSURIError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
-        JSContext.CreateRangeError = static (message, function, filePath, line) =>
+        JSEngine.CreateRangeError = static (message, function, filePath, line) =>
             new JSRangeError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
-        JSContext.CreateError = static (message, function, filePath, line) =>
+        JSEngine.CreateError = static (message, function, filePath, line) =>
             new JSError(new Arguments(JSUndefined.Value, JSValue.CreateString(message)), function: function, filePath: filePath, line: line).Exception;
         JSException.CreateJSError = static (ex, msg) => new JSError(ex, msg);
         JSException.CreateJSErrorWithPrototype = static (ex, prototype) => new JSError(ex, prototype);
@@ -238,7 +238,7 @@ internal static class BuiltInsAssemblyInitializer
             if (value is JSArrayBuffer arrayBuffer)
             {
                 if (arrayBuffer.isDetached)
-                    throw JSContext.NewTypeError("structuredClone: cannot clone a detached ArrayBuffer");
+                    throw JSEngine.NewTypeError("structuredClone: cannot clone a detached ArrayBuffer");
 
                 var newBuf = new byte[arrayBuffer.buffer.Length];
                 System.Array.Copy(arrayBuffer.buffer, newBuf, arrayBuffer.buffer.Length);
@@ -270,9 +270,9 @@ internal static class BuiltInsAssemblyInitializer
 
         // Wire factory delegates for JSPromise so Core can create
         // promise instances without referencing the concrete type directly.
-        JSContext.CreateResolvedOrRejectedPromise = static (value, isResolved) =>
+        JSEngine.CreateResolvedOrRejectedPromise = static (value, isResolved) =>
             new JSPromise(value, isResolved ? JSPromise.PromiseState.Resolved : JSPromise.PromiseState.Rejected);
-        JSContext.CreatePromiseFromDelegate = static (d) => new JSPromise(d);
+        JSEngine.CreatePromiseFromDelegate = static (d) => new JSPromise(d);
         JSValue.CreatePromiseFromTask = static (task) => new JSPromise(task);
         JSValue.CreatePromiseFromUntypedTask = static (task) => task.ToPromise();
         JSValue.CreatePromiseFromGenericTask = static (task) => task.ToPromise();

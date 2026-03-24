@@ -27,7 +27,7 @@ public partial class JSWeakMap: JSObject
 {
     private StringMap<WeakReference<WeakValue>> index;
 
-    public JSWeakMap(in Arguments a) : base(JSContext.NewTargetPrototype)
+    public JSWeakMap(in Arguments a) : base(JSEngine.NewTargetPrototype)
     {
         if (a[0] is not JSArray array)
             return;
@@ -114,7 +114,7 @@ public partial class JSWeakMap: JSObject
     {
         var (keyVal, defaultValue) = a.Get2();
         if (keyVal is not JSObject key)
-            throw JSContext.NewTypeError("WeakMap key must be an object");
+            throw JSEngine.NewTypeError("WeakMap key must be an object");
 
         var uk = key.ToUniqueID();
         lock (this)
@@ -141,10 +141,10 @@ public partial class JSWeakMap: JSObject
     {
         var (keyVal, callbackfn) = a.Get2();
         if (keyVal is not JSObject key)
-            throw JSContext.NewTypeError("WeakMap key must be an object");
+            throw JSEngine.NewTypeError("WeakMap key must be an object");
 
         if (!callbackfn.IsFunction)
-            throw JSContext.NewTypeError("getOrInsertComputed requires a callback function");
+            throw JSEngine.NewTypeError("getOrInsertComputed requires a callback function");
 
         var uk = key.ToUniqueID();
         lock (this)

@@ -307,7 +307,7 @@ public class Phase2ValidationTests
         Assert.NotNull(JSValue.CreateBigInt(0));
 
         // CLR interop:
-        Assert.NotNull(JSContext.ClrInterop);
+        Assert.NotNull(JSEngine.ClrInterop);
     }
 
     [Fact]

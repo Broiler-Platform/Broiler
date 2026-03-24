@@ -21,7 +21,7 @@ static class JSBigIntExtensions
 [JSFunctionGenerator("BigInt")]
 public partial class JSBigInt : JSPrimitive
 {
-    public static JSException CannotMix() => JSContext.NewTypeError("Cannot mix BigInt and other types, use explicit conversions");
+    public static JSException CannotMix() => JSEngine.NewTypeError("Cannot mix BigInt and other types, use explicit conversions");
 
     internal readonly BigInteger value;
 
@@ -49,7 +49,7 @@ public partial class JSBigInt : JSPrimitive
         text = text.TrimEnd('n').Replace("_", "");
 
         if (!BigInteger.TryParse(text, out var v))
-            throw JSContext.NewTypeError($"{f} is not a valid big integer");
+            throw JSEngine.NewTypeError($"{f} is not a valid big integer");
 
         return new JSBigInt(v);
     }
@@ -59,7 +59,7 @@ public partial class JSBigInt : JSPrimitive
     {
         var v = stringValue.TrimEnd('n').Replace("_", "");
         if (!BigInteger.TryParse(v, out var n))
-            throw JSContext.NewTypeError($"{stringValue} is not a valid big integer");
+            throw JSEngine.NewTypeError($"{stringValue} is not a valid big integer");
         value = n;
     }
 
@@ -107,7 +107,7 @@ public partial class JSBigInt : JSPrimitive
 
     public override JSValue TypeOf() => JSConstants.BigInt;
 
-    protected override JSValue GetPrototype() => (JSContext.Current[Names.BigInt] as JSFunction).prototype;
+    protected override JSValue GetPrototype() => ((JSEngine.Current as JSObject)[Names.BigInt] as JSFunction).prototype;
 
     internal override PropertyKey ToKey(bool create = true) => (uint)value;
 
@@ -199,7 +199,7 @@ public partial class JSBigInt : JSPrimitive
     public static JSValue AsIntN(long bits, JSBigInt bigint)
     {
         if (bits < 0 || bits > 9007199254740991)
-            throw JSContext.NewRangeError("Invalid range for bits");
+            throw JSEngine.NewRangeError("Invalid range for bits");
 
         var n = bigint.value;
         var buffer = n.ToByteArray();
@@ -263,7 +263,7 @@ public partial class JSBigInt : JSPrimitive
     public static JSValue AsUintN(long bits, JSBigInt bigint)
     {
         if (bits < 0 || bits > 9007199254740991)
-            throw JSContext.NewRangeError("Invalid range for bits");
+            throw JSEngine.NewRangeError("Invalid range for bits");
 
         var n = bigint.value;
         if (n.Sign == BigInteger.MinusOne.Sign)

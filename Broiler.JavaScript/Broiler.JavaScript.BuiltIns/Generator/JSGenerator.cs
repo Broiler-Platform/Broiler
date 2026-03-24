@@ -21,7 +21,7 @@ public partial class JSGenerator : JSObject, IJSGenerator
     internal JSValue value;
     internal bool done;
 
-    public JSGenerator(in Arguments a) : base(JSContext.NewTargetPrototype) => throw new NotImplementedException();
+    public JSGenerator(in Arguments a) : base(JSEngine.NewTargetPrototype) => throw new NotImplementedException();
 
     public JSGenerator(IElementEnumerator en, string name) : this()
     {
@@ -59,7 +59,7 @@ public partial class JSGenerator : JSObject, IJSGenerator
 
     public bool MoveNext(JSValue replaceOld, out JSValue item)
     {
-        var c = JSContext.Current;
+        var c = JSEngine.Current;
         var top = c.Top;
 
         try
@@ -98,7 +98,7 @@ public partial class JSGenerator : JSObject, IJSGenerator
             return ValueObject;
         }
 
-        var c = JSContext.Current;
+        var c = JSEngine.Current;
         var top = c.Top;
         
         try

@@ -35,7 +35,7 @@ public partial class JSString
         var f = a.Get1();
 
         if (f is JSRegExp)
-            throw JSContext.NewTypeError("Substring argument must not be a regular expression.");
+            throw JSEngine.NewTypeError("Substring argument must not be a regular expression.");
 
         var endPosition = a[1]?.IntegerValue ?? int.MaxValue;
         var fs = f.ToString();
@@ -63,7 +63,7 @@ public partial class JSString
         var pos = a[1]?.IntegerValue ?? 0;
 
         if (searchStr is JSRegExp)
-            throw JSContext.NewTypeError("Substring argument must not be a regular expression.");
+            throw JSEngine.NewTypeError("Substring argument must not be a regular expression.");
 
         var search = searchStr.ToString();
         if (pos == 0)
@@ -89,7 +89,7 @@ public partial class JSString
         var pos = a[1]?.IntegerValue ?? 0;
 
         if (searchStr is JSRegExp)
-            throw JSContext.NewTypeError("Substring argument must not be a regular expression.");
+            throw JSEngine.NewTypeError("Substring argument must not be a regular expression.");
 
         pos = Math.Min(Math.Max(pos, 0), @this.Length);
         return @this.IndexOf(searchStr.ToString(), pos) >= 0 ? JSValue.BooleanTrue : JSValue.BooleanFalse;
@@ -138,7 +138,7 @@ public partial class JSString
     {
         var @this = a.This;
         if (@this.IsNullOrUndefined)
-            throw JSContext.NewTypeError("String.prototype.localeCompare called on null or undefined");
+            throw JSEngine.NewTypeError("String.prototype.localeCompare called on null or undefined");
 
         var (compareString, locale, options) = a.Get3();
         var str = compareString.ToString();

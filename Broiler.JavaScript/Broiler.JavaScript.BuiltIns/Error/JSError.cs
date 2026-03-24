@@ -23,7 +23,7 @@ public partial class JSError : JSObject, IJSError
         var sb = new StringBuilder();
         sb.AppendLine($"{ToString(Arguments.Empty)}");
 
-        var top = JSContext.Current.Top;
+        var top = JSEngine.Current.Top;
         while (top != null)
         {
             // ref var top = ref walker.Current;
@@ -44,7 +44,7 @@ public partial class JSError : JSObject, IJSError
     }
 
     public JSError(in Arguments a, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) :
-        this(JSContext.NewTargetPrototype)
+        this(JSEngine.NewTargetPrototype)
     {
         Exception = new JSException(this, function: function, filePath: filePath, line: line);
         var message = a[0]?.ToString() ?? "Internal Error";

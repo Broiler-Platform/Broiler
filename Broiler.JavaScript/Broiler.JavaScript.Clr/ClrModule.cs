@@ -36,7 +36,7 @@ public static class ClrModule
         var a1 = a.Get1();
         
         if (!a1.BooleanValue)
-            throw JSContext.NewTypeError("First parameter should be non empty string");
+            throw JSEngine.NewTypeError("First parameter should be non empty string");
         
         var name = a1.ToString();
         return ClrType.From(Type.GetType(name));
@@ -55,6 +55,6 @@ public static class ClrModule
         if (a1.ConvertTo(typeof(DateTimeOffset), out var dto))
             return ClrProxy.From((DateTimeOffset)dto);
 
-        throw JSContext.NewTypeError($"Not a Date");
+        throw JSEngine.NewTypeError($"Not a Date");
     }
 }

@@ -15,7 +15,7 @@ partial class FastCompiler
         if (name != null)
         {
             var target = LoopScope.Get(name);
-            return target == null ? throw JSContext.NewSyntaxError($"No label found for {name}") : YExpression.Break(target.Break);
+            return target == null ? throw JSEngine.NewSyntaxError($"No label found for {name}") : YExpression.Break(target.Break);
         }
 
         if (ls.IsSwitch)

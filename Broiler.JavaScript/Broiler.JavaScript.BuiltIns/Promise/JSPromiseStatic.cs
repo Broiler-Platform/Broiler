@@ -43,7 +43,7 @@ public partial class JSPromise
     {
         var callbackfn = a.Get1();
         if (!callbackfn.IsFunction)
-            throw JSContext.NewTypeError("Promise.try requires a callable argument");
+            throw JSEngine.NewTypeError("Promise.try requires a callable argument");
 
         try
         {
@@ -77,7 +77,7 @@ public partial class JSPromise
     {
         var reason = a.Get1();
         if (reason.IsNullOrUndefined)
-            throw JSContext.NewTypeError($"Failure reason must be provided for rejected promise");
+            throw JSEngine.NewTypeError($"Failure reason must be provided for rejected promise");
 
         return new JSPromise(reason, PromiseState.Rejected);
     }
@@ -93,7 +93,7 @@ public partial class JSPromise
 
         return new JSPromise((resolve, reject) =>
         {
-            var sc = JSContext.Current.synchronizationContext ?? throw JSContext.NewTypeError($"Cannot use promise without Synchronization Context");
+            var sc = (JSEngine.Current as JSContext).synchronizationContext ?? throw JSEngine.NewTypeError($"Cannot use promise without Synchronization Context");
             uint total = 0;
 
             bool empty = true;
@@ -103,7 +103,7 @@ public partial class JSPromise
                 empty = false;
 
                 if (e is not JSPromise p)
-                    throw JSContext.NewTypeError($"All parameters must be Promise");
+                    throw JSEngine.NewTypeError($"All parameters must be Promise");
 
                 var item = e;
                 var ni = i++;

@@ -20,7 +20,7 @@ static class JSDecimalExtensions
 [JSFunctionGenerator("Decimal")]
 public partial class JSDecimal : JSPrimitive
 {
-    public static JSException CannotMix() => JSContext.NewTypeError("Cannot mix BigInt and other types, use explicit conversions");
+    public static JSException CannotMix() => JSEngine.NewTypeError("Cannot mix BigInt and other types, use explicit conversions");
 
     internal readonly decimal value;
 
@@ -51,7 +51,7 @@ public partial class JSDecimal : JSPrimitive
         text = text.TrimEnd('m').Replace("_", "");
 
         if (!decimal.TryParse(text, out var v))
-            throw JSContext.NewTypeError($"{f} is not a valid big integer");
+            throw JSEngine.NewTypeError($"{f} is not a valid big integer");
 
         return new JSDecimal(v);
     }
@@ -62,7 +62,7 @@ public partial class JSDecimal : JSPrimitive
         var v = stringValue.TrimEnd('m').Replace("_", "");
 
         if (!decimal.TryParse(v, out var n))
-            throw JSContext.NewTypeError($"{stringValue} is not a valid big integer");
+            throw JSEngine.NewTypeError($"{stringValue} is not a valid big integer");
 
         value = n;
     }
@@ -107,7 +107,7 @@ public partial class JSDecimal : JSPrimitive
     public override bool EqualsLiteral(string value) => this.value.ToString() == value;
     public override bool EqualsLiteral(double value) => (double)this.value == value;
     public override JSValue TypeOf() => JSConstants.Decimal;
-    protected override JSValue GetPrototype() => (JSContext.Current[Names.Decimal] as JSFunction).prototype;
+    protected override JSValue GetPrototype() => ((JSEngine.Current as JSObject)[Names.Decimal] as JSFunction).prototype;
     internal override PropertyKey ToKey(bool create = true) => (uint)value;
 
     public override bool ConvertTo(Type type, out object value)
@@ -197,7 +197,7 @@ public partial class JSDecimal : JSPrimitive
         if (a.Get1() is JSNumber n1)
         {
             if (double.IsNaN(n1.value) || n1.value > 20 || n1.value < 0)
-                throw JSContext.NewRangeError("toFixed() digits argument must be between 0 and 100");
+                throw JSEngine.NewRangeError("toFixed() digits argument must be between 0 and 100");
 
             var i = (int)n1.value;
             if (nv > 999999999999999.0m && i <= 15)

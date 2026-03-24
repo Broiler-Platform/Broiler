@@ -67,12 +67,12 @@ public partial class JSArray
         var (items, mapFn, thisArg) = a.Get3();
 
         if (items.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         bool hasMap = mapFn.IsFunction;
 
         if (!mapFn.IsNullOrUndefined && !hasMap)
-            throw JSContext.NewTypeError("mapFn must be a function");
+            throw JSEngine.NewTypeError("mapFn must be a function");
 
         try
         {

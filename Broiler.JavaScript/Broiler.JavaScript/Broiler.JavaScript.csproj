@@ -44,6 +44,7 @@
     <ProjectReference Include="..\Broiler.JavaScript.ExpressionCompiler\Broiler.JavaScript.ExpressionCompiler.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Modules\Broiler.JavaScript.Modules.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Network\Broiler.JavaScript.Network.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.Engine\Broiler.JavaScript.Engine.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="..\modules\inbuilt\**\*">

@@ -81,7 +81,7 @@ partial class JSTypedArray
 
         var (first, thisArg) = a.Get2();
         if (first is not JSFunction fn)
-            throw JSContext.NewTypeError($"First argument is not function");
+            throw JSEngine.NewTypeError($"First argument is not function");
         var en = GetElementEnumerator();
         while (en.MoveNext(out var hasValue, out var item, out var index))
         {
@@ -117,7 +117,7 @@ partial class JSTypedArray
         var (callback, thisArg) = a.Get2();
 
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.filter");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.filter");
         var r = new JSArray();
         var en = GetElementEnumerator();
         while (en.MoveNext(out var hasValue, out var item, out var index))
@@ -139,7 +139,7 @@ partial class JSTypedArray
         var (callback, thisArg) = a.Get2();
 
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.filter");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.filter");
 
         var en = GetElementEnumerator();
         while (en.MoveNext(out var hasValue, out var item, out var index))
@@ -162,7 +162,7 @@ partial class JSTypedArray
 
         var (callback, thisArg) = a.Get2();
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.find");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.find");
         var en = GetElementEnumerator();
         while (en.MoveNext(out var hasValue, out var item, out var n))
         {
@@ -185,7 +185,7 @@ partial class JSTypedArray
     {
         var (callback, thisArg) = a.Get2();
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.find");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.find");
         var en = GetElementEnumerator();
         while (en.MoveNext(out var hasValue, out var item, out var index))
         {
@@ -319,7 +319,7 @@ partial class JSTypedArray
     {
         var (callback, thisArg) = a.Get2();
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.find");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.find");
         var r = new JSArray();
         ref var rElements = ref r.CreateElements();
         var en = GetElementEnumerator();
@@ -341,13 +341,13 @@ partial class JSTypedArray
     {
         var (callback, initialValue) = a.Get2();
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.reduce");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.reduce");
         var en = GetElementEnumerator();
         uint index = 0;
         if (a.Length == 1)
         {
             if (!en.MoveNext(out initialValue))
-                throw JSContext.NewTypeError($"No initial value provided and array is empty");
+                throw JSEngine.NewTypeError($"No initial value provided and array is empty");
         }
         while (en.MoveNext(out var hasValue, out var item, out index))
         {
@@ -366,12 +366,12 @@ partial class JSTypedArray
 
         var (callback, initialValue) = a.Get2();
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.reduce");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.reduce");
         var start = Length - 1;
         if (a.Length == 1)
         {
             if (Length == 0)
-                throw JSContext.NewTypeError($"No initial value provided and array is empty");
+                throw JSEngine.NewTypeError($"No initial value provided and array is empty");
             initialValue = this[(uint)start];
             start--;
         }
@@ -416,10 +416,10 @@ partial class JSTypedArray
 
         var relativeStart = offset.AsInt32OrDefault();
         if (relativeStart < 0)
-            throw JSContext.NewRangeError("Offset is out of bounds");
+            throw JSEngine.NewRangeError("Offset is out of bounds");
         var targetArrayLength = source.Length + relativeStart;
         if (targetArrayLength > length)
-            throw JSContext.NewRangeError("Offset is out of bounds");
+            throw JSEngine.NewRangeError("Offset is out of bounds");
         if (source is JSTypedArray typedArray)
         {
             var src = typedArray.buffer.buffer;
@@ -497,7 +497,7 @@ partial class JSTypedArray
     {
         var (callback, thisArg) = a.Get2();
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"First argument is not function");
+            throw JSEngine.NewTypeError($"First argument is not function");
         var en = GetElementEnumerator();
         while (en.MoveNext(out var hasValue, out var item, out var index))
         {
@@ -527,7 +527,7 @@ partial class JSTypedArray
         else
         {
             if (!fx.IsUndefined)
-                throw JSContext.NewTypeError($"Argument is not a function");
+                throw JSEngine.NewTypeError($"Argument is not a function");
             cx = (l, r) =>
             {
                 var x = l.DoubleValue;
@@ -601,7 +601,7 @@ partial class JSTypedArray
         }
 
         string strFormat = format.IsNullOrUndefined ? def : (format.IsString ? format.ToString() :
-            throw JSContext.NewTypeError("Options not supported, use .Net String Formats")
+            throw JSEngine.NewTypeError("Options not supported, use .Net String Formats")
             );
 
         CultureInfo culture = locale.IsNullOrUndefined ? CultureInfo.CurrentCulture : CultureInfo.GetCultureInfo(locale.ToString());

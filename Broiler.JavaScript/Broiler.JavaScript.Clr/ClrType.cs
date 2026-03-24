@@ -35,7 +35,7 @@ public class ClrType : JSFunction
         if (type.BaseType != null && type.BaseType != typeof(object))
             baseType = From(type.BaseType);
 
-        var nc = JSContext.Current.ClrMemberNamingConvention;
+        var nc = (JSEngine.Current as JSContext)?.ClrMemberNamingConvention ?? ClrMemberNamingConvention.CamelCase;
         var key = ConcurrentTypeCache.GetOrCreate(type, nc.Name);
 
         return cachedTypes.GetOrCreate(key, () => new ClrType(nc, type, baseType));
@@ -359,7 +359,7 @@ public class ClrType : JSFunction
     {
         var a1 = a.Get1();
         if (a1.IsNullOrUndefined)
-            throw JSContext.NewTypeError($"Name is required");
+            throw JSEngine.NewTypeError($"Name is required");
 
         var name = a1.ToString();
         MethodInfo method;

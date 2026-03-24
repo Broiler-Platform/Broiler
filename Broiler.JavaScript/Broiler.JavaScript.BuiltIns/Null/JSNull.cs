@@ -32,9 +32,9 @@ public sealed class JSNull : JSValue
 
     public override bool Equals(object obj) => obj is JSNull;
 
-    public override JSValue Delete(in KeyString key) => throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+    public override JSValue Delete(in KeyString key) => throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
-    public override JSValue Delete(uint key) => throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+    public override JSValue Delete(uint key) => throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
     public override JSValue this[KeyString name]
     {
@@ -45,21 +45,21 @@ public sealed class JSNull : JSValue
             Console.Error.WriteLine($"[JSNull] Cannot get property {name} of null");
             Console.Error.WriteLine(st.ToString());
 #endif
-            throw JSContext.NewTypeError($"Cannot get property {name} of null");
+            throw JSEngine.NewTypeError($"Cannot get property {name} of null");
         }
-        set => throw JSContext.NewTypeError($"Cannot set property {name} of null");
+        set => throw JSEngine.NewTypeError($"Cannot set property {name} of null");
     }
 
     public override JSValue this[uint key]
     {
-        get => throw JSContext.NewTypeError($"Cannot get property {key} of null");
-        set => throw JSContext.NewTypeError($"Cannot get property {key} of null");
+        get => throw JSEngine.NewTypeError($"Cannot get property {key} of null");
+        set => throw JSEngine.NewTypeError($"Cannot get property {key} of null");
     }
 
-    internal override JSFunctionDelegate GetMethod(in KeyString key) => throw JSContext.NewTypeError($"Cannot get property {key} of null");
+    internal override JSFunctionDelegate GetMethod(in KeyString key) => throw JSEngine.NewTypeError($"Cannot get property {key} of null");
 
 
-    public override IElementEnumerator GetElementEnumerator() => throw JSContext.NewTypeError("null is not iterable");
+    public override IElementEnumerator GetElementEnumerator() => throw JSEngine.NewTypeError("null is not iterable");
 
 
     public override int GetHashCode() => 0;
@@ -77,7 +77,7 @@ public sealed class JSNull : JSValue
 
     public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
-    public override JSValue CreateInstance(in Arguments a) => throw JSContext.NewTypeError("cannot create instance of null");
+    public override JSValue CreateInstance(in Arguments a) => throw JSEngine.NewTypeError("cannot create instance of null");
 
     public override JSValue InvokeFunction(in Arguments a) => throw new NotImplementedException("null is not a function");
 

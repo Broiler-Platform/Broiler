@@ -122,7 +122,7 @@ public partial class JSArray
         var def = "N0";
 
         string strFormat = format.IsNullOrUndefined ? def : (format.IsString ? format.ToString() :
-            throw JSContext.NewTypeError("Options not supported, use .Net String Formats")
+            throw JSEngine.NewTypeError("Options not supported, use .Net String Formats")
             );
 
         CultureInfo culture = locale.IsNullOrUndefined ? CultureInfo.CurrentCulture : CultureInfo.GetCultureInfo(locale.ToString());

@@ -38,7 +38,7 @@ public abstract class JSPrimitive: JSValue
             var px = prototypeChain.GetInternalProperty(symbol);
             if (px.IsEmpty)
             {
-                // throw JSContext.Current.NewTypeError($"{name} property not found on {this.GetType().Name}:{this}");
+                // throw JSEngine.Current.NewTypeError($"{name} property not found on {this.GetType().Name}:{this}");
                 return UndefinedValue;
             }
             return this.GetValue(px);
@@ -56,7 +56,7 @@ public abstract class JSPrimitive: JSValue
             var px = prototypeChain.GetInternalProperty(name);
             if (px.IsEmpty)
             {
-                // throw JSContext.Current.NewTypeError($"{name} property not found on {this.GetType().Name}:{this}");
+                // throw JSEngine.Current.NewTypeError($"{name} property not found on {this.GetType().Name}:{this}");
                 return UndefinedValue;
             }
             return this.GetValue(px);
