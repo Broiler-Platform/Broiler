@@ -33,8 +33,8 @@ public class JSModuleContext : JSContext
         Module = JSModule.CreateClass(this, false); // this.Create<JSModule>(KeyStrings.Module, null, false);
         ModulePrototype = Module.prototype;
 
-        if (enableClrIntegration && ClrModuleProvider != null)
-            moduleCache[ModuleCache.clr] = new JSModule(this, ClrModuleProvider(), "clr");
+        if (enableClrIntegration && JSEngine.ClrModuleProvider != null)
+            moduleCache[ModuleCache.clr] = new JSModule(this, JSEngine.ClrModuleProvider(), "clr");
 
         moduleCache[ModuleCache.module] = new JSModule(this, Module, "module");
 
@@ -233,7 +233,7 @@ public class JSModuleContext : JSContext
                 throw NewTypeError("import method's parameter must be a string");
 
             var result = LoadModuleAsync(dirPath, name.StringValue);
-            return ClrInterop.Marshal(result);
+            return JSEngine.ClrInterop.Marshal(result);
         });
 
         newModule.Require = new JSFunction((in Arguments a) =>
@@ -249,7 +249,7 @@ public class JSModuleContext : JSContext
         newModule.Compile = new JSFunction((in Arguments a) =>
         {
             var task = CompileModuleAsync(newModule);
-            return ClrInterop.Marshal(task);
+            return JSEngine.ClrInterop.Marshal(task);
         });
 
         await newModule.InitAsync();
@@ -307,7 +307,7 @@ public class JSModuleContext : JSContext
                     throw NewTypeError("import method's parameter must be a string");
 
                 var result = LoadModuleAsync(dirPath, name.StringValue);
-                return ClrInterop.Marshal(result);
+                return JSEngine.ClrInterop.Marshal(result);
             });
 
             newModule.Require = new JSFunction((in Arguments a) =>
@@ -323,7 +323,7 @@ public class JSModuleContext : JSContext
             newModule.Compile = new JSFunction((in Arguments a) =>
             {
                 var task = CompileModuleAsync(newModule);
-                return ClrInterop.Marshal(task);
+                return JSEngine.ClrInterop.Marshal(task);
             });
 
             return newModule;

@@ -31,7 +31,7 @@ public partial class JSIteratorObject : JSObject
     // Constructors
     // ---------------------------------------------------------------
 
-    public JSIteratorObject(in Arguments a) : this(JSContext.NewTargetPrototype) => throw JSContext.NewTypeError("Iterator is not intended to be called as a constructor");
+    public JSIteratorObject(in Arguments a) : this(JSEngine.NewTargetPrototype) => throw JSEngine.NewTypeError("Iterator is not intended to be called as a constructor");
 
     internal JSIteratorObject(IElementEnumerator enumerator) : this() => _enumerator = enumerator;
 
@@ -74,7 +74,7 @@ public partial class JSIteratorObject : JSObject
         var obj = a.Get1();
 
         if (obj.IsNullOrUndefined)
-            throw JSContext.NewTypeError("Iterator.from requires an iterable or iterator argument");
+            throw JSEngine.NewTypeError("Iterator.from requires an iterable or iterator argument");
 
         if (obj is JSIteratorObject)
             return obj;
@@ -94,7 +94,7 @@ public partial class JSIteratorObject : JSObject
             var item = a.GetAt(i);
 
             if (item.IsNullOrUndefined)
-                throw JSContext.NewTypeError("Iterator.concat requires iterable arguments");
+                throw JSEngine.NewTypeError("Iterator.concat requires iterable arguments");
 
             iterables[i] = item;
         }
@@ -120,7 +120,7 @@ public partial class JSIteratorObject : JSObject
         var fn = a.Get1();
 
         if (!fn.IsFunction)
-            throw JSContext.NewTypeError("Iterator.prototype.map requires a callable argument");
+            throw JSEngine.NewTypeError("Iterator.prototype.map requires a callable argument");
 
         return new JSIteratorObject(new MapEnumerator(EnumeratorFrom(a.This), fn));
     }
@@ -130,7 +130,7 @@ public partial class JSIteratorObject : JSObject
         var fn = a.Get1();
 
         if (!fn.IsFunction)
-            throw JSContext.NewTypeError("Iterator.prototype.filter requires a callable argument");
+            throw JSEngine.NewTypeError("Iterator.prototype.filter requires a callable argument");
 
         return new JSIteratorObject(new FilterEnumerator(EnumeratorFrom(a.This), fn));
     }
@@ -140,7 +140,7 @@ public partial class JSIteratorObject : JSObject
         var n = a.Get1().DoubleValue;
 
         if (double.IsNaN(n) || n < 0)
-            throw JSContext.NewRangeError("Iterator.prototype.take requires a non-negative number");
+            throw JSEngine.NewRangeError("Iterator.prototype.take requires a non-negative number");
 
         return new JSIteratorObject(new TakeEnumerator(EnumeratorFrom(a.This), (int)n));
     }
@@ -150,7 +150,7 @@ public partial class JSIteratorObject : JSObject
         var n = a.Get1().DoubleValue;
 
         if (double.IsNaN(n) || n < 0)
-            throw JSContext.NewRangeError("Iterator.prototype.drop requires a non-negative number");
+            throw JSEngine.NewRangeError("Iterator.prototype.drop requires a non-negative number");
 
         return new JSIteratorObject(new DropEnumerator(EnumeratorFrom(a.This), (int)n));
     }
@@ -160,7 +160,7 @@ public partial class JSIteratorObject : JSObject
         var fn = a.Get1();
 
         if (!fn.IsFunction)
-            throw JSContext.NewTypeError("Iterator.prototype.flatMap requires a callable argument");
+            throw JSEngine.NewTypeError("Iterator.prototype.flatMap requires a callable argument");
 
         return new JSIteratorObject(new FlatMapEnumerator(EnumeratorFrom(a.This), fn));
     }
@@ -170,7 +170,7 @@ public partial class JSIteratorObject : JSObject
         var (fn, initialValue) = a.Get2();
 
         if (!fn.IsFunction)
-            throw JSContext.NewTypeError("Iterator.prototype.reduce requires a callable argument");
+            throw JSEngine.NewTypeError("Iterator.prototype.reduce requires a callable argument");
 
         var en = EnumeratorFrom(a.This);
         JSValue accumulator;
@@ -182,7 +182,7 @@ public partial class JSIteratorObject : JSObject
         else
         {
             if (!en.MoveNext(out var first))
-                throw JSContext.NewTypeError("Reduce of empty iterator with no initial value");
+                throw JSEngine.NewTypeError("Reduce of empty iterator with no initial value");
 
             accumulator = first;
         }
@@ -208,7 +208,7 @@ public partial class JSIteratorObject : JSObject
     {
         var fn = a.Get1();
         if (!fn.IsFunction)
-            throw JSContext.NewTypeError("Iterator.prototype.forEach requires a callable argument");
+            throw JSEngine.NewTypeError("Iterator.prototype.forEach requires a callable argument");
 
         var en = EnumeratorFrom(a.This);
         while (en.MoveNext(out var value))
@@ -221,7 +221,7 @@ public partial class JSIteratorObject : JSObject
     {
         var fn = a.Get1();
         if (!fn.IsFunction)
-            throw JSContext.NewTypeError("Iterator.prototype.some requires a callable argument");
+            throw JSEngine.NewTypeError("Iterator.prototype.some requires a callable argument");
 
         var en = EnumeratorFrom(a.This);
         while (en.MoveNext(out var value))
@@ -237,7 +237,7 @@ public partial class JSIteratorObject : JSObject
     {
         var fn = a.Get1();
         if (!fn.IsFunction)
-            throw JSContext.NewTypeError("Iterator.prototype.every requires a callable argument");
+            throw JSEngine.NewTypeError("Iterator.prototype.every requires a callable argument");
 
         var en = EnumeratorFrom(a.This);
 
@@ -254,7 +254,7 @@ public partial class JSIteratorObject : JSObject
     {
         var fn = a.Get1();
         if (!fn.IsFunction)
-            throw JSContext.NewTypeError("Iterator.prototype.find requires a callable argument");
+            throw JSEngine.NewTypeError("Iterator.prototype.find requires a callable argument");
 
         var en = EnumeratorFrom(a.This);
         while (en.MoveNext(out var value))

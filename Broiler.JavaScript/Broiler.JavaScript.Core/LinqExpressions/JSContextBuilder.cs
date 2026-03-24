@@ -1,4 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LambdaGen;
 using System;
 using System.Reflection;
@@ -27,15 +27,14 @@ public class JSContextStackBuilder
 
 public class JSContextBuilder
 {
-    private static Type type = typeof(JSContext);
+    private static readonly FieldInfo _CurrentField = typeof(JSEngine).GetField(nameof(JSEngine.Current));
+    public static Expression Current = Expression.Field(null, _CurrentField);
+    public static Expression Object = Current.PropertyExpression<IJSExecutionContext, JSValue>(() => (x) => x.Object);
 
-    public static Expression Current = NewLambdaExpression.StaticFieldExpression<JSContext>(() => () => JSContext.Current);
-    public static Expression Object = Current.FieldExpression<JSContext, JSValue>(() => (x) => x.Object);
+    private static PropertyInfo _Index = typeof(JSObject).IndexProperty(typeof(KeyString));
+    public static Expression Index(Expression key) => Expression.MakeIndex(Expression.Convert(Current, typeof(JSObject)), _Index, [key]);
 
-    private static PropertyInfo _Index = type.IndexProperty(typeof(KeyString));
-    public static Expression Index(Expression key) => Expression.MakeIndex(Current, _Index, [key]);
+    public static Expression NewTarget() => Current.PropertyExpression<IJSExecutionContext, CallStackItem>(() => (x) => x.Top).FieldExpression<CallStackItem, JSValue>(() => (x) => x.NewTarget);
 
-    public static Expression NewTarget() => Current.FieldExpression<JSContext, CallStackItem>(() => (x) => x.Top).FieldExpression<CallStackItem, JSValue>(() => (x) => x.NewTarget);
-
-    public static Expression Register(ParameterExpression lScope, ParameterExpression variable) => lScope.CallExpression<JSContext, JSVariable, JSValue>(() => (x, a) => x.Register(a), variable);
+    public static Expression Register(ParameterExpression lScope, ParameterExpression variable) => lScope.CallExpression<IJSExecutionContext, JSVariable, JSValue>(() => (x, a) => x.Register(a), variable);
 }

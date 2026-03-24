@@ -110,7 +110,7 @@ public class M8ValidationTests
         Assert.NotNull(JSValue.CreateBigInt(0));
 
         // From ClrAssemblyInitializer:
-        Assert.NotNull(JSContext.ClrInterop);
+        Assert.NotNull(JSEngine.ClrInterop);
     }
 
     [Fact]

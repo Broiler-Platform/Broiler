@@ -64,7 +64,7 @@ namespace YantraJS.Network
         }
 
 
-        public KeyValueStore(in Arguments a) : this(a[0], JSContext.NewTargetPrototype) { }
+        public KeyValueStore(in Arguments a) : this(a[0], JSEngine.NewTargetPrototype) { }
 
         public IEnumerable<KeyValuePair<string, string>> GetEnumerable()
         {

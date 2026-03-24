@@ -52,7 +52,7 @@ public class IntegrationTests
     {
         using var ctx = new JSContext();
         // CLR interop should be functional after registration
-        Assert.NotNull(JSContext.Current);
+        Assert.NotNull(JSEngine.Current);
     }
 
     [Fact]

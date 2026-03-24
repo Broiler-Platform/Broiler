@@ -48,7 +48,7 @@ public class JSDisposableStack : IJSDisposableStack, IDisposable, IAsyncDisposab
             var (v, a) = stack.Pop();
 
             if (a)
-                throw JSContext.NewTypeError("Async resource must not be disposed synchronously.");
+                throw JSEngine.NewTypeError("Async resource must not be disposed synchronously.");
 
             try
             {

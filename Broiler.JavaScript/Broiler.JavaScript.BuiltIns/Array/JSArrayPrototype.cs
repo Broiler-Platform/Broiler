@@ -21,7 +21,7 @@ public partial class JSArray
         {
             double val = arg.DoubleValue;
             if (double.IsNaN(val) || val < 0 || val > uint.MaxValue || Math.Floor(val) != val)
-                throw JSContext.NewRangeError($"Invalid array length");
+                throw JSEngine.NewRangeError($"Invalid array length");
             return new JSArray((uint)arg.DoubleValue);
         }
 

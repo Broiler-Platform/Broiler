@@ -37,7 +37,7 @@ public static class JSPromiseExtensions
         if (typeof(T) == typeof(JSValue))
             return (JSValue)result;
 
-        return JSContext.ClrInterop.Marshal(result);
+        return JSEngine.ClrInterop.Marshal(result);
     }
 
     [EditorBrowsable(EditorBrowsableState.Never)]

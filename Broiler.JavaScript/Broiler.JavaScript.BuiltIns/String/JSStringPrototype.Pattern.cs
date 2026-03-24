@@ -16,7 +16,7 @@ public partial class JSString
     {
         var @this = a.This;
         if (@this.IsNullOrUndefined)
-            throw JSContext.NewTypeError("String.prototype.match called on null or undefined");
+            throw JSEngine.NewTypeError("String.prototype.match called on null or undefined");
         
         var reg = a.Get1();
         if (reg is JSRegExp jSRegExp)

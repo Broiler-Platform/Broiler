@@ -10,7 +10,7 @@ namespace Broiler.JavaScript.Modules;
 
 public class JSArguments: JSObject
 {
-    public static JSValue Callee(in Arguments a) => throw JSContext.NewTypeError($"Cannot access callee in strict mode");
+    public static JSValue Callee(in Arguments a) => throw JSEngine.NewTypeError($"Cannot access callee in strict mode");
 
     public new JSValue Values(in Arguments a) => JSGeneratorBuilder.CreateFromEnumerator(GetElementEnumerator(), "Arguments");
 

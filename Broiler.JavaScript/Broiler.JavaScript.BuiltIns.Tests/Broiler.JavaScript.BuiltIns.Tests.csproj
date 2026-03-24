@@ -20,6 +20,7 @@
     <ProjectReference Include="..\Broiler.JavaScript.Clr\Broiler.JavaScript.Clr.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Globals\Broiler.JavaScript.Globals.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Extensions\Broiler.JavaScript.Extensions.csproj" />
+    <ProjectReference Include="..\Broiler.JavaScript.Engine\Broiler.JavaScript.Engine.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

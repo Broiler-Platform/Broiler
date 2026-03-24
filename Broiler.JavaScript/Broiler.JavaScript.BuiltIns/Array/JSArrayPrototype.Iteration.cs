@@ -22,7 +22,7 @@ public partial class JSArray
         var (first, thisArg) = a.Get2();
 
         if (first is not JSFunction fn)
-            throw JSContext.NewTypeError($"First argument is not function");
+            throw JSEngine.NewTypeError($"First argument is not function");
         
         var en = array.GetElementEnumerator();
         
@@ -53,7 +53,7 @@ public partial class JSArray
         var (callback, thisArg) = a.Get2();
 
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.filter");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.filter");
         
         var r = new JSArray();
         var en = @this.GetElementEnumerator();
@@ -77,7 +77,7 @@ public partial class JSArray
         var (callback, thisArg) = a.Get2();
 
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.find");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.find");
         
         var en = @this.GetElementEnumerator();
         
@@ -161,7 +161,7 @@ public partial class JSArray
         var (callback, thisArg) = a.Get2();
 
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.find");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.find");
 
         var en = @this.GetElementEnumerator();
 
@@ -189,7 +189,7 @@ public partial class JSArray
         var (callback, thisArg) = a.Get2();
 
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.find");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.find");
 
         var en = @this.GetElementEnumerator();
 
@@ -221,12 +221,12 @@ public partial class JSArray
     public static JSValue Map(in Arguments a)
     {
         if (a.This is not JSObject @this)
-            throw JSContext.NewTypeError($"{a.This} is not an object or an array");
+            throw JSEngine.NewTypeError($"{a.This} is not an object or an array");
 
         var callback = a.Get1();
 
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.find");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.find");
 
         ref var te = ref @this.GetElements();
         var r = new JSArray();
@@ -260,7 +260,7 @@ public partial class JSArray
         var (callback, initialValue) = a.Get2();
 
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.reduce");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.reduce");
 
         var en = @this.GetElementEnumerator();
         uint index = 0;
@@ -268,7 +268,7 @@ public partial class JSArray
         if (a.Length == 1)
         {
             if (!en.MoveNext(out initialValue))
-                throw JSContext.NewTypeError($"No initial value provided and array is empty");
+                throw JSEngine.NewTypeError($"No initial value provided and array is empty");
         }
 
         while (en.MoveNext(out var hasValue, out var item, out index))
@@ -292,14 +292,14 @@ public partial class JSArray
         var (callback, initialValue) = a.Get2();
 
         if (callback is not JSFunction fn)
-            throw JSContext.NewTypeError($"{callback} is not a function in Array.prototype.reduce");
+            throw JSEngine.NewTypeError($"{callback} is not a function in Array.prototype.reduce");
 
         var start = @this.Length - 1;
 
         if (a.Length == 1)
         {
             if (@this.Length == 0)
-                throw JSContext.NewTypeError($"No initial value provided and array is empty");
+                throw JSEngine.NewTypeError($"No initial value provided and array is empty");
 
             initialValue = @this[(uint)start];
             start--;
@@ -323,7 +323,7 @@ public partial class JSArray
         var (first, thisArg) = a.Get2();
 
         if (first is not JSFunction fn)
-            throw JSContext.NewTypeError($"First argument is not function");
+            throw JSEngine.NewTypeError($"First argument is not function");
 
         var en = array.GetElementEnumerator();
 

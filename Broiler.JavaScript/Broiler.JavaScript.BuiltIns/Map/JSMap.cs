@@ -20,7 +20,7 @@ public partial class JSMap : JSObject
     [JSExport]
     public int Size => store.Count;
 
-    public JSMap(in Arguments a) : base(JSContext.NewTargetPrototype)
+    public JSMap(in Arguments a) : base(JSEngine.NewTargetPrototype)
     {
         if (a[0] is not JSArray array)
             return;
@@ -35,10 +35,10 @@ public partial class JSMap : JSObject
     {
         var (items, callbackfn) = a.Get2();
         if (items.IsNullOrUndefined)
-            throw JSContext.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
+            throw JSEngine.NewTypeError(JSException.Cannot_convert_undefined_or_null_to_object);
 
         if (!callbackfn.IsFunction)
-            throw JSContext.NewTypeError("CallbackFn must be a function");
+            throw JSEngine.NewTypeError("CallbackFn must be a function");
 
         var result = new JSMap(Arguments.Empty);
         var en = items.GetElementEnumerator();
@@ -126,7 +126,7 @@ public partial class JSMap : JSObject
     {
         var fx = a.Get1();
         if (!fx.IsFunction)
-            throw JSContext.NewTypeError($"Function parameter expected");
+            throw JSEngine.NewTypeError($"Function parameter expected");
 
         var @this = a.This ?? this;
         if (store == null)
@@ -211,7 +211,7 @@ public partial class JSMap : JSObject
     {
         var (key, callbackfn) = a.Get2();
         if (!callbackfn.IsFunction)
-            throw JSContext.NewTypeError("getOrInsertComputed requires a callback function");
+            throw JSEngine.NewTypeError("getOrInsertComputed requires a callback function");
         
         HashedString uk = key.ToUniqueID();
         if (index.TryGetValue(in uk, out var i))

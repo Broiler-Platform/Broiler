@@ -14,7 +14,7 @@ internal static class JSDateStatic
     internal static JSDate AsJSDate(this JSValue v, [CallerMemberName] string helper = null)
     {
         if (v is not JSDate date)
-            throw JSContext.NewTypeError($"Date.prototype.{helper} called on non date");
+            throw JSEngine.NewTypeError($"Date.prototype.{helper} called on non date");
 
         return date;
     }

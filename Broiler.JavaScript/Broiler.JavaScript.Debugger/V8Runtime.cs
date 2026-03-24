@@ -73,7 +73,7 @@ public partial class V8Runtime(V8InspectorProtocol inspectorContext) : V8Protoco
                     list.Add(new V8PropertyDescriptor(KeyStrings.GetNameString(pt.key).Value, v, pt));
                 }
 
-                ref var p = ref JSContext.Current.ObjectPrototype.GetOwnProperties(false).GetValue(KeyStrings.__proto__.Key);
+                ref var p = ref JSEngine.Current.ObjectPrototype.GetOwnProperties(false).GetValue(KeyStrings.__proto__.Key);
                 list.Add(new V8PropertyDescriptor("__proto__", c, p));
             }
 
@@ -96,11 +96,11 @@ public partial class V8Runtime(V8InspectorProtocol inspectorContext) : V8Protoco
         {
 
             var fx = CoreScript.Compile(a.FunctionDeclaration, codeCache: c.CodeCache);
-            var previous = JSContext.Current;
+            var previous = JSEngine.Current;
 
             try
             {
-                JSContext.Current = c;
+                JSEngine.Current = c;
                 JSValue @this = a.ObjectId != null ? V8RemoteObject.From(a.ObjectId) : c;
                 var length = a.Arguments.Count;
                 var args = new JSValue[length];
@@ -113,7 +113,7 @@ public partial class V8Runtime(V8InspectorProtocol inspectorContext) : V8Protoco
             }
             finally
             {
-                JSContext.Current = previous;
+                JSEngine.Current = previous;
             }
         }
         catch (Exception ex)
@@ -155,17 +155,17 @@ public partial class V8Runtime(V8InspectorProtocol inspectorContext) : V8Protoco
         {
 
             var fx = CoreScript.Compile(a.Expression);
-            var previous = JSContext.Current;
+            var previous = JSEngine.Current;
 
             try
             {
-                JSContext.Current = c;
+                JSEngine.Current = c;
                 JSValue @this = c;
                 return fx(new Arguments(@this));
             }
             finally
             {
-                JSContext.Current = previous;
+                JSEngine.Current = previous;
             }
         }
         catch (Exception ex)
@@ -193,15 +193,15 @@ public partial class V8Runtime(V8InspectorProtocol inspectorContext) : V8Protoco
 
         try
         {
-            var prev = JSContext.Current;
+            var prev = JSEngine.Current;
             try
             {
-                JSContext.Current = c;
+                JSEngine.Current = c;
                 return script(Arguments.Empty);
             }
             finally
             {
-                JSContext.Current = prev;
+                JSEngine.Current = prev;
             }
         }
         catch (Exception ex)

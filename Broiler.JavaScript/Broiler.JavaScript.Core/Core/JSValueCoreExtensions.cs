@@ -15,13 +15,13 @@ internal static class JSValueCoreExtensions
     {
         JSValue.UndefinedValue = JSUndefined.Value;
 
-        JSValue.NewTypeError = msg => JSContext.NewTypeError(msg);
+        JSValue.NewTypeError = msg => JSEngine.NewTypeError(msg);
         JSValue.CreateDynamicMetaObject = (param, value) => new JSDynamicMetaData(param, value);
         JSValue.ForceConvertHelper = (jsValue, type, _) =>
         {
             var protoObj = (jsValue.prototypeChain as IJSPrototype)?.Object as JSObject;
             if (protoObj != null
-                && JSContext.ClrInterop.TryUnwrapClrObject(protoObj, out var clrObj))
+                && JSEngine.ClrInterop.TryUnwrapClrObject(protoObj, out var clrObj))
             {
                 if (((System.Type)type).IsAssignableFrom(clrObj.GetType()))
                     return clrObj;
@@ -39,6 +39,6 @@ internal static class JSValueCoreExtensions
         // Proactively load the BuiltIns assembly so that its ModuleInitializer
         // wires string/number/boolean factories (JSValue.CreateString, etc.)
         // before any user code runs—even without a JSContext being created.
-        JSContext.EnsureBuiltInsAssemblyLoaded();
+        JSEngine.EnsureBuiltInsAssemblyLoaded();
     }
 }

@@ -17,7 +17,7 @@ namespace YantraJS.Utils
                 if (a.TryGetAt(i, out var ai))
                 {
                     Console.Write(ai);
-                    JSContext.CurrentContext.ReportLog(ai);
+                    JSEngine.CurrentContext.ReportLog(ai);
                 }
             }
             Console.WriteLine();

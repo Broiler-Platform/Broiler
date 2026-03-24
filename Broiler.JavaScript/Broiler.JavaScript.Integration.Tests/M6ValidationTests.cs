@@ -131,8 +131,8 @@ public class M6ValidationTests
         EnsureAllAssembliesLoaded();
 
         // ClrAssemblyInitializer wires the full CLR interop implementation.
-        Assert.NotNull(JSContext.ClrInterop);
-        Assert.IsType<Broiler.JavaScript.Clr.DefaultClrInterop>(JSContext.ClrInterop);
+        Assert.NotNull(JSEngine.ClrInterop);
+        Assert.IsType<Broiler.JavaScript.Clr.DefaultClrInterop>(JSEngine.ClrInterop);
     }
 
     [Fact]

@@ -76,7 +76,7 @@ public static class DelegateHelper
         var fx = m.CreateDelegate<StaticDelegate<T>>();
         return (in Arguments a) =>
         {
-            var @this = a.This.ForceConvert(typeof(T)) as T ?? throw JSContext.NewTypeError($"this is not of type {typeof(T).Name}");
+            var @this = a.This.ForceConvert(typeof(T)) as T ?? throw JSEngine.NewTypeError($"this is not of type {typeof(T).Name}");
             return fx(@this, in a);
         };
     }

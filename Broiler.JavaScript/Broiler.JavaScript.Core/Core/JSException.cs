@@ -82,7 +82,7 @@ public class JSException : Exception
                 sb.AppendLine($"    at {f.target}:{f.file}:{f.line},{f.column}");
             }
 
-            var top = JSContext.Current.Top;
+            var top = JSEngine.Current.Top;
             while (top != null)
             {
                 // ref var top = ref walker.Current;
@@ -117,10 +117,10 @@ public class JSException : Exception
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue ThrowSyntaxError(string value) => throw JSContext.NewSyntaxError(value);
+    public static JSValue ThrowSyntaxError(string value) => throw JSEngine.NewSyntaxError(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSValue ThrowNotFunction(JSValue value) => throw JSContext.NewTypeError($"{value} is not a function");
+    internal static JSValue ThrowNotFunction(JSValue value) => throw JSEngine.NewTypeError($"{value} is not a function");
 
     public static JSException FromValue(JSValue value)
     {

@@ -97,12 +97,12 @@ public partial class JSArray : JSObject
         set
         {
             if (IsSealedOrFrozen())
-                throw JSContext.NewTypeError("Cannot modify property length");
+                throw JSEngine.NewTypeError("Cannot modify property length");
             var prev = _length;
             ref var elements = ref GetElements();
             double n = value;
             if (n < 0 || n > uint.MaxValue || double.IsNaN(n))
-                throw JSContext.NewRangeError("Invalid length");
+                throw JSEngine.NewRangeError("Invalid length");
             _length = (uint)n;
             if (prev > _length)
             {

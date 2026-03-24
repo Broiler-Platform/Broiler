@@ -24,7 +24,7 @@ public partial class JSString
             "NFD" => new JSString(@this.Normalize(NormalizationForm.FormD)),
             "NFKC" => new JSString(@this.Normalize(NormalizationForm.FormKC)),
             "NFKD" => new JSString(@this.Normalize(NormalizationForm.FormKD)),
-            _ => throw JSContext.NewRangeError($"The normalization form should be one of NFC, NFD, NFKC, NFKD."),
+            _ => throw JSEngine.NewRangeError($"The normalization form should be one of NFC, NFD, NFKC, NFKD."),
         };
     }
 
@@ -59,7 +59,7 @@ public partial class JSString
         var c = a[0]?.IntegerValue ?? int.MaxValue;
         
         if (c < 0 || c == int.MaxValue)
-            throw JSContext.NewRangeError($"Invalid count value");
+            throw JSEngine.NewRangeError($"Invalid count value");
         
         var result = new StringBuilder(c * @this.Length);
         for (var i = 0; i < c; i++)
@@ -83,7 +83,7 @@ public partial class JSString
         }
         catch (CultureNotFoundException)
         {
-            throw JSContext.NewRangeError($"Incorrect locale information provided");
+            throw JSEngine.NewRangeError($"Incorrect locale information provided");
         }
     }
 
@@ -101,7 +101,7 @@ public partial class JSString
         }
         catch (CultureNotFoundException)
         {
-            throw JSContext.NewRangeError($"Incorrect locale information provided");
+            throw JSEngine.NewRangeError($"Incorrect locale information provided");
         }
     }
 

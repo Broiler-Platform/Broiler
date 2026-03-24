@@ -16,12 +16,12 @@ public partial class JSArrayBuffer : JSObject
 
     public byte[] Buffer => buffer;
 
-    public JSArrayBuffer(in Arguments a) : this(JSContext.NewTargetPrototype)
+    public JSArrayBuffer(in Arguments a) : this(JSEngine.NewTargetPrototype)
     {
         int length = a.Get1().AsInt32OrDefault();
         if (length < 0 || length > JSNumber.MaxSafeInteger)
         {
-            throw JSContext.NewRangeError("Buffer length out of range");
+            throw JSEngine.NewRangeError("Buffer length out of range");
         }
         buffer = new byte[length];
     }
@@ -35,7 +35,7 @@ public partial class JSArrayBuffer : JSObject
 
     public override bool Equals(JSValue value) => ReferenceEquals(this, value);
 
-    public override JSValue InvokeFunction(in Arguments a) => throw JSContext.NewTypeError($"{this} is not a function");
+    public override JSValue InvokeFunction(in Arguments a) => throw JSEngine.NewTypeError($"{this} is not a function");
 
     public override bool StrictEquals(JSValue value) => ReferenceEquals(this, value);
 
@@ -49,7 +49,7 @@ public partial class JSArrayBuffer : JSObject
         get
         {
             if (isDetached)
-                throw JSContext.NewTypeError("Cannot access byteLength of a detached ArrayBuffer");
+                throw JSEngine.NewTypeError("Cannot access byteLength of a detached ArrayBuffer");
 
             return buffer.Length;
         }
@@ -70,14 +70,14 @@ public partial class JSArrayBuffer : JSObject
     internal JSValue Transfer(in Arguments a)
     {
         if (isDetached)
-            throw JSContext.NewTypeError("Cannot transfer a detached ArrayBuffer");
+            throw JSEngine.NewTypeError("Cannot transfer a detached ArrayBuffer");
 
         int newLength = a.Length > 0
             ? a.Get1().AsInt32OrDefault()
             : buffer.Length;
 
         if (newLength < 0)
-            throw JSContext.NewRangeError("Invalid ArrayBuffer length");
+            throw JSEngine.NewRangeError("Invalid ArrayBuffer length");
 
         var newBuffer = new byte[newLength];
         System.Array.Copy(buffer, newBuffer, Math.Min(buffer.Length, newLength));
@@ -110,7 +110,7 @@ public partial class JSArrayBuffer : JSObject
     internal JSValue Slice(in Arguments a)
     {
         if (isDetached)
-            throw JSContext.NewTypeError("Cannot slice a detached ArrayBuffer");
+            throw JSEngine.NewTypeError("Cannot slice a detached ArrayBuffer");
 
         int len = buffer.Length;
         var (beginVal, endVal) = a.Get2();

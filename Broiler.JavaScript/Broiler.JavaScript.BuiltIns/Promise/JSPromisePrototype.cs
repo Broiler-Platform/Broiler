@@ -14,12 +14,12 @@ public partial class JSPromise
         var (success, fail) = a.Get2();
 
         if (success is not JSFunction successFx)
-            throw JSContext.NewTypeError($"Parameter for then is not a function");
+            throw JSEngine.NewTypeError($"Parameter for then is not a function");
 
         if (!fail.IsUndefined)
         {
             if (fail is not JSFunction failFx)
-                throw JSContext.NewTypeError($"Parameter for then is not a function");
+                throw JSEngine.NewTypeError($"Parameter for then is not a function");
 
             return Then(successFx.f, failFx.f);
         }

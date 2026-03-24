@@ -63,7 +63,7 @@ internal class RegistrationGenerator(
         sb.AppendLine("}");
 
         // add registerall
-        sb.AppendLine("static private void RegisterAll(JSContext context) {");
+        sb.AppendLine("static private void RegisterAll(JSObject context) {");
 
         foreach(var type in gc.RegistrationOrder)
         {

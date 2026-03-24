@@ -41,12 +41,12 @@ internal class JSMethodGroup
     private JSValue Invoke(in Arguments a)
     {
         if (!a.This.ConvertTo(type, out var target))
-            throw JSContext.NewTypeError($"{type.Name}.prototype.{name} called with object not of type {type.Name}");
+            throw JSEngine.NewTypeError($"{type.Name}.prototype.{name} called with object not of type {type.Name}");
 
         try
         {
             var (method, args) = all.Match(a, name);
-            return JSContext.ClrInterop.Marshal(method.Invoke(target, args));
+            return JSEngine.ClrInterop.Marshal(method.Invoke(target, args));
         }
         catch (Exception ex)
         {
@@ -59,7 +59,7 @@ internal class JSMethodGroup
         try
         {
             var (method, args) = all.Match(a, name);
-            return JSContext.ClrInterop.Marshal(method.Invoke(null, args));
+            return JSEngine.ClrInterop.Marshal(method.Invoke(null, args));
         }
         catch (Exception ex)
         {

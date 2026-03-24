@@ -51,7 +51,7 @@ public partial class JSGlobalStatic
         var text = f.StringValue;
         string location = null;
 
-        JSContext.Current.DispatchEvalEvent(ref text, ref location);
+        JSEngine.Current.DispatchEvalEvent(ref text, ref location);
         return CoreScript.Evaluate(text, null);
     }
 
@@ -144,9 +144,9 @@ public partial class JSGlobalStatic
         var fx = a.Get1();
 
         if (fx is not JSFunction f)
-            throw JSContext.NewTypeError("Argument is not a function");
+            throw JSEngine.NewTypeError("Argument is not a function");
 
-        var c = JSContext.Current;
+        var c = JSEngine.Current as JSContext;
         SynchronizationContext.Current.Post((_1) =>
         {
             try
@@ -169,10 +169,10 @@ public partial class JSGlobalStatic
         var (fx, timeout) = a.Get2();
 
         if (fx is not JSFunction f)
-            throw JSContext.NewTypeError("Argument is not a function");
+            throw JSEngine.NewTypeError("Argument is not a function");
 
         var delay = timeout.IsUndefined ? 0 : timeout.IntValue;
-        var key = JSContext.Current.SetInterval(delay, f, a);
+        var key = (JSEngine.Current as JSContext).SetInterval(delay, f, a);
 
         return JSValue.CreateBigInt(key);
     }
@@ -181,19 +181,19 @@ public partial class JSGlobalStatic
     public static JSValue ClearInterval(in Arguments a)
     {
         var n = a.Get1().BigIntValue;
-        JSContext.Current.ClearInterval(n);
+        (JSEngine.Current as JSContext).ClearInterval(n);
         return JSUndefined.Value;
     }
 
     [JSExport("setTimeout", Length = 2)]
     public static JSValue SetTimeout(in Arguments a)
     {
-        var context = JSContext.Current;
+        var context = JSEngine.Current as JSContext;
         var (fx, timeout) = a.Get2();
-        var current = JSContext.Current;
+        var current = JSEngine.Current as JSContext;
 
         if (fx is not JSFunction f)
-            throw JSContext.NewTypeError("Argument is not a function");
+            throw JSEngine.NewTypeError("Argument is not a function");
 
         var delay = timeout.IsUndefined ? 0 : timeout.IntValue;
         var key = context.PostTimeout(delay, f, a);
@@ -205,7 +205,7 @@ public partial class JSGlobalStatic
     public static JSValue ClearTimeout(in Arguments a)
     {
         var n = a.Get1().BigIntValue;
-        var context = JSContext.Current;
+        var context = JSEngine.Current as JSContext;
 
         context.ClearTimeout(n);
         return JSUndefined.Value;
@@ -239,7 +239,7 @@ public partial class JSGlobalStatic
 
         // Functions cannot be cloned.
         if (value is JSFunction)
-            throw JSContext.NewTypeError("structuredClone: function values cannot be cloned");
+            throw JSEngine.NewTypeError("structuredClone: function values cannot be cloned");
 
         // Check for circular references.
         if (seen.TryGetValue(value, out var existing))

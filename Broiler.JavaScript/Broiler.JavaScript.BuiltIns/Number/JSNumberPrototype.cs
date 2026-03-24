@@ -20,7 +20,7 @@ internal static class JSNumberExtensions
             if (target is JSPrimitiveObject primitiveObject)
                 return primitiveObject.value.ToNumber();
 
-            throw JSContext.NewTypeError($"Number.prototype.{name} requires that 'this' be a Number");
+            throw JSEngine.NewTypeError($"Number.prototype.{name} requires that 'this' be a Number");
         }
 
         return n;
@@ -33,7 +33,7 @@ partial class JSNumber
     [JSExport(Length = 1, IsConstructor = true)]
     public static JSValue Constructor(in Arguments a)
     {
-        if (JSContext.Current.CurrentNewTarget == null)
+        if (JSEngine.Current.CurrentNewTarget == null)
         {
             if (a.Length == 0)
                 return Zero;
@@ -99,7 +99,7 @@ partial class JSNumber
         {
             radix = arg.IntValue;
             if (radix < 2 || radix > 36)
-                throw JSContext.NewRangeError("The radix must be between 2 and 36, inclusive.");
+                throw JSEngine.NewRangeError("The radix must be between 2 and 36, inclusive.");
 
             result = DecimalToBase(value, radix);
             return new JSString(result);
@@ -134,7 +134,7 @@ partial class JSNumber
                 var v = n1.value;
 
                 if (double.IsNaN(v) || v > 20 || v < 0)
-                    throw JSContext.NewRangeError("toExponential() digitis argument must be between 0 and 100");
+                    throw JSEngine.NewRangeError("toExponential() digitis argument must be between 0 and 100");
 
                 var m = (int)v;
                 if (m == 0)
@@ -172,7 +172,7 @@ partial class JSNumber
         if (a.Get1() is JSNumber n1)
         {
             if (double.IsNaN(n1.value) || n1.value > 20 || n1.value < 0)
-                throw JSContext.NewRangeError("toFixed() digitis argument must be between 0 and 100");
+                throw JSEngine.NewRangeError("toFixed() digitis argument must be between 0 and 100");
 
             var i = (int)n1.value;
 
@@ -203,7 +203,7 @@ partial class JSNumber
         if (a.Get1() is JSNumber n1)
         {
             if (double.IsNaN(n1.value) || n1.value > 21 || n1.value < 1)
-                throw JSContext.NewRangeError("toPrecision() digits argument must be between 0 and 100");
+                throw JSEngine.NewRangeError("toPrecision() digits argument must be between 0 and 100");
 
             var i = (int)n1.value;
             var originalPrecision = i;
@@ -316,7 +316,7 @@ partial class JSNumber
             }
             else
             {
-                throw JSContext.NewTypeError("Options not supported, use .Net String Formats");
+                throw JSEngine.NewTypeError("Options not supported, use .Net String Formats");
             }
         }
 

@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 using Broiler.JavaScript.ExpressionCompiler;
 
 namespace Broiler.JavaScript.Core.Core;
@@ -6,5 +6,5 @@ namespace Broiler.JavaScript.Core.Core;
 [JSRegistrationGenerator]
 internal static partial class Names
 {
-    public static void RegisterGeneratedClasses(this JSContext context) => RegisterAll(context);
+    public static void RegisterGeneratedClasses(this JSObject context) => RegisterAll(context);
 }

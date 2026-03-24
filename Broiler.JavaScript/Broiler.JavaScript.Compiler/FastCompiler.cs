@@ -142,7 +142,7 @@ public partial class FastCompiler : AstMapVisitor<YExpression>
         if (name != null)
         {
             var target = LoopScope.Get(name);
-            return target == null ? throw JSContext.NewSyntaxError($"No label found for {name}") : YExpression.Continue(target.Break);
+            return target == null ? throw JSEngine.NewSyntaxError($"No label found for {name}") : YExpression.Continue(target.Break);
         }
 
         return YExpression.Continue(scope.Top.Loop.Top.Continue);

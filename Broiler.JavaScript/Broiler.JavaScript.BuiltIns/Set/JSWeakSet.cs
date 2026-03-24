@@ -16,7 +16,7 @@ public partial class JSWeakSet : JSObject
 {
     private StringMap<WeakReference<WeakValue>> index;
 
-    public JSWeakSet(in Arguments a) : base(JSContext.NewTargetPrototype)
+    public JSWeakSet(in Arguments a) : base(JSEngine.NewTargetPrototype)
     {
         if (a[0] is JSArray array)
         {

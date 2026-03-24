@@ -126,7 +126,7 @@ public struct ClrObjectEnumerator<T>(IElementEnumerator en) : IEnumerator<T>
             if (c.ConvertTo(typeof(T), out var v))
                 Current = (T)v;
 
-            throw JSContext.NewTypeError($"Failed to convert {c} to type {typeof(T).Name}");
+            throw JSEngine.NewTypeError($"Failed to convert {c} to type {typeof(T).Name}");
         }
         return false;
     }
@@ -148,7 +148,7 @@ public struct EnumerableElementEnumerable(IEnumerator en) : IElementEnumerator
     {
         if (en.MoveNext())
         {
-            value = JSContext.ClrInterop.Marshal(en.Current);
+            value = JSEngine.ClrInterop.Marshal(en.Current);
             this.index = this.index == uint.MaxValue ? 0 : this.index + 1;
             index = this.index;
             hasValue = true;
@@ -165,7 +165,7 @@ public struct EnumerableElementEnumerable(IEnumerator en) : IElementEnumerator
     {
         if (en.MoveNext())
         {
-            value = JSContext.ClrInterop.Marshal(en.Current);
+            value = JSEngine.ClrInterop.Marshal(en.Current);
             index = index == uint.MaxValue ? 0 : index + 1;
             return true;
         }
@@ -178,7 +178,7 @@ public struct EnumerableElementEnumerable(IEnumerator en) : IElementEnumerator
     {
         if (en.MoveNext())
         {
-            value = JSContext.ClrInterop.Marshal(en.Current);
+            value = JSEngine.ClrInterop.Marshal(en.Current);
             index = index == uint.MaxValue ? 0 : index + 1;
             return true;
         }
@@ -192,7 +192,7 @@ public struct EnumerableElementEnumerable(IEnumerator en) : IElementEnumerator
         if (en.MoveNext())
         {
             index = index == uint.MaxValue ? 0 : index + 1;
-            return JSContext.ClrInterop.Marshal(en.Current);
+            return JSEngine.ClrInterop.Marshal(en.Current);
         }
 
         return @default;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Broiler.JavaScript.Core.Core;
@@ -6,7 +6,7 @@ namespace Broiler.JavaScript.Core.Core;
 public static class JSContextExtensions
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void EnsureSufficientExecutionStack(this JSContext context)
+    public static void EnsureSufficientExecutionStack(this IJSExecutionContext context)
     {
 #if NETSTANDARD2_1_OR_GREATER
         if(RuntimeHelpers.TryEnsureSufficientExecutionStack())
@@ -27,6 +27,6 @@ public static class JSContextExtensions
             }
         }
 #endif
-        throw JSContext.NewRangeError("Maximum call stack size exceeded");
+        throw JSEngine.NewRangeError("Maximum call stack size exceeded");
     }
 }

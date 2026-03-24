@@ -222,7 +222,7 @@ public partial class JSObject
             }
 
             if (throwError)
-                throw JSContext.NewTypeError($"Cannot modify property {name} of {this} which has only a getter");
+                throw JSEngine.NewTypeError($"Cannot modify property {name} of {this} which has only a getter");
 
             return false;
         }
@@ -232,7 +232,7 @@ public partial class JSObject
             if (throwError)
             {
                 // Only in Strict Mode ..
-                throw JSContext.NewTypeError($"Cannot modify property {name} of {this}");
+                throw JSEngine.NewTypeError($"Cannot modify property {name} of {this}");
             }
 
             return false;
@@ -241,7 +241,7 @@ public partial class JSObject
         if (IsFrozen())
         {
             if (throwError)
-                throw JSContext.NewTypeError($"Cannot modify property {name} of {this}");
+                throw JSEngine.NewTypeError($"Cannot modify property {name} of {this}");
 
             return false;
         }
@@ -249,7 +249,7 @@ public partial class JSObject
         if (p.IsEmpty && !IsExtensible())
         {
             if (throwError)
-                throw JSContext.NewTypeError($"Cannot add property {name} to {this}");
+                throw JSEngine.NewTypeError($"Cannot add property {name} to {this}");
 
             return false;
         }
@@ -283,7 +283,7 @@ public partial class JSObject
         if (IsFrozen())
         {
             if (throwError)
-                throw JSContext.NewTypeError($"Cannot modify property {name} of {this}");
+                throw JSEngine.NewTypeError($"Cannot modify property {name} of {this}");
 
             return false;
         }
@@ -320,7 +320,7 @@ public partial class JSObject
         if (IsFrozen())
         {
             if (throwError)
-                throw JSContext.NewTypeError($"Cannot modify property {name} of {this}");
+                throw JSEngine.NewTypeError($"Cannot modify property {name} of {this}");
 
             return false;
         }
@@ -471,7 +471,7 @@ public partial class JSObject
     public override JSValue Delete(in KeyString key)
     {
         if (IsSealedOrFrozen())
-            throw JSContext.NewTypeError($"Cannot delete property {key} of {this}");
+            throw JSEngine.NewTypeError($"Cannot delete property {key} of {this}");
 
         if (ownProperties.RemoveAt(key.Key))
         {
@@ -485,7 +485,7 @@ public partial class JSObject
     public override JSValue Delete(uint key)
     {
         if (IsSealedOrFrozen())
-            throw JSContext.NewTypeError($"Cannot delete property {key} of {this}");
+            throw JSEngine.NewTypeError($"Cannot delete property {key} of {this}");
 
         ref var element = ref elements.Get(key);
 
@@ -501,7 +501,7 @@ public partial class JSObject
     public override JSValue Delete(IJSSymbol symbol)
     {
         if (IsSealedOrFrozen())
-            throw JSContext.NewTypeError($"Cannot delete property {symbol} of {this}");
+            throw JSEngine.NewTypeError($"Cannot delete property {symbol} of {this}");
 
         if (symbols.RemoveAt(symbol.Key))
         {

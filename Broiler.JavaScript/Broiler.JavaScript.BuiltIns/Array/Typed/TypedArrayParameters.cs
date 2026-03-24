@@ -57,7 +57,7 @@ public readonly struct TypedArrayParameters
         copyFrom = null;
         map = null;
         thisArg = null;
-        prototype = JSContext.NewTargetPrototype;
+        prototype = JSEngine.NewTargetPrototype;
     }
 
     public TypedArrayParameters(
@@ -70,7 +70,7 @@ public readonly struct TypedArrayParameters
         copyFrom = null;
         map = null;
         thisArg = null;
-        prototype = JSContext.NewTargetPrototype;
+        prototype = JSEngine.NewTargetPrototype;
         if (a.Length == 0)
         {
             buffer = null;

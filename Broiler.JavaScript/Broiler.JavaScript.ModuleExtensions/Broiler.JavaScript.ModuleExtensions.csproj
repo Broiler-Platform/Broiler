@@ -26,6 +26,7 @@ Adding fluent interface for module registering.</Description>
       <ProjectReference Include="..\Broiler.JavaScript.Extensions\Broiler.JavaScript.Extensions.csproj" />
       <ProjectReference Include="..\Broiler.JavaScript.ExpressionCompiler\Broiler.JavaScript.ExpressionCompiler.csproj" />
       <ProjectReference Include="..\Broiler.JavaScript.Modules\Broiler.JavaScript.Modules.csproj" />
+      <ProjectReference Include="..\Broiler.JavaScript.Engine\Broiler.JavaScript.Engine.csproj" />
     </ItemGroup>
 
   <ItemGroup>

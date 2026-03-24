@@ -10,7 +10,7 @@ internal static class ClrAssemblyInitializer
     internal static void Initialize()
     {
         // Register the full CLR interop implementation.
-        JSContext.ClrInterop = DefaultClrInterop.Instance;
+        JSEngine.ClrInterop = DefaultClrInterop.Instance;
 
         // Register the expression tree builder for CLR proxy marshalling.
         ClrProxyBuilder.Register(
@@ -18,6 +18,6 @@ internal static class ClrAssemblyInitializer
             ClrExpressionBuilder.From);
 
         // Register the default CLR module provider for JSModuleContext.
-        JSContext.ClrModuleProvider = () => ClrModule.Default;
+        JSEngine.ClrModuleProvider = () => ClrModule.Default;
     }
 }

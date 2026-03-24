@@ -567,7 +567,7 @@ public partial class JSMath : JSObject
     {
         var iterable = args.Get1();
         if (iterable.IsNullOrUndefined)
-            throw JSContext.NewTypeError("Math.sumPrecise requires an iterable argument");
+            throw JSEngine.NewTypeError("Math.sumPrecise requires an iterable argument");
 
         double sum = 0.0;
         double compensation = 0.0;

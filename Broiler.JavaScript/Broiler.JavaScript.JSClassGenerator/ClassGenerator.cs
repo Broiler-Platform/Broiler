@@ -75,7 +75,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
                 }
                 else
                 {
-                    sb = sb.AppendLine($"protected override JSValue GetCurrentPrototype() => (JSContext.Current?[{names.GetOrCreateName(className)}] as JSFunction)?.prototype;");
+                    sb = sb.AppendLine($"protected override JSValue GetCurrentPrototype() => ((JSEngine.Current as JSObject)?[{names.GetOrCreateName(className)}] as JSFunction)?.prototype;");
                 }
 
                 sb = sb.AppendLine($"internal protected {type.Name}(JSObject prototype = null): base(prototype) {{}}");
@@ -92,11 +92,11 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
             // generate each marked method...
             if (hasBaseClasse)
             {
-                sb.AppendLine($"public static new {createClassReturnType} CreateClass(JSContext context, bool register = true) {{");
+                sb.AppendLine($"public static new {createClassReturnType} CreateClass(JSObject context, bool register = true) {{");
             }
             else
             {
-                sb.AppendLine($"public static {createClassReturnType} CreateClass(JSContext context, bool register = true) {{");
+                sb.AppendLine($"public static {createClassReturnType} CreateClass(JSObject context, bool register = true) {{");
             }
 
 
@@ -226,7 +226,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
     {
         var method = exports.Field!;
 
-        var t = $"throw JSContext.NewTypeError(\"Failed to convert this to {type.Name}\")";
+        var t = $"throw JSEngine.NewTypeError(\"Failed to convert this to {type.Name}\")";
 
         var access = !method.IsStatic
             ? $"@this.{method.Name}"
@@ -297,7 +297,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
         JSExportInfo exports)
     {
         var method = exports.Property!;
-        var t = $"throw JSContext.NewTypeError(\"Failed to convert this to {type.Name}\")";
+        var t = $"throw JSEngine.NewTypeError(\"Failed to convert this to {type.Name}\")";
         var keyName = names.GetOrCreateName(name);
 
         string setter = "null";
@@ -395,7 +395,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
             l += ", length: " + e.Length;
         }
 
-        var t = $"throw JSContext.NewTypeError(\"Failed to convert this to {type.Name}\")";
+        var t = $"throw JSEngine.NewTypeError(\"Failed to convert this to {type.Name}\")";
         if (method.IsJSFunction())
         {
             var fx = $"new JSFunction({type.Name}.{method.Name}, \"{name}\" {l})";
@@ -445,7 +445,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
         else
         {
             fb.AppendLine($"var @return = {callee}.{method.Name}({args});");
-            fb.AppendLine($"return JSContext.ClrInterop.Marshal(@return);");
+            fb.AppendLine($"return JSEngine.ClrInterop.Marshal(@return);");
         }
         fb.AppendLine("}");
 

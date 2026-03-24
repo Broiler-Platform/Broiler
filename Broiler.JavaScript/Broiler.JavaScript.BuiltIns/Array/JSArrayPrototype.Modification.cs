@@ -105,7 +105,7 @@ public partial class JSArray
             return JSNumber.Zero;
 
         if (t.IsSealedOrFrozen())
-            throw JSContext.NewTypeError($"Cannot modify property length");
+            throw JSEngine.NewTypeError($"Cannot modify property length");
 
         int ai, al;
 
@@ -136,7 +136,7 @@ public partial class JSArray
             }
 
             if (l > max)
-                throw JSContext.NewTypeError($"Invalid array length");
+                throw JSEngine.NewTypeError($"Invalid array length");
 
             ta._length = i;
 
@@ -212,7 +212,7 @@ public partial class JSArray
             return first;
 
         if (@object.IsSealedOrFrozen())
-            throw JSContext.NewTypeError("Cannot modify property length");
+            throw JSEngine.NewTypeError("Cannot modify property length");
 
         var n = (uint)@this.Length;
         if (n == 0)
@@ -242,7 +242,7 @@ public partial class JSArray
         var @this = a.This as JSObject;
 
         if (@this == null)
-            throw JSContext.NewTypeError($"Sort can only be called with an Array or an Object");
+            throw JSEngine.NewTypeError($"Sort can only be called with an Array or an Object");
 
         var length = @this.Length;
         if (length <= 1)
@@ -290,7 +290,7 @@ public partial class JSArray
         else
         {
             if (!fx.IsUndefined)
-                throw JSContext.NewTypeError($"Argument is not a function");
+                throw JSEngine.NewTypeError($"Argument is not a function");
 
             cx = (left, right) =>
             {
@@ -349,14 +349,14 @@ public partial class JSArray
             return r;
 
         if (@this.IsSealedOrFrozen())
-            throw JSContext.NewTypeError("Cannot modify property length");
+            throw JSEngine.NewTypeError("Cannot modify property length");
 
         // Get the length of the array.
         int arrayLength = @this.Length;
 
         // This method only supports arrays of length up to 2^31 - 1.
         if (@this.Length > int.MaxValue)
-            throw JSContext.NewRangeError("The array is too long");
+            throw JSEngine.NewRangeError("The array is too long");
 
         // Fix the arguments so they are positive and within the bounds of the array.
         if (start < 0)
@@ -427,7 +427,7 @@ public partial class JSArray
             return JSUndefined.Value;
 
         if (@this.IsSealedOrFrozen())
-            throw JSContext.NewTypeError("Cannot modify property length");
+            throw JSEngine.NewTypeError("Cannot modify property length");
 
         var l = a.This.Length;
         if (l > 0)

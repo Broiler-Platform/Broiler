@@ -60,7 +60,7 @@ public partial class JSUInt8Array : JSTypedArray
     {
         var str = a.Get1();
         if (!str.IsString)
-            throw JSContext.NewTypeError("Uint8Array.fromBase64 requires a string argument");
+            throw JSEngine.NewTypeError("Uint8Array.fromBase64 requires a string argument");
         var bytes = System.Convert.FromBase64String(str.ToString());
         return new JSUInt8Array(bytes);
     }
@@ -74,10 +74,10 @@ public partial class JSUInt8Array : JSTypedArray
     {
         var str = a.Get1();
         if (!str.IsString)
-            throw JSContext.NewTypeError("Uint8Array.fromHex requires a string argument");
+            throw JSEngine.NewTypeError("Uint8Array.fromHex requires a string argument");
         var hex = str.ToString();
         if (hex.Length % 2 != 0)
-            throw JSContext.NewSyntaxError("Invalid hex string length");
+            throw JSEngine.NewSyntaxError("Invalid hex string length");
         var bytes = new byte[hex.Length / 2];
         for (int i = 0; i < bytes.Length; i++)
         {
@@ -120,7 +120,7 @@ public partial class JSUInt8Array : JSTypedArray
     {
         var str = a.Get1();
         if (!str.IsString)
-            throw JSContext.NewTypeError("setFromBase64 requires a string argument");
+            throw JSEngine.NewTypeError("setFromBase64 requires a string argument");
         var bytes = System.Convert.FromBase64String(str.ToString());
         int written = Math.Min(bytes.Length, length);
         System.Array.Copy(bytes, 0, buffer.buffer, byteOffset, written);
@@ -140,10 +140,10 @@ public partial class JSUInt8Array : JSTypedArray
     {
         var str = a.Get1();
         if (!str.IsString)
-            throw JSContext.NewTypeError("setFromHex requires a string argument");
+            throw JSEngine.NewTypeError("setFromHex requires a string argument");
         var hex = str.ToString();
         if (hex.Length % 2 != 0)
-            throw JSContext.NewSyntaxError("Invalid hex string length");
+            throw JSEngine.NewSyntaxError("Invalid hex string length");
         var bytes = new byte[hex.Length / 2];
         for (int i = 0; i < bytes.Length; i++)
         {

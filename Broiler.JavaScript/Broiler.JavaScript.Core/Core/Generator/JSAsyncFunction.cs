@@ -26,11 +26,11 @@ public class JSAsyncFunction
         try
         {
             if(!gen.MoveNext(lastResult, out var r))
-                return JSContext.CreateResolvedOrRejectedPromise(r, true);
+                return JSEngine.CreateResolvedOrRejectedPromise(r, true);
 
             var then = r[KeyStrings.then];
             if (then.IsUndefined)
-                return JSContext.CreateResolvedOrRejectedPromise(r, true);
+                return JSEngine.CreateResolvedOrRejectedPromise(r, true);
 
             r = r.InvokeMethod(in KeyStrings.then, JSValue.CreateFunction((in Arguments a) =>
             {
@@ -46,7 +46,7 @@ public class JSAsyncFunction
         } 
         catch (Exception ex)
         {
-            return JSContext.CreateResolvedOrRejectedPromise(JSException.JSErrorFrom(ex), false);
+            return JSEngine.CreateResolvedOrRejectedPromise(JSException.JSErrorFrom(ex), false);
         }
     }
 }
