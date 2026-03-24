@@ -40,6 +40,6 @@ internal static class JSValueCoreExtensions
         // Proactively load the BuiltIns assembly so that its ModuleInitializer
         // wires string/number/boolean factories (JSValue.CreateString, etc.)
         // before any user code runs—even without a JSContext being created.
-        DefaultBuiltInRegistry.EnsureBuiltInsAssemblyLoaded();
+        JSContext.EnsureBuiltInsAssemblyLoaded();
     }
 }

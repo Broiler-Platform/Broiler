@@ -34,6 +34,10 @@ internal static class BuiltInsAssemblyInitializer
     [ModuleInitializer]
     internal static void Initialize()
     {
+        // Set the default built-in registry on JSContext.
+        // DefaultBuiltInRegistry now lives in this assembly (BuiltIns).
+        JSContext.BuiltInRegistry ??= DefaultBuiltInRegistry.Instance;
+
         // Register BuiltIns assembly types into the built-in registration pipeline.
         // This appends to any existing additional registrations so that multiple
         // satellite assemblies can contribute built-in types.

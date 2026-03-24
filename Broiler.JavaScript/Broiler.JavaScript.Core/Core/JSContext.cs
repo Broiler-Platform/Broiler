@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -53,9 +54,18 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
     /// Gets or sets the built-in object registry used to populate new contexts.
     /// When set before constructing a <see cref="JSContext"/>, the custom
     /// registry will be used instead of the default source-generated one.
-    /// Defaults to <see cref="DefaultBuiltInRegistry.Instance"/>.
+    /// Set by the BuiltIns assembly's module initializer to
+    /// <c>DefaultBuiltInRegistry.Instance</c>.
     /// </summary>
-    public static IBuiltInRegistry BuiltInRegistry { get; set; } = DefaultBuiltInRegistry.Instance;
+    public static IBuiltInRegistry BuiltInRegistry { get; set; }
+
+    /// <summary>
+    /// Delegate for registering Core's source-generated built-in classes.
+    /// Wired automatically by Core's module initializer so that the registry
+    /// implementation (in the BuiltIns assembly) can invoke Core's generated
+    /// <c>Names.RegisterAll</c> without needing a direct reference.
+    /// </summary>
+    internal static Action<JSContext> CoreClassRegistrations { get; set; }
 
     /// <summary>
     /// Gets or sets the CLR interop provider used to marshal between .NET
@@ -161,7 +171,7 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
         // Ensure the BuiltIns assembly is loaded before any JSFunction
         // construction, so that factory delegates (CreateNumber, etc.) are
         // available for JSFunction CreateClass calls below.
-        DefaultBuiltInRegistry.EnsureBuiltInsAssemblyLoaded();
+        EnsureBuiltInsAssemblyLoaded();
 
         this.synchronizationContext = synchronizationContext ?? SynchronizationContext.Current;
 
@@ -183,13 +193,57 @@ public partial class JSContext : JSObject, IJSContext, IDisposable
 
         // Symbol and all other built-in types are registered here via
         // the BuiltIns assembly's RegisterBuiltInClasses pipeline.
-        BuiltInRegistry.Register(this);
+        // After EnsureBuiltInsAssemblyLoaded(), BuiltInRegistry is typically
+        // set by the BuiltIns module initializer. If the BuiltIns assembly
+        // is unavailable, fall back to Core's own class registration.
+        if (BuiltInRegistry != null)
+        {
+            BuiltInRegistry.Register(this);
+        }
+        else
+        {
+            CoreClassRegistrations?.Invoke(this);
+        }
 
         this[KeyStrings.debug] = new JSFunction(Debug);
 
     }
 
     internal void FireConsoleEvent(string type, in Arguments a) => ConsoleEvent?.Invoke(this, type, in a);
+
+    /// <summary>
+    /// Attempts to load satellite assemblies (<c>Broiler.JavaScript.BuiltIns</c>,
+    /// <c>Broiler.JavaScript.Globals</c>, <c>Broiler.JavaScript.Extensions</c>)
+    /// and run their module constructors so that <c>[ModuleInitializer]</c> methods
+    /// register factory delegates and additional built-in type registrations.
+    /// If an assembly is not available, the failure is silently ignored.
+    /// </summary>
+    internal static void EnsureBuiltInsAssemblyLoaded()
+    {
+        if (BuiltInRegistry != null)
+            return;
+
+        TryLoadAssembly("Broiler.JavaScript.BuiltIns");
+        TryLoadAssembly("Broiler.JavaScript.Globals");
+        TryLoadAssembly("Broiler.JavaScript.Extensions");
+    }
+
+    private static void TryLoadAssembly(string name)
+    {
+        try
+        {
+            var assembly = Assembly.Load(name);
+            RuntimeHelpers.RunModuleConstructor(assembly.ManifestModule.ModuleHandle);
+        }
+        catch (Exception ex) when (
+            ex is System.IO.FileNotFoundException
+            or System.IO.FileLoadException
+            or BadImageFormatException)
+        {
+            // Assembly is not available. Delegates remain null and
+            // Register() will skip satellite registrations gracefully.
+        }
+    }
 
     private JSValue Debug(in Arguments a)
     {

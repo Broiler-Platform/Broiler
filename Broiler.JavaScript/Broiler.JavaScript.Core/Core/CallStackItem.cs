@@ -1,6 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
 using System.ComponentModel;
-using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Ast.Misc;
 
@@ -33,7 +32,7 @@ public class CallStackItem
         }
 
         FileName = scriptInfo.FileName;
-        Function = (nameLength > 0) ? scriptInfo.Code.ToStringSpan(nameOffset, nameLength) : Inline;
+        Function = (nameLength > 0) ? new StringSpan(scriptInfo.Code, nameOffset, nameLength) : Inline;
         Line = line;
         Column = column;
         Parent = context.Top;
