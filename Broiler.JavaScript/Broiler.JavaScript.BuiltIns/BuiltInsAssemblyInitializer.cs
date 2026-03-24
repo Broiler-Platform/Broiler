@@ -24,6 +24,7 @@ using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.BuiltIns.Class;
+using Broiler.JavaScript.BuiltIns.RegExp;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Runtime;
 
@@ -148,6 +149,10 @@ internal static class BuiltInsAssemblyInitializer
         // Initialize JSFunctionBuilder with the concrete JSFunction type so the
         // Compiler can build function expression trees without a direct reference.
         JSFunctionBuilder.Initialize(typeof(JSFunction));
+
+        // Initialize JSRegExpBuilder with the concrete JSRegExp type so the
+        // Compiler can build regex expression trees without a direct reference.
+        JSRegExpBuilder.Initialize(typeof(JSRegExp));
 
         // Wire factory delegates for JSFunction so Core can create
         // function instances without referencing the concrete type directly.

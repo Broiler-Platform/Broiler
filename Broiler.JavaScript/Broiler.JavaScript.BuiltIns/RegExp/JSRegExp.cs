@@ -4,15 +4,20 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.BuiltIns.RegExp;
 
 
 [JSClassGenerator("RegExp")]
-public partial class JSRegExp : JSObject
+public partial class JSRegExp : JSObject, IJSRegExp
 {
+    string IJSRegExp.Pattern => pattern;
+    string IJSRegExp.Flags => flags;
+    System.Text.RegularExpressions.Regex IJSRegExp.Value => value;
+
     [JSExport("escape")]
     internal static JSValue Escape(in Arguments a)
     {
