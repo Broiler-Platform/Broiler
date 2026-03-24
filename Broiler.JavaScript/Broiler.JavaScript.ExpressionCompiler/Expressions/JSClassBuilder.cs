@@ -1,11 +1,9 @@
 ﻿using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using System;
 using System.Reflection;
 
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 public static class JSClassBuilder
 {
@@ -23,11 +21,11 @@ public static class JSClassBuilder
     /// Initializes the builder with the concrete JSClass type.
     /// Called by the BuiltIns assembly via <c>[ModuleInitializer]</c>.
     /// </summary>
-    internal static void Initialize(Type classType)
+    internal static void Initialize(Type classType, Type functionType, Type delegateType)
     {
         _type = classType;
-        _addConstructor = classType.GetMethod(nameof(AddConstructorName), [typeof(JSFunction)]);
-        _ctor = classType.GetConstructor([typeof(JSFunctionDelegate), typeof(JSFunction), typeof(string), typeof(string)]);
+        _addConstructor = classType.GetMethod(nameof(AddConstructorName), [functionType]);
+        _ctor = classType.GetConstructor([delegateType, functionType, typeof(string), typeof(string)]);
     }
 
     private const string AddConstructorName = "AddConstructor";

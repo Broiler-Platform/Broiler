@@ -3,7 +3,6 @@ using System;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
-using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Ast.Misc;
 
 namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
@@ -20,7 +19,7 @@ public class JSGeneratorFunctionV2 : JSFunction
         f = InvokeFunction;
     }
 
-    public override JSValue InvokeFunction(in Arguments a) => new JSGenerator(new ClrGeneratorV2(this, @delegate, a));
+    public override JSValue InvokeFunction(in Arguments a) => JSGeneratorBuilder.CreateFromClrV2(new ClrGeneratorV2(this, @delegate, a));
 }
 
 public class GeneratorState(JSValue value, int nextJump, bool isValueDelegate)

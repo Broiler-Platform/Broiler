@@ -2,6 +2,7 @@
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.Core.Enumerators;
+using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
 using System;
 using System.Collections;
@@ -10,7 +11,6 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Ast.Misc;
 
 namespace Broiler.JavaScript.Clr;
@@ -88,8 +88,8 @@ public partial class ClrProxy : JSObject
     public static JSValue Marshal(Task<JSValue> task) => new JSPromise(task);
     public static JSValue Marshal<T>(Task<T> task) => task.ToPromise();
     public static JSValue Marshal(IJavaScriptObject javaScriptObject) => From(javaScriptObject);
-    public static JSValue Marshal(IElementEnumerator en) => new JSGenerator(en, "Clr Iterator");
-    public static JSValue Marshal(IEnumerable<JSValue> en) => new JSGenerator(new ClrEnumerableElementEnumerator(en), "Clr Iterator");
+    public static JSValue Marshal(IElementEnumerator en) => JSGeneratorBuilder.CreateFromEnumerator(en, "Clr Iterator");
+    public static JSValue Marshal(IEnumerable<JSValue> en) => JSGeneratorBuilder.CreateFromEnumerator(new ClrEnumerableElementEnumerator(en), "Clr Iterator");
 
     /// <summary>
     /// Can be improved in future !!
@@ -134,7 +134,7 @@ public partial class ClrProxy : JSObject
                 Task<JSValue> task => task.ToPromise(),
                 Task task => task.ToPromise(),
                 IJavaScriptObject obj => From(obj),
-                IEnumerable<JSValue> en => new JSGenerator(new ClrEnumerableElementEnumerator(en), "Clr Iterator"),
+                IEnumerable<JSValue> en => JSGeneratorBuilder.CreateFromEnumerator(new ClrEnumerableElementEnumerator(en), "Clr Iterator"),
                 _ => From(value),
             },
         };

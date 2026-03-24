@@ -1,4 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Internal;
 using System;
 using System.Text;

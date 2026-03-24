@@ -1,4 +1,4 @@
-﻿namespace Broiler.JavaScript.Core.Core;
+﻿namespace Broiler.JavaScript.Core.Core.Primitive;
 
 internal class JSConstants
 {

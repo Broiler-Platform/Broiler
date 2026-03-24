@@ -131,7 +131,7 @@ public sealed class DefaultBuiltInRegistry : IBuiltInRegistry
         IteratorPrototypeSetup?.Invoke(proto);
 
         // Generator.prototype → Iterator.prototype (§2.1.14).
-        if (context[Names.Generator] is JSFunction generatorCtor)
+        if (context[KeyStrings.GetOrCreate("Generator")] is JSFunction generatorCtor)
             generatorCtor.prototype.SetPrototypeOf(proto);
     }
 
