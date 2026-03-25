@@ -25,6 +25,12 @@ public class JSVariable
     internal readonly StringSpan Name;
     private KeyString key;
 
+    /// <summary>
+    /// Delegate that retrieves the current JavaScript execution context.
+    /// Wired by Core's module initializer to point to JSEngine.Current.
+    /// </summary>
+    internal static Func<object> GetCurrentContext;
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public JSVariable(JSValue v, string name)
     {
@@ -57,7 +63,7 @@ public class JSVariable
             if (key.Value == null)
                 key = KeyStrings.GetOrCreate(Name);
 
-            if (JSEngine.Current is JSObject ctx)
+            if (GetCurrentContext?.Invoke() is JSObject ctx)
             {
                 var old = ctx[key];
                 if (old != value && !value.IsUndefined)

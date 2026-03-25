@@ -16,6 +16,13 @@ public class JSException : Exception
     internal static Func<JSException, JSObject, JSValue> CreateJSErrorWithPrototype;
     internal static Func<Exception, JSValue> JSErrorFrom;
 
+    // ── Delegates for engine-level functionality (wired by Core's initializer) ──
+    // These replace the direct JSEngine references that existed when JSException
+    // lived inside the Core assembly.
+    internal static Func<string, JSException> NewSyntaxErrorFactory;
+    internal static Func<string, JSException> NewTypeErrorFactory;
+    internal static Action<StringBuilder, List<(StringSpan target, string file, int line, int column)>> AppendStackTraceHelper;
+
     // Error message constants (moved from JSError for Core accessibility)
     public const string Cannot_convert_undefined_or_null_to_object = "Cannot convert undefined or null to object";
     public const string Parameter_is_not_an_object = "Parameter is not an object";
@@ -84,7 +91,7 @@ public class JSException : Exception
                 sb.AppendLine($"    at {f.target}:{f.file}:{f.line},{f.column}");
             }
 
-            JSEngine.AppendStackTrace?.Invoke(sb, trace);
+            AppendStackTraceHelper?.Invoke(sb, trace);
 
             return JSValue.CreateString(sb.ToString());
         }
@@ -103,10 +110,14 @@ public class JSException : Exception
 
     [EditorBrowsable(EditorBrowsableState.Never)]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue ThrowSyntaxError(string value) => throw JSEngine.NewSyntaxError(value);
+    public static JSValue ThrowSyntaxError(string value) =>
+        throw (NewSyntaxErrorFactory ?? throw new InvalidOperationException("JSException.NewSyntaxErrorFactory delegate is not initialized. Ensure the Core assembly module initializer has run."))
+            (value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static JSValue ThrowNotFunction(JSValue value) => throw JSEngine.NewTypeError($"{value} is not a function");
+    internal static JSValue ThrowNotFunction(JSValue value) =>
+        throw (NewTypeErrorFactory ?? throw new InvalidOperationException("JSException.NewTypeErrorFactory delegate is not initialized. Ensure the Core assembly module initializer has run."))
+            ($"{value} is not a function");
 
     public static JSException FromValue(JSValue value)
     {
