@@ -1,4 +1,5 @@
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;
 using System;
@@ -20,7 +21,7 @@ public partial class JSError : JSObject, IJSError
         var sb = new StringBuilder();
         sb.AppendLine($"{ToString(Arguments.Empty)}");
 
-        var top = JSEngine.Current.Top;
+        var top = (JSEngine.Current as IJSExecutionContext)?.Top;
         while (top != null)
         {
             // ref var top = ref walker.Current;

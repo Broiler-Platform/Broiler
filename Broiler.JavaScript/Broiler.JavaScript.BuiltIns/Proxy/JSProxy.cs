@@ -2,6 +2,7 @@
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Symbol;
+using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Runtime;
@@ -16,7 +17,7 @@ public partial class JSProxy : JSObject
     readonly JSObject target;
     private readonly JSObject handler;
 
-    protected JSProxy((JSObject target, JSObject handler) p) : base(JSEngine.Current.ObjectPrototype)
+    protected JSProxy((JSObject target, JSObject handler) p) : base((JSEngine.Current as IJSExecutionContext)?.ObjectPrototype)
     {
         var (target, handler) = p;
         if (target == null || handler == null)

@@ -73,7 +73,7 @@ public partial class V8Runtime(V8InspectorProtocol inspectorContext) : V8Protoco
                     list.Add(new V8PropertyDescriptor(KeyStrings.GetNameString(pt.key).Value, v, pt));
                 }
 
-                ref var p = ref JSEngine.Current.ObjectPrototype.GetOwnProperties(false).GetValue(KeyStrings.__proto__.Key);
+                ref var p = ref (JSEngine.Current as IJSExecutionContext).ObjectPrototype.GetOwnProperties(false).GetValue(KeyStrings.__proto__.Key);
                 list.Add(new V8PropertyDescriptor("__proto__", c, p));
             }
 

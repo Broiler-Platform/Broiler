@@ -51,7 +51,7 @@ public partial class JSGlobalStatic
         var text = f.StringValue;
         string location = null;
 
-        JSEngine.Current.DispatchEvalEvent(ref text, ref location);
+        (JSEngine.Current as IJSExecutionContext)?.DispatchEvalEvent(ref text, ref location);
         return CoreScript.Evaluate(text, null);
     }
 

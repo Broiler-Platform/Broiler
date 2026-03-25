@@ -39,7 +39,7 @@ public class ClrGeneratorV2(JSValue generator, JSGeneratorDelegateV2 @delegate, 
 
     public JSValue LastValue;
 
-    public IJSExecutionContext Context = JSEngine.Current;
+    public IJSExecutionContext Context = JSEngine.Current as IJSExecutionContext;
 
     public bool IsFinished;
     public int NextJump;

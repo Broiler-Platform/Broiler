@@ -1,4 +1,5 @@
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Extensions;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;
@@ -55,8 +56,8 @@ public partial class JSGenerator : JSObject, IJSGenerator
 
     public bool MoveNext(JSValue replaceOld, out JSValue item)
     {
-        var c = JSEngine.Current;
-        var top = c.Top;
+        var c = JSEngine.Current as IJSExecutionContext;
+        var top = c?.Top;
 
         try
         {
@@ -74,7 +75,7 @@ public partial class JSGenerator : JSObject, IJSGenerator
         }
         finally
         {
-            c.Top = top;
+            if (c != null) c.Top = top;
         }
     }
 
@@ -94,8 +95,8 @@ public partial class JSGenerator : JSObject, IJSGenerator
             return ValueObject;
         }
 
-        var c = JSEngine.Current;
-        var top = c.Top;
+        var c = JSEngine.Current as IJSExecutionContext;
+        var top = c?.Top;
         
         try
         {
@@ -104,7 +105,7 @@ public partial class JSGenerator : JSObject, IJSGenerator
         }
         finally
         {
-            c.Top = top;
+            if (c != null) c.Top = top;
         }
     }
 

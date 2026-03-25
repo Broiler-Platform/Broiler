@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
+using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Core.Core;
@@ -21,12 +24,12 @@ public static class JSEngine
 
     [ThreadStatic]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static IJSExecutionContext Current;
+    public static IJSContext Current;
 
-    private static readonly AsyncLocal<IJSExecutionContext> _current =
+    private static readonly AsyncLocal<IJSContext> _current =
         new((e) => { Current = e.CurrentValue ?? e.PreviousValue; });
 
-    public static IJSExecutionContext CurrentContext
+    public static IJSContext CurrentContext
     {
         get => Current;
         set
@@ -142,10 +145,29 @@ public static class JSEngine
 
     // ── new.target helpers ──────────────────────────────────────────
 
-    public static JSValue NewTarget => Current?.Top?.NewTarget;
+    /// <summary>
+    /// Delegate that retrieves the current <c>new.target</c> value from
+    /// the execution context. Wired by the Engine assembly's module initializer.
+    /// </summary>
+    internal static Func<IJSContext, JSValue> GetNewTargetFromTop;
 
-    public static JSObject NewTargetPrototype =>
-        (Current?.Top?.NewTarget as IJSFunction)?.Prototype as JSObject;
+    /// <summary>
+    /// Delegate that retrieves the current <c>new.target</c>'s prototype from
+    /// the execution context. Wired by the Engine assembly's module initializer.
+    /// </summary>
+    internal static Func<IJSContext, JSObject> GetNewTargetPrototypeFromTop;
+
+    public static JSValue NewTarget => GetNewTargetFromTop?.Invoke(Current);
+
+    public static JSObject NewTargetPrototype => GetNewTargetPrototypeFromTop?.Invoke(Current);
+
+    // ── Stack trace helpers ─────────────────────────────────────────
+
+    /// <summary>
+    /// Delegate that walks the current call stack and appends trace entries.
+    /// Wired by the Engine assembly's module initializer.
+    /// </summary>
+    internal static Action<StringBuilder, List<(StringSpan target, string file, int line, int column)>> AppendStackTrace;
 
     // ── Assembly loading ────────────────────────────────────────────
 
@@ -159,6 +181,7 @@ public static class JSEngine
         if (BuiltInRegistry != null)
             return;
 
+        TryLoadAssembly("Broiler.JavaScript.Engine");
         TryLoadAssembly("Broiler.JavaScript.BuiltIns");
         TryLoadAssembly("Broiler.JavaScript.Globals");
         TryLoadAssembly("Broiler.JavaScript.Extensions");
