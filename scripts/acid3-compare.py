@@ -4,6 +4,10 @@
 Compares a Broiler CLI render of Acid3 against a Chromium reference image,
 producing a colour-coded diff image and a structured report.
 
+Background pixels are identified and excluded from the primary pass/fail
+content-area match metric, so that only foreground/content rendering
+fidelity is assessed.
+
 Usage:
     python3 scripts/acid3-compare.py <broiler_image> <reference_image> [--output-dir <dir>]
 
@@ -12,10 +16,9 @@ Output:
     - acid3-report.txt      Human-readable comparison report
 
 Colour coding in diff image:
-    Green   — pixel match (difference <= 10)
-    Red     — Broiler has darker content where reference is lighter
-    Blue    — Reference has darker content where Broiler is lighter
-    Yellow  — Other colour differences
+    Green   — pixel match (per-channel difference <= tolerance)
+    Red     — Content-area mismatch
+    Yellow  — Background-area mismatch
 """
 
 import argparse
@@ -28,10 +31,14 @@ from PIL import Image
 
 # --- Constants ---------------------------------------------------------------
 
-# Tolerance thresholds per RGB channel (0–255)
-EXACT_THRESHOLD = 0       # Exact match
-NEAR_THRESHOLD = 5        # Near match (anti-aliasing, sub-pixel)
-SIGNIFICANT_THRESHOLD = 25  # Significant visual difference
+# Per-channel colour tolerance (matches DeterministicRenderConfig.ColorTolerance)
+COLOR_TOLERANCE = 5
+
+# Background pixel threshold: a pixel is considered *content* if any of its
+# RGB channels is ≤ this value in either image.  Only pixels where every
+# channel exceeds this threshold in both images are treated as background
+# and excluded from the primary content-area match metric.
+BACKGROUND_THRESHOLD = 240
 
 # Region definitions (x_start, x_end, y_start, y_end) for 1024x768 viewport
 REGIONS = {
@@ -39,9 +46,6 @@ REGIONS = {
     "bucket_area": (0, 1024, 80, 400),
     "bottom_area": (0, 1024, 400, 768),
 }
-
-# Background pixel threshold: mean channel > 240 is considered background
-BACKGROUND_THRESHOLD = 240
 
 
 # --- Core comparison ---------------------------------------------------------
@@ -54,83 +58,55 @@ def load_and_normalise(path: str, target_size: tuple[int, int]) -> np.ndarray:
     return np.array(img, dtype=np.int16)
 
 
-def compute_diff(broiler: np.ndarray, reference: np.ndarray) -> np.ndarray:
-    """Compute per-pixel absolute difference (signed for direction)."""
-    return broiler - reference
+def compute_match(actual: np.ndarray, reference: np.ndarray,
+                  tolerance: int = COLOR_TOLERANCE) -> np.ndarray:
+    """Return boolean mask where pixels match within tolerance."""
+    diff = np.abs(actual - reference)
+    return np.all(diff <= tolerance, axis=2)
 
 
-def classify_pixels(diff: np.ndarray) -> dict[str, int]:
-    """Classify pixels into exact, near, and significant difference buckets."""
-    abs_diff = np.abs(diff)
-    max_channel_diff = abs_diff.max(axis=2)
-    total = max_channel_diff.size
+def content_mask(actual: np.ndarray, reference: np.ndarray,
+                 threshold: int = BACKGROUND_THRESHOLD) -> np.ndarray:
+    """Return mask of non-background (content) pixels in either image.
 
-    exact = int(np.sum(max_channel_diff == EXACT_THRESHOLD))
-    near = int(np.sum(max_channel_diff <= NEAR_THRESHOLD))
-    significant = int(np.sum(max_channel_diff > SIGNIFICANT_THRESHOLD))
-
-    return {
-        "total_pixels": total,
-        "exact_matches": exact,
-        "exact_pct": exact / total * 100,
-        "near_matches": near,
-        "near_pct": near / total * 100,
-        "significant_differences": significant,
-        "significant_pct": significant / total * 100,
-    }
+    A pixel is considered background only if *all* channels exceed the
+    threshold in *both* images.  Any pixel that has visible content in
+    either image is classified as content.
+    """
+    return (np.any(actual <= threshold, axis=2) |
+            np.any(reference <= threshold, axis=2))
 
 
-def analyse_region(diff: np.ndarray, region: tuple[int, int, int, int]) -> float:
-    """Compute mean absolute pixel difference in a named region."""
+def region_content_match(match: np.ndarray, content: np.ndarray,
+                         region: tuple[int, int, int, int],
+                         ) -> tuple[int, int, float]:
+    """Compute content-area match within a named region.
+
+    Returns (matching_content_pixels, total_content_pixels, pct).
+    """
     x1, x2, y1, y2 = region
-    region_diff = np.abs(diff[y1:y2, x1:x2])
-    return float(np.mean(region_diff))
+    r_content = content[y1:y2, x1:x2]
+    r_match = match[y1:y2, x1:x2] & r_content
+    total = int(np.sum(r_content))
+    matching = int(np.sum(r_match))
+    pct = matching / total * 100 if total > 0 else 0.0
+    return matching, total, pct
 
 
-def classify_background(reference: np.ndarray) -> dict[str, float]:
-    """Classify pixels as background (white) or content and report percentages."""
-    mean_channels = reference.mean(axis=2)
-    bg_mask = mean_channels > BACKGROUND_THRESHOLD
-    total = mean_channels.size
-    bg_count = int(np.sum(bg_mask))
-    return {
-        "background_pct": bg_count / total * 100,
-        "content_pct": (total - bg_count) / total * 100,
-    }
-
-
-def generate_diff_image(diff: np.ndarray) -> Image.Image:
+def generate_diff_image(match: np.ndarray,
+                        content: np.ndarray) -> Image.Image:
     """Generate a colour-coded diff image.
 
-    Green  — match (diff <= 10)
-    Red    — Broiler darker (broiler > reference in luminance)
-    Blue   — Reference darker (reference > broiler in luminance)
-    Yellow — Other colour differences
+    Green  — pixel match (per-channel diff ≤ tolerance)
+    Red    — content-area mismatch
+    Yellow — background-area mismatch
     """
-    abs_diff = np.abs(diff)
-    max_diff = abs_diff.max(axis=2)
-
-    # Luminance difference (signed): positive = Broiler brighter
-    luminance = diff.astype(np.float32).mean(axis=2)
-
-    h, w = max_diff.shape
+    h, w = match.shape
     out = np.zeros((h, w, 3), dtype=np.uint8)
 
-    # Green: match region
-    match_mask = max_diff <= 10
-    out[match_mask] = [0, 180, 0]
-
-    # Red: Broiler has darker content where reference is lighter
-    broiler_darker = (~match_mask) & (luminance < -10)
-    out[broiler_darker] = [220, 40, 40]
-
-    # Blue: Reference has darker content where Broiler is lighter
-    ref_darker = (~match_mask) & (luminance > 10)
-    out[ref_darker] = [40, 40, 220]
-
-    # Yellow: Other colour differences
-    other = (~match_mask) & (~broiler_darker) & (~ref_darker)
-    out[other] = [220, 220, 40]
+    out[match] = [0, 180, 0]                   # Green: match
+    out[~match & content] = [220, 40, 40]       # Red: content mismatch
+    out[~match & ~content] = [220, 220, 40]     # Yellow: background mismatch
 
     return Image.fromarray(out)
 
@@ -140,11 +116,26 @@ def generate_diff_image(diff: np.ndarray) -> Image.Image:
 def generate_report(
     broiler_path: str,
     reference_path: str,
-    stats: dict,
-    regions: dict[str, float],
-    bg_info: dict,
+    match: np.ndarray,
+    content: np.ndarray,
+    region_stats: dict[str, tuple[int, int, float]],
+    viewport: tuple[int, int],
 ) -> str:
-    """Generate a human-readable comparison report."""
+    """Generate a human-readable comparison report.
+
+    The primary metric is the **content-area match** which ignores
+    background pixels, focusing only on foreground/content fidelity.
+    """
+    h, w = match.shape
+    total = h * w
+    full_match = int(np.sum(match))
+
+    content_total = int(np.sum(content))
+    content_match = int(np.sum(match & content))
+    content_pct = content_match / content_total * 100 if content_total > 0 else 0.0
+
+    bg_total = total - content_total
+
     lines = [
         "=" * 70,
         "Acid3 Pixel Comparison Report",
@@ -152,29 +143,44 @@ def generate_report(
         "",
         f"Broiler image:    {broiler_path}",
         f"Reference image:  {reference_path}",
+        f"Viewport:         {viewport[0]}×{viewport[1]}",
+        f"Color tolerance:  {COLOR_TOLERANCE} (per-channel)",
         "",
         "--- Overall Pixel Statistics ---",
-        f"Total pixels compared:       {stats['total_pixels']:>10,}",
-        f"Exact matches:               {stats['exact_matches']:>10,}  ({stats['exact_pct']:.1f}%)",
-        f"Near matches (≤{NEAR_THRESHOLD}):          {stats['near_matches']:>10,}  ({stats['near_pct']:.1f}%)",
-        f"Significant differences (>{SIGNIFICANT_THRESHOLD}): {stats['significant_differences']:>10,}  ({stats['significant_pct']:.1f}%)",
-        "",
-        "--- Region Analysis (Mean Pixel Difference) ---",
+        f"Full-image match:   {full_match:>10,} / {total:>10,}  "
+        f"({full_match / total * 100:.2f}%)",
     ]
-    for name, mean_diff in regions.items():
-        lines.append(f"  {name:20s}  {mean_diff:7.1f}")
+
+    if content_total > 0:
+        lines.append(
+            f"Content-area match: {content_match:>10,} / {content_total:>10,}  "
+            f"({content_pct:.2f}%)"
+        )
+    else:
+        lines.append("Content-area match: N/A (no content pixels detected)")
 
     lines += [
         "",
         "--- Background / Content Classification ---",
-        f"  Background pixels:  {bg_info['background_pct']:.1f}%",
-        f"  Content pixels:     {bg_info['content_pct']:.1f}%",
+        f"  Background pixels:  {bg_total:>10,}  "
+        f"({bg_total / total * 100:.1f}%)",
+        f"  Content pixels:     {content_total:>10,}  "
+        f"({content_total / total * 100:.1f}%)",
+        "",
+        "--- Per-Region Content-Area Match ---",
+        f"{'Region':<20} {'Match':>8} {'Total':>8} {'Pct':>8}",
+        "-" * 50,
+    ]
+
+    for name, (m, t, p) in region_stats.items():
+        lines.append(f"{name:<20} {m:>8,} {t:>8,} {p:>7.2f}%")
+
+    lines += [
         "",
         "--- Diff Image Colour Key ---",
-        "  Green  — pixel match (difference ≤ 10)",
-        "  Red    — Broiler has darker content where reference is lighter",
-        "  Blue   — Reference has darker content where Broiler is lighter",
-        "  Yellow — Other colour differences",
+        f"  Green  — pixel match (per-channel diff ≤ {COLOR_TOLERANCE})",
+        "  Red    — content-area mismatch",
+        "  Yellow — background-area mismatch",
         "",
         "=" * 70,
     ]
@@ -213,25 +219,25 @@ def main() -> int:
     reference = load_and_normalise(args.reference_image, target_size)
     broiler = load_and_normalise(args.broiler_image, target_size)
 
-    # Compute difference
-    diff = compute_diff(broiler, reference)
+    # Compute comparison masks
+    match = compute_match(broiler, reference)
+    content = content_mask(broiler, reference)
 
-    # Statistics
-    stats = classify_pixels(diff)
-    region_results = {}
+    # Per-region content-area match statistics
+    region_stats: dict[str, tuple[int, int, float]] = {}
     for name, bounds in REGIONS.items():
-        region_results[name] = analyse_region(diff, bounds)
-    bg_info = classify_background(reference)
+        region_stats[name] = region_content_match(match, content, bounds)
 
-    # Generate diff image
-    diff_img = generate_diff_image(diff)
+    # Generate diff image (content vs background colour coding)
+    diff_img = generate_diff_image(match, content)
     diff_path = os.path.join(args.output_dir, "acid3-diff.png")
     diff_img.save(diff_path)
     print(f"Diff image saved to: {diff_path}")
 
     # Generate report
     report = generate_report(
-        args.broiler_image, args.reference_image, stats, region_results, bg_info
+        args.broiler_image, args.reference_image,
+        match, content, region_stats, target_size,
     )
     report_path = os.path.join(args.output_dir, "acid3-report.txt")
     with open(report_path, "w") as f:
