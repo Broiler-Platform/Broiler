@@ -206,9 +206,9 @@ public class Phase2ValidationTests
     }
 
     [Fact]
-    public void M12_CompilerAssembly_NamespacesUnchanged()
+    public void M12_CompilerAssembly_NamespaceMatchesAssembly()
     {
-        // Subdirectory reorganization must NOT change namespaces.
+        // FastCompiler lives in the Broiler.JavaScript.Compiler namespace.
         var compilerType = typeof(Broiler.JavaScript.Compiler.FastCompiler);
         Assert.Equal("Broiler.JavaScript.Compiler", compilerType.Namespace);
     }
