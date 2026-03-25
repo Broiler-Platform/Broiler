@@ -3,7 +3,6 @@ using Broiler.JavaScript.Core.Enumerators;
 using System;
 using System.Collections.Generic;
 using System.Text;
-using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Generator;
 using Broiler.JavaScript.ExpressionCompiler;

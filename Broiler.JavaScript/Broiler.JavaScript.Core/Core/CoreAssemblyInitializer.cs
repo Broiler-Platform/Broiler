@@ -15,7 +15,7 @@ internal static class CoreAssemblyInitializer
         JSObject.NewTypeError = static msg => JSEngine.NewTypeError(msg);
         JSObject.GetCurrentObjectPrototype = static () => JSEngine.Current?.ObjectPrototype;
         JSObject.CoerceToNumber = static str => Utils.NumberParser.CoerceToNumber(str);
-        JSObject.CreatePrimitiveObject = static p => new Primitive.JSPrimitiveObject(p);
+        JSObject.CreatePrimitiveObject = static p => new JSPrimitiveObject(p);
         JSObject.TryGetClrEnumeratorFunc = Internal.CoreInternalHelpers.TryGetClrEnumerator;
         JSObject.TryUnmarshalObject = Internal.CoreInternalHelpers.TryUnmarshal;
     }

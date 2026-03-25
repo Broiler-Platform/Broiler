@@ -1,8 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core.Core.Storage;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Extension methods for <see cref="PropertySequence"/> that require runtime

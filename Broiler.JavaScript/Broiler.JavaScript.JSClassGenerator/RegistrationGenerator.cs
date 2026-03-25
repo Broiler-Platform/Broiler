@@ -26,7 +26,6 @@ internal class RegistrationGenerator(
                             .AppendLine("using Broiler.JavaScript.Core.Core;")
             .AppendLine("using Broiler.JavaScript.Core.Utils;")
             .AppendLine("using Broiler.JavaScript.Runtime;")
-        .AppendLine("using Broiler.JavaScript.Core.Core.Primitive;")
             .AppendLine("using Broiler.JavaScript.Core.Core.Storage;")
             .AppendLine("using Broiler.JavaScript.Storage;")
 

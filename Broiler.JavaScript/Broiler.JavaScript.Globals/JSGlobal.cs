@@ -2,7 +2,6 @@
 using System.Threading;
 using System.Collections.Generic;
 using Broiler.JavaScript.Core.Utils;
-using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.BuiltIns.Error;
 using Broiler.JavaScript.BuiltIns.RegExp;
 using Broiler.JavaScript.ExpressionCompiler;

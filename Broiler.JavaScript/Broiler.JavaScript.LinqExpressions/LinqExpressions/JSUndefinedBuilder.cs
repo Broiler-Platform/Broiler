@@ -1,5 +1,4 @@
 ﻿using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.LinqExpressions.LambdaGen;
 using Broiler.JavaScript.Runtime;
 

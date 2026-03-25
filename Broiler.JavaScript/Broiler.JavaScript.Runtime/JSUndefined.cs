@@ -1,9 +1,8 @@
-using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using System;
 using System.Globalization;
 
-namespace Broiler.JavaScript.Core.Core.Primitive;
+namespace Broiler.JavaScript.Runtime;
 
 public sealed class JSUndefined : JSValue
 {

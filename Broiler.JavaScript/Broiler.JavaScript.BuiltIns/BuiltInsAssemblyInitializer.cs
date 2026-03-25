@@ -14,7 +14,6 @@ using Broiler.JavaScript.BuiltIns.Promise;
 using Broiler.JavaScript.BuiltIns.Set;
 using Broiler.JavaScript.BuiltIns.Symbol;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.BuiltIns.BigInt;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Generator;

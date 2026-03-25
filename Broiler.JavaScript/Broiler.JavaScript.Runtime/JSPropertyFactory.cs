@@ -1,8 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core.Core.Storage;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Factory methods for creating <see cref="JSProperty"/> instances that require

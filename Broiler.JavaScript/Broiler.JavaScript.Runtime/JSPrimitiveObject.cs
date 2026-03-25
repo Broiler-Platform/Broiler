@@ -1,8 +1,7 @@
-﻿using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Storage;
+﻿using Broiler.JavaScript.Storage;
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Primitive;
+namespace Broiler.JavaScript.Runtime;
 
 public class JSPrimitiveObject : JSObject
 {

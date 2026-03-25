@@ -44,8 +44,6 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
                 .AppendLine("using Broiler.JavaScript.Runtime;")
             .AppendLine("using Broiler.JavaScript.BuiltIns.Function;")
                         .AppendLine("using Broiler.JavaScript.Core.Utils;")
-        .AppendLine("using Broiler.JavaScript.Core.Core.Primitive;")
-
             .AppendLine("using Broiler.JavaScript.Core.Core.Storage;")
             .AppendLine("using Broiler.JavaScript.Storage;")
 
