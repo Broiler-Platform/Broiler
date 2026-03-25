@@ -113,6 +113,8 @@ These assemblies have **no upward dependencies** and contain the lowest-level ab
 
 - **`Core`** — Central engine assembly containing `JSContext`, global objects, scope management, LINQ expression builders, property/element storage, and built-in registration infrastructure (`DefaultBuiltInRegistry`). Depends on Parser, Storage, Runtime, and ExpressionCompiler.
 
+> **Note (Phase 3):** Core has been reduced to ~44 source files.  `JSContext` is now in Engine, LINQ builders are in LinqExpressions, `DefaultBuiltInRegistry` is in BuiltIns, and `TypeQuery` is in LinqExpressions.  See `docs/architecture/modular-design.md` for the current architecture.
+
 ### 3.3 Feature Layer
 
 Each feature assembly depends on Core and implements a specific capability:
@@ -783,3 +785,27 @@ Each milestone should be delivered as a separate PR for focused review:
 **Phase 1 final state:** 40 built-in types extracted, 31 types forwarded, 6 module initializers, 158 tests, full CI on 3 platforms.
 
 **Phase 2 final state:** M9 coupling analysis completed (builders stay in Core due to runtime coupling in `JSFunction.CreateClrDelegate()`), large files decomposed for readability (5 files → 16 partials), foundation layer cleaned (dedup `CancellableDisposableAction`), Compiler reorganized into semantic subdirectories (Statements/, Expressions/, Declarations/, Scope/, Infrastructure/), ExpressionCompiler assessed and documented (no-go — intentionally cohesive), 177 tests passing across 12 test projects.
+
+### Phase 3 (Complete)
+
+| Milestone | Status | Description |
+|-----------|--------|-------------|
+| M15 | ✅ Complete | Final Core cleanup — dead-code removal, consolidation, remaining class migration |
+| M16 | ✅ Complete | Legacy refactor-hack audit and documentation |
+| M17 | ✅ Complete | Comprehensive modular architecture documentation |
+
+**Phase 3 final state:** Core reduced from ~48 to ~44 source files.  Dead code removed (`SafeExitException`, `JSClosureFunctionDelegate`/`Delegates.cs`).  `TypeQuery` utility migrated to LinqExpressions (sole consumer).  `EngineAssemblyInfo.cs` merged into `AssemblyInfo.cs`.  `FunctionNamespace.cs` documented as a known source-generator workaround.  Legacy refactor hacks audited and documented (see `docs/architecture/modular-design.md` §6).  New comprehensive architecture document created (`docs/architecture/modular-design.md`) covering assembly map, dependency graph, cross-assembly communication patterns, Core residual inventory, known workarounds, and contributor guidance.
+
+### Remaining Work (Future Phases)
+
+The following items are identified but not yet addressed:
+
+| Item | Priority | Description |
+|------|----------|-------------|
+| Fix test project references | High | Many test projects fail to build due to missing `Engine` project references and stale `using` directives after type extractions. |
+| Update `JSClassGenerator` | Medium | Remove emission of unused `using` directives to eliminate the `FunctionNamespace.cs` workaround. |
+| Move `PrototypeAttribute` to Runtime | Medium | Currently in Core; could live in Runtime with type forwarding since Core already references Runtime. |
+| Consolidate `CoreInternalHelpers` | Low | Duplicate helper code between `Core/Extensions/InternalExtensionHelpers.cs` and `Extensions/InternalExtensionHelpers.cs`. |
+| Fix `NotImplementedException` stubs | Low | `ClrObjectEnumerator<T>.Dispose()` and `.Reset()` should provide no-op or `NotSupportedException` implementations. |
+| Add null-guard diagnostics to static delegates | Low | Factory delegates in `JSEngine`, `JSException`, `JSValueToClrConverter` are null until module initializers run. |
+| Fix Network/NodePollyfill build | Low | These projects reference old Core namespaces and need `using`-directive updates. |
