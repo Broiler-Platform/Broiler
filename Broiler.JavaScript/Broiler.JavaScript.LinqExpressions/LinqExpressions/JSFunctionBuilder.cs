@@ -38,6 +38,13 @@ public class JSFunctionBuilder
             ?? throw new InvalidOperationException($"InvokeSuperConstructor method not found on {type.FullName}");
     }
 
+    /// <summary>
+    /// Gets the concrete <c>JSFunction</c> <see cref="Type"/> registered via
+    /// <see cref="Initialize"/>.  Used by the Compiler to avoid a direct
+    /// assembly reference to BuiltIns.
+    /// </summary>
+    public static Type FunctionType => type;
+
     public static Expression Prototype(Expression target) => Expression.Field(target, _prototype);
 
     public static Expression InvokeSuperConstructor(Expression super, Expression returnValue, Expression args)

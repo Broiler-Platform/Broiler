@@ -330,7 +330,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
         return base.ConvertTo(type, out value);
     }
 
-    internal static Func<Type, JSFunction, object> CreateClrDelegateFactory;
+    internal static Func<Type, IJSFunction, object> CreateClrDelegateFactory;
 
     static object CreateClrDelegate(Type type, JSFunction function)
     {

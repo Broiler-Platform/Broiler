@@ -1,7 +1,6 @@
-﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Core.Core;
 using System;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Runtime;
@@ -9,19 +8,6 @@ using Broiler.JavaScript.Runtime;
 namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 
 public delegate GeneratorState JSGeneratorDelegateV2(ClrGeneratorV2 generator, in Arguments a, int nextJump, JSValue nextValue, Exception ex);
-
-public class JSGeneratorFunctionV2 : JSFunction
-{
-    readonly JSGeneratorDelegateV2 @delegate;
-
-    public JSGeneratorFunctionV2(JSGeneratorDelegateV2 @delegate, in StringSpan name, in StringSpan code) : base(null, name, code)
-    {
-        this.@delegate = @delegate;
-        f = InvokeFunction;
-    }
-
-    public override JSValue InvokeFunction(in Arguments a) => JSGeneratorBuilder.CreateFromClrV2(new ClrGeneratorV2(this, @delegate, a));
-}
 
 public class GeneratorState(JSValue value, int nextJump, bool isValueDelegate)
 {
@@ -41,7 +27,7 @@ public class TryBlock
     public TryBlock Parent;
 }
 
-public class ClrGeneratorV2(JSGeneratorFunctionV2 generator, JSGeneratorDelegateV2 @delegate, Arguments arguments)
+public class ClrGeneratorV2(JSValue generator, JSGeneratorDelegateV2 @delegate, Arguments arguments)
 {
     public CallStackItem StackItem;
 

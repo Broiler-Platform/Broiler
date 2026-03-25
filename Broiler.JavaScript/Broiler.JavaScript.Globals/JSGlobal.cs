@@ -152,7 +152,7 @@ public partial class JSGlobalStatic
         {
             try
             {
-                f.f(new Arguments(_1 as JSValue));
+                f.Delegate(new Arguments(_1 as JSValue));
             }
             catch (Exception ex)
             {

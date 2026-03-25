@@ -1,4 +1,5 @@
 ﻿#nullable enable
+using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using System;
 using Broiler.JavaScript.Core.Core.Primitive;
@@ -10,7 +11,7 @@ namespace Broiler.JavaScript.Core.Core.Generator;
 
 public class JSAsyncFunction
 {
-    public static JSValue Create(JSGeneratorFunctionV2 gf)
+    public static JSValue Create(JSValue gf)
     {
         JSValue ToAsync(in Arguments a)
         {
@@ -18,7 +19,8 @@ public class JSAsyncFunction
             return ToPromise(gen!, JSUndefined.Value);
         }
 
-        return JSValue.CreateFunction(ToAsync, gf.name.Value, null, gf.Length);
+        var fn = gf as JSFunction;
+        return JSValue.CreateFunction(ToAsync, fn?.name.Value, null, gf.Length);
     }
 
     private static JSValue ToPromise(IJSGenerator gen, JSValue lastResult)

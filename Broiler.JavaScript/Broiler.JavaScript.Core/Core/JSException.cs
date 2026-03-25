@@ -4,7 +4,6 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Core.Core;

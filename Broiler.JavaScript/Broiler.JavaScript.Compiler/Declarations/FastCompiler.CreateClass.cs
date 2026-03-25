@@ -2,7 +2,6 @@
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Ast.Statements;
 using Broiler.JavaScript.Ast.Expressions;
@@ -53,12 +52,12 @@ partial class FastCompiler
             superExp = JSContextBuilder.Object;
         }
 
-        var superVar = YExpression.Parameter(typeof(JSFunction));
+        var superVar = YExpression.Parameter(JSFunctionBuilder.FunctionType);
         var superPrototypeVar = YExpression.Parameter(typeof(JSObject));
 
         var stmts = new Sequence<YExpression>(body.Members.Count)
         {
-            YExpression.Assign(superVar, YExpression.TypeAs(superExp, typeof(JSFunction))),
+            YExpression.Assign(superVar, YExpression.TypeAs(superExp, JSFunctionBuilder.FunctionType)),
             YExpression.Assign(superPrototypeVar, JSFunctionBuilder.Prototype(superVar))
         };
 

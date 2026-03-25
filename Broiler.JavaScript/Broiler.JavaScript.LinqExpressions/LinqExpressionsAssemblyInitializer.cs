@@ -1,12 +1,12 @@
 using System;
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.ExpressionCompiler.Runtime;
+using Broiler.JavaScript.Runtime;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
 
@@ -17,15 +17,12 @@ public static class LinqExpressionsAssemblyInitializer
     [ModuleInitializer]
     public static void Initialize()
     {
-        // Wire up JSFunction.CreateClrDelegateFactory
-        JSFunction.CreateClrDelegateFactory = CreateClrDelegate;
-
         // Wire up JSValueToClrConverter expression delegates
         JSValueToClrConverter.GetAtExpression = ArgumentsBuilder.GetAt;
         JSValueToClrConverter.LengthExpression = ArgumentsBuilder.Length;
     }
 
-    private static object CreateClrDelegate(Type type, JSFunction function)
+    internal static object CreateClrDelegate(Type type, IJSFunction function)
     {
         var method = type.GetMethod("Invoke");
         var rt = method.ReturnType;
@@ -46,9 +43,9 @@ public static class LinqExpressionsAssemblyInitializer
             stmts.Add(Expression.Assign(jsV, ClrProxyBuilder.Marshal(inP)));
         }
 
-        var @delegate = function.f;
+        var @delegate = function.Delegate;
         var d = Expression.Constant(@delegate);
-        var @this = Expression.Constant(function);
+        var @this = Expression.Constant((JSValue)function);
         var nargs = ArgumentsBuilder.New(@this, veList.AsSequence<Expression>());
 
         if (rt == typeof(void) || rt == typeof(object))
