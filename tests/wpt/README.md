@@ -47,7 +47,7 @@ Add or remove lines to adjust which tests run.  Categories currently include:
 
 | Label | Meaning |
 |-------|---------|
-| ✅ **MATCH** | Text outputs are ≥ 95 % similar |
+| ✅ **MATCH** | Text outputs are ≥ 95% similar |
 | ⚠️ **DIFF** | Both engines loaded the page but outputs differ significantly |
 | ❌ **BROILER_FAIL** | Broiler CLI failed to capture the page |
 | 🟡 **PLAYWRIGHT_FAIL** | Playwright failed (rare — indicates a wpt.live issue) |

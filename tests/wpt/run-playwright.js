@@ -83,14 +83,12 @@ async function main() {
     try {
       await page.goto(entry.url, { waitUntil: "networkidle", timeout: args.timeout });
 
-      // Give the WPT test-harness a moment to render results.
-      await page.waitForTimeout(2000);
-
-      // Try to wait for completion signal from testharness.js
+      // Wait for WPT test-harness completion signal or DOM stability.
       try {
-        await page.waitForSelector("#results, .pass, .fail, #summary", { timeout: 5000 });
+        await page.waitForSelector("#results, .pass, .fail, #summary", { timeout: 10000 });
       } catch {
-        // Not all pages use testharness.js — proceed anyway.
+        // Not all pages use testharness.js — fall back to load-state check.
+        await page.waitForLoadState("domcontentloaded");
       }
 
       const textContent = await page.evaluate(() => {

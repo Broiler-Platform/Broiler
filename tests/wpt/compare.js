@@ -150,8 +150,8 @@ function main() {
   lines.push("");
   lines.push(`| Status | Count |`);
   lines.push(`|--------|-------|`);
-  lines.push(`| ✅ MATCH (≥95 % similar) | ${counts.MATCH} |`);
-  lines.push(`| ⚠️ DIFF (< 95 % similar) | ${counts.DIFF} |`);
+  lines.push(`| ✅ MATCH (≥ 95% similar) | ${counts.MATCH} |`);
+  lines.push(`| ⚠️ DIFF (< 95% similar) | ${counts.DIFF} |`);
   lines.push(`| ❌ BROILER_FAIL | ${counts.BROILER_FAIL} |`);
   lines.push(`| 🟡 PLAYWRIGHT_FAIL | ${counts.PLAYWRIGHT_FAIL} |`);
   lines.push(`| 🔴 BOTH_FAIL | ${counts.BOTH_FAIL} |`);
@@ -166,7 +166,7 @@ function main() {
     lines.push("| Category | Test ID | Similarity | URL |");
     lines.push("|----------|---------|------------|-----|");
     for (const r of subset) {
-      lines.push(`| ${r.category} | ${r.id} | ${r.similarity} % | [link](${r.url}) |`);
+      lines.push(`| ${r.category} | ${r.id} | ${r.similarity}% | [link](${r.url}) |`);
     }
     lines.push("");
   }
