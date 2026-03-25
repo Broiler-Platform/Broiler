@@ -1,5 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
@@ -147,14 +146,14 @@ public static class JSValueToClrConverter
             return f(value, "");
         }
 
-        if (value.ConvertTo<T>(out var v))
+        if (value.TryConvertTo(typeof(T), out var obj) && obj is T v)
             return v;
 
         throw new JSException($"Failed to convert JSValue to {type.Name}");
     }
 
-    public static T GetAs<T>(JSValue value) => value.ConvertTo(out T v1) ? v1 : default;
+    public static T GetAs<T>(JSValue value) => value.TryConvertTo(typeof(T), out var obj) && obj is T v1 ? v1 : default;
 
-    public static T GetAsOrThrow<T>(JSValue value, string error) => value.ConvertTo(out T v1) ? v1 : throw new JSException(error);
+    public static T GetAsOrThrow<T>(JSValue value, string error) => value.TryConvertTo(typeof(T), out var obj) && obj is T v1 ? v1 : throw new JSException(error);
 
 }
