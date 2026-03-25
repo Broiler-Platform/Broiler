@@ -170,7 +170,7 @@ internal static class BuiltInsAssemblyInitializer
         // Wire factory delegates for JSGenerator so Core and Clr can create
         // generator instances without a direct type reference.
         JSGeneratorBuilder.CreateFromEnumerator = static (en, name) => new JSGenerator(en, name);
-        JSGeneratorBuilder.CreateFromClrV2 = static g => new JSGenerator(g);
+        JSGeneratorBuilder.CreateFromClrV2 = static g => new JSGenerator((ClrGeneratorV2)g);
 
         // Wire factory delegate for JSPrototype so Core can create prototype
         // instances without referencing the concrete type directly.
@@ -290,6 +290,6 @@ internal static class BuiltInsAssemblyInitializer
 
         // Initialize builders for generator/async function types
         JSGeneratorFunctionBuilderV2.Initialize(typeof(JSGeneratorFunctionV2));
-        JSAsyncFunctionBuilder.Initialize(typeof(JSAsyncFunction), typeof(JSGeneratorFunctionV2));
+        JSAsyncFunctionBuilder.Initialize(typeof(JSAsyncFunction), typeof(JSValue));
     }
 }

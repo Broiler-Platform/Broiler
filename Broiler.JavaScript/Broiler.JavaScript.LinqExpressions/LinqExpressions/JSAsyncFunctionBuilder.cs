@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Core.LinqExpressions;
 
@@ -12,9 +13,9 @@ public static class JSAsyncFunctionBuilder
     /// Initializes the builder with the concrete JSAsyncFunction type.
     /// Called from BuiltInsAssemblyInitializer.
     /// </summary>
-    internal static void Initialize(Type asyncFunctionType, Type generatorFunctionType)
+    internal static void Initialize(Type asyncFunctionType, Type parameterType)
     {
-        _createMethod = asyncFunctionType.GetMethod("Create", [generatorFunctionType]);
+        _createMethod = asyncFunctionType.GetMethod("Create", [parameterType]);
     }
 
     public static YExpression Create(YExpression fx) => YExpression.Call(null, _createMethod, fx);
