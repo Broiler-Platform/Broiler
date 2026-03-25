@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
 
-namespace Broiler.JavaScript.Core.TypeQuery;
+namespace Broiler.JavaScript.LinqExpressions.TypeQuery;
 
 public static class TypeQuery
 {

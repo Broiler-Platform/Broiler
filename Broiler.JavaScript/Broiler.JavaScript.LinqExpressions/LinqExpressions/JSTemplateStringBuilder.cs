@@ -16,8 +16,8 @@ public class JSTemplateStringBuilder
         var newExp = NewLambdaExpression.NewExpression<JSTemplateString>(() => () => new JSTemplateString(0), Expression.Constant(total));
         var en = select.GetEnumerator();
 
-        var addStringMethod = Broiler.JavaScript.Core.TypeQuery.TypeQuery.QueryInstanceMethod<JSTemplateString>(() => (x) => x.Add(""));
-        var addValueMethod = Broiler.JavaScript.Core.TypeQuery.TypeQuery.QueryInstanceMethod<JSTemplateString>(() => (x) => x.Add((JSValue)null));
+        var addStringMethod = TypeQuery.TypeQuery.QueryInstanceMethod<JSTemplateString>(() => (x) => x.Add(""));
+        var addValueMethod = TypeQuery.TypeQuery.QueryInstanceMethod<JSTemplateString>(() => (x) => x.Add((JSValue)null));
 
         while (en.MoveNext())
         {

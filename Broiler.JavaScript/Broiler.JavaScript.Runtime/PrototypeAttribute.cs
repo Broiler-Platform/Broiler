@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.Storage;
 using System;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 
 public enum MemberType: int

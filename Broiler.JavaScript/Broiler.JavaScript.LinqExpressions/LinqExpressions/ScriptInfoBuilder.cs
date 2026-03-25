@@ -10,8 +10,8 @@ public static class ScriptInfoBuilder
 {
     public static Expression New(string fileName, string code)
     {
-        var _code = Broiler.JavaScript.Core.TypeQuery.TypeQuery.QueryInstanceField<ScriptInfo, string>(() => (x) => x.Code);
-        var _fileName = Broiler.JavaScript.Core.TypeQuery.TypeQuery.QueryInstanceField<ScriptInfo, string>(() => (x) => x.FileName);
+        var _code = TypeQuery.TypeQuery.QueryInstanceField<ScriptInfo, string>(() => (x) => x.Code);
+        var _fileName = TypeQuery.TypeQuery.QueryInstanceField<ScriptInfo, string>(() => (x) => x.FileName);
 
         return Expression.MemberInit(NewLambdaExpression.NewExpression<ScriptInfo>(() => () =>
         new ScriptInfo()), Expression.Bind(_code, Expression.Constant(code)), Expression.Bind(_fileName, Expression.Constant(fileName)));

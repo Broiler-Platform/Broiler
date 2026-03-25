@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Core.Core;
 
 // Type forwarding for types moved to Broiler.JavaScript.Runtime assembly.
 // These ensure binary compatibility for downstream consumers that reference
