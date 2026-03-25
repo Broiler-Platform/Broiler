@@ -1,6 +1,4 @@
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core.Core.Promise;
-using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.Runtime;
 
 // Type forwarding for types moved to Broiler.JavaScript.Runtime assembly.

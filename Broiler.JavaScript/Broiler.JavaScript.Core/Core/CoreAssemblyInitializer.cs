@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Core.Core;
@@ -14,7 +13,7 @@ internal static class CoreAssemblyInitializer
 
         // Wire JSObject factory delegates for Core dependencies
         JSObject.NewTypeError = static msg => JSEngine.NewTypeError(msg);
-        JSObject.CoerceToNumber = static str => Utils.NumberParser.CoerceToNumber(str);
+        JSObject.CoerceToNumber = static str => NumberParser.CoerceToNumber(str);
         JSObject.CreatePrimitiveObject = static p => new JSPrimitiveObject(p);
         JSObject.TryGetClrEnumeratorFunc = Internal.CoreInternalHelpers.TryGetClrEnumerator;
         JSObject.TryUnmarshalObject = Internal.CoreInternalHelpers.TryUnmarshal;

@@ -1,8 +1,7 @@
 ﻿using System;
 using System.Text;
-using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.Utils;
+namespace Broiler.JavaScript.Runtime;
 
 internal static class UriHelper
 {

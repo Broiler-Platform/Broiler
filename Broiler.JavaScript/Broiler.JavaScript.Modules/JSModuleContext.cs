@@ -6,7 +6,6 @@ using System.Text;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
-using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Runtime;

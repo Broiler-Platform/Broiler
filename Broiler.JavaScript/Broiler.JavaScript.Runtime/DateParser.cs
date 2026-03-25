@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Globalization;
 
-namespace Broiler.JavaScript.Core.Utils;
+namespace Broiler.JavaScript.Runtime;
 
 public static class DateParser
 {

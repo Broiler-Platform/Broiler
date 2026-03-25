@@ -1,7 +1,6 @@
-﻿using Broiler.JavaScript.Runtime;
-using System;
+﻿using System;
 
-namespace Broiler.JavaScript.Core.Utils;
+namespace Broiler.JavaScript.Runtime;
 
 public class TypeConverter
 {

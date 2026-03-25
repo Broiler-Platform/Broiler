@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Numerics;
 
-namespace Broiler.JavaScript.Core.Utils;
+namespace Broiler.JavaScript.Runtime;
 
 public static class BigIntegerExtensions
 {

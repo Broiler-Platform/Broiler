@@ -3,7 +3,7 @@ using System;
 using System.IO;
 using System.Numerics;
 
-namespace Broiler.JavaScript.Core.Utils;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Parses strings into numbers.
