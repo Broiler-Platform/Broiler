@@ -1,4 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;
 using System;
@@ -30,7 +31,7 @@ public partial class JSSymbol: JSValue, IJSSymbol
 
     public static implicit operator PropertyKey(JSSymbol key) => PropertyKey.FromSymbol(key);
 
-    public JSSymbol(string name) : base(JSEngine.Current?.ObjectPrototype)
+    public JSSymbol(string name) : base((JSEngine.Current as IJSExecutionContext)?.ObjectPrototype)
     {
         this.name = name;
         Key = (uint)Interlocked.Increment(ref SymbolID);

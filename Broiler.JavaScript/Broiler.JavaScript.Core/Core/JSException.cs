@@ -84,23 +84,7 @@ public class JSException : Exception
                 sb.AppendLine($"    at {f.target}:{f.file}:{f.line},{f.column}");
             }
 
-            var top = JSEngine.Current.Top;
-            while (top != null)
-            {
-                // ref var top = ref walker.Current;
-                var fx = top.Function;
-                var file = top.FileName;
-
-                if (fx.IsNullOrWhiteSpace())
-                    fx = "native";
-
-                if (string.IsNullOrWhiteSpace(file))
-                    file = "file";
-
-                sb.AppendLine($"    at {fx}:{file}:{top.Line},{top.Column}");
-                trace.Add((fx, file, top.Line, top.Column));
-                top = top.Parent;
-            }
+            JSEngine.AppendStackTrace?.Invoke(sb, trace);
 
             return JSValue.CreateString(sb.ToString());
         }

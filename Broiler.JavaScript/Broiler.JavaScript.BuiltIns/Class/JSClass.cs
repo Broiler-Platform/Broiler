@@ -2,6 +2,7 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.BuiltIns.Class;
@@ -21,7 +22,7 @@ public class JSClass : JSFunction
 
     public override JSValue InvokeFunction(in Arguments a)
     {
-        if (JSEngine.NewTarget == null && JSEngine.Current.CurrentNewTarget == null)
+        if (JSEngine.NewTarget == null && (JSEngine.Current as IJSExecutionContext)?.CurrentNewTarget == null)
             throw JSEngine.NewTypeError($"{this} is not a function");
 
         return f(a);
@@ -32,7 +33,8 @@ public class JSClass : JSFunction
     {
         var @object = new JSObject() { BasePrototypeObject = prototype };
         var ao = a.OverrideThis(@object);
-        JSEngine.Current.CurrentNewTarget = this;
+        var ec = JSEngine.Current as IJSExecutionContext;
+        if (ec != null) ec.CurrentNewTarget = this;
         var @this = f(ao);
         
         if (!@this.IsUndefined)

@@ -1,4 +1,5 @@
 ﻿using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;
 using System;
@@ -30,7 +31,7 @@ partial class JSNumber
     [JSExport(Length = 1, IsConstructor = true)]
     public static JSValue Constructor(in Arguments a)
     {
-        if (JSEngine.Current.CurrentNewTarget == null)
+        if ((JSEngine.Current as IJSExecutionContext)?.CurrentNewTarget == null)
         {
             if (a.Length == 0)
                 return Zero;

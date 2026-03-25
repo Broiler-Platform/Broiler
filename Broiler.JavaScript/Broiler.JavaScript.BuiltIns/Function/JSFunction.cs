@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Core.Core;
 
@@ -131,7 +132,7 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
         constructor = this;
     }
 
-    public JSFunction(JSFunctionDelegate f, in StringSpan name, in StringSpan source, int length = 0, bool createPrototype = true) : base(JSEngine.Current?.FunctionPrototype)
+    public JSFunction(JSFunctionDelegate f, in StringSpan name, in StringSpan source, int length = 0, bool createPrototype = true) : base((JSEngine.Current as IJSExecutionContext)?.FunctionPrototype)
     {
         ref var ownProperties = ref GetOwnProperties();
         this.f = f;
@@ -174,7 +175,8 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
 
         JSValue obj = new JSObject { BasePrototypeObject = prototype };
         var a1 = a.OverrideThis(obj);
-        JSEngine.Current.CurrentNewTarget = this;
+        var ec = JSEngine.Current as IJSExecutionContext;
+        if (ec != null) ec.CurrentNewTarget = this;
         var r = f(a1);
 
         if (r.IsObject)
@@ -290,13 +292,13 @@ public partial class JSFunction : JSObject, IPropertyAccessor, IJSFunction
 
         var bodyText = body.IsString ? body.StringValue : body.ToString();
         string location = null;
-        var context = JSEngine.Current;
-        context.DispatchEvalEvent(ref bodyText, ref location);
+        var context = JSEngine.Current as IJSExecutionContext;
+        context?.DispatchEvalEvent(ref bodyText, ref location);
 
         var fx = new JSFunction(empty, "internal", bodyText);
 
         // parse and create method...
-        var fx1 = CoreScript.Compile(bodyText, "internal", sargs, codeCache: context.CodeCache);
+        var fx1 = CoreScript.Compile(bodyText, "internal", sargs, codeCache: context?.CodeCache);
         fx.f = fx1;
         return fx;
     }

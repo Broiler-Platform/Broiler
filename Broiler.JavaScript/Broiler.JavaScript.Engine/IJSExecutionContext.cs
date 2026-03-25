@@ -3,11 +3,12 @@ using Broiler.JavaScript.Runtime;
 namespace Broiler.JavaScript.Core.Core;
 
 /// <summary>
-/// Extended execution context contract used internally by Core types that
-/// need access to prototype objects, the call stack, and variable registration.
+/// Extended execution context contract used internally by Engine and
+/// higher-level types that need access to prototype objects, the call
+/// stack, and variable registration.
 /// <see cref="IJSContext"/> (in Runtime) provides the minimal contract;
-/// this interface adds properties required by types that live inside Core
-/// (e.g., <c>JSObject</c>, <c>JSFunction</c>, <c>CallStackItem</c>).
+/// this interface adds properties required by types that participate in
+/// execution (e.g., <c>JSContext</c>, <c>CallStackItem</c>).
 /// </summary>
 public interface IJSExecutionContext : IJSContext
 {

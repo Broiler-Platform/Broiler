@@ -15,7 +15,6 @@ internal static class JSValueCoreExtensions
         JSValue.UndefinedValue = JSUndefined.Value;
 
         JSValue.NewTypeError = msg => JSEngine.NewTypeError(msg);
-        JSValue.CreateDynamicMetaObject = (param, value) => new JSDynamicMetaData(param, value);
         JSValue.ForceConvertHelper = (jsValue, type, _) =>
         {
             var protoObj = (jsValue.prototypeChain as IJSPrototype)?.Object as JSObject;
@@ -30,10 +29,6 @@ internal static class JSValueCoreExtensions
         JSValue.InvokePropertyGetter = (getter, receiver) => getter is IJSFunction fn ? fn.InvokeFunction(new Arguments(receiver)) : JSValue.UndefinedValue;
         JSValue.CreatePrototypeObject = value => (value as JSObject)?.PrototypeObject;
         Arguments.Empty = new Arguments(JSUndefined.Value);
-        Arguments.ForApplyImpl = ArgumentsCoreExtensions.ForApplyCore;
-        Arguments.RestFromImpl = ArgumentsCoreExtensions.RestFromCore;
-        Arguments.GetStringImpl = ArgumentsCoreExtensions.GetStringCore;
-        Arguments.GetSpreadTarget = ArgumentsCoreExtensions.GetSpreadTargetCore;
 
         // Proactively load the BuiltIns assembly so that its ModuleInitializer
         // wires string/number/boolean factories (JSValue.CreateString, etc.)

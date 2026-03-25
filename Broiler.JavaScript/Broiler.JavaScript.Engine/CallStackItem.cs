@@ -20,7 +20,7 @@ public class CallStackItem
     [EditorBrowsable(EditorBrowsableState.Never)]
     public CallStackItem(IJSExecutionContext context, ScriptInfo scriptInfo, int nameOffset, int nameLength, int line, int column)
     {
-        context = context ?? JSEngine.Current;
+        context = context ?? JSEngine.Current as IJSExecutionContext;
         context.EnsureSufficientExecutionStack();
         this.context = context;
         var ctx = context.CurrentNewTarget;
@@ -42,7 +42,7 @@ public class CallStackItem
     [EditorBrowsable(EditorBrowsableState.Never)]
     public CallStackItem(IJSExecutionContext context, string fileName, in StringSpan function, int line, int column)
     {
-        context = context ?? JSEngine.Current;
+        context = context ?? JSEngine.Current as IJSExecutionContext;
         context.EnsureSufficientExecutionStack();
         this.context = context;
         FileName = fileName;
@@ -73,7 +73,7 @@ public class CallStackItem
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Pop(IJSExecutionContext context)
     {
-        context = context ?? JSEngine.Current;
+        context = context ?? JSEngine.Current as IJSExecutionContext;
         context.Top = Parent;
         Parent = null;
     }

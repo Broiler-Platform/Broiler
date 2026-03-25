@@ -13,7 +13,6 @@ internal static class CoreAssemblyInitializer
 
         // Wire JSObject factory delegates for Core dependencies
         JSObject.NewTypeError = static msg => JSEngine.NewTypeError(msg);
-        JSObject.GetCurrentObjectPrototype = static () => JSEngine.Current?.ObjectPrototype;
         JSObject.CoerceToNumber = static str => Utils.NumberParser.CoerceToNumber(str);
         JSObject.CreatePrimitiveObject = static p => new JSPrimitiveObject(p);
         JSObject.TryGetClrEnumeratorFunc = Internal.CoreInternalHelpers.TryGetClrEnumerator;
