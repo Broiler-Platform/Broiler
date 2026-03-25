@@ -1,7 +1,8 @@
+using Broiler.JavaScript.Core.Core;
 using System;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Engine;
 
 public static class JSContextExtensions
 {

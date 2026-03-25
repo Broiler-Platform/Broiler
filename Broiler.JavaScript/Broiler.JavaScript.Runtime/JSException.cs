@@ -4,10 +4,9 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 public class JSException : Exception
 {

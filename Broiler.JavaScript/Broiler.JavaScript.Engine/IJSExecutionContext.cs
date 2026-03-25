@@ -1,6 +1,6 @@
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Engine;
 
 /// <summary>
 /// Extended execution context contract used internally by Engine and

@@ -2,6 +2,7 @@ using Broiler.JavaScript.Core.Core;
 using System;
 using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Engine;
 
 namespace Broiler.JavaScript.LinqExpressions.LinqExpressions.GeneratorsV2;
 

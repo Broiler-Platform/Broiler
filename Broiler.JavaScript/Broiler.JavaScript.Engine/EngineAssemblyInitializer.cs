@@ -1,10 +1,8 @@
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Text;
-using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Engine;
 
 /// <summary>
 /// Module initializer for the Engine assembly.

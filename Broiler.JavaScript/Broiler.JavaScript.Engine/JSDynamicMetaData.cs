@@ -1,3 +1,4 @@
+using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.Runtime;
 using System;
@@ -6,7 +7,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Engine;
 
 internal class JSDynamicMetaData : DynamicMetaObject
 {

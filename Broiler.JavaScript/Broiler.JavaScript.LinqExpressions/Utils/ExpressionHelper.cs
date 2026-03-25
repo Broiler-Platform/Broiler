@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.LinqExpressions.LinqExpressions;

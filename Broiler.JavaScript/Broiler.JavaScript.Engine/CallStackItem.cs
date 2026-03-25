@@ -2,8 +2,9 @@ using System.Runtime.CompilerServices;
 using System.ComponentModel;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Core.Core;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Engine;
 
 public class CallStackItem
 {

@@ -1,8 +1,7 @@
-using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Extension methods and Core-dependent helpers for <see cref="KeyString"/>

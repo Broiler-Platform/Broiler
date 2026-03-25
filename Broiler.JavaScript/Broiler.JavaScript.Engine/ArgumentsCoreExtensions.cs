@@ -1,7 +1,8 @@
 using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Engine;
 
 /// <summary>
 /// Core-dependent implementations for <see cref="Arguments"/> factory delegates.

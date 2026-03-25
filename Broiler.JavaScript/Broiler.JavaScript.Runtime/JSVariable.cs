@@ -1,12 +1,11 @@
 ﻿using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 public class JSVariable
 {
