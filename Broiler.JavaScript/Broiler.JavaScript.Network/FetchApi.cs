@@ -6,7 +6,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Clr;
+using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Engine.Extensions;
 
 namespace YantraJS.Network
 {

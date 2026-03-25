@@ -1,5 +1,10 @@
 using System.Runtime.CompilerServices;
+using Broiler.JavaScript.BuiltIns;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.LinqExpressions.LinqExpressions;
+using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Integration.Tests;
 
@@ -24,18 +29,20 @@ public class Phase2ValidationTests
     // ── M9: Code-Generation Builder Isolation Analysis ─────────────────
 
     [Fact]
-    public void M9_BuildersRemainInCore_LinqExpressionsAccessible()
+    public void M9_BuildersInLinqExpressions()
     {
-        // M9 analysis concluded that LinqExpressions builders must stay in Core
-        // due to runtime coupling. Verify they are accessible from Core assembly.
-        var coreAssembly = typeof(JSContext).Assembly;
-        var coreTypes = coreAssembly.GetTypes().Select(t => t.FullName).ToList();
+        // LinqExpressions builders live in the LinqExpressions assembly.
+        var linqAssembly = typeof(Broiler.JavaScript.LinqExpressions.LinqExpressions.JSRegExpBuilder).Assembly;
+        var linqTypes = linqAssembly.GetTypes().Select(t => t.FullName).ToList();
 
-        // Key builder types that were analyzed and confirmed to stay in Core:
-        Assert.Contains(coreTypes, t => t != null && t.Contains("JSValueBuilder"));
-        Assert.Contains(coreTypes, t => t != null && t.Contains("JSObjectBuilder"));
-        Assert.Contains(coreTypes, t => t != null && t.Contains("ArgumentsBuilder"));
-        Assert.Contains(coreTypes, t => t != null && t.Contains("ClrProxyBuilder"));
+        // Key builder types in LinqExpressions:
+        Assert.Contains(linqTypes, t => t != null && t.Contains("JSValueBuilder"));
+        Assert.Contains(linqTypes, t => t != null && t.Contains("ArgumentsBuilder"));
+        Assert.Contains(linqTypes, t => t != null && t.Contains("ClrProxyBuilder"));
+
+        // JSObjectBuilder was moved to Runtime:
+        var runtimeTypes = typeof(JSValue).Assembly.GetTypes().Select(t => t.FullName).ToList();
+        Assert.Contains(runtimeTypes, t => t != null && t.Contains("JSObjectBuilder"));
     }
 
     [Fact]
@@ -62,20 +69,20 @@ public class Phase2ValidationTests
     }
 
     [Fact]
-    public void M9_CompilerStillReferencesCore()
+    public void M9_CompilerStillReferencesEngine()
     {
-        // Verify that Compiler assembly references Core (not the other way around).
+        // Verify that Compiler assembly references Engine (not the other way around).
         var compilerAssembly = typeof(Broiler.JavaScript.Compiler.FastCompiler).Assembly;
-        var coreAssembly = typeof(JSContext).Assembly;
+        var engineAssembly = typeof(JSContext).Assembly;
 
         var compilerRefs = compilerAssembly.GetReferencedAssemblies()
             .Select(a => a.Name).ToList();
-        Assert.Contains("Broiler.JavaScript.Core", compilerRefs);
+        Assert.Contains("Broiler.JavaScript.Engine", compilerRefs);
 
-        // Core must NOT reference Compiler.
-        var coreRefs = coreAssembly.GetReferencedAssemblies()
+        // Engine must NOT reference Compiler.
+        var engineRefs = engineAssembly.GetReferencedAssemblies()
             .Select(a => a.Name).ToList();
-        Assert.DoesNotContain("Broiler.JavaScript.Compiler", coreRefs);
+        Assert.DoesNotContain("Broiler.JavaScript.Compiler", engineRefs);
     }
 
     // ── M10: Core Large-File Decomposition ─────────────────────────────
@@ -106,8 +113,8 @@ public class Phase2ValidationTests
     [Fact]
     public void M10_JSObject_PartialFilesExist()
     {
-        // Verify JSObject class exists and is not broken by the split.
-        var type = typeof(JSContext).Assembly.GetTypes()
+        // Verify JSObject class exists in Runtime and is not broken by the split.
+        var type = typeof(JSValue).Assembly.GetTypes()
             .FirstOrDefault(t => t.Name == "JSObject");
         Assert.NotNull(type);
 
@@ -160,8 +167,8 @@ public class Phase2ValidationTests
     [Fact]
     public void M10_JSObjectStatic_PartialFilesExist()
     {
-        // Verify JSObjectStatic exists and has methods from each category.
-        var type = typeof(JSContext).Assembly.GetTypes()
+        // Verify JSObjectStatic exists in Runtime and has methods from each category.
+        var type = typeof(JSValue).Assembly.GetTypes()
             .FirstOrDefault(t => t.Name == "JSObjectStatic");
         Assert.NotNull(type);
     }
@@ -199,11 +206,11 @@ public class Phase2ValidationTests
     }
 
     [Fact]
-    public void M12_CompilerAssembly_NamespacesUnchanged()
+    public void M12_CompilerAssembly_NamespaceMatchesAssembly()
     {
-        // Subdirectory reorganization must NOT change namespaces.
+        // FastCompiler lives in the Broiler.JavaScript.Compiler namespace.
         var compilerType = typeof(Broiler.JavaScript.Compiler.FastCompiler);
-        Assert.Equal("Broiler.JavaScript.Core.FastParser.Compiler", compilerType.Namespace);
+        Assert.Equal("Broiler.JavaScript.Compiler", compilerType.Namespace);
     }
 
     // ── M13: ExpressionCompiler Assessment ─────────────────────────────
@@ -311,16 +318,14 @@ public class Phase2ValidationTests
     }
 
     [Fact]
-    public void M14_TypeForwardingIntact()
+    public void M14_TypesInCorrectAssemblies()
     {
-        // Verify type forwarding count hasn't decreased after Phase 2 changes.
-        // Types are forwarded across 3 files: ClrTypeForwarding.cs (9),
-        // ParserTypeForwarding.cs (12), StorageTypeForwarding.cs (10).
-        var coreAssembly = typeof(JSContext).Assembly;
-        var forwarded = coreAssembly.GetForwardedTypes();
-
-        Assert.True(forwarded.Length >= 31,
-            $"Expected at least 31 forwarded types, found {forwarded.Length}");
+        // Verify types reside directly in their target assemblies after
+        // Core was merged into Engine (no type forwarding needed).
+        Assert.Equal("Broiler.JavaScript.Runtime", typeof(JSValue).Assembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.Runtime", typeof(Arguments).Assembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.Storage", typeof(KeyStrings).Assembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.Engine", typeof(JSContext).Assembly.GetName().Name);
     }
 
     [Fact]

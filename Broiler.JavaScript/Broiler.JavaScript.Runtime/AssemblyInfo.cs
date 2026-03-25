@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("Broiler.JavaScript.Core")]
 [assembly: InternalsVisibleTo("Broiler.JavaScript.Core.Tests")]
 [assembly: InternalsVisibleTo("Broiler.JavaScript.Clr")]
 [assembly: InternalsVisibleTo("Broiler.JavaScript.Compiler")]

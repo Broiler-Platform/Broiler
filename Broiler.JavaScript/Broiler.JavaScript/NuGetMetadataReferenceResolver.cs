@@ -1,4 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core.Promise;
+﻿using Broiler.JavaScript.Runtime;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;

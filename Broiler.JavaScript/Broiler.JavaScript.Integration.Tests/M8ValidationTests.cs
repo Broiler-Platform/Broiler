@@ -1,5 +1,11 @@
 using System.Runtime.CompilerServices;
+using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.BuiltIns;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Parser;
+using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Integration.Tests;
 
@@ -57,22 +63,22 @@ public class M8ValidationTests
     public void M8_ArchitectureDiagram_LayeringIsCorrect()
     {
         // Verify the documented 4-layer architecture by checking assembly references.
-        // Feature layer (BuiltIns) must reference Core layer but not vice versa.
+        // Feature layer (BuiltIns) must reference Engine layer but not vice versa.
         var builtInsAssembly = typeof(Broiler.JavaScript.BuiltIns.Map.JSMap).Assembly;
-        var coreAssembly = typeof(JSContext).Assembly;
+        var engineAssembly = typeof(JSContext).Assembly;
 
         Assert.Equal("Broiler.JavaScript.BuiltIns", builtInsAssembly.GetName().Name);
-        Assert.Equal("Broiler.JavaScript.Core", coreAssembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.Engine", engineAssembly.GetName().Name);
 
-        // BuiltIns references Core (Feature → Core is allowed).
+        // BuiltIns references Engine (Feature → Engine is allowed).
         var builtInsRefs = builtInsAssembly.GetReferencedAssemblies()
             .Select(a => a.Name).ToList();
-        Assert.Contains("Broiler.JavaScript.Core", builtInsRefs);
+        Assert.Contains("Broiler.JavaScript.Engine", builtInsRefs);
 
-        // Core must NOT reference BuiltIns (no upward dependency).
-        var coreRefs = coreAssembly.GetReferencedAssemblies()
+        // Engine must NOT reference BuiltIns (no upward dependency).
+        var engineRefs = engineAssembly.GetReferencedAssemblies()
             .Select(a => a.Name).ToList();
-        Assert.DoesNotContain("Broiler.JavaScript.BuiltIns", coreRefs);
+        Assert.DoesNotContain("Broiler.JavaScript.BuiltIns", engineRefs);
     }
 
     // ── 8.3: Module Initializer Documentation Accuracy ────────────────
@@ -119,12 +125,12 @@ public class M8ValidationTests
         // The documentation states there are 6 module initializers across 4 assemblies.
         // Verify the initializer classes exist in the documented locations.
 
-        // Core assembly — 3 initializers:
-        var coreAssembly = typeof(JSContext).Assembly;
-        var coreTypes = coreAssembly.GetTypes().Select(t => t.Name).ToList();
-        Assert.Contains("JSValueCoreExtensions", coreTypes);
-        Assert.Contains("CoreScriptCoreExtensions", coreTypes);
-        Assert.Contains("PropertySequenceCoreExtensions", coreTypes);
+        // Engine assembly — 3 initializers:
+        var engineAssembly = typeof(JSContext).Assembly;
+        var engineTypes = engineAssembly.GetTypes().Select(t => t.Name).ToList();
+        Assert.Contains("JSValueCoreExtensions", engineTypes);
+        Assert.Contains("CoreScriptCoreExtensions", engineTypes);
+        Assert.Contains("PropertySequenceCoreExtensions", engineTypes);
 
         // BuiltIns assembly — 1 initializer:
         var builtInsAssembly = typeof(Broiler.JavaScript.BuiltIns.Map.JSMap).Assembly;
@@ -162,16 +168,16 @@ public class M8ValidationTests
     }
 
     [Fact]
-    public void M8_ContributionGuide_TypeForwardingCount()
+    public void M8_ContributionGuide_TypesInCorrectAssemblies()
     {
-        // Types are forwarded across 3 forwarding files:
-        //   ClrTypeForwarding.cs (9), ParserTypeForwarding.cs (12),
-        //   StorageTypeForwarding.cs (10)
-        var coreAssembly = typeof(JSContext).Assembly;
-        var forwarded = coreAssembly.GetForwardedTypes();
-
-        Assert.True(forwarded.Length >= 31,
-            $"Expected at least 31 forwarded types but found {forwarded.Length}");
+        // After refactoring, types live directly in their target assemblies
+        // (no type forwarding needed since Core was merged into Engine).
+        // Verify key types are in their expected assemblies.
+        Assert.Equal("Broiler.JavaScript.Runtime", typeof(JSValue).Assembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.Runtime", typeof(Arguments).Assembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.Storage", typeof(KeyString).Assembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.Ast", typeof(StringSpan).Assembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.Parser", typeof(FastParser).Assembly.GetName().Name);
     }
 
     // ── M8 Documentation file existence ───────────────────────────────

@@ -4,8 +4,9 @@ using System.IO;
 using System.Threading.Tasks;
 using YantraJS;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Emit;
-using Broiler.JavaScript.Generator;
+using Broiler.JavaScript.ExpressionCompiler;
+using Broiler.JavaScript.ExpressionCompiler.Generator;
+using Broiler.JavaScript.Runtime;
 using YantraJS.Utils;
 using YantraJS.REPL;
 

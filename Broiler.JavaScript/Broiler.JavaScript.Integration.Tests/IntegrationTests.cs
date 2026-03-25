@@ -1,9 +1,11 @@
-using Broiler.JavaScript.Ast;
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core;
+using Broiler.JavaScript.BuiltIns;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Module;
+using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Modules;
 using Broiler.JavaScript.Parser;
+using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Integration.Tests;
 
@@ -56,12 +58,12 @@ public class IntegrationTests
     }
 
     [Fact]
-    public void TypeForwarding_ResolvesCorrectly()
+    public void TypeLocation_ResolvesCorrectly()
     {
-        // Types forwarded from Core should resolve properly
+        // Types live directly in their target assemblies after refactoring
         var jsValueType = typeof(JSValue);
         Assert.NotNull(jsValueType);
-        Assert.Equal("Broiler.JavaScript.Core.Core", jsValueType.Namespace);
+        Assert.Equal("Broiler.JavaScript.Runtime", jsValueType.Namespace);
     }
 
     [Fact]
