@@ -47,8 +47,8 @@ public class RuntimeTests
     [Fact]
     public void GetValue_UintKey_NonFunctionGetter_ReturnsUndefined()
     {
-        // Arrange: create a JSObject and add an accessor property at uint key 0
-        // where the getter is a JSString (not IJSFunction).
+        // Arrange: create a JSObject and add an accessor property (getter/setter descriptor)
+        // at uint key 0 where the getter slot contains a JSString (not IJSFunction).
         var obj = new JSObject();
         var nonFunctionGetter = new JSString("not a function");
         obj.FastAddProperty(
@@ -67,8 +67,8 @@ public class RuntimeTests
     [Fact]
     public void GetValue_KeyString_NonFunctionGetter_ReturnsUndefined()
     {
-        // Arrange: create a JSObject and add an accessor property at a KeyString key
-        // where the getter is a JSString (not IJSFunction).
+        // Arrange: create a JSObject and add an accessor property (getter/setter descriptor)
+        // at a KeyString key where the getter slot contains a JSString (not IJSFunction).
         var obj = new JSObject();
         var nonFunctionGetter = new JSString("not a function");
         var key = KeyStrings.GetOrCreate(new StringSpan("testProp"));
@@ -88,8 +88,8 @@ public class RuntimeTests
     [Fact]
     public void SetValue_UintKey_NonFunctionSetter_DoesNotThrow()
     {
-        // Arrange: create a JSObject and add an accessor property at uint key 0
-        // where the setter is a JSString (not IJSFunction).
+        // Arrange: create a JSObject and add an accessor property (getter/setter descriptor)
+        // at uint key 0 where the setter slot contains a JSString (not IJSFunction).
         var obj = new JSObject();
         var nonFunctionSetter = new JSString("not a function");
         obj.FastAddProperty(
