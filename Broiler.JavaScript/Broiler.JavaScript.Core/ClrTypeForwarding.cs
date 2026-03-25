@@ -1,4 +1,6 @@
 using System.Runtime.CompilerServices;
+using Broiler.JavaScript.Core.Core.Promise;
+using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.Runtime;
 
 // Type forwarding for types moved to Broiler.JavaScript.Runtime assembly.
@@ -37,3 +39,10 @@ using Broiler.JavaScript.Runtime;
 [assembly: TypeForwardedTo(typeof(ClrEnumerableElementEnumerator))]
 [assembly: TypeForwardedTo(typeof(JSValueToClrConverter))]
 [assembly: TypeForwardedTo(typeof(KeyEnumerator))]
+
+// Utils types moved to Runtime
+[assembly: TypeForwardedTo(typeof(BigIntegerExtensions))]
+[assembly: TypeForwardedTo(typeof(DateParser))]
+[assembly: TypeForwardedTo(typeof(NumberParser))]
+[assembly: TypeForwardedTo(typeof(TypeConverter))]
+[assembly: TypeForwardedTo(typeof(AsyncPump))]
