@@ -396,9 +396,16 @@ public class CaptureService
         container.MaxSize = new System.Drawing.SizeF(w, LayoutMaxHeight);
         container.SetHtml(html);
 
+        // Resolve the root element's background color so the canvas matches
+        // CSS :root styling instead of always being white.
+        var rootBg = container.GetRootBackgroundColor();
+        var bgColor = (!rootBg.IsEmpty && rootBg.A > 0)
+            ? new SKColor(rootBg.R, rootBg.G, rootBg.B, rootBg.A)
+            : SKColors.White;
+
         using var layoutBmp = new SKBitmap(w, LayoutBitmapHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
         using var layoutCanvas = new SKCanvas(layoutBmp);
-        layoutCanvas.Clear(SKColors.White);
+        layoutCanvas.Clear(bgColor);
         container.PerformLayout(layoutCanvas, new System.Drawing.RectangleF(0, 0, w, LayoutMaxHeight));
 
         // 2. Find the anchor element position.
@@ -412,7 +419,7 @@ public class CaptureService
         // 4. Render with canvas translation to map scroll region to bitmap.
         using var bitmap = new SKBitmap(w, h, SKColorType.Rgba8888, SKAlphaType.Premul);
         using var canvas = new SKCanvas(bitmap);
-        canvas.Clear(SKColors.White);
+        canvas.Clear(bgColor);
         canvas.Save();
         canvas.Translate(0, -scrollY);
         container.PerformPaint(canvas, new System.Drawing.RectangleF(0, scrollY, w, h));
