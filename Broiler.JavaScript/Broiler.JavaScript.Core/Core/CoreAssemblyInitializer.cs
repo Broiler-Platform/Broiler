@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Core.Core;
@@ -29,5 +30,9 @@ internal static class CoreAssemblyInitializer
         // Wire JSVariable delegate for accessing the current execution context
         // without a direct dependency on JSEngine.
         JSVariable.GetCurrentContext = static () => JSEngine.Current;
+
+        // Wire UriHelper delegate for creating URI errors without a direct
+        // dependency on JSEngine from the Runtime assembly.
+        UriHelper.NewURIError = static message => JSEngine.NewURIError(message);
     }
 }

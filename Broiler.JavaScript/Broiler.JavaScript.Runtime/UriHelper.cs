@@ -1,11 +1,14 @@
-﻿using Broiler.JavaScript.Core.Core;
-using System;
+﻿using System;
 using System.Text;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Core.Utils;
 
 internal static class UriHelper
 {
+    internal static Func<string, JSException> NewURIError = _ =>
+        throw new InvalidOperationException("UriHelper.NewURIError delegate is not initialized.");
+
 
     /// <summary>
     /// Creates a 128 entry lookup table for the characters in the given string.
@@ -96,7 +99,7 @@ internal static class UriHelper
                 // Decode the %XX encoding.
                 int utf8Byte = ParseHexNumber(input, i + 1, 2);
                 if (utf8Byte < 0)
-                    throw JSEngine.NewURIError( "URI malformed");
+                    throw NewURIError("URI malformed");
                 
                 i += 2;
 
@@ -120,7 +123,7 @@ internal static class UriHelper
 
                     // Check for an invalid UTF-8 start value.
                     if (utf8Byte == 0xc0 || utf8Byte == 0xc1)
-                        throw JSEngine.NewURIError( "URI malformed");
+                        throw NewURIError("URI malformed");
 
                     // Count the number of high bits set (this is the number of bytes required for the character).
                     int utf8ByteCount = 1;
@@ -133,7 +136,7 @@ internal static class UriHelper
                     }
 
                     if (utf8ByteCount < 2 || utf8ByteCount > 4)
-                        throw JSEngine.NewURIError( "URI malformed");
+                        throw NewURIError("URI malformed");
 
                     // Read the additional bytes.
                     byte[] utf8Bytes = new byte[utf8ByteCount];
@@ -142,16 +145,16 @@ internal static class UriHelper
                     {
                         // An additional escape sequence is expected.
                         if (i >= input.Length - 1 || input[++i] != '%')
-                            throw JSEngine.NewURIError( "URI malformed");
+                            throw NewURIError("URI malformed");
 
                         // Decode the %XX encoding.
                         utf8Byte = ParseHexNumber(input, i + 1, 2);
                         if (utf8Byte < 0)
-                            throw JSEngine.NewURIError( "URI malformed");
+                            throw NewURIError("URI malformed");
 
                         // Top two bits must be 10 (i.e. byte must be 10XXXXXX in binary).
                         if ((utf8Byte & 0xC0) != 0x80)
-                            throw JSEngine.NewURIError( "URI malformed");
+                            throw NewURIError("URI malformed");
 
                         // Store the byte.
                         utf8Bytes[j] = (byte)utf8Byte;
