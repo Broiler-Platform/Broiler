@@ -21,7 +21,10 @@ public struct ClrObjectEnumerator<T>(IElementEnumerator en) : IEnumerator<T>
         if (en.MoveNext(out var c))
         {
             if (c.ConvertTo(typeof(T), out var v))
+            {
                 Current = (T)v;
+                return true;
+            }
 
             throw JSValue.NewTypeError($"Failed to convert {c} to type {typeof(T).Name}");
         }
