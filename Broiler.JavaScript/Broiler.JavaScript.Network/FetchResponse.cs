@@ -4,9 +4,10 @@ using System.Threading.Tasks;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Clr;
-using Broiler.JavaScript.Core.Core.Json;
+using Broiler.JavaScript.BuiltIns.Json;
+using Broiler.JavaScript.BuiltIns.Promise;
+using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Core.Debugger;
 using Broiler.JavaScript.ExpressionCompiler;
 
 namespace YantraJS.Network

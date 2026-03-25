@@ -6,8 +6,10 @@ using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Boolean;
+using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Clr;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Engine.Extensions;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.ExpressionCompiler;
 

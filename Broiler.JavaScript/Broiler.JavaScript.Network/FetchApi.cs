@@ -9,6 +9,7 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Clr;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Engine.Extensions;
 
 namespace YantraJS.Network
 {

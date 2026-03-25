@@ -7,6 +7,8 @@ using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
+using Broiler.JavaScript.BuiltIns.Promise;
+using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Clr;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Runtime;
