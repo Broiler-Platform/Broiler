@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.Runtime;
 using System.Text;
 
-namespace Broiler.JavaScript.Core.Core.String;
+namespace Broiler.JavaScript.LinqExpressions.String;
 
 public class JSTemplateString(int size)
 {
