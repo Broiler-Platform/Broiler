@@ -32,3 +32,8 @@ using Broiler.JavaScript.Runtime;
 [assembly: TypeForwardedTo(typeof(JSException))]
 [assembly: TypeForwardedTo(typeof(JSVariable))]
 [assembly: TypeForwardedTo(typeof(KeyStringCoreExtensions))]
+
+// ClrEnumerableElementEnumerator, JSValueToClrConverter moved to Runtime
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Enumerators.ClrEnumerableElementEnumerator))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Utils.JSValueToClrConverter))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Typed.KeyEnumerator))]
