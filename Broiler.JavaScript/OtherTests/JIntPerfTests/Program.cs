@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Broiler.JavaScript.Ast;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
 
 public class Program
 {

@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Core.Core;
 
 // Type forwarding for types moved to Broiler.JavaScript.Runtime assembly.
 // These ensure binary compatibility for downstream consumers that reference
@@ -14,3 +15,11 @@ using Broiler.JavaScript.Runtime;
 [assembly: TypeForwardedTo(typeof(MethodProvider))]
 [assembly: TypeForwardedTo(typeof(ListMethodProvider))]
 [assembly: TypeForwardedTo(typeof(IJavaScriptObject))]
+[assembly: TypeForwardedTo(typeof(MemberType))]
+[assembly: TypeForwardedTo(typeof(SymbolAttribute))]
+[assembly: TypeForwardedTo(typeof(PrototypeAttribute))]
+[assembly: TypeForwardedTo(typeof(GetProperty))]
+[assembly: TypeForwardedTo(typeof(SetProperty))]
+[assembly: TypeForwardedTo(typeof(StaticGetProperty))]
+[assembly: TypeForwardedTo(typeof(StaticSetProperty))]
+[assembly: TypeForwardedTo(typeof(StaticAttribute))]

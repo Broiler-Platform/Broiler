@@ -15,6 +15,14 @@ public static class JSValueToClrConverter
     internal static Func<YExpression, int, YExpression> GetAtExpression;
     internal static Func<YExpression, YExpression> LengthExpression;
 
+    private static Func<YExpression, int, YExpression> EnsureGetAtExpression =>
+        GetAtExpression ?? throw new InvalidOperationException(
+            "JSValueToClrConverter.GetAtExpression delegate is not initialized. Ensure the LinqExpressions assembly module initializer has run.");
+
+    private static Func<YExpression, YExpression> EnsureLengthExpression =>
+        LengthExpression ?? throw new InvalidOperationException(
+            "JSValueToClrConverter.LengthExpression delegate is not initialized. Ensure the LinqExpressions assembly module initializer has run.");
+
     public static string ToString(JSValue value, string name) => value.HasValue() ? value.ToString() : throw new JSException($"{name} is required");
 
     public static JSValue ToJSNumber(this JSValue value, string name) =>
@@ -79,16 +87,16 @@ public static class JSValueToClrConverter
         if (methods.TryGetValue(type, out var method))
         {
             if (defaultValue == null)
-                return YExpression.Call(null, method, GetAtExpression(args, index), YExpression.Constant(name));
+                return YExpression.Call(null, method, EnsureGetAtExpression(args, index), YExpression.Constant(name));
 
-            return YExpression.Condition(YExpression.Binary(LengthExpression(args), YOperator.Greater, YExpression.Constant(index)),
-                YExpression.Call(null, method, GetAtExpression(args, index), YExpression.Constant(name)), defaultValue);
+            return YExpression.Condition(YExpression.Binary(EnsureLengthExpression(args), YOperator.Greater, YExpression.Constant(index)),
+                YExpression.Call(null, method, EnsureGetAtExpression(args, index), YExpression.Constant(name)), defaultValue);
         }
 
         if (typeof(JSValue).IsAssignableFrom(type))
-            return GetAtExpression(args, index);
+            return EnsureGetAtExpression(args, index);
 
-        return Get(GetAtExpression(args, index), type, defaultValue, $"{name} is required");
+        return Get(EnsureGetAtExpression(args, index), type, defaultValue, $"{name} is required");
     }
 
     public static YExpression Get(YExpression target, Type type, string name)
