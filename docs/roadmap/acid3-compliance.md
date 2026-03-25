@@ -11,7 +11,7 @@
 2. [Test Automation Setup](#2-test-automation-setup)
 3. [Image Comparison Methodology](#3-image-comparison-methodology)
 4. [Identified Rendering Differences](#4-identified-rendering-differences)
-5. [Prioritised TODO List](#5-prioritised-todo-list)
+5. [Prioritized TODO List](#5-prioritized-todo-list)
 6. [Suggested Test Coverage Improvements](#6-suggested-test-coverage-improvements)
 7. [Fidelity Targets and Milestones](#7-fidelity-targets-and-milestones)
 
@@ -112,7 +112,7 @@ bash scripts/acid3-pixel-test.sh                 # full pipeline
 bash scripts/acid3-pixel-test.sh --skip-reference # reuse existing reference
 ```
 
-Output artefacts are written to `acid/acid3/`:
+Output artifacts are written to `acid/acid3/`:
 
 | File                  | Description                       |
 |-----------------------|-----------------------------------|
@@ -129,7 +129,7 @@ Output artefacts are written to `acid/acid3/`:
 
 `scripts/acid3-compare.py` performs the comparison using Pillow and NumPy:
 
-1. **Load and normalise** — both images are converted to RGB and resized to
+1. **Load and normalize** — both images are converted to RGB and resized to
    the reference dimensions (1024 × 768).
 2. **Per-pixel match** — each pixel is compared per-channel with a tolerance
    of **5** (matching `DeterministicRenderConfig.ColorTolerance`).
@@ -137,11 +137,11 @@ Output artefacts are written to `acid/acid3/`:
    if all three RGB channels exceed 240 in *both* images. Everything else is
    *content*. This ensures that foreground rendering fidelity is the primary
    metric, explicitly ignoring background-only mismatches.
-4. **Region breakdown** — three named regions are analysed independently:
+4. **Region breakdown** — three named regions are analyzed independently:
    - `score_area` (350–700 x, 0–80 y) — the "100/100" score display
-   - `bucket_area` (0–1024 x, 80–400 y) — the six coloured test buckets
+   - `bucket_area` (0–1024 x, 80–400 y) — the six colored test buckets
    - `bottom_area` (0–1024 x, 400–768 y) — the instruction paragraph
-5. **Diff image** — colour-coded: green = match, red = content mismatch,
+5. **Diff image** — color-coded: green = match, red = content mismatch,
    yellow = background mismatch.
 
 ### 3.2 Running the Comparison Standalone
@@ -176,7 +176,7 @@ the reference reads (192,192,192).
 **Root cause:** The `HtmlRender.RenderToImage` method hard-codes
 `SKColors.White` as the fallback background. The CSS `:root` background
 declaration is either not parsed or not applied to the root-level canvas
-clear colour.
+clear color.
 
 ### D2 — Gray Border Layout (`border: 2cm solid gray`)
 
@@ -218,8 +218,8 @@ during post-processing.
 
 **Root cause candidates:**
 - The `#slash` element uses `color: hsla(0, 0%, 0%, 1.0)` (after a fallback
-  `color: red`). HSLA colour parsing may fail, causing the element to inherit
-  transparent or white colour on a white background.
+  `color: red`). HSLA color parsing may fail, causing the element to inherit
+  transparent or white color on a white background.
 - The slash is inserted via JavaScript (`document.createTextNode('/')`);
   the DOM bridge may fail to serialize it.
 - `font-weight: bolder` or `font-size: 5em` interaction with the slash
@@ -290,8 +290,8 @@ this element will be absent or incorrectly styled.
 **Severity: Medium**
 
 The Acid3 test uses `color: hsla(0, 0%, 0%, 1.0)` for the `#slash` element.
-If HSLA parsing fails, the slash would inherit a wrong colour or be invisible.
-The CSS also uses `rgba()` colour values (`text-shadow: rgba(192,192,192,1.0) 3px 3px`) which require proper alpha channel support.
+If HSLA parsing fails, the slash would inherit a wrong color or be invisible.
+The CSS also uses `rgba()` color values (`text-shadow: rgba(192,192,192,1.0) 3px 3px`) which require proper alpha channel support.
 
 ### D11 — CSS `display: inline-block` and `vertical-align` on Bucket Elements
 
@@ -345,7 +345,7 @@ rendering at an incorrect position or size.
 
 ---
 
-## 5. Prioritised TODO List
+## 5. Prioritized TODO List
 
 ### P0 — Show-Stoppers (must fix for meaningful pixel comparison)
 
@@ -358,9 +358,9 @@ rendering at an incorrect position or size.
     2. Fix total width = content (640px) + border + margin calculation.
     3. Ensure viewport-constrained render clips at 768px height.
 
-- [ ] **TODO-2 (D1): Apply `:root` background colour to canvas**
+- [ ] **TODO-2 (D1): Apply `:root` background color to canvas**
   - The `:root { background: silver }` declaration must propagate to the
-    canvas clear colour in `HtmlRender.RenderToImage`.
+    canvas clear color in `HtmlRender.RenderToImage`.
   - Sub-steps:
     1. Parse and resolve the computed `background-color` on the `<html>` element.
     2. Pass resolved background to `canvas.Clear()` instead of hard-coded white.
@@ -376,12 +376,12 @@ rendering at an incorrect position or size.
     3. Test cascade: more-specific `:root` rule overrides less-specific `html` rule.
 
 - [ ] **TODO-4 (D4): Fix slash rendering in score display**
-  - Ensure `document.createTextNode('/')` content is serialised by DomBridge.
+  - Ensure `document.createTextNode('/')` content is serialized by DomBridge.
   - Ensure `color: hsla(0, 0%, 0%, 1.0)` is parsed and applied.
   - Sub-steps:
-    1. Add unit test for HSLA colour parsing with integer-percent values.
+    1. Add unit test for HSLA color parsing with integer-percent values.
     2. Verify DomBridge text-node serialisation for dynamically created nodes.
-    3. Verify `#slash` element receives correct computed colour.
+    3. Verify `#slash` element receives correct computed color.
 
 ### P1 — High Priority (significant visual impact)
 
@@ -406,7 +406,7 @@ rendering at an incorrect position or size.
   - Verify `text-shadow` rendering support.
   - Verify `font-weight: bolder` resolution.
   - Sub-steps:
-    1. Add test for `text-shadow` with RGBA colours.
+    1. Add test for `text-shadow` with RGBA colors.
     2. Verify `bolder` resolves to correct numerical weight (700 or 900).
     3. Compare glyph metrics for Arial at 20px between SkiaSharp and Chromium.
 
@@ -428,12 +428,12 @@ rendering at an incorrect position or size.
     2. Apply `position: absolute` and coordinate properties.
     3. Apply `background`, `color`, and `font` properties to pseudo-element.
 
-- [ ] **TODO-10 (D10): Implement HSLA colour function parsing**
+- [ ] **TODO-10 (D10): Implement HSLA color function parsing**
   - Parse `hsla(h, s%, l%, a)` and convert to RGBA.
   - Support both comma-separated and space-separated syntax.
   - Sub-steps:
     1. Add HSLA-to-RGBA conversion utility.
-    2. Integrate into CSS colour parser.
+    2. Integrate into CSS color parser.
     3. Add regression tests for edge cases (0%, 100%, alpha 0/1).
 
 - [ ] **TODO-11 (D11): Fix `display: inline-block` with `vertical-align` in em units**
@@ -492,8 +492,8 @@ Add targeted CSS unit tests for properties used by Acid3:
 |-----------------------------|-----------------|--------|
 | `border-width` shorthand    | Partial         | Full 4-value expansion + cascade |
 | `cm` unit conversion        | Unknown         | 96 DPI conversion test |
-| `hsla()` colour parsing     | None            | Full parsing test |
-| `text-shadow`               | None            | Render test with offset + colour |
+| `hsla()` color parsing     | None            | Full parsing test |
+| `text-shadow`               | None            | Render test with offset + color |
 | `@font-face` loading        | None            | Local file loading test |
 | `::after` / `::before`      | None            | Content generation + positioning |
 | `display: inline-block`     | Partial         | With `vertical-align` in em units |
