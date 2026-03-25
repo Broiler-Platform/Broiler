@@ -1,7 +1,6 @@
 using System.Collections;
-using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.Enumerators;
+namespace Broiler.JavaScript.Runtime;
 
 public struct EnumerableElementEnumerable(IEnumerator en) : IElementEnumerator
 {

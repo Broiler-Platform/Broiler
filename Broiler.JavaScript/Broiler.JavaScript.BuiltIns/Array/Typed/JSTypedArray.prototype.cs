@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Text;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Generator;
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;

@@ -39,11 +39,11 @@ using Broiler.JavaScript.Runtime;
 [assembly: TypeForwardedTo(typeof(KeyEnumerator))]
 
 // Enumerator types and JavaScriptObject moved to Runtime
-[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Enumerators.ListElementEnumerator))]
-[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Enumerators.ClrObjectEnumerator<>))]
-[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Enumerators.ClrObjectEnumerable<>))]
-[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Enumerators.EnumerableElementEnumerable))]
-[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.JavaScriptObject))]
+[assembly: TypeForwardedTo(typeof(ListElementEnumerator))]
+[assembly: TypeForwardedTo(typeof(ClrObjectEnumerator<>))]
+[assembly: TypeForwardedTo(typeof(ClrObjectEnumerable<>))]
+[assembly: TypeForwardedTo(typeof(EnumerableElementEnumerable))]
+[assembly: TypeForwardedTo(typeof(JavaScriptObject))]
 
 // Utils types moved to Runtime
 [assembly: TypeForwardedTo(typeof(BigIntegerExtensions))]

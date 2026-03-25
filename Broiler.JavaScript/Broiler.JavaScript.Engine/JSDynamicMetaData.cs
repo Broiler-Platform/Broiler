@@ -1,4 +1,3 @@
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Engine.Extensions;
 using Broiler.JavaScript.Runtime;
 using System;

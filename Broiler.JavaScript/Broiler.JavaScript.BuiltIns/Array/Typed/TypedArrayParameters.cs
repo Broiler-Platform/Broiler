@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.BuiltIns.Function;
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Engine.Extensions;
 using Broiler.JavaScript.Runtime;

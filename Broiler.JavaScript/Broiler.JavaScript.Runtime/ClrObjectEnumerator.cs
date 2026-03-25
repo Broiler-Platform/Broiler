@@ -1,9 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.Enumerators;
+namespace Broiler.JavaScript.Runtime;
 
 public struct ClrObjectEnumerator<T>(IElementEnumerator en) : IEnumerator<T>
 {

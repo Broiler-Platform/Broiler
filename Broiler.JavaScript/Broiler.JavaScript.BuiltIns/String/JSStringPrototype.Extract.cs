@@ -1,5 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core;
-using System;
+﻿using System;
 using System.Text;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.BuiltIns.Generator;

@@ -1,4 +1,3 @@
-using Broiler.JavaScript.Core.Enumerators;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using System;

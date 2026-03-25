@@ -1,12 +1,10 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Enumerators;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Generator;
 using Broiler.JavaScript.ExpressionCompiler;
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine.Extensions;

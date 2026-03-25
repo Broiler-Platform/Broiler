@@ -1,5 +1,4 @@
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Engine;

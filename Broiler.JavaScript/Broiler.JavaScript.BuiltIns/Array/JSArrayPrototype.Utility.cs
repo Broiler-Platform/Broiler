@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Text;
 using System.Globalization;
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;

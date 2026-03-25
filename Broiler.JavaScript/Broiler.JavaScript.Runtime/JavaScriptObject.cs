@@ -1,8 +1,6 @@
 #nullable enable
 
-using Broiler.JavaScript.Runtime;
-
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Runtime;
 
 public abstract class JavaScriptObject(in Arguments a) : IJavaScriptObject
 {
