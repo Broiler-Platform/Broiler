@@ -3,7 +3,8 @@ using System;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Clr;
-using Broiler.JavaScript.Core.Core.Events;
+using Broiler.JavaScript.BuiltIns.Events;
+using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.ExpressionCompiler;
 
 namespace YantraJS.Network

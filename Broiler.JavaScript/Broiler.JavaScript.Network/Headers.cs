@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Clr;
+using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.ExpressionCompiler;
 
 namespace YantraJS.Network
