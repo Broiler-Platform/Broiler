@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using Broiler.JavaScript.BuiltIns;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.LinqExpressions.LinqExpressions;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 
@@ -28,18 +29,20 @@ public class Phase2ValidationTests
     // ── M9: Code-Generation Builder Isolation Analysis ─────────────────
 
     [Fact]
-    public void M9_BuildersRemainInCore_LinqExpressionsAccessible()
+    public void M9_BuildersInLinqExpressions()
     {
-        // M9 analysis concluded that LinqExpressions builders must stay in Core
-        // due to runtime coupling. Verify they are accessible from Core assembly.
-        var coreAssembly = typeof(JSContext).Assembly;
-        var coreTypes = coreAssembly.GetTypes().Select(t => t.FullName).ToList();
+        // LinqExpressions builders live in the LinqExpressions assembly.
+        var linqAssembly = typeof(Broiler.JavaScript.LinqExpressions.LinqExpressions.JSRegExpBuilder).Assembly;
+        var linqTypes = linqAssembly.GetTypes().Select(t => t.FullName).ToList();
 
-        // Key builder types that were analyzed and confirmed to stay in Core:
-        Assert.Contains(coreTypes, t => t != null && t.Contains("JSValueBuilder"));
-        Assert.Contains(coreTypes, t => t != null && t.Contains("JSObjectBuilder"));
-        Assert.Contains(coreTypes, t => t != null && t.Contains("ArgumentsBuilder"));
-        Assert.Contains(coreTypes, t => t != null && t.Contains("ClrProxyBuilder"));
+        // Key builder types in LinqExpressions:
+        Assert.Contains(linqTypes, t => t != null && t.Contains("JSValueBuilder"));
+        Assert.Contains(linqTypes, t => t != null && t.Contains("ArgumentsBuilder"));
+        Assert.Contains(linqTypes, t => t != null && t.Contains("ClrProxyBuilder"));
+
+        // JSObjectBuilder was moved to Runtime:
+        var runtimeTypes = typeof(JSValue).Assembly.GetTypes().Select(t => t.FullName).ToList();
+        Assert.Contains(runtimeTypes, t => t != null && t.Contains("JSObjectBuilder"));
     }
 
     [Fact]
@@ -110,8 +113,8 @@ public class Phase2ValidationTests
     [Fact]
     public void M10_JSObject_PartialFilesExist()
     {
-        // Verify JSObject class exists and is not broken by the split.
-        var type = typeof(JSContext).Assembly.GetTypes()
+        // Verify JSObject class exists in Runtime and is not broken by the split.
+        var type = typeof(JSValue).Assembly.GetTypes()
             .FirstOrDefault(t => t.Name == "JSObject");
         Assert.NotNull(type);
 
@@ -164,8 +167,8 @@ public class Phase2ValidationTests
     [Fact]
     public void M10_JSObjectStatic_PartialFilesExist()
     {
-        // Verify JSObjectStatic exists and has methods from each category.
-        var type = typeof(JSContext).Assembly.GetTypes()
+        // Verify JSObjectStatic exists in Runtime and has methods from each category.
+        var type = typeof(JSValue).Assembly.GetTypes()
             .FirstOrDefault(t => t.Name == "JSObjectStatic");
         Assert.NotNull(type);
     }
@@ -207,7 +210,7 @@ public class Phase2ValidationTests
     {
         // Subdirectory reorganization must NOT change namespaces.
         var compilerType = typeof(Broiler.JavaScript.Compiler.FastCompiler);
-        Assert.Equal("Broiler.JavaScript.Core.FastParser.Compiler", compilerType.Namespace);
+        Assert.Equal("Broiler.JavaScript.Compiler", compilerType.Namespace);
     }
 
     // ── M13: ExpressionCompiler Assessment ─────────────────────────────

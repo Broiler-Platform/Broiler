@@ -65,8 +65,8 @@ Dependencies flow strictly downward — no circular references are allowed.
 │    BuiltIns ── Compiler ── Clr ── Debugger                  │
 │    Modules ── ModuleExtensions ── Network ── NodePollyfill  │
 ├─────────────────────────────────────────────────────────────┤
-│  Core Layer                                                 │
-│    Broiler.JavaScript.Core                                  │
+│  Engine Layer                                               │
+│    Broiler.JavaScript.Engine                                │
 │    (JSContext, globals, scope, LINQ builders, registration) │
 ├─────────────────────────────────────────────────────────────┤
 │  Foundation Layer                                           │
@@ -74,9 +74,9 @@ Dependencies flow strictly downward — no circular references are allowed.
 └─────────────────────────────────────────────────────────────┘
 ```
 
-Satellite assemblies (BuiltIns, Compiler, Clr) register themselves with Core
+Satellite assemblies (BuiltIns, Compiler, Clr) register themselves with Engine
 via **module initializers** that wire factory delegates at assembly load time.
-This allows Core to use built-in types without referencing them directly.
+This allows Engine to use built-in types without referencing them directly.
 
 For detailed architecture documentation see:
 - [Extraction Pattern](../docs/architecture/extraction-pattern.md)

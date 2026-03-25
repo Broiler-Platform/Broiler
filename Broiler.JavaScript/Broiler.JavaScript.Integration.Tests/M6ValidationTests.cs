@@ -224,9 +224,9 @@ public class M6ValidationTests
     {
         // After refactoring, types live directly in their target assemblies
         // (no forwarding needed since Core was merged into Engine).
-        Assert.Equal(typeof(JSValue).Assembly.GetName().Name, "Broiler.JavaScript.Runtime");
-        Assert.Equal(typeof(StringSpan).Assembly.GetName().Name, "Broiler.JavaScript.Ast");
-        Assert.Equal(typeof(FastParser).Assembly.GetName().Name, "Broiler.JavaScript.Parser");
+        Assert.Equal("Broiler.JavaScript.Runtime", typeof(JSValue).Assembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.Ast", typeof(StringSpan).Assembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.Parser", typeof(FastParser).Assembly.GetName().Name);
     }
 
     [Fact]
@@ -281,8 +281,7 @@ public class M6ValidationTests
         // Engine must reference Foundation assemblies.
         Assert.Contains("Broiler.JavaScript.Runtime", engineRefs);
         Assert.Contains("Broiler.JavaScript.Storage", engineRefs);
-        Assert.Contains("Broiler.JavaScript.Parser", engineRefs);
-        Assert.Contains("Broiler.JavaScript.Ast", engineRefs);
+        Assert.Contains("Broiler.JavaScript.ExpressionCompiler", engineRefs);
     }
 
     // ── 6.6: Performance Baseline ──────────────────────────────────────

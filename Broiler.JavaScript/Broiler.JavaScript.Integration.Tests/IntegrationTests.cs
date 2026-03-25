@@ -58,12 +58,12 @@ public class IntegrationTests
     }
 
     [Fact]
-    public void TypeForwarding_ResolvesCorrectly()
+    public void TypeLocation_ResolvesCorrectly()
     {
-        // Types forwarded from Core should resolve properly
+        // Types live directly in their target assemblies after refactoring
         var jsValueType = typeof(JSValue);
         Assert.NotNull(jsValueType);
-        Assert.Equal("Broiler.JavaScript.Core.Core", jsValueType.Namespace);
+        Assert.Equal("Broiler.JavaScript.Runtime", jsValueType.Namespace);
     }
 
     [Fact]

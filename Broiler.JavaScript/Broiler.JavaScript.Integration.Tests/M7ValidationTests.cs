@@ -219,14 +219,16 @@ public class M7ValidationTests
     [Fact]
     public void M7_Iterator_DecoupledFromDefaultBuiltInRegistry()
     {
-        // DefaultBuiltInRegistry no longer has direct references to
-        // JSIteratorObject — it uses the IteratorPrototypeSetup delegate.
+        // DefaultBuiltInRegistry uses the IteratorPrototypeSetup delegate
+        // for loose coupling with iterator setup.
         Assert.NotNull(DefaultBuiltInRegistry.IteratorPrototypeSetup);
 
-        // JSIteratorObject is in BuiltIns, DefaultBuiltInRegistry is in Core.
-        Assert.NotEqual(
-            typeof(JSIteratorObject).Assembly,
-            typeof(DefaultBuiltInRegistry).Assembly);
+        // Both JSIteratorObject and DefaultBuiltInRegistry are in the BuiltIns
+        // assembly after the refactoring merged Core into Engine.
+        Assert.Equal("Broiler.JavaScript.BuiltIns",
+            typeof(JSIteratorObject).Assembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.BuiltIns",
+            typeof(DefaultBuiltInRegistry).Assembly.GetName().Name);
     }
 
     [Fact]
