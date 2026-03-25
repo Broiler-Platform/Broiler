@@ -1,5 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 
+[assembly: InternalsVisibleTo("Broiler.JavaScript.Engine")]
+
 #if !WEB_ATOMS
 [assembly: InternalsVisibleTo("Broiler.JavaScript.Core.Tests")]
 

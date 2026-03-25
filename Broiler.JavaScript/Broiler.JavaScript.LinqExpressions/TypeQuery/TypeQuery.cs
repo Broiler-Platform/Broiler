@@ -62,19 +62,19 @@ public static class TypeQuery
             var exp = fx();
 
             if (exp.Body is not MemberExpression me)
-                throw new ArgumentException($"Field not found in {exp}");
+                throw new ArgumentException($"Property not found in {exp}");
 
-            if (me.Member is not PropertyInfo field)
-                throw new ArgumentException($"{me.Member} is not a field");
+            if (me.Member is not PropertyInfo property)
+                throw new ArgumentException($"{me.Member} is not a property");
 
-            return field;
+            return property;
         });
 
     public static MethodInfo QueryStaticMethod<T>(Func<Expression<Func<T>>> fx) => GetOrCreate(fx.Method, () =>
     {
         var exp = fx();
         if (exp.Body is not MethodCallExpression me)
-            throw new ArgumentException($"Method found in {exp}");
+            throw new ArgumentException($"Method not found in {exp}");
 
         return me.Method;
     });
@@ -83,7 +83,7 @@ public static class TypeQuery
     {
         var exp = fx();
         if (exp.Body is not MethodCallExpression me)
-            throw new ArgumentException($"Method found in {exp}");
+            throw new ArgumentException($"Method not found in {exp}");
 
         return me.Method;
     });
@@ -92,7 +92,7 @@ public static class TypeQuery
     {
         var exp = fx();
         if (exp.Body is not MethodCallExpression me)
-            throw new ArgumentException($"Method found in {exp}");
+            throw new ArgumentException($"Method not found in {exp}");
 
         return me.Method;
     });
@@ -101,7 +101,7 @@ public static class TypeQuery
     {
         var exp = fx();
         if (exp.Body is not MethodCallExpression me)
-            throw new ArgumentException($"Method found in {exp}");
+            throw new ArgumentException($"Method not found in {exp}");
 
         return me.Method;
     });
@@ -110,7 +110,7 @@ public static class TypeQuery
     {
         var exp = fx();
         if (exp.Body is not MethodCallExpression me)
-            throw new ArgumentException($"Method found in {exp}");
+            throw new ArgumentException($"Method not found in {exp}");
 
         return me.Method;
     });
