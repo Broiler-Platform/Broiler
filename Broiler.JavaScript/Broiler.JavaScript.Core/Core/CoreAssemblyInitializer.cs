@@ -33,5 +33,9 @@ internal static class CoreAssemblyInitializer
         // Wire UriHelper delegate for creating URI errors without a direct
         // dependency on JSEngine from the Runtime assembly.
         UriHelper.NewURIError = static message => JSEngine.NewURIError(message);
+
+        // Wire JSValue.MarshalObject delegate so Runtime types can marshal
+        // CLR objects to JSValue without a direct dependency on JSEngine.
+        JSValue.MarshalObject = static obj => JSEngine.ClrInterop.Marshal(obj);
     }
 }
