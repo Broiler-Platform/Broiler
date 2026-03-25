@@ -34,9 +34,10 @@ from PIL import Image
 # Per-channel colour tolerance (matches DeterministicRenderConfig.ColorTolerance)
 COLOR_TOLERANCE = 5
 
-# Background pixel threshold: pixels where all channels > this value in
-# *both* images are classified as background and excluded from the primary
-# content-area match metric.
+# Background pixel threshold: a pixel is considered *content* if any of its
+# RGB channels is ≤ this value in either image.  Only pixels where every
+# channel exceeds this threshold in both images are treated as background
+# and excluded from the primary content-area match metric.
 BACKGROUND_THRESHOLD = 240
 
 # Region definitions (x_start, x_end, y_start, y_end) for 1024x768 viewport
@@ -105,7 +106,7 @@ def generate_diff_image(match: np.ndarray,
 
     out[match] = [0, 180, 0]                   # Green: match
     out[~match & content] = [220, 40, 40]       # Red: content mismatch
-    out[~match & ~content] = [180, 180, 40]     # Yellow: background mismatch
+    out[~match & ~content] = [220, 220, 40]     # Yellow: background mismatch
 
     return Image.fromarray(out)
 
