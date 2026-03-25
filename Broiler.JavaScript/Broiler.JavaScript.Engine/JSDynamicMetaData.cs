@@ -1,5 +1,6 @@
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Utils;
+using Broiler.JavaScript.Engine.Extensions;
 using Broiler.JavaScript.Runtime;
 using System;
 using System.Dynamic;

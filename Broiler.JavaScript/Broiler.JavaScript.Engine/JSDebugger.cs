@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.Runtime;
 using System;
 
-namespace Broiler.JavaScript.Core.Debugger;
+namespace Broiler.JavaScript.Engine;
 
 /// <summary>
 /// Abstract base class for JavaScript debuggers.

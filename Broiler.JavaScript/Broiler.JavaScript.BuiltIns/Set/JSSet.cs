@@ -6,6 +6,7 @@ using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.ExpressionCompiler;
 using System.Collections.Generic;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Engine.Extensions;
 
 namespace Broiler.JavaScript.BuiltIns.Set;
 

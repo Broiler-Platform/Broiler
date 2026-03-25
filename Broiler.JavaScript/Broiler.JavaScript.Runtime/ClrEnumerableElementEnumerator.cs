@@ -1,7 +1,6 @@
 using System.Collections.Generic;
-using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.Enumerators;
+namespace Broiler.JavaScript.Runtime;
 
 public readonly struct ClrEnumerableElementEnumerator(in IEnumerable<JSValue> en) : IElementEnumerator
 {

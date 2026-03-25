@@ -7,9 +7,9 @@ using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Generator;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Typed;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Engine.Extensions;
 
 namespace Broiler.JavaScript.BuiltIns.Array.Typed;
 
@@ -203,9 +203,9 @@ public partial class JSTypedArray: JSObject
 
     internal IElementEnumerator GetEntries() => new EntryEnumerator(this);
 
-    public override IElementEnumerator GetAllKeys(bool showEnumerableOnly = true, bool inherited = true) => new Core.Typed.KeyEnumerator(length);
+    public override IElementEnumerator GetAllKeys(bool showEnumerableOnly = true, bool inherited = true) => new IntKeyEnumerator(length);
 
-    internal JSGenerator GetKeys() => new(new Core.Typed.KeyEnumerator(length), "Array Iterator");
+    internal JSGenerator GetKeys() => new(new IntKeyEnumerator(length), "Array Iterator");
 
     struct ElementEnumerator(JSTypedArray typedArray, int startIndex = 0) : IElementEnumerator
     {

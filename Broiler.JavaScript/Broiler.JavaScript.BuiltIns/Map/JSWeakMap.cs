@@ -5,6 +5,7 @@ using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.ExpressionCompiler;
 using System;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Engine.Extensions;
 
 namespace Broiler.JavaScript.BuiltIns.Map;
 

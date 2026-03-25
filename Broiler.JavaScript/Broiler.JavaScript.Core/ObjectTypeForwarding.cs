@@ -8,7 +8,7 @@ using Broiler.JavaScript.Runtime;
 [assembly: TypeForwardedTo(typeof(JSObject))]
 [assembly: TypeForwardedTo(typeof(JSObjectStatic))]
 [assembly: TypeForwardedTo(typeof(PropertyEnumerator))]
-[assembly: TypeForwardedTo(typeof(KeyEnumerator))]
+[assembly: TypeForwardedTo(typeof(IntKeyEnumerator))]
 [assembly: TypeForwardedTo(typeof(JSObjectBuilder))]
 [assembly: TypeForwardedTo(typeof(JSIterator))]
 [assembly: TypeForwardedTo(typeof(PropertyValueEnumerator))]

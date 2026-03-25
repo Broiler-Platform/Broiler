@@ -2,7 +2,7 @@
 using Broiler.JavaScript.Runtime;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Engine.Extensions;
 
 public static partial class JSValueExtensions
 {

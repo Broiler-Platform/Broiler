@@ -4,7 +4,7 @@ using Broiler.JavaScript.Storage;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Engine.Extensions;
 
 public static partial class JSValueExtensions
 {

@@ -1,12 +1,10 @@
-using Broiler.JavaScript.Runtime;
-
-namespace Broiler.JavaScript.Core.Typed;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// A simple integer-key enumerator that yields sequential numbers from 0 to length-1.
 /// Used by string values, JSArrayPrototype, and JSTypedArray for key enumeration.
 /// </summary>
-public struct KeyEnumerator(int length) : IElementEnumerator
+public struct IntKeyEnumerator(int length) : IElementEnumerator
 {
     private int index = -1;
 

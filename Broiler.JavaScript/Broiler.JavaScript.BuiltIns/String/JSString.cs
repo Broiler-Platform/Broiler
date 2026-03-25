@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Typed;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Ast.Misc;
@@ -176,7 +175,7 @@ public partial class JSString : JSPrimitive
         return new JSString(new string(value[(int)key], 1));
     }
 
-    public override IElementEnumerator GetAllKeys(bool showEnumerableOnly = true, bool inherited = true) => new Core.Typed.KeyEnumerator(Length);
+    public override IElementEnumerator GetAllKeys(bool showEnumerableOnly = true, bool inherited = true) => new IntKeyEnumerator(Length);
 
     [JSExport]
     public override int Length => value.Length;

@@ -2,9 +2,8 @@
 using System.Collections.Generic;
 using System.Reflection;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
-using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.Utils;
+namespace Broiler.JavaScript.Runtime;
 
 public static class JSValueToClrConverter
 {

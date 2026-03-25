@@ -5,6 +5,7 @@ using System;
 using System.Threading.Tasks;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.JavaScript.Engine.Extensions;
 
 namespace Broiler.JavaScript.BuiltIns.Promise;
 

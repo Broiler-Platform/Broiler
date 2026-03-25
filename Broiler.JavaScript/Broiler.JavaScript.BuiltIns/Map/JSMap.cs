@@ -6,6 +6,7 @@ using Broiler.JavaScript.ExpressionCompiler;
 using System.Collections.Generic;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Engine.Extensions;
 
 namespace Broiler.JavaScript.BuiltIns.Map;
 
