@@ -8,7 +8,7 @@ public class JSPrimitiveObject : JSObject
 {
     internal readonly JSValue value;
 
-    public JSPrimitiveObject(JSPrimitive value) : base(JSEngine.Current.ObjectPrototype)
+    public JSPrimitiveObject(JSPrimitive value) : base(GetCurrentObjectPrototype?.Invoke())
     {
         this.value = value;
         value.ResolvePrototype();
@@ -25,7 +25,7 @@ public class JSPrimitiveObject : JSObject
 
     public override bool ConvertTo(Type type, out object value) => this.value.ConvertTo(type, out value);
 
-    public override JSValue CreateInstance(in Arguments a) => throw JSEngine.NewTypeError($"Cannot create instance of {this}");
+    public override JSValue CreateInstance(in Arguments a) => throw NewTypeError($"Cannot create instance of {this}");
 
     public override JSValue AddValue(JSValue value) => this.value.AddValue(value);
 

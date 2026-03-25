@@ -36,14 +36,14 @@ These assemblies sit at the bottom of the dependency graph and have
 | **ExpressionCompiler** | LINQ expression-tree compilation infrastructure.  Leaf dependency—most other assemblies reference it. |
 | **Ast** | JavaScript AST node types and token definitions.  Depends on ExpressionCompiler. |
 | **Storage** | Memory management primitives (`VirtualMemory`, `VirtualArray`, concurrent maps, `PropertySequence`, `KeyString`).  Depends on ExpressionCompiler. |
-| **Runtime** | Core value types (`JSValue`, `JSObject`, `Arguments`, `PropertyKey`), function delegate types, prototype/symbol contracts, iterator interfaces.  Depends on Ast and ExpressionCompiler. |
+| **Runtime** | Core value types (`JSValue`, `JSObject`, `JSPrimitive`, `JSUndefined`, `JSPrimitiveObject`, `Arguments`, `PropertyKey`), function delegate types, prototype/symbol contracts, iterator interfaces, `JSPropertyFactory`.  Depends on Ast, ExpressionCompiler, and Storage. |
 | **Parser** | JavaScript lexer and parser (`FastParser`, `FastScanner`, `FastTokenStream`).  Depends on Ast. |
 
 ### 2.2 Core Layer
 
 | Assembly | Purpose |
 |----------|---------|
-| **Core** | Central wiring assembly.  Contains `JSEngine` (static access to the current execution context), `IJSExecutionContext`, `JSException`, exception/value factory delegates, module initializers, `ObjectClassFactory`, primitive types (`JSUndefined`, `JSPrimitiveObject`), `CallStackItem`, the `DefaultJSCompiler` adapter, and the `JSDebugger` base class.  Depends on Parser, Storage, Runtime, ExpressionCompiler. |
+| **Core** | Central wiring assembly.  Contains `JSEngine` (static access to the current execution context), `IJSExecutionContext`, `JSException`, exception/value factory delegates, module initializers, `ObjectClassFactory`, `CallStackItem`, the `DefaultJSCompiler` adapter, and the `JSDebugger` base class.  Depends on Parser, Storage, Runtime, ExpressionCompiler. |
 
 Core's role is **coordination, not business logic**.  It provides the
 delegate infrastructure that lets Feature assemblies plug into the
@@ -57,7 +57,7 @@ assemblies) and implements a specific capability:
 | Assembly | Purpose | Initialization |
 |----------|---------|----------------|
 | **Engine** | Concrete `JSContext` implementation (execution context, global scope, prototype bootstrapping). | — |
-| **LinqExpressions** | LINQ expression-tree builders for JS operations (arithmetic, comparison, coercion, property access, function calls), `TypeQuery` utility, template-string builder. | `LinqExpressionsAssemblyInitializer` wires `JSFunction.CreateClrDelegateFactory` and `JSValueToClrConverter` delegates. |
+| **LinqExpressions** | LINQ expression-tree builders for JS operations (arithmetic, comparison, coercion, property access, function calls), `TypeQuery` utility, template-string builder (`JSTemplateString`, `JSTemplateStringBuilder`). | `LinqExpressionsAssemblyInitializer` wires `JSFunction.CreateClrDelegateFactory` and `JSValueToClrConverter` delegates. |
 | **BuiltIns** | Extracted built-in JavaScript objects (Array, Map, Set, Date, BigInt, Boolean, Number, String, Symbol, RegExp, Promise, Proxy, Error, JSON, Math, Reflect, Intl, Console, DataView, WeakRef, Iterator, Generator, Disposable, Events, etc.) and `DefaultBuiltInRegistry`. | `BuiltInsAssemblyInitializer` registers all built-in classes and factory delegates. |
 | **Extensions** | JSValue/JSObject extension methods, CLR proxy extensions, string/marshal extensions. | `ExtensionsAssemblyInitializer`. |
 | **Globals** | Global functions (`parseInt`, `parseFloat`, `isNaN`, `isFinite`, `eval`, `encodeURI`, `decodeURI`). | `GlobalsAssemblyInitializer`. |

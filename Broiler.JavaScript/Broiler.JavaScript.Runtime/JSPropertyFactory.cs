@@ -8,7 +8,7 @@ namespace Broiler.JavaScript.Core.Core.Storage;
 /// Factory methods for creating <see cref="JSProperty"/> instances that require
 /// concrete runtime types (<see cref="JSFunctionDelegate"/>).
 /// These methods cannot live on <see cref="JSProperty"/> itself because it resides
-/// in the Storage assembly, which has no dependency on the Core runtime types.
+/// in the Storage assembly, which has no dependency on the runtime types.
 /// </summary>
 public static class JSPropertyFactory
 {
