@@ -3,4 +3,4 @@
 // within the Core assembly.  The concrete JSFunction class now lives
 // in the Broiler.JavaScript.BuiltIns assembly.
 
-namespace Broiler.JavaScript.Core.Core.Function;
+namespace Broiler.JavaScript.BuiltIns.Function;

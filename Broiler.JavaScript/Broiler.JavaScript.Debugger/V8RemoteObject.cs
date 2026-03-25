@@ -7,6 +7,7 @@ using Broiler.JavaScript.BuiltIns.Error;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns;
+using Broiler.JavaScript.Engine;
 
 namespace Broiler.JavaScript.Debugger;
 

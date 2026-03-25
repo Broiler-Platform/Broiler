@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 
@@ -11,7 +14,7 @@ using Broiler.JavaScript.Storage;
 // loading bootstrap logic was extracted to JSContext so that Core can load
 // satellite assemblies without a circular dependency.
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.BuiltIns;
 
 /// <summary>
 /// Default implementation of <see cref="IBuiltInRegistry"/> that delegates

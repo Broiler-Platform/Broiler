@@ -11,8 +11,10 @@ using Broiler.JavaScript.Core.Emit;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Engine;
 
 public delegate void ConsoleEvent(JSContext context, string type, in Arguments a);
 public delegate void LogEventHandler(JSContext context, JSValue value);

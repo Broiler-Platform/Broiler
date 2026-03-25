@@ -20,7 +20,6 @@ using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Generator;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.Core.Core.Disposable;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
@@ -30,6 +29,8 @@ using Broiler.JavaScript.BuiltIns.Class;
 using Broiler.JavaScript.BuiltIns.RegExp;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.JavaScript.Engine;
 
 namespace Broiler.JavaScript.BuiltIns;
 

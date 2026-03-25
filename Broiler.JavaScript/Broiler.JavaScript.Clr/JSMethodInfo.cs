@@ -1,10 +1,10 @@
 ﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Function;
 using System.Reflection;
 using System.ComponentModel;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.BuiltIns.Function;
 
 namespace Broiler.JavaScript.Clr;
 

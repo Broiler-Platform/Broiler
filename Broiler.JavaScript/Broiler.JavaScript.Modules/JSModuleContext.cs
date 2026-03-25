@@ -6,12 +6,13 @@ using System.Text;
 using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.BuiltIns.Function;
 
 namespace Broiler.JavaScript.Modules;
 

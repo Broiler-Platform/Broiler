@@ -6,11 +6,11 @@ using System.Linq;
 using System.Text;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.BuiltIns.Number;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.BuiltIns.Function;
 
 namespace Broiler.App.Rendering;
 

@@ -3,12 +3,12 @@ using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.BuiltIns.Boolean;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Typed;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.BuiltIns.Generator;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.BuiltIns.Function;
 
 namespace Broiler.JavaScript.BuiltIns.Array;
 

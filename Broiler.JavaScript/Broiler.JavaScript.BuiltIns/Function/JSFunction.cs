@@ -10,8 +10,10 @@ using Broiler.JavaScript.ExpressionCompiler.Runtime;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Core.Core;
 
-namespace Broiler.JavaScript.Core.Core.Function;
+namespace Broiler.JavaScript.BuiltIns.Function;
 
 
 [JSBaseClass("Object")]

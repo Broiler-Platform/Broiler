@@ -1,4 +1,5 @@
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
 
 namespace Broiler.Cli.Tests;
 

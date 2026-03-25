@@ -11,6 +11,7 @@ using System.Text.Json.Serialization;
 using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Engine;
 
 namespace Broiler.JavaScript.Debugger;
 
