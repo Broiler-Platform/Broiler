@@ -1,7 +1,7 @@
 ﻿#nullable enable
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Clr;
 using Broiler.JavaScript.ExpressionCompiler;
 
 namespace YantraJS.Network

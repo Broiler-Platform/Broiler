@@ -1,11 +1,14 @@
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.BuiltIns;
 using Broiler.JavaScript.BuiltIns.Array.Typed;
 using Broiler.JavaScript.BuiltIns.Intl;
 using Broiler.JavaScript.BuiltIns.Iterator;
 using Broiler.JavaScript.BuiltIns.Promise;
 using Broiler.JavaScript.BuiltIns.RegExp;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.LinqExpressions.LinqExpressions;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Integration.Tests;
 
@@ -113,20 +116,20 @@ public class M7ValidationTests
     [Fact]
     public void M7_RegExp_CompilerDecoupledViaInitialize()
     {
-        // JSRegExpBuilder remains in Core/LinqExpressions and uses the
+        // JSRegExpBuilder lives in LinqExpressions and uses the
         // Initialize(Type) pattern — the Compiler no longer has a
         // compile-time dependency on the concrete JSRegExp type.
-        var coreAssembly = typeof(JSContext).Assembly;
-        var regExpBuilderType = coreAssembly.GetType(
-            "Broiler.JavaScript.Core.LinqExpressions.JSRegExpBuilder");
+        var linqAssembly = typeof(JSRegExpBuilder).Assembly;
+        var regExpBuilderType = linqAssembly.GetType(
+            "Broiler.JavaScript.LinqExpressions.LinqExpressions.JSRegExpBuilder");
         Assert.NotNull(regExpBuilderType);
 
-        // Confirm the Compiler assembly references Core (for JSRegExpBuilder).
+        // Confirm the Compiler assembly references Engine (for JSRegExpBuilder).
         var compilerAssembly = typeof(Broiler.JavaScript.Compiler.FastCompiler).Assembly;
         var compilerRefs = compilerAssembly.GetReferencedAssemblies()
             .Select(r => r.Name!)
             .ToHashSet();
-        Assert.Contains("Broiler.JavaScript.Core", compilerRefs);
+        Assert.Contains("Broiler.JavaScript.Engine", compilerRefs);
     }
 
     [Fact]

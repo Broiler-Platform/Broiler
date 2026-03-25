@@ -4,9 +4,9 @@ using System.Text;
 using System.Threading.Tasks;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Core.Core.Storage;
-using Broiler.JavaScript.Core.Extensions;
+using Broiler.JavaScript.Extensions;
 using Broiler.JavaScript.Storage;
 
 namespace YantraJS.NodePollyfill

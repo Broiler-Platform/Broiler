@@ -5,7 +5,7 @@ using System.Net.Http;
 using System.Threading;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Clr;
 using Broiler.JavaScript.Core.Debugger;
 using Broiler.JavaScript.ExpressionCompiler;
 

@@ -3,9 +3,9 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
+using Broiler.JavaScript.Clr;
 using Broiler.JavaScript.Core.Core.Json;
-using Broiler.JavaScript.Core.Core.Primitive;
+using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Core.Debugger;
 using Broiler.JavaScript.ExpressionCompiler;
 

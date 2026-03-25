@@ -1,5 +1,8 @@
 using System.Runtime.CompilerServices;
+using Broiler.JavaScript.BuiltIns;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Integration.Tests;
 
@@ -62,20 +65,20 @@ public class Phase2ValidationTests
     }
 
     [Fact]
-    public void M9_CompilerStillReferencesCore()
+    public void M9_CompilerStillReferencesEngine()
     {
-        // Verify that Compiler assembly references Core (not the other way around).
+        // Verify that Compiler assembly references Engine (not the other way around).
         var compilerAssembly = typeof(Broiler.JavaScript.Compiler.FastCompiler).Assembly;
-        var coreAssembly = typeof(JSContext).Assembly;
+        var engineAssembly = typeof(JSContext).Assembly;
 
         var compilerRefs = compilerAssembly.GetReferencedAssemblies()
             .Select(a => a.Name).ToList();
-        Assert.Contains("Broiler.JavaScript.Core", compilerRefs);
+        Assert.Contains("Broiler.JavaScript.Engine", compilerRefs);
 
-        // Core must NOT reference Compiler.
-        var coreRefs = coreAssembly.GetReferencedAssemblies()
+        // Engine must NOT reference Compiler.
+        var engineRefs = engineAssembly.GetReferencedAssemblies()
             .Select(a => a.Name).ToList();
-        Assert.DoesNotContain("Broiler.JavaScript.Compiler", coreRefs);
+        Assert.DoesNotContain("Broiler.JavaScript.Compiler", engineRefs);
     }
 
     // ── M10: Core Large-File Decomposition ─────────────────────────────
@@ -311,16 +314,14 @@ public class Phase2ValidationTests
     }
 
     [Fact]
-    public void M14_TypeForwardingIntact()
+    public void M14_TypesInCorrectAssemblies()
     {
-        // Verify type forwarding count hasn't decreased after Phase 2 changes.
-        // Types are forwarded across 3 files: ClrTypeForwarding.cs (9),
-        // ParserTypeForwarding.cs (12), StorageTypeForwarding.cs (10).
-        var coreAssembly = typeof(JSContext).Assembly;
-        var forwarded = coreAssembly.GetForwardedTypes();
-
-        Assert.True(forwarded.Length >= 31,
-            $"Expected at least 31 forwarded types, found {forwarded.Length}");
+        // Verify types reside directly in their target assemblies after
+        // Core was merged into Engine (no type forwarding needed).
+        Assert.Equal("Broiler.JavaScript.Runtime", typeof(JSValue).Assembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.Runtime", typeof(Arguments).Assembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.Storage", typeof(KeyStrings).Assembly.GetName().Name);
+        Assert.Equal("Broiler.JavaScript.Engine", typeof(JSContext).Assembly.GetName().Name);
     }
 
     [Fact]

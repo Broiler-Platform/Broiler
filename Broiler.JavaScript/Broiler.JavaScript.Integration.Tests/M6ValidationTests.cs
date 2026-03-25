@@ -1,16 +1,12 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Storage;
-using Broiler.JavaScript.Core.Debugger;
-using Broiler.JavaScript.Core.Emit;
-using Broiler.JavaScript.Core.FastParser.Compiler;
+using Broiler.JavaScript.BuiltIns;
 using Broiler.JavaScript.BuiltIns.Null;
+using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Parser;
+using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Integration.Tests;
@@ -32,34 +28,12 @@ public class M6ValidationTests
             typeof(Broiler.JavaScript.Clr.DefaultClrInterop).TypeHandle);
     }
 
-    // ── 6.2: TypeForwardedTo Resolution ────────────────────────────────
+    // ── 6.2: Type Location Verification ──────────────────────────────
 
     [Fact]
-    public void M6_AllTypeForwardedTo_ResolveCorrectly()
+    public void M6_TypesResolveToCorrectAssembly()
     {
-        // Load the Core assembly and retrieve all TypeForwardedTo attributes.
-        var coreAssembly = typeof(JSContext).Assembly;
-        var forwarded = coreAssembly.GetForwardedTypes();
-
-        // The refactored architecture forwards types across 3 forwarding files:
-        //   ClrTypeForwarding.cs (9), ParserTypeForwarding.cs (12),
-        //   StorageTypeForwarding.cs (10)
-        Assert.True(forwarded.Length >= 31,
-            $"Expected at least 31 forwarded types but found {forwarded.Length}");
-
-        // Verify every forwarded type can be loaded and is not null.
-        foreach (var type in forwarded)
-        {
-            Assert.NotNull(type);
-            Assert.False(string.IsNullOrEmpty(type.FullName),
-                $"Forwarded type has no FullName: {type}");
-        }
-    }
-
-    [Fact]
-    public void M6_TypeForwardedTo_ResolvesToCorrectAssembly()
-    {
-        // Spot-check representative forwarded types resolve to their target assemblies.
+        // Spot-check representative types resolve to their target assemblies.
         var expectations = new (Type type, string expectedAssemblyPrefix)[]
         {
             // → Runtime
@@ -246,29 +220,13 @@ public class M6ValidationTests
     // ── 6.5: Backward Compatibility ────────────────────────────────────
 
     [Fact]
-    public void M6_ForwardedTypes_ResolveViaCore()
+    public void M6_TypesResolvedDirectlyInTargetAssemblies()
     {
-        // Consumers that reference Broiler.JavaScript.Core should still
-        // resolve types that have been extracted to Foundation assemblies.
-        var coreAssembly = typeof(JSContext).Assembly;
-
-        // Load JSValue through Core's forwarding — it now lives in Runtime.
-        var jsValueType = coreAssembly.GetForwardedTypes()
-            .FirstOrDefault(t => t.Name == nameof(JSValue));
-        Assert.NotNull(jsValueType);
-        Assert.Equal(typeof(JSValue), jsValueType);
-
-        // Load StringSpan through Core's forwarding — it now lives in Ast.
-        var stringSpanType = coreAssembly.GetForwardedTypes()
-            .FirstOrDefault(t => t.Name == nameof(StringSpan));
-        Assert.NotNull(stringSpanType);
-        Assert.Equal(typeof(StringSpan), stringSpanType);
-
-        // Load FastParser through Core's forwarding — it now lives in Parser.
-        var parserType = coreAssembly.GetForwardedTypes()
-            .FirstOrDefault(t => t.Name == nameof(FastParser));
-        Assert.NotNull(parserType);
-        Assert.Equal(typeof(FastParser), parserType);
+        // After refactoring, types live directly in their target assemblies
+        // (no forwarding needed since Core was merged into Engine).
+        Assert.Equal(typeof(JSValue).Assembly.GetName().Name, "Broiler.JavaScript.Runtime");
+        Assert.Equal(typeof(StringSpan).Assembly.GetName().Name, "Broiler.JavaScript.Ast");
+        Assert.Equal(typeof(FastParser).Assembly.GetName().Name, "Broiler.JavaScript.Parser");
     }
 
     [Fact]
@@ -303,28 +261,28 @@ public class M6ValidationTests
     }
 
     [Fact]
-    public void M6_DependencyLayering_FeaturesDependOnCore()
+    public void M6_DependencyLayering_FeaturesDependOnEngine()
     {
         EnsureAllAssembliesLoaded();
 
-        // Feature-layer assemblies should reference Core but Core should NOT
+        // Feature-layer assemblies should reference Engine but Engine should NOT
         // reference any Feature-layer assembly.
-        var coreRefs = typeof(JSContext).Assembly.GetReferencedAssemblies()
+        var engineRefs = typeof(JSContext).Assembly.GetReferencedAssemblies()
             .Select(r => r.Name!)
             .ToHashSet();
 
-        // Core must NOT reference Feature assemblies.
-        Assert.DoesNotContain("Broiler.JavaScript.BuiltIns", coreRefs);
-        Assert.DoesNotContain("Broiler.JavaScript.Compiler", coreRefs);
-        Assert.DoesNotContain("Broiler.JavaScript.Clr", coreRefs);
-        Assert.DoesNotContain("Broiler.JavaScript.Debugger", coreRefs);
-        Assert.DoesNotContain("Broiler.JavaScript.Modules", coreRefs);
+        // Engine must NOT reference Feature assemblies.
+        Assert.DoesNotContain("Broiler.JavaScript.BuiltIns", engineRefs);
+        Assert.DoesNotContain("Broiler.JavaScript.Compiler", engineRefs);
+        Assert.DoesNotContain("Broiler.JavaScript.Clr", engineRefs);
+        Assert.DoesNotContain("Broiler.JavaScript.Debugger", engineRefs);
+        Assert.DoesNotContain("Broiler.JavaScript.Modules", engineRefs);
 
-        // Core must reference Foundation assemblies.
-        Assert.Contains("Broiler.JavaScript.Runtime", coreRefs);
-        Assert.Contains("Broiler.JavaScript.Storage", coreRefs);
-        Assert.Contains("Broiler.JavaScript.Parser", coreRefs);
-        Assert.Contains("Broiler.JavaScript.Ast", coreRefs);
+        // Engine must reference Foundation assemblies.
+        Assert.Contains("Broiler.JavaScript.Runtime", engineRefs);
+        Assert.Contains("Broiler.JavaScript.Storage", engineRefs);
+        Assert.Contains("Broiler.JavaScript.Parser", engineRefs);
+        Assert.Contains("Broiler.JavaScript.Ast", engineRefs);
     }
 
     // ── 6.6: Performance Baseline ──────────────────────────────────────
