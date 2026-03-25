@@ -2,7 +2,9 @@ using Broiler.JavaScript.Ast;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Module;
+using Broiler.JavaScript.Modules;
+using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.JavaScript.Modules.Tests;
 

@@ -1,6 +1,7 @@
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine;
 using System.Runtime.CompilerServices;
 
 namespace Broiler.JavaScript.BuiltIns.Tests;
