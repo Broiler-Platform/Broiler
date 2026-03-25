@@ -51,6 +51,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyAcc
     internal static Func<string, KeyString, JSValue> CreateStringWithKey;
 
     internal static Func<string, Exception> NewTypeError;
+    internal static Func<object, JSValue> MarshalObject;
     internal static Func<JSValue, object, bool, object> ForceConvertHelper;
     internal static Func<Expression, JSValue, DynamicMetaObject> CreateDynamicMetaObject;
     internal static Func<double, string> NumberToECMAString;

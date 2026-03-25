@@ -38,6 +38,13 @@ using Broiler.JavaScript.Runtime;
 [assembly: TypeForwardedTo(typeof(JSValueToClrConverter))]
 [assembly: TypeForwardedTo(typeof(KeyEnumerator))]
 
+// Enumerator types and JavaScriptObject moved to Runtime
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Enumerators.ListElementEnumerator))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Enumerators.ClrObjectEnumerator<>))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Enumerators.ClrObjectEnumerable<>))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Enumerators.EnumerableElementEnumerable))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.JavaScriptObject))]
+
 // Utils types moved to Runtime
 [assembly: TypeForwardedTo(typeof(BigIntegerExtensions))]
 [assembly: TypeForwardedTo(typeof(DateParser))]

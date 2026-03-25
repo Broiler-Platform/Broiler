@@ -1,6 +1,5 @@
-﻿#nullable enable
+#nullable enable
 
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Core;
@@ -16,7 +15,7 @@ public abstract class JavaScriptObject(in Arguments a) : IJavaScriptObject
 
     public static implicit operator JSValue(JavaScriptObject @object)
     {
-        var handle = @object.handle ??= JSEngine.ClrInterop.Marshal(@object);
+        var handle = @object.handle ??= JSValue.MarshalObject(@object);
         return handle;
     }
 }
