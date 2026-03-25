@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Enumerators;
 using System;
 using System.Collections.Generic;
@@ -205,9 +204,9 @@ public partial class JSTypedArray: JSObject
 
     internal IElementEnumerator GetEntries() => new EntryEnumerator(this);
 
-    public override IElementEnumerator GetAllKeys(bool showEnumerableOnly = true, bool inherited = true) => new KeyEnumerator(length);
+    public override IElementEnumerator GetAllKeys(bool showEnumerableOnly = true, bool inherited = true) => new Core.Typed.KeyEnumerator(length);
 
-    internal JSGenerator GetKeys() => new(new KeyEnumerator(length), "Array Iterator");
+    internal JSGenerator GetKeys() => new(new Core.Typed.KeyEnumerator(length), "Array Iterator");
 
     struct ElementEnumerator(JSTypedArray typedArray, int startIndex = 0) : IElementEnumerator
     {

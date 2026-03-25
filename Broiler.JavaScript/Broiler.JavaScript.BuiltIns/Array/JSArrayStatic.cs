@@ -1,7 +1,5 @@
-﻿using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.Boolean;
-using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.BuiltIns.Error;
 using Broiler.JavaScript.BuiltIns.Promise;
 using System;

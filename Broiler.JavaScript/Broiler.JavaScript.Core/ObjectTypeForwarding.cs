@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Runtime;
 
 // Type forwarding for JSObject types moved to Broiler.JavaScript.Runtime assembly.

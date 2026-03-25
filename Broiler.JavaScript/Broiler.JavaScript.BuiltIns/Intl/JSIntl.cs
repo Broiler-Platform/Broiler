@@ -1,5 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core.Clr;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Globalization;
 using Broiler.JavaScript.Core.Core.Primitive;

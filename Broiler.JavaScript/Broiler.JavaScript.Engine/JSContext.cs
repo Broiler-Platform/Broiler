@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,7 +7,6 @@ using Broiler.JavaScript.Core.Core.Promise;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 
 namespace Broiler.JavaScript.Engine;

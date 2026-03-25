@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Clr;
-using Broiler.JavaScript.Core.Core.Module;
 using Broiler.JavaScript.Extensions;
 using Broiler.JavaScript.Modules;
 using Broiler.JavaScript.Runtime;

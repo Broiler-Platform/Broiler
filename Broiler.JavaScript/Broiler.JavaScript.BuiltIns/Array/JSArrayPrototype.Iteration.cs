@@ -1,7 +1,5 @@
-﻿using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Core.Typed;
 using Broiler.JavaScript.ExpressionCompiler;
@@ -213,7 +211,7 @@ public partial class JSArray
     public new static JSValue Keys(in Arguments a)
     {
         var @this = a.This;
-        return new JSGenerator(new KeyEnumerator(@this.Length), "Array Iterator");
+        return new JSGenerator(new Core.Typed.KeyEnumerator(@this.Length), "Array Iterator");
     }
 
     [JSPrototypeMethod]

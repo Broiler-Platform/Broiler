@@ -1,6 +1,4 @@
 using Broiler.JavaScript.Runtime;
-using System;
-using System.Threading.Tasks;
 
 namespace Broiler.JavaScript.Core.Core;
 

@@ -1,9 +1,7 @@
 ﻿using Broiler.JavaScript.BuiltIns.Map;
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Boolean;
-using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.ExpressionCompiler;
 using System;

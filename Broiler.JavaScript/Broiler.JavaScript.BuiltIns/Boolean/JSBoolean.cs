@@ -1,6 +1,4 @@
-﻿using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.ExpressionCompiler;
+﻿using Broiler.JavaScript.ExpressionCompiler;
 using System;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Runtime;

@@ -1,12 +1,8 @@
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Enumerators;
-using Broiler.JavaScript.Core.Internal;
-using Broiler.JavaScript.Extensions;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
@@ -18,44 +14,7 @@ namespace Broiler.JavaScript.Extensions;
 /// </summary>
 public static class InternalExtensionHelpers
 {
-    // ── JSObjectExtensions (AddProperty) ────────────────────────────
-
-    [EditorBrowsable(EditorBrowsableState.Never)]
-    public static JSObject AddProperty(this JSObject target, in KeyString key, JSValue value, JSPropertyAttributes attributes = JSPropertyAttributes.EnumerableConfigurableValue)
-    {
-        target.GetOwnProperties().Put(in key, value, attributes);
-        return target;
-    }
-
     // ── JSPropertyExtensions (ToJSValue) ────────────────────────────
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static JSValue ToJSValue(in this JSProperty px)
-    {
-        var t = JSValue.BooleanTrue;
-        var f = JSValue.BooleanFalse;
-        JSObject obj;
-
-        if (px.IsValue)
-        {
-            obj = JSObject.NewWithProperties()
-                .AddProperty(KeyStrings.configurable, px.IsConfigurable ? t : f)
-                .AddProperty(KeyStrings.enumerable, px.IsEnumerable ? t : f)
-                .AddProperty(KeyStrings.writable, !px.IsReadOnly ? t : f)
-                .AddProperty(KeyStrings.value, (JSValue)px.value);
-        }
-        else
-        {
-            obj = JSObject.NewWithProperties()
-                .AddProperty(KeyStrings.configurable, px.IsConfigurable ? t : f)
-                .AddProperty(KeyStrings.enumerable, px.IsEnumerable ? t : f)
-                .AddProperty(KeyStrings.@get, (JSValue)px.get)
-                .AddProperty(KeyStrings.@set, (JSValue)px.set);
-        }
-
-        return obj;
-    }
-
     // ── ClrProxyExtensions (TryGetClrEnumerator) ────────────────────
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

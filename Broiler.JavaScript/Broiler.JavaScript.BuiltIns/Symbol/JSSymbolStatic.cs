@@ -1,5 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Runtime;
+﻿using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.BuiltIns.Symbol;
 

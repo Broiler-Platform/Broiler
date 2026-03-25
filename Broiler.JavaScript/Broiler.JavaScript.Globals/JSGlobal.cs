@@ -1,5 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core.Clr;
-using System;
+﻿using System;
 using System.Threading;
 using System.Collections.Generic;
 using Broiler.JavaScript.Core.Utils;
@@ -9,7 +8,6 @@ using Broiler.JavaScript.BuiltIns.RegExp;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Extensions;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns;
 using Broiler.JavaScript.Engine;

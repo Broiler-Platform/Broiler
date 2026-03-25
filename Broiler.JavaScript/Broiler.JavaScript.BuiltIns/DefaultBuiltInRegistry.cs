@@ -1,11 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Broiler.JavaScript.BuiltIns.Function;
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Storage;
 
 // Moved from Broiler.JavaScript.Core to Broiler.JavaScript.BuiltIns.
 // Rationale: DefaultBuiltInRegistry is responsible for orchestrating the

@@ -1,7 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.BuiltIns.Function;
-using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Runtime;
 

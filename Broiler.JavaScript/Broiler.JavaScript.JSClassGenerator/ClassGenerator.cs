@@ -379,7 +379,7 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
         sb.AppendLine($"var fx = {fx};");
         fx = "fx";
         sb.AppendLine($"{target}.FastAddValue({keyName}, {fx}, JSPropertyAttributes.ConfigurableValue);");
-        sb.AppendLine($"{target}.FastAddValue( Broiler.JavaScript.Core.Core.JSValue.GetGlobalSymbolFactory(\"{e.Symbol}\"), {fx}, JSPropertyAttributes.ConfigurableValue);");
+        sb.AppendLine($"{target}.FastAddValue( Broiler.JavaScript.Runtime.JSValue.GetGlobalSymbolFactory(\"{e.Symbol}\"), {fx}, JSPropertyAttributes.ConfigurableValue);");
         sb.AppendLine("}");
     }
 

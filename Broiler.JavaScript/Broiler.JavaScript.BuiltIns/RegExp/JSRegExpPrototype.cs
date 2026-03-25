@@ -1,8 +1,5 @@
-﻿using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core;
+﻿using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Storage;
 using System.Runtime.CompilerServices;
 
 namespace Broiler.JavaScript.BuiltIns.RegExp;

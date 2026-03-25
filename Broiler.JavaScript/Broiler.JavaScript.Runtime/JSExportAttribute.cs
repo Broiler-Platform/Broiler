@@ -1,5 +1,4 @@
 ﻿#nullable enable
-using Broiler;
 using System;
 
 namespace Broiler.JavaScript.Runtime;
