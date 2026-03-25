@@ -22,7 +22,6 @@
   </Target>
 
   <ItemGroup>
-    <ProjectReference Include="..\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.BuiltIns\Broiler.JavaScript.BuiltIns.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.LinqExpressions\Broiler.JavaScript.LinqExpressions.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.JSClassGenerator\Broiler.JavaScript.JSClassGenerator.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />

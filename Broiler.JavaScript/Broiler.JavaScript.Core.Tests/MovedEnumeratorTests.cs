@@ -1,6 +1,5 @@
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Enumerators;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
@@ -140,11 +139,11 @@ public class MovedEnumeratorTests
     [Fact]
     public void JavaScriptObject_TypeForwarding_TypeResolvesCorrectly()
     {
-        // Verify that JavaScriptObject type resolves correctly via type forwarding
+        // Verify that JavaScriptObject type resolves correctly from Runtime assembly
         var type = typeof(JavaScriptObject);
         Assert.NotNull(type);
         Assert.Equal("Broiler.JavaScript.Runtime", type.Assembly.GetName().Name);
-        Assert.Equal("Broiler.JavaScript.Core", type.Namespace);
+        Assert.Equal("Broiler.JavaScript.Runtime", type.Namespace);
     }
 
     [Fact]
@@ -153,7 +152,7 @@ public class MovedEnumeratorTests
         var type = typeof(ListElementEnumerator);
         Assert.NotNull(type);
         Assert.Equal("Broiler.JavaScript.Runtime", type.Assembly.GetName().Name);
-        Assert.Equal("Broiler.JavaScript.Core.Enumerators", type.Namespace);
+        Assert.Equal("Broiler.JavaScript.Runtime", type.Namespace);
     }
 
     [Fact]
@@ -162,7 +161,7 @@ public class MovedEnumeratorTests
         var type = typeof(EnumerableElementEnumerable);
         Assert.NotNull(type);
         Assert.Equal("Broiler.JavaScript.Runtime", type.Assembly.GetName().Name);
-        Assert.Equal("Broiler.JavaScript.Core.Enumerators", type.Namespace);
+        Assert.Equal("Broiler.JavaScript.Runtime", type.Namespace);
     }
 
     [Fact]

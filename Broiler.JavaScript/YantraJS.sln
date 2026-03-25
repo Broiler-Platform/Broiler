@@ -25,8 +25,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Storage"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.JSClassGenerator", "Broiler.JavaScript.JSClassGenerator\Broiler.JavaScript.JSClassGenerator.csproj", "{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Core", "Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj", "{3D5B1A84-8B2D-4F5C-9F52-B8C3280419B3}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Debugger", "Broiler.JavaScript.Debugger\Broiler.JavaScript.Debugger.csproj", "{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript", "Broiler.JavaScript\Broiler.JavaScript.csproj", "{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}"
@@ -165,18 +163,6 @@ Global
 		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Release|x64.Build.0 = Release|Any CPU
 		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Release|x86.ActiveCfg = Release|Any CPU
 		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Release|x86.Build.0 = Release|Any CPU
-		{3D5B1A84-8B2D-4F5C-9F52-B8C3280419B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3D5B1A84-8B2D-4F5C-9F52-B8C3280419B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3D5B1A84-8B2D-4F5C-9F52-B8C3280419B3}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{3D5B1A84-8B2D-4F5C-9F52-B8C3280419B3}.Debug|x64.Build.0 = Debug|Any CPU
-		{3D5B1A84-8B2D-4F5C-9F52-B8C3280419B3}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{3D5B1A84-8B2D-4F5C-9F52-B8C3280419B3}.Debug|x86.Build.0 = Debug|Any CPU
-		{3D5B1A84-8B2D-4F5C-9F52-B8C3280419B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3D5B1A84-8B2D-4F5C-9F52-B8C3280419B3}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3D5B1A84-8B2D-4F5C-9F52-B8C3280419B3}.Release|x64.ActiveCfg = Release|Any CPU
-		{3D5B1A84-8B2D-4F5C-9F52-B8C3280419B3}.Release|x64.Build.0 = Release|Any CPU
-		{3D5B1A84-8B2D-4F5C-9F52-B8C3280419B3}.Release|x86.ActiveCfg = Release|Any CPU
-		{3D5B1A84-8B2D-4F5C-9F52-B8C3280419B3}.Release|x86.Build.0 = Release|Any CPU
 		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Debug|x64.ActiveCfg = Debug|Any CPU
