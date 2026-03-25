@@ -118,7 +118,10 @@ public struct ClrObjectEnumerator<T>(IElementEnumerator en) : IEnumerator<T>
 
     readonly object IEnumerator.Current => Current;
 
-    public void Dispose() => throw new NotImplementedException();
+    public void Dispose()
+    {
+        // No-op: struct enumerator has no unmanaged resources to release.
+    }
 
     public bool MoveNext()
     {
@@ -132,7 +135,7 @@ public struct ClrObjectEnumerator<T>(IElementEnumerator en) : IEnumerator<T>
         return false;
     }
 
-    public void Reset() => throw new NotImplementedException();
+    public void Reset() => throw new NotSupportedException();
 }
 
 public readonly struct ClrObjectEnumerable<T>(JSValue value) : IEnumerable<T>

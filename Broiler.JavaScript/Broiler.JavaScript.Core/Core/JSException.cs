@@ -58,7 +58,8 @@ public class JSException : Exception
         if (function != null)
             trace.Add((function, filePath ?? "Unknown", line, 1));
 
-        Error = CreateJSError(this, message);
+        Error = (CreateJSError ?? throw new InvalidOperationException("JSException.CreateJSError delegate is not initialized. Ensure the BuiltIns assembly module initializer has run."))
+            (this, message);
     }
 
     public JSException(string message, JSObject prototype, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) : base(message)
@@ -66,7 +67,8 @@ public class JSException : Exception
         if (function != null)
             trace.Add((function, filePath ?? "Unknown", line, 1));
 
-        Error = CreateJSErrorWithPrototype(this, prototype);
+        Error = (CreateJSErrorWithPrototype ?? throw new InvalidOperationException("JSException.CreateJSErrorWithPrototype delegate is not initialized. Ensure the BuiltIns assembly module initializer has run."))
+            (this, prototype);
     }
 
     public JSValue JSStackTrace

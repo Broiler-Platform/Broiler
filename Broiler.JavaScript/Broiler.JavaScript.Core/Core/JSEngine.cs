@@ -86,35 +86,40 @@ public static class JSEngine
         [CallerMemberName] string function = null,
         [CallerFilePath] string filePath = null,
         [CallerLineNumber] int line = 0) =>
-        CreateTypeError(message, function, filePath, line);
+        (CreateTypeError ?? throw new InvalidOperationException("JSEngine.CreateTypeError delegate is not initialized. Ensure the BuiltIns assembly module initializer has run."))
+            (message, function, filePath, line);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewSyntaxError(string message,
         [CallerMemberName] string function = null,
         [CallerFilePath] string filePath = null,
         [CallerLineNumber] int line = 0) =>
-        CreateSyntaxError(message, function, filePath, line);
+        (CreateSyntaxError ?? throw new InvalidOperationException("JSEngine.CreateSyntaxError delegate is not initialized. Ensure the BuiltIns assembly module initializer has run."))
+            (message, function, filePath, line);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewURIError(string message,
         [CallerMemberName] string function = null,
         [CallerFilePath] string filePath = null,
         [CallerLineNumber] int line = 0) =>
-        CreateURIError(message, function, filePath, line);
+        (CreateURIError ?? throw new InvalidOperationException("JSEngine.CreateURIError delegate is not initialized. Ensure the BuiltIns assembly module initializer has run."))
+            (message, function, filePath, line);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewRangeError(string message,
         [CallerMemberName] string function = null,
         [CallerFilePath] string filePath = null,
         [CallerLineNumber] int line = 0) =>
-        CreateRangeError(message, function, filePath, line);
+        (CreateRangeError ?? throw new InvalidOperationException("JSEngine.CreateRangeError delegate is not initialized. Ensure the BuiltIns assembly module initializer has run."))
+            (message, function, filePath, line);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static JSException NewError(string message,
         [CallerMemberName] string function = null,
         [CallerFilePath] string filePath = null,
         [CallerLineNumber] int line = 0) =>
-        CreateError(message, function, filePath, line);
+        (CreateError ?? throw new InvalidOperationException("JSEngine.CreateError delegate is not initialized. Ensure the BuiltIns assembly module initializer has run."))
+            (message, function, filePath, line);
 
     // ── Promise factory delegates ───────────────────────────────────
 
