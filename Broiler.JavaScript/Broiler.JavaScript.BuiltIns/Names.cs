@@ -1,4 +1,3 @@
-#nullable enable
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.ExpressionCompiler;
 

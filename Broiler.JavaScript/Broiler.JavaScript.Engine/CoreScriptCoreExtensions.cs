@@ -1,9 +1,9 @@
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.FastParser.Compiler;
+using Broiler.JavaScript.Engine.Core;
+using Broiler.JavaScript.Engine.FastParser.Compiler;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Engine;
 
 internal static class CoreScriptCoreExtensions
 {

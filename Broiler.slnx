@@ -25,7 +25,6 @@
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Ast/Broiler.JavaScript.Ast.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Clr/Broiler.JavaScript.Clr.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Compiler/Broiler.JavaScript.Compiler.csproj" />
-    <Project Path="Broiler.JavaScript/Broiler.JavaScript.Core/Broiler.JavaScript.Core.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Modules/Broiler.JavaScript.Modules.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Debugger/Broiler.JavaScript.Debugger.csproj" />
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Parser/Broiler.JavaScript.Parser.csproj" />

@@ -1,8 +1,9 @@
 ﻿using System.Runtime.CompilerServices;
+using Broiler.JavaScript.Engine.Core;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core.Core.Storage;
+namespace Broiler.JavaScript.Engine.Core.Storage;
 
 /// <summary>
 /// Initializes <see cref="PropertySequence"/> delegates that require Core

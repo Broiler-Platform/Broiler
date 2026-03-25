@@ -1,8 +1,8 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.ExpressionCompiler;
+﻿using Broiler.JavaScript.ExpressionCompiler;
 using System;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Engine.Core;
 
 namespace Broiler.JavaScript.BuiltIns.Array.Typed;
 

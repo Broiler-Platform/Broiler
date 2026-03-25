@@ -40,19 +40,14 @@ internal class ClassGenerator(JSTypeInfo type, JSGeneratorContext gc)
 
             sb = sb.AppendLine("using System.Collections.Generic;")
                 .AppendLine("using System.Runtime.CompilerServices;")
-                .AppendLine("using Broiler.JavaScript.Core.Core;")
                 .AppendLine("using Broiler.JavaScript.Runtime;")
+                .AppendLine("using Broiler.JavaScript.Engine.Core;")
             .AppendLine("using Broiler.JavaScript.BuiltIns.Function;")
-            .AppendLine("using Broiler.JavaScript.Core.Core.Storage;")
             .AppendLine("using Broiler.JavaScript.Storage;")
 
                 .AppendLine("using System.Text;");
 
             var ns = type.ContainingNamespace.ToString();
-            if (ns != "Broiler.JavaScript.Core")
-            {
-                sb = sb.AppendLine("using Broiler.JavaScript.Core;");
-            }
 
             sb = sb.AppendLine($"namespace {ns} {{ ");
 

@@ -1,5 +1,4 @@
 ﻿using Broiler.JavaScript.BuiltIns;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.BuiltIns.Error;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
@@ -8,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Engine.Core;
 
 namespace Broiler.JavaScript.Debugger;
 

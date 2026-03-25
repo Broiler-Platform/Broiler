@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Engine.Core;
 
 /// <summary>
 /// Initializes <see cref="JSValue"/> factory delegates so that Runtime

@@ -1,5 +1,5 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Engine;
+﻿using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Engine.Core;
 using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.BuiltIns.Debug;

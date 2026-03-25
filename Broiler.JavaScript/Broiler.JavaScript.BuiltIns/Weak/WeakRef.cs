@@ -1,9 +1,9 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.BuiltIns.Symbol;
+﻿using Broiler.JavaScript.BuiltIns.Symbol;
 using Broiler.JavaScript.ExpressionCompiler;
 using System;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.JavaScript.Engine.Core;
 
 namespace Broiler.JavaScript.BuiltIns.Weak;
 

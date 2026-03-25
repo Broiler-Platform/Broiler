@@ -5,7 +5,7 @@ using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine.Core;
 
 namespace Broiler.JavaScript.BuiltIns.Function;
 

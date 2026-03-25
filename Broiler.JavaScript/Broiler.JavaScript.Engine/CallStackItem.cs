@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 using System.ComponentModel;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine.Core;
 
 namespace Broiler.JavaScript.Engine;
 

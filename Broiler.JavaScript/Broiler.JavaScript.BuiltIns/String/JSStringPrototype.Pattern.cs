@@ -1,9 +1,9 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.BuiltIns.RegExp;
+﻿using Broiler.JavaScript.BuiltIns.RegExp;
 using System;
 using System.Text;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Engine.Core;
 
 namespace Broiler.JavaScript.BuiltIns.String;
 

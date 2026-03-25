@@ -6,7 +6,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core.Internal;
+namespace Broiler.JavaScript.Engine.Internal;
 
 /// <summary>
 /// Minimal internal helpers for Core call sites that cannot reference the

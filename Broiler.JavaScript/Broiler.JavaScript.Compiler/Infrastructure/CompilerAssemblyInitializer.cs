@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core.FastParser.Compiler;
+using Broiler.JavaScript.Engine.FastParser.Compiler;
 
 namespace Broiler.JavaScript.Compiler;
 

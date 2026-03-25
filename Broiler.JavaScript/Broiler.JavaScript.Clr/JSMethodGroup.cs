@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Reflection;
 using System.Linq;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.JavaScript.Engine.Core;
 
 namespace Broiler.JavaScript.Clr;
 

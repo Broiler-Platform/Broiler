@@ -8,7 +8,7 @@ using System.Threading;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Engine.Core;
 
 /// <summary>
 /// Provides static access to the current JavaScript execution context and

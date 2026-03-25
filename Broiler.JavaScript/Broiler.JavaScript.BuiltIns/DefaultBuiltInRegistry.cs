@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Broiler.JavaScript.BuiltIns.Function;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Engine.Core;
 using Broiler.JavaScript.Runtime;
 
 // Moved from Broiler.JavaScript.Core to Broiler.JavaScript.BuiltIns.

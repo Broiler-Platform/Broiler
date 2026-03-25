@@ -6,7 +6,7 @@ using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Engine.FastParser.Compiler;
 
 /// <summary>
 /// Default implementation of <see cref="IJSCompiler"/> that delegates to

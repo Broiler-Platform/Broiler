@@ -1,7 +1,7 @@
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Engine.Core;
 
 /// <summary>
 /// Creates the JavaScript <c>Object</c> constructor and wires its prototype

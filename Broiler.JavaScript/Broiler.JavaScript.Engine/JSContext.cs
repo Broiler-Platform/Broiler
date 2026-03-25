@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Engine.Core;
 
 namespace Broiler.JavaScript.Engine;
 

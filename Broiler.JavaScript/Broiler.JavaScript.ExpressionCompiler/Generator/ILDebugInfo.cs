@@ -1,7 +1,6 @@
 ﻿#nullable enable
 
 
-#nullable enable
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
 namespace Broiler.JavaScript.ExpressionCompiler.Generator;

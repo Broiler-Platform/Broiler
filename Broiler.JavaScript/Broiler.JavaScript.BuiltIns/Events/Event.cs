@@ -1,5 +1,4 @@
-﻿#nullable enable
-using System;
+﻿using System;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Runtime;
 

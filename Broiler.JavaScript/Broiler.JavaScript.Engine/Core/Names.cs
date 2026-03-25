@@ -3,7 +3,7 @@ using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Engine.Core;
 
 [JSRegistrationGenerator]
 internal static partial class Names

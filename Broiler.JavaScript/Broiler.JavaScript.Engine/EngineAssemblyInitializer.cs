@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Internal;
+using Broiler.JavaScript.Engine.Core;
+using Broiler.JavaScript.Engine.Internal;
 using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Engine;

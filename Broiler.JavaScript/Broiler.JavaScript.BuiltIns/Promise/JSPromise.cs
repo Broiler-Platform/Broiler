@@ -1,6 +1,6 @@
 ﻿using Broiler.JavaScript.BuiltIns.Function;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Engine.Core;
 using Broiler.JavaScript.Engine.Extensions;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.ExpressionCompiler.Core;

@@ -1,8 +1,7 @@
-﻿#nullable enable
-using System;
+﻿using System;
 using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Engine.Extensions;
+using Broiler.JavaScript.Engine.Core;
 
 namespace Broiler.JavaScript.BuiltIns.Function;
 
