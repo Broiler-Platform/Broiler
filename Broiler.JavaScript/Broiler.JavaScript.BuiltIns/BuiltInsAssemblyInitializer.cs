@@ -21,8 +21,11 @@ using Broiler.JavaScript.BuiltIns.Generator;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.Core.Core.Disposable;
 using Broiler.JavaScript.Core.Core.Function;
+using Broiler.JavaScript.Core.Core.Generator;
 using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.LinqExpressions;
 using Broiler.JavaScript.BuiltIns.Class;
 using Broiler.JavaScript.BuiltIns.RegExp;
 using Broiler.JavaScript.Core;
@@ -281,5 +284,12 @@ internal static class BuiltInsAssemblyInitializer
         JSValue.CreatePromiseFromTask = static (task) => new JSPromise(task);
         JSValue.CreatePromiseFromUntypedTask = static (task) => task.ToPromise();
         JSValue.CreatePromiseFromGenericTask = static (task) => task.ToPromise();
+
+        // Wire JSFunction.CreateClrDelegateFactory (moved from LinqExpressionsAssemblyInitializer)
+        JSFunction.CreateClrDelegateFactory = LinqExpressionsAssemblyInitializer.CreateClrDelegate;
+
+        // Initialize builders for generator/async function types
+        JSGeneratorFunctionBuilderV2.Initialize(typeof(JSGeneratorFunctionV2));
+        JSAsyncFunctionBuilder.Initialize(typeof(JSAsyncFunction), typeof(JSGeneratorFunctionV2));
     }
 }

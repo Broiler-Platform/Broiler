@@ -4,7 +4,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Function;
 using Broiler.JavaScript.Core.Core.Primitive;
 using Broiler.JavaScript.Core.Core.Storage;
 using Broiler.JavaScript.Core.Extensions;
@@ -56,7 +55,7 @@ namespace YantraJS.NodePollyfill
             var key = ToKey(eventName);
 
             var task = new JSPromise((r, e) => {
-                var remove = new JSFunction((in Arguments a1) => {
+                var remove = JSValue.CreateFunction((in Arguments a1) => {
                     if (listeners.TryGetValue(key, out var list))
                     {
                         listener.InvokeFunction(in a1);
