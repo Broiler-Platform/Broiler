@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 public class CancellableDisposableAction(Action action) : IDisposable
 {

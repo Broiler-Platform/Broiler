@@ -1,11 +1,11 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Object;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Core;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Extensions;
 

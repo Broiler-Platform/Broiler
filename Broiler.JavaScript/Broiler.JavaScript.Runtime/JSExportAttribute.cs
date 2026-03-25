@@ -1,7 +1,8 @@
 ﻿#nullable enable
+using Broiler;
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Clr;
+namespace Broiler.JavaScript.Runtime;
 
 public class JSExportAttribute(string? name = null) : Attribute 
 {

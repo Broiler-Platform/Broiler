@@ -4,7 +4,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading;
 
-namespace Broiler.JavaScript.Core.Emit;
+namespace Broiler.JavaScript.Runtime;
 
 public abstract class MethodProvider
 {

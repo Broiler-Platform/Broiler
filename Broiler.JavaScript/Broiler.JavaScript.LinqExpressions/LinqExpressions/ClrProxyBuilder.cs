@@ -1,8 +1,8 @@
-﻿using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Runtime;
 using System;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 /// <summary>
 /// Thin dispatcher that delegates CLR expression building to a registered

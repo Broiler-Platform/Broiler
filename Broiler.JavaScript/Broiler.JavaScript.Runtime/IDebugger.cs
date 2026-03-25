@@ -1,6 +1,4 @@
-using Broiler.JavaScript.Core.Core;
-
-namespace Broiler.JavaScript.Core.Debugger;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Defines the contract for a JavaScript debugger.

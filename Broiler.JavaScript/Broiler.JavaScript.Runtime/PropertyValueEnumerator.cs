@@ -1,6 +1,6 @@
 ﻿using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Enumerator for iterating over property values in a <see cref="PropertySequence"/>.

@@ -6,7 +6,7 @@ using System.Collections.Generic;
 // recording/throwing during parsing) and logically belongs with the
 // parser implementation. Namespace preserved for binary compatibility.
 
-namespace Broiler.JavaScript.Core.Parser;
+namespace Broiler.JavaScript.Parser;
 
 public class Error(string message) : Exception(message)
 {

@@ -1,11 +1,11 @@
 ﻿using Broiler.JavaScript.Ast.Expressions;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Ast.Patterns;
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.LinqExpressions;
-using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.LinqExpressions.LinqExpressions;
+using Broiler.JavaScript.LinqExpressions.Utils;
+using Broiler.JavaScript.Runtime;
 using System;
 
 namespace Broiler.JavaScript.Compiler;

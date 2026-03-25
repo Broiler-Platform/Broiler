@@ -1,5 +1,5 @@
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core.Core;
+using Broiler.JavaScript.Runtime;
 using System;
 using System.Runtime.CompilerServices;
 

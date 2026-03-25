@@ -1,15 +1,9 @@
-﻿using Broiler.JavaScript.Core.Core;
-
-using Broiler.JavaScript.Core.Core.Generator;
-using Broiler.JavaScript.Core.Core.Object;
-using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Storage;
+﻿using Broiler.JavaScript.Storage;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Runtime;
 
 public partial class JSObject
 {

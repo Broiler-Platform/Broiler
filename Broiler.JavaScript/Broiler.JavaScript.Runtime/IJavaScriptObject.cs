@@ -1,8 +1,8 @@
 ﻿#nullable enable
 
-using Broiler.JavaScript.Core.Core;
+using Broiler;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Moving JavaScript objects in and out of JavaScript Runtime and CLR requires

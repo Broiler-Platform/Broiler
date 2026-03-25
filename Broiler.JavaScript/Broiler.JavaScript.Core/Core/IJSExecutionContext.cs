@@ -1,4 +1,3 @@
-using Broiler.JavaScript.Core.Emit;
 using Broiler.JavaScript.Runtime;
 using System;
 using System.Threading.Tasks;

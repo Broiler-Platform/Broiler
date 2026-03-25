@@ -1,4 +1,4 @@
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Enumerator protocol for iterating over JavaScript object elements.

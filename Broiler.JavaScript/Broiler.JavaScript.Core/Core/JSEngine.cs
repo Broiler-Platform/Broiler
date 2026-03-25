@@ -3,9 +3,7 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Promise;
-using Broiler.JavaScript.Core.Emit;
 using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Core.Core;

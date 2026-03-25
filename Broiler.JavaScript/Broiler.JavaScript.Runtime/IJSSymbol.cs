@@ -1,4 +1,4 @@
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Abstraction over a JavaScript Symbol value, allowing Runtime

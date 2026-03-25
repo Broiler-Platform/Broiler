@@ -4,7 +4,6 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core.Core;
 
 namespace Broiler.JavaScript.Runtime;
 

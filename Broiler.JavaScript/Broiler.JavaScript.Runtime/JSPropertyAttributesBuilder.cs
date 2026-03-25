@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.Runtime;
 
 public static class JSPropertyAttributesBuilder
 {

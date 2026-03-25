@@ -1,11 +1,10 @@
 ﻿using Broiler.JavaScript.ExpressionCompiler.Expressions;
-using Broiler.JavaScript.Core.Core.Disposable;
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.LambdaGen;
-using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Ast.Patterns;
 using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.LinqExpressions.LambdaGen;
+using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 namespace Broiler.JavaScript.Compiler;
 

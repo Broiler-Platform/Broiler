@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core.Extensions;
+namespace Broiler.JavaScript.Runtime;
 
 public static class StringExtensions
 {

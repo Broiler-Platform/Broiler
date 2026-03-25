@@ -1,10 +1,7 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Runtime;
-using Broiler.JavaScript.Storage;
+﻿using Broiler.JavaScript.Storage;
 using System;
 using System.Text;
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Runtime;
 
 public partial class JSObject
 {

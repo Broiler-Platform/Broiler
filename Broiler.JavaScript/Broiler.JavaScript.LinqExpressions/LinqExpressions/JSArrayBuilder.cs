@@ -2,11 +2,11 @@
 using System.Linq;
 using System.Reflection;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 public class JSArrayBuilder
 {

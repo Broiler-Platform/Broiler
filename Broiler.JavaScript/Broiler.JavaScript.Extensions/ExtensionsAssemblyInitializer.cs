@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Extensions;
 

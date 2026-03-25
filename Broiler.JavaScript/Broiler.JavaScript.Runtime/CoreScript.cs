@@ -1,13 +1,9 @@
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Emit;
-using Broiler.JavaScript.Core.FastParser.Compiler;
-using Broiler.JavaScript.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Runtime;
 
 
 /// <summary>

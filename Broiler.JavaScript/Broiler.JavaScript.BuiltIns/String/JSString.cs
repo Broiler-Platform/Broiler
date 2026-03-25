@@ -2,7 +2,6 @@
 using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Clr;
 using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.Core.Extensions;
 using Broiler.JavaScript.Core.Typed;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler;

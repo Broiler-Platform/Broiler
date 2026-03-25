@@ -1,4 +1,5 @@
 #nullable enable
+using Broiler;
 using Broiler.JavaScript.Ast.Misc;
 using System.Text;
 
@@ -8,7 +9,7 @@ using System.Text;
 // the other extension helper classes in the Extensions assembly.
 // Namespace preserved for binary compatibility.
 
-namespace Broiler.JavaScript.Core.Extensions;
+namespace Broiler.JavaScript.Extensions;
 
 public static class StringSpanExtensions
 {

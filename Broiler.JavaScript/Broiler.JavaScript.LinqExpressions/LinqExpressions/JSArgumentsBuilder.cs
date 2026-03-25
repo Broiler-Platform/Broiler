@@ -3,7 +3,7 @@ using System.Reflection;
 using Broiler.JavaScript.Runtime;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 public static class JSArgumentsBuilder
 {

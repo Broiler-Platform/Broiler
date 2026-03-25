@@ -7,13 +7,12 @@ using LambdaExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YLamb
 using LabelTarget = Broiler.JavaScript.ExpressionCompiler.Expressions.YLabelTarget;
 using GotoExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YGoToExpression;
 using TryExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YTryCatchFinallyExpression;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions.GeneratorsV2;
 
 
 

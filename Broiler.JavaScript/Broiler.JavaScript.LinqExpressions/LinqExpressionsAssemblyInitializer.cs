@@ -1,11 +1,10 @@
 using System;
 using System.Runtime.CompilerServices;
-using Broiler.JavaScript.Core.Core;
 using Broiler.JavaScript.Core.Core.Generator;
-using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.Core.Utils;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.ExpressionCompiler.Runtime;
+using Broiler.JavaScript.LinqExpressions.LinqExpressions;
 using Broiler.JavaScript.Runtime;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;

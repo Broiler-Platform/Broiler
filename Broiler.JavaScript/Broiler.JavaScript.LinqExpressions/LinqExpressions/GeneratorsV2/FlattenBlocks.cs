@@ -5,7 +5,7 @@ using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
 
-namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions.GeneratorsV2;
 
 public class FlattenBlocks : YExpressionMapVisitor
 {

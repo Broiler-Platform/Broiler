@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Abstraction over JavaScript Promise objects, allowing Core types

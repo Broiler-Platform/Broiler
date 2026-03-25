@@ -1,8 +1,8 @@
 ﻿using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core.LambdaGen;
+using Broiler.JavaScript.LinqExpressions.LambdaGen;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 public static class StringSpanBuilder
 {

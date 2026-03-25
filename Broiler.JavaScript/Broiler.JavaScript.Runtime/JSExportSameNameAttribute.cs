@@ -1,4 +1,4 @@
-﻿namespace Broiler.JavaScript.Core.Core.Clr;
+﻿namespace Broiler.JavaScript.Runtime;
 
 public class JSExportSameNameAttribute : JSExportAttribute
 {

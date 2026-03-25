@@ -1,7 +1,6 @@
-﻿using Broiler.JavaScript.Core.Core;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Runtime;
 
 public static class JSObjectStatic
 {

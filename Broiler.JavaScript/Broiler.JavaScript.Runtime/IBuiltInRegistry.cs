@@ -1,4 +1,4 @@
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Defines the contract for registering built-in JavaScript objects

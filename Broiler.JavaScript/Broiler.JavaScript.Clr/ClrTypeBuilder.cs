@@ -1,7 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Extensions;
-using Broiler.JavaScript.Core.LinqExpressions;
-using Broiler.JavaScript.Core.Utils;
+﻿using Broiler.JavaScript.Core.Utils;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -9,6 +6,7 @@ using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.ExpressionCompiler.Runtime;
 using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 namespace Broiler.JavaScript.Clr;
 

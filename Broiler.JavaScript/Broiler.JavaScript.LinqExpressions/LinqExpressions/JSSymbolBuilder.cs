@@ -1,7 +1,7 @@
 using System;
 using System.Reflection;
 
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 public class JSSymbolBuilder
 {

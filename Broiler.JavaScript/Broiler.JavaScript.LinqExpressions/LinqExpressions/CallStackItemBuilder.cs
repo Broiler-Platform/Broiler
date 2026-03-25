@@ -1,8 +1,8 @@
 ﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.LambdaGen;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.LinqExpressions.LambdaGen;
 
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 public static class CallStackItemBuilder
 {

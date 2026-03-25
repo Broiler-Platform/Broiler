@@ -1,6 +1,5 @@
 using System;
-using Broiler.JavaScript.Core.Core;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Runtime;
 
 public delegate void JSPromiseDelegate(Action<JSValue> resolve, Action<JSValue> reject);

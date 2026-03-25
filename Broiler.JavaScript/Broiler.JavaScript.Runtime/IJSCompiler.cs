@@ -1,10 +1,8 @@
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Emit;
 using System.Collections.Generic;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.Ast.Misc;
 
-namespace Broiler.JavaScript.Core.FastParser.Compiler;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Defines the contract for compiling JavaScript source code into an executable

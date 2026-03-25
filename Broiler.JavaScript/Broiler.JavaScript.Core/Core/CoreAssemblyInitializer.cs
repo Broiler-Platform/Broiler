@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Core.Core;
 

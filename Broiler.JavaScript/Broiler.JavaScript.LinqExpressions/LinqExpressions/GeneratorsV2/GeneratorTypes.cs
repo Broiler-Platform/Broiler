@@ -5,7 +5,7 @@ using Broiler.JavaScript.ExpressionCompiler.ClosureSeparator;
 using Broiler.JavaScript.Ast.Misc;
 using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions.GeneratorsV2;
 
 public delegate GeneratorState JSGeneratorDelegateV2(ClrGeneratorV2 generator, in Arguments a, int nextJump, JSValue nextValue, Exception ex);
 

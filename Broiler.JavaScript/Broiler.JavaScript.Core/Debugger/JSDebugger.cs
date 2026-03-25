@@ -1,4 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Runtime;
 using System;
 
 namespace Broiler.JavaScript.Core.Debugger;

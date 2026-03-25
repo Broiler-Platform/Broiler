@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
-namespace Broiler.JavaScript.Core.Utils;
+namespace Broiler.JavaScript.LinqExpressions.Utils;
 
 public static class ExpressionHelper
 {

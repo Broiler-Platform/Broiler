@@ -1,4 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Runtime;
 using System.Runtime.CompilerServices;
 
 namespace Broiler.JavaScript.Extensions;

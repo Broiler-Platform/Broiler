@@ -2,7 +2,7 @@
 using System.Runtime.CompilerServices;
 using System.Threading;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Runtime;
 
 internal static class SynchronizationContextExtensions
 {

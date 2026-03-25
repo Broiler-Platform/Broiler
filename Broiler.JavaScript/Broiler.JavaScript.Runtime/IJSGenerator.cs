@@ -1,4 +1,4 @@
-namespace Broiler.JavaScript.Core.Core.Generator;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Abstraction over a JavaScript Generator value, allowing Core

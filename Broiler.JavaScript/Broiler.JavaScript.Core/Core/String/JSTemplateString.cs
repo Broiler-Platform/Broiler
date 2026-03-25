@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using Broiler.JavaScript.Runtime;
+using System.Text;
 
 namespace Broiler.JavaScript.Core.Core.String;
 

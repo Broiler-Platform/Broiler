@@ -1,6 +1,6 @@
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Clr;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Defines the contract for marshalling between .NET (CLR) objects and

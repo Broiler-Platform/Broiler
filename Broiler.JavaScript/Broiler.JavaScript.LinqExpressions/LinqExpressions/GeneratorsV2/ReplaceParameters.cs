@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions.GeneratorsV2;
 
 internal class ReplaceParameters(Dictionary<YExpression, YExpression> replacers) : YExpressionMapVisitor
 {

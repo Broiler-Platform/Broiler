@@ -1,6 +1,6 @@
 using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Abstraction over the prototype chain, allowing Runtime types

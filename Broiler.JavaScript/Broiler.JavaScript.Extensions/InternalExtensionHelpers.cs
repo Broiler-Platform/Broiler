@@ -1,6 +1,8 @@
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Object;
+using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Enumerators;
+using Broiler.JavaScript.Core.Internal;
+using Broiler.JavaScript.Extensions;
+using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using System;
 using System.Collections.Generic;
@@ -8,7 +10,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
-namespace Broiler.JavaScript.Core.Internal;
+namespace Broiler.JavaScript.Extensions;
 
 /// <summary>
 /// Backward-compatible helpers that maintain the <c>Broiler.JavaScript.Core.Internal</c>

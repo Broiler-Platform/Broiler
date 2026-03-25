@@ -1,11 +1,11 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.ExpressionCompiler.Expressions;
+﻿using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.Runtime;
 using System;
 using System.CodeDom.Compiler;
 using System.Reflection;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 
 public class JSSpreadValueBuilder

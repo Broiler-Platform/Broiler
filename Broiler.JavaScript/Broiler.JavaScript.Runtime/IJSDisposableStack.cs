@@ -1,6 +1,6 @@
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Disposable;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Contract interface for the ES2025 DisposableStack built-in.

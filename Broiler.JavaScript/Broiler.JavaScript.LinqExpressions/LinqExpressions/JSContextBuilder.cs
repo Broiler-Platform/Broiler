@@ -1,5 +1,4 @@
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.LambdaGen;
 using System;
 using System.Reflection;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
@@ -7,9 +6,10 @@ using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YP
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.LinqExpressions.LambdaGen;
+using Broiler.JavaScript.Core;
 
-
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 public class JSContextStackBuilder
 {

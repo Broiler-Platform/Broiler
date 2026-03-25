@@ -3,7 +3,7 @@ using System.Linq.Expressions;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 
-namespace Broiler.JavaScript.Core.LambdaGen;
+namespace Broiler.JavaScript.LinqExpressions.LambdaGen;
 
 public static class NewLambdaExpression
 {

@@ -1,7 +1,7 @@
-﻿using Broiler.JavaScript.Core.LambdaGen;
+﻿using Broiler.JavaScript.LinqExpressions.LambdaGen;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
-namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions.GeneratorsV2;
 
 public class GeneratorStateBuilder
 {

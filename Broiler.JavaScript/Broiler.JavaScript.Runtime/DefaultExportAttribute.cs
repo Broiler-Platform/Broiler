@@ -1,6 +1,6 @@
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Module;
+namespace Broiler.JavaScript.Runtime;
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
 public class DefaultExportAttribute : ExportAttribute

@@ -1,8 +1,7 @@
 using System;
 using System.Threading.Tasks;
-using Broiler.JavaScript.Core.Emit;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Minimal contract for a JavaScript execution context.

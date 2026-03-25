@@ -1,6 +1,4 @@
-using Broiler.JavaScript.Runtime;
-
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Abstraction over a JavaScript function value, allowing Runtime

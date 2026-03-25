@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 namespace Broiler.JavaScript.Clr;
 

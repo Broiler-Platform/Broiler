@@ -1,6 +1,6 @@
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Clr;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Minimal <see cref="IClrInterop"/> implementation used when the full

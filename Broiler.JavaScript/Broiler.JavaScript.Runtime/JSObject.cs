@@ -1,8 +1,4 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Object;
-using Broiler.JavaScript.Core.Core.Primitive;
-using Broiler.JavaScript.ExpressionCompiler;
-using Broiler.JavaScript.Runtime;
+﻿using Broiler.JavaScript.ExpressionCompiler;
 using Broiler.JavaScript.Storage;
 using System;
 using System.Collections.Generic;
@@ -10,7 +6,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
-namespace Broiler.JavaScript.Core;
+namespace Broiler.JavaScript.Runtime;
 
 
 internal delegate void PropertyChangedEventHandler(JSObject sender, (uint keyString, uint index, IJSSymbol symbol) index);

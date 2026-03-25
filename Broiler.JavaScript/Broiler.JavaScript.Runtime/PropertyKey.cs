@@ -1,6 +1,6 @@
 using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Discriminated union key for property access: string, uint, or symbol.

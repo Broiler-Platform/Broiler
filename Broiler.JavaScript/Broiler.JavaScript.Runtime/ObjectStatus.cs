@@ -1,4 +1,4 @@
-﻿namespace Broiler.JavaScript.Core.Core.Object;
+﻿namespace Broiler.JavaScript.Runtime;
 
 public enum ObjectStatus
 {

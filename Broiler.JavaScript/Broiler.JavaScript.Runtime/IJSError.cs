@@ -1,6 +1,6 @@
 using System;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Abstraction over JavaScript error objects, allowing Core types

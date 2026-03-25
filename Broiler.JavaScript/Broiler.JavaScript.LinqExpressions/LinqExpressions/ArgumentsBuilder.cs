@@ -1,13 +1,12 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.LambdaGen;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.LinqExpressions.LambdaGen;
 
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 public class ArgumentsBuilder
 {

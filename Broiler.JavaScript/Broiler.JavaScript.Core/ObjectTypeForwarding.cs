@@ -1,9 +1,6 @@
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.Core;
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Object;
-using Broiler.JavaScript.Core.Core.Generator;
-using Broiler.JavaScript.Core.LinqExpressions;
+using Broiler.JavaScript.Runtime;
 
 // Type forwarding for JSObject types moved to Broiler.JavaScript.Runtime assembly.
 // These ensure binary compatibility for downstream consumers that reference

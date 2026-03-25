@@ -1,8 +1,8 @@
-﻿using Broiler.JavaScript.Core.LambdaGen;
-using Broiler.JavaScript.ExpressionCompiler.Expressions;
-using Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.ExpressionCompiler.Expressions;
+using Broiler.JavaScript.LinqExpressions.LambdaGen;
+using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 public class JSBigIntBuilder
 {

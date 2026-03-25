@@ -1,8 +1,7 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.ExpressionCompiler.Runtime;
+﻿using Broiler.JavaScript.ExpressionCompiler.Runtime;
 using Broiler.JavaScript.Storage;
 
-namespace Broiler.JavaScript.Core.Emit;
+namespace Broiler.JavaScript.Runtime;
 
 public class DictionaryCodeCache : ICodeCache
 {

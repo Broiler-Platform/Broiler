@@ -1,11 +1,10 @@
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Emit;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.Core.FastParser.Compiler;
 

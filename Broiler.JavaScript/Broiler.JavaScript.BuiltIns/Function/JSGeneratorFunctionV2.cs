@@ -1,7 +1,6 @@
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.LinqExpressions;
-using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
+using Broiler.JavaScript.LinqExpressions.LinqExpressions;
+using Broiler.JavaScript.LinqExpressions.LinqExpressions.GeneratorsV2;
 using Broiler.JavaScript.Runtime;
 
 namespace Broiler.JavaScript.BuiltIns.Function;

@@ -2,14 +2,14 @@
 using System.Linq;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using ParameterExpression = Broiler.JavaScript.ExpressionCompiler.Expressions.YParameterExpression;
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.LambdaGen;
-using Broiler.JavaScript.Core.LinqExpressions;
 using Broiler.JavaScript.ExpressionCompiler.Core;
 using Broiler.JavaScript.Ast.Misc;
+using Broiler.JavaScript.LinqExpressions.LambdaGen;
+using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 
-namespace Broiler.JavaScript.Core.Utils;
+namespace Broiler.JavaScript.LinqExpressions.Utils;
 
 public delegate Expression CaseExpression(ParameterExpression pe);
 

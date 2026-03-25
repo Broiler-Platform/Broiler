@@ -1,6 +1,6 @@
 using System;
 
-namespace Broiler.JavaScript.Core.Core.Module;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Exports the given type as a class.

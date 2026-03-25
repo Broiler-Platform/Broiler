@@ -8,7 +8,7 @@ namespace Broiler.JavaScript.Clr;
 /// <summary>
 /// Builds LINQ expression tree nodes that call <see cref="ClrProxy"/>
 /// marshal/from methods.  Registered into
-/// <see cref="Broiler.JavaScript.Core.LinqExpressions.ClrProxyBuilder"/>
+/// <see cref="LinqExpressions.LinqExpressions.ClrProxyBuilder"/>
 /// by the assembly's module initializer.
 /// </summary>
 internal static class ClrExpressionBuilder

@@ -1,4 +1,6 @@
-﻿namespace Broiler.JavaScript.Core.Core;
+﻿using Broiler.JavaScript.Runtime;
+
+namespace Broiler.JavaScript.Core.Core;
 
 internal static class UniqueID
 {

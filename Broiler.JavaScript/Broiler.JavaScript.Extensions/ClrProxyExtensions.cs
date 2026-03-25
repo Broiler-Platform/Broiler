@@ -1,5 +1,5 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Enumerators;
+﻿using Broiler.JavaScript.Core.Enumerators;
+using Broiler.JavaScript.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;

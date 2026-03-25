@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Broiler.JavaScript.Ast.Misc;
 
-namespace Broiler.JavaScript.Core.Emit;
+namespace Broiler.JavaScript.Runtime;
 
 public readonly struct JSCode(string location, in StringSpan code, IList<string> args, JSCodeCompiler compiler)
 {

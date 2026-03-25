@@ -1,10 +1,10 @@
-﻿using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.LambdaGen;
-using Broiler.JavaScript.Storage;
+﻿using Broiler.JavaScript.Storage;
 using Expression = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 using Broiler.JavaScript.ExpressionCompiler.Core;
+using Broiler.JavaScript.LinqExpressions.LambdaGen;
+using Broiler.JavaScript.Runtime;
 
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 public static class ScriptInfoBuilder
 {

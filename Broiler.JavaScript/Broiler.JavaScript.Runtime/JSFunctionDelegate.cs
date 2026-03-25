@@ -1,6 +1,4 @@
-using Broiler.JavaScript.Runtime;
-
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Delegate type for JavaScript function calls.

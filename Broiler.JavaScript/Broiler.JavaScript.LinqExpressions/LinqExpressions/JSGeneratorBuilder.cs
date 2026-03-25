@@ -1,8 +1,8 @@
-using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
+using Broiler.JavaScript.LinqExpressions.LinqExpressions.GeneratorsV2;
+using Broiler.JavaScript.Runtime;
 using System;
 
-namespace Broiler.JavaScript.Core.LinqExpressions;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions;
 
 /// <summary>
 /// Factory delegates for creating <c>JSGenerator</c> instances without a

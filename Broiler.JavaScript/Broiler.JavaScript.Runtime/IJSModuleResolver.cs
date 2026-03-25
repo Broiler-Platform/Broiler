@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 
-namespace Broiler.JavaScript.Core.Core.Module;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Defines the contract for resolving and loading JavaScript modules.

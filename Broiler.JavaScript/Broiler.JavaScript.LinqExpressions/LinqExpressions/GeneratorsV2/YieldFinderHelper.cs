@@ -1,7 +1,7 @@
 ﻿using Broiler.JavaScript.ExpressionCompiler.Expressions;
 using Exp = Broiler.JavaScript.ExpressionCompiler.Expressions.YExpression;
 
-namespace Broiler.JavaScript.Core.LinqExpressions.GeneratorsV2;
+namespace Broiler.JavaScript.LinqExpressions.LinqExpressions.GeneratorsV2;
 
 public static class YieldFinderHelper
 {

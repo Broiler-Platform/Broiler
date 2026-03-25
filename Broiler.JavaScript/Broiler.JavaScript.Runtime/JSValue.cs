@@ -1,6 +1,4 @@
 using Broiler.JavaScript.Ast.Misc;
-using Broiler.JavaScript.Core.Extensions;
-using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
 using System;
 using System.ComponentModel;
@@ -10,7 +8,7 @@ using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
-namespace Broiler.JavaScript.Core.Core;
+namespace Broiler.JavaScript.Runtime;
 
 /// <summary>
 /// Base class for all JavaScript values.  Every JS type (number, string,
