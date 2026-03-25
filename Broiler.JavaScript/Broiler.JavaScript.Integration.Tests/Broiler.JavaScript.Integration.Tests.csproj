@@ -14,7 +14,6 @@
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Broiler.JavaScript.Core\Broiler.JavaScript.Core.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Compiler\Broiler.JavaScript.Compiler.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.BuiltIns\Broiler.JavaScript.BuiltIns.csproj" />
     <ProjectReference Include="..\Broiler.JavaScript.Globals\Broiler.JavaScript.Globals.csproj" />
