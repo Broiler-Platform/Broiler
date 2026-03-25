@@ -78,7 +78,7 @@ public partial class JSObject
             }
 
             if (p.IsProperty)
-                return ((IJSFunction)p.get).Delegate;
+                return (p.get as IJSFunction)?.Delegate;
         }
 
         return prototypeChain?.GetMethod(key);
