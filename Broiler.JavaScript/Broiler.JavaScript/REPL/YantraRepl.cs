@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Clr;
 using Broiler.JavaScript.Core;
 using Broiler.JavaScript.Core.Core;
-using Broiler.JavaScript.Core.Core.Clr;
-using Broiler.JavaScript.Core.Core.Function;
-using Broiler.JavaScript.Core.Core.Promise;
+using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Storage;
 using YantraJS;
 
 namespace YantraJS.REPL
