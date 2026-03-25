@@ -99,8 +99,12 @@ deletion errors in the Storage assembly produce the correct JavaScript
 `TypeError` exception:
 
 ```csharp
-PropertySequence.TypeErrorFactory = msg => JSContext.NewTypeError(msg);
+PropertySequence.TypeErrorFactory = msg => JSEngine.NewTypeError(msg);
 ```
+
+> **Note:** The `Put` extension method for `JSFunctionDelegate`-based
+> getters/setters has been moved to `PropertySequenceRuntimeExtensions`
+> in the Runtime assembly.
 
 ### 4. `BuiltInsAssemblyInitializer.Initialize()`
 
