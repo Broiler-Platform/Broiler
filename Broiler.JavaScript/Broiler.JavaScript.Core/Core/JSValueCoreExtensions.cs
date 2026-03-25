@@ -28,7 +28,7 @@ internal static class JSValueCoreExtensions
             }
             return null;
         };
-        JSValue.InvokePropertyGetter = (getter, receiver) => ((IJSFunction)getter).InvokeFunction(new Arguments(receiver));
+        JSValue.InvokePropertyGetter = (getter, receiver) => getter is IJSFunction fn ? fn.InvokeFunction(new Arguments(receiver)) : JSValue.UndefinedValue;
         JSValue.CreatePrototypeObject = value => (value as JSObject)?.PrototypeObject;
         Arguments.Empty = new Arguments(JSUndefined.Value);
         Arguments.ForApplyImpl = ArgumentsCoreExtensions.ForApplyCore;

@@ -13,7 +13,12 @@ public static class JSPropertyExtensions
         if (p.IsEmpty)
             return JSUndefined.Value;
 
-        return !p.IsProperty ? (JSValue)p.value : ((IJSFunction)p.get).InvokeFunction(new Arguments(target));
+        if (!p.IsProperty)
+            return (JSValue)p.value;
+
+        return p.get is IJSFunction getter
+            ? getter.InvokeFunction(new Arguments(target))
+            : JSUndefined.Value;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

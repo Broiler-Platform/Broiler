@@ -130,12 +130,12 @@ public class JSPrototype : IJSPrototype
         
         if(p.IsValue)
         {
-            if (p.get != null)
-                return ((IJSFunction)p.get).Delegate;
+            if (p.get is IJSFunction valueGetter)
+                return valueGetter.Delegate;
         }
         
         if (p.IsProperty)
-            return ((IJSFunction)p.get).Delegate;
+            return (p.get as IJSFunction)?.Delegate;
         
         return null;
     }

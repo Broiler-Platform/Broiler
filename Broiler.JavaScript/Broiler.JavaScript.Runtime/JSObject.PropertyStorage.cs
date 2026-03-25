@@ -207,9 +207,9 @@ public partial class JSObject
         var p = GetInternalProperty(name, true);
         if (p.IsProperty)
         {
-            if (p.set != null)
+            if (p.set is IJSFunction setter)
             {
-                ((IJSFunction)p.set).Delegate(new Arguments(receiver ?? this, value));
+                setter.Delegate(new Arguments(receiver ?? this, value));
                 return true;
             }
 
@@ -263,9 +263,9 @@ public partial class JSObject
         var p = GetInternalProperty(name);
         if (p.IsProperty)
         {
-            if (p.set != null)
+            if (p.set is IJSFunction setter)
             {
-                ((IJSFunction)p.set).Delegate(new Arguments(receiver ?? this, value));
+                setter.Delegate(new Arguments(receiver ?? this, value));
                 return true;
             }
 
@@ -300,9 +300,9 @@ public partial class JSObject
         var p = GetInternalProperty(name);
         if (p.IsProperty)
         {
-            if (p.set != null)
+            if (p.set is IJSFunction setter)
             {
-                ((IJSFunction)p.set).Delegate(new Arguments(receiver ?? this, value));
+                setter.Delegate(new Arguments(receiver ?? this, value));
                 return true;
             }
 
@@ -348,7 +348,10 @@ public partial class JSObject
             if (p.IsValue)
                 return (JSValue)p.value;
 
-            return ((IJSFunction)p.get).InvokeFunction(new Arguments(receiver ?? this));
+            if (p.get is IJSFunction getter)
+                return getter.InvokeFunction(new Arguments(receiver ?? this));
+
+            return JSValue.UndefinedValue;
         }
 
         return base.GetValue(key, receiver, throwError);
