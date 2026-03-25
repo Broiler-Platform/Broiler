@@ -27,3 +27,8 @@ using Broiler.JavaScript.Runtime;
 [assembly: TypeForwardedTo(typeof(JSPropertyFactory))]
 [assembly: TypeForwardedTo(typeof(JSUndefined))]
 [assembly: TypeForwardedTo(typeof(JSPrimitiveObject))]
+
+// JSException, JSVariable, KeyStringCoreExtensions moved to Runtime
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.JSException))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.JSVariable))]
+[assembly: TypeForwardedTo(typeof(Broiler.JavaScript.Core.Core.KeyStringCoreExtensions))]

@@ -8,7 +8,7 @@ namespace Broiler.JavaScript.Core.Core;
 /// Extension methods and Core-dependent helpers for <see cref="KeyString"/>
 /// and <see cref="KeyStrings"/>.  The bulk of the KeyString/KeyStrings
 /// implementation lives in the Storage assembly; this file retains only
-/// the methods that depend on Core types (JSValue).
+/// the methods that depend on Runtime types (JSValue).
 /// </summary>
 public static class KeyStringCoreExtensions
 {
