@@ -247,7 +247,8 @@ internal static class CssLayoutEngine
                     }
 
                     if ((b.WhiteSpace != CssConstants.NoWrap && b.WhiteSpace != CssConstants.Pre && curx + word.Width + rightspacing > limitRight
-                         && (b.WhiteSpace != CssConstants.PreWrap || !word.IsSpaces)) || word.IsLineBreak || wrapNoWrapBox)
+                         && (b.WhiteSpace != CssConstants.PreWrap || !word.IsSpaces)
+                         && (b.WhiteSpace != CssConstants.PreLine || !word.IsSpaces)) || word.IsLineBreak || wrapNoWrapBox)
                     {
                         wrapNoWrapBox = false;
                         curx = startx;
@@ -645,9 +646,18 @@ internal static class CssLayoutEngine
 
     private static void ApplyVerticalAlignment(RGraphics g, CssLineBox lineBox)
     {
+        // CSS 2.1 §10.8: The baseline is where text sits, approximated as
+        // the top of each box plus the font ascent. Most Latin fonts have
+        // an ascent/height ratio near 0.8 (e.g. OS/2 sTypoAscender is
+        // typically ~80% of UPM). This matches common browser heuristics.
+        const double TypicalAscentRatio = 0.8;
         double baseline = float.MinValue;
         foreach (var box in lineBox.Rectangles.Keys)
-            baseline = Math.Max(baseline, lineBox.Rectangles[box].Top);
+        {
+            double boxBaseline = lineBox.Rectangles[box].Top
+                + box.ActualFont.Height * TypicalAscentRatio;
+            baseline = Math.Max(baseline, boxBaseline);
+        }
 
         // Compute line box top and bottom for top/bottom/text-top/text-bottom alignment.
         double lineTop = double.MaxValue;
