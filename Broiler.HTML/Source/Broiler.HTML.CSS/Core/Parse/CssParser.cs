@@ -336,16 +336,20 @@ internal sealed class CssParser
                     selectors.Insert(0, new CssBlockSelectorItem(firstClass, false));
                 }
 
-                var properties = ParseCssBlockProperties(blockSource);
-                return new CssBlock(firstClass + pseudoElement, properties, selectors);
+                var (properties, importantProps) = ParseCssBlockProperties(blockSource);
+                var block = new CssBlock(firstClass + pseudoElement, properties, selectors);
+                MarkImportantProperties(block, importantProps);
+                return block;
             }
 
             if (psedoClass == null || psedoClass == "link" || psedoClass == "hover")
             {
                 var selectors = ParseCssBlockSelector(className, out string firstClass);
-                var properties = ParseCssBlockProperties(blockSource);
+                var (properties, importantProps) = ParseCssBlockProperties(blockSource);
 
-                return new CssBlock(firstClass, properties, selectors, psedoClass == "hover");
+                var block = new CssBlock(firstClass, properties, selectors, psedoClass == "hover");
+                MarkImportantProperties(block, importantProps);
+                return block;
             }
         }
 
@@ -409,9 +413,18 @@ internal sealed class CssParser
         return selectors;
     }
 
-    private Dictionary<string, string> ParseCssBlockProperties(string blockSource)
+    private static void MarkImportantProperties(CssBlock block, HashSet<string> importantProperties)
+    {
+        if (importantProperties == null)
+            return;
+        foreach (var prop in importantProperties)
+            block.MarkImportant(prop);
+    }
+
+    private (Dictionary<string, string> properties, HashSet<string> importantProperties) ParseCssBlockProperties(string blockSource)
     {
         var properties = new Dictionary<string, string>();
+        HashSet<string> importantProperties = null;
         int startIdx = 0;
 
         while (startIdx < blockSource.Length)
@@ -447,29 +460,42 @@ internal sealed class CssParser
                         && propValue.IndexOf("url(", StringComparison.InvariantCultureIgnoreCase) < 0)
                         propValue = propValue.ToLower();
 
-                    AddProperty(propName, propValue, properties);
+                    AddProperty(propName, propValue, properties, ref importantProperties);
                 }
             }
 
             startIdx = endIdx + 1;
         }
 
-        return properties;
+        return (properties, importantProperties);
     }
 
-    private void AddProperty(string propName, string propValue, Dictionary<string, string> properties)
+    private void AddProperty(string propName, string propValue, Dictionary<string, string> properties, ref HashSet<string> importantProperties)
     {
         // CSS2.1 §1.3.2: handle !important declarations.
         // If '!' is present but not followed by 'important', the
         // declaration is malformed and must be discarded (§4.1.7).
+        bool isImportant = false;
         int bangIdx = propValue.IndexOf('!');
         if (bangIdx >= 0)
         {
             var afterBang = propValue.Substring(bangIdx + 1).Trim();
             if (afterBang.Equals("important", StringComparison.OrdinalIgnoreCase))
+            {
                 propValue = propValue.Substring(0, bangIdx).Trim();
+                isImportant = true;
+            }
             else
                 return; // malformed !important — discard the entire declaration
+        }
+
+        // Snapshot current property keys only for shorthand properties that
+        // expand into multiple longhands — avoids HashSet allocation for the
+        // common case of simple (non-shorthand) declarations.
+        HashSet<string> keysBefore = null;
+        if (isImportant && IsShorthandProperty(propName))
+        {
+            keysBefore = new HashSet<string>(properties.Keys, StringComparer.OrdinalIgnoreCase);
         }
 
         switch (propName)
@@ -539,7 +565,40 @@ internal sealed class CssParser
                 properties[propName] = propValue;
                 break;
         }
+
+        // CSS2.1 §6.4.2: Record which longhand properties carry the
+        // !important flag so that the cascade can give them priority.
+        if (isImportant)
+        {
+            importantProperties ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (keysBefore != null)
+            {
+                // Shorthand: mark all newly-expanded longhand keys.
+                foreach (var key in properties.Keys)
+                {
+                    if (!keysBefore.Contains(key))
+                        importantProperties.Add(key);
+                }
+            }
+            else
+            {
+                // Non-shorthand: mark the stored key directly.
+                // Handle renamed properties (border-radius → corner-radius).
+                if (properties.ContainsKey(propName))
+                    importantProperties.Add(propName);
+                else if (propName == "border-radius" && properties.ContainsKey("corner-radius"))
+                    importantProperties.Add("corner-radius");
+            }
+        }
     }
+
+    private static bool IsShorthandProperty(string propName) => propName switch
+    {
+        "font" or "border" or "border-left" or "border-top" or "border-right" or
+        "border-bottom" or "margin" or "border-style" or "border-width" or
+        "border-color" or "padding" or "background" => true,
+        _ => false
+    };
 
     private static void ParseLengthProperty(string propName, string propValue, Dictionary<string, string> properties)
     {

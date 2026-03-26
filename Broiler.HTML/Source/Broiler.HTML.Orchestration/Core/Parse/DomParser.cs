@@ -439,8 +439,22 @@ internal sealed class DomParser
             if (prop.Value == CssConstants.Inherit && box.ParentBox != null)
                 value = CssUtils.GetPropertyValue(box.ParentBox, prop.Key);
 
+            bool newIsImportant = block.ImportantProperties.Contains(prop.Key);
+
+            // CSS2.1 §6.4.2: A property previously set with !important
+            // can only be overridden by another !important declaration.
+            if (box.ImportantProperties != null
+                && box.ImportantProperties.Contains(prop.Key)
+                && !newIsImportant)
+                continue;
+
             if (IsStyleOnElementAllowed(box, prop.Key, value))
+            {
                 CssUtils.SetPropertyValue(box, prop.Key, value);
+
+                if (newIsImportant)
+                    box.MarkPropertyImportant(prop.Key);
+            }
         }
     }
 
