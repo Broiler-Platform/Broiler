@@ -288,6 +288,16 @@ internal sealed class CssParser
         if (string.IsNullOrEmpty(className))
             return null;
 
+        // CSS2.1 §5.11: Pre-process structural pseudo-classes (:first-child,
+        // :last-child) that may appear anywhere in the selector chain.
+        // Extract the pseudo-class and rewrite the selector so the rest of
+        // the parsing pipeline handles it correctly.
+        string structuralPseudo = null;
+        bool structuralOnTerminal = false;
+        className = StripStructuralPseudoClasses(className, out structuralPseudo, out structuralOnTerminal);
+        if (string.IsNullOrEmpty(className))
+            return null;
+
         string psedoClass = null;
         string pseudoElement = null;
         bool descendantCombinatorBeforePseudo = false;
@@ -339,6 +349,7 @@ internal sealed class CssParser
                 var (properties, importantProps) = ParseCssBlockProperties(blockSource);
                 var block = new CssBlock(firstClass + pseudoElement, properties, selectors);
                 MarkImportantProperties(block, importantProps);
+                ApplyStructuralPseudo(block, structuralPseudo, structuralOnTerminal);
                 return block;
             }
 
@@ -349,11 +360,125 @@ internal sealed class CssParser
 
                 var block = new CssBlock(firstClass, properties, selectors, psedoClass == "hover");
                 MarkImportantProperties(block, importantProps);
+                ApplyStructuralPseudo(block, structuralPseudo, structuralOnTerminal);
                 return block;
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// CSS2.1 §5.11.1: Recognised structural pseudo-classes.
+    /// </summary>
+    private static bool IsStructuralPseudoClass(string name) => name is
+        "first-child" or "last-child" or "only-child";
+
+    /// <summary>
+    /// Scans <paramref name="selector"/> for structural pseudo-classes
+    /// (e.g. <c>:first-child</c>) and removes them, returning the cleaned
+    /// selector.  The extracted pseudo-class name and whether it was on the
+    /// terminal simple selector are reported via the out parameters.
+    /// <para>
+    /// Standalone leading pseudo (":first-child + * .buckets p") is replaced
+    /// with a universal selector ("* + * .buckets p") so that the rest of
+    /// the parsing pipeline sees a well-formed selector.
+    /// </para>
+    /// </summary>
+    private static string StripStructuralPseudoClasses(string selector, out string pseudo, out bool onTerminal)
+    {
+        pseudo = null;
+        onTerminal = false;
+
+        // Fast path: no colon means no pseudo-class.
+        int colonIdx = selector.IndexOf(':');
+        if (colonIdx < 0)
+            return selector;
+
+        // Skip pseudo-elements (::before, ::after).
+        if (selector.Length > colonIdx + 1 && selector[colonIdx + 1] == ':')
+            return selector;
+
+        // Extract the pseudo-class name (up to next whitespace/combinator/colon).
+        int nameStart = colonIdx + 1;
+        int nameEnd = nameStart;
+        while (nameEnd < selector.Length
+               && !char.IsWhiteSpace(selector[nameEnd])
+               && selector[nameEnd] != '>' && selector[nameEnd] != '+'
+               && selector[nameEnd] != ':')
+            nameEnd++;
+
+        string pseudoName = selector.Substring(nameStart, nameEnd - nameStart);
+
+        if (!IsStructuralPseudoClass(pseudoName))
+            return selector; // not structural — leave unchanged for existing handling
+
+        pseudo = pseudoName;
+
+        string before = selector.Substring(0, colonIdx).TrimEnd();
+        string after = selector.Substring(nameEnd).TrimStart();
+
+        if (before.Length == 0)
+        {
+            // Standalone leading pseudo (":first-child + * .buckets p").
+            // Replace with "* <rest>" — the "*" represents the element that
+            // must satisfy the pseudo-class condition.
+            onTerminal = false;
+            return string.IsNullOrEmpty(after) ? "*" : "* " + after;
+        }
+        else
+        {
+            // Attached to a selector ("h1:first-child", "#id:last-child").
+            onTerminal = !after.Contains(' ') && !after.Contains('>') && !after.Contains('+');
+            // If there is no remaining selector after the pseudo, the pseudo is on the terminal.
+            if (string.IsNullOrEmpty(after))
+                onTerminal = true;
+            return string.IsNullOrEmpty(after) ? before : before + " " + after;
+        }
+    }
+
+    /// <summary>
+    /// After a CssBlock has been created, attach the structural pseudo-class
+    /// information so that matching can verify the condition at cascade time.
+    /// </summary>
+    private static void ApplyStructuralPseudo(CssBlock block, string pseudo, bool onTerminal)
+    {
+        if (pseudo == null)
+            return;
+
+        if (onTerminal || block.Selectors == null || block.Selectors.Count == 0)
+        {
+            // Pseudo-class applies to the terminal selector element.
+            // Store on the block itself (checked in IsBlockAssignableToBox).
+            // Use reflection-free approach: CssBlock.PseudoClass was added.
+            // Re-create with the pseudo — CssBlock is mutable enough via the property.
+            // Actually, CssBlock.PseudoClass is set via constructor; but we already
+            // created the block.  We need a setter or to set in constructor.
+            // For now, we set it using a small internal method.
+            SetBlockPseudoClass(block, pseudo);
+        }
+        else
+        {
+            // Pseudo-class applies to the last selector item in the chain
+            // (the element furthest from the terminal, at the start of the
+            // original selector string).
+            int lastIdx = block.Selectors.Count - 1;
+            var item = block.Selectors[lastIdx];
+            block.Selectors[lastIdx] = new CssBlockSelectorItem(
+                item.Class, item.DirectParent, item.AdjacentSibling, pseudo);
+        }
+    }
+
+    /// <summary>
+    /// Sets the structural pseudo-class on the block's terminal selector.
+    /// </summary>
+    private static void SetBlockPseudoClass(CssBlock block, string pseudo)
+    {
+        // CssBlock.PseudoClass is { get; } only — use a wrapper constructor approach.
+        // Since CssBlock is sealed and PseudoClass is set via constructor, we need
+        // a different approach.  Add a mutable setter via internal property.
+        // For minimal change, we use reflection... actually let's just make PseudoClass settable.
+        block.PseudoClassInternal = pseudo;
     }
 
     private static List<CssBlockSelectorItem> ParseCssBlockSelector(string className, out string firstClass)

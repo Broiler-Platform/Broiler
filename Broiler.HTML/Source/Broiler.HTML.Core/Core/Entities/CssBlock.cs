@@ -8,7 +8,7 @@ public sealed class CssBlock
     private readonly Dictionary<string, string> _properties;
     private HashSet<string> _importantProperties;
 
-    public CssBlock(string @class, Dictionary<string, string> properties, List<CssBlockSelectorItem> selectors = null, bool hover = false)
+    public CssBlock(string @class, Dictionary<string, string> properties, List<CssBlockSelectorItem> selectors = null, bool hover = false, string pseudoClass = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(@class);
         ArgumentNullException.ThrowIfNull(properties);
@@ -17,12 +17,25 @@ public sealed class CssBlock
         Selectors = selectors;
         _properties = properties;
         Hover = hover;
+        PseudoClass = pseudoClass;
     }
 
     public string Class { get; }
     public List<CssBlockSelectorItem> Selectors { get; }
     public IDictionary<string, string> Properties => _properties;
     public bool Hover { get; }
+
+    /// <summary>
+    /// Optional structural pseudo-class on the terminal selector
+    /// (e.g. "first-child" for <c>h1:first-child</c>).  CSS2.1 §5.11.
+    /// </summary>
+    public string PseudoClass { get; private set; }
+
+    /// <summary>
+    /// Internal setter for <see cref="PseudoClass"/>, used by the CSS parser
+    /// when the pseudo-class is determined after initial construction.
+    /// </summary>
+    internal string PseudoClassInternal { set => PseudoClass = value; }
 
     /// <summary>
     /// Property names in this block that were declared with <c>!important</c>.
@@ -58,7 +71,7 @@ public sealed class CssBlock
 
     public CssBlock Clone()
     {
-        var clone = new CssBlock(Class, new Dictionary<string, string>(_properties), Selectors != null ? [.. Selectors] : null);
+        var clone = new CssBlock(Class, new Dictionary<string, string>(_properties), Selectors != null ? [.. Selectors] : null, pseudoClass: PseudoClass);
         if (_importantProperties != null)
             clone._importantProperties = new HashSet<string>(_importantProperties, StringComparer.OrdinalIgnoreCase);
         return clone;
