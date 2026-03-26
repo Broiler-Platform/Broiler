@@ -1242,9 +1242,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             // internal space.  In either case, this element's own
             // margin-bottom is always external spacing and must never be
             // included in its own content-height calculation.
-            if (ActualBorderBottomWidth > 0.1 || ActualPaddingBottom > 0.1)
-                margin = lastChildBottomMargin;
-            else if (Height != CssConstants.Auto)
+            if (ActualBorderBottomWidth > 0.1 || ActualPaddingBottom > 0.1 || Height != CssConstants.Auto)
                 margin = lastChildBottomMargin;
             // else: Height is auto, no bottom border/padding — child's
             // margin collapses with this element's margin and propagates
