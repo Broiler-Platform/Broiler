@@ -359,7 +359,8 @@ public class CaptureService
         }
         else if (options.FullPage)
         {
-            using var bitmap = HtmlRender.RenderToImageAutoSized(html, maxWidth: options.Width);
+            using var bitmap = HtmlRender.RenderToImageAutoSized(html,
+                maxWidth: options.Width, maxHeight: options.Height);
             using var data = bitmap.Encode(format, 90);
             using var stream = File.OpenWrite(options.OutputPath);
             data.SaveTo(stream);

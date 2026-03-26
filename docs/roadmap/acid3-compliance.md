@@ -1222,14 +1222,14 @@ gap is attributable to:
 #### P0 — Rendering Fixes: Show-Stoppers (target: M1 ≥ 50 %)
 
 - [ ] **TODO-1 (D3): Fix viewport overflow / page height calculation**
-  - [ ] Add unit test for box-model computation with `border: 2cm` + `width: 32em`
-  - [ ] Fix total width = content (640 px) + border + margin to fit within 1024 px
-  - [ ] Ensure viewport-constrained render clips at 768 px height
-  - [ ] Verify `overflow` handling on root and body elements (§9.2.1)
+  - [x] Add unit test for box-model computation with `border: 2cm` + `width: 32em`
+  - [x] Fix total width = content (640 px) + border + margin to fit within 1024 px
+  - [x] Ensure viewport-constrained render clips at 768 px height
+  - [x] Verify `overflow` handling on root and body elements (§9.2.1)
 - [ ] **TODO-3 (D2): Fix CSS border layout in rendering engine**
-  - [ ] Fix asymmetric `border-width: 0 0.2em 0.2em 0` rendering geometry
+  - [x] Fix asymmetric `border-width: 0 0.2em 0.2em 0` rendering geometry
   - [ ] Ensure bottom border renders at row ~452 (currently extends to row 745)
-  - [ ] Align gray border column offsets with reference (col 20–663)
+  - [x] Align gray border column offsets with reference (col 20–663)
   - *Note:* CSSOM cascade is correct (cm units ✅, 4-value expansion ✅,
     `:root` override ✅) — remaining work is in `HtmlRender` layout engine
 
