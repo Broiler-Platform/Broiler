@@ -3379,7 +3379,7 @@ document.getElementById('result').textContent =
 
     // ═══════════════════════════════════════════════════════════════════
     //  Phase F: Acid3 test-by-test coverage expansion
-    //  Targeting uncovered Acid3 tests: 28, 30, 86, 87, 91, 92, 94, 95, 96
+    //  Targeting uncovered Acid3 tests: 28, 30, 85, 86, 87, 91, 92, 94, 95, 96
     // ═══════════════════════════════════════════════════════════════════
 
     /// <summary>

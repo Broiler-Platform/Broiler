@@ -610,8 +610,8 @@ rendering at an incorrect position or size.
     - `PhaseF_Test91_Properties_Enumerable_Including_Shadow` — shadow
       properties (constructor, toString, valueOf, etc.) are enumerable when
       defined on an object literal.
-    - `PhaseF_Test92_Function_Constructor_Properties` — Function.prototype.
-      constructor is writable and not enumerable.
+    - `PhaseF_Test92_Function_Constructor_Properties` — Function.prototype
+      .constructor is writable and not enumerable.
     - `PhaseF_Test94_Exception_Catch_Scope_Isolation` — catch block variable
       does not poison the outer scope.
     - `PhaseF_Test95_Typeof_Assignment_Result` — `typeof` on the result of
