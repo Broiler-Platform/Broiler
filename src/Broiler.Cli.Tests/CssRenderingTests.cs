@@ -658,7 +658,8 @@ var cs = window.getComputedStyle(document.getElementById('target'));
 var r = [];
 r.push(cs.color === 'blue');
 // font-family from @font-face should NOT be applied to elements
-r.push(cs.fontFamily === undefined || cs.fontFamily === '');
+var ff = cs.fontFamily || '';
+r.push(ff.indexOf('TestFont') === -1);
 document.getElementById('result').textContent = r.join(',');
 </script>
 </body></html>";
