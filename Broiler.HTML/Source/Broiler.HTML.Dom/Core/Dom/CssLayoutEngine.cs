@@ -686,6 +686,26 @@ internal static class CssLayoutEngine
                     }
                     break;
                 default:
+                    // CSS 2.1 §10.8.1: A <length> or <percentage> value
+                    // raises (positive) or lowers (negative) the box by
+                    // the given distance relative to the baseline.
+                    // A percentage is calculated against the line-height
+                    // of the element itself.
+                    if (box.VerticalAlign != CssConstants.Baseline
+                        && !string.IsNullOrEmpty(box.VerticalAlign))
+                    {
+                        double lineHeight = box.ActualLineHeight > 0
+                            ? box.ActualLineHeight
+                            : box.ActualFont.Height;
+                        double offset = CssValueParser.ParseLength(
+                            box.VerticalAlign, lineHeight, box.GetEmHeight());
+                        if (!double.IsNaN(offset) && offset != 0)
+                        {
+                            // Positive values move the box UP (raise).
+                            lineBox.SetBaseLine(g, box, baseline - offset);
+                            break;
+                        }
+                    }
                     //case: baseline
                     lineBox.SetBaseLine(g, box, baseline);
                     break;
