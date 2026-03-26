@@ -524,6 +524,23 @@ public sealed partial class DomBridge
                 return v is "normal" or "bold" or "bolder" or "lighter"
                     || (int.TryParse(v, out var w) && w >= 1 && w <= 1000);
 
+            case "color":
+            case "background-color":
+            case "border-color":
+            case "border-top-color":
+            case "border-right-color":
+            case "border-bottom-color":
+            case "border-left-color":
+            case "outline-color":
+                // CSS color values: named colors, #hex, rgb(), rgba(),
+                // hsl(), hsla(), transparent, currentcolor.
+                // Reject unknown vendor-prefixed values (e.g. -acid3-bogus).
+                return !v.StartsWith('-')
+                    || v.StartsWith("-webkit-", StringComparison.Ordinal)
+                    || v.StartsWith("-moz-", StringComparison.Ordinal)
+                    || v.StartsWith("-ms-", StringComparison.Ordinal)
+                    || v.StartsWith("-o-", StringComparison.Ordinal);
+
             default:
                 // For all other properties accept any non-empty value
                 return true;

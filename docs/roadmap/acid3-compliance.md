@@ -435,6 +435,23 @@ rendering at an incorrect position or size.
   - Together with TODO-17, this raised the Acid3 score from **98/100 to
     100/100**.
 
+- [x] **TODO-19: Implement CSS error recovery for enumerated properties (CSS2.1 §4.1.8)**
+  - CSS declarations with invalid values must be ignored per CSS2.1 §4.1.8.
+    The Acid3 test uses two error-recovery patterns:
+    - `white-space: pre-wrap; white-space: x-bogus;` (line 131) — `x-bogus`
+      must be rejected, keeping `pre-wrap`.
+    - `color: gray; color: -acid3-bogus;` (instruction text) — `-acid3-bogus`
+      must be rejected, keeping `gray`.
+  - **Fix:** Added `IsValidPropertyValue()` to `CssParser.cs` that validates
+    enumerated CSS properties (`white-space`, `display`, `visibility`,
+    `overflow`, `position`, `float`, `clear`, `text-align`, etc.) against
+    their allowed keyword sets. Invalid values cause the declaration to be
+    silently discarded.
+  - Also added color property validation to `DomBridge.IsAcceptableCssValue()`
+    to reject unknown vendor-prefixed color values (starting with `-` but not
+    matching known vendor prefixes `-webkit-`, `-moz-`, `-ms-`, `-o-`).
+  - 7 new regression tests added in `Acid3CssComplianceTests.cs`.
+
 ### P1 — High Priority (significant visual impact)
 
 - [x] **TODO-5 (D5): Fix CSS specificity for `!important` border overrides**
@@ -452,11 +469,21 @@ rendering at an incorrect position or size.
 - [ ] **TODO-6 (D6): Fix word spacing and text layout in instruction paragraph**
   - Investigate `white-space` collapsing and word-break algorithm.
   - Verify `font: 0.8em` computed size inheritance.
+  - **Progress**: CSS error recovery now implemented. `white-space: x-bogus`
+    (from Acid3 line 131 `white-space: pre-wrap; white-space: x-bogus;`) is
+    correctly rejected by both `CssParser.IsValidPropertyValue()` and
+    `DomBridge.IsAcceptableCssValue()`, so `pre-wrap` is preserved.
+    `color: -acid3-bogus` (from `#instructions` rule) is also rejected,
+    preserving `gray`.
   - Sub-steps:
     1. ~~Add test for text word-spacing with inherited font sizes.~~ ✅
        (`WordSpacing_With_Inherited_Font_Size` test added — 9 words preserved)
-    2. Fix whitespace collapsing between inline elements.
-    3. Verify `margin-right: -20px; padding-right: 20px` does not collapse text.
+    2. ~~Implement CSS error recovery for `white-space: x-bogus`.~~ ✅
+       (`IsValidPropertyValue` in CssParser, `IsAcceptableCssValue` in DomBridge)
+    3. ~~Implement CSS error recovery for `color: -acid3-bogus`.~~ ✅
+       (color properties reject unknown `-` prefixed values in DomBridge)
+    4. Fix whitespace collapsing between inline elements.
+    5. Verify `margin-right: -20px; padding-right: 20px` does not collapse text.
 
 - [ ] **TODO-7 (D7): Improve font rendering fidelity**
   - Investigate SkiaSharp font metrics vs browser expectations.
@@ -558,7 +585,7 @@ fidelity**.
 
 ### 6.2 CSS Unit Tests
 
-✅ **Added** — see `src/Broiler.Cli.Tests/Acid3CssComplianceTests.cs` (24 tests).
+✅ **Added** — see `src/Broiler.Cli.Tests/Acid3CssComplianceTests.cs` (39 tests).
 
 Targeted CSS unit tests for properties used by Acid3:
 
@@ -570,11 +597,16 @@ Targeted CSS unit tests for properties used by Acid3:
 | `hsla()` color parsing     | ✅ Full          | Full parsing test | Done — `Hsla_Black_Color_For_Slash_Element`, `Hsla_Zero_Saturation_Produces_Valid_Color` |
 | `text-shadow`               | ✅ Full          | Render test with offset + color | Done — `TextShadow_Rgba_Color_GetComputedStyle` (in `Acid3CssComplianceTests`) |
 | `font-weight: bolder`       | ✅ Full          | Numeric resolution per CSS 2.1 §15.6 | Done — `FontWeight_Bolder_Resolves_To_700_From_Normal_Parent`, `FontWeight_Bolder_From_Bold_Parent_Resolves_To_900`, `FontWeight_Lighter_Resolves_To_100_From_Normal_Parent` |
-| `@font-face` loading        | ✅ CSSOM         | Local file loading test | Done — `FontFace_With_Url_Src_Accessible_Via_CSSOM` |
-| `::after` / `::before`      | ✅ Implemented   | Content generation + positioning | Done (in `DomParser.ApplyPseudoElementBoxes`) |
+| `@font-face` loading        | ✅ CSSOM         | Local file loading test | Done — `FontFace_With_Url_Src_Accessible_Via_CSSOM`, `FontFace_FontFamily_Name_Accessible` |
+| `::after` / `::before`      | ✅ Implemented   | Content generation + positioning | Done (in `DomParser.ApplyPseudoElementBoxes`) + `PseudoElement_Absolute_Position_In_CSSOM` |
 | `display: inline-block`     | ✅ Full          | With `vertical-align` in em units | Done — `InlineBlock_VerticalAlign_Em_Units` |
 | Negative margins            | ✅ Full          | Collapsing with borders | Done — `Negative_Margin_With_Border_GetComputedStyle`, `Large_Negative_Margin_GetComputedStyle` |
 | Word spacing                | ✅ Tested        | Inherited font sizes | Done — `WordSpacing_With_Inherited_Font_Size` |
+| CSS error recovery          | ✅ Full          | `white-space: x-bogus` rejected | Done — `WhiteSpace_Invalid_Value_Discarded_By_Error_Recovery`, `Invalid_Display_Value_Discarded_Keeps_Previous`, `Invalid_Visibility_Value_Discarded`, `Invalid_Overflow_Value_Discarded`, `Inherit_Value_Accepted_For_Enumerated_Properties` |
+| Color error recovery        | ✅ Full          | `color: -acid3-bogus` rejected | Done — `Acid3_Instructions_Color_Error_Recovery` |
+| Data-URI backgrounds        | ✅ Tested        | `url(data:...)` preserved | Done — `DataUri_Background_Image_Preserved` |
+| Object positioning          | ✅ Tested        | `position: fixed` on `<object>` | Done — `Object_Position_Fixed_GetComputedStyle` |
+| Box model (32em + border)   | ✅ Tested        | Acid3 html element sizing | Done — `Acid3_Html_Width_32em_GetComputedStyle`, `Acid3_Full_BoxModel_Computed_Styles` |
 
 Additional tests added:
 - Score display slash visibility: `Score_Display_Slash_Visible_After_RemoveAttribute`
@@ -583,6 +615,21 @@ Additional tests added:
 - Zero-sized floated iframe: `ZeroSized_Float_GetComputedStyle`
 - !important border override: `Important_Border_Override_Universal_Selector`
 - Whitespace preservation: `Whitespace_Preserved_Between_Inline_Elements`
+- CSS error recovery (white-space): `WhiteSpace_Invalid_Value_Discarded_By_Error_Recovery`
+- CSS error recovery (display): `Invalid_Display_Value_Discarded_Keeps_Previous`
+- CSS error recovery (visibility): `Invalid_Visibility_Value_Discarded`
+- CSS error recovery (overflow): `Invalid_Overflow_Value_Discarded`
+- CSS error recovery (inherit): `Inherit_Value_Accepted_For_Enumerated_Properties`
+- Acid3 color error recovery: `Acid3_Instructions_Color_Error_Recovery`
+- Acid3 white-space error recovery: `Acid3_Instructions_WhiteSpace_Error_Recovery`
+- Acid3 html 32em width: `Acid3_Html_Width_32em_GetComputedStyle`
+- Acid3 full box model: `Acid3_Full_BoxModel_Computed_Styles`
+- @font-face family name: `FontFace_FontFamily_Name_Accessible`
+- Object position fixed: `Object_Position_Fixed_GetComputedStyle`
+- Data-URI background-image: `DataUri_Background_Image_Preserved`
+- Pseudo-element CSSOM: `PseudoElement_Absolute_Position_In_CSSOM`
+- Acid3 base CSS cascade: `Acid3_Base_Css_Cascade_Integration`
+- Acid3 bucket inline-block: `Acid3_Bucket_InlineBlock_Css_Integration`
 
 ### 6.3 End-to-End Score Test
 

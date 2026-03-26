@@ -562,7 +562,11 @@ internal sealed class CssParser
                 properties["corner-radius"] = propValue;
                 break;
             default:
-                properties[propName] = propValue;
+                // CSS2.1 §4.1.8: Ignore declarations with illegal values.
+                // Validate enumerated CSS properties to reject unknown keywords
+                // (e.g. "white-space: x-bogus" must be discarded).
+                if (IsValidPropertyValue(propName, propValue))
+                    properties[propName] = propValue;
                 break;
         }
 
@@ -599,6 +603,57 @@ internal sealed class CssParser
         "border-color" or "padding" or "background" => true,
         _ => false
     };
+
+    /// <summary>
+    /// CSS2.1 §4.1.8: Validates property values for CSS properties that accept
+    /// only a fixed set of keywords. Returns <c>true</c> if the property is not
+    /// an enumerated property or if the value is a valid keyword; <c>false</c>
+    /// if the value is an unknown keyword for an enumerated property.
+    /// Keyword sets include both CSS2.1 values and commonly-used CSS3 values
+    /// (e.g. <c>flex</c>, <c>grid</c>, <c>sticky</c>) for forward compatibility.
+    /// </summary>
+    private static bool IsValidPropertyValue(string propName, string propValue)
+    {
+        var lower = propValue.ToLowerInvariant();
+
+        // "inherit" and "initial" are valid for all CSS properties.
+        if (lower is "inherit" or "initial" or "unset")
+            return true;
+
+        return propName switch
+        {
+            "white-space" => lower is "normal" or "pre" or "nowrap" or "pre-wrap" or "pre-line" or "break-spaces",
+            "visibility" => lower is "visible" or "hidden" or "collapse",
+            "overflow" or "overflow-x" or "overflow-y" => lower is "visible" or "hidden" or "scroll" or "auto",
+            "display" => lower is "block" or "inline" or "inline-block" or "none" or "list-item"
+                or "table" or "table-row" or "table-cell" or "table-row-group"
+                or "table-header-group" or "table-footer-group" or "table-column"
+                or "table-column-group" or "table-caption" or "flex" or "inline-flex"
+                or "grid" or "inline-grid" or "contents" or "run-in",
+            "position" => lower is "static" or "relative" or "absolute" or "fixed" or "sticky",
+            "float" or "cssfloat" => lower is "left" or "right" or "none",
+            "clear" => lower is "left" or "right" or "both" or "none",
+            "text-align" => lower is "left" or "right" or "center" or "justify" or "start" or "end",
+            "text-transform" => lower is "capitalize" or "uppercase" or "lowercase" or "none" or "full-width",
+            "font-style" => lower is "normal" or "italic" or "oblique",
+            "font-variant" => lower is "normal" or "small-caps",
+            "list-style-type" => lower is "disc" or "circle" or "square" or "decimal"
+                or "decimal-leading-zero" or "lower-roman" or "upper-roman"
+                or "lower-alpha" or "upper-alpha" or "lower-latin" or "upper-latin"
+                or "lower-greek" or "armenian" or "georgian" or "none",
+            "list-style-position" => lower is "inside" or "outside",
+            "border-collapse" => lower is "collapse" or "separate",
+            "empty-cells" => lower is "show" or "hide",
+            "table-layout" => lower is "auto" or "fixed",
+            "caption-side" => lower is "top" or "bottom",
+            "direction" => lower is "ltr" or "rtl",
+            "unicode-bidi" => lower is "normal" or "embed" or "bidi-override" or "isolate" or "isolate-override" or "plaintext",
+            "word-break" => lower is "normal" or "break-all" or "keep-all" or "break-word",
+            "overflow-wrap" or "word-wrap" => lower is "normal" or "break-word" or "anywhere",
+            "box-sizing" => lower is "content-box" or "border-box",
+            _ => true, // Unknown property — accept any value
+        };
+    }
 
     private static void ParseLengthProperty(string propName, string propValue, Dictionary<string, string> properties)
     {
