@@ -1820,4 +1820,37 @@ body { margin: 0; padding: 0; }
         Assert.True(rightBorderPixel.Green > 100,
             $"Right border should be green, got ({rightBorderPixel.Red},{rightBorderPixel.Green},{rightBorderPixel.Blue})");
     }
+
+    /// <summary>
+    /// Verifies that font-size: 0 creates a near-zero height container, matching
+    /// CSS 2.1 §15.4 which states that font-size:0 gives a zero-size em box.
+    /// The Acid3 .buckets container uses this pattern to collapse text height.
+    /// </summary>
+    [Fact]
+    public void FontSize_Zero_Creates_NearZero_Height_Container()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; padding: 0; border: none; }
+html { font: 20px Arial, sans-serif; }
+body { margin: 0; }
+.zero-font { font-size: 0; line-height: 0; background: red; }
+.normal { background: blue; width: 100px; height: 40px; }
+</style>
+</head><body>
+<div class=""zero-font"">This text should be zero height</div>
+<div class=""normal""></div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+
+        // The blue div should start near the top (y ≈ 0-2) since the
+        // zero-font div has near-zero height. If font-size:0 is clipped
+        // to a large default, the blue div would be pushed further down.
+        var nearTop = bitmap.GetPixel(50, 3);
+        Assert.True(nearTop.Blue > 200,
+            $"Blue div should start near top (font-size:0 has near-zero height), " +
+            $"got pixel at (50,3) = ({nearTop.Red},{nearTop.Green},{nearTop.Blue})");
+    }
 }

@@ -919,8 +919,11 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
                 _ => CssValueParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
             };
 
+            // CSS 2.1 §15.4: font-size: 0 results in a zero-size em box.
+            // Use a tiny positive value so the font object remains valid
+            // while producing near-zero word dimensions in the layout engine.
             if (fsize <= 0)
-                fsize = CssConstants.FontSize;
+                fsize = 0.001;
 
             _actualFont = GetCachedFont(FontFamily, fsize, st);
 
