@@ -580,7 +580,7 @@ public sealed partial class DomBridge
 
     /// <summary>
     /// Resolves CSS relative font-weight keywords (<c>bolder</c>, <c>lighter</c>)
-    /// to numeric values per CSS 2.1 §15.6.  Also normalises <c>normal</c> → 400
+    /// to numeric values per CSS 2.1 §15.6.  Also normalizes <c>normal</c> → 400
     /// and <c>bold</c> → 700 so that <c>getComputedStyle</c> always returns a number.
     /// </summary>
     private void ResolveFontWeightKeywords(Dictionary<string, string> computed, DomElement element)
@@ -608,15 +608,32 @@ public sealed partial class DomBridge
         {
             int parentWeight = 400;
             if (element?.Parent != null)
-            {
                 parentWeight = ResolveParentFontWeight(element.Parent);
-            }
 
-            if (fw.Equals("bolder", StringComparison.OrdinalIgnoreCase))
-                computed["font-weight"] = (parentWeight < 400 ? 400 : parentWeight < 600 ? 700 : 900).ToString();
-            else
-                computed["font-weight"] = (parentWeight > 700 ? 400 : parentWeight > 500 ? 400 : 100).ToString();
+            computed["font-weight"] = fw.Equals("bolder", StringComparison.OrdinalIgnoreCase)
+                ? ResolveBolderWeight(parentWeight).ToString()
+                : ResolveLighterWeight(parentWeight).ToString();
         }
+    }
+
+    /// <summary>
+    /// CSS 2.1 §15.6: <c>bolder</c> selects the next weight above the inherited value.
+    /// </summary>
+    private static int ResolveBolderWeight(int parentWeight)
+    {
+        if (parentWeight < 400) return 400;
+        if (parentWeight < 600) return 700;
+        return 900;
+    }
+
+    /// <summary>
+    /// CSS 2.1 §15.6: <c>lighter</c> selects the next weight below the inherited value.
+    /// </summary>
+    private static int ResolveLighterWeight(int parentWeight)
+    {
+        if (parentWeight > 700) return 400;
+        if (parentWeight > 500) return 400;
+        return 100;
     }
 
     /// <summary>
@@ -688,12 +705,12 @@ public sealed partial class DomBridge
         if (value.Equals("bolder", StringComparison.OrdinalIgnoreCase))
         {
             int pw = element?.Parent != null ? ResolveParentFontWeight(element.Parent) : 400;
-            return pw < 400 ? 400 : pw < 600 ? 700 : 900;
+            return ResolveBolderWeight(pw);
         }
         if (value.Equals("lighter", StringComparison.OrdinalIgnoreCase))
         {
             int pw = element?.Parent != null ? ResolveParentFontWeight(element.Parent) : 400;
-            return pw > 700 ? 400 : pw > 500 ? 400 : 100;
+            return ResolveLighterWeight(pw);
         }
         return 400;
     }

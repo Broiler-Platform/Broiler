@@ -1032,20 +1032,33 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
             if (parent != null)
                 parentWeight = ResolveNumericFontWeight(parent.FontWeight, parent.GetParent());
 
-            if (fontWeight == CssConstants.Bolder)
-            {
-                // CSS 2.1 §15.6: bolder selects the next weight above the inherited value
-                return parentWeight < 400 ? 400 : parentWeight < 600 ? 700 : 900;
-            }
-            else // lighter
-            {
-                // CSS 2.1 §15.6: lighter selects the next weight below the inherited value
-                return parentWeight > 700 ? 400 : parentWeight > 500 ? 400 : 100;
-            }
+            return fontWeight == CssConstants.Bolder
+                ? ResolveBolder(parentWeight)
+                : ResolveLighter(parentWeight);
         }
 
         // Any other non-empty, non-normal value is treated as bold
         return 700;
+    }
+
+    /// <summary>
+    /// CSS 2.1 §15.6: <c>bolder</c> selects the next weight above the inherited value.
+    /// </summary>
+    private static int ResolveBolder(int parentWeight)
+    {
+        if (parentWeight < 400) return 400;
+        if (parentWeight < 600) return 700;
+        return 900;
+    }
+
+    /// <summary>
+    /// CSS 2.1 §15.6: <c>lighter</c> selects the next weight below the inherited value.
+    /// </summary>
+    private static int ResolveLighter(int parentWeight)
+    {
+        if (parentWeight > 700) return 400;
+        if (parentWeight > 500) return 400;
+        return 100;
     }
 
     /// <summary>
