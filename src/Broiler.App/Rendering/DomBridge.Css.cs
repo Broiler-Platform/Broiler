@@ -484,7 +484,7 @@ public sealed partial class DomBridge
             {
                 style ??= part;
             }
-            else if (lower is "thin" or "medium" or "thick" || IsLengthOrPercentage(lower) || lower == "0")
+            else if (lower is "thin" or "medium" or "thick" || IsLengthOrPercentage(lower))
             {
                 width ??= part;
             }
@@ -517,7 +517,7 @@ public sealed partial class DomBridge
         foreach (char c in value)
         {
             if (c == '(') depth++;
-            else if (c == ')') depth--;
+            else if (c == ')' && depth > 0) depth--;
 
             if (char.IsWhiteSpace(c) && depth == 0 && sb.Length > 0)
             {
