@@ -51,7 +51,11 @@ internal static class RegExpValidator
         if (string.IsNullOrEmpty(pattern))
             return pattern;
 
-        // Quick check — avoid allocation when not needed
+        // Quick check — avoid StringBuilder allocation for patterns that
+        // cannot contain empty character classes.  This may false-positive on
+        // patterns like "a][]b" where "][]" spans two constructs, but the
+        // full loop below handles those correctly (it only rewrites actual
+        // empty classes found outside existing character classes).
         if (!pattern.Contains("[]") && !pattern.Contains("[^]"))
             return pattern;
 

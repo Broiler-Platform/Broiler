@@ -21,7 +21,7 @@
 
 ### Acid3 Score (JavaScript)
 
-Broiler's JavaScript engine currently achieves a score of **98/100** when
+Broiler's JavaScript engine currently achieves a score of **100/100** when
 executing the Acid3 test harness via `CaptureService.ExecuteScriptsWithDom`.
 This is tracked by existing regression tests in
 `src/Broiler.Cli.Tests/Acid3RegressionTests.cs` (102 individual tests).
@@ -406,6 +406,34 @@ rendering at an incorrect position or size.
        rules. Wired into `removeAttribute`, `setAttribute`, `className` setter,
        `classList.add/remove/toggle`, and `setNamedItem/removeNamedItem`.
        3 new regression tests added.
+
+- [x] **TODO-17: Fix regex empty character class `[]` tokenization (Acid3 test 89)**
+  - The JavaScript parser's `RegExpValidator.IsValid` passed raw ES3 patterns
+    to .NET `Regex`, which does not support empty character classes `[]`.
+    This caused `/[]/` to be tokenized as a division operator instead of a
+    regex literal, failing Acid3 test 89.
+  - **Fix:** Added `NormalizeES3CharacterClasses()` to `RegExpValidator` in
+    `Broiler.JavaScript.Parser` that rewrites `[]` → `[^\s\S]` (matches
+    nothing) and `[^]` → `[\s\S]` (matches any character) before validation.
+    The full JS-to-.NET transformation is still performed later by
+    `JSRegExp.TransformES3Patterns` at regex construction time.
+
+- [x] **TODO-18: Fix `Array.prototype.unshift` element insertion (Acid3 test 83)**
+  - `unshift('A','B','C')` on `['a','b','c']` produced `[undefined,undefined,
+    undefined,'a','b','c']` instead of `['A','B','C','a','b','c']`.
+  - **Root cause:** C# overload resolution. `JSProperty.Property(JSValue)`
+    resolved to the `Property(IPropertyAccessor get, ...)` overload (creating
+    a getter property) instead of `Property(IPropertyValue d, ...)` (creating
+    a value property), because `IPropertyAccessor` extends `IPropertyValue`
+    and is therefore more specific.
+  - **Fix:** Changed `elements.Put(i) = JSProperty.Property(a.GetAt(...))` to
+    `elements.Put(i, a.GetAt(...))` which uses the 2-argument
+    `ElementArray.Put(uint, IPropertyValue)` overload, correctly creating
+    value properties. Also fixed the empty-array case (`l == 0`) where
+    `unshift` previously did nothing.
+  - Same fix applied to `Array.prototype.splice` element insertion.
+  - Together with TODO-17, this raised the Acid3 score from **98/100 to
+    100/100**.
 
 ### P1 — High Priority (significant visual impact)
 

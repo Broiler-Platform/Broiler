@@ -430,8 +430,14 @@ public partial class JSArray
         var l = a.This.Length;
         if (l > 0)
         {
-            // move existing elements to the right
+            // move existing elements to the right; MoveElements updates Length
             @this.MoveElements(0, a.Length);
+        }
+        else
+        {
+            // No existing elements — set length explicitly since MoveElements
+            // is not called.  Length can be 0 or -1 (missing length property).
+            @this.Length = a.Length;
         }
 
         // insert the new elements at the front
@@ -440,9 +446,6 @@ public partial class JSArray
         {
             elements.Put(i, a.GetAt((int)i));
         }
-
-        if (l <= 0)
-            @this.Length = a.Length;
 
         return new JSNumber(a.This.Length);
     }
