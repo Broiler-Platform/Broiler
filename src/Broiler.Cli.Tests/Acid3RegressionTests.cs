@@ -3376,4 +3376,337 @@ document.getElementById('result').textContent =
         Assert.Contains("c=1.5em", result);
         Assert.Contains("Deep", result);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Phase F: Acid3 test-by-test coverage expansion
+    //  Targeting uncovered Acid3 tests: 28, 30, 85, 86, 87, 91, 92, 94, 95, 96
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Acid3 test 28 pattern: getElementById() must not match on the 'name'
+    /// attribute, and must handle space-character IDs correctly.
+    /// </summary>
+    [Fact]
+    public void PhaseF_Test28_GetElementById_Does_Not_Match_Name()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<form name=""myform"" id=""actualFormId""></form>
+<div id=""r""></div>
+<script>
+var r = document.getElementById('r');
+var results = [];
+try {
+    // getElementById must not return element by name attribute
+    var byName = document.getElementById('myform');
+    results.push(byName === null ? 'P' : 'F');
+
+    // getElementById must find the correct element by id
+    var byId = document.getElementById('actualFormId');
+    results.push(byId && byId.tagName.toLowerCase() === 'form' ? 'P' : 'F');
+
+    // getElementById with space character ID
+    var div = document.createElement('div');
+    div.textContent = 'SPACE';
+    div.id = ' ';
+    document.body.appendChild(div);
+    var found = document.getElementById(' ');
+    results.push(found === div ? 'P' : 'F');
+
+    r.textContent = results.join(',');
+} catch(e) {
+    r.textContent = 'ERR:' + e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("P,P,P", result);
+    }
+
+    /// <summary>
+    /// Acid3 test 30 pattern: dispatchEvent with UIEvents, addEventListener,
+    /// and removeEventListener.
+    /// </summary>
+    [Fact]
+    public void PhaseF_Test30_DispatchEvent_AddRemoveListener()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""target""></div>
+<div id=""r""></div>
+<script>
+var r = document.getElementById('r');
+var results = [];
+try {
+    var count = 0;
+    var handler = function(event) { count++; };
+
+    var target = document.getElementById('target');
+    target.addEventListener('click', handler, false);
+
+    // Dispatch first event
+    var evt = document.createEvent('MouseEvents');
+    evt.initEvent('click', true, true);
+    target.dispatchEvent(evt);
+    results.push(count === 1 ? 'P' : 'F:count=' + count);
+
+    // Dispatch second event
+    target.dispatchEvent(evt);
+    results.push(count === 2 ? 'P' : 'F:count=' + count);
+
+    // Remove listener and dispatch again
+    target.removeEventListener('click', handler, false);
+    target.dispatchEvent(evt);
+    results.push(count === 2 ? 'P' : 'F:count=' + count);
+
+    r.textContent = results.join(',');
+} catch(e) {
+    r.textContent = 'ERR:' + e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("P,P,P", result);
+    }
+
+    /// <summary>
+    /// Acid3 test 86 pattern: Date.setMilliseconds() with no arguments
+    /// should produce NaN.
+    /// </summary>
+    [Fact]
+    public void PhaseF_Test86_Date_SetMilliseconds_NoArgs_ProducesNaN()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""r""></div>
+<script>
+var r = document.getElementById('r');
+var results = [];
+try {
+    var d = new Date();
+    d.setMilliseconds();
+    results.push(isNaN(d.getTime()) ? 'P' : 'F');
+    results.push(isNaN(d.getDay()) ? 'P' : 'F');
+
+    r.textContent = results.join(',');
+} catch(e) {
+    r.textContent = 'ERR:' + e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("P,P", result);
+    }
+
+    /// <summary>
+    /// Acid3 test 87 pattern: Date.UTC() and new Date() with fractional
+    /// two-digit year values perform proper 1900-year offsetting.
+    /// </summary>
+    [Fact]
+    public void PhaseF_Test87_Date_TwoDigitYear_Offsetting()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""r""></div>
+<script>
+var r = document.getElementById('r');
+var results = [];
+try {
+    var d1 = new Date(Date.UTC(99.9, 6));
+    results.push(d1.getUTCFullYear() === 1999 ? 'P' : 'F:' + d1.getUTCFullYear());
+
+    var d2 = new Date(98.9, 6);
+    results.push(d2.getFullYear() === 1998 ? 'P' : 'F:' + d2.getFullYear());
+
+    r.textContent = results.join(',');
+} catch(e) {
+    r.textContent = 'ERR:' + e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("P,P", result);
+    }
+
+    /// <summary>
+    /// Acid3 test 91 pattern: All properties on an object literal are
+    /// enumerable, including shadow properties like 'constructor', 'toString',
+    /// 'valueOf', 'hasOwnProperty', etc.
+    /// </summary>
+    [Fact]
+    public void PhaseF_Test91_Properties_Enumerable_Including_Shadow()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""r""></div>
+<script>
+var r = document.getElementById('r');
+try {
+    var test = {
+        constructor: 1,
+        toString: 2,
+        valueOf: 3,
+        hasOwnProperty: 4,
+        unique: 5
+    };
+    var count = 0;
+    for (var p in test) count++;
+    r.textContent = count === 5 ? 'PASS:' + count : 'FAIL:' + count;
+} catch(e) {
+    r.textContent = 'ERR:' + e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("PASS:5", result);
+    }
+
+    /// <summary>
+    /// Acid3 test 92 pattern: Function.prototype.constructor is writable
+    /// and deletable, but not enumerable.
+    /// </summary>
+    [Fact]
+    public void PhaseF_Test92_Function_Constructor_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""r""></div>
+<script>
+var r = document.getElementById('r');
+var results = [];
+try {
+    // constructor is writable
+    var f1 = function() {};
+    f1.prototype.constructor = 'hello';
+    var inst = new f1();
+    results.push(inst.constructor === 'hello' ? 'P' : 'F');
+
+    // constructor is not enumerable
+    var f2 = function() {};
+    var inst2 = new f2();
+    var count = 0;
+    for (var p in inst2) count++;
+    results.push(count === 0 ? 'P' : 'F:' + count);
+
+    r.textContent = results.join(',');
+} catch(e) {
+    r.textContent = 'ERR:' + e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("P,P", result);
+    }
+
+    /// <summary>
+    /// Acid3 test 94 pattern: catch block variable scope must not
+    /// poison the outer scope.
+    /// </summary>
+    [Fact]
+    public void PhaseF_Test94_Exception_Catch_Scope_Isolation()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""r""></div>
+<script>
+var r = document.getElementById('r');
+try {
+    var test = 'pass';
+    try {
+        throw 'fail';
+    } catch (test) {
+        test += 'ing';
+    }
+    r.textContent = test === 'pass' ? 'PASS' : 'FAIL:' + test;
+} catch(e) {
+    r.textContent = 'ERR:' + e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("PASS", result);
+    }
+
+    /// <summary>
+    /// Acid3 test 95 pattern: typeof the result of assignment to
+    /// array length property preserves the string type.
+    /// </summary>
+    [Fact]
+    public void PhaseF_Test95_Typeof_Assignment_Result()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""r""></div>
+<script>
+var r = document.getElementById('r');
+try {
+    var a = [];
+    var s = a.length = '2147483648';
+    r.textContent = typeof s === 'string' ? 'PASS' : 'FAIL:' + typeof s;
+} catch(e) {
+    r.textContent = 'ERR:' + e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("PASS", result);
+    }
+
+    /// <summary>
+    /// Acid3 test 96 pattern: encodeURIComponent must encode null bytes
+    /// (U+0000) as '%00'.
+    /// </summary>
+    [Fact]
+    public void PhaseF_Test96_EncodeURIComponent_NullByte()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""r""></div>
+<script>
+var r = document.getElementById('r');
+var results = [];
+try {
+    results.push(encodeURIComponent(String.fromCharCode(0)) === '%00' ? 'P' : 'F');
+    results.push(encodeURI(String.fromCharCode(0)) === '%00' ? 'P' : 'F');
+    r.textContent = results.join(',');
+} catch(e) {
+    r.textContent = 'ERR:' + e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("P,P", result);
+    }
+
+    /// <summary>
+    /// Acid3 test 85 pattern: String.substr() with negative start index.
+    /// </summary>
+    [Fact]
+    public void PhaseF_Test85_Substr_Negative_Start()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""r""></div>
+<script>
+var r = document.getElementById('r');
+try {
+    r.textContent = 'scathing'.substr(-7, 3) === 'cat' ? 'PASS' : 'FAIL';
+} catch(e) {
+    r.textContent = 'ERR:' + e.message;
+}
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("PASS", result);
+    }
 }
