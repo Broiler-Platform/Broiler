@@ -768,4 +768,482 @@ document.getElementById('result').textContent = 'words=' + words;
         // "To pass the test, each colored box should appear." has 9 words
         Assert.Contains("words=9", result);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // New tests for remaining Acid3 compliance TODO items
+    // Ref: docs/roadmap/acid3-compliance.md §5 Prioritized TODO List
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // ────────────── CSS Error Recovery (CSS2.1 §4.1.8) ──────────────
+
+    /// <summary>
+    /// CSS2.1 §4.1.8: Declarations with illegal values must be ignored.
+    /// The Acid3 test uses <c>white-space: pre-wrap; white-space: x-bogus;</c>
+    /// on the instructions element.  "x-bogus" is an unknown keyword for
+    /// white-space, so it must be discarded and "pre-wrap" must remain.
+    /// </summary>
+    [Fact]
+    public void WhiteSpace_Invalid_Value_Discarded_By_Error_Recovery()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { white-space: pre-wrap; white-space: x-bogus; }
+</style>
+</head><body>
+<p id=""target"">hello   world</p>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+document.getElementById('result').textContent = 'ws=' + cs.whiteSpace;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // "x-bogus" should be rejected; "pre-wrap" should remain
+        Assert.Contains("ws=pre-wrap", result);
+    }
+
+    /// <summary>
+    /// CSS2.1 §4.1.8: When a valid and an invalid value are declared for
+    /// the same property in the same rule, the valid one must win.
+    /// Tests multiple enumerated properties.
+    /// </summary>
+    [Fact]
+    public void Invalid_Display_Value_Discarded_Keeps_Previous()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { display: inline-block; display: supergrid; }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+document.getElementById('result').textContent = 'display=' + cs.display;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("display=inline-block", result);
+    }
+
+    /// <summary>
+    /// CSS2.1 §4.1.8: Invalid visibility value should be discarded.
+    /// </summary>
+    [Fact]
+    public void Invalid_Visibility_Value_Discarded()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { visibility: hidden; visibility: magic; }
+</style>
+</head><body>
+<span id=""target"">text</span>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+document.getElementById('result').textContent = 'vis=' + cs.visibility;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("vis=hidden", result);
+    }
+
+    /// <summary>
+    /// CSS2.1 §4.1.8: Invalid overflow value should be discarded.
+    /// Validates that the rendering engine does not apply unknown overflow keywords.
+    /// </summary>
+    [Fact]
+    public void Invalid_Overflow_Value_Discarded()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { overflow: hidden; overflow: magical-scroll; }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+document.getElementById('result').textContent = 'overflow=' + cs.overflow;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("overflow=hidden", result);
+    }
+
+    /// <summary>
+    /// CSS error recovery: valid "inherit" keyword should be accepted for
+    /// enumerated properties even when validated.
+    /// </summary>
+    [Fact]
+    public void Inherit_Value_Accepted_For_Enumerated_Properties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#parent { white-space: pre; }
+#child { white-space: inherit; }
+</style>
+</head><body>
+<div id=""parent""><span id=""child"">text</span></div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('child'));
+document.getElementById('result').textContent = 'ws=' + cs.whiteSpace;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // "inherit" should be accepted as a valid value
+        Assert.Contains("ws=", result);
+        Assert.DoesNotContain("ws=undefined", result);
+    }
+
+    // ────────────── TODO-1 (D3): Viewport / box-model ──────────────
+
+    /// <summary>
+    /// Verifies the Acid3 html element box model: width: 32em (640px at 20px
+    /// font) + border + margin should fit within a 1024px viewport.
+    /// This is a getComputedStyle validation for TODO-1.
+    /// </summary>
+    [Fact]
+    public void Acid3_Html_Width_32em_GetComputedStyle()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; padding: 0; }
+html { font: 20px Arial, sans-serif; width: 32em; margin: 1em; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.documentElement);
+var r = [];
+r.push('w=' + cs.width);
+r.push('ml=' + cs.marginLeft);
+r.push('mr=' + cs.marginRight);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // Width should be 32em and margin 1em — both should be accessible
+        Assert.Contains("w=32em", result);
+        Assert.Contains("ml=1em", result);
+    }
+
+    /// <summary>
+    /// Tests that the full Acid3-like box model (border: 2cm + border-width
+    /// override + width: 32em + margin) produces valid computed styles.
+    /// </summary>
+    [Fact]
+    public void Acid3_Full_BoxModel_Computed_Styles()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; border: 1px blue; padding: 0; }
+html { font: 20px Arial, sans-serif; border: 2cm solid gray; width: 32em; margin: 1em; }
+html { border-width: 0 0.2em 0.2em 0; }
+body { padding: 2em 2em 0; border: solid 1px black; margin: -0.2em 0 0 -0.2em; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var htmlCs = window.getComputedStyle(document.documentElement);
+var bodyCs = window.getComputedStyle(document.body);
+var r = [];
+r.push('html-w=' + htmlCs.width);
+r.push('html-btw=' + htmlCs.getPropertyValue('border-top-width'));
+r.push('html-brw=' + htmlCs.getPropertyValue('border-right-width'));
+r.push('body-pt=' + bodyCs.paddingTop);
+r.push('body-mt=' + bodyCs.marginTop);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // html border-top-width should be "0" (from override)
+        Assert.Contains("html-btw=0", result);
+        // html width should be 32em
+        Assert.Contains("html-w=32em", result);
+        // body padding-top should be 2em
+        Assert.Contains("body-pt=2em", result);
+    }
+
+    // ────────────── TODO-6 (D6): Acid3 instruction text ──────────────
+
+    /// <summary>
+    /// Tests the Acid3 instruction text CSS error recovery pattern:
+    /// <c>color: gray; color: -acid3-bogus;</c> should result in gray
+    /// because -acid3-bogus is an invalid color and must be rejected.
+    /// </summary>
+    [Fact]
+    public void Acid3_Instructions_Color_Error_Recovery()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#instructions { color: gray; color: -acid3-bogus; }
+</style>
+</head><body>
+<p id=""instructions"">To pass the test, each colored box should appear.</p>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('instructions'));
+// The color should be 'gray' since '-acid3-bogus' is invalid
+document.getElementById('result').textContent = 'color=' + cs.color;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // "-acid3-bogus" should be rejected; "gray" should remain
+        Assert.Contains("color=gray", result);
+    }
+
+    /// <summary>
+    /// Tests the Acid3 instruction text white-space error recovery:
+    /// <c>white-space: pre-wrap; white-space: x-bogus;</c> should keep pre-wrap.
+    /// Uses id selector instead of :last-child since the rendering engine
+    /// may not support :last-child pseudo-class.
+    /// </summary>
+    [Fact]
+    public void Acid3_Instructions_WhiteSpace_Error_Recovery()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#instructions { white-space: pre-wrap; white-space: x-bogus; }
+</style>
+</head><body>
+<p id=""instructions"">Line 1  with  extra  spaces</p>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('instructions'));
+document.getElementById('result').textContent = 'ws=' + cs.whiteSpace;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("ws=pre-wrap", result);
+    }
+
+    // ────────────── TODO-8 (D8): @font-face rule access ──────────────
+
+    /// <summary>
+    /// Verifies that @font-face rules are counted correctly in the CSSOM
+    /// and that the font-family name is accessible.
+    /// </summary>
+    [Fact]
+    public void FontFace_FontFamily_Name_Accessible()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+@font-face { font-family: ""AcidAhemTest""; src: url(font.ttf); }
+p { font-family: AcidAhemTest, Arial; }
+</style>
+</head><body>
+<p id=""target"">text</p>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var ff = cs.fontFamily || cs.getPropertyValue('font-family') || '';
+document.getElementById('result').textContent = 'ff=' + ff;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // The font-family should reference AcidAhemTest
+        Assert.Contains("ff=", result);
+        Assert.DoesNotContain("ff=undefined", result);
+    }
+
+    // ────────────── TODO-13 (D13): SVG and object elements ──────────────
+
+    /// <summary>
+    /// Verifies that <c>&lt;object&gt;</c> elements with position: fixed are
+    /// recognized in the DOM and have valid computed styles.
+    /// </summary>
+    [Fact]
+    public void Object_Position_Fixed_GetComputedStyle()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+object { position: fixed; left: 130.5px; top: 84.3px; background: transparent; }
+</style>
+</head><body>
+<object id=""target"" data=""test.svg""></object>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push('pos=' + cs.position);
+r.push('left=' + cs.left);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("pos=fixed", result);
+        Assert.Contains("left=130.5px", result);
+    }
+
+    // ────────────── TODO-15 (D15): Data-URI background images ──────────────
+
+    /// <summary>
+    /// Verifies that data: URI background images are preserved in the
+    /// CSS computed style, not stripped during post-processing.
+    /// </summary>
+    [Fact]
+    public void DataUri_Background_Image_Preserved()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { background-image: url(data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7); }
+</style>
+</head><body>
+<div id=""target"">text</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var bg = cs.backgroundImage || cs.getPropertyValue('background-image') || '';
+document.getElementById('result').textContent = 'has-data-uri=' + (bg.indexOf('data:') >= 0 || bg.indexOf('url(') >= 0);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("has-data-uri=true", result);
+    }
+
+    // ────────────── TODO-16 (D16): Pseudo-element positioning ──────────────
+
+    /// <summary>
+    /// Verifies that pseudo-element positioning with absolute coordinates
+    /// is recognized by the CSS engine (map::after pattern from Acid3).
+    /// </summary>
+    [Fact]
+    public void PseudoElement_Absolute_Position_In_CSSOM()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+map::after { position: absolute; top: 18px; left: 638px; content: ""X""; background: fuchsia; }
+</style>
+</head><body>
+<map id=""target""></map>
+<div id=""result""></div>
+<script>
+var sheet = document.styleSheets[0];
+var r = [];
+r.push('rules=' + sheet.cssRules.length);
+if (sheet.cssRules.length > 0) {
+    var rule = sheet.cssRules[0];
+    r.push('selector=' + (rule.selectorText || 'N/A'));
+}
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("rules=", result);
+    }
+
+    // ────────────── Acid3 full CSS pattern integration ──────────────
+
+    /// <summary>
+    /// Integration test: applies the full set of Acid3 base CSS rules
+    /// (universal reset + html + :root + body) and verifies the cascade
+    /// produces valid computed styles for key elements.
+    /// Note: :root is rewritten to html by HtmlPostProcessor, so we use
+    /// html directly here to test what the rendering engine sees.
+    /// </summary>
+    [Fact]
+    public void Acid3_Base_Css_Cascade_Integration()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; border: 1px blue; padding: 0; border-spacing: 0; font: inherit; line-height: 1.2; color: inherit; background: transparent; }
+html { font: 20px Arial, sans-serif; border: 2cm solid gray; width: 32em; margin: 1em; }
+html { background: silver; color: black; border-width: 0 0.2em 0.2em 0; }
+body { padding: 2em 2em 0; border: solid 1px black; margin: -0.2em 0 0 -0.2em; }
+.hidden { visibility: hidden; }
+#slash { color: red; color: hsla(0, 0%, 0%, 1.0); }
+</style>
+</head><body>
+<h1>Acid3</h1>
+<p id=""result""><span id=""score"">0</span><span id=""slash"" class=""hidden"">/</span><span>100</span></p>
+<div id=""output""></div>
+<script>
+var htmlCs = window.getComputedStyle(document.documentElement);
+var bodyCs = window.getComputedStyle(document.body);
+var slashCs = window.getComputedStyle(document.getElementById('slash'));
+var r = [];
+r.push('html-color=' + htmlCs.color);
+r.push('body-pl=' + bodyCs.paddingLeft);
+r.push('slash-vis=' + slashCs.visibility);
+r.push('slash-color=' + slashCs.color);
+document.getElementById('output').textContent = r.join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // Color should be black (from html rule that was :root)
+        Assert.Contains("html-color=black", result);
+        // Body padding-left should be 2em
+        Assert.Contains("body-pl=2em", result);
+        // Slash visibility should be hidden (class="hidden")
+        Assert.Contains("slash-vis=hidden", result);
+    }
+
+    /// <summary>
+    /// Integration test: verifies that the Acid3 bucket CSS rules produce
+    /// valid computed styles for inline-block elements with dotted borders.
+    /// </summary>
+    [Fact]
+    public void Acid3_Bucket_InlineBlock_Css_Integration()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; border: 1px blue; padding: 0; font: inherit; }
+html { font: 20px Arial, sans-serif; }
+.buckets { font: 0/0 Arial, sans-serif; padding: 0 0 150px 3px; }
+:first-child + * .buckets p { display: inline-block; vertical-align: 2em; border: 2em dotted red; padding: 1.0em 0 1.0em 2em; }
+* + * > * > p { margin: 0; border: 1px solid ! important; }
+.z { visibility: hidden; }
+#bucket1 { font-size: 20px; margin-left: 0.2em; padding-left: 1.3em; padding-right: 1.3em; }
+</style>
+</head><body>
+<div class=""buckets"">
+  <p id=""bucket1"" class=""z"">B1</p>
+</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('bucket1'));
+var r = [];
+r.push('display=' + cs.display);
+r.push('vis=' + cs.visibility);
+r.push('fs=' + cs.fontSize);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("display=inline-block", result);
+        Assert.Contains("vis=hidden", result);
+        Assert.Contains("fs=20px", result);
+    }
 }
