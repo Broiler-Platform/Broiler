@@ -1248,4 +1248,339 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("vis=hidden", result);
         Assert.Contains("fs=20px", result);
     }
+
+    // ────────────── Border-color shorthand expansion ──────────────
+
+    /// <summary>
+    /// Verifies that the <c>border</c> shorthand expands the color component
+    /// into individual side-color longhands (border-top-color, etc.).
+    /// Acid3 uses <c>border: 2cm solid gray</c> on &lt;html&gt; — the gray
+    /// must propagate to all four border-*-color properties.
+    /// </summary>
+    [Fact]
+    public void Border_Shorthand_Expands_Color_To_Individual_Sides()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+html { border: 2cm solid gray; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.documentElement);
+var r = [];
+r.push('btc=' + cs.borderTopColor);
+r.push('brc=' + cs.borderRightColor);
+r.push('bbc=' + cs.borderBottomColor);
+r.push('blc=' + cs.borderLeftColor);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("btc=gray", result);
+        Assert.Contains("brc=gray", result);
+        Assert.Contains("bbc=gray", result);
+        Assert.Contains("blc=gray", result);
+    }
+
+    /// <summary>
+    /// Verifies that the <c>border-color</c> 4-value shorthand expands into
+    /// individual side-color longhands following CSS box-model order.
+    /// </summary>
+    [Fact]
+    public void BorderColor_FourValue_Shorthand_Expands_To_Sides()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { border-style: solid; border-width: 1px; border-color: red green blue yellow; }
+</style>
+</head><body>
+<div id=""target"">test</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push('btc=' + cs.borderTopColor);
+r.push('brc=' + cs.borderRightColor);
+r.push('bbc=' + cs.borderBottomColor);
+r.push('blc=' + cs.borderLeftColor);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("btc=red", result);
+        Assert.Contains("brc=green", result);
+        Assert.Contains("bbc=blue", result);
+        Assert.Contains("blc=yellow", result);
+    }
+
+    // ────────────── CSS initial values for missing properties ──────────────
+
+    /// <summary>
+    /// Verifies that <c>getComputedStyle</c> returns correct CSS initial values
+    /// for properties commonly queried by Acid3 that were not previously in
+    /// the initial-values dictionary (z-index, width, height, etc.).
+    /// </summary>
+    [Fact]
+    public void GetComputedStyle_Returns_Correct_Initial_Values()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""target"">test</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push('zi=' + cs.zIndex);
+r.push('t=' + cs.top);
+r.push('l=' + cs.left);
+r.push('w=' + cs.width);
+r.push('h=' + cs.height);
+r.push('mw=' + cs.maxWidth);
+r.push('mh=' + cs.maxHeight);
+r.push('bs=' + cs.boxSizing);
+r.push('ls=' + cs.letterSpacing);
+r.push('ws=' + cs.wordSpacing);
+r.push('ti=' + cs.textIndent);
+r.push('ts=' + cs.textShadow);
+r.push('fv=' + cs.fontVariant);
+r.push('bi=' + cs.backgroundImage);
+r.push('bp=' + cs.backgroundPosition);
+r.push('br=' + cs.backgroundRepeat);
+r.push('bco=' + cs.borderCollapse);
+r.push('bsp=' + cs.borderSpacing);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("zi=auto", result);
+        Assert.Contains("t=auto", result);
+        Assert.Contains("l=auto", result);
+        Assert.Contains("w=auto", result);
+        Assert.Contains("h=auto", result);
+        Assert.Contains("mw=none", result);
+        Assert.Contains("mh=none", result);
+        Assert.Contains("bs=content-box", result);
+        Assert.Contains("ls=normal", result);
+        Assert.Contains("ws=normal", result);
+        Assert.Contains("ti=0px", result);
+        Assert.Contains("ts=none", result);
+        Assert.Contains("fv=normal", result);
+        Assert.Contains("bi=none", result);
+        Assert.Contains("bp=0% 0%", result);
+        Assert.Contains("br=repeat", result);
+        Assert.Contains("bco=separate", result);
+        Assert.Contains("bsp=0px", result);
+    }
+
+    /// <summary>
+    /// Verifies that border-*-color initial values return rgb(0, 0, 0) when
+    /// no CSS rule sets a border color (CSS2.1: border color defaults to the
+    /// element's color property, but initial value is currentColor → black).
+    /// </summary>
+    [Fact]
+    public void BorderColor_Initial_Values_Return_Black()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""target"">test</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push('btc=' + cs.borderTopColor);
+r.push('brc=' + cs.borderRightColor);
+r.push('bbc=' + cs.borderBottomColor);
+r.push('blc=' + cs.borderLeftColor);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // When no CSS sets the border-color, initial value is rgb(0, 0, 0)
+        Assert.Contains("btc=rgb(0, 0, 0)", result);
+        Assert.Contains("brc=rgb(0, 0, 0)", result);
+        Assert.Contains("bbc=rgb(0, 0, 0)", result);
+        Assert.Contains("blc=rgb(0, 0, 0)", result);
+    }
+
+    // ────────────── TODO-11 (D11): Inline formatting context ──────────────
+
+    /// <summary>
+    /// Verifies that <c>display: inline-block</c> elements participate in inline
+    /// formatting context — multiple inline-block elements should lay out side-by-side.
+    /// The Acid3 test buckets use this pattern for the six colored boxes.
+    /// </summary>
+    [Fact]
+    public void InlineBlock_Elements_Participate_In_Inline_Formatting_Context()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.container { font: 0/0 Arial, sans-serif; }
+.box { display: inline-block; width: 50px; height: 50px; }
+#box1 { background: red; }
+#box2 { background: green; }
+#box3 { background: blue; }
+</style>
+</head><body>
+<div class=""container"">
+  <div id=""box1"" class=""box""></div>
+  <div id=""box2"" class=""box""></div>
+  <div id=""box3"" class=""box""></div>
+</div>
+<div id=""result""></div>
+<script>
+var r = [];
+var cs1 = window.getComputedStyle(document.getElementById('box1'));
+var cs2 = window.getComputedStyle(document.getElementById('box2'));
+var cs3 = window.getComputedStyle(document.getElementById('box3'));
+r.push('d1=' + cs1.display);
+r.push('d2=' + cs2.display);
+r.push('d3=' + cs3.display);
+r.push('w1=' + cs1.width);
+r.push('w2=' + cs2.width);
+r.push('w3=' + cs3.width);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("d1=inline-block", result);
+        Assert.Contains("d2=inline-block", result);
+        Assert.Contains("d3=inline-block", result);
+        Assert.Contains("w1=50px", result);
+        Assert.Contains("w2=50px", result);
+        Assert.Contains("w3=50px", result);
+    }
+
+    /// <summary>
+    /// Verifies that <c>border-style: dotted</c> is correctly computed and
+    /// accessible via getComputedStyle. Acid3 bucket elements use
+    /// <c>border: 2em dotted red</c>.
+    /// </summary>
+    [Fact]
+    public void DottedBorder_Style_GetComputedStyle()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { border: 2em dotted red; }
+</style>
+</head><body>
+<div id=""target"">test</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push('bts=' + cs.borderTopStyle);
+r.push('brs=' + cs.borderRightStyle);
+r.push('bbs=' + cs.borderBottomStyle);
+r.push('bls=' + cs.borderLeftStyle);
+r.push('btc=' + cs.borderTopColor);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("bts=dotted", result);
+        Assert.Contains("brs=dotted", result);
+        Assert.Contains("bbs=dotted", result);
+        Assert.Contains("bls=dotted", result);
+        Assert.Contains("btc=red", result);
+    }
+
+    // ────────────── TODO-6 (D6): Negative margin + padding text ──────────────
+
+    /// <summary>
+    /// Verifies that negative <c>margin-right</c> combined with
+    /// <c>padding-right</c> does not collapse or remove text content.
+    /// Acid3 instruction text uses <c>margin-right: -20px; padding-right: 20px</c>.
+    /// </summary>
+    [Fact]
+    public void Negative_Margin_With_Padding_Preserves_Text()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#instructions { margin-right: -20px; padding-right: 20px; font-size: 0.8em; }
+</style>
+</head><body>
+<p id=""instructions"">To pass the test, a browser must use its default settings.</p>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('instructions'));
+var r = [];
+r.push('mr=' + cs.marginRight);
+r.push('pr=' + cs.paddingRight);
+r.push('text=' + document.getElementById('instructions').textContent.substring(0, 20));
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("mr=-20px", result);
+        Assert.Contains("pr=20px", result);
+        Assert.Contains("text=To pass the test, a", result);
+    }
+
+    // ────────────── Overflow property handling ──────────────
+
+    /// <summary>
+    /// Verifies that <c>overflow-x</c> and <c>overflow-y</c> initial values
+    /// are correctly returned by getComputedStyle.
+    /// </summary>
+    [Fact]
+    public void Overflow_XY_Initial_Values_Are_Visible()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""target"">test</div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var r = [];
+r.push('ox=' + cs.overflowX);
+r.push('oy=' + cs.overflowY);
+r.push('o=' + cs.overflow);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("ox=visible", result);
+        Assert.Contains("oy=visible", result);
+        Assert.Contains("o=visible", result);
+    }
+
+    /// <summary>
+    /// Verifies that the <c>font-variant: small-caps</c> property is correctly
+    /// computed. Acid3 uses <c>font: 900 small-caps 10px sans-serif</c> on
+    /// the #linktest element.
+    /// </summary>
+    [Fact]
+    public void FontVariant_SmallCaps_GetComputedStyle()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#target { font-variant: small-caps; }
+</style>
+</head><body>
+<span id=""target"">Test Text</span>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+document.getElementById('result').textContent = 'fv=' + cs.fontVariant;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("fv=small-caps", result);
+    }
 }

@@ -760,9 +760,13 @@ document.getElementById('result').textContent = r.join(',');
 <div id=""result""></div>
 <script>
 var r = [];
-r.push(window.getComputedStyle(document.getElementById('a'), '').zIndex || '0');
-r.push(window.getComputedStyle(document.getElementById('b'), '').zIndex || '0');
-r.push(window.getComputedStyle(document.getElementById('c'), '').zIndex || '0');
+// CSS initial value for z-index is 'auto'; use explicit check for numeric values
+var za = window.getComputedStyle(document.getElementById('a'), '').zIndex;
+var zb = window.getComputedStyle(document.getElementById('b'), '').zIndex;
+var zc = window.getComputedStyle(document.getElementById('c'), '').zIndex;
+r.push(za === '1' || za === 1 ? '1' : '0');
+r.push(zb === '2' || zb === 2 ? '2' : '0');
+r.push(zc === '3' || zc === 3 ? '3' : '0');
 document.getElementById('result').textContent = r.join(',');
 </script>
 </body></html>";

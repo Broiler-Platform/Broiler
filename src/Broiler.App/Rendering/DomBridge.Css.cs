@@ -31,17 +31,28 @@ public sealed partial class DomBridge
         ["float"] = "none",
         ["visibility"] = "visible",
         ["overflow"] = "visible",
+        ["overflow-x"] = "visible",
+        ["overflow-y"] = "visible",
         ["text-transform"] = "none",
         ["text-decoration"] = "none",
         ["text-align"] = "start",
+        ["text-indent"] = "0px",
+        ["text-shadow"] = "none",
         ["white-space"] = "normal",
         ["cursor"] = "auto",
         ["font-style"] = "normal",
+        ["font-variant"] = "normal",
         ["font-weight"] = "normal",
         ["font-size"] = "16px",
+        ["font-family"] = "serif",
         ["line-height"] = "normal",
+        ["letter-spacing"] = "normal",
+        ["word-spacing"] = "normal",
         ["color"] = "rgb(0, 0, 0)",
         ["background-color"] = "rgba(0, 0, 0, 0)",
+        ["background-image"] = "none",
+        ["background-position"] = "0% 0%",
+        ["background-repeat"] = "repeat",
         ["margin"] = "0px",
         ["margin-top"] = "0px",
         ["margin-right"] = "0px",
@@ -63,9 +74,30 @@ public sealed partial class DomBridge
         ["border-right-style"] = "none",
         ["border-bottom-style"] = "none",
         ["border-left-style"] = "none",
+        ["border-top-color"] = "rgb(0, 0, 0)",
+        ["border-right-color"] = "rgb(0, 0, 0)",
+        ["border-bottom-color"] = "rgb(0, 0, 0)",
+        ["border-left-color"] = "rgb(0, 0, 0)",
+        ["border-collapse"] = "separate",
+        ["border-spacing"] = "0px",
         ["opacity"] = "1",
         ["vertical-align"] = "baseline",
         ["clear"] = "none",
+        ["z-index"] = "auto",
+        ["top"] = "auto",
+        ["right"] = "auto",
+        ["bottom"] = "auto",
+        ["left"] = "auto",
+        ["width"] = "auto",
+        ["height"] = "auto",
+        ["min-width"] = "0px",
+        ["min-height"] = "0px",
+        ["max-width"] = "none",
+        ["max-height"] = "none",
+        ["box-sizing"] = "content-box",
+        ["list-style-type"] = "disc",
+        ["list-style-position"] = "outside",
+        ["content"] = "normal",
     };
 
     private static readonly Regex StyleTagPattern = new(
@@ -467,6 +499,10 @@ public sealed partial class DomBridge
         if (computed.TryGetValue("border-style", out var bsVal))
             ExpandBoxShorthand(computed, bsVal, "border-top-style", "border-right-style", "border-bottom-style", "border-left-style");
 
+        // Expand border-color shorthand → individual sides
+        if (computed.TryGetValue("border-color", out var bcVal))
+            ExpandBoxShorthand(computed, bcVal, "border-top-color", "border-right-color", "border-bottom-color", "border-left-color");
+
         // Expand border shorthand (e.g. "2cm solid gray") → border-width, border-style, border-color
         if (computed.TryGetValue("border", out var borderVal))
             ExpandBorderShorthand(computed, borderVal);
@@ -543,11 +579,13 @@ public sealed partial class DomBridge
         if (style != null && !computed.ContainsKey("border-style")) computed["border-style"] = style;
         if (color != null && !computed.ContainsKey("border-color")) computed["border-color"] = color;
 
-        // Further expand border-width and border-style into individual sides
+        // Further expand border-width, border-style, and border-color into individual sides
         if (width != null)
             ExpandBoxShorthand(computed, width, "border-top-width", "border-right-width", "border-bottom-width", "border-left-width");
         if (style != null)
             ExpandBoxShorthand(computed, style, "border-top-style", "border-right-style", "border-bottom-style", "border-left-style");
+        if (color != null)
+            ExpandBoxShorthand(computed, color, "border-top-color", "border-right-color", "border-bottom-color", "border-left-color");
     }
 
     /// <summary>
