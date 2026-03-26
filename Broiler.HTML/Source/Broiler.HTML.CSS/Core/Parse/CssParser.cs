@@ -489,10 +489,11 @@ internal sealed class CssParser
                 return; // malformed !important — discard the entire declaration
         }
 
-        // Snapshot current property keys so we can detect which longhands
-        // a shorthand expansion adds (all inherit the !important flag).
+        // Snapshot current property keys only for shorthand properties that
+        // expand into multiple longhands — avoids HashSet allocation for the
+        // common case of simple (non-shorthand) declarations.
         HashSet<string> keysBefore = null;
-        if (isImportant)
+        if (isImportant && IsShorthandProperty(propName))
         {
             keysBefore = new HashSet<string>(properties.Keys, StringComparer.OrdinalIgnoreCase);
         }
@@ -570,13 +571,34 @@ internal sealed class CssParser
         if (isImportant)
         {
             importantProperties ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var key in properties.Keys)
+            if (keysBefore != null)
             {
-                if (keysBefore == null || !keysBefore.Contains(key))
-                    importantProperties.Add(key);
+                // Shorthand: mark all newly-expanded longhand keys.
+                foreach (var key in properties.Keys)
+                {
+                    if (!keysBefore.Contains(key))
+                        importantProperties.Add(key);
+                }
+            }
+            else
+            {
+                // Non-shorthand: mark the stored key directly.
+                // Handle renamed properties (border-radius → corner-radius).
+                if (properties.ContainsKey(propName))
+                    importantProperties.Add(propName);
+                else if (propName == "border-radius" && properties.ContainsKey("corner-radius"))
+                    importantProperties.Add("corner-radius");
             }
         }
     }
+
+    private static bool IsShorthandProperty(string propName) => propName switch
+    {
+        "font" or "border" or "border-left" or "border-top" or "border-right" or
+        "border-bottom" or "margin" or "border-style" or "border-width" or
+        "border-color" or "padding" or "background" => true,
+        _ => false
+    };
 
     private static void ParseLengthProperty(string propName, string propValue, Dictionary<string, string> properties)
     {
