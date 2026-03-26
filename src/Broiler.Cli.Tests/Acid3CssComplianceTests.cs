@@ -1,3 +1,6 @@
+using SkiaSharp;
+using Broiler.HTML.Image;
+
 namespace Broiler.Cli.Tests;
 
 /// <summary>
@@ -1582,5 +1585,239 @@ document.getElementById('result').textContent = 'fv=' + cs.fontVariant;
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("fv=small-caps", result);
+    }
+
+    // ────────────── P0 — TODO-1 (D3): Viewport & box model ──────────────
+
+    /// <summary>
+    /// Verifies that the Acid3-like box model computes correct border-box
+    /// dimensions when border: 2cm is overridden by border-width: 0 0.2em 0.2em 0.
+    /// The total width must be: content (640px) + left border (0) + right border (4px) = 644px,
+    /// which fits within a 1024px viewport.
+    /// </summary>
+    [Fact]
+    public void BoxModel_Border2cm_Width32em_Computed_Dimensions()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; border: 1px blue; padding: 0; font: inherit; }
+html { font: 20px Arial, sans-serif; border: 2cm solid gray; width: 32em; margin: 1em; }
+html { border-width: 0 0.2em 0.2em 0; }
+body { padding: 2em 2em 0; border: solid 1px black; margin: -0.2em 0 0 -0.2em; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var htmlCs = window.getComputedStyle(document.documentElement);
+var r = [];
+r.push('btw=' + htmlCs.getPropertyValue('border-top-width'));
+r.push('brw=' + htmlCs.getPropertyValue('border-right-width'));
+r.push('bbw=' + htmlCs.getPropertyValue('border-bottom-width'));
+r.push('blw=' + htmlCs.getPropertyValue('border-left-width'));
+r.push('w=' + htmlCs.width);
+r.push('mt=' + htmlCs.getPropertyValue('margin-top'));
+r.push('mr=' + htmlCs.getPropertyValue('margin-right'));
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // border-top-width: 0 (overridden from 2cm)
+        Assert.Contains("btw=0", result);
+        // border-left-width: 0 (overridden from 2cm)
+        Assert.Contains("blw=0", result);
+        // border-right-width: 0.2em = 4px at 20px font-size
+        Assert.Contains("brw=0.2em", result);
+        // border-bottom-width: 0.2em = 4px
+        Assert.Contains("bbw=0.2em", result);
+        // width should be 32em = 640px
+        Assert.Contains("w=32em", result);
+        // margin: 1em on all sides
+        Assert.Contains("mt=1em", result);
+        Assert.Contains("mr=1em", result);
+    }
+
+    /// <summary>
+    /// Verifies that RenderToImageAutoSized with maxHeight clips the bitmap
+    /// to the specified height, ensuring viewport-constrained rendering.
+    /// </summary>
+    [Fact]
+    public void Viewport_Constrained_Render_Clips_At_MaxHeight()
+    {
+        // Create content taller than the viewport
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+body { margin: 0; padding: 0; }
+div { width: 50px; height: 300px; background: red; }
+</style>
+</head><body>
+<div></div>
+</body></html>";
+
+        // Render with maxHeight = 100 to clip at viewport height
+        using var bitmap = HtmlRender.RenderToImageAutoSized(html, maxWidth: 200, maxHeight: 100);
+
+        // The bitmap height must not exceed maxHeight
+        Assert.True(bitmap.Height <= 100,
+            $"Expected bitmap height <= 100, but got {bitmap.Height}");
+        Assert.True(bitmap.Width <= 200,
+            $"Expected bitmap width <= 200, but got {bitmap.Width}");
+    }
+
+    /// <summary>
+    /// Verifies that the asymmetric border-width: 0 0.2em 0.2em 0 renders correctly.
+    /// Top and left borders should be absent (0), while bottom and right borders should
+    /// be present (0.2em = 4px at 20px font size).
+    /// </summary>
+    [Fact]
+    public void Asymmetric_Border_Width_Renders_Correctly()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; padding: 0; border: none; }
+html { font: 20px Arial, sans-serif; }
+body { margin: 0; }
+#target {
+    width: 60px;
+    height: 40px;
+    border: 5px solid red;
+    border-width: 0 5px 5px 0;
+    background: white;
+}
+</style>
+</head><body>
+<div id=""target""></div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+
+        // Top-left corner should NOT have red border (top=0, left=0)
+        var topLeft = bitmap.GetPixel(1, 1);
+        Assert.False(topLeft.Red > 200 && topLeft.Green < 50 && topLeft.Blue < 50,
+            $"Top-left should not be red border, got ({topLeft.Red},{topLeft.Green},{topLeft.Blue})");
+
+        // Bottom-right corner area should have red border
+        // The element is at (0,0), width=60, height=40
+        // Right border is at x=60 to x=65 (5px wide), from y=0 to y=45
+        var rightBorder = bitmap.GetPixel(62, 20);
+        Assert.True(rightBorder.Red > 200,
+            $"Right border pixel should be red, got ({rightBorder.Red},{rightBorder.Green},{rightBorder.Blue})");
+
+        // Bottom border is at y=40 to y=45 (5px wide), from x=0 to x=65
+        var bottomBorder = bitmap.GetPixel(30, 42);
+        Assert.True(bottomBorder.Red > 200,
+            $"Bottom border pixel should be red, got ({bottomBorder.Red},{bottomBorder.Green},{bottomBorder.Blue})");
+    }
+
+    /// <summary>
+    /// Verifies that the root (html) and body element overflow defaults to
+    /// 'visible' when no overflow property is set, per CSS 2.1.
+    /// </summary>
+    [Fact]
+    public void Root_And_Body_Default_Overflow_Is_Visible()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head></head><body>
+<div id=""result""></div>
+<script>
+var htmlCs = window.getComputedStyle(document.documentElement);
+var bodyCs = window.getComputedStyle(document.body);
+var r = [];
+r.push('html-ov=' + htmlCs.overflow);
+r.push('body-ov=' + bodyCs.overflow);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("html-ov=visible", result);
+        Assert.Contains("body-ov=visible", result);
+    }
+
+    // ────────────── P0 — TODO-3 (D2): Border layout geometry ──────────────
+
+    /// <summary>
+    /// Verifies that the gray border on the html element (Acid3 pattern)
+    /// renders with correct column offsets. The left edge should be at the
+    /// html element's margin (1em = 20px) and the content should start
+    /// immediately (since border-left-width is 0).
+    /// </summary>
+    [Fact]
+    public void Acid3_Html_Border_Column_Offsets()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; padding: 0; border: none; }
+html { font: 20px Arial, sans-serif; border: 2px solid gray; width: 100px;
+       margin: 10px; border-width: 0 2px 2px 0; }
+body { margin: 0; padding: 0; }
+</style>
+</head><body>
+<div style=""width:100px;height:50px;background:blue""></div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+
+        // Left margin is 10px, border-left is 0
+        // Content starts at x=10 (margin only)
+        // Right border at x=110 to x=112 (2px wide)
+        // Bottom border at y=50 to y=52 (2px wide)
+
+        // Inside content area (should be blue)
+        var content = bitmap.GetPixel(50, 25);
+        Assert.True(content.Blue > 200,
+            $"Content area should be blue, got ({content.Red},{content.Green},{content.Blue})");
+
+        // Right border area (should be gray)
+        var rightBorder = bitmap.GetPixel(111, 25);
+        Assert.True(rightBorder.Red > 100 && rightBorder.Green > 100 && rightBorder.Blue > 100,
+            $"Right border should be gray, got ({rightBorder.Red},{rightBorder.Green},{rightBorder.Blue})");
+    }
+
+    /// <summary>
+    /// Verifies that border-width shorthand with 4 values correctly
+    /// overrides a previous border shorthand in the HtmlRender layout engine.
+    /// The rendered border geometry should reflect the override.
+    /// </summary>
+    [Fact]
+    public void BorderWidth_Override_Renders_Zero_Top_Left()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; padding: 0; border: none; }
+html { font: 20px Arial, sans-serif; }
+body { margin: 0; padding: 0; }
+#target {
+    width: 80px; height: 60px;
+    border: 10px solid green;
+    border-width: 0 10px 10px 0;
+}
+</style>
+</head><body>
+<div id=""target""></div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+
+        // Top-left pixel should NOT be green (border-top=0, border-left=0)
+        // The content should be at (0,0) since there's no top or left border
+        var topLeftContent = bitmap.GetPixel(5, 5);
+        Assert.False(topLeftContent.Green > 200 && topLeftContent.Red < 50 && topLeftContent.Blue < 50,
+            $"Top-left should not be green border, got ({topLeftContent.Red},{topLeftContent.Green},{topLeftContent.Blue})");
+
+        // Bottom border area should be green (at y >= 60, up to y < 70)
+        var bottomBorderPixel = bitmap.GetPixel(40, 65);
+        Assert.True(bottomBorderPixel.Green > 100,
+            $"Bottom border should be green, got ({bottomBorderPixel.Red},{bottomBorderPixel.Green},{bottomBorderPixel.Blue})");
+
+        // Right border area should be green (at x >= 80, up to x < 90)
+        var rightBorderPixel = bitmap.GetPixel(85, 30);
+        Assert.True(rightBorderPixel.Green > 100,
+            $"Right border should be green, got ({rightBorderPixel.Red},{rightBorderPixel.Green},{rightBorderPixel.Blue})");
     }
 }

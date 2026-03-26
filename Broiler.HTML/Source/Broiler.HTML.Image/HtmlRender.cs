@@ -91,6 +91,10 @@ public static class HtmlRender
         if (maxWidth < 1 && w > 4096)
             w = 4096;
 
+        // Clamp to max height when a viewport height constraint is specified
+        if (maxHeight > 0 && h > maxHeight)
+            h = maxHeight;
+
         container.MaxSize = new SizeF(w, h);
 
         var bitmap = new SKBitmap(w, h, SKColorType.Rgba8888, SKAlphaType.Premul);
