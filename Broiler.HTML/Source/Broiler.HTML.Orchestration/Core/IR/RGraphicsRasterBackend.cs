@@ -218,7 +218,19 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
             // from Chromium's pixel-snapped baseline, producing per-glyph
             // anti-aliasing differences.
             var origin = new PointF((float)Math.Round(item.Origin.X), (float)Math.Round(item.Origin.Y));
-            g.DrawString(item.Text, font, item.Color, origin, new SizeF(item.Bounds.Width, item.Bounds.Height), item.IsRtl);
+            var size = new SizeF(item.Bounds.Width, item.Bounds.Height);
+
+            // Draw text shadow first (behind the actual text)
+            if (!item.TextShadowColor.IsEmpty &&
+                (item.TextShadowOffsetX != 0 || item.TextShadowOffsetY != 0))
+            {
+                var shadowOrigin = new PointF(
+                    origin.X + item.TextShadowOffsetX,
+                    origin.Y + item.TextShadowOffsetY);
+                g.DrawString(item.Text, font, item.TextShadowColor, shadowOrigin, size, item.IsRtl);
+            }
+
+            g.DrawString(item.Text, font, item.Color, origin, size, item.IsRtl);
         }
     }
 

@@ -399,6 +399,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string Opacity { get; set; } = "1";
     public string ZIndex { get; set; } = CssConstants.Auto;
     public string BoxShadow { get; set; } = "none";
+    public string TextShadow { get; set; } = "none";
     public string FlexDirection { get; set; } = "row";
     public string JustifyContent { get; set; } = "flex-start";
     public string AlignItems { get; set; } = "stretch";
@@ -1136,6 +1137,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         _lineHeight = p._lineHeight;
         WordBreak = p.WordBreak;
         Direction = p.Direction;
+        TextShadow = p.TextShadow;
 
         if (!everything)
             return;

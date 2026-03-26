@@ -80,6 +80,15 @@ public sealed class DrawTextItem : DisplayItem
 
     /// <summary>Whether text is right-to-left (Phase 3).</summary>
     public bool IsRtl { get; init; }
+
+    /// <summary>Text shadow horizontal offset in pixels (0 = no shadow).</summary>
+    public float TextShadowOffsetX { get; init; }
+
+    /// <summary>Text shadow vertical offset in pixels (0 = no shadow).</summary>
+    public float TextShadowOffsetY { get; init; }
+
+    /// <summary>Text shadow color. Empty means no shadow.</summary>
+    public Color TextShadowColor { get; init; }
 }
 
 /// <summary>Draws an image into a destination rectangle.</summary>

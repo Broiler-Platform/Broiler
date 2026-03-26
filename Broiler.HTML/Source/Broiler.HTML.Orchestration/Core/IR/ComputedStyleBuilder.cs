@@ -131,6 +131,9 @@ internal static class ComputedStyleBuilder
             // Box shadow
             BoxShadow = box.BoxShadow,
 
+            // Text shadow
+            TextShadow = box.TextShadow,
+
             // Positioning
             Left = box.Left,
             Top = box.Top,
