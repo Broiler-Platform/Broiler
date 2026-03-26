@@ -682,7 +682,7 @@ public sealed partial class DomBridge
     /// Builds a <c>classList</c> object exposing <c>add</c>, <c>remove</c>,
     /// <c>toggle</c>, and <c>contains</c>.
     /// </summary>
-    private static JSObject BuildClassListObject(DomElement element)
+    private static JSObject BuildClassListObject(DomElement element, Action<DomElement>? onClassChanged = null)
     {
         var classList = new JSObject();
 
@@ -715,6 +715,7 @@ public sealed partial class DomBridge
                         classes.Add(cls);
                 }
                 element.ClassName = string.Join(" ", classes);
+                onClassChanged?.Invoke(element);
                 return JSUndefined.Value;
             }, "add"),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -730,6 +731,7 @@ public sealed partial class DomBridge
                 var classes = (element.ClassName ?? string.Empty)
                     .Split(' ').Where(s => s.Length > 0 && !toRemove.Contains(s)).ToList();
                 element.ClassName = string.Join(" ", classes);
+                onClassChanged?.Invoke(element);
                 return JSUndefined.Value;
             }, "remove"),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -753,12 +755,14 @@ public sealed partial class DomBridge
                 {
                     if (classSet.Add(cls)) classes.Add(cls);
                     element.ClassName = string.Join(" ", classes);
+                    onClassChanged?.Invoke(element);
                     return JSBoolean.True;
                 }
                 else
                 {
                     classes.Remove(cls);
                     element.ClassName = string.Join(" ", classes);
+                    onClassChanged?.Invoke(element);
                     return JSBoolean.False;
                 }
             }, "toggle", 1),

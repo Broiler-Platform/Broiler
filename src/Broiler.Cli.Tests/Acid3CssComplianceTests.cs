@@ -496,4 +496,97 @@ document.getElementById('result').textContent = p.textContent;
         Assert.Contains("To pass the test", result);
         Assert.Contains("each colored box", result);
     }
+
+    // ────────────── D4: CSS invalidation after class changes ──────────────
+
+    /// <summary>
+    /// Verifies that CSS-derived visibility is cleared from element.Style
+    /// when removeAttribute('class') removes the class that triggered
+    /// the .hidden { visibility: hidden } rule.  After removal, the
+    /// element's computed visibility should revert to "visible".
+    /// </summary>
+    [Fact]
+    public void RemoveAttribute_Class_Clears_Visibility_Style()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.hidden { visibility: hidden; }
+</style>
+</head><body>
+<span id=""target"" class=""hidden"">text</span>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+el.removeAttribute('class');
+var cs = window.getComputedStyle(el);
+document.getElementById('result').textContent =
+    'vis=' + cs.visibility + ',cls=' + (el.className || 'EMPTY');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("vis=visible", result);
+        Assert.Contains("cls=EMPTY", result);
+        // The element's inline style should not contain visibility:hidden
+        Assert.DoesNotContain("style=\"visibility", result.ToLowerInvariant());
+    }
+
+    /// <summary>
+    /// Verifies that classList.remove() triggers CSS style recalculation,
+    /// removing styles from rules that no longer match.
+    /// </summary>
+    [Fact]
+    public void ClassList_Remove_Triggers_Style_Invalidation()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.red { color: red; }
+</style>
+</head><body>
+<span id=""target"" class=""red"">text</span>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+el.classList.remove('red');
+var cs = window.getComputedStyle(el);
+document.getElementById('result').textContent =
+    'hasRed=' + el.classList.contains('red') + ',hasColor=' + (cs.color !== '');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("hasRed=false", result);
+    }
+
+    /// <summary>
+    /// Verifies that setAttribute('class', ...) triggers CSS style
+    /// recalculation so new class rules apply and old ones are removed.
+    /// </summary>
+    [Fact]
+    public void SetAttribute_Class_Triggers_Style_Recalculation()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.a { color: red; }
+.b { font-weight: bold; }
+</style>
+</head><body>
+<span id=""target"" class=""a"">text</span>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+el.setAttribute('class', 'b');
+var cs = window.getComputedStyle(el);
+document.getElementById('result').textContent =
+    'fw=' + cs.fontWeight + ',cls=' + el.className;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("cls=b", result);
+        Assert.Contains("fw=bold", result);
+    }
 }

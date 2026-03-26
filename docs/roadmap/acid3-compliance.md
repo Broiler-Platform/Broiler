@@ -210,20 +210,22 @@ render (`acid3-viewport.png`) produces only a 9.0% overall match.
 
 ### D4 — Score Display ("98/100" → "98100")
 
-**Severity: High**
+**Severity: High** — **FIXED ✅**
 
-The Broiler render shows the score text as "98100" rather than "98/100". The
-slash character either does not render, renders invisibly, or is dropped
-during post-processing.
+The Broiler render showed the score text as "98100" rather than "98/100". The
+slash character rendered invisibly because CSS-derived `visibility: hidden`
+from the `.hidden` class was cached in `element.Style` and never cleared
+when JavaScript removed the class attribute via `removeAttribute('class')`.
 
-**Root cause candidates:**
-- The `#slash` element uses `color: hsla(0, 0%, 0%, 1.0)` (after a fallback
-  `color: red`). HSLA color parsing may fail, causing the element to inherit
-  transparent or white color on a white background.
-- The slash is inserted via JavaScript (`document.createTextNode('/')`);
-  the DOM bridge may fail to serialize it.
-- `font-weight: bolder` or `font-size: 5em` interaction with the slash
-  element might produce zero-width rendering.
+**Root cause:** `ApplyCascadedStyles()` ran once at parse time, caching CSS
+properties in `element.Style`. When JavaScript modified the `class` attribute,
+the cached styles were not invalidated or recalculated.
+
+**Fix:** Implemented `InvalidateElementStyles()` in `DomBridge.Css.cs` —
+clears CSS-derived (non-inline) styles and re-applies matching CSS rules.
+Wired into all class mutation paths: `removeAttribute`, `setAttribute`,
+`className` setter, `classList.add/remove/toggle`, and
+`setNamedItem/removeNamedItem`.
 
 ### D5 — Blue Border Artefacts in Test Buckets
 
@@ -384,21 +386,25 @@ rendering at an incorrect position or size.
     3. Test cascade: more-specific `:root` rule overrides less-specific `html` rule.
     4. Remaining: Fix border layout in the rendering engine (pixel fidelity).
 
-- [ ] **TODO-4 (D4): Fix slash rendering in score display**
+- [x] **TODO-4 (D4): Fix slash rendering in score display**
   - Ensure `document.createTextNode('/')` content is serialized by DomBridge.
   - Ensure `color: hsla(0, 0%, 0%, 1.0)` is parsed and applied.
   - **Investigation result**: DOM serialization is correct — the slash "/"
     appears in the serialized HTML output after `removeAttribute('class')`
     removes the `.hidden` class. `firstChild.data` read/write works correctly.
     HSLA parsing is fully functional (`GetColorByHsla` in `CssValueParser`).
-    The "98100" display is a CSS rendering engine issue: the HtmlRenderer
-    does not re-apply CSS rules after JavaScript removes the class attribute.
+    The "98100" display was a CSS rendering engine issue: the HtmlRenderer
+    did not re-apply CSS rules after JavaScript removes the class attribute.
   - Sub-steps:
     1. ~~Add unit test for HSLA color parsing with integer-percent values.~~ ✅
     2. ~~Verify DomBridge text-node serialisation for dynamically created nodes.~~ ✅
     3. ~~Verify `#slash` element receives correct computed color.~~ ✅
-    4. Remaining: Fix CSS rendering engine to properly remove `visibility: hidden`
-       after class attribute removal (requires HtmlRenderer changes).
+    4. ~~Fix CSS rendering engine to properly remove `visibility: hidden`
+       after class attribute removal.~~ ✅ Implemented `InvalidateElementStyles`
+       in `DomBridge.Css.cs` — clears CSS-derived styles and re-applies matching
+       rules. Wired into `removeAttribute`, `setAttribute`, `className` setter,
+       `classList.add/remove/toggle`, and `setNamedItem/removeNamedItem`.
+       3 new regression tests added.
 
 ### P1 — High Priority (significant visual impact)
 
