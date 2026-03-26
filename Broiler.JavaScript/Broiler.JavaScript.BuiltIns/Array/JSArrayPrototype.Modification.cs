@@ -376,7 +376,7 @@ public partial class JSArray
 
             if (property.IsProperty)
             {
-                deletedItemsElements.Put(i) = JSProperty.Property(@this.GetValue(in property));
+                deletedItemsElements.Put(i, @this.GetValue(in property));
                 continue;
             }
 
@@ -409,7 +409,7 @@ public partial class JSArray
         // Insert the new elements.
         for (int i = 0; i < itemsLength; i++)
         {
-            elements.Put((uint)(start + i)) = JSProperty.Property(a[i + 2]);
+            elements.Put((uint)(start + i), a[i + 2]);
         }
 
         // Return the deleted items.
@@ -430,15 +430,20 @@ public partial class JSArray
         var l = a.This.Length;
         if (l > 0)
         {
-            // move.. 
+            // move existing elements to the right
             @this.MoveElements(0, a.Length);
-            ref var elements = ref @this.GetElements();
-
-            for (uint i = 0; i < a.Length; i++)
-            {
-                elements.Put(i) = JSProperty.Property(a.GetAt((int)i));
-            }
         }
+
+        // insert the new elements at the front
+        ref var elements = ref @this.GetElements();
+        for (uint i = 0; i < a.Length; i++)
+        {
+            elements.Put(i, a.GetAt((int)i));
+        }
+
+        if (l <= 0)
+            @this.Length = a.Length;
+
         return new JSNumber(a.This.Length);
     }
 

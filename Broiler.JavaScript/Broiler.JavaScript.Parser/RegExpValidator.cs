@@ -31,12 +31,76 @@ internal static class RegExpValidator
                 }
             }
 
-            _ = new Regex(pattern, options);
+            _ = new Regex(NormalizeES3CharacterClasses(pattern), options);
             return true;
         }
         catch
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Normalizes ES3 empty character classes (<c>[]</c> and <c>[^]</c>) into
+    /// .NET-compatible equivalents so that the pattern can be validated by the
+    /// .NET <see cref="Regex"/> engine.  The full JS-to-.NET transformation
+    /// is performed later by <c>JSRegExp.TransformES3Patterns</c>.
+    /// </summary>
+    private static string NormalizeES3CharacterClasses(string pattern)
+    {
+        if (string.IsNullOrEmpty(pattern))
+            return pattern;
+
+        // Quick check — avoid allocation when not needed
+        if (!pattern.Contains("[]") && !pattern.Contains("[^]"))
+            return pattern;
+
+        var sb = new System.Text.StringBuilder(pattern.Length + 8);
+        bool inClass = false;
+
+        for (int i = 0; i < pattern.Length; i++)
+        {
+            char c = pattern[i];
+
+            if (c == '\\' && i + 1 < pattern.Length)
+            {
+                sb.Append(c);
+                sb.Append(pattern[++i]);
+                continue;
+            }
+
+            if (inClass)
+            {
+                if (c == ']')
+                    inClass = false;
+                sb.Append(c);
+                continue;
+            }
+
+            if (c == '[')
+            {
+                if (i + 1 < pattern.Length && pattern[i + 1] == ']')
+                {
+                    // [] — empty character class, matches nothing
+                    sb.Append("[^\\s\\S]");
+                    i++; // skip ']'
+                    continue;
+                }
+
+                if (i + 2 < pattern.Length && pattern[i + 1] == '^' && pattern[i + 2] == ']')
+                {
+                    // [^] — complement of empty class, matches any character
+                    sb.Append("[\\s\\S]");
+                    i += 2; // skip '^]'
+                    continue;
+                }
+
+                inClass = true;
+            }
+
+            sb.Append(c);
+        }
+
+        return sb.ToString();
     }
 }
