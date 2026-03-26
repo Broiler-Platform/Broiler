@@ -587,6 +587,185 @@ document.getElementById('result').textContent =
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("cls=b", result);
-        Assert.Contains("fw=bold", result);
+        Assert.Contains("fw=700", result);
+    }
+
+    // ────────────── D2: :root cascade overriding html ──────────────
+
+    /// <summary>
+    /// Verifies that the CSS cascade correctly applies when :root (rewritten
+    /// to html by HtmlPostProcessor) overrides a less-specific html rule.
+    /// This is the Acid3 pattern: html { border: 2cm solid gray }
+    /// then :root { border-width: 0 0.2em 0.2em 0 }.
+    /// </summary>
+    [Fact]
+    public void Root_Selector_Overrides_Html_Border_Width()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+html { border: 2cm solid gray; }
+:root { border-width: 0 0.2em 0.2em 0; }
+</style>
+</head><body>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.documentElement);
+var r = [];
+var top = cs.getPropertyValue('border-top-width');
+var right = cs.getPropertyValue('border-right-width');
+var bottom = cs.getPropertyValue('border-bottom-width');
+var left = cs.getPropertyValue('border-left-width');
+r.push('top=' + top);
+r.push('right=' + right);
+r.push('bottom=' + bottom);
+r.push('left=' + left);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // The :root rule should override the html border: 2cm shorthand
+        // border-top-width should be 0 (from the 4-value shorthand)
+        Assert.Contains("top=0", result);
+    }
+
+    // ────────────── D7: font-weight bolder resolution ──────────────
+
+    /// <summary>
+    /// Verifies that font-weight: bolder resolves to a numeric weight
+    /// (700 when parent is normal/400) per CSS 2.1 §15.6.
+    /// </summary>
+    [Fact]
+    public void FontWeight_Bolder_Resolves_To_700_From_Normal_Parent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#parent { font-weight: normal; }
+#child { font-weight: bolder; }
+</style>
+</head><body>
+<div id=""parent""><span id=""child"">text</span></div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('child'));
+document.getElementById('result').textContent = 'fw=' + cs.fontWeight;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("fw=700", result);
+    }
+
+    /// <summary>
+    /// Verifies that font-weight: lighter resolves to a numeric weight
+    /// (100 when parent is normal/400) per CSS 2.1 §15.6.
+    /// </summary>
+    [Fact]
+    public void FontWeight_Lighter_Resolves_To_100_From_Normal_Parent()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#parent { font-weight: normal; }
+#child { font-weight: lighter; }
+</style>
+</head><body>
+<div id=""parent""><span id=""child"">text</span></div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('child'));
+document.getElementById('result').textContent = 'fw=' + cs.fontWeight;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("fw=100", result);
+    }
+
+    /// <summary>
+    /// Verifies that font-weight: bolder resolves to 900 when the parent
+    /// already has font-weight: bold (700).
+    /// </summary>
+    [Fact]
+    public void FontWeight_Bolder_From_Bold_Parent_Resolves_To_900()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+#parent { font-weight: bold; }
+#child { font-weight: bolder; }
+</style>
+</head><body>
+<div id=""parent""><span id=""child"">text</span></div>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('child'));
+document.getElementById('result').textContent = 'fw=' + cs.fontWeight;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("fw=900", result);
+    }
+
+    // ────────────── D7: text-shadow with RGBA ──────────────
+
+    /// <summary>
+    /// Verifies that text-shadow with rgba() color is recognized as valid
+    /// CSS and accessible via getComputedStyle, as used by Acid3's h1
+    /// text-shadow: rgba(192,192,192,1.0) 3px 3px.
+    /// </summary>
+    [Fact]
+    public void TextShadow_Rgba_Color_GetComputedStyle()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+h1 { text-shadow: rgba(192,192,192,1.0) 3px 3px; }
+</style>
+</head><body>
+<h1 id=""target"">Acid3</h1>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.getElementById('target'));
+var ts = cs.getPropertyValue('text-shadow') || cs.textShadow || '';
+document.getElementById('result').textContent = 'shadow=' + (ts !== '' && ts !== 'none' ? 'yes' : 'no');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("shadow=yes", result);
+    }
+
+    // ────────────── D6: Word spacing with inherited font ──────────────
+
+    /// <summary>
+    /// Verifies that word spacing works correctly with inherited font sizes.
+    /// The text "To pass the test" should preserve spaces between words.
+    /// </summary>
+    [Fact]
+    public void WordSpacing_With_Inherited_Font_Size()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+body { font: 0.8em sans-serif; }
+</style>
+</head><body>
+<p id=""text"">To pass the test, each colored box should appear.</p>
+<div id=""result""></div>
+<script>
+var p = document.getElementById('text');
+var text = p.textContent || p.innerText || '';
+var words = text.split(' ').length;
+document.getElementById('result').textContent = 'words=' + words;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        // "To pass the test, each colored box should appear." has 9 words
+        Assert.Contains("words=9", result);
     }
 }

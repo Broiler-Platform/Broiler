@@ -921,8 +921,8 @@ document.getElementById('result').textContent = before + '|' + after;
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
         // Before: empty (target is not :last-child)
-        // After: bold (target is now :last-child after sibling removal)
-        Assert.Contains("|bold", result);
+        // After: 700 (bold — target is now :last-child after sibling removal)
+        Assert.Contains("|700", result);
     }
 
     /// <summary>

@@ -761,7 +761,7 @@ document.getElementById('result').textContent = cs.cursor;
 <script>
 var cs = window.getComputedStyle(document.getElementById('target'));
 var r = [];
-r.push(cs.fontWeight === 'bolder');
+r.push(cs.fontWeight === '700');
 r.push(cs.fontSize === '5em');
 document.getElementById('result').textContent = r.join(',');
 </script>
