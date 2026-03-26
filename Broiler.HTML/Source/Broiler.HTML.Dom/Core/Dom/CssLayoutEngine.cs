@@ -497,6 +497,21 @@ internal static class CssLayoutEngine
         left += box.ActualMarginLeft;
         top += box.ActualMarginTop;
 
+        // CSS 2.1 §9.3.2: Apply 'top' and 'left' offsets for absolutely
+        // positioned elements.
+        if (box.Top != CssConstants.Auto && !string.IsNullOrEmpty(box.Top))
+        {
+            double topOffset = CssValueParser.ParseLength(box.Top, box.Size.Height, box.GetEmHeight());
+            if (!double.IsNaN(topOffset))
+                top += topOffset;
+        }
+        if (box.Left != CssConstants.Auto && !string.IsNullOrEmpty(box.Left))
+        {
+            double leftOffset = CssValueParser.ParseLength(box.Left, box.Size.Width, box.GetEmHeight());
+            if (!double.IsNaN(leftOffset))
+                left += leftOffset;
+        }
+
         if (box.Words.Count > 0)
         {
             foreach (var word in box.Words)
