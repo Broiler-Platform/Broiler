@@ -1207,6 +1207,8 @@ gap is attributable to:
 
 ### 10.5 Outstanding Tasks Checklist
 
+#### ✅ Completed Verification (2026-03-26 Re-Test)
+
 - [x] Re-render acid3 with Broiler CLI (viewport-constrained 1024 × 768)
 - [x] Re-render acid3 reference with latest Chromium (Playwright)
 - [x] Run pixel comparison and generate diff image + report
@@ -1216,10 +1218,119 @@ gap is attributable to:
 - [x] Document pixel-level metrics and visual differences
 - [x] Update fidelity milestones (M0′ at 42.68 %, surpassed old M1 target)
 - [x] Update all D-item evidence with new pixel data
-- [ ] Fix TODO-1/TODO-3: Viewport overflow / border layout
-- [ ] Fix TODO-6: Word spacing in instruction paragraph
-- [ ] Fix TODO-5: Remaining blue border artefacts
-- [ ] Fix TODO-7: Font rendering metrics alignment
-- [ ] Fix TODO-16: Magenta pseudo-element positioning
-- [ ] Fix TODO-8: `@font-face` local file loading
-- [ ] Fix TODO-13: SVG rendering
+
+#### P0 — Rendering Fixes: Show-Stoppers (target: M1 ≥ 50 %)
+
+- [ ] **TODO-1 (D3): Fix viewport overflow / page height calculation**
+  - [ ] Add unit test for box-model computation with `border: 2cm` + `width: 32em`
+  - [ ] Fix total width = content (640 px) + border + margin to fit within 1024 px
+  - [ ] Ensure viewport-constrained render clips at 768 px height
+  - [ ] Verify `overflow` handling on root and body elements (§9.2.1)
+- [ ] **TODO-3 (D2): Fix CSS border layout in rendering engine**
+  - [ ] Fix asymmetric `border-width: 0 0.2em 0.2em 0` rendering geometry
+  - [ ] Ensure bottom border renders at row ~452 (currently extends to row 745)
+  - [ ] Align gray border column offsets with reference (col 20–663)
+  - *Note:* CSSOM cascade is correct (cm units ✅, 4-value expansion ✅,
+    `:root` override ✅) — remaining work is in `HtmlRender` layout engine
+
+#### P1 — Rendering Fixes: High Impact (target: M2 ≥ 65 %)
+
+- [ ] **TODO-5 (D5): Eliminate remaining blue border artefacts**
+  - [ ] Identify which elements still show `border: 1px blue` despite `!important` overrides
+  - [ ] Reduce blue pixel count from 2,109 → ~197 to match reference
+  - [ ] Verify `.z { visibility: hidden }` correctly hides unfilled bucket elements
+- [ ] **TODO-6 (D6): Fix word spacing and text layout in instruction paragraph**
+  - [ ] Fix inline text whitespace collapsing in `HtmlRender` (§9.2.2)
+  - [ ] Fix line-break algorithm to match CSS 2.1 specification
+  - [ ] Verify `font: 0.8em` computed size inheritance through inline elements
+  - *Note:* CSS error recovery is done (`white-space: x-bogus` rejected ✅,
+    `color: -acid3-bogus` rejected ✅, negative margin + padding ✅)
+
+#### P2 — Feature Completeness (target: M3 ≥ 80 %)
+
+- [ ] **TODO-7 (D7): Improve font rendering fidelity**
+  - [ ] Compare SkiaSharp glyph metrics (widths, ascent/descent) for Arial at 20 px against Chromium
+  - [ ] Implement or verify `text-shadow` rendering in `HtmlRender`
+  - [ ] Ensure Arial is available in CI environments; configure fallback font selection
+  - *Note:* `font-weight: bolder/lighter` numeric resolution is done ✅
+- [ ] **TODO-8 (D8): Implement `@font-face` with local file loading**
+  - [ ] Parse `@font-face` declarations from CSS
+  - [ ] Resolve `url(font.ttf)` relative to the HTML file's base path
+  - [ ] Register custom font with `SKFontManager` before rendering
+  - *Note:* CSSOM correctly reports family name and src URL ✅
+- [ ] **TODO-11 (D11): Fix `display: inline-block` baseline alignment**
+  - [ ] Fix rendering engine baseline alignment precision for `vertical-align: 2em`
+  - *Note:* CSSOM and unit tests pass ✅ — remaining work is in layout engine
+
+#### P3 — Minor Fidelity (target: M4 ≥ 90 %)
+
+- [ ] **TODO-13 (D13): Implement SVG rendering within `<object>` elements**
+  - [ ] Implement SVG-to-Skia rendering pipeline (§9.2.4)
+  - [ ] Render inline SVG content from `svg.xml`
+  - [ ] Support `position: fixed` on `<object>` elements in layout
+  - *Note:* SVG DOM API stubs are sufficient for JS score ✅
+- [ ] **TODO-16 (D16): Fix stray magenta pseudo-element positioning**
+  - [ ] Fix absolute positioning coordinates for `map::after` element (§9.2.5)
+  - [ ] Ensure `position: absolute; top: 18px; left: 638px` places the element
+    outside the visible content area in the final state
+  - [ ] Reduce magenta pixel count from 128 → 0
+
+#### Regression Test Coverage Expansion
+
+- [ ] **TODO-22: Add regression tests for DOM traversal edge cases (§9.3)**
+  - [ ] Test 2 — Removing nodes during iteration (`NodeIterator`)
+  - [ ] Test 3 — Infinite iterator
+  - [ ] Test 5 — Whitespace text nodes with `TreeWalker`
+  - [ ] Test 6 — Walking outside a tree
+  - [ ] Test 9 — `extractContents()`
+  - [ ] Test 10 — Ranges and Attribute Nodes
+  - [ ] Test 11 — Ranges and Comments
+  - [ ] Test 12 — Ranges under mutations: insertion
+  - [ ] Test 13 — Ranges under mutations: deletion
+- [ ] **TODO-23: Add regression tests for HTML element methods (§9.4)**
+  - [ ] Tests 49–63 — Table API (`createTHead`, `insertRow`, `insertCell`),
+    form elements (`HTMLFormElement.elements`, `namedItem`), input types
+- [ ] **Add regression tests for remaining Bucket 2 gaps**
+  - [ ] Test 20 — Null bytes in various places
+  - [ ] Test 24 — Event handler attributes
+  - [ ] Test 26 — Document tree lifecycle
+  - [ ] Test 27 — Continuation of test 26
+  - [ ] Test 29 — Whitespace survives cloning
+  - [ ] Test 32 — Events bubbling through Document
+- [ ] **Add regression tests for Bucket 3 (CSS Selectors, tests 33–48)**
+  - [ ] Promote indirect (🔶) coverage to explicit (✅) regression tests
+  - [ ] Test individual CSS selector patterns (class, attribute, pseudo-class)
+- [ ] **Add regression tests for Bucket 5 gaps (SVG and Parsing)**
+  - [ ] Tests 65–71 — SVG DOM tests
+  - [ ] Tests 73–74 — Parsing edge cases
+  - [ ] Test 76 — SVG text content
+  - [ ] Tests 78–80 — SVG length / forms
+- [ ] **Add regression tests for Special Tests (97–99)**
+  - [ ] Test 97 — `data:` URI parsing
+  - [ ] Test 98 — XHTML and the DOM
+  - [ ] Test 99 — "Weirdest bug ever"
+- [ ] **Add event system edge-case tests (§9.5)**
+  - [ ] Test 31 — `stopPropagation()` during capture phase
+  - [ ] Multiple listeners on the same element in capture mode
+
+#### CI / Infrastructure
+
+- [ ] **Add automated pixel-comparison integration test (§6.1)**
+  - [ ] Render `acid/acid3/acid3.html` via `HtmlRender.RenderToImage`
+  - [ ] Compare output against `acid/acid3/acid3-reference.png`
+  - [ ] Assert minimum content-area match percentage (start at 40 %, raise as fixes land)
+- [ ] **Enhance CI pipeline for milestone gating**
+  - [ ] Add milestone match-percentage assertion to `acid3-pixel-test.yml`
+  - [ ] Fail the build if pixel fidelity regresses below the current milestone (M0′ = 42.68 %)
+- [ ] **HTTP-dependent tests 14–16 (§9.6)**
+  - [ ] Evaluate feasibility of a local HTTP test fixture for Content-Type / status-code tests
+  - *Note:* Currently skipped gracefully by the Acid3 harness; low priority
+
+#### Documentation and Maintenance
+
+- [ ] **Update this checklist** when new tasks are discovered or existing tasks are completed
+- [ ] **Re-run pixel comparison** after each rendering fix and record new match percentage
+- [ ] **Update Section 7 milestones** as each target is reached (M1 → M5)
+- [ ] **Update Section 8 coverage map** as new regression tests are added
+- [ ] **Update Section 4 D-items** with re-test evidence after each fix
+- [ ] **Archive superseded data** (move old pixel counts / screenshots to a history section)
