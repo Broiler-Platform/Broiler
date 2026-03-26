@@ -1053,14 +1053,12 @@ internal sealed class CssParser
         }
         else
         {
-            if (borderWidth != null)
-                ParseBorderWidthProperty(borderWidth, properties);
-
-            if (borderStyle != null)
-                ParseBorderStyleProperty(borderStyle, properties);
-
-            if (borderColor != null)
-                ParseBorderColorProperty(borderColor, properties);
+            // CSS2.1 §8.5: The generic border shorthand resets ALL
+            // sub-properties.  When a component (width, style, or
+            // color) is omitted, use the initial value.
+            ParseBorderWidthProperty(borderWidth ?? "medium", properties);
+            ParseBorderStyleProperty(borderStyle ?? "none", properties);
+            ParseBorderColorProperty(borderColor ?? "black", properties);
         }
     }
 

@@ -323,4 +323,76 @@ body { margin: 0; }
         Assert.True(bitmap.Width > 0 && bitmap.Height > 0,
             "Render should produce a valid image");
     }
+
+    // ──────── P0 / TODO-3: border shorthand CSS 2.1 §8.5 reset ────────
+
+    /// <summary>
+    /// CSS 2.1 §8.5: The generic 'border' shorthand must reset ALL
+    /// sub-properties to their initial values when a component is
+    /// omitted.  For example, 'border: 1px solid' (no color) must
+    /// also reset border-color to its initial value ('black').
+    /// Combined with !important, this ensures the full override in the
+    /// Acid3 rule: * + * > * > p { border: 1px solid !important }
+    /// </summary>
+    [Fact]
+    public void Border_Shorthand_Resets_All_SubProperties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; padding: 0; border: none; }
+body { margin: 0; background: white; }
+#target { width: 40px; height: 40px; border: 5px solid red; }
+#target { border: 2px solid; }
+</style>
+</head><body>
+<div id=""target""></div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+
+        // The second 'border: 2px solid' should reset color to black.
+        // Check the top-left border area for black (not red).
+        var borderPx = bitmap.GetPixel(1, 1);
+        Assert.False(borderPx.Red > 200 && borderPx.Green < 50 && borderPx.Blue < 50,
+            $"Border shorthand should reset color to black, got red=({borderPx.Red},{borderPx.Green},{borderPx.Blue})");
+    }
+
+    /// <summary>
+    /// Acid3 cascade: 'border: 1px solid !important' must override a
+    /// previous 'border: 2em dotted red' on all sub-properties including
+    /// border-width, border-style, and border-color.
+    /// </summary>
+    [Fact]
+    public void Border_Important_Overrides_All_SubProperties()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; padding: 0; border: none; }
+body { margin: 0; background: white; }
+.wide-border { border: 2em dotted red; }
+.override { border: 1px solid ! important; }
+#target { width: 40px; height: 40px; }
+</style>
+</head><body>
+<div id=""target"" class=""wide-border override""></div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+
+        // With 'border: 1px solid !important', the border should be
+        // 1px wide (not 2em), solid (not dotted), and black (not red).
+        // The content area should start at (1,1) not (40,40).
+        // Sample just inside the expected 1px border.
+        var contentPx = bitmap.GetPixel(3, 3);
+        // Content should be white (not bordered area)
+        Assert.True(contentPx.Red > 200 && contentPx.Green > 200 && contentPx.Blue > 200,
+            $"With 1px border, (3,3) should be content area (white), got ({contentPx.Red},{contentPx.Green},{contentPx.Blue})");
+
+        // The border should be black (not red)
+        var borderPx = bitmap.GetPixel(0, 0);
+        Assert.False(borderPx.Red > 200 && borderPx.Green < 50 && borderPx.Blue < 50,
+            $"border: 1px solid !important should reset color to black, got ({borderPx.Red},{borderPx.Green},{borderPx.Blue})");
+    }
 }
