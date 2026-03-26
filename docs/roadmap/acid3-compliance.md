@@ -1,6 +1,6 @@
 # Roadmap: Making Broiler ACID3 Compliant
 
-> **Status**: Active — last updated 2026-03-26 (image-comparison re-test)  
+> **Status**: Active — last updated 2026-03-26 (chapter 10.5 rendering fixes)  
 > **Tracking issue**: Repeat acid3 image-comparison, update findings and tasks
 
 ---
@@ -1268,19 +1268,25 @@ gap is attributable to:
   - [x] Fix asymmetric `border-width: 0 0.2em 0.2em 0` rendering geometry
   - [ ] Ensure bottom border renders at row ~452 (currently extends to row 745)
   - [x] Align gray border column offsets with reference (col 20–663)
+  - [x] Fix CSS 2.1 §8.5 `border` shorthand to reset all sub-properties (width, style, color)
+    when a component is omitted — previously only set non-null components
+  - [x] Add WHATWG default styles for `iframe` (`border: 2px inset; display: inline-block`)
+    and `object` (`display: inline-block`) to `CssDefaults`
   - *Note:* CSSOM cascade is correct (cm units ✅, 4-value expansion ✅,
     `:root` override ✅) — remaining work is in `HtmlRender` layout engine
 
 #### P1 — Rendering Fixes: High Impact (target: M2 ≥ 65 %)
 
 - [ ] **TODO-5 (D5): Eliminate remaining blue border artefacts**
+  - [x] Fix `border` shorthand !important cascade to properly override all longhands
+    (border-color now reset to initial value by shorthand)
   - [ ] Identify which elements still show `border: 1px blue` despite `!important` overrides
   - [ ] Reduce blue pixel count from 2,109 → ~197 to match reference
-  - [ ] Verify `.z { visibility: hidden }` correctly hides unfilled bucket elements
+  - [x] Verify `.z { visibility: hidden }` correctly hides unfilled bucket elements
 - [ ] **TODO-6 (D6): Fix word spacing and text layout in instruction paragraph**
-  - [ ] Fix inline text whitespace collapsing in `HtmlRender` (§9.2.2)
+  - [x] Verify inline text whitespace collapsing between elements (regression test added)
   - [ ] Fix line-break algorithm to match CSS 2.1 specification
-  - [ ] Verify `font: 0.8em` computed size inheritance through inline elements
+  - [x] Verify `font: 0.8em` computed size inheritance through inline elements
   - *Note:* CSS error recovery is done (`white-space: x-bogus` rejected ✅,
     `color: -acid3-bogus` rejected ✅, negative margin + padding ✅)
 
@@ -1297,6 +1303,8 @@ gap is attributable to:
   - [ ] Register custom font with `SKFontManager` before rendering
   - *Note:* CSSOM correctly reports family name and src URL ✅
 - [ ] **TODO-11 (D11): Fix `display: inline-block` baseline alignment**
+  - [x] Implement CSS 2.1 §10.8.1 `vertical-align: <length>` support
+    (e.g. `2em`, `-10px`, `50%`) in `CssLayoutEngine.ApplyVerticalAlignment`
   - [ ] Fix rendering engine baseline alignment precision for `vertical-align: 2em`
   - *Note:* CSSOM and unit tests pass ✅ — remaining work is in layout engine
 

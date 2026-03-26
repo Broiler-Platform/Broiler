@@ -92,6 +92,10 @@ internal static class CssDefaults
         a               { color: #0055BB; text-decoration:underline }
         table           { border-color:#dfdfdf; }
         td, th          { border-color:#dfdfdf; overflow: hidden; }
+        /* Replaced inline elements — WHATWG default rendering */
+        iframe          { border: 2px inset; display: inline-block }
+        object          { display: inline-block }
+
         /* HTML5 semantic/sectioning elements – display:block per WHATWG */
         section, article,
         nav, aside,
