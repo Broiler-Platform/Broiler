@@ -281,6 +281,13 @@ internal sealed class DomParser
             assignable = false;
         }
 
+        // CSS2.1 §5.11: Check structural pseudo-class on the terminal selector.
+        if (assignable && block.PseudoClass != null)
+        {
+            if (!MatchesPseudoClass(box, block.PseudoClass))
+                assignable = false;
+        }
+
         if (assignable && block.Hover)
         {
             box.ContainerInt.AddHoverBox(box, block);
@@ -304,6 +311,10 @@ internal sealed class DomParser
 
                 if (!MatchesSelectorItem(box, selector.Class))
                     return false;
+
+                // CSS2.1 §5.11: Check structural pseudo-class on this selector item.
+                if (selector.PseudoClass != null && !MatchesPseudoClass(box, selector.PseudoClass))
+                    return false;
             }
             else
             {
@@ -318,6 +329,10 @@ internal sealed class DomParser
                         return false;
 
                     matched = MatchesSelectorItem(box, selector.Class);
+
+                    // CSS2.1 §5.11: Also verify structural pseudo-class.
+                    if (matched && selector.PseudoClass != null && !MatchesPseudoClass(box, selector.PseudoClass))
+                        matched = false;
 
                     if (!matched && selector.DirectParent)
                         return false;
@@ -428,6 +443,58 @@ internal sealed class DomParser
                 return sib;
         }
         return null;
+    }
+
+    /// <summary>
+    /// CSS2.1 §5.11.1: Checks whether <paramref name="box"/> satisfies a
+    /// structural pseudo-class condition.
+    /// </summary>
+    private static bool MatchesPseudoClass(CssBox box, string pseudoClass)
+    {
+        if (box.HtmlTag == null || box.ParentBox == null)
+            return false;
+
+        switch (pseudoClass)
+        {
+            case "first-child":
+                // CSS2.1 §5.11.1: :first-child matches an element that is the
+                // first child element of its parent.
+                foreach (var child in box.ParentBox.Boxes)
+                {
+                    if (child.HtmlTag != null)
+                        return ReferenceEquals(child, box);
+                }
+                return false;
+
+            case "last-child":
+                // CSS3 §6.6.5.7: :last-child matches an element that is the
+                // last child element of its parent.
+                for (int i = box.ParentBox.Boxes.Count - 1; i >= 0; i--)
+                {
+                    var child = box.ParentBox.Boxes[i];
+                    if (child.HtmlTag != null)
+                        return ReferenceEquals(child, box);
+                }
+                return false;
+
+            case "only-child":
+                // CSS3 §6.6.5.9: :only-child matches when the element is
+                // both first-child and last-child.
+                int elementChildCount = 0;
+                foreach (var child in box.ParentBox.Boxes)
+                {
+                    if (child.HtmlTag != null)
+                    {
+                        elementChildCount++;
+                        if (elementChildCount > 1)
+                            return false;
+                    }
+                }
+                return elementChildCount == 1;
+
+            default:
+                return false;
+        }
     }
 
     private static void AssignCssBlock(CssBox box, CssBlock block)
