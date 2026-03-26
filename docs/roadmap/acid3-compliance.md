@@ -421,14 +421,14 @@ or size.
 
 ### P0 — Show-Stoppers (must fix for meaningful pixel comparison)
 
-- [ ] **TODO-1 (D3): Fix viewport overflow / page height calculation**
+- [x] **TODO-1 (D3): Fix viewport overflow / page height calculation**
   - Investigate `HtmlRender.RenderToImageAutoSized` vs fixed-viewport render.
   - Ensure `width: 32em` (640px) + `border: 2cm` + margins fit within 1024px.
   - Verify `overflow` handling on root and body elements.
   - Sub-steps:
-    1. Add unit test for box-model computation with `border: 2cm` + `width: 32em`.
-    2. Fix total width = content (640px) + border + margin calculation.
-    3. Ensure viewport-constrained render clips at 768px height.
+    1. ~~Add unit test for box-model computation with `border: 2cm` + `width: 32em`.~~ ✅
+    2. ~~Fix total width = content (640px) + border + margin calculation.~~ ✅
+    3. ~~Ensure viewport-constrained render clips at 768px height.~~ ✅
 
 - [x] **TODO-2 (D1): Apply `:root` background color to canvas**
   - The `:root { background: silver }` declaration now propagates to the
@@ -1259,7 +1259,7 @@ gap is attributable to:
 
 #### P0 — Rendering Fixes: Show-Stoppers (target: M1 ≥ 50 %)
 
-- [ ] **TODO-1 (D3): Fix viewport overflow / page height calculation**
+- [x] **TODO-1 (D3): Fix viewport overflow / page height calculation**
   - [x] Add unit test for box-model computation with `border: 2cm` + `width: 32em`
   - [x] Fix total width = content (640 px) + border + margin to fit within 1024 px
   - [x] Ensure viewport-constrained render clips at 768 px height
