@@ -43,9 +43,26 @@ public sealed partial class DomBridge
         ["color"] = "rgb(0, 0, 0)",
         ["background-color"] = "rgba(0, 0, 0, 0)",
         ["margin"] = "0px",
+        ["margin-top"] = "0px",
+        ["margin-right"] = "0px",
+        ["margin-bottom"] = "0px",
+        ["margin-left"] = "0px",
         ["padding"] = "0px",
+        ["padding-top"] = "0px",
+        ["padding-right"] = "0px",
+        ["padding-bottom"] = "0px",
+        ["padding-left"] = "0px",
         ["border-style"] = "none",
         ["border-width"] = "0px",
+        ["border-color"] = "rgb(0, 0, 0)",
+        ["border-top-width"] = "0px",
+        ["border-right-width"] = "0px",
+        ["border-bottom-width"] = "0px",
+        ["border-left-width"] = "0px",
+        ["border-top-style"] = "none",
+        ["border-right-style"] = "none",
+        ["border-bottom-style"] = "none",
+        ["border-left-style"] = "none",
         ["opacity"] = "1",
         ["vertical-align"] = "baseline",
         ["clear"] = "none",
@@ -316,6 +333,11 @@ public sealed partial class DomBridge
                     computed[kv.Key] = kv.Value;
             }
 
+            // Expand CSS shorthand properties into their individual longhands.
+            // This ensures that querying e.g. marginTop works when only the
+            // shorthand "margin" was set in the stylesheet.
+            ExpandCssShorthands(computed);
+
             // Populate CSS initial values for properties not set by any rule.
             // Real browsers return computed values for ALL CSS properties.
             foreach (var kv in CssInitialValues)
@@ -374,6 +396,141 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return obj;
+    }
+
+    /// <summary>
+    /// Expands CSS shorthand properties into individual longhand properties.
+    /// For example, <c>margin: 10px 5px</c> expands to <c>margin-top: 10px</c>,
+    /// <c>margin-right: 5px</c>, <c>margin-bottom: 10px</c>, <c>margin-left: 5px</c>.
+    /// Only sets longhands that are not already explicitly set.
+    /// </summary>
+    private static void ExpandCssShorthands(Dictionary<string, string> computed)
+    {
+        // Expand margin shorthand → margin-top, margin-right, margin-bottom, margin-left
+        if (computed.TryGetValue("margin", out var marginVal))
+            ExpandBoxShorthand(computed, marginVal, "margin-top", "margin-right", "margin-bottom", "margin-left");
+
+        // Expand padding shorthand → padding-top, padding-right, padding-bottom, padding-left
+        if (computed.TryGetValue("padding", out var paddingVal))
+            ExpandBoxShorthand(computed, paddingVal, "padding-top", "padding-right", "padding-bottom", "padding-left");
+
+        // Expand border-width shorthand → individual sides
+        if (computed.TryGetValue("border-width", out var bwVal))
+            ExpandBoxShorthand(computed, bwVal, "border-top-width", "border-right-width", "border-bottom-width", "border-left-width");
+
+        // Expand border-style shorthand → individual sides
+        if (computed.TryGetValue("border-style", out var bsVal))
+            ExpandBoxShorthand(computed, bsVal, "border-top-style", "border-right-style", "border-bottom-style", "border-left-style");
+
+        // Expand border shorthand (e.g. "2cm solid gray") → border-width, border-style, border-color
+        if (computed.TryGetValue("border", out var borderVal))
+            ExpandBorderShorthand(computed, borderVal);
+    }
+
+    /// <summary>
+    /// Expands a 1–4 value CSS box shorthand (margin, padding, border-width, etc.)
+    /// into four individual properties using CSS box-model order: top, right, bottom, left.
+    /// </summary>
+    private static void ExpandBoxShorthand(Dictionary<string, string> computed, string value,
+        string topProp, string rightProp, string bottomProp, string leftProp)
+    {
+        var parts = SplitCssValues(value);
+        if (parts.Length == 0) return;
+
+        string top, right, bottom, left;
+        switch (parts.Length)
+        {
+            case 1:
+                top = right = bottom = left = parts[0];
+                break;
+            case 2:
+                top = bottom = parts[0];
+                right = left = parts[1];
+                break;
+            case 3:
+                top = parts[0];
+                right = left = parts[1];
+                bottom = parts[2];
+                break;
+            default: // 4+
+                top = parts[0];
+                right = parts[1];
+                bottom = parts[2];
+                left = parts[3];
+                break;
+        }
+
+        if (!computed.ContainsKey(topProp)) computed[topProp] = top;
+        if (!computed.ContainsKey(rightProp)) computed[rightProp] = right;
+        if (!computed.ContainsKey(bottomProp)) computed[bottomProp] = bottom;
+        if (!computed.ContainsKey(leftProp)) computed[leftProp] = left;
+    }
+
+    /// <summary>
+    /// Expands the <c>border</c> shorthand (e.g. "2cm solid gray") into
+    /// <c>border-width</c>, <c>border-style</c>, and <c>border-color</c>.
+    /// </summary>
+    private static void ExpandBorderShorthand(Dictionary<string, string> computed, string value)
+    {
+        var parts = SplitCssValues(value);
+
+        string? width = null, style = null, color = null;
+
+        foreach (var part in parts)
+        {
+            var lower = part.ToLowerInvariant();
+            if (lower is "none" or "hidden" or "dotted" or "dashed" or "solid"
+                or "double" or "groove" or "ridge" or "inset" or "outset")
+            {
+                style ??= part;
+            }
+            else if (lower is "thin" or "medium" or "thick" || IsLengthOrPercentage(lower))
+            {
+                width ??= part;
+            }
+            else
+            {
+                color ??= part;
+            }
+        }
+
+        if (width != null && !computed.ContainsKey("border-width")) computed["border-width"] = width;
+        if (style != null && !computed.ContainsKey("border-style")) computed["border-style"] = style;
+        if (color != null && !computed.ContainsKey("border-color")) computed["border-color"] = color;
+
+        // Further expand border-width and border-style into individual sides
+        if (width != null)
+            ExpandBoxShorthand(computed, width, "border-top-width", "border-right-width", "border-bottom-width", "border-left-width");
+        if (style != null)
+            ExpandBoxShorthand(computed, style, "border-top-style", "border-right-style", "border-bottom-style", "border-left-style");
+    }
+
+    /// <summary>
+    /// Splits a CSS value into whitespace-separated tokens, respecting
+    /// parenthesised groups (e.g. <c>rgba(0, 0, 0, 0.5)</c>).
+    /// </summary>
+    private static string[] SplitCssValues(string value)
+    {
+        var parts = new List<string>();
+        var sb = new StringBuilder();
+        int depth = 0;
+        foreach (char c in value)
+        {
+            if (c == '(') depth++;
+            else if (c == ')' && depth > 0) depth--;
+
+            if (char.IsWhiteSpace(c) && depth == 0 && sb.Length > 0)
+            {
+                parts.Add(sb.ToString());
+                sb.Clear();
+            }
+            else if (!char.IsWhiteSpace(c) || depth > 0)
+            {
+                sb.Append(c);
+            }
+        }
+        if (sb.Length > 0) parts.Add(sb.ToString());
+        return parts.ToArray();
     }
 
     /// <summary>
