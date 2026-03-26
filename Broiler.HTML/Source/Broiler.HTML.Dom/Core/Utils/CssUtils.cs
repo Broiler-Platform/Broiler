@@ -39,6 +39,7 @@ internal static class CssUtils
             "border-radius" => cssBox.CornerRadius,
             "opacity" => cssBox.Opacity,
             "box-shadow" => cssBox.BoxShadow,
+            "text-shadow" => cssBox.TextShadow,
             "flex-direction" => cssBox.FlexDirection,
             "justify-content" => cssBox.JustifyContent,
             "align-items" => cssBox.AlignItems,
@@ -159,6 +160,9 @@ internal static class CssUtils
                 break;
             case "box-shadow":
                 cssBox.BoxShadow = value;
+                break;
+            case "text-shadow":
+                cssBox.TextShadow = value;
                 break;
             case "flex-direction":
                 cssBox.FlexDirection = value;

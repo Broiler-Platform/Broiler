@@ -43,6 +43,7 @@ internal sealed class CssParser
 
             ParseStyleBlocks(cssData, StripAtRules(stylesheet));
             ParseMediaStyleBlocks(cssData, stylesheet);
+            ParseFontFaceBlocks(cssData, stylesheet);
         }
     }
 
@@ -249,6 +250,65 @@ internal sealed class CssParser
                     else
                         FeedStyleBlock(cssData, insideBlock.Value, mediaType);
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Extracts @font-face rules from the stylesheet and adds them to
+    /// <see cref="CssData.FontFaces"/>.
+    /// </summary>
+    private static void ParseFontFaceBlocks(CssData cssData, string stylesheet)
+    {
+        int startIdx = 0;
+        string atrule;
+
+        while ((atrule = RegexParserUtils.GetCssAtRules(stylesheet, ref startIdx)) != null)
+        {
+            if (!atrule.StartsWith("@font-face", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            int braceOpen = atrule.IndexOf('{');
+            int braceClose = atrule.LastIndexOf('}');
+            if (braceOpen < 0 || braceClose <= braceOpen)
+                continue;
+
+            string body = atrule.Substring(braceOpen + 1, braceClose - braceOpen - 1);
+
+            string family = null;
+            string src = null;
+
+            foreach (string decl in body.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                int colon = decl.IndexOf(':');
+                if (colon < 0)
+                    continue;
+
+                string name = decl.Substring(0, colon).Trim().ToLowerInvariant();
+                string value = decl.Substring(colon + 1).Trim();
+
+                if (name == "font-family")
+                {
+                    family = value.Trim('"', '\'', ' ');
+                }
+                else if (name == "src")
+                {
+                    int urlStart = value.IndexOf("url(", StringComparison.OrdinalIgnoreCase);
+                    if (urlStart >= 0)
+                    {
+                        int pathStart = urlStart + 4;
+                        int pathEnd = value.IndexOf(')', pathStart);
+                        if (pathEnd > pathStart)
+                        {
+                            src = value.Substring(pathStart, pathEnd - pathStart).Trim('"', '\'', ' ');
+                        }
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(family) && !string.IsNullOrEmpty(src))
+            {
+                cssData.FontFaces.Add(new CssFontFace { Family = family, Src = src });
             }
         }
     }

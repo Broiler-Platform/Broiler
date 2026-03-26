@@ -31,6 +31,10 @@ public sealed class DisplayList
 [JsonDerivedType(typeof(RestoreItem), "Restore")]
 [JsonDerivedType(typeof(OpacityItem), "Opacity")]
 [JsonDerivedType(typeof(DrawLineItem), "DrawLine")]
+[JsonDerivedType(typeof(DrawSvgRectItem), "DrawSvgRect")]
+[JsonDerivedType(typeof(DrawSvgEllipseItem), "DrawSvgEllipse")]
+[JsonDerivedType(typeof(DrawSvgTextItem), "DrawSvgText")]
+[JsonDerivedType(typeof(DrawSvgLineItem), "DrawSvgLine")]
 public abstract class DisplayItem
 {
     public RectangleF Bounds { get; init; }
@@ -80,6 +84,15 @@ public sealed class DrawTextItem : DisplayItem
 
     /// <summary>Whether text is right-to-left (Phase 3).</summary>
     public bool IsRtl { get; init; }
+
+    /// <summary>Text shadow horizontal offset in pixels (0 = no shadow).</summary>
+    public float TextShadowOffsetX { get; init; }
+
+    /// <summary>Text shadow vertical offset in pixels (0 = no shadow).</summary>
+    public float TextShadowOffsetY { get; init; }
+
+    /// <summary>Text shadow color. Empty means no shadow.</summary>
+    public Color TextShadowColor { get; init; }
 }
 
 /// <summary>Draws an image into a destination rectangle.</summary>
@@ -127,4 +140,52 @@ public sealed class DrawLineItem : DisplayItem
     public Color Color { get; init; }
     public float Width { get; init; } = 1;
     public string DashStyle { get; init; } = "solid";
+}
+
+/// <summary>Draws an SVG rectangle.</summary>
+public sealed class DrawSvgRectItem : DisplayItem
+{
+    public float X { get; init; }
+    public float Y { get; init; }
+    public float Width { get; init; }
+    public float Height { get; init; }
+    public Color Fill { get; init; }
+    public Color Stroke { get; init; }
+    public float StrokeWidth { get; init; }
+}
+
+/// <summary>Draws an SVG circle or ellipse.</summary>
+public sealed class DrawSvgEllipseItem : DisplayItem
+{
+    public float Cx { get; init; }
+    public float Cy { get; init; }
+    public float Rx { get; init; }
+    public float Ry { get; init; }
+    public Color Fill { get; init; }
+    public Color Stroke { get; init; }
+    public float StrokeWidth { get; init; }
+}
+
+/// <summary>Draws SVG text.</summary>
+public sealed class DrawSvgTextItem : DisplayItem
+{
+    public string Text { get; init; } = string.Empty;
+    public float X { get; init; }
+    public float Y { get; init; }
+    public float FontSize { get; init; }
+    public string FontFamily { get; init; } = string.Empty;
+    public Color Fill { get; init; }
+    /// <summary>Platform-specific font handle for rendering.</summary>
+    public object? FontHandle { get; init; }
+}
+
+/// <summary>Draws an SVG line.</summary>
+public sealed class DrawSvgLineItem : DisplayItem
+{
+    public float X1 { get; init; }
+    public float Y1 { get; init; }
+    public float X2 { get; init; }
+    public float Y2 { get; init; }
+    public Color Stroke { get; init; }
+    public float StrokeWidth { get; init; }
 }

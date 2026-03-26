@@ -42,6 +42,18 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                 case DrawLineItem line:
                     RenderDrawLine(g, line);
                     break;
+                case DrawSvgRectItem svgRect:
+                    RenderSvgRect(g, svgRect);
+                    break;
+                case DrawSvgEllipseItem svgEllipse:
+                    RenderSvgEllipse(g, svgEllipse);
+                    break;
+                case DrawSvgTextItem svgText:
+                    RenderSvgText(g, svgText);
+                    break;
+                case DrawSvgLineItem svgLine:
+                    RenderSvgLine(g, svgLine);
+                    break;
                 case ClipItem clip:
                     g.PushClip(clip.ClipRect);
                     break;
@@ -218,7 +230,19 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
             // from Chromium's pixel-snapped baseline, producing per-glyph
             // anti-aliasing differences.
             var origin = new PointF((float)Math.Round(item.Origin.X), (float)Math.Round(item.Origin.Y));
-            g.DrawString(item.Text, font, item.Color, origin, new SizeF(item.Bounds.Width, item.Bounds.Height), item.IsRtl);
+            var size = new SizeF(item.Bounds.Width, item.Bounds.Height);
+
+            // Draw text shadow first (behind the actual text)
+            if (!item.TextShadowColor.IsEmpty &&
+                (item.TextShadowOffsetX != 0 || item.TextShadowOffsetY != 0))
+            {
+                var shadowOrigin = new PointF(
+                    origin.X + item.TextShadowOffsetX,
+                    origin.Y + item.TextShadowOffsetY);
+                g.DrawString(item.Text, font, item.TextShadowColor, shadowOrigin, size, item.IsRtl);
+            }
+
+            g.DrawString(item.Text, font, item.Color, origin, size, item.IsRtl);
         }
     }
 
@@ -298,6 +322,55 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
             _ => DashStyle.Solid,
         };
         g.DrawLine(pen, item.Start.X, item.Start.Y, item.End.X, item.End.Y);
+    }
+
+    private static void RenderSvgRect(RGraphics g, DrawSvgRectItem item)
+    {
+        double x = item.Bounds.X + item.X;
+        double y = item.Bounds.Y + item.Y;
+        if (!item.Fill.IsEmpty && item.Fill.A > 0)
+            g.DrawRectangle(g.GetSolidBrush(item.Fill), x, y, item.Width, item.Height);
+        if (!item.Stroke.IsEmpty && item.Stroke.A > 0 && item.StrokeWidth > 0)
+        {
+            var pen = g.GetPen(item.Stroke);
+            pen.Width = item.StrokeWidth;
+            g.DrawRectangle(pen, x, y, item.Width, item.Height);
+        }
+    }
+
+    private static void RenderSvgEllipse(RGraphics g, DrawSvgEllipseItem item)
+    {
+        // RGraphics has no native ellipse; approximate with the bounding rectangle fill.
+        double x = item.Bounds.X + item.Cx - item.Rx;
+        double y = item.Bounds.Y + item.Cy - item.Ry;
+        double w = item.Rx * 2;
+        double h = item.Ry * 2;
+        if (!item.Fill.IsEmpty && item.Fill.A > 0)
+            g.DrawRectangle(g.GetSolidBrush(item.Fill), x, y, w, h);
+    }
+
+    private static void RenderSvgText(RGraphics g, DrawSvgTextItem item)
+    {
+        if (string.IsNullOrEmpty(item.Text))
+            return;
+        if (item.FontHandle is RFont font)
+        {
+            var origin = new PointF(item.Bounds.X + item.X, item.Bounds.Y + item.Y);
+            var size = new SizeF(item.Bounds.Width, item.Bounds.Height);
+            g.DrawString(item.Text, font, item.Fill, origin, size, false);
+        }
+    }
+
+    private static void RenderSvgLine(RGraphics g, DrawSvgLineItem item)
+    {
+        if (!item.Stroke.IsEmpty && item.Stroke.A > 0 && item.StrokeWidth > 0)
+        {
+            var pen = g.GetPen(item.Stroke);
+            pen.Width = item.StrokeWidth;
+            g.DrawLine(pen,
+                item.Bounds.X + item.X1, item.Bounds.Y + item.Y1,
+                item.Bounds.X + item.X2, item.Bounds.Y + item.Y2);
+        }
     }
 
     private static RPen CreateBorderPen(RGraphics g, string style, Color color, double width)

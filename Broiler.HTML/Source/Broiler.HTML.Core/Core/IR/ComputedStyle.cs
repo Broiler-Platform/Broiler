@@ -132,6 +132,10 @@ public sealed class ComputedStyle
 
     public string BoxShadow { get; init; } = "none";
 
+    // --- Text shadow ---
+
+    public string TextShadow { get; init; } = "none";
+
     // --- Positioning ---
 
     public string Left { get; init; } = "auto";

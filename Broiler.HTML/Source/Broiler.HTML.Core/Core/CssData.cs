@@ -11,6 +11,9 @@ public sealed class CssData
 
     internal CssData() => _mediaBlocks.Add("all", new Dictionary<string, List<CssBlock>>(StringComparer.InvariantCultureIgnoreCase));
 
+    /// <summary>Parsed @font-face rules from the stylesheet.</summary>
+    public List<CssFontFace> FontFaces { get; } = new();
+
     internal IDictionary<string, Dictionary<string, List<CssBlock>>> MediaBlocks => _mediaBlocks;
 
     public bool ContainsCssBlock(string className, string media = "all") => _mediaBlocks.TryGetValue(media, out Dictionary<string, List<CssBlock>> mid) && mid.ContainsKey(className);
@@ -80,6 +83,8 @@ public sealed class CssData
                 }
             }
         }
+
+        FontFaces.AddRange(other.FontFaces);
     }
 
     public CssData Clone()
@@ -99,6 +104,8 @@ public sealed class CssData
             }
             clone._mediaBlocks[mid.Key] = cloneMid;
         }
+        clone.FontFaces.AddRange(FontFaces);
+
         return clone;
     }
 }

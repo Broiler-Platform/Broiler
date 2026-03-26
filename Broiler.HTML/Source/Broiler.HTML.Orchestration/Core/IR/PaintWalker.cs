@@ -2,6 +2,7 @@ using Broiler.HTML.Core.Core.IR;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
 
 namespace Broiler.HTML.Orchestration.Core.IR;
 
@@ -437,6 +438,8 @@ internal static class PaintWalker
 
                 var inlineStyle = inline.Style;
 
+                var (shadowX, shadowY, shadowColor) = ParseTextShadow(inlineStyle.TextShadow);
+
                 items.Add(new DrawTextItem
                 {
                     Bounds = new RectangleF(inline.X, inline.Y, inline.Width, inline.Height),
@@ -448,6 +451,9 @@ internal static class PaintWalker
                     Origin = new PointF(inline.X, inline.Y),
                     FontHandle = inline.FontHandle,
                     IsRtl = isRtl,
+                    TextShadowOffsetX = shadowX,
+                    TextShadowOffsetY = shadowY,
+                    TextShadowColor = shadowColor,
                 });
             }
         }
@@ -963,6 +969,9 @@ internal static class PaintWalker
                 Origin = new PointF(t.Origin.X + dx, t.Origin.Y + dy),
                 FontHandle = t.FontHandle,
                 IsRtl = t.IsRtl,
+                TextShadowOffsetX = t.TextShadowOffsetX,
+                TextShadowOffsetY = t.TextShadowOffsetY,
+                TextShadowColor = t.TextShadowColor,
             },
             DrawImageItem img => new DrawImageItem
             {
@@ -997,4 +1006,95 @@ internal static class PaintWalker
 
     internal static RectangleF OffsetRect(RectangleF r, float dx, float dy)
         => new(r.X + dx, r.Y + dy, r.Width, r.Height);
+
+    /// <summary>
+    /// Parses a CSS text-shadow value and returns the offset and color components.
+    /// Supports: &lt;color&gt; &lt;offsetX&gt; &lt;offsetY&gt; or &lt;offsetX&gt; &lt;offsetY&gt; &lt;blur&gt;? &lt;color&gt;?.
+    /// </summary>
+    private static (float offsetX, float offsetY, Color color) ParseTextShadow(string value)
+    {
+        if (string.IsNullOrEmpty(value) || value == "none")
+            return (0, 0, Color.Empty);
+
+        var parts = new List<string>();
+        int depth = 0;
+        int start = 0;
+
+        for (int i = 0; i <= value.Length; i++)
+        {
+            char c = i < value.Length ? value[i] : ' ';
+            if (c == '(') depth++;
+            else if (c == ')') depth--;
+            else if (c == ' ' && depth == 0 && i > start)
+            {
+                parts.Add(value[start..i]);
+                start = i + 1;
+            }
+            else if (i == value.Length && start < i)
+                parts.Add(value[start..i]);
+        }
+
+        var lengths = new List<float>();
+        string colorStr = "";
+
+        foreach (var p in parts)
+        {
+            var trimmed = p.Trim();
+            if (string.IsNullOrEmpty(trimmed)) continue;
+
+            if (trimmed.EndsWith("px", StringComparison.OrdinalIgnoreCase)
+                || (trimmed.Length > 0 && (char.IsDigit(trimmed[0]) || trimmed[0] == '-' || trimmed[0] == '.')))
+            {
+                var num = trimmed.Replace("px", "", StringComparison.OrdinalIgnoreCase).Trim();
+                if (float.TryParse(num, NumberStyles.Float, CultureInfo.InvariantCulture, out float v))
+                {
+                    lengths.Add(v);
+                    continue;
+                }
+            }
+            colorStr += (colorStr.Length > 0 ? " " : "") + trimmed;
+        }
+
+        float offsetX = lengths.Count >= 1 ? lengths[0] : 0;
+        float offsetY = lengths.Count >= 2 ? lengths[1] : 0;
+
+        Color color = Color.Black;
+        if (!string.IsNullOrEmpty(colorStr))
+        {
+            colorStr = colorStr.Trim();
+            if (colorStr.StartsWith("rgba(", StringComparison.OrdinalIgnoreCase) && colorStr.EndsWith(")"))
+            {
+                var inner = colorStr.Substring(5, colorStr.Length - 6);
+                var vals = inner.Split(',');
+                if (vals.Length >= 4 &&
+                    int.TryParse(vals[0].Trim(), out int r) &&
+                    int.TryParse(vals[1].Trim(), out int g) &&
+                    int.TryParse(vals[2].Trim(), out int b) &&
+                    float.TryParse(vals[3].Trim(), NumberStyles.Float,
+                        CultureInfo.InvariantCulture, out float a))
+                {
+                    color = Color.FromArgb((int)(a * 255), r, g, b);
+                }
+            }
+            else if (colorStr.StartsWith("rgb(", StringComparison.OrdinalIgnoreCase) && colorStr.EndsWith(")"))
+            {
+                var inner = colorStr.Substring(4, colorStr.Length - 5);
+                var vals = inner.Split(',');
+                if (vals.Length >= 3 &&
+                    int.TryParse(vals[0].Trim(), out int r) &&
+                    int.TryParse(vals[1].Trim(), out int g) &&
+                    int.TryParse(vals[2].Trim(), out int b))
+                {
+                    color = Color.FromArgb(r, g, b);
+                }
+            }
+            else
+            {
+                // Unrecognised color names fall back to Color.Black (the default above).
+                try { color = Color.FromName(colorStr); } catch { /* invalid name – keep default */ }
+            }
+        }
+
+        return (offsetX, offsetY, color);
+    }
 }
