@@ -1,3 +1,6 @@
+using Broiler.Cli;
+using Xunit;
+
 namespace Broiler.Cli.Tests;
 
 /// <summary>
