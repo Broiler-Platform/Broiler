@@ -897,7 +897,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
             if (this.FontStyle == CssConstants.Italic || this.FontStyle == CssConstants.Oblique)
                 st |= System.Drawing.FontStyle.Italic;
 
-            if (FontWeight != CssConstants.Normal && FontWeight != CssConstants.Lighter && !string.IsNullOrEmpty(FontWeight) && FontWeight != CssConstants.Inherit)
+            if (IsBoldWeight(FontWeight, GetParent()))
                 st |= System.Drawing.FontStyle.Bold;
 
             double parentSize = CssConstants.FontSize;
@@ -1010,6 +1010,67 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     protected abstract CssBoxProperties GetParent();
 
     public double GetEmHeight() => ActualFont.Size * (96.0 / 72.0);
+
+    /// <summary>
+    /// Resolves a CSS font-weight value to a numeric weight (100–900)
+    /// per CSS 2.1 §15.6. Handles keywords <c>normal</c>, <c>bold</c>,
+    /// <c>bolder</c>, <c>lighter</c>, and numeric strings.
+    /// </summary>
+    internal static int ResolveNumericFontWeight(string fontWeight, CssBoxProperties parent)
+    {
+        if (string.IsNullOrEmpty(fontWeight) || fontWeight == CssConstants.Normal || fontWeight == CssConstants.Inherit)
+            return 400;
+        if (fontWeight == CssConstants.Bold)
+            return 700;
+
+        if (int.TryParse(fontWeight, out int numeric))
+            return Math.Clamp(numeric, 100, 900);
+
+        if (fontWeight == CssConstants.Bolder || fontWeight == CssConstants.Lighter)
+        {
+            int parentWeight = 400;
+            if (parent != null)
+                parentWeight = ResolveNumericFontWeight(parent.FontWeight, parent.GetParent());
+
+            return fontWeight == CssConstants.Bolder
+                ? ResolveBolder(parentWeight)
+                : ResolveLighter(parentWeight);
+        }
+
+        // Any other non-empty, non-normal value is treated as bold
+        return 700;
+    }
+
+    /// <summary>
+    /// CSS 2.1 §15.6: <c>bolder</c> selects the next weight above the inherited value.
+    /// </summary>
+    private static int ResolveBolder(int parentWeight)
+    {
+        if (parentWeight < 400) return 400;
+        if (parentWeight < 600) return 700;
+        return 900;
+    }
+
+    /// <summary>
+    /// CSS 2.1 §15.6: <c>lighter</c> selects the next weight below the inherited value.
+    /// </summary>
+    private static int ResolveLighter(int parentWeight)
+    {
+        if (parentWeight > 700) return 400;
+        if (parentWeight > 500) return 400;
+        return 100;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when the resolved numeric font weight is 600 or above,
+    /// meaning the font should use a bold face.
+    /// </summary>
+    private static bool IsBoldWeight(string fontWeight, CssBoxProperties parent)
+    {
+        if (string.IsNullOrEmpty(fontWeight) || fontWeight == CssConstants.Normal || fontWeight == CssConstants.Inherit)
+            return false;
+        return ResolveNumericFontWeight(fontWeight, parent) >= 600;
+    }
 
     protected string NoEms(string length)
     {

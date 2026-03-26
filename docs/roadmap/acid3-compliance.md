@@ -383,7 +383,8 @@ rendering at an incorrect position or size.
   - Sub-steps:
     1. ~~Verify `cm` unit support in `ParseCssValue`.~~ ✅ (37.795275591f px/cm)
     2. ~~Verify 4-value `border-width` shorthand expansion.~~ ✅ (`ExpandBoxShorthand`)
-    3. Test cascade: more-specific `:root` rule overrides less-specific `html` rule.
+    3. ~~Test cascade: more-specific `:root` rule overrides less-specific `html` rule.~~ ✅
+       (`Root_Selector_Overrides_Html_Border_Width` test added)
     4. Remaining: Fix border layout in the rendering engine (pixel fidelity).
 
 - [x] **TODO-4 (D4): Fix slash rendering in score display**
@@ -424,7 +425,8 @@ rendering at an incorrect position or size.
   - Investigate `white-space` collapsing and word-break algorithm.
   - Verify `font: 0.8em` computed size inheritance.
   - Sub-steps:
-    1. Add test for text word-spacing with inherited font sizes.
+    1. ~~Add test for text word-spacing with inherited font sizes.~~ ✅
+       (`WordSpacing_With_Inherited_Font_Size` test added — 9 words preserved)
     2. Fix whitespace collapsing between inline elements.
     3. Verify `margin-right: -20px; padding-right: 20px` does not collapse text.
 
@@ -432,9 +434,19 @@ rendering at an incorrect position or size.
   - Investigate SkiaSharp font metrics vs browser expectations.
   - Verify `text-shadow` rendering support.
   - Verify `font-weight: bolder` resolution.
+  - **Progress**: `font-weight: bolder/lighter` now resolves to numeric values
+    per CSS 2.1 §15.6. `getComputedStyle` returns the resolved numeric weight
+    (e.g. 700 for bolder from normal parent, 900 from bold parent, 100 for
+    lighter from normal parent). The rendering engine (`CssBoxProperties`)
+    uses `ResolveNumericFontWeight()` with parent weight inheritance.
+    `text-shadow` with `rgba()` colors is parsed and accessible.
   - Sub-steps:
-    1. Add test for `text-shadow` with RGBA colors.
-    2. Verify `bolder` resolves to correct numerical weight (700 or 900).
+    1. ~~Add test for `text-shadow` with RGBA colors.~~ ✅
+       (`TextShadow_Rgba_Color_GetComputedStyle` test added)
+    2. ~~Verify `bolder` resolves to correct numerical weight (700 or 900).~~ ✅
+       (`FontWeight_Bolder_Resolves_To_700_From_Normal_Parent`,
+        `FontWeight_Bolder_From_Bold_Parent_Resolves_To_900`,
+        `FontWeight_Lighter_Resolves_To_100_From_Normal_Parent` tests added)
     3. Compare glyph metrics for Arial at 20px between SkiaSharp and Chromium.
 
 ### P2 — Medium Priority (feature completeness)
@@ -518,20 +530,23 @@ fidelity**.
 
 ### 6.2 CSS Unit Tests
 
-✅ **Added** — see `src/Broiler.Cli.Tests/Acid3CssComplianceTests.cs` (15 tests).
+✅ **Added** — see `src/Broiler.Cli.Tests/Acid3CssComplianceTests.cs` (24 tests).
 
 Targeted CSS unit tests for properties used by Acid3:
 
 | Property / Feature          | Current Coverage | Needed | Status |
 |-----------------------------|-----------------|--------|--------|
 | `border-width` shorthand    | ✅ Full         | Full 4-value expansion + cascade | Done — `BorderWidth_FourValue_Cascade_Override` |
+| `:root` cascade override    | ✅ Tested       | `:root` overrides `html` border-width | Done — `Root_Selector_Overrides_Html_Border_Width` |
 | `cm` unit conversion        | ✅ Tested       | 96 DPI conversion test | Done — `Cm_Unit_Border_GetComputedStyle` |
 | `hsla()` color parsing     | ✅ Full          | Full parsing test | Done — `Hsla_Black_Color_For_Slash_Element`, `Hsla_Zero_Saturation_Produces_Valid_Color` |
-| `text-shadow`               | ✅ Partial       | Render test with offset + color | Done (in `CssRenderingTests`) |
+| `text-shadow`               | ✅ Full          | Render test with offset + color | Done — `TextShadow_Rgba_Color_GetComputedStyle` (in `Acid3CssComplianceTests`) |
+| `font-weight: bolder`       | ✅ Full          | Numeric resolution per CSS 2.1 §15.6 | Done — `FontWeight_Bolder_Resolves_To_700_From_Normal_Parent`, `FontWeight_Bolder_From_Bold_Parent_Resolves_To_900`, `FontWeight_Lighter_Resolves_To_100_From_Normal_Parent` |
 | `@font-face` loading        | ✅ CSSOM         | Local file loading test | Done — `FontFace_With_Url_Src_Accessible_Via_CSSOM` |
 | `::after` / `::before`      | ✅ Implemented   | Content generation + positioning | Done (in `DomParser.ApplyPseudoElementBoxes`) |
 | `display: inline-block`     | ✅ Full          | With `vertical-align` in em units | Done — `InlineBlock_VerticalAlign_Em_Units` |
 | Negative margins            | ✅ Full          | Collapsing with borders | Done — `Negative_Margin_With_Border_GetComputedStyle`, `Large_Negative_Margin_GetComputedStyle` |
+| Word spacing                | ✅ Tested        | Inherited font sizes | Done — `WordSpacing_With_Inherited_Font_Size` |
 
 Additional tests added:
 - Score display slash visibility: `Score_Display_Slash_Visible_After_RemoveAttribute`

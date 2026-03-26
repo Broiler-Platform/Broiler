@@ -378,6 +378,11 @@ public sealed partial class DomBridge
             // shorthand "margin" was set in the stylesheet.
             ExpandCssShorthands(computed);
 
+            // Resolve relative font-weight keywords (bolder/lighter) to numeric
+            // values per CSS 2.1 §15.6.  Real browsers always return the resolved
+            // numeric weight from getComputedStyle().
+            ResolveFontWeightKeywords(computed, element);
+
             // Populate CSS initial values for properties not set by any rule.
             // Real browsers return computed values for ALL CSS properties.
             foreach (var kv in CssInitialValues)
@@ -571,6 +576,143 @@ public sealed partial class DomBridge
         }
         if (sb.Length > 0) parts.Add(sb.ToString());
         return parts.ToArray();
+    }
+
+    /// <summary>
+    /// Resolves CSS relative font-weight keywords (<c>bolder</c>, <c>lighter</c>)
+    /// to numeric values per CSS 2.1 §15.6.  Also normalizes <c>normal</c> → 400
+    /// and <c>bold</c> → 700 so that <c>getComputedStyle</c> always returns a number.
+    /// </summary>
+    private void ResolveFontWeightKeywords(Dictionary<string, string> computed, DomElement element)
+    {
+        if (!computed.TryGetValue("font-weight", out var fw) || string.IsNullOrEmpty(fw))
+            return;
+
+        // Already a plain number — nothing to resolve.
+        if (int.TryParse(fw, out _))
+            return;
+
+        if (fw.Equals("normal", StringComparison.OrdinalIgnoreCase))
+        {
+            computed["font-weight"] = "400";
+            return;
+        }
+        if (fw.Equals("bold", StringComparison.OrdinalIgnoreCase))
+        {
+            computed["font-weight"] = "700";
+            return;
+        }
+
+        if (fw.Equals("bolder", StringComparison.OrdinalIgnoreCase) ||
+            fw.Equals("lighter", StringComparison.OrdinalIgnoreCase))
+        {
+            int parentWeight = 400;
+            if (element?.Parent != null)
+                parentWeight = ResolveParentFontWeight(element.Parent);
+
+            computed["font-weight"] = fw.Equals("bolder", StringComparison.OrdinalIgnoreCase)
+                ? ResolveBolderWeight(parentWeight).ToString()
+                : ResolveLighterWeight(parentWeight).ToString();
+        }
+    }
+
+    /// <summary>
+    /// CSS 2.1 §15.6: <c>bolder</c> selects the next weight above the inherited value.
+    /// </summary>
+    private static int ResolveBolderWeight(int parentWeight)
+    {
+        if (parentWeight < 400) return 400;
+        if (parentWeight < 600) return 700;
+        return 900;
+    }
+
+    /// <summary>
+    /// CSS 2.1 §15.6: <c>lighter</c> selects the next weight below the inherited value.
+    /// </summary>
+    private static int ResolveLighterWeight(int parentWeight)
+    {
+        if (parentWeight > 700) return 400;
+        if (parentWeight > 500) return 400;
+        return 100;
+    }
+
+    /// <summary>
+    /// Resolves the font-weight for a parent element by checking inline styles,
+    /// CSS cascade rules, and walking up the tree. Returns a numeric weight (100–900).
+    /// </summary>
+    private int ResolveParentFontWeight(DomElement element)
+    {
+        if (element == null) return 400;
+
+        // Check inline style attribute first (highest specificity)
+        if (element.Attributes.TryGetValue("style", out var inlineStyle) && !string.IsNullOrEmpty(inlineStyle))
+        {
+            foreach (var kv in ParseStyle(inlineStyle))
+            {
+                if (kv.Key.Equals("font-weight", StringComparison.OrdinalIgnoreCase))
+                    return NormalizeFontWeight(kv.Value, element);
+            }
+        }
+
+        // Check CSS rules from <style> elements
+        var docRoot = GetDocumentRootFor(element);
+        var styleElements = new List<DomElement>();
+        CollectStyleElementsInTree(docRoot, styleElements);
+
+        var parentComputed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var parentSpecificity = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var (vpWidth, vpHeight) = GetViewportForDocRoot(docRoot);
+
+        foreach (var styleEl in styleElements)
+        {
+            var cssText = new StringBuilder();
+            foreach (var child in styleEl.Children)
+            {
+                if (child.IsTextNode && child.TextContent != null)
+                    cssText.Append(child.TextContent);
+            }
+            if (cssText.Length == 0 && styleEl.TextContent != null)
+                cssText.Append(styleEl.TextContent);
+
+            if (styleEl.DomProperties.TryGetValue("_insertedRules", out var insertedObj) &&
+                insertedObj is List<(int Index, string Rule)> insertedRules)
+            {
+                foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))
+                    cssText.Append(' ').Append(rule);
+            }
+
+            ParseAndApplyCssRules(cssText.ToString(), element, parentComputed, parentSpecificity, vpWidth, vpHeight);
+        }
+
+        if (parentComputed.TryGetValue("font-weight", out var cascadedFw))
+            return NormalizeFontWeight(cascadedFw, element);
+
+        return 400;
+    }
+
+    /// <summary>
+    /// Converts a font-weight keyword or numeric string to an integer weight.
+    /// For <c>bolder</c>/<c>lighter</c>, resolves relative to the element's parent.
+    /// </summary>
+    private int NormalizeFontWeight(string value, DomElement element)
+    {
+        if (string.IsNullOrEmpty(value) || value.Equals("normal", StringComparison.OrdinalIgnoreCase))
+            return 400;
+        if (value.Equals("bold", StringComparison.OrdinalIgnoreCase))
+            return 700;
+        if (int.TryParse(value, out int numeric))
+            return Math.Clamp(numeric, 100, 900);
+        if (value.Equals("bolder", StringComparison.OrdinalIgnoreCase))
+        {
+            int pw = element?.Parent != null ? ResolveParentFontWeight(element.Parent) : 400;
+            return ResolveBolderWeight(pw);
+        }
+        if (value.Equals("lighter", StringComparison.OrdinalIgnoreCase))
+        {
+            int pw = element?.Parent != null ? ResolveParentFontWeight(element.Parent) : 400;
+            return ResolveLighterWeight(pw);
+        }
+        return 400;
     }
 
     /// <summary>
