@@ -251,4 +251,290 @@ document.getElementById('result').textContent = r.join(',');
         // Nested dispatch: outer handler starts, inner fires completely, outer continues
         Assert.Contains("outer-start,inner,outer-end", result);
     }
+
+    // ──────────────────── Acid3 Bucket 2 regression tests (17–32 gaps) ────────────────────
+
+    [Fact]
+    public void Acid3_Test20_Null_Bytes_In_Element_Names_Attributes_And_Text()
+    {
+        // Null bytes (\0) in attribute values and text content must not crash the DOM
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var r = [];
+try {
+    var div = document.createElement('div');
+    div.setAttribute('data-x', 'a\0b');
+    r.push('attr-ok');
+    r.push(div.getAttribute('data-x').length >= 3 ? 'len-ok' : 'len-bad');
+    div.textContent = 'hello\0world';
+    r.push('text-ok');
+    r.push(div.textContent.length >= 11 ? 'tlen-ok' : 'tlen-bad');
+    document.body.appendChild(div);
+    r.push(div.parentNode === document.body ? 'attached' : 'detached');
+    document.body.removeChild(div);
+    r.push('dom-ok');
+} catch(e) {
+    r.push('error:' + e.message);
+}
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // DOM remains functional after null-byte operations
+        Assert.Contains("attr-ok", result);
+        Assert.Contains("text-ok", result);
+        Assert.Contains("dom-ok", result);
+    }
+
+    [Fact]
+    public void Acid3_Test24_SetAttribute_OnClick_Compiles_And_Fires()
+    {
+        // setAttribute('onclick', code) must compile the code as a function and fire on dispatch
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""btn""></div>
+<div id=""result""></div>
+<script>
+var r = [];
+var btn = document.getElementById('btn');
+window.handlerResult = false;
+btn.setAttribute('onclick', 'window.handlerResult = true');
+r.push(typeof btn.onclick);
+var evt = document.createEvent('Event');
+evt.initEvent('click', true, true);
+btn.dispatchEvent(evt);
+r.push('fired:' + window.handlerResult);
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // setAttribute compiles the string to a function and dispatching click fires it
+        Assert.Contains("function", result);
+        Assert.Contains("fired:true", result);
+    }
+
+    [Fact(Skip = "Cross-document node adoption not yet implemented — implementation gap")]
+    public void Acid3_Test26_Document_Tree_Lifecycle_Cross_Document_Move()
+    {
+        // Moving nodes between documents: create in one doc, append in another
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var newDoc = document.implementation.createDocument(null, 'root', null);
+r.push('D' + (newDoc.documentElement.tagName === 'root' ? '1' : '0'));
+var div = document.createElement('div');
+div.setAttribute('id', 'moved');
+div.textContent = 'content';
+r.push('O' + (div.ownerDocument === document ? '1' : '0'));
+// Cross-document appendChild (implicitly adopts)
+newDoc.documentElement.appendChild(div);
+r.push('P' + (div.parentNode === newDoc.documentElement ? '1' : '0'));
+r.push('T' + div.textContent);
+r.push('I' + div.getAttribute('id'));
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // Node moved cross-document preserves attributes and content
+        Assert.Contains("D1,O1,P1,Tcontent,Imoved", result);
+    }
+
+    [Fact(Skip = "Cross-document node adoption not yet implemented — implementation gap")]
+    public void Acid3_Test27_Cross_Document_Subtree_Preserves_Structure()
+    {
+        // Moving a subtree cross-document preserves children, attributes, and text
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var newDoc = document.implementation.createDocument(null, 'root', null);
+var parent = document.createElement('div');
+parent.setAttribute('class', 'wrapper');
+var child = document.createElement('span');
+child.setAttribute('data-val', '42');
+child.textContent = 'kept';
+parent.appendChild(child);
+// Cross-document appendChild
+newDoc.documentElement.appendChild(parent);
+r.push('A' + parent.getAttribute('class'));
+r.push('C' + parent.childNodes.length);
+r.push('T' + parent.firstChild.tagName.toLowerCase());
+r.push('V' + parent.firstChild.getAttribute('data-val'));
+r.push('X' + parent.firstChild.textContent);
+r.push('P' + (parent.parentNode === newDoc.documentElement ? '1' : '0'));
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // Subtree structure, attributes, and text survive cross-document move
+        Assert.Contains("Awrapper,C1,Tspan,V42,Xkept,P1", result);
+    }
+
+    [Fact]
+    public void Acid3_Test29_CloneNode_Deep_Preserves_Whitespace_Text_Nodes()
+    {
+        // cloneNode(true) must preserve whitespace text nodes between elements
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var container = document.createElement('div');
+var s1 = document.createElement('span');
+s1.textContent = 'a';
+var ws = document.createTextNode(' ');
+var s2 = document.createElement('span');
+s2.textContent = 'b';
+container.appendChild(s1);
+container.appendChild(ws);
+container.appendChild(s2);
+var clone = container.cloneNode(true);
+r.push(clone.childNodes.length);
+var hasWhitespace = false;
+for (var i = 0; i < clone.childNodes.length; i++) {
+    var n = clone.childNodes[i];
+    if (n.nodeType === 3 && /^\s+$/.test(n.nodeValue)) {
+        hasWhitespace = true;
+    }
+}
+r.push(hasWhitespace ? 'ws-yes' : 'ws-no');
+r.push(clone.firstChild.tagName ? clone.firstChild.tagName.toLowerCase() : 'text');
+r.push(clone.lastChild.tagName ? clone.lastChild.tagName.toLowerCase() : 'text');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // Three child nodes: <span>, whitespace text, <span>
+        Assert.Contains("3,ws-yes,span,span", result);
+    }
+
+    [Fact]
+    public void Acid3_Test31_StopPropagation_During_Capture_Prevents_Target_And_Bubble()
+    {
+        // stopPropagation() in capture phase must prevent target and bubble phases
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""outer""><div id=""inner""></div></div>
+<div id=""result""></div>
+<script>
+var r = [];
+var outer = document.getElementById('outer');
+var inner = document.getElementById('inner');
+outer.addEventListener('test', function(e) {
+    r.push('C1');
+    e.stopPropagation();
+}, true);
+inner.addEventListener('test', function(e) {
+    r.push('T1');
+}, false);
+outer.addEventListener('test', function(e) {
+    r.push('B1');
+}, false);
+document.addEventListener('test', function(e) {
+    r.push('D1');
+}, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, false);
+inner.dispatchEvent(evt);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // Only capture listener fires; target and bubble are suppressed
+        Assert.Contains(">C1<", result);
+    }
+
+    [Fact]
+    public void Acid3_Test32_Event_Bubbles_Full_Chain_Target_Parent_Body_Html_Document()
+    {
+        // Events must bubble through the full chain with order tracking
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""parent""><div id=""target""></div></div>
+<div id=""result""></div>
+<script>
+var r = [];
+var target = document.getElementById('target');
+var parent = document.getElementById('parent');
+target.addEventListener('test', function(e) {
+    r.push('target:' + e.eventPhase);
+}, false);
+parent.addEventListener('test', function(e) {
+    r.push('parent:' + e.eventPhase);
+}, false);
+document.body.addEventListener('test', function(e) {
+    r.push('body:' + e.eventPhase);
+}, false);
+document.documentElement.addEventListener('test', function(e) {
+    r.push('html:' + e.eventPhase);
+}, false);
+document.addEventListener('test', function(e) {
+    r.push('doc:' + e.eventPhase);
+}, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, false);
+target.dispatchEvent(evt);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // Full bubble chain: target(2) → parent(3) → body(3) → html(3) → doc(3)
+        Assert.Contains("target:2,parent:3,body:3,html:3,doc:3", result);
+    }
+
+    [Fact]
+    public void Multiple_Capture_Listeners_Same_Element_Fire_In_Registration_Order()
+    {
+        // Multiple addEventListener calls with capture=true on the same element fire in order
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""outer""><div id=""inner""></div></div>
+<div id=""result""></div>
+<script>
+var r = [];
+var outer = document.getElementById('outer');
+var inner = document.getElementById('inner');
+outer.addEventListener('test', function(e) {
+    r.push('cap-1');
+}, true);
+outer.addEventListener('test', function(e) {
+    r.push('cap-2');
+}, true);
+outer.addEventListener('test', function(e) {
+    r.push('cap-3');
+}, true);
+inner.addEventListener('test', function(e) {
+    r.push('target');
+}, false);
+var evt = document.createEvent('Event');
+evt.initEvent('test', true, false);
+inner.dispatchEvent(evt);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // Capture listeners fire in registration order
+        Assert.Contains("cap-1,cap-2,cap-3,target", result);
+    }
 }

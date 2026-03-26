@@ -200,6 +200,13 @@ def main() -> int:
         default=".",
         help="Directory for diff image and report (default: current directory)",
     )
+    parser.add_argument(
+        "--assert-min",
+        type=float,
+        default=None,
+        metavar="PERCENTAGE",
+        help="Fail (exit 1) if full-image match is below this percentage",
+    )
     args = parser.parse_args()
 
     if not os.path.isfile(args.broiler_image):
@@ -247,6 +254,19 @@ def main() -> int:
     # Print report to stdout
     print()
     print(report)
+
+    # Assert minimum match percentage if requested
+    if args.assert_min is not None:
+        h, w = match.shape
+        total = h * w
+        full_match = int(np.sum(match))
+        full_pct = full_match / total * 100 if total > 0 else 0.0
+
+        if full_pct >= args.assert_min:
+            print(f"\n✅ PASS: Full-image match {full_pct:.2f}% >= {args.assert_min:.1f}% minimum")
+        else:
+            print(f"\n❌ FAIL: Full-image match {full_pct:.2f}% < {args.assert_min:.1f}% minimum")
+            return 1
 
     return 0
 
