@@ -36,7 +36,7 @@ body { background: white; }
             {
                 var p = bitmap.GetPixel(x, y);
                 if (p.Red > 200 && p.Green < 80 && p.Blue < 80) redPixels++;
-                if (p.Green > 200 && p.Red > 100 && p.Blue < 80) limePixels++; // lime = (0,255,0) or similar
+                if (p.Green > 200 && p.Red < 80 && p.Blue < 80) limePixels++;
             }
 
         _output.WriteLine($"Red pixels (should be ~0 with !important): {redPixels}");

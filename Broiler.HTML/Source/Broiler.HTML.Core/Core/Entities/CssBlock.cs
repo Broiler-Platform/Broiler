@@ -29,13 +29,7 @@ public sealed class CssBlock
     /// Optional structural pseudo-class on the terminal selector
     /// (e.g. "first-child" for <c>h1:first-child</c>).  CSS2.1 §5.11.
     /// </summary>
-    public string PseudoClass { get; private set; }
-
-    /// <summary>
-    /// Internal setter for <see cref="PseudoClass"/>, used by the CSS parser
-    /// when the pseudo-class is determined after initial construction.
-    /// </summary>
-    internal string PseudoClassInternal { set => PseudoClass = value; }
+    public string PseudoClass { get; internal set; }
 
     /// <summary>
     /// Property names in this block that were declared with <c>!important</c>.

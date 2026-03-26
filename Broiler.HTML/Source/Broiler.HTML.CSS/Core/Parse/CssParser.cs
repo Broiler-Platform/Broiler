@@ -429,10 +429,8 @@ internal sealed class CssParser
         else
         {
             // Attached to a selector ("h1:first-child", "#id:last-child").
-            onTerminal = !after.Contains(' ') && !after.Contains('>') && !after.Contains('+');
-            // If there is no remaining selector after the pseudo, the pseudo is on the terminal.
-            if (string.IsNullOrEmpty(after))
-                onTerminal = true;
+            onTerminal = string.IsNullOrEmpty(after)
+                || (!after.Contains(' ') && !after.Contains('>') && !after.Contains('+'));
             return string.IsNullOrEmpty(after) ? before : before + " " + after;
         }
     }
@@ -449,13 +447,7 @@ internal sealed class CssParser
         if (onTerminal || block.Selectors == null || block.Selectors.Count == 0)
         {
             // Pseudo-class applies to the terminal selector element.
-            // Store on the block itself (checked in IsBlockAssignableToBox).
-            // Use reflection-free approach: CssBlock.PseudoClass was added.
-            // Re-create with the pseudo — CssBlock is mutable enough via the property.
-            // Actually, CssBlock.PseudoClass is set via constructor; but we already
-            // created the block.  We need a setter or to set in constructor.
-            // For now, we set it using a small internal method.
-            SetBlockPseudoClass(block, pseudo);
+            block.PseudoClass = pseudo;
         }
         else
         {
@@ -467,18 +459,6 @@ internal sealed class CssParser
             block.Selectors[lastIdx] = new CssBlockSelectorItem(
                 item.Class, item.DirectParent, item.AdjacentSibling, pseudo);
         }
-    }
-
-    /// <summary>
-    /// Sets the structural pseudo-class on the block's terminal selector.
-    /// </summary>
-    private static void SetBlockPseudoClass(CssBlock block, string pseudo)
-    {
-        // CssBlock.PseudoClass is { get; } only — use a wrapper constructor approach.
-        // Since CssBlock is sealed and PseudoClass is set via constructor, we need
-        // a different approach.  Add a mutable setter via internal property.
-        // For minimal change, we use reflection... actually let's just make PseudoClass settable.
-        block.PseudoClassInternal = pseudo;
     }
 
     private static List<CssBlockSelectorItem> ParseCssBlockSelector(string className, out string firstClass)

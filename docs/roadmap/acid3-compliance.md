@@ -1182,6 +1182,7 @@ Both viewport-constrained and full-page renders were captured and compared.
 | **D1 root background** | VERIFIED FIXED — corners match (192,192,192) |
 | **D4 score slash** | VERIFIED FIXED — "100/100" renders correctly |
 | **D5 !important cascade** | Partially improved — blue pixels down from 4,706 → 2,109 |
+| **D5 structural pseudo** | FIXED — `:first-child`/`:last-child` rules no longer silently dropped |
 | **D2/D3 border & overflow** | Still present — gray border extends to row 745 vs 452 |
 | **D6 text spacing** | Still present — 5,127 dark pixels vs 740 in reference |
 | **D16 magenta artefact** | Slightly worse — 128 pixels (from 91) |
@@ -1197,6 +1198,12 @@ render), primarily driven by:
   of background mismatches, accounting for ~30 pp of the improvement.
 - **D4 fix** (slash visibility): Score text now renders correctly.
 - **D5 partial fix** (!important cascade): Reduced blue artefacts by ~55%.
+- **D5 structural pseudo-class fix**: CSS parser now handles `:first-child`,
+  `:last-child`, and `:only-child` pseudo-classes.  Previously, rules like
+  `:first-child + * .buckets p { display: inline-block; ... }` were silently
+  dropped, causing incorrect bucket layout.  This also enables
+  `h1:first-child` (heading styling) and `#instructions:last-child`
+  (whitespace handling).
 
 The score is still **NOT 100/100** in visual terms. The remaining **57.32 %**
 gap is attributable to:
@@ -1225,9 +1232,10 @@ gap is attributable to:
    `margin-right: -20px; padding-right: 20px` interaction is correct.
 
 3. **Fix remaining !important cascade (TODO-5)** — Reduce the blue pixel
-   count from 2,109 to match the reference's 197. Investigate which
-   elements still have `border: 1px blue` applied despite `!important`
-   overrides.
+   count from 2,109 to match the reference's 197. The structural pseudo-class
+   fix now enables `:first-child + * .buckets p` rule (previously dropped),
+   giving buckets correct `display: inline-block` layout. Investigate
+   remaining blue artefacts.
 
 4. **Improve font rendering (TODO-7)** — Compare SkiaSharp font metrics
    (glyph widths, ascent/descent) against Chromium's for Arial at 20px.
@@ -1280,11 +1288,21 @@ gap is attributable to:
 - [ ] **TODO-5 (D5): Eliminate remaining blue border artefacts**
   - [x] Fix `border` shorthand !important cascade to properly override all longhands
     (border-color now reset to initial value by shorthand)
+  - [x] Fix CSS parser to handle structural pseudo-classes (`:first-child`, `:last-child`,
+    `:only-child`) — previously rules like `:first-child + * .buckets p { ... }` were
+    silently dropped, causing incorrect bucket layout
+  - [x] Enable Acid3 rule `:first-child + * .buckets p { display: inline-block; ... }`
+    for correct bucket element layout (display, vertical-align, padding)
+  - [x] Enable `h1:first-child { font-size: 5em; margin-bottom: -0.4em; ... }` for
+    correct heading styling
+  - [x] Enable `#instructions:last-child { white-space: pre-wrap; ... }` for correct
+    instruction text whitespace handling
   - [ ] Identify which elements still show `border: 1px blue` despite `!important` overrides
   - [ ] Reduce blue pixel count from 2,109 → ~197 to match reference
   - [x] Verify `.z { visibility: hidden }` correctly hides unfilled bucket elements
 - [ ] **TODO-6 (D6): Fix word spacing and text layout in instruction paragraph**
   - [x] Verify inline text whitespace collapsing between elements (regression test added)
+  - [x] Enable `#instructions:last-child { white-space: pre-wrap }` via structural pseudo-class support
   - [ ] Fix line-break algorithm to match CSS 2.1 specification
   - [x] Verify `font: 0.8em` computed size inheritance through inline elements
   - *Note:* CSS error recovery is done (`white-space: x-bogus` rejected ✅,
