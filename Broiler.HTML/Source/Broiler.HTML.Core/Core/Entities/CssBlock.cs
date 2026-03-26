@@ -65,7 +65,7 @@ public sealed class CssBlock
 
     public CssBlock Clone()
     {
-        var clone = new CssBlock(Class, new Dictionary<string, string>(_properties), Selectors != null ? [.. Selectors] : null, pseudoClass: PseudoClass);
+        var clone = new CssBlock(Class, new Dictionary<string, string>(_properties), Selectors != null ? [.. Selectors] : null, Hover, PseudoClass);
         if (_importantProperties != null)
             clone._importantProperties = new HashSet<string>(_importantProperties, StringComparer.OrdinalIgnoreCase);
         return clone;
