@@ -1,6 +1,6 @@
 # Roadmap: Making Broiler ACID3 Compliant
 
-> **Status**: Active — last updated 2026-03-25  
+> **Status**: Active — last updated 2026-03-26  
 > **Tracking issue**: Proceed with acid3-compliance.md
 
 ---
@@ -387,12 +387,16 @@ rendering at an incorrect position or size.
 
 ### P1 — High Priority (significant visual impact)
 
-- [ ] **TODO-5 (D5): Fix CSS specificity for `!important` border overrides**
+- [x] **TODO-5 (D5): Fix CSS specificity for `!important` border overrides**
   - `* + * > * > p { border: 1px solid !important }` must win over
     `* { border: 1px blue }`.
+  - Implemented by tracking `!important` per-property through the CSS
+    cascade: `CssBlock.ImportantProperties`, `CssBox.ImportantProperties`,
+    and `DomParser.AssignCssBlock` now skips non-important overrides of
+    important properties per CSS2.1 §6.4.2.
   - Sub-steps:
-    1. Verify `!important` flag handling in CSS cascade resolution.
-    2. Test: `!important` on more-specific selector overrides less-specific rule.
+    1. ~~Verify `!important` flag handling in CSS cascade resolution.~~ ✅
+    2. ~~Test: `!important` on more-specific selector overrides less-specific rule.~~ ✅ (5 tests)
     3. Reduce blue pixel count in bucket area to match reference (~431 pixels).
 
 - [ ] **TODO-6 (D6): Fix word spacing and text layout in instruction paragraph**
@@ -422,21 +426,26 @@ rendering at an incorrect position or size.
     2. Resolve `url(font.ttf)` relative to the HTML file's base path.
     3. Register font with `SKFontManager` before rendering.
 
-- [ ] **TODO-9 (D9): Implement `::after` / `::before` pseudo-element rendering**
-  - Generate pseudo-element content from CSS `content` property.
-  - Apply positioning and styling to generated content.
+- [x] **TODO-9 (D9): Implement `::after` / `::before` pseudo-element rendering**
+  - Pseudo-element generation is implemented in
+    `DomParser.ApplyPseudoElementBoxes()` / `CreatePseudoElementBox()`.
+    The code finds matching `::before` / `::after` CSS blocks by element
+    tag, class, and ID; creates a child `CssBox`; applies all CSS
+    properties; and sets the text content from the `content` value.
   - Sub-steps:
-    1. Parse `content: "X"` and generate inline box.
-    2. Apply `position: absolute` and coordinate properties.
-    3. Apply `background`, `color`, and `font` properties to pseudo-element.
+    1. ~~Parse `content: "X"` and generate inline box.~~ ✅
+    2. ~~Apply `position: absolute` and coordinate properties.~~ ✅
+    3. ~~Apply `background`, `color`, and `font` properties to pseudo-element.~~ ✅
 
-- [ ] **TODO-10 (D10): Implement HSLA color function parsing**
-  - Parse `hsla(h, s%, l%, a)` and convert to RGBA.
-  - Support both comma-separated and space-separated syntax.
+- [x] **TODO-10 (D10): Implement HSLA color function parsing**
+  - HSL and HSLA color parsing is fully implemented in
+    `CssValueParser.GetColorByHsl()` and `GetColorByHsla()` with
+    `HslToRgb()` conversion.  The parser handles both `%` and bare
+    number syntax for saturation and lightness.
   - Sub-steps:
-    1. Add HSLA-to-RGBA conversion utility.
-    2. Integrate into CSS color parser.
-    3. Add regression tests for edge cases (0%, 100%, alpha 0/1).
+    1. ~~Add HSLA-to-RGBA conversion utility.~~ ✅ (`HslToRgb`)
+    2. ~~Integrate into CSS color parser.~~ ✅ (`TryGetColor` dispatches to HSL/HSLA)
+    3. ~~Add regression tests for edge cases (0%, 100%, alpha 0/1).~~ ✅ (6 tests in `CssRenderingTests`)
 
 - [ ] **TODO-11 (D11): Fix `display: inline-block` with `vertical-align` in em units**
   - Verify inline-block baseline alignment with `vertical-align: 2em`.

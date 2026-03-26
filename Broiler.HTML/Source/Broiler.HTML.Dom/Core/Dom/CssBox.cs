@@ -24,6 +24,24 @@ internal class CssBox : CssBoxProperties, IDisposable
     private IImageLoadHandler _imageLoadHandler;
 
     /// <summary>
+    /// CSS property names that were applied with <c>!important</c> during
+    /// cascade.  Normal-priority declarations must not override these.
+    /// CSS2.1 §6.4.2.
+    /// </summary>
+    internal HashSet<string> ImportantProperties { get; private set; }
+
+    /// <summary>
+    /// Marks a property as having been set via an <c>!important</c>
+    /// declaration so that subsequent normal-priority rules cannot
+    /// override it.
+    /// </summary>
+    internal void MarkPropertyImportant(string propertyName)
+    {
+        ImportantProperties ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        ImportantProperties.Add(propertyName);
+    }
+
+    /// <summary>
     /// Returns the loaded background image handle, or null if no background image is loaded.
     /// Used by <c>FragmentTreeBuilder</c> to capture background images for the new paint path.
     /// </summary>

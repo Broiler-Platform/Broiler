@@ -6,6 +6,7 @@ namespace Broiler.HTML.Core.Core.Entities;
 public sealed class CssBlock
 {
     private readonly Dictionary<string, string> _properties;
+    private HashSet<string> _importantProperties;
 
     public CssBlock(string @class, Dictionary<string, string> properties, List<CssBlockSelectorItem> selectors = null, bool hover = false)
     {
@@ -22,15 +23,46 @@ public sealed class CssBlock
     public List<CssBlockSelectorItem> Selectors { get; }
     public IDictionary<string, string> Properties => _properties;
     public bool Hover { get; }
+
+    /// <summary>
+    /// Property names in this block that were declared with <c>!important</c>.
+    /// CSS2.1 §6.4.2: Important declarations override normal declarations
+    /// regardless of specificity.
+    /// </summary>
+    public IReadOnlySet<string> ImportantProperties => _importantProperties ?? (IReadOnlySet<string>)_emptySet;
+    private static readonly HashSet<string> _emptySet = [];
+
+    /// <summary>
+    /// Marks the given property name as <c>!important</c>.
+    /// </summary>
+    public void MarkImportant(string propertyName)
+    {
+        _importantProperties ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        _importantProperties.Add(propertyName);
+    }
+
     public void Merge(CssBlock other)
     {
         ArgumentNullException.ThrowIfNull(other);
 
         foreach (var prop in other._properties.Keys)
             _properties[prop] = other._properties[prop];
+
+        if (other._importantProperties != null)
+        {
+            _importantProperties ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var prop in other._importantProperties)
+                _importantProperties.Add(prop);
+        }
     }
 
-    public CssBlock Clone() => new(Class, new Dictionary<string, string>(_properties), Selectors != null ? [.. Selectors] : null);
+    public CssBlock Clone()
+    {
+        var clone = new CssBlock(Class, new Dictionary<string, string>(_properties), Selectors != null ? [.. Selectors] : null);
+        if (_importantProperties != null)
+            clone._importantProperties = new HashSet<string>(_importantProperties, StringComparer.OrdinalIgnoreCase);
+        return clone;
+    }
 
     public bool Equals(CssBlock other)
     {
