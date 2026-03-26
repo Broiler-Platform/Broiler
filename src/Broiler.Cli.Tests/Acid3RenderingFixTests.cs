@@ -395,4 +395,114 @@ body { margin: 0; background: white; }
         Assert.False(borderPx.Red > 200 && borderPx.Green < 50 && borderPx.Blue < 50,
             $"border: 1px solid !important should reset color to black, got ({borderPx.Red},{borderPx.Green},{borderPx.Blue})");
     }
+
+    // ──────── P0 / TODO-3 (D2): html element content height ────────
+
+    /// <summary>
+    /// CSS 2.1 §8.3.1 / §10.6.3: The html element's own margin-bottom
+    /// must not be included in its content-height calculation.  When the
+    /// html element has an explicit bottom border (e.g. border-bottom: 4px)
+    /// the child's bottom margin is internal but the html element's own
+    /// margin-bottom is always external spacing.  Previously, the layout
+    /// engine incorrectly added Math.Max(html.marginBottom, body.marginBottom)
+    /// to the html element's border-box height, causing the bottom border
+    /// to render ~20px (1em) too low.
+    /// </summary>
+    [Fact]
+    public void Html_Element_Height_Excludes_Own_MarginBottom()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; padding: 0; border: none; }
+html { font: 20px Arial, sans-serif; border: 4px solid gray;
+       border-width: 0 4px 4px 0; margin: 20px; }
+body { margin: 0; padding: 0; }
+</style>
+</head><body>
+<div style='width:100px;height:100px;background:green;'></div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
+
+        // The green div is 100px tall.  html has border-top:0, so the
+        // div starts at html margin-top (20px).  The bottom gray border
+        // should start at y=120 (20+100) and span 4px (to y=123).
+        // Previously the border rendered ~20px too low (at y=140) because
+        // html.marginBottom was incorrectly added to the height.
+
+        // Check that gray border is present in the expected range
+        bool foundGrayInRange = false;
+        for (int y = 100; y <= 130; y++)
+        {
+            var px = bitmap.GetPixel(50, y);
+            if (px.Red > 115 && px.Red < 145 && px.Green > 115 && px.Green < 145
+                && px.Blue > 115 && px.Blue < 145)
+            {
+                foundGrayInRange = true;
+                break;
+            }
+        }
+        Assert.True(foundGrayInRange,
+            "Gray bottom border should appear within y=100-130 (not pushed down by own margin-bottom)");
+
+        // Check that no gray border appears in the old incorrect range (y=140-170)
+        bool foundGrayInOldRange = false;
+        for (int y = 140; y <= 170; y++)
+        {
+            var px = bitmap.GetPixel(50, y);
+            if (px.Red > 115 && px.Red < 145 && px.Green > 115 && px.Green < 145
+                && px.Blue > 115 && px.Blue < 145)
+            {
+                foundGrayInOldRange = true;
+                break;
+            }
+        }
+        Assert.False(foundGrayInOldRange,
+            "Gray bottom border should NOT appear in old incorrect range (y=140-170)");
+    }
+
+    /// <summary>
+    /// Acid3-pattern test: html element with border: 2cm solid gray and
+    /// :root override border-width: 0 0.2em 0.2em 0 should render the
+    /// bottom gray border immediately after the content, not pushed down
+    /// by the html element's own margin-bottom.
+    /// </summary>
+    [Fact]
+    public void Acid3_Html_Bottom_Border_Not_Overestimated()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+* { margin: 0; border: 1px blue; padding: 0; border-spacing: 0;
+    font: inherit; line-height: 1.2; color: inherit; background: transparent; }
+html { font: 20px Arial, sans-serif; border: 2cm solid gray;
+       width: 32em; margin: 1em; }
+html { background: silver; color: black; border-width: 0 0.2em 0.2em 0; }
+body { padding: 2em 2em 0; background: white; border: solid 1px black;
+       margin: -0.2em 0 0 -0.2em; }
+</style>
+</head><body>
+<div style='width:100px;height:100px;background:green;'>Content</div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+
+        // Find the last gray border pixel in the center column
+        int lastGrayRow = -1;
+        for (int y = 0; y < bitmap.Height; y++)
+        {
+            var px = bitmap.GetPixel(50, y);
+            if (px.Red > 115 && px.Red < 145 && px.Green > 115 && px.Green < 145
+                && px.Blue > 115 && px.Blue < 145)
+                lastGrayRow = y;
+        }
+
+        // The bottom border (0.2em = 4px gray) should end well before
+        // halfway down the 768px viewport.  Before the fix it extended
+        // to ~182 because html.marginBottom (20px) was incorrectly added.
+        Assert.True(lastGrayRow > 0, "Should find a gray border");
+        Assert.True(lastGrayRow < 200,
+            $"Bottom gray border should end before y=200, actual last gray row: {lastGrayRow}");
+    }
 }

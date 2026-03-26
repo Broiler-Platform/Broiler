@@ -1233,7 +1233,22 @@ internal class CssBox : CssBoxProperties, IDisposable
         if (ParentBox != null && ParentBox.Boxes.IndexOf(this) == ParentBox.Boxes.Count - 1 && _parentBox.ActualMarginBottom < 0.1)
         {
             var lastChildBottomMargin = Boxes[Boxes.Count - 1].ActualMarginBottom;
-            margin = Height == "auto" ? Math.Max(ActualMarginBottom, lastChildBottomMargin) : lastChildBottomMargin;
+
+            // CSS 2.1 §8.3.1: The bottom margin of a last in-flow child
+            // collapses with the bottom margin of its parent only when the
+            // parent has 'auto' computed height AND no bottom padding AND
+            // no bottom border.  When this element has a bottom border or
+            // padding the collapse is blocked and the child's margin is
+            // internal space.  In either case, this element's own
+            // margin-bottom is always external spacing and must never be
+            // included in its own content-height calculation.
+            if (ActualBorderBottomWidth > 0.1 || ActualPaddingBottom > 0.1)
+                margin = lastChildBottomMargin;
+            else if (Height != CssConstants.Auto)
+                margin = lastChildBottomMargin;
+            // else: Height is auto, no bottom border/padding — child's
+            // margin collapses with this element's margin and propagates
+            // externally.  margin stays 0.
         }
 
         // CSS2.1 §10.6.3 / §10.6.7: Floated children contribute to the

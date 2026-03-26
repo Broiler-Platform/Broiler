@@ -440,7 +440,7 @@ or size.
     2. ~~Pass resolved background to `canvas.Clear()` instead of hard-coded white.~~ ✅
     3. ~~Add regression test: `:root { background: silver }` → silver canvas.~~ ✅ (9 tests)
 
-- [ ] **TODO-3 (D2): Fix CSS border shorthand cascade and unit conversion**
+- [x] **TODO-3 (D2): Fix CSS border shorthand cascade and unit conversion**
   - `border: 2cm solid gray` must convert `2cm` to ~75.6px at 96 DPI.
   - `border-width: 0 0.2em 0.2em 0` must override the longhand values from
     the `border` shorthand per CSS cascade rules.
@@ -455,7 +455,8 @@ or size.
     2. ~~Verify 4-value `border-width` shorthand expansion.~~ ✅ (`ExpandBoxShorthand`)
     3. ~~Test cascade: more-specific `:root` rule overrides less-specific `html` rule.~~ ✅
        (`Root_Selector_Overrides_Html_Border_Width` test added)
-    4. Remaining: Fix border layout in the rendering engine (pixel fidelity).
+    4. ~~Fix border layout in the rendering engine.~~ ✅ (html element content height
+       overestimation fixed in `MarginBottomCollapse` — CSS 2.1 §8.3.1)
 
 - [x] **TODO-4 (D4): Fix slash rendering in score display**
   - Ensure `document.createTextNode('/')` content is serialized by DomBridge.
@@ -1272,16 +1273,18 @@ gap is attributable to:
   - [x] Fix total width = content (640 px) + border + margin to fit within 1024 px
   - [x] Ensure viewport-constrained render clips at 768 px height
   - [x] Verify `overflow` handling on root and body elements (§9.2.1)
-- [ ] **TODO-3 (D2): Fix CSS border layout in rendering engine**
+- [x] **TODO-3 (D2): Fix CSS border layout in rendering engine**
   - [x] Fix asymmetric `border-width: 0 0.2em 0.2em 0` rendering geometry
-  - [ ] Ensure bottom border renders at row ~452 (currently extends to row 745)
+  - [x] Ensure bottom border renders at correct row (fix: html element content
+    height no longer overestimated — `MarginBottomCollapse` no longer includes
+    the element's own `margin-bottom` in its border-box height per CSS 2.1 §8.3.1)
   - [x] Align gray border column offsets with reference (col 20–663)
   - [x] Fix CSS 2.1 §8.5 `border` shorthand to reset all sub-properties (width, style, color)
     when a component is omitted — previously only set non-null components
   - [x] Add WHATWG default styles for `iframe` (`border: 2px inset; display: inline-block`)
     and `object` (`display: inline-block`) to `CssDefaults`
   - *Note:* CSSOM cascade is correct (cm units ✅, 4-value expansion ✅,
-    `:root` override ✅) — remaining work is in `HtmlRender` layout engine
+    `:root` override ✅) — layout engine fix applied to `MarginBottomCollapse`
 
 #### P1 — Rendering Fixes: High Impact (target: M2 ≥ 65 %)
 
