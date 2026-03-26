@@ -28,6 +28,7 @@ public sealed partial class DomBridge
             return cached;
 
         var obj = new JSObject();
+        var bridge = this;
         _jsObjectCache[element] = obj;
 
         obj.FastAddValue(
@@ -70,6 +71,7 @@ public sealed partial class DomBridge
                 var val = a.Length > 0 ? a[0].ToString() : string.Empty;
                 element.ClassName = val;
                 element.Attributes["class"] = val;
+                bridge.InvalidateElementStyles(element);
                 return JSUndefined.Value;
             }, "set className"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -140,7 +142,7 @@ public sealed partial class DomBridge
         // classList — class list manipulation
         obj.FastAddValue(
             (KeyString)"classList",
-            BuildClassListObject(element),
+            BuildClassListObject(element, bridge.InvalidateElementStyles),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // attributes — NamedNodeMap interface
@@ -166,7 +168,10 @@ public sealed partial class DomBridge
                     if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
                         element.Id = attrVal;
                     else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
+                    {
                         element.ClassName = attrVal;
+                        bridgeForSet.InvalidateElementStyles(element);
+                    }
                     else if (string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
                     {
                         element.Style.Clear();
@@ -597,7 +602,10 @@ public sealed partial class DomBridge
                     if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
                         element.Id = null;
                     else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
+                    {
                         element.ClassName = null;
+                        bridgeForSet.InvalidateElementStyles(element);
+                    }
                 }
                 return JSUndefined.Value;
             }, "removeAttribute", 1),
@@ -973,7 +981,6 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // dispatchEvent(event) — DOM Events Level 3 with capture/target/bubble phases
-        var bridge = this;
         obj.FastAddValue(
             (KeyString)"dispatchEvent",
             new JSFunction((in Arguments a) =>
@@ -3774,7 +3781,10 @@ public sealed partial class DomBridge
                 if (string.Equals(name, "id", StringComparison.OrdinalIgnoreCase))
                     element.Id = value;
                 else if (string.Equals(name, "class", StringComparison.OrdinalIgnoreCase))
+                {
                     element.ClassName = value;
+                    InvalidateElementStyles(element);
+                }
                 return old;
             }, "setNamedItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -3793,7 +3803,10 @@ public sealed partial class DomBridge
                 if (string.Equals(name, "id", StringComparison.OrdinalIgnoreCase))
                     element.Id = null;
                 else if (string.Equals(name, "class", StringComparison.OrdinalIgnoreCase))
+                {
                     element.ClassName = null;
+                    InvalidateElementStyles(element);
+                }
                 return BuildAttrNode(name, val, element, ownerObj);
             }, "removeNamedItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);

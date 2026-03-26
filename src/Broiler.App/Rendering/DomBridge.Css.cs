@@ -247,6 +247,46 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Recalculates cascaded CSS styles for a single element after a class or
+    /// attribute change.  Strips any CSS-derived properties that were set by
+    /// <see cref="ApplyCascadedStyles"/> and re-applies only the rules whose
+    /// selectors still match the element's current state.  Inline style
+    /// declarations (from the <c>style</c> HTML attribute) are preserved.
+    /// </summary>
+    internal void InvalidateElementStyles(DomElement element)
+    {
+        // 1. Collect property names that come from the inline style attribute.
+        //    These must never be cleared or overwritten by the cascade.
+        var inlineStyleProps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (element.Attributes.TryGetValue("style", out var inlineStyle) &&
+            !string.IsNullOrEmpty(inlineStyle))
+        {
+            foreach (var kv in ParseStyle(inlineStyle))
+                inlineStyleProps.Add(kv.Key);
+        }
+
+        // 2. Remove all CSS-derived properties (keep inline ones).
+        var keysToRemove = element.Style.Keys
+            .Where(k => !inlineStyleProps.Contains(k))
+            .ToList();
+        foreach (var key in keysToRemove)
+            element.Style.Remove(key);
+
+        // 3. Re-apply CSS rules that still match.
+        foreach (var (selector, _, declarations) in _cssRules)
+        {
+            if (MatchesSelector(element, selector))
+            {
+                foreach (var kv in declarations)
+                {
+                    if (!inlineStyleProps.Contains(kv.Key))
+                        element.Style[kv.Key] = kv.Value;
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Finds the document root ancestor for the given element by walking up the
     /// parent chain. Stops at <c>#subdoc-root</c> or <c>#document</c> boundaries.
     /// Returns the topmost node within the element's document scope.
