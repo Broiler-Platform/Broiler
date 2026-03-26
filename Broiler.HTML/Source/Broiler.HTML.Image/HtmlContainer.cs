@@ -122,5 +122,58 @@ public sealed class HtmlContainer : IDisposable
     /// </summary>
     public List<LinkElementData<RectangleF>> GetLinks() => HtmlContainerInt.GetLinks();
 
+    /// <summary>
+    /// Returns the computed background color of the root CSS box, or
+    /// <see cref="Color.Empty"/> when the root has no explicit (non-transparent)
+    /// background.  Requires <see cref="SetHtml"/> to have been called first.
+    /// Per the CSS 2.1 canvas background model (§14.2), the canvas background
+    /// is taken from the root element; if that is transparent, the body
+    /// element's background is used instead.
+    /// </summary>
+    public Color GetRootBackgroundColor()
+    {
+        var root = HtmlContainerInt.Root;
+        if (root == null)
+            return Color.Empty;
+
+        // The Root CssBox is an anonymous wrapper; the actual <html> element
+        // is typically its first child.  Check the wrapper first, then walk
+        // into children to find <html> and, per CSS 2.1, <body> as fallback.
+        var bg = root.ActualBackgroundColor;
+        if (!bg.IsEmpty && bg.A > 0)
+            return bg;
+
+        Broiler.HTML.Dom.Core.Dom.CssBox? htmlBox = null;
+        foreach (var child in root.Boxes)
+        {
+            if (string.Equals(child.HtmlTag?.Name, "html", StringComparison.OrdinalIgnoreCase))
+            {
+                htmlBox = child;
+                bg = child.ActualBackgroundColor;
+                if (!bg.IsEmpty && bg.A > 0)
+                    return bg;
+                break;
+            }
+        }
+
+        // CSS 2.1 §14.2: if the root element's background is transparent,
+        // use the <body> element's background for the canvas.
+        if (htmlBox != null)
+        {
+            foreach (var child in htmlBox.Boxes)
+            {
+                if (string.Equals(child.HtmlTag?.Name, "body", StringComparison.OrdinalIgnoreCase))
+                {
+                    bg = child.ActualBackgroundColor;
+                    if (!bg.IsEmpty && bg.A > 0)
+                        return bg;
+                    break;
+                }
+            }
+        }
+
+        return Color.Empty;
+    }
+
     public void Dispose() => HtmlContainerInt.Dispose();
 }

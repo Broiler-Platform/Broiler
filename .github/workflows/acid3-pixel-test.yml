@@ -1,0 +1,25 @@
+name: Acid3 Pixel Test
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  acid3:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install Pillow numpy
+      - run: bash scripts/acid3-pixel-test.sh --skip-reference
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: acid3-results
+          path: |
+            acid/acid3/acid3.png
+            acid/acid3/acid3-diff.png
+            acid/acid3/acid3-report.txt

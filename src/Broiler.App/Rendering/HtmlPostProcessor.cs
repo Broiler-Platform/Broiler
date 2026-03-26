@@ -58,6 +58,15 @@ internal static class HtmlPostProcessor
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
+    /// Matches the <c>:root</c> pseudo-class selector in CSS rules so it can
+    /// be rewritten to <c>html</c> for HtmlRenderer which does not support
+    /// the <c>:root</c> pseudo-class.
+    /// </summary>
+    private static readonly Regex RootSelectorPattern = new(
+        @"(?<![:\w]):root\b",
+        RegexOptions.Compiled);
+
+    /// <summary>
     /// Applies the full set of post-processing steps to the HTML so that
     /// it renders correctly in HtmlRenderer (WPF or Image).
     /// </summary>
@@ -76,6 +85,7 @@ internal static class HtmlPostProcessor
         // image fallback).  Acid3 tests that need object stripping call
         // StripObjectContent() directly; the default pipeline preserves them.
         html = StripHiddenTestArtifacts(html);
+        html = RewriteRootSelector(html);
         return html;
     }
 
@@ -163,5 +173,16 @@ internal static class HtmlPostProcessor
 
         html = FailDivPattern.Replace(html, string.Empty);
         return html;
+    }
+
+    /// <summary>
+    /// Rewrites the CSS <c>:root</c> pseudo-class selector to the equivalent
+    /// <c>html</c> type selector.  In HTML, <c>:root</c> always selects the
+    /// <c>&lt;html&gt;</c> element (Selectors Level 3 §6.6.1), but the
+    /// HtmlRenderer CSS engine does not support pseudo-class selectors.
+    /// </summary>
+    internal static string RewriteRootSelector(string html)
+    {
+        return RootSelectorPattern.Replace(html, "html");
     }
 }

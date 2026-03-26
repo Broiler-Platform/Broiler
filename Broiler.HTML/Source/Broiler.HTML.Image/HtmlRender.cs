@@ -17,14 +17,39 @@ public static class HtmlRender
         EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null,
         EventHandler<HtmlImageLoadEventArgs> imageLoad = null)
     {
+        var bgColor = backgroundColor == default ? SKColors.White : backgroundColor;
+
         var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
         using var canvas = new SKCanvas(bitmap);
 
-        var bgColor = backgroundColor == default ? SKColors.White : backgroundColor;
-        canvas.Clear(bgColor);
-
         if (!string.IsNullOrEmpty(html))
-            RenderHtml(canvas, html, new PointF(0, 0), new SizeF(width, height), cssData, stylesheetLoad, imageLoad);
+        {
+            using var container = new HtmlContainer();
+            container.Location = new PointF(0, 0);
+            container.MaxSize = new SizeF(width, height);
+            container.AvoidAsyncImagesLoading = true;
+            container.AvoidImagesLateLoading = true;
+
+            if (stylesheetLoad != null)
+                container.StylesheetLoad += stylesheetLoad;
+            if (imageLoad != null)
+                container.ImageLoad += imageLoad;
+
+            container.SetHtml(html, cssData);
+
+            if (backgroundColor == default)
+                bgColor = ResolveCanvasBackground(container, bgColor);
+
+            canvas.Clear(bgColor);
+
+            var clip = new RectangleF(0, 0, width, height);
+            container.PerformLayout(canvas, clip);
+            container.PerformPaint(canvas, clip);
+        }
+        else
+        {
+            canvas.Clear(bgColor);
+        }
 
         return bitmap;
     }
@@ -50,6 +75,9 @@ public static class HtmlRender
             container.ImageLoad += imageLoad;
 
         container.SetHtml(html, cssData);
+
+        if (backgroundColor == default)
+            bgColor = ResolveCanvasBackground(container, bgColor);
 
         var minSize = new SizeF(0, 0);
         var maxSize = new SizeF(maxWidth, maxHeight);
@@ -143,5 +171,19 @@ public static class HtmlRender
         actualSize = container.ActualSize;
 
         return actualSize;
+    }
+
+    /// <summary>
+    /// Reads the root element's computed background color from the container
+    /// and converts it to an <see cref="SKColor"/>.  Returns the supplied
+    /// <paramref name="fallback"/> when the root has no explicit background.
+    /// </summary>
+    private static SKColor ResolveCanvasBackground(HtmlContainer container, SKColor fallback)
+    {
+        var rootBg = container.GetRootBackgroundColor();
+        if (!rootBg.IsEmpty && rootBg.A > 0)
+            return new SKColor(rootBg.R, rootBg.G, rootBg.B, rootBg.A);
+
+        return fallback;
     }
 }

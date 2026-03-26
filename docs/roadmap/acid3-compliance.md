@@ -1,7 +1,7 @@
 # Roadmap: Making Broiler ACID3 Compliant
 
-> **Status**: Active — last updated based on real pixel-comparison results  
-> **Tracking issue**: Create Roadmap for Making Broiler ACID3 Compliant
+> **Status**: Active — last updated 2026-03-25  
+> **Tracking issue**: Proceed with acid3-compliance.md
 
 ---
 
@@ -358,13 +358,15 @@ rendering at an incorrect position or size.
     2. Fix total width = content (640px) + border + margin calculation.
     3. Ensure viewport-constrained render clips at 768px height.
 
-- [ ] **TODO-2 (D1): Apply `:root` background color to canvas**
-  - The `:root { background: silver }` declaration must propagate to the
+- [x] **TODO-2 (D1): Apply `:root` background color to canvas**
+  - The `:root { background: silver }` declaration now propagates to the
     canvas clear color in `HtmlRender.RenderToImage`.
+  - Implemented via `HtmlContainer.GetRootBackgroundColor()` and
+    `HtmlPostProcessor.RewriteRootSelector()` (`:root` → `html`).
   - Sub-steps:
-    1. Parse and resolve the computed `background-color` on the `<html>` element.
-    2. Pass resolved background to `canvas.Clear()` instead of hard-coded white.
-    3. Add regression test: `:root { background: silver }` → silver canvas.
+    1. ~~Parse and resolve the computed `background-color` on the `<html>` element.~~ ✅
+    2. ~~Pass resolved background to `canvas.Clear()` instead of hard-coded white.~~ ✅
+    3. ~~Add regression test: `:root { background: silver }` → silver canvas.~~ ✅ (9 tests)
 
 - [ ] **TODO-3 (D2): Fix CSS border shorthand cascade and unit conversion**
   - `border: 2cm solid gray` must convert `2cm` to ~75.6px at 96 DPI.
@@ -512,7 +514,9 @@ be kept up to date as fixes land.
 
 ### 6.4 CI Pipeline
 
-Consider adding the pixel-comparison pipeline to CI:
+✅ **Added** — see `.github/workflows/acid3-pixel-test.yml`.
+
+The pixel-comparison pipeline runs on every push and pull request:
 
 ```yaml
 # .github/workflows/acid3-pixel-test.yml
