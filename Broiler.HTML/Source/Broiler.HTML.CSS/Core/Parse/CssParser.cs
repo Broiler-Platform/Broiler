@@ -609,6 +609,8 @@ internal sealed class CssParser
     /// only a fixed set of keywords. Returns <c>true</c> if the property is not
     /// an enumerated property or if the value is a valid keyword; <c>false</c>
     /// if the value is an unknown keyword for an enumerated property.
+    /// Keyword sets include both CSS2.1 values and commonly-used CSS3 values
+    /// (e.g. <c>flex</c>, <c>grid</c>, <c>sticky</c>) for forward compatibility.
     /// </summary>
     private static bool IsValidPropertyValue(string propName, string propValue)
     {

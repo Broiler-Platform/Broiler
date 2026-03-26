@@ -902,9 +902,10 @@ document.getElementById('result').textContent = 'ws=' + cs.whiteSpace;
 </body></html>";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
-        // "inherit" should be accepted as a valid value
-        Assert.Contains("ws=", result);
-        Assert.DoesNotContain("ws=undefined", result);
+        // "inherit" should be accepted as a valid value — Broiler's
+        // getComputedStyle preserves the keyword (does not resolve to the
+        // parent's computed value), so we check for "inherit" directly.
+        Assert.Contains("ws=inherit", result);
     }
 
     // ────────────── TODO-1 (D3): Viewport / box-model ──────────────
@@ -1063,9 +1064,8 @@ document.getElementById('result').textContent = 'ff=' + ff;
 </body></html>";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
-        // The font-family should reference AcidAhemTest
-        Assert.Contains("ff=", result);
-        Assert.DoesNotContain("ff=undefined", result);
+        // The font-family should reference AcidAhemTest from the @font-face rule
+        Assert.Contains("AcidAhemTest", result);
     }
 
     // ────────────── TODO-13 (D13): SVG and object elements ──────────────
@@ -1157,7 +1157,9 @@ document.getElementById('result').textContent = r.join(',');
 </body></html>";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
-        Assert.Contains("rules=", result);
+        Assert.Contains("rules=1", result);
+        // The pseudo-element selector should be properly parsed and accessible
+        Assert.Contains("selector=map::after", result);
     }
 
     // ────────────── Acid3 full CSS pattern integration ──────────────
