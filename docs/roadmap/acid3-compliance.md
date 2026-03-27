@@ -1488,7 +1488,7 @@ The image-comparison was performed on 2026-03-27 using:
 | Full-image pixel match   | —                     | **38.94 %**           |
 | Silver pixels            | 334,392               | 513,271               |
 | White pixels             | 19                    | **212,830**           |
-| Red pixels               | **379,664** (48.3 %)  | 8,255 (1.0 %)        |
+| Red pixels               | **379,664** (48.3 % of 786,432 viewport pixels) | 8,255 (1.0 %) |
 | Black/text pixels        | 14,217                | 24,204                |
 | Yellow pixels            | 12,994                | 0                     |
 | Orange pixels            | 9,576                 | 72                    |
@@ -1760,7 +1760,7 @@ Based on this deep comparison, the following new actionable items are added:
 - [ ] **TODO-24 (V1/RC1): Fix `background` shorthand parsing with data-URI images**
   - The `body { background: url(data:...) no-repeat 99.8392283% 1px white; }`
     declaration must correctly extract `background-color: white`.
-  - Test case: render `<body style="background: url(data:image/gif;base64,...) no-repeat 50% 1px white;">` and verify white background.
+  - Test case: render `<body style="background: url(data:image/gif;base64,...) no-repeat 99.8392283% 1px white;">` and verify white background.
   - Investigate `CssParser.ParseBackgroundShorthand()` handling of:
     - Data-URI with percent-encoded characters
     - Non-integer percentage positions (`99.8392283%`)
