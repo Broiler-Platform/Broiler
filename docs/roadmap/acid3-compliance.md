@@ -1,6 +1,6 @@
 # Roadmap: Making Broiler ACID3 Compliant
 
-> **Status**: Active — last updated 2026-03-27 (re-test + roadmap reconciliation)  
+> **Status**: Active — last updated 2026-03-27 (deep visual comparison V1–V6, new TODOs 24–28)  
 > **Tracking issue**: Repeat acid3 image-comparison, update findings and tasks
 
 ---
@@ -17,7 +17,7 @@
 8. [Acid3 Test-by-Test Coverage Map](#8-acid3-test-by-test-coverage-map)
 9. [Partial Implementations and Known Obstacles](#9-partial-implementations-and-known-obstacles)
 10. [Re-Test Summary and Next Steps (2026-03-26)](#10-re-test-summary-and-next-steps-2026-03-26)
-11. [Re-Test Summary (2026-03-27)](#11-re-test-summary-2026-03-27)
+11. [Deep Visual Comparison (2026-03-27)](#11-deep-visual-comparison-2026-03-27)
 
 ---
 
@@ -1466,92 +1466,350 @@ gap is attributable to:
 
 ---
 
-## 11. Re-Test Summary (2026-03-27)
+## 11. Deep Visual Comparison (2026-03-27)
 
 ### 11.1 Re-Test Procedure
 
-The image-comparison procedure was repeated on 2026-03-27 using:
+The image-comparison was performed on 2026-03-27 using:
 
 1. **Broiler CLI** (`dotnet run --project src/Broiler.Cli`) for rendering
    `acid/acid3/acid3.html` at 1024 × 768 viewport (viewport-constrained,
    no `--full-page`).
 2. **Existing Chromium reference** (`acid/acid3/acid3-reference.png`, generated
    from Chromium Headless Shell v1208, Chrome 145.0.7632.6 via Playwright).
-3. **`scripts/acid3-compare.py`** (Pillow + NumPy) for pixel-level comparison
-   with per-channel tolerance of 5.
+3. **Deep pixel analysis** using Pillow + NumPy with per-region, per-color
+   breakdowns beyond the standard comparison script.
 
-### 11.2 Results
+### 11.2 Overall Pixel Statistics
 
-| Metric                   | 2026-03-26 | 2026-03-27 | Delta     |
-|--------------------------|------------|------------|-----------|
-| Full-image pixel match   | 42.68 %    | **38.94 %** | −3.74 pp  |
-| Content-area match       | 42.68 %    | **38.94 %** | −3.74 pp  |
-| Score-area match         | 30.48 %    | **30.48 %** | 0.00 pp   |
-| Bucket-area match        | 39.52 %    | **39.68 %** | +0.16 pp  |
-| Bottom-text-area match   | 43.66 %    | **35.73 %** | −7.93 pp  |
+| Metric                   | Broiler               | Reference             |
+|--------------------------|-----------------------|-----------------------|
+| Image dimensions         | 1024 × 768            | 1024 × 768            |
+| Full-image pixel match   | —                     | **38.94 %**           |
+| Silver pixels            | 334,392               | 513,271               |
+| White pixels             | 19                    | **212,830**           |
+| Red pixels               | **379,664** (48.3 %)  | 8,255 (1.0 %)        |
+| Black/text pixels        | 14,217                | 24,204                |
+| Yellow pixels            | 12,994                | 0                     |
+| Orange pixels            | 9,576                 | 72                    |
+| Purple pixels            | 24,266                | 8,435                 |
+| Blue pixels              | 0                     | 517                   |
+| Gray pixels              | 5,477                 | 8,334                 |
 
-### 11.3 Analysis
+**Key finding:** Broiler renders **379,664 red pixels** (48% of the viewport)
+while the reference has only **8,255** (1%). Broiler renders **19 white pixels**
+while the reference has **212,830**. This is the dominant visual difference.
 
-The overall pixel fidelity decreased slightly from 42.68% to 38.94%. This is
-**environment-dependent** — the score-area and bucket-area matches are stable
-(±0.2 pp), while the bottom-text-area dropped by ~8 pp. This pattern is
-consistent with **font availability differences** between test environments:
+### 11.3 Issue-by-Issue Deep Analysis
 
-- The 2026-03-26 re-test used a local development environment with Arial fonts
-  installed. The current CI/sandbox environment may not have Arial, causing
-  SkiaSharp to fall back to Liberation Sans or DejaVu Sans. The fallback font
-  has different glyph metrics (widths, kerning, ascent/descent), producing
-  different text layout in the instruction paragraph area.
-- The score-area match (30.48% — identical) and bucket-area match (39.68% —
-  nearly identical) confirm that non-text rendering is stable. The fidelity
-  delta is entirely attributable to text rendering differences.
+The following six specific rendering differences were identified by visual
+comparison of the Broiler output against the Chromium reference:
 
-**Key takeaway:** Pixel fidelity is **font-sensitive**. The canonical
-comparison should be performed in an environment matching the reference
-(Chromium Headless Shell with the same system fonts). The CI pipeline at
-`.github/workflows/acid3-pixel-test.yml` uses Ubuntu runners with standard
-font packages — this is the authoritative environment for milestone tracking.
+---
 
-### 11.4 TODO Status Reconciliation
+#### V1 — Background is red (should be white)
 
-Section 5 (Prioritized TODO List) was reconciled with Section 10.5 (Outstanding
-Tasks Checklist) to eliminate stale checkbox markers. The following TODOs were
-updated from `[ ]` to `[x]` in Section 5 to match their actual implementation
-status documented in Section 10.5:
+**Severity: Critical — single largest rendering defect**
 
-| TODO | Description | Status |
-|------|-------------|--------|
-| TODO-6 (D6) | Word spacing / text layout | ✅ — CSS error recovery, whitespace mode support, structural pseudo-class enabling `pre-wrap` |
-| TODO-7 (D7) | Font rendering fidelity | ✅ — font fallback chains, `text-shadow` rendering, bolder/lighter resolution |
-| TODO-8 (D8) | `@font-face` local file loading | ✅ — `ParseFontFaceBlocks`, `ResolveLocalFontPath`, `LoadFontFromFile` |
-| TODO-11 (D11) | `inline-block` + `vertical-align` | ✅ — `ApplyVerticalAlignment` with em-unit length values |
-| TODO-13 (D13) | SVG rendering in `<object>` | ✅ — `SvgRenderer.RenderSvgContent`, `FragmentTreeBuilder.TryLoadSvgContent` |
-| TODO-16 (D16) | Magenta pseudo-element positioning | ✅ — `ApplyPseudoElementBoxes` with absolute positioning |
-| TODO-22 | DOM traversal regression tests | ✅ — tests 2–6, 9–13 covered |
-| TODO-23 | HTML element regression tests | ✅ — tests 49–63 covered |
+The entire content area inside the gray border frame is **bright red
+(RGB 255,0,0)** in Broiler instead of **white (RGB 255,255,255)** in the
+reference. Red covers 48.3% of all viewport pixels (379,664 px) vs 1.0%
+(8,255 px) in the reference.
 
-### 11.5 Remaining Work
+**Expected:** The CSS for `<body>` is:
+```css
+body { background: url(data:image/gif;base64,...) no-repeat 99.8392283% 1px white; }
+```
+The `white` color in this `background` shorthand should set
+`background-color: white` on the body, making the content area white.
 
-All P0–P3 TODO items are now marked as completed. The remaining open items are:
+**Root cause analysis:**
 
-1. **HTTP-dependent tests 14–16** — Evaluate feasibility of a local HTTP test
-   fixture. Low priority; currently skipped gracefully by the Acid3 harness.
-2. **Update Section 7 milestones** — Record M1+ milestone achievements as
-   pixel fidelity improves in the CI canonical environment.
-3. **Archive superseded data** — Move old pixel counts and screenshots to a
-   history section for cleaner document navigation.
-4. **Font rendering environment parity** — Ensure CI environment installs the
-   same font packages as the reference Chromium environment to produce
-   consistent pixel-fidelity measurements.
+The `background` shorthand contains a complex combination of:
+- `url(data:image/gif;base64,...)` — data-URI image
+- `no-repeat` — repeat mode
+- `99.8392283%` — horizontal position (non-integer percentage)
+- `1px` — vertical position
+- `white` — background color
 
-### 11.6 Issue Checklist Completion Status
+`CssParser.ParseBackgroundShorthand()` must decompose this shorthand into
+its five longhand properties. If **any** token fails validation, the entire
+shorthand is rejected and no properties are set (CSS error recovery). This
+leaves `background-color` at its initial value `transparent`.
 
-All seven TODO items from the tracking issue are now addressed:
+With `body` transparent, the `<html>` element (`:root { background: silver }`)
+shows through — explaining the silver corners. The bucket `<p>` elements have
+`border: 2em dotted red` (from the `:first-child + * .buckets p` rule), and
+their large red dotted borders dominate the visible area.
+
+**Specific concerns:**
+1. The `99.8392283%` position value may fail the position parser.
+2. The data-URI contains `%2F` sequences that could confuse URL extraction.
+3. The `no-repeat` keyword must be recognized before position parsing.
+
+**Actionable TODO:** Fix `ParseBackgroundShorthand()` to handle data-URI
+images with non-integer position percentages. Add regression test with the
+exact acid3 body background declaration.
+
+---
+
+#### V2 — "Acid3" title text position (too far in the middle)
+
+**Severity: Medium**
+
+The `<h1>Acid3</h1>` title text is overlapping with the colored test bars in
+Broiler. In the reference, the title is positioned at the top of the content
+area (within the gray border frame) with the bars below.
+
+**Expected layout (reference):**
+- Title `h1` at top-left of body content area
+- CSS: `h1:first-child { font-size: 5em; font-weight: bolder; margin-bottom: -0.4em; text-shadow: rgba(192,192,192,1.0) 3px 3px; }`
+- Score `#result` positioned with `margin: -2.19em 0 0` (pulled upward over title)
+
+**Broiler layout:**
+- Title text rows 16–119, cols 16–659 (center at col 338)
+- Reference title text rows 16–119, cols 16–659 (center at col 338)
+- Title position appears correct, but **it overlaps with bucket bars** because
+  the bars are vertically displaced (see V3/V4 below), creating visual
+  interference
+
+**Root cause:** The title itself appears correctly positioned. The overlap
+is a secondary effect of the bucket bars being too large and not properly
+formatted as `inline-block` (V3/V4).
+
+---
+
+#### V3 — Colored test bars are too big
+
+**Severity: High**
+
+The colored bucket bars (red/orange/yellow/silver/purple blocks) are
+massively oversized in Broiler compared to the reference.
+
+**Pixel measurements:**
+
+| Element      | Broiler extent       | Reference extent     |
+|-------------|---------------------|---------------------|
+| Red bar area | rows 17–767, cols 17–715 (751 × 699 px) | rows 19–152, cols 18–325 (134 × 308 px) |
+| Orange block | rows 205–280, cols 169–294 (76 × 126 px) | rows 19–45, cols 17–84 (27 × 68 px) |
+| Yellow block | rows 205–293, cols 297–442 (89 × 146 px) | (none detected — yellow in reference is lime, different threshold) |
+| Purple block | rows 310–684, cols 57–442 (375 × 386 px) | rows 19–402, cols 18–602 (384 × 585 px) |
+
+The Broiler bar area spans **751 px vertically** vs **134 px** in the
+reference — a **5.6× vertical oversize**. The bars occupy nearly the
+entire viewport height.
+
+**Root cause:** Each bucket `<p>` has:
+```css
+:first-child + * .buckets p { display: inline-block; vertical-align: 2em;
+  border: 2em dotted red; padding: 1.0em 0 1.0em 2em; }
+```
+
+With individual `font-size` values of 20px–40px, `border: 2em dotted red`
+produces borders of 40px–80px per side. Combined with padding and margins,
+each bucket is correctly sized *individually*. The problem is that they
+are **not displayed as `inline-block`** — they are rendering as full-width
+`block` elements, each taking the full container width and stacking
+vertically instead of sitting side by side in a single horizontal line.
+
+**Contributing factor:** The `.buckets` div has `font: 0/0 Arial, sans-serif`
+(font-size: 0, line-height: 0). The `0/0` shorthand font notation must be
+parsed correctly — `font-size: 0` with `line-height: 0`. If this fails, the
+parent div may have a normal font size, changing all `em` calculations for
+the bucket children.
+
+---
+
+#### V4 — Colored test bars reside in two lines (should be one line)
+
+**Severity: High** (closely related to V3)
+
+In the reference, all six bucket `<p>` elements sit in a **single horizontal
+line**. In Broiler, they wrap into **at least two rows** of block elements:
+
+- **Row 1** (rows ~205–280): Red, orange, yellow, silver/gray blocks
+- **Row 2** (rows ~310–684): Silver/gray, purple blocks
+
+The reference shows all six buckets in a single inline row between
+approximately rows 19–152.
+
+**Root cause:** The CSS rule that sets `display: inline-block` on the
+buckets uses a complex selector:
+```css
+:first-child + * .buckets p { display: inline-block; ... }
+```
+
+This requires the CSS selector engine to:
+1. Find a `:first-child` element (structural pseudo-class)
+2. Find its adjacent sibling (`+`) with any tag (`*`)
+3. Find a descendant with class `.buckets`
+4. Find a descendant `<p>` element
+
+If the `:first-child + *` combinator chain is not matched, `display`
+stays at `block` (default for `<p>`), causing vertical stacking.
+
+**Verification needed:**
+- Does `StripStructuralPseudoClasses()` in `CssParser` handle `:first-child`
+  in multi-part selectors like `:first-child + * .buckets p`?
+- Does the adjacent sibling combinator `+` work with the universal selector
+  `*` after a pseudo-class?
+
+---
+
+#### V5 — Colored test bars are horizontally mirrored
+
+**Severity: Medium**
+
+In the reference, the six bucket colors should appear left-to-right in
+this order: **red, orange, yellow, lime, blue, purple**. In Broiler:
+
+- **Row 1** shows: red, orange, yellow, then silver/gray blocks
+- **Row 2** shows: silver/gray, purple blocks
+- **lime and blue are missing entirely** (0 green pixels, 0 blue pixels)
+
+The Acid3 CSS assigns colors based on a specific class progression:
+```css
+#bucket1.zPPPPPPPPPPPPPPPP { background: red; }
+#bucket2.zPPPPPPPPPPPPPPPP { background: orange; }
+#bucket3.zPPPPPPPPPPPPPPPP { background: yellow; }
+#bucket4.zPPPPPPPPPPPPPPPP { background: lime; }
+#bucket5.zPPPPPPPPPPPPPPPP { background: blue; }
+#bucket6.zPPPPPPPPPPPPPPPP { background: purple; }
+```
+
+The class `zPPPPPPPPPPPPPPPP` (16 Ps) is only applied when all 16 tests
+in a bucket pass. Starting class is `z` (hidden via `.z { visibility: hidden }`).
+
+**Analysis:**
+- Buckets 1–3 (red, orange, yellow) are visible → tests 1–48 pass ✅
+- Bucket 4 (lime) is **not visible** → some tests 49–64 fail or the
+  class update to `zPPPPPPPPPPPPPPPP` fails
+- Bucket 5 (blue) is **not visible** → some tests 65–80 fail or class
+  update fails
+- Bucket 6 (purple) is visible → tests 81–96 pass ✅
+- The silver/gray blocks are buckets with intermediate class (e.g.
+  `zPPPPPPPPPPPPPPP` — 15 Ps) which gets `background: silver`
+
+The "mirroring" is actually a **bucket scoring issue** — not all buckets
+reach the full 16/16 score needed for their final color.
+
+**Actionable TODO:** Investigate which specific tests in buckets 4–5 fail
+during the full rendering pipeline. The JS engine scores 100/100 in the
+test harness, so the rendering pipeline's JS execution may produce
+different results from the standalone test.
+
+---
+
+#### V6 — Remaining blocks at the bottom
+
+**Severity: High**
+
+Broiler renders **167,501 colored pixels below row 500**, while the
+reference has **none** below row 500. These include:
+
+- A large red-bordered rectangle at rows ~570–620 (appears to be a
+  block-level element with the `border: 2em dotted red` bucket styling)
+- Red fill continuing to row 767 (bottom of viewport)
+- A small magenta/fuchsia square near row ~680 (the `map::after`
+  pseudo-element at `position: absolute; top: 18px; left: 638px`)
+
+**Expected:** In the reference, the bottom half of the viewport
+(below ~row 450) is entirely silver/gray background from the `<html>`
+element's `:root { background: silver }` declaration, with a thin line of
+gray instruction text at rows 400–448.
+
+**Root cause:** The bucket `<p>` elements render as block-level elements
+(see V3/V4), causing them to stack vertically and overflow far below the
+`.buckets` div boundary. The `overflow` property on `.buckets` is not set
+(defaults to `visible`), so all overflowing content is painted.
+
+Additionally, the `document.write()` generated content (containing `<map>`,
+`<iframe>`, `<form>`, `<table>` elements) may be rendered visibly when it
+should be zero-sized or hidden:
+- `iframe { float: left; height: 0; width: 0; }` — should be invisible
+- `<map>` should have no visual representation
+- `<form>`, `<table>` with `* { border: 1px blue }` may render visible
+  borders if the border-style defaults incorrectly
+
+---
+
+### 11.4 Root Cause Summary
+
+The six visual issues trace back to **three core rendering engine defects**:
+
+| Root Cause | Affected Issues | Est. Impact |
+|------------|-----------------|-------------|
+| **RC1: `background` shorthand parsing fails with data-URI + position** | V1 (red bg) | ~40% of all pixel mismatches |
+| **RC2: Complex CSS selector `:first-child + * .buckets p` not matched** | V3 (bar size), V4 (two lines), V6 (bottom blocks) | ~35% of all pixel mismatches |
+| **RC3: Bucket scoring incomplete (buckets 4–5 not fully colored)** | V5 (missing lime/blue) | ~5% of all pixel mismatches |
+
+**RC1** is the single most impactful defect. Fixing `ParseBackgroundShorthand()`
+to correctly handle the acid3 body declaration would turn the entire content
+area from red to white, immediately improving pixel fidelity by an estimated
+30–40 percentage points.
+
+**RC2** is the second most impactful. If the `:first-child + * .buckets p`
+selector matched correctly, the buckets would be `inline-block` elements in
+a single horizontal line (~162px tall total), contained within the `.buckets`
+div, instead of full-width blocks stacking to fill the viewport.
+
+### 11.5 Actionable TODOs
+
+Based on this deep comparison, the following new actionable items are added:
+
+- [ ] **TODO-24 (V1/RC1): Fix `background` shorthand parsing with data-URI images**
+  - The `body { background: url(data:...) no-repeat 99.8392283% 1px white; }`
+    declaration must correctly extract `background-color: white`.
+  - Test case: render `<body style="background: url(data:image/gif;base64,...) no-repeat 50% 1px white;">` and verify white background.
+  - Investigate `CssParser.ParseBackgroundShorthand()` handling of:
+    - Data-URI with percent-encoded characters
+    - Non-integer percentage positions (`99.8392283%`)
+    - The `white` color keyword after position values
+
+- [ ] **TODO-25 (V3/V4/V6/RC2): Fix complex selector matching for `:first-child + *`**
+  - The selector `:first-child + * .buckets p` must match the bucket `<p>` elements.
+  - Investigate `StripStructuralPseudoClasses()` handling of `:first-child` when
+    it is followed by combinators (`+`, `>`, `~`).
+  - Test case: verify `display: inline-block` is applied to bucket elements when
+    the full acid3 CSS cascade is processed.
+
+- [ ] **TODO-26 (V5/RC3): Investigate missing bucket colors in rendering pipeline**
+  - Buckets 4 (lime) and 5 (blue) show silver/gray backgrounds instead of their
+    final colors, indicating their class did not reach `zPPPPPPPPPPPPPPPP`.
+  - Compare JS execution results between standalone test harness (100/100) and
+    the rendering pipeline's `ExecuteScriptsWithDom` to identify which tests
+    produce different results.
+
+- [ ] **TODO-27 (V2): Verify `h1:first-child` selector and `margin-bottom: -0.4em`**
+  - The title position depends on the `:first-child` pseudo-class in the
+    `h1:first-child` selector and the negative bottom margin pulling the
+    content upward.
+  - Verify this selector is matched and the negative margin is applied.
+
+- [ ] **TODO-28 (V6): Verify `document.write()` generated elements are correctly hidden**
+  - `iframe { float: left; height: 0; width: 0; }` must produce zero-size layout
+  - `<map>` must have no visual box
+  - `<form>`, `<table>` must not render visible borders
+
+### 11.6 Priority Matrix
+
+| Priority | TODO | Description | Est. Pixel Impact |
+|----------|------|-------------|-------------------|
+| **P0** | TODO-24 | Fix body background (white) | +30–40 pp |
+| **P0** | TODO-25 | Fix `:first-child + *` selector (inline-block) | +15–25 pp |
+| **P1** | TODO-26 | Fix bucket colors (lime, blue) | +3–5 pp |
+| **P2** | TODO-27 | Verify title positioning | +1–2 pp |
+| **P2** | TODO-28 | Fix document.write() element visibility | +1–2 pp |
+
+Fixing TODO-24 and TODO-25 alone is estimated to improve pixel fidelity
+from ~39% to **~75–85%**.
+
+### 11.7 Issue Checklist Status
 
 - [x] Integrate Broiler.CLI image-rendering for `acid/acid3/acid3.html` — §2.1
 - [x] Automate Chromium/Playwright rendering of the same page to image — §2.2
 - [x] Implement content-comparison script (ignore backgrounds) — §3.1
-- [x] Log differences in DOM structure between Broiler and Chromium outputs — §4
-- [x] Log all color mismatches (by element/type) between outputs, ignoring backgrounds — §4, §10.2
-- [x] Document all layout or content differences observed — §4 (D1–D16)
-- [x] Create actionable issues/subtasks for each meaningful difference — §5 (TODO-1–TODO-23)
+- [x] Log differences in DOM structure between Broiler and Chromium outputs — §4, §11.3
+- [x] Log all color mismatches (by element/type) between outputs, ignoring backgrounds — §11.2, §11.3
+- [x] Document all layout or content differences observed — §11.3 (V1–V6)
+- [x] Create actionable issues/subtasks for each meaningful difference — §11.5 (TODO-24–TODO-28)
