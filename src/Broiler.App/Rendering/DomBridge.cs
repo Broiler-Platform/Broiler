@@ -409,7 +409,7 @@ public sealed partial class DomBridge
     private static Dictionary<string, string> ParseStyle(string styleValue)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var declaration in styleValue.Split(';'))
+        foreach (var declaration in SplitCssDeclarations(styleValue))
         {
             var colonIdx = declaration.IndexOf(':');
             if (colonIdx > 0)

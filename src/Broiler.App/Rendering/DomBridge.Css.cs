@@ -506,6 +506,11 @@ public sealed partial class DomBridge
         // Expand border shorthand (e.g. "2cm solid gray") → border-width, border-style, border-color
         if (computed.TryGetValue("border", out var borderVal))
             ExpandBorderShorthand(computed, borderVal);
+
+        // Expand background shorthand → background-color, background-image, background-repeat,
+        // background-attachment, background-position (CSS2.1 §14.2.1)
+        if (computed.TryGetValue("background", out var bgVal))
+            ExpandBackgroundShorthand(computed, bgVal);
     }
 
     /// <summary>
@@ -589,6 +594,88 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Expands the CSS <c>background</c> shorthand into its individual longhand
+    /// properties: <c>background-color</c>, <c>background-image</c>,
+    /// <c>background-repeat</c>, <c>background-attachment</c>, and
+    /// <c>background-position</c>.  CSS2.1 §14.2.1: tokens can appear in any
+    /// order; unspecified longhands receive their initial values.
+    /// </summary>
+    private static void ExpandBackgroundShorthand(Dictionary<string, string> computed, string value)
+    {
+        var tokens = SplitCssValues(value);
+
+        string? color = null;
+        string? image = null;
+        string? repeat = null;
+        string? attachment = null;
+        var positionParts = new List<string>();
+
+        foreach (var token in tokens)
+        {
+            var lower = token.ToLowerInvariant();
+
+            // background-image: url(...) or none
+            if (lower.StartsWith("url("))
+            {
+                image ??= token;
+                continue;
+            }
+            if (lower == "none")
+            {
+                image ??= "none";
+                continue;
+            }
+
+            // background-attachment
+            if (lower is "scroll" or "fixed")
+            {
+                attachment ??= lower;
+                continue;
+            }
+
+            // background-repeat
+            if (lower is "repeat" or "repeat-x" or "repeat-y" or "no-repeat")
+            {
+                repeat ??= lower;
+                continue;
+            }
+
+            // background-position keywords
+            if (lower is "left" or "right" or "top" or "bottom" or "center")
+            {
+                positionParts.Add(lower);
+                continue;
+            }
+
+            // Length or percentage values → position
+            if (IsLengthOrPercentage(lower))
+            {
+                positionParts.Add(token);
+                continue;
+            }
+
+            // inherit — skip
+            if (lower == "inherit")
+                continue;
+
+            // Remaining token → treat as color (named color, hex, rgb(), etc.)
+            color ??= token;
+        }
+
+        if (!computed.ContainsKey("background-color"))
+            computed["background-color"] = color ?? "transparent";
+        if (!computed.ContainsKey("background-image"))
+            computed["background-image"] = image ?? "none";
+        if (!computed.ContainsKey("background-repeat"))
+            computed["background-repeat"] = repeat ?? "repeat";
+        if (!computed.ContainsKey("background-attachment"))
+            computed["background-attachment"] = attachment ?? "scroll";
+        if (!computed.ContainsKey("background-position"))
+            computed["background-position"] = positionParts.Count > 0
+                ? string.Join(" ", positionParts) : "0% 0%";
+    }
+
+    /// <summary>
     /// Splits a CSS value into whitespace-separated tokens, respecting
     /// parenthesised groups (e.g. <c>rgba(0, 0, 0, 0.5)</c>).
     /// </summary>
@@ -608,6 +695,39 @@ public sealed partial class DomBridge
                 sb.Clear();
             }
             else if (!char.IsWhiteSpace(c) || depth > 0)
+            {
+                sb.Append(c);
+            }
+        }
+        if (sb.Length > 0) parts.Add(sb.ToString());
+        return parts.ToArray();
+    }
+
+    /// <summary>
+    /// Splits a CSS declaration block into individual declarations on <c>;</c>,
+    /// respecting parenthesised groups so that semicolons inside <c>url()</c>
+    /// or other CSS functions (e.g. <c>data:image/gif;base64,…</c>) are not
+    /// treated as declaration separators.
+    /// </summary>
+    internal static string[] SplitCssDeclarations(string declarations)
+    {
+        var parts = new List<string>();
+        var sb = new StringBuilder();
+        int depth = 0;
+        foreach (char c in declarations)
+        {
+            if (c == '(') depth++;
+            else if (c == ')' && depth > 0) depth--;
+
+            if (c == ';' && depth == 0)
+            {
+                if (sb.Length > 0)
+                {
+                    parts.Add(sb.ToString());
+                    sb.Clear();
+                }
+            }
+            else
             {
                 sb.Append(c);
             }
