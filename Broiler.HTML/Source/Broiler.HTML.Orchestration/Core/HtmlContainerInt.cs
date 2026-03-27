@@ -158,14 +158,85 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
         _loadComplete = false;
         _cssData = baseCssData ?? Adapter.DefaultCssData;
 
+        var baseUri = new Uri(baseUrl ?? "/", UriKind.RelativeOrAbsolute);
         DomParser parser = new(CssParser, new StylesheetLoadHandler(this));
-        Root = parser.GenerateCssTree(htmlSource, this, ref _cssData, new Uri(baseUrl ?? "/", UriKind.RelativeOrAbsolute));
+        Root = parser.GenerateCssTree(htmlSource, this, ref _cssData, baseUri);
 
         if (Root == null)
             return;
 
+        // Load @font-face fonts before layout so custom families are available.
+        LoadFontFacesFromCssData(baseUrl);
+
         _selectionHandler = _handlerFactory.CreateSelectionHandler(Root);
         _imageDownloader = new ImageDownloader();
+    }
+
+    /// <summary>
+    /// Iterates parsed <c>@font-face</c> rules from <see cref="_cssData"/> and
+    /// loads each font file via the platform adapter.  Relative <c>src</c> URLs
+    /// are resolved against <paramref name="baseUrl"/>.
+    /// </summary>
+    private void LoadFontFacesFromCssData(string baseUrl)
+    {
+        if (_cssData?.FontFaces == null || _cssData.FontFaces.Count == 0)
+            return;
+
+        foreach (var face in _cssData.FontFaces)
+        {
+            if (string.IsNullOrEmpty(face.Src) || string.IsNullOrEmpty(face.Family))
+                continue;
+
+            var src = face.Src.Trim('\'', '"');
+
+            // Skip remote URLs — only local file paths are supported.
+            if (src.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                src.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            string resolved = ResolveLocalFontPath(src, baseUrl);
+            if (!string.IsNullOrEmpty(resolved) && File.Exists(resolved))
+                Adapter.LoadFontFromFile(resolved, face.Family);
+        }
+    }
+
+    /// <summary>
+    /// Resolves a font <paramref name="src"/> path against the document
+    /// <paramref name="baseUrl"/>.  Returns an absolute file system path,
+    /// or <c>null</c> if resolution fails.
+    /// </summary>
+    private static string ResolveLocalFontPath(string src, string baseUrl)
+    {
+        // Already absolute file path
+        if (Path.IsPathRooted(src) && File.Exists(src))
+            return src;
+
+        // Resolve against base URL (file-based)
+        if (!string.IsNullOrEmpty(baseUrl))
+        {
+            // Try as file URI
+            if (Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri) && baseUri.IsFile)
+            {
+                string dir = Path.GetDirectoryName(baseUri.LocalPath);
+                if (!string.IsNullOrEmpty(dir))
+                {
+                    string combined = Path.GetFullPath(Path.Combine(dir, src));
+                    if (File.Exists(combined))
+                        return combined;
+                }
+            }
+
+            // Try as plain file system path
+            string baseDir = Path.GetDirectoryName(baseUrl);
+            if (!string.IsNullOrEmpty(baseDir))
+            {
+                string combined = Path.GetFullPath(Path.Combine(baseDir, src));
+                if (File.Exists(combined))
+                    return combined;
+            }
+        }
+
+        return null;
     }
 
     public void Clear()

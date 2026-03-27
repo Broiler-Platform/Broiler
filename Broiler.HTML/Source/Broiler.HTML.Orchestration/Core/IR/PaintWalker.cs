@@ -306,6 +306,13 @@ internal static class PaintWalker
 
     private static void EmitReplacedImage(Fragment fragment, List<DisplayItem> items)
     {
+        // SVG content for <object data="...svg"> elements — render via SvgRenderer.
+        if (!string.IsNullOrEmpty(fragment.SvgContent))
+        {
+            EmitSvgContent(fragment, items);
+            return;
+        }
+
         if (fragment.ImageHandle == null)
             return;
 
@@ -340,6 +347,31 @@ internal static class PaintWalker
                     DestRect = r,
                 });
             }
+        }
+    }
+
+    /// <summary>
+    /// Renders SVG content stored on the fragment using <see cref="SvgRenderer"/>.
+    /// </summary>
+    private static void EmitSvgContent(Fragment fragment, List<DisplayItem> items)
+    {
+        var rects = GetPaintRects(fragment);
+        var border = fragment.Border;
+        var padding = fragment.Padding;
+
+        foreach (var bounds in rects)
+        {
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+                continue;
+
+            var r = new RectangleF(
+                (float)Math.Floor(bounds.X + border.Left + padding.Left),
+                (float)Math.Floor(bounds.Y + border.Top + padding.Top),
+                bounds.Width - (float)(border.Left + border.Right + padding.Left + padding.Right),
+                bounds.Height - (float)(border.Top + border.Bottom + padding.Top + padding.Bottom));
+
+            if (r.Width > 0 && r.Height > 0)
+                items.AddRange(SvgRenderer.RenderSvgContent(fragment.SvgContent, r));
         }
     }
 

@@ -130,4 +130,13 @@ public abstract class RAdapter : IColorResolver, IResourceFactory, IFontCreator,
     protected virtual RContextMenu CreateContextMenuInt() => throw new NotImplementedException();
 
     protected virtual void SaveToFileInt(RImage image, string name, string extension, RControl control = null) => throw new NotImplementedException();
+
+    /// <summary>
+    /// Loads a font from a file path and registers it as an available font family.
+    /// Override in platform-specific adapters to implement font file loading.
+    /// </summary>
+    /// <param name="path">Absolute path to a .ttf or .otf font file.</param>
+    /// <param name="mapFromName">Optional CSS family name to map to the loaded font.</param>
+    /// <returns>The loaded font family name, or <c>null</c> if loading failed.</returns>
+    public virtual string LoadFontFromFile(string path, string mapFromName = null) => null;
 }
