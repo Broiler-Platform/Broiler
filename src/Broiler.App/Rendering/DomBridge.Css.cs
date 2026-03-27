@@ -597,9 +597,20 @@ public sealed partial class DomBridge
     /// Expands the CSS <c>background</c> shorthand into its individual longhand
     /// properties: <c>background-color</c>, <c>background-image</c>,
     /// <c>background-repeat</c>, <c>background-attachment</c>, and
-    /// <c>background-position</c>.  CSS2.1 §14.2.1: tokens can appear in any
-    /// order; unspecified longhands receive their initial values.
+    /// <summary>
+    /// Expands the CSS <c>background</c> shorthand into its five longhand properties:
+    /// <c>background-color</c>, <c>background-image</c>, <c>background-repeat</c>,
+    /// <c>background-attachment</c>, and <c>background-position</c>.
+    /// CSS2.1 §14.2.1: tokens can appear in any order; unspecified longhands
+    /// receive their initial values.
     /// </summary>
+    /// <remarks>
+    /// Implements TODO-24 (acid3-compliance.md §11.5): correctly handles data-URI
+    /// images with percent-encoded characters, non-integer percentage positions
+    /// (e.g. <c>99.8392283%</c>), and trailing color keywords (e.g. <c>white</c>).
+    /// See also: <c>CssParser.ParseBackgroundShorthand()</c> for the rendering-path
+    /// counterpart.  Tests: <c>Acid3Todo24_28Tests.cs</c>.
+    /// </remarks>
     private static void ExpandBackgroundShorthand(Dictionary<string, string> computed, string value)
     {
         var tokens = SplitCssValues(value);

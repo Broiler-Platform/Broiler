@@ -449,6 +449,12 @@ internal sealed class DomParser
     /// CSS2.1 §5.11.1: Checks whether <paramref name="box"/> satisfies a
     /// structural pseudo-class condition.
     /// </summary>
+    /// <remarks>
+    /// Implements TODO-25 and TODO-27 (acid3-compliance.md §11.5):
+    /// <c>:first-child</c> matching is used by both the <c>:first-child + *</c>
+    /// complex selector (TODO-25) and the <c>h1:first-child</c> attached
+    /// pseudo-class (TODO-27).  Tests: <c>Acid3Todo24_28Tests.cs</c>.
+    /// </remarks>
     private static bool MatchesPseudoClass(CssBox box, string pseudoClass)
     {
         if (box.HtmlTag == null || box.ParentBox == null)

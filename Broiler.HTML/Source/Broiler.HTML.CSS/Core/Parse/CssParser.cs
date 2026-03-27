@@ -445,6 +445,14 @@ internal sealed class CssParser
     /// the parsing pipeline sees a well-formed selector.
     /// </para>
     /// </summary>
+    /// <remarks>
+    /// Implements TODO-25 (acid3-compliance.md §11.5): ensures that
+    /// <c>:first-child + *</c> followed by combinators is correctly
+    /// transformed so that the adjacent-sibling (<c>+</c>) combinator is
+    /// preserved in the parsed selector chain.  Also supports TODO-27
+    /// for attached pseudo-classes like <c>h1:first-child</c>.
+    /// Tests: <c>Acid3Todo24_28Tests.cs</c>.
+    /// </remarks>
     private static string StripStructuralPseudoClasses(string selector, out string pseudo, out bool onTerminal)
     {
         pseudo = null;
@@ -831,6 +839,14 @@ internal sealed class CssParser
     /// CSS2.1 §14.2.1: <c>background: [color] [image] [repeat] [attachment] [position]</c>.
     /// Tokens can appear in any order (except position values, which are taken as a pair).
     /// </summary>
+    /// <remarks>
+    /// Implements TODO-24 (acid3-compliance.md §11.5): extracts <c>url(data:…)</c>
+    /// first (handling nested parentheses and percent-encoded characters), then
+    /// tokenises the remainder.  Color keywords (e.g. <c>white</c>) are validated
+    /// via <c>CssValueParser.IsColorValid()</c>.
+    /// See also: <c>DomBridge.Css.ExpandBackgroundShorthand()</c> for the CSSOM-path
+    /// counterpart.  Tests: <c>Acid3Todo24_28Tests.cs</c>.
+    /// </remarks>
     private void ParseBackgroundShorthand(string propValue, Dictionary<string, string> properties)
     {
         if (string.IsNullOrEmpty(propValue))
