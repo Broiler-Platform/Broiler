@@ -718,7 +718,7 @@ internal static class CssLayoutEngine
             // bottom-edge position to the top-edge position.
             bool isInlineBlock = box.Display == CssConstants.InlineBlock;
             double boxAscent = isInlineBlock
-                ? lineBox.Rectangles[box].Height  // baseline = bottom edge
+                ? lineBox.Rectangles[box].Height
                 : box.ActualFont.Height * TypicalAscentRatio;
 
             //Important notes on http://www.w3.org/TR/CSS21/tables.html#height-layout
