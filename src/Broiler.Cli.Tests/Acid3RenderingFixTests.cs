@@ -100,30 +100,38 @@ body { margin: 0; padding: 0; }
 
     /// <summary>
     /// CSS 2.1 §10.8.1: vertical-align with em units should be resolved
-    /// against the element's own computed font-size.
+    /// against the element's own computed font-size.  For an inline-block
+    /// with no in-flow line boxes, the baseline is the bottom margin edge.
+    /// vertical-align: 1em raises that bottom edge 1em above the parent
+    /// baseline, so the box top = baseline - boxHeight - 1em.
     /// </summary>
     [Fact]
     public void VerticalAlign_Em_Units_Resolved()
     {
+        // Use a container tall enough (padding-top: 80px) so that the
+        // raised inline-block remains visible.  With font-size: 20px on
+        // the container, the strut sets the baseline ~16px below
+        // padding-top (80px), so baseline ≈ 96px.
+        // The box (20px tall, vertical-align: 1em = 20px) has its top at
+        //   baseline - boxHeight - 1em = 96 - 20 - 20 = 56px.
         var html = @"<!DOCTYPE html>
 <html><head>
 <style>
 * { margin: 0; padding: 0; border: none; }
 body { margin: 0; }
-.container { font-size: 0; line-height: 0; }
+.container { font-size: 20px; line-height: 1.2; padding-top: 80px; }
 .box { display: inline-block; font-size: 20px; width: 20px; height: 20px; background: green; vertical-align: 1em; }
 </style>
 </head><body>
 <div class=""container""><span class=""box""></span></div>
 </body></html>";
 
-        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
 
-        // The box should be raised by 1em = 20px. With font-size: 0 on
-        // the container, the strut is zero-height, so the box is
-        // effectively offset upward.  The box should still render.
+        // The green box should be visible somewhere in the upper portion
+        // of the container (y < 120).
         bool foundGreen = false;
-        for (int y = 0; y < 60; y++)
+        for (int y = 0; y < 120; y++)
         {
             var px = bitmap.GetPixel(10, y);
             if (px.Green > 100 && px.Red < 50 && px.Blue < 50)

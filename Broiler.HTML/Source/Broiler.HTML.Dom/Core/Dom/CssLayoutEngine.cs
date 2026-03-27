@@ -709,11 +709,17 @@ internal static class CssLayoutEngine
             // For inline text boxes, SetBaseLine receives the desired
             // word-top position, so baseline-relative values must be
             // converted from baseline Y to word-top Y by subtracting
-            // the box's ascent.  Inline-block boxes are positioned by
-            // their block top directly (SetBaseLine handles them), so
-            // no ascent adjustment is needed.
+            // the box's ascent.
+            //
+            // For inline-block boxes, CSS 2.1 §10.8.1: the baseline of
+            // an inline-block with no in-flow line boxes is the bottom
+            // margin edge.  SetBaseLine positions the box by its top, so
+            // we must subtract the box height to convert from the desired
+            // bottom-edge position to the top-edge position.
             bool isInlineBlock = box.Display == CssConstants.InlineBlock;
-            double boxAscent = isInlineBlock ? 0 : box.ActualFont.Height * TypicalAscentRatio;
+            double boxAscent = isInlineBlock
+                ? lineBox.Rectangles[box].Height  // baseline = bottom edge
+                : box.ActualFont.Height * TypicalAscentRatio;
 
             //Important notes on http://www.w3.org/TR/CSS21/tables.html#height-layout
             switch (box.VerticalAlign)
