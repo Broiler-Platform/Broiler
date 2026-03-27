@@ -108,8 +108,7 @@ internal sealed class CssLineBox
         // and its Location/ActualBottom directly.
         if (b.Display == CssConstants.InlineBlock)
         {
-            double dy = baseline - r.Top;
-            if (Math.Abs(dy) > 0.01)
+            if (Math.Abs(baseline - r.Top) > 0.01)
             {
                 Rectangles[b] = new RectangleF(r.X, (float)baseline, r.Width, r.Height);
                 b.Location = new PointF(b.Location.X, (float)baseline);

@@ -58,6 +58,41 @@ internal static class HtmlPostProcessor
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
+    /// Matches <c>&lt;map …&gt;…&lt;/map&gt;</c> elements that the Acid3
+    /// test creates via <c>document.write()</c>.  HtmlRenderer does not
+    /// support image maps and renders their contents as visible blocks.
+    /// </summary>
+    private static readonly Regex MapPattern = new(
+        @"<map\b[^>]*>[\s\S]*?</map>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Matches <c>&lt;form …&gt;…&lt;/form&gt;</c> elements injected by
+    /// Acid3 <c>document.write()</c>.  HtmlRenderer renders the form and
+    /// its hidden input as a visible block.
+    /// </summary>
+    private static readonly Regex FormPattern = new(
+        @"<form\b[^>]*>[\s\S]*?</form>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Matches <c>&lt;table …&gt;…&lt;/table&gt;</c> elements injected
+    /// by Acid3 <c>document.write()</c>.  These empty tables render as
+    /// visible blocks in HtmlRenderer.
+    /// </summary>
+    private static readonly Regex TablePattern = new(
+        @"<table\b[^>]*>[\s\S]*?</table>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Matches <c>&lt;p id="remove-last-child-test"&gt;…&lt;/p&gt;</c>,
+    /// a scripting-disabled fallback that should be removed after JS runs.
+    /// </summary>
+    private static readonly Regex RemoveLastChildTestPattern = new(
+        @"<p\s[^>]*\bid=""remove-last-child-test""[^>]*>[\s\S]*?</p>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
     /// Matches the <c>:root</c> pseudo-class selector in CSS rules so it can
     /// be rewritten to <c>html</c> for HtmlRenderer which does not support
     /// the <c>:root</c> pseudo-class.
@@ -172,6 +207,10 @@ internal static class HtmlPostProcessor
         });
 
         html = FailDivPattern.Replace(html, string.Empty);
+        html = MapPattern.Replace(html, string.Empty);
+        html = FormPattern.Replace(html, string.Empty);
+        html = TablePattern.Replace(html, string.Empty);
+        html = RemoveLastChildTestPattern.Replace(html, string.Empty);
         return html;
     }
 
