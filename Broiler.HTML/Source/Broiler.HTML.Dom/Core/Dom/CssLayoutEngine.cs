@@ -150,8 +150,21 @@ internal static class CssLayoutEngine
         // box height for inline formatting contexts.
         // The strut only affects content height when height is 'auto';
         // an explicit height (CSS2.1 §10.6.3) overrides the content height.
+        // CSS2.1 §9.4.2: The strut only contributes to height when the
+        // inline formatting context has actual inline content (words or
+        // inline-level boxes).  An empty block should have zero content
+        // height from the IFC.
         bool hasExplicitHeight = blockBox.Height != null && blockBox.Height != CssConstants.Auto;
-        if (blockBox.ActualLineHeight > 0 && !hasExplicitHeight)
+        bool hasInlineContent = false;
+        foreach (var lb in blockBox.LineBoxes)
+        {
+            if (lb.Words.Count > 0 || lb.Rectangles.Count > 0)
+            {
+                hasInlineContent = true;
+                break;
+            }
+        }
+        if (blockBox.ActualLineHeight > 0 && !hasExplicitHeight && hasInlineContent)
             maxBottom = Math.Max(maxBottom, starty + blockBox.ActualLineHeight);
 
         blockBox.ActualBottom = maxBottom + blockBox.ActualPaddingBottom + blockBox.ActualBorderBottomWidth;
