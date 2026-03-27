@@ -234,54 +234,40 @@ internal static class PaintWalker
             var repeat = fragment.Style.BackgroundRepeat;
             var isFixed = fragment.Style.BackgroundAttachment == "fixed" && viewport.Width > 0 && viewport.Height > 0;
 
-            if (repeat == "no-repeat" && !isFixed)
-            {
-                // Simple case: single image at natural position within the padding box
-                items.Add(new DrawImageItem
-                {
-                    Bounds = imgRect,
-                    ImageHandle = fragment.BackgroundImageHandle,
-                    SourceRect = RectangleF.Empty,
-                    DestRect = imgRect,
-                });
-            }
-            else
-            {
-                // CSS2.1 §14.2.1: For fixed attachment, the tiling origin is
-                // the viewport origin; the image is visible only within the
-                // element's padding area.  For scroll attachment, the origin
-                // is the padding-box origin.
-                var tileOrigin = isFixed
-                    ? new PointF(viewport.X, viewport.Y)
-                    : new PointF(imgRect.X, imgRect.Y);
+            // CSS2.1 §14.2.1: For fixed attachment, the tiling origin is
+            // the viewport origin; the image is visible only within the
+            // element's padding area.  For scroll attachment, the origin
+            // is the padding-box origin.
+            var tileOrigin = isFixed
+                ? new PointF(viewport.X, viewport.Y)
+                : new PointF(imgRect.X, imgRect.Y);
 
-                // Apply background-position offset to tile origin
-                var posStr = fragment.Style.BackgroundPosition;
-                if (!string.IsNullOrEmpty(posStr))
+            // Apply background-position offset to tile origin
+            var posStr = fragment.Style.BackgroundPosition;
+            if (!string.IsNullOrEmpty(posStr))
+            {
+                var parts = posStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 1)
                 {
-                    var parts = posStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 1)
-                    {
-                        float xOff = ParsePositionValue(parts[0], imgRect.Width);
-                        tileOrigin.X += xOff;
-                    }
-                    if (parts.Length >= 2)
-                    {
-                        float yOff = ParsePositionValue(parts[1], imgRect.Height);
-                        tileOrigin.Y += yOff;
-                    }
+                    float xOff = ParsePositionValue(parts[0], imgRect.Width);
+                    tileOrigin.X += xOff;
                 }
-
-                items.Add(new DrawTiledImageItem
+                if (parts.Length >= 2)
                 {
-                    Bounds = imgRect,
-                    ImageHandle = fragment.BackgroundImageHandle,
-                    SourceRect = RectangleF.Empty,
-                    FillRect = imgRect,
-                    TileOrigin = tileOrigin,
-                    Repeat = repeat,
-                });
+                    float yOff = ParsePositionValue(parts[1], imgRect.Height);
+                    tileOrigin.Y += yOff;
+                }
             }
+
+            items.Add(new DrawTiledImageItem
+            {
+                Bounds = imgRect,
+                ImageHandle = fragment.BackgroundImageHandle,
+                SourceRect = RectangleF.Empty,
+                FillRect = imgRect,
+                TileOrigin = tileOrigin,
+                Repeat = repeat,
+            });
         }
     }
 

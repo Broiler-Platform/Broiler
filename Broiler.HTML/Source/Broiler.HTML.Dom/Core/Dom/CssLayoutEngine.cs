@@ -403,6 +403,14 @@ internal static class CssLayoutEngine
             b.GetMinMaxWidth(out double prefMin, out double prefMax);
             if (double.IsNaN(prefMin)) prefMin = 0;
             if (double.IsNaN(prefMax)) prefMax = 0;
+            // GetMinMaxWidth returns border-box widths (content + padding +
+            // border).  Convert to content-only widths so the shrink-to-fit
+            // calculation matches the content-only `available` value and the
+            // padding/border added back at ibBoxWidth below.
+            double ownPaddingBorder = b.ActualBorderLeftWidth + b.ActualBorderRightWidth
+                + b.ActualPaddingLeft + b.ActualPaddingRight;
+            prefMin = Math.Max(0, prefMin - ownPaddingBorder);
+            prefMax = Math.Max(0, prefMax - ownPaddingBorder);
             double available = Math.Max(0, limitRight - curx - rightspacing
                 - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
                 - b.ActualPaddingLeft - b.ActualPaddingRight);
