@@ -238,7 +238,9 @@ internal static class FragmentTreeBuilder
         {
             try
             {
-                string basePath = baseUrl.IsAbsoluteUri ? baseUrl.LocalPath : baseUrl.OriginalString;
+                string basePath = baseUrl.IsAbsoluteUri && baseUrl.IsFile
+                    ? baseUrl.LocalPath
+                    : baseUrl.OriginalString;
                 string dir = Path.GetDirectoryName(basePath);
                 if (!string.IsNullOrEmpty(dir))
                 {
