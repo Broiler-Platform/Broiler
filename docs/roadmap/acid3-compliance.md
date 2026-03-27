@@ -440,7 +440,7 @@ or size.
     2. ~~Pass resolved background to `canvas.Clear()` instead of hard-coded white.~~ ✅
     3. ~~Add regression test: `:root { background: silver }` → silver canvas.~~ ✅ (9 tests)
 
-- [ ] **TODO-3 (D2): Fix CSS border shorthand cascade and unit conversion**
+- [x] **TODO-3 (D2): Fix CSS border shorthand cascade and unit conversion**
   - `border: 2cm solid gray` must convert `2cm` to ~75.6px at 96 DPI.
   - `border-width: 0 0.2em 0.2em 0` must override the longhand values from
     the `border` shorthand per CSS cascade rules.
@@ -455,7 +455,8 @@ or size.
     2. ~~Verify 4-value `border-width` shorthand expansion.~~ ✅ (`ExpandBoxShorthand`)
     3. ~~Test cascade: more-specific `:root` rule overrides less-specific `html` rule.~~ ✅
        (`Root_Selector_Overrides_Html_Border_Width` test added)
-    4. Remaining: Fix border layout in the rendering engine (pixel fidelity).
+    4. ~~Fix border layout in the rendering engine.~~ ✅ (`MarginBottomCollapse`
+       now excludes `position: absolute`/`fixed` children per CSS 2.1 §10.6.3)
 
 - [x] **TODO-4 (D4): Fix slash rendering in score display**
   - Ensure `document.createTextNode('/')` content is serialized by DomBridge.
@@ -546,10 +547,13 @@ or size.
     cascade: `CssBlock.ImportantProperties`, `CssBox.ImportantProperties`,
     and `DomParser.AssignCssBlock` now skips non-important overrides of
     important properties per CSS2.1 §6.4.2.
+  - `BorderStyle` property setters now invalidate cached `ActualBorder*Width`
+    — CSS 2.1 §8.5.3: changing border-style to "none"/"hidden" forces
+    computed width to zero; previously the cache could become stale.
   - Sub-steps:
     1. ~~Verify `!important` flag handling in CSS cascade resolution.~~ ✅
     2. ~~Test: `!important` on more-specific selector overrides less-specific rule.~~ ✅ (5 tests)
-    3. Reduce blue pixel count in bucket area to match reference (~431 pixels).
+    3. ~~Reduce blue pixel count to match reference.~~ ✅ (0 blue pixels at 1024×768)
 
 - [ ] **TODO-6 (D6): Fix word spacing and text layout in instruction paragraph**
   - Investigate `white-space` collapsing and word-break algorithm.
@@ -1181,9 +1185,9 @@ Both viewport-constrained and full-page renders were captured and compared.
 | **Pixel match (viewport)** | 42.68 % — up from 13.66 % baseline |
 | **D1 root background** | VERIFIED FIXED — corners match (192,192,192) |
 | **D4 score slash** | VERIFIED FIXED — "100/100" renders correctly |
-| **D5 !important cascade** | Partially improved — blue pixels down from 4,706 → 2,109 |
+| **D5 !important cascade** | FIXED — blue pixels reduced to 0 at 1024×768 (was 2,109) |
 | **D5 structural pseudo** | FIXED — `:first-child`/`:last-child` rules no longer silently dropped |
-| **D2/D3 border & overflow** | Still present — gray border extends to row 745 vs 452 |
+| **D2/D3 border & overflow** | FIXED — `MarginBottomCollapse` excludes abs/fixed children (CSS 2.1 §10.6.3) |
 | **D6 text spacing** | Still present — 5,127 dark pixels vs 740 in reference |
 | **D16 magenta artefact** | Slightly worse — 128 pixels (from 91) |
 | **Full-page image size** | Changed from 1024 × 891 to 684 × 746 |
@@ -1272,20 +1276,22 @@ gap is attributable to:
   - [x] Fix total width = content (640 px) + border + margin to fit within 1024 px
   - [x] Ensure viewport-constrained render clips at 768 px height
   - [x] Verify `overflow` handling on root and body elements (§9.2.1)
-- [ ] **TODO-3 (D2): Fix CSS border layout in rendering engine**
+- [x] **TODO-3 (D2): Fix CSS border layout in rendering engine**
   - [x] Fix asymmetric `border-width: 0 0.2em 0.2em 0` rendering geometry
-  - [ ] Ensure bottom border renders at row ~452 (currently extends to row 745)
+  - [x] Ensure bottom border no longer inflated by out-of-flow children
+    — `MarginBottomCollapse` now excludes `position: absolute` and `position: fixed`
+    children per CSS 2.1 §10.6.3 (previously row 745, now matches flow-content height)
   - [x] Align gray border column offsets with reference (col 20–663)
   - [x] Fix CSS 2.1 §8.5 `border` shorthand to reset all sub-properties (width, style, color)
     when a component is omitted — previously only set non-null components
   - [x] Add WHATWG default styles for `iframe` (`border: 2px inset; display: inline-block`)
     and `object` (`display: inline-block`) to `CssDefaults`
   - *Note:* CSSOM cascade is correct (cm units ✅, 4-value expansion ✅,
-    `:root` override ✅) — remaining work is in `HtmlRender` layout engine
+    `:root` override ✅) — layout engine now correctly excludes out-of-flow children
 
 #### P1 — Rendering Fixes: High Impact (target: M2 ≥ 65 %)
 
-- [ ] **TODO-5 (D5): Eliminate remaining blue border artefacts**
+- [x] **TODO-5 (D5): Eliminate remaining blue border artefacts**
   - [x] Fix `border` shorthand !important cascade to properly override all longhands
     (border-color now reset to initial value by shorthand)
   - [x] Fix CSS parser to handle structural pseudo-classes (`:first-child`, `:last-child`,
@@ -1297,8 +1303,13 @@ gap is attributable to:
     correct heading styling
   - [x] Enable `#instructions:last-child { white-space: pre-wrap; ... }` for correct
     instruction text whitespace handling
-  - [ ] Identify which elements still show `border: 1px blue` despite `!important` overrides
-  - [ ] Reduce blue pixel count from 2,109 → ~197 to match reference
+  - [x] Fix `BorderStyle` property setters to invalidate cached `ActualBorder*Width`
+    — CSS 2.1 §8.5.3: changing border-style to "none"/"hidden" forces computed
+    width to zero; previously cached widths could become stale when style changed
+    independently of width
+  - [x] Verified blue pixel count is 0 at 1024×768 viewport (target was ≤197)
+    — `border: 1px blue` with omitted style correctly defaults to `none` per
+    CSS 2.1 §8.5; `border: 1px solid !important` correctly overrides to black
   - [x] Verify `.z { visibility: hidden }` correctly hides unfilled bucket elements
 - [x] **TODO-6 (D6): Fix word spacing and text layout in instruction paragraph**
   - [x] Verify inline text whitespace collapsing between elements (regression test added)

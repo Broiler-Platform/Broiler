@@ -1257,6 +1257,12 @@ internal class CssBox : CssBoxProperties, IDisposable
         
         foreach (var child in Boxes)
         {
+            // CSS2.1 §10.6.3: Only children in the normal flow are taken
+            // into account.  Absolutely positioned and fixed-position boxes
+            // are out of flow and must not influence the parent's auto height.
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+
             if (!isBfc && child.Float != CssConstants.None)
                 continue;
 

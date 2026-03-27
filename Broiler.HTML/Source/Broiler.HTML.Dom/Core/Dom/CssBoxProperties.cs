@@ -130,10 +130,37 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         }
     }
 
-    public string BorderBottomStyle { get; set; } = "none";
-    public string BorderLeftStyle { get; set; } = "none";
-    public string BorderRightStyle { get; set; } = "none";
-    public string BorderTopStyle { get; set; } = "none";
+    private string _borderBottomStyle = "none";
+    private string _borderLeftStyle = "none";
+    private string _borderRightStyle = "none";
+    private string _borderTopStyle = "none";
+
+    /// <summary>CSS2.1 §8.5.3: Changing border-style affects the used border-width
+    /// (style "none"/"hidden" forces width to zero), so invalidate the cached
+    /// actual width whenever the style changes.</summary>
+    public string BorderBottomStyle
+    {
+        get => _borderBottomStyle;
+        set { _borderBottomStyle = value; _actualBorderBottomWidth = double.NaN; }
+    }
+
+    public string BorderLeftStyle
+    {
+        get => _borderLeftStyle;
+        set { _borderLeftStyle = value; _actualBorderLeftWidth = double.NaN; }
+    }
+
+    public string BorderRightStyle
+    {
+        get => _borderRightStyle;
+        set { _borderRightStyle = value; _actualBorderRightWidth = double.NaN; }
+    }
+
+    public string BorderTopStyle
+    {
+        get => _borderTopStyle;
+        set { _borderTopStyle = value; _actualBorderTopWidth = double.NaN; }
+    }
 
     public string BorderBottomColor
     {
