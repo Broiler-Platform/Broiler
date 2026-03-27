@@ -124,6 +124,14 @@ internal static class PaintWalker
             return;
         }
 
+        // CSS3: opacity: 0 means fully transparent — skip the entire
+        // stacking context (element and all descendants).
+        if (style.Opacity != null
+            && double.TryParse(style.Opacity, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var parsedOpacity)
+            && parsedOpacity <= 0.0)
+            return;
+
         var bounds = fragment.Bounds;
 
         // Skip empty-cells table cells
