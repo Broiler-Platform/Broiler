@@ -594,10 +594,6 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Expands the CSS <c>background</c> shorthand into its individual longhand
-    /// properties: <c>background-color</c>, <c>background-image</c>,
-    /// <c>background-repeat</c>, <c>background-attachment</c>, and
-    /// <summary>
     /// Expands the CSS <c>background</c> shorthand into its five longhand properties:
     /// <c>background-color</c>, <c>background-image</c>, <c>background-repeat</c>,
     /// <c>background-attachment</c>, and <c>background-position</c>.

@@ -523,10 +523,7 @@ table { width: 0; height: 0; border: none; border-collapse: collapse; }
 </body></html>";
 
         using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
-        // The div should start near the top since table takes minimal/no space
-        var pixel = bitmap.GetPixel(25, 10);
-        // With zero-size table, the lime div should be very close to the top
-        // We verify that the div is visible in the upper portion
+        // With zero-size table, the lime div should be visible in the upper portion
         var limePixel = bitmap.GetPixel(25, 25);
         Assert.True(limePixel.Green > 100, $"Expected green for lime div, got R={limePixel.Red} G={limePixel.Green} B={limePixel.Blue}");
     }
