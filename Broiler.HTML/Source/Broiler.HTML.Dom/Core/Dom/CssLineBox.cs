@@ -132,9 +132,9 @@ internal sealed class CssLineBox
                 gap = firstw.Top - r.Top;
         }
 
-        //New top that words will have
-        //float newtop = baseline - (Height - OwnerBox.FontDescent - 3); //OLD
-        double newtop = baseline; // -GetBaseLineHeight(b, g); //OLD
+        // The `baseline` parameter is the desired word.Top (visual text
+        // top coordinate) already computed by ApplyVerticalAlignment.
+        double newtop = baseline;
 
         if (b.ParentBox != null && b.ParentBox.Rectangles.ContainsKey(this) && r.Height < b.ParentBox.Rectangles[this].Height)
         {

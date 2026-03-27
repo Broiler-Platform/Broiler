@@ -692,14 +692,23 @@ internal static class CssLayoutEngine
         var boxes = new List<CssBox>(lineBox.Rectangles.Keys);
         foreach (CssBox box in boxes)
         {
+            // For inline text boxes, SetBaseLine receives the desired
+            // word-top position, so baseline-relative values must be
+            // converted from baseline Y to word-top Y by subtracting
+            // the box's ascent.  Inline-block boxes are positioned by
+            // their block top directly (SetBaseLine handles them), so
+            // no ascent adjustment is needed.
+            bool isInlineBlock = box.Display == CssConstants.InlineBlock;
+            double boxAscent = isInlineBlock ? 0 : box.ActualFont.Height * TypicalAscentRatio;
+
             //Important notes on http://www.w3.org/TR/CSS21/tables.html#height-layout
             switch (box.VerticalAlign)
             {
                 case CssConstants.Sub:
-                    lineBox.SetBaseLine(g, box, baseline + lineBox.Rectangles[box].Height * .5f);
+                    lineBox.SetBaseLine(g, box, baseline - boxAscent + lineBox.Rectangles[box].Height * .5f);
                     break;
                 case CssConstants.Super:
-                    lineBox.SetBaseLine(g, box, baseline - lineBox.Rectangles[box].Height * .2f);
+                    lineBox.SetBaseLine(g, box, baseline - boxAscent - lineBox.Rectangles[box].Height * .2f);
                     break;
                 case CssConstants.TextTop:
                 case CssConstants.Top:
@@ -748,12 +757,12 @@ internal static class CssLayoutEngine
                         if (!double.IsNaN(offset) && offset != 0)
                         {
                             // Positive values move the box UP (raise).
-                            lineBox.SetBaseLine(g, box, baseline - offset);
+                            lineBox.SetBaseLine(g, box, baseline - boxAscent - offset);
                             break;
                         }
                     }
                     //case: baseline
-                    lineBox.SetBaseLine(g, box, baseline);
+                    lineBox.SetBaseLine(g, box, baseline - boxAscent);
                     break;
             }
         }
