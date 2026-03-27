@@ -75,3 +75,4 @@ tests/wpt/package-lock.json
 
 # Pixel comparison generated reports
 acid3-report.txt
+acid3-current.png
