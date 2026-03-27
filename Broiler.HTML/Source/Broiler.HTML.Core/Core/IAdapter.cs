@@ -37,4 +37,12 @@ internal interface IAdapter : IColorResolver
     /// Gets the error placeholder image.
     /// </summary>
     RImage GetLoadingFailedImage();
+
+    /// <summary>
+    /// Loads a font from a file path and registers it as an available font family.
+    /// </summary>
+    /// <param name="path">Absolute path to a font file.</param>
+    /// <param name="mapFromName">Optional CSS family name to map to the loaded font.</param>
+    /// <returns>The loaded font family name, or <c>null</c> if loading failed.</returns>
+    string LoadFontFromFile(string path, string mapFromName = null);
 }

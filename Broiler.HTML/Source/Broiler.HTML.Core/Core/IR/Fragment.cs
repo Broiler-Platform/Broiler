@@ -52,6 +52,12 @@ public sealed class Fragment
     public RectangleF ImageSourceRect { get; init; }
 
     /// <summary>
+    /// SVG markup for replaced elements (e.g. <c>&lt;object data="file.svg"&gt;</c>)
+    /// that should be rendered via <c>SvgRenderer</c> instead of as a raster image.
+    /// </summary>
+    public string SvgContent { get; init; }
+
+    /// <summary>
     /// Per-line-box rectangles for inline elements. Used by paint to render
     /// backgrounds and borders for inline boxes that span multiple line boxes.
     /// When non-empty, paint uses these instead of <see cref="Bounds"/>.

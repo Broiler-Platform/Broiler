@@ -67,7 +67,7 @@ internal sealed class SkiaImageAdapter : RAdapter
     /// loaded font's family name (e.g. <c>"sans-serif"</c>).
     /// </param>
     /// <returns>The family name of the loaded font, or <c>null</c> on failure.</returns>
-    public string? LoadFontFromFile(string path, string? mapFromName = null)
+    public override string LoadFontFromFile(string path, string mapFromName = null)
     {
         var typeface = SKTypeface.FromFile(path);
         if (typeface == null)

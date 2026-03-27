@@ -1,8 +1,11 @@
 using Broiler.HTML.Core.Core.IR;
 using Broiler.HTML.Dom.Core.Dom;
 using Broiler.HTML.Utils.Core.Utils;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
+using System.Text;
 
 namespace Broiler.HTML.Orchestration.Core.IR;
 
@@ -40,12 +43,28 @@ internal static class FragmentTreeBuilder
         // Phase 3: Capture replaced image handle (e.g. <img> elements)
         object? imgHandle = null;
         RectangleF imgSourceRect = RectangleF.Empty;
+        string svgContent = null;
         if (box is CssBoxImage imgBox)
         {
             imgHandle = imgBox.Image;
             // CssBoxImage stores source rect on its internal CssRectImage word
             if (imgBox.Words.Count > 0 && imgBox.Words[0] is CssRectImage rectImage)
                 imgSourceRect = rectImage.ImageRectangle;
+        }
+
+        // Check for <object> elements referencing SVG content.  When the
+        // image loader cannot decode the data (e.g. SVG, which is not a
+        // raster format), imgHandle will be null.  If the data attribute
+        // ends with ".svg" or is a data:image/svg+xml URI, try to load
+        // the SVG content so that PaintWalker can render it via SvgRenderer.
+        if (imgHandle == null && box.HtmlTag != null &&
+            box.HtmlTag.Name.Equals("object", StringComparison.OrdinalIgnoreCase))
+        {
+            string dataAttr = box.GetAttribute("data");
+            if (!string.IsNullOrEmpty(dataAttr))
+            {
+                svgContent = TryLoadSvgContent(dataAttr, box.BaseUrl);
+            }
         }
 
         // Capture per-line-box rectangles for inline elements (used for backgrounds/borders)
@@ -90,6 +109,7 @@ internal static class FragmentTreeBuilder
             BackgroundImageHandle = bgImage,
             ImageHandle = imgHandle,
             ImageSourceRect = imgSourceRect,
+            SvgContent = svgContent,
             InlineRects = inlineRects,
         };
     }
@@ -177,5 +197,61 @@ internal static class FragmentTreeBuilder
             return z;
 
         return 0;
+    }
+
+    /// <summary>
+    /// Attempts to load SVG content from a <c>data</c> attribute value.
+    /// Supports <c>data:image/svg+xml</c> URIs and local <c>.svg</c> file references.
+    /// </summary>
+    private static string TryLoadSvgContent(string dataAttr, Uri baseUrl)
+    {
+        // data:image/svg+xml,<svg>...</svg>
+        const string svgDataPrefix = "data:image/svg+xml";
+        if (dataAttr.StartsWith(svgDataPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            int comma = dataAttr.IndexOf(',');
+            if (comma >= 0 && comma + 1 < dataAttr.Length)
+                return Uri.UnescapeDataString(dataAttr[(comma + 1)..]);
+
+            // base64 variant
+            int semi = dataAttr.IndexOf(';');
+            if (semi >= 0)
+            {
+                string encoding = dataAttr[(semi + 1)..];
+                int commaB64 = encoding.IndexOf(',');
+                if (commaB64 >= 0 && encoding[..commaB64].Equals("base64", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        byte[] bytes = Convert.FromBase64String(encoding[(commaB64 + 1)..]);
+                        return Encoding.UTF8.GetString(bytes);
+                    }
+                    catch { /* invalid base64 — fall through */ }
+                }
+            }
+
+            return null;
+        }
+
+        // Local .svg file reference
+        if (dataAttr.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) && baseUrl != null)
+        {
+            try
+            {
+                string basePath = baseUrl.IsAbsoluteUri && baseUrl.IsFile
+                    ? baseUrl.LocalPath
+                    : baseUrl.OriginalString;
+                string dir = Path.GetDirectoryName(basePath);
+                if (!string.IsNullOrEmpty(dir))
+                {
+                    string svgPath = Path.GetFullPath(Path.Combine(dir, dataAttr));
+                    if (File.Exists(svgPath))
+                        return File.ReadAllText(svgPath);
+                }
+            }
+            catch { /* path resolution failure — skip */ }
+        }
+
+        return null;
     }
 }
