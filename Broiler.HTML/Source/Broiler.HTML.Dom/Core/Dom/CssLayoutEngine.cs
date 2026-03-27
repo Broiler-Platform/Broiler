@@ -144,6 +144,20 @@ internal static class CssLayoutEngine
             linebox.AssignRectanglesToBoxes();
         }
 
+        // CSS2.1 §10.8: After vertical alignment adjusts inline-block
+        // positions (e.g. vertical-align: 2em raises boxes), recalculate
+        // maxBottom from the actual post-alignment positions.  The
+        // pre-alignment maxBottom may be inflated when boxes are raised,
+        // pushing subsequent siblings too far down.
+        maxBottom = starty;
+        foreach (var linebox in blockBox.LineBoxes)
+        {
+            foreach (var rect in linebox.Rectangles.Values)
+                maxBottom = Math.Max(maxBottom, rect.Bottom);
+            foreach (var word in linebox.Words)
+                maxBottom = Math.Max(maxBottom, word.Bottom);
+        }
+
         // CSS2.1 §10.8: The "strut" — each line box starts with an
         // imaginary zero-width inline box with the block container's font
         // and line-height properties.  This establishes the minimum line
