@@ -265,7 +265,7 @@ public sealed partial class DomBridge
             {
                 var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
                 var styleObj = new JSObject();
-                foreach (var decl in declarations.Split(';'))
+                foreach (var decl in SplitCssDeclarations(declarations))
                 {
                     var colonIdx = decl.IndexOf(':');
                     if (colonIdx > 0)
@@ -302,7 +302,7 @@ public sealed partial class DomBridge
                 {
                     var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
                     var styleObj = new JSObject();
-                    foreach (var decl in declarations.Split(';'))
+                    foreach (var decl in SplitCssDeclarations(declarations))
                     {
                         var colonIdx = decl.IndexOf(':');
                         if (colonIdx > 0)
