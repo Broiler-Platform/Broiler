@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Broiler.App.Rendering;
@@ -97,12 +98,16 @@ public sealed partial class DomBridge
             sb.Append(' ').Append(kvp.Key).Append("=\"").Append(HtmlEncode(kvp.Value)).Append('"');
         }
 
-        // Emit inline style from the style dictionary
+        // Emit inline style from the style dictionary.
+        // CSS shorthand properties (e.g. "margin", "border", "padding") must
+        // appear before their longhand counterparts ("margin-left", etc.) so
+        // that the longhands override the shorthand defaults.
         if (element.Style.Count > 0)
         {
             sb.Append(" style=\"");
             var first = true;
-            foreach (var kvp in element.Style)
+            // Emit shorthands first, then longhands, preserving original order within each group.
+            foreach (var kvp in element.Style.OrderBy(kv => IsShorthandProperty(kv.Key) ? 0 : 1))
             {
                 if (!first) sb.Append("; ");
                 sb.Append(kvp.Key).Append(": ").Append(HtmlEncode(kvp.Value));
@@ -145,5 +150,20 @@ public sealed partial class DomBridge
             .Replace("<", "&lt;")
             .Replace(">", "&gt;")
             .Replace("\"", "&quot;");
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when <paramref name="property"/> is a CSS shorthand
+    /// that, if emitted after its longhands, would reset those longhands to
+    /// initial values (e.g. <c>margin</c> resets <c>margin-left</c>).
+    /// </summary>
+    private static bool IsShorthandProperty(string property)
+    {
+        return property switch
+        {
+            "margin" or "padding" or "border" or "background"
+                or "font" or "list-style" or "outline" => true,
+            _ => false,
+        };
     }
 }

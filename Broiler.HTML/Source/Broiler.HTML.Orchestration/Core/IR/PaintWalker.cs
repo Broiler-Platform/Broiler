@@ -1,3 +1,4 @@
+using Broiler.HTML.Adapters.Adapters;
 using Broiler.HTML.Core.Core.IR;
 using System;
 using System.Collections.Generic;
@@ -250,21 +251,48 @@ internal static class PaintWalker
                 ? new PointF(viewport.X, viewport.Y)
                 : new PointF(imgRect.X, imgRect.Y);
 
-            // Apply background-position offset to tile origin
+            // Apply background-position offset to tile origin.
+            // CSS2.1 §14.2.1: position keywords may appear in any order
+            // and translate to percentages: left=0%, center=50%, right=100%,
+            // top=0%, bottom=100%.
             var posStr = fragment.Style.BackgroundPosition;
             if (!string.IsNullOrEmpty(posStr))
             {
+                float imgW = 0, imgH = 0;
+                if (fragment.BackgroundImageHandle is RImage bgImg)
+                {
+                    imgW = (float)bgImg.Width;
+                    imgH = (float)bgImg.Height;
+                }
+
                 var parts = posStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length >= 1)
+
+                // Resolve keywords to (xVal, yVal), handling that keywords
+                // can appear in any order.  Non-keyword values are assigned
+                // positionally (first→X, second→Y).
+                string xVal = null, yVal = null;
+                foreach (var p in parts)
                 {
-                    float xOff = ParsePositionValue(parts[0], imgRect.Width);
-                    tileOrigin.X += xOff;
+                    if (IsHorizontalKeyword(p))
+                        xVal = p;
+                    else if (IsVerticalKeyword(p))
+                        yVal = p;
+                    else if (p.Equals("center", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // "center" can be either axis; assign to the first unset axis.
+                        if (xVal == null) xVal = p;
+                        else if (yVal == null) yVal = p;
+                    }
+                    else
+                    {
+                        // Length or percentage — assign positionally.
+                        if (xVal == null) xVal = p;
+                        else if (yVal == null) yVal = p;
+                    }
                 }
-                if (parts.Length >= 2)
-                {
-                    float yOff = ParsePositionValue(parts[1], imgRect.Height);
-                    tileOrigin.Y += yOff;
-                }
+
+                tileOrigin.X += ParsePositionValue(xVal, imgRect.Width, imgW);
+                tileOrigin.Y += ParsePositionValue(yVal, imgRect.Height, imgH);
             }
 
             items.Add(new DrawTiledImageItem
@@ -279,17 +307,35 @@ internal static class PaintWalker
         }
     }
 
-    /// <summary>Parses a single CSS background-position value (keyword, px, or %).</summary>
-    private static float ParsePositionValue(string val, float containerSize)
+    /// <summary>Parses a single CSS background-position value (keyword, px, %, or length).</summary>
+    /// <param name="val">The position token (e.g. "right", "50%", "10px").</param>
+    /// <param name="containerSize">Width or height of the positioning area.</param>
+    /// <param name="imageSize">Width or height of the background image.</param>
+    /// <returns>Offset in pixels from the origin.</returns>
+    private static float ParsePositionValue(string val, float containerSize, float imageSize)
     {
         if (string.IsNullOrEmpty(val)) return 0;
+
+        // CSS2.1 §14.2.1 keyword equivalences.
+        if (val.Equals("left", StringComparison.OrdinalIgnoreCase)
+            || val.Equals("top", StringComparison.OrdinalIgnoreCase))
+            return 0;
+        if (val.Equals("right", StringComparison.OrdinalIgnoreCase)
+            || val.Equals("bottom", StringComparison.OrdinalIgnoreCase))
+            return containerSize - imageSize;
+        if (val.Equals("center", StringComparison.OrdinalIgnoreCase))
+            return (containerSize - imageSize) / 2f;
+
         if (val.EndsWith("px", StringComparison.OrdinalIgnoreCase))
         {
             if (float.TryParse(val.AsSpan(0, val.Length - 2), out float px)) return px;
         }
         else if (val.EndsWith("%"))
         {
-            if (float.TryParse(val.AsSpan(0, val.Length - 1), out float pct)) return containerSize * pct / 100f;
+            // CSS2.1 §14.2.1: percentage positions use (container - image) as
+            // the reference length so that 100% places the image flush-right.
+            if (float.TryParse(val.AsSpan(0, val.Length - 1), out float pct))
+                return (containerSize - imageSize) * pct / 100f;
         }
         else if (float.TryParse(val, out float raw))
         {
@@ -297,6 +343,14 @@ internal static class PaintWalker
         }
         return 0;
     }
+
+    private static bool IsHorizontalKeyword(string val) =>
+        val.Equals("left", StringComparison.OrdinalIgnoreCase)
+        || val.Equals("right", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsVerticalKeyword(string val) =>
+        val.Equals("top", StringComparison.OrdinalIgnoreCase)
+        || val.Equals("bottom", StringComparison.OrdinalIgnoreCase);
 
     private static void EmitReplacedImage(Fragment fragment, List<DisplayItem> items)
     {
