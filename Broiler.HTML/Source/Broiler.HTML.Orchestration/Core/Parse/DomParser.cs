@@ -530,6 +530,9 @@ internal sealed class DomParser
 
             // CSS2.1 §6.4.1: Author-origin declarations override
             // user-agent declarations regardless of specificity.
+            // Check after !important but before IsStyleOnElementAllowed
+            // so that a failed author IsStyleOnElementAllowed check does
+            // not leave a gap that lets a later UA rule through.
             if (block.IsUserAgent
                 && box.AuthorProperties != null
                 && box.AuthorProperties.Contains(prop.Key))
@@ -542,6 +545,8 @@ internal sealed class DomParser
                 if (newIsImportant)
                     box.MarkPropertyImportant(prop.Key);
 
+                // Track author-origin properties so UA rules at higher
+                // specificity cannot overwrite them.
                 if (!block.IsUserAgent)
                     box.MarkPropertyAuthor(prop.Key);
             }

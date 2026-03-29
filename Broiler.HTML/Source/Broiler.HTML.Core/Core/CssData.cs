@@ -46,13 +46,10 @@ public sealed class CssData
             bool merged = false;
             foreach (var block in list)
             {
-                if (!block.EqualsSelector(cssBlock))
-                    continue;
-
                 // CSS2.1 §6.4.1: Do not merge blocks from different
                 // cascade origins (UA vs author) so that per-property
                 // origin tracking is preserved.
-                if (block.IsUserAgent != cssBlock.IsUserAgent)
+                if (!block.EqualsSelector(cssBlock) || block.IsUserAgent != cssBlock.IsUserAgent)
                     continue;
 
                 merged = true;
