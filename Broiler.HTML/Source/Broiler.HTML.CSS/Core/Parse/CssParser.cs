@@ -432,7 +432,7 @@ internal sealed class CssParser
     /// CSS2.1 §5.11.1: Recognised structural pseudo-classes.
     /// </summary>
     private static bool IsStructuralPseudoClass(string name) => name is
-        "first-child" or "last-child" or "only-child";
+        "first-child" or "last-child" or "only-child" or "root";
 
     /// <summary>
     /// Scans <paramref name="selector"/> for structural pseudo-classes
@@ -491,8 +491,15 @@ internal sealed class CssParser
             // Standalone leading pseudo (":first-child + * .buckets p").
             // Replace with "* <rest>" — the "*" represents the element that
             // must satisfy the pseudo-class condition.
-            onTerminal = false;
-            return string.IsNullOrEmpty(after) ? "*" : "* " + after;
+            // Special case: ":root" → replace with "html" so the type-
+            // selector specificity allows it to override "html { … }" rules
+            // when it appears later in document order (CSS 2.1 §6.4.1).
+            // For ":root", onTerminal is always true so the PseudoClass is
+            // stored on the block itself (not on a selector chain item),
+            // ensuring the pseudo-class check runs on the matched element.
+            string replacement = (pseudoName == "root") ? "html" : "*";
+            onTerminal = (pseudoName == "root") || string.IsNullOrEmpty(after);
+            return string.IsNullOrEmpty(after) ? replacement : replacement + " " + after;
         }
         else
         {

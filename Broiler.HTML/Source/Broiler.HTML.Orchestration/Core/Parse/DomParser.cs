@@ -457,7 +457,14 @@ internal sealed class DomParser
     /// </remarks>
     private static bool MatchesPseudoClass(CssBox box, string pseudoClass)
     {
-        if (box.HtmlTag == null || box.ParentBox == null)
+        if (box.HtmlTag == null)
+            return false;
+
+        // :root needs no parent — handle it before the ParentBox null check.
+        if (pseudoClass == "root")
+            return string.Equals(box.HtmlTag.Name, "html", StringComparison.OrdinalIgnoreCase);
+
+        if (box.ParentBox == null)
             return false;
 
         switch (pseudoClass)
