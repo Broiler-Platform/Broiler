@@ -21,7 +21,14 @@ public abstract class RAdapter : IColorResolver, IResourceFactory, IFontCreator,
 
     protected RAdapter() => _fontsHandler = new FontsHandler(this);
 
-    public CssData DefaultCssData => _defaultCssData ??= CssDataParser.Parse(this, CssDefaults.DefaultStyleSheet);
+    public CssData DefaultCssData => _defaultCssData ??= CreateDefaultCssData();
+
+    private CssData CreateDefaultCssData()
+    {
+        var data = CssDataParser.Parse(this, CssDefaults.DefaultStyleSheet);
+        data.MarkAllBlocksAsUserAgent();
+        return data;
+    }
 
     public Color GetColor(string colorName)
     {

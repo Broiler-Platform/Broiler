@@ -31,6 +31,14 @@ internal class CssBox : CssBoxProperties, IDisposable
     internal HashSet<string> ImportantProperties { get; private set; }
 
     /// <summary>
+    /// CSS property names that were set by an author-origin declaration
+    /// during cascade.  User-agent declarations must not override these.
+    /// CSS2.1 §6.4.1: Author origin beats UA origin regardless of
+    /// specificity.
+    /// </summary>
+    internal HashSet<string> AuthorProperties { get; private set; }
+
+    /// <summary>
     /// Marks a property as having been set via an <c>!important</c>
     /// declaration so that subsequent normal-priority rules cannot
     /// override it.
@@ -39,6 +47,16 @@ internal class CssBox : CssBoxProperties, IDisposable
     {
         ImportantProperties ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         ImportantProperties.Add(propertyName);
+    }
+
+    /// <summary>
+    /// Marks a property as having been set by an author-origin
+    /// declaration so that UA declarations cannot override it.
+    /// </summary>
+    internal void MarkPropertyAuthor(string propertyName)
+    {
+        AuthorProperties ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        AuthorProperties.Add(propertyName);
     }
 
     /// <summary>

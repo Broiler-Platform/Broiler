@@ -528,12 +528,22 @@ internal sealed class DomParser
                 && !newIsImportant)
                 continue;
 
+            // CSS2.1 §6.4.1: Author-origin declarations override
+            // user-agent declarations regardless of specificity.
+            if (block.IsUserAgent
+                && box.AuthorProperties != null
+                && box.AuthorProperties.Contains(prop.Key))
+                continue;
+
             if (IsStyleOnElementAllowed(box, prop.Key, value))
             {
                 CssUtils.SetPropertyValue(box, prop.Key, value);
 
                 if (newIsImportant)
                     box.MarkPropertyImportant(prop.Key);
+
+                if (!block.IsUserAgent)
+                    box.MarkPropertyAuthor(prop.Key);
             }
         }
     }

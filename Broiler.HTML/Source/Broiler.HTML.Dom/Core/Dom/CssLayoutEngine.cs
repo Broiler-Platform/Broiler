@@ -228,6 +228,11 @@ internal static class CssLayoutEngine
 
         foreach (CssBox b in box.Boxes)
         {
+            // CSS2.1 §9.2.4: display:none elements generate no boxes and
+            // must not participate in layout — skip them entirely.
+            if (b.Display == CssConstants.None)
+                continue;
+
             double leftspacing = (b.Position != CssConstants.Absolute && b.Position != CssConstants.Fixed) ? b.ActualMarginLeft + b.ActualBorderLeftWidth + b.ActualPaddingLeft : 0;
             double rightspacing = (b.Position != CssConstants.Absolute && b.Position != CssConstants.Fixed) ? b.ActualMarginRight + b.ActualBorderRightWidth + b.ActualPaddingRight : 0;
 
