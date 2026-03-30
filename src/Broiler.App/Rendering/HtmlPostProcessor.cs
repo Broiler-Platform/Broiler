@@ -61,9 +61,11 @@ internal static class HtmlPostProcessor
     /// Matches <c>&lt;map …&gt;…&lt;/map&gt;</c> elements that the Acid3
     /// test creates via <c>document.write()</c>.  HtmlRenderer does not
     /// support image maps and renders their contents as visible blocks.
+    /// The opening tag is captured separately so the element can be
+    /// preserved as an empty tag for <c>::after</c> pseudo-element support.
     /// </summary>
     private static readonly Regex MapPattern = new(
-        @"<map\b[^>]*>[\s\S]*?</map>",
+        @"(<map\b[^>]*>)[\s\S]*?</map>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
@@ -207,7 +209,9 @@ internal static class HtmlPostProcessor
         });
 
         html = FailDivPattern.Replace(html, string.Empty);
-        html = MapPattern.Replace(html, string.Empty);
+        // Preserve the empty <map> tag so that CSS pseudo-elements such as
+        // map::after can still be generated; only strip internal content.
+        html = MapPattern.Replace(html, "$1</map>");
         html = FormPattern.Replace(html, string.Empty);
         html = TablePattern.Replace(html, string.Empty);
         html = RemoveLastChildTestPattern.Replace(html, string.Empty);

@@ -233,8 +233,13 @@ internal static class CssLayoutEngine
             if (b.Display == CssConstants.None)
                 continue;
 
-            double leftspacing = (b.Position != CssConstants.Absolute && b.Position != CssConstants.Fixed) ? b.ActualMarginLeft + b.ActualBorderLeftWidth + b.ActualPaddingLeft : 0;
-            double rightspacing = (b.Position != CssConstants.Absolute && b.Position != CssConstants.Fixed) ? b.ActualMarginRight + b.ActualBorderRightWidth + b.ActualPaddingRight : 0;
+            bool isAbsoluteChild = b.Position == CssConstants.Absolute || b.Position == CssConstants.Fixed;
+            double leftspacing = !isAbsoluteChild ? b.ActualMarginLeft + b.ActualBorderLeftWidth + b.ActualPaddingLeft : 0;
+            double rightspacing = !isAbsoluteChild ? b.ActualMarginRight + b.ActualBorderRightWidth + b.ActualPaddingRight : 0;
+
+            // CSS2.1 §9.3.2: Save flow state before absolutely positioned
+            // children so their layout does not affect the normal flow.
+            double savedCurx = curx, savedCury = cury, savedMaxRight = maxRight, savedMaxbottom = maxbottom;
 
             b.RectanglesReset();
             b.MeasureWordsSize(g);
@@ -325,12 +330,6 @@ internal static class CssLayoutEngine
 
                     maxRight = Math.Max(maxRight, word.Right);
                     maxbottom = Math.Max(maxbottom, word.Bottom);
-
-                    if (b.Position == CssConstants.Absolute)
-                    {
-                        word.Left += box.ActualMarginLeft;
-                        word.Top += box.ActualMarginTop;
-                    }
                 }
             }
             else
@@ -372,6 +371,20 @@ internal static class CssLayoutEngine
             }
 
             curx += rightspacing;
+
+            // CSS2.1 §9.3.2: Absolutely positioned children are taken out of
+            // normal flow — restore flow state and move the child to its
+            // specified absolute position.
+            if (isAbsoluteChild)
+            {
+                curx = savedCurx;
+                maxRight = savedMaxRight;
+                maxbottom = savedMaxbottom;
+                // Subtract the flow origin so that AdjustAbsolutePosition
+                // places words at CSS top/left relative to the containing
+                // block rather than adding offsets to the flow position.
+                AdjustAbsolutePosition(b, -savedCurx, -savedCury);
+            }
         }
 
         // handle height setting
