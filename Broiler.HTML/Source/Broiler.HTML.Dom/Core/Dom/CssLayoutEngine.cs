@@ -146,16 +146,35 @@ internal static class CssLayoutEngine
 
         // CSS2.1 §10.8: After vertical alignment adjusts inline-block
         // positions (e.g. vertical-align: 2em raises boxes), recalculate
-        // maxBottom from the actual post-alignment positions.  The
-        // pre-alignment maxBottom may be inflated when boxes are raised,
-        // pushing subsequent siblings too far down.
+        // maxBottom from the actual post-alignment positions.
+        //
+        // CSS2.1 §10.8.1: The line box height is the distance between
+        // the uppermost box top and the lowermost box bottom.  When
+        // positive vertical-align raises inline-blocks above the flow
+        // start, the line box extends upward; the next content must
+        // start after the full line box height, not just at maxBottom.
         maxBottom = starty;
+        double minTop = starty;
         foreach (var linebox in blockBox.LineBoxes)
         {
             foreach (var rect in linebox.Rectangles.Values)
+            {
                 maxBottom = Math.Max(maxBottom, rect.Bottom);
+                minTop = Math.Min(minTop, rect.Top);
+            }
             foreach (var word in linebox.Words)
+            {
                 maxBottom = Math.Max(maxBottom, word.Bottom);
+                minTop = Math.Min(minTop, word.Top);
+            }
+        }
+        // When inline-level boxes overflow above the starting flow
+        // position (minTop < starty), the full line box height must be
+        // reflected in maxBottom so subsequent siblings are pushed down.
+        if (minTop < starty)
+        {
+            double lineBoxHeight = maxBottom - minTop;
+            maxBottom = Math.Max(maxBottom, starty + lineBoxHeight);
         }
 
         // CSS2.1 §10.8: The "strut" — each line box starts with an
