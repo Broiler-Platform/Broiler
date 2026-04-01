@@ -169,13 +169,16 @@ internal static class CssLayoutEngine
                 minTop = Math.Min(minTop, word.Top);
             }
         }
-        // CSS2.1 §10.6.3: For block-level elements with auto height,
-        // the content height extends from the content area top (starty)
-        // to the bottom of the last in-flow content.  Inline-level boxes
-        // that overflow ABOVE the content area (e.g. via positive
-        // vertical-align) are visual overflow and do NOT increase the
-        // block's content height.  maxBottom already holds the maximum
-        // bottom edge from lines 157-170.
+        // CSS2.1 §10.8.1: The line box height is the distance between
+        // the uppermost box top and the lowermost box bottom.  When
+        // inline-level boxes overflow above the starting flow position
+        // (minTop < starty), the full line box height must be reflected
+        // in maxBottom so subsequent siblings are positioned correctly.
+        if (minTop < starty)
+        {
+            double lineBoxHeight = maxBottom - minTop;
+            maxBottom = Math.Max(maxBottom, starty + lineBoxHeight);
+        }
 
         // CSS2.1 §10.8: The "strut" — each line box starts with an
         // imaginary zero-width inline box with the block container's font
