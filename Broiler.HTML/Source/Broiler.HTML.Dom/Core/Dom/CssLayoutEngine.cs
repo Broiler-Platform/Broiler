@@ -151,8 +151,9 @@ internal static class CssLayoutEngine
         // CSS2.1 §10.8.1: The line box height is the distance between
         // the uppermost box top and the lowermost box bottom.  When
         // positive vertical-align raises inline-blocks above the flow
-        // start, the line box extends upward; the next content must
-        // start after the full line box height, not just at maxBottom.
+        // start, the line box extends upward.  The full line box height
+        // must be reflected in the block's content height so that
+        // subsequent siblings are positioned correctly.
         maxBottom = starty;
         double minTop = starty;
         foreach (var linebox in blockBox.LineBoxes)
