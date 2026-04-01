@@ -1183,6 +1183,11 @@ internal sealed class DomParser
     {
         foreach (var childBox in box.Boxes)
         {
+            // CSS2.1 §9.5: Floats are out-of-flow and should not trigger
+            // block-inside-inline corrections.  Skip them when checking
+            // whether a box contains only inline content.
+            if (childBox.Float != CssConstants.None)
+                continue;
             if (!childBox.IsInline || !ContainsInlinesOnlyDeep(childBox))
                 return false;
         }
@@ -1197,6 +1202,11 @@ internal sealed class DomParser
 
         for (int i = 0; i < box.Boxes.Count && (!hasBlock || !hasInline); i++)
         {
+            // CSS2.1 §9.5: Floats are out-of-flow — they do not create a
+            // mixed inline/block situation that requires anonymous block
+            // wrapping.
+            if (box.Boxes[i].Float != CssConstants.None)
+                continue;
             var isBlock = !box.Boxes[i].IsInline;
             hasBlock = hasBlock || isBlock;
             hasInline = hasInline || !isBlock;

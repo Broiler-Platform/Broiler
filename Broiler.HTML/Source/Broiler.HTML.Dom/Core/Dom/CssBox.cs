@@ -777,6 +777,15 @@ internal class CssBox : CssBoxProperties, IDisposable
                 {
                     ActualBottom = Location.Y;
                     CssLayoutEngine.CreateLineBoxes(g, this); //This will automatically set the bottom of this block
+
+                    // CSS2.1 §9.5: Floated children were skipped by
+                    // CreateLineBoxes (they are out-of-flow).  Lay them out
+                    // now so they are positioned and painted.
+                    foreach (var childBox in Boxes)
+                    {
+                        if (childBox.Float != CssConstants.None)
+                            childBox.PerformLayout(g);
+                    }
                 }
                 else if (Boxes.Count > 0)
                 {

@@ -32,7 +32,14 @@ internal sealed class DomUtils
     {
         foreach (CssBox b in box.Boxes)
         {
-            if (!b.IsInline)
+            // CSS2.1 §9.5: Floats are out-of-flow.  Their computed display
+            // is promoted to 'block' (§9.7) but they participate in the
+            // inline formatting context of their parent for line-box
+            // purposes.  Treat them as inline-compatible so that a parent
+            // with only text + floats is laid out using CreateLineBoxes
+            // instead of the block path (which would split the text around
+            // the float and introduce unwanted line breaks).
+            if (!b.IsInline && b.Float == CssConstants.None)
                 return false;
         }
 

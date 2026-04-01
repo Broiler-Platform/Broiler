@@ -169,14 +169,13 @@ internal static class CssLayoutEngine
                 minTop = Math.Min(minTop, word.Top);
             }
         }
-        // When inline-level boxes overflow above the starting flow
-        // position (minTop < starty), the full line box height must be
-        // reflected in maxBottom so subsequent siblings are pushed down.
-        if (minTop < starty)
-        {
-            double lineBoxHeight = maxBottom - minTop;
-            maxBottom = Math.Max(maxBottom, starty + lineBoxHeight);
-        }
+        // CSS2.1 §10.6.3: For block-level elements with auto height,
+        // the content height extends from the content area top (starty)
+        // to the bottom of the last in-flow content.  Inline-level boxes
+        // that overflow ABOVE the content area (e.g. via positive
+        // vertical-align) are visual overflow and do NOT increase the
+        // block's content height.  maxBottom already holds the maximum
+        // bottom edge from lines 157-170.
 
         // CSS2.1 §10.8: The "strut" — each line box starts with an
         // imaginary zero-width inline box with the block container's font
@@ -251,6 +250,12 @@ internal static class CssLayoutEngine
             // CSS2.1 §9.2.4: display:none elements generate no boxes and
             // must not participate in layout — skip them entirely.
             if (b.Display == CssConstants.None)
+                continue;
+
+            // CSS2.1 §9.5: Floated elements are out of normal flow and
+            // must not participate in the inline formatting context.
+            // Their positioning is handled separately in PerformLayoutImp.
+            if (b.Float != CssConstants.None)
                 continue;
 
             double leftspacing = (b.Position != CssConstants.Absolute && b.Position != CssConstants.Fixed) ? b.ActualMarginLeft + b.ActualBorderLeftWidth + b.ActualPaddingLeft : 0;
@@ -711,22 +716,38 @@ internal static class CssLayoutEngine
         // an ascent/height ratio near 0.8 (e.g. OS/2 sTypoAscender is
         // typically ~80% of UPM). This matches common browser heuristics.
         const double TypicalAscentRatio = 0.8;
-        double baseline = float.MinValue;
+
+        // CSS2.1 §10.8: The "strut" — an imaginary zero-width inline box
+        // with the block container's font and line-height — establishes
+        // the initial baseline of the line box.  This is critical when the
+        // parent has font-size: 0 (e.g. .buckets { font: 0/0 }): the strut
+        // baseline is at the top of the content area and must not be
+        // overridden by child inline-block font metrics.
+        double lineTop = double.MaxValue;
+        foreach (var rect in lineBox.Rectangles.Values)
+            lineTop = Math.Min(lineTop, rect.Top);
+
+        // Start with the strut baseline (parent's font ascent from line top).
+        double parentFontHeight = lineBox.OwnerBox?.ActualFont.Height ?? 0;
+        double baseline = (lineTop < double.MaxValue)
+            ? lineTop + parentFontHeight * TypicalAscentRatio
+            : float.MinValue;
+
+        // Non-inline-block boxes also contribute to the baseline.
         foreach (var box in lineBox.Rectangles.Keys)
         {
-            double boxBaseline = lineBox.Rectangles[box].Top
-                + box.ActualFont.Height * TypicalAscentRatio;
-            baseline = Math.Max(baseline, boxBaseline);
+            if (box.Display != CssConstants.InlineBlock)
+            {
+                double boxBaseline = lineBox.Rectangles[box].Top
+                    + box.ActualFont.Height * TypicalAscentRatio;
+                baseline = Math.Max(baseline, boxBaseline);
+            }
         }
 
-        // Compute line box top and bottom for top/bottom/text-top/text-bottom alignment.
-        double lineTop = double.MaxValue;
+        // Compute line box bottom for top/bottom/text-top/text-bottom alignment.
         double lineBottom = double.MinValue;
         foreach (var rect in lineBox.Rectangles.Values)
-        {
-            lineTop = Math.Min(lineTop, rect.Top);
             lineBottom = Math.Max(lineBottom, rect.Bottom);
-        }
 
         var boxes = new List<CssBox>(lineBox.Rectangles.Keys);
         foreach (CssBox box in boxes)
@@ -780,8 +801,8 @@ internal static class CssLayoutEngine
                     if (lineBox.Rectangles.ContainsKey(box) && baseline > float.MinValue)
                     {
                         double boxHeight = lineBox.Rectangles[box].Height;
-                        double parentFontHeight = box.ParentBox?.ActualFont.Height ?? 0;
-                        double halfXHeight = parentFontHeight * 0.25;
+                        double parentFont = box.ParentBox?.ActualFont.Height ?? 0;
+                        double halfXHeight = parentFont * 0.25;
                         lineBox.SetBaseLine(g, box, baseline + halfXHeight - boxHeight / 2);
                     }
                     break;
