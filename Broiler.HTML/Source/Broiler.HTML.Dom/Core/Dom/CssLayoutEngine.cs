@@ -148,22 +148,41 @@ internal static class CssLayoutEngine
         // positions (e.g. vertical-align: 2em raises boxes), recalculate
         // maxBottom from the actual post-alignment positions.
         //
-        // CSS2.1 §10.6.3 / §10.8.1: When positive vertical-align raises
-        // inline-blocks above the flow start position, the upward extent
-        // is visual overflow — it does NOT increase the block container's
-        // auto height.  Only content that extends below the flow start
-        // contributes to maxBottom.
+        // CSS2.1 §10.8.1: The line box height is the distance between
+        // the uppermost box top and the lowermost box bottom.  When
+        // positive vertical-align raises inline-blocks above the flow
+        // start, the line box extends upward.  The full line box height
+        // must be reflected in the block's content height so that
+        // subsequent siblings are positioned correctly.
+        //
+        // Example: Acid3's .buckets div has font: 0/0 (baseline at
+        // content edge) and bucket6 extends 162px above the baseline.
+        // The line box height is 162px, so the div's auto height = 162px
+        // (plus padding/border).
         maxBottom = starty;
+        double minTop = starty;
         foreach (var linebox in blockBox.LineBoxes)
         {
             foreach (var rect in linebox.Rectangles.Values)
             {
                 maxBottom = Math.Max(maxBottom, rect.Bottom);
+                minTop = Math.Min(minTop, rect.Top);
             }
             foreach (var word in linebox.Words)
             {
                 maxBottom = Math.Max(maxBottom, word.Bottom);
+                minTop = Math.Min(minTop, word.Top);
             }
+        }
+        // CSS2.1 §10.8.1: The line box height is the distance between
+        // the uppermost box top and the lowermost box bottom.  When
+        // inline-level boxes overflow above the starting flow position
+        // (minTop < starty), the full line box height must be reflected
+        // in maxBottom so subsequent siblings are positioned correctly.
+        if (minTop < starty)
+        {
+            double lineBoxHeight = maxBottom - minTop;
+            maxBottom = Math.Max(maxBottom, starty + lineBoxHeight);
         }
 
         // CSS2.1 §10.8: The "strut" — each line box starts with an

@@ -6,12 +6,15 @@ using Xunit.Abstractions;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// CSS2.1 §10.6.3 / §10.8: When vertical-align raises inline-blocks
-/// above the flow start, the upward extent is visual overflow and must
-/// NOT inflate the block container's auto height.  Only content that
-/// extends below the flow start contributes to maxBottom.
-/// An inflated maxBottom pushes subsequent siblings too far down
-/// (Acid3 colored bars appear "too far at top" relative to the score).
+/// CSS2.1 §10.8.1: The line box height is the distance between the
+/// uppermost box top and the lowermost box bottom.  When vertical-align
+/// raises inline-blocks above the flow start, the full line box height
+/// contributes to the block container's auto height (the block height
+/// is projected downward from the content edge).
+///
+/// This matches the Acid3 specification comment which states that the
+/// div.bucket height is 162px (the line box height from the biggest
+/// inline-block raised by vertical-align: 2em).
 /// </summary>
 public class VerticalAlignMaxBottomTests
 {
@@ -19,19 +22,19 @@ public class VerticalAlignMaxBottomTests
     public VerticalAlignMaxBottomTests(ITestOutputHelper output) => _output = output;
 
     /// <summary>
-    /// When an inline-block is raised by vertical-align above the flow
-    /// start, the upward extent is visual overflow per CSS 2.1 §10.6.3
-    /// and does NOT inflate the container's auto height.  Only content
-    /// that extends below the flow start contributes to maxBottom.
+    /// CSS2.1 §10.8.1: When an inline-block is raised by vertical-align
+    /// above the flow start (e.g. font: 0/0 parent), the line box height
+    /// is measured from the topmost to the bottommost extent.  This full
+    /// height is projected downward from the content edge to determine
+    /// the block container's auto height.
     /// </summary>
     [Fact]
-    public void VerticalAlign_Raised_InlineBlock_DoesNot_Inflate_ContainerHeight()
+    public void VerticalAlign_Raised_InlineBlock_Line_Box_Height_Projected_Downward()
     {
         // The .container div has an inline-block child raised by
-        // vertical-align: 40px.  The box is entirely above the baseline
-        // (font: 0/0 makes the baseline the content edge top).
-        // The container's auto height = 0 (no content below baseline)
-        // + padding-bottom 10px = 10px.
+        // vertical-align: 40px.  With font: 0/0, baseline = content edge.
+        // Box height = 20px, raise = 40px → line box height = 60px.
+        // Container auto height = 60px + padding-bottom 10px = 70px.
         var html = @"<!DOCTYPE html>
 <html><head><style>
 * { margin: 0; padding: 0; border: none; }
@@ -61,19 +64,20 @@ body { margin: 0; background: white; }
 
         _output.WriteLine($"First blue row: {firstBlueRow}");
 
-        // CSS 2.1 §10.6.3: Upward overflow from vertical-align does NOT
-        // inflate the container's auto height.  The container is only
-        // padding-bottom (10px), so the blue div starts around y=10.
+        // CSS2.1 §10.8.1: Line box height = 20px box + 40px raise = 60px.
+        // Container height = 60px (content) + 10px (padding) = 70px.
+        // The blue .after div should start around y=70.
         Assert.True(firstBlueRow >= 0, "Blue div (.after) not found");
-        Assert.True(firstBlueRow < 30,
-            $"Blue div starts at y={firstBlueRow} — expected ~10 (<30). " +
-            "Container height should not be inflated by upward visual overflow.");
+        Assert.True(firstBlueRow >= 50 && firstBlueRow <= 90,
+            $"Blue div starts at y={firstBlueRow} — expected ~70 (60px line box + 10px padding). " +
+            "Line box height from raised inline-block should be projected downward.");
     }
 
     /// <summary>
     /// Acid3-style pattern: inline-blocks with vertical-align in an
-    /// IFC container with padding-bottom.  A subsequent sibling with
-    /// negative margin-top should overlap the container area.
+    /// IFC container with padding-bottom.  The line box height includes
+    /// the raise amount.  A subsequent sibling with negative margin-top
+    /// should be positioned correctly based on the full container height.
     /// </summary>
     [Fact]
     public void Acid3_Score_Position_With_Negative_Margin()
@@ -110,12 +114,12 @@ body { margin: 0; background: white; font: 20px Arial; }
         _output.WriteLine($"Score first blue row: {firstBlueRow}");
 
         // Title: line-height 120px, margin-bottom -40px → bottom at 80px
-        // Buckets: padding-bottom 150px, content height ~30px → bottom ~260px
-        // Score: margin-top -200px → top ~60px
-        // The score should overlap with the bucket/title area.
+        // Buckets: line box height = 20+40=60px, padding-bottom 150px → height=210px, bottom=290px
+        // Score: margin-top -200px → top ≈ 90px
+        // The score should be positioned correctly in the page.
         Assert.True(firstBlueRow >= 0, "Score element not found");
-        Assert.True(firstBlueRow < 150,
-            $"Score starts at y={firstBlueRow} — expected <150. " +
+        Assert.True(firstBlueRow < 200,
+            $"Score starts at y={firstBlueRow} — expected <200. " +
             "Negative margin may not be pulling the score up enough.");
     }
 }

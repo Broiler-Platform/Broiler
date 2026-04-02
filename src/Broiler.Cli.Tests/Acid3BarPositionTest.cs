@@ -4,13 +4,18 @@ using Xunit.Abstractions;
 
 namespace Broiler.Cli.Tests;
 
+/// <summary>
+/// Verifies that the Acid3 colored bars are rendered as inline-block
+/// elements in a single horizontal line with correct sizing per
+/// the CSS !important border override.
+/// </summary>
 public class Acid3BarPositionTest
 {
     private readonly ITestOutputHelper _output;
     public Acid3BarPositionTest(ITestOutputHelper output) => _output = output;
 
     [Fact]
-    public void DiagnoseBarPositions_WithImportant()
+    public void Acid3_Bars_Single_Line_With_Important_Border_Override()
     {
         // Full Acid3 CSS including the critical !important rule
         var html = @"<!DOCTYPE html>
@@ -37,34 +42,31 @@ public class Acid3BarPositionTest
   #bucket4 { background: lime; }
   #bucket5 { background: blue; }
   #bucket6 { background: purple; }
-  #result { font-weight: bolder; width: 5.68em; text-align: right; }
-  #result { font-size: 5em; margin: -2.19em 0 0; }
 </style>
 </head>
 <body>
   <h1>Acid3</h1>
   <div class='buckets'><p id='bucket1'></p><p id='bucket2'></p><p id='bucket3'></p><p id='bucket4'></p><p id='bucket5'></p><p id='bucket6'></p></div>
-  <p id='result'><span id='score'>100</span>/100</p>
 </body>
 </html>";
 
         using var bmp = HtmlRender.RenderToImage(html, 1024, 768);
 
         var colors = new Dictionary<string, (int minY, int maxY, int minX, int maxX)>();
-        
+
         for (int y = 0; y < bmp.Height; y++)
         {
             for (int x = 0; x < bmp.Width; x++)
             {
                 var p = bmp.GetPixel(x, y);
-                string colorName = null;
+                string? colorName = null;
                 if (p.Red > 200 && p.Green < 80 && p.Blue < 80) colorName = "red";
                 else if (p.Red > 200 && p.Green > 120 && p.Green < 200 && p.Blue < 80) colorName = "orange";
                 else if (p.Red > 200 && p.Green > 200 && p.Blue < 80) colorName = "yellow";
                 else if (p.Red < 80 && p.Green > 200 && p.Blue < 80) colorName = "lime";
                 else if (p.Red < 80 && p.Green < 80 && p.Blue > 200) colorName = "blue-bar";
                 else if (p.Red > 80 && p.Red < 200 && p.Green < 30 && p.Blue > 80 && p.Blue < 200) colorName = "purple";
-                
+
                 if (colorName != null)
                 {
                     if (!colors.ContainsKey(colorName))
@@ -78,26 +80,33 @@ public class Acid3BarPositionTest
             }
         }
 
-        _output.WriteLine("=== Colored bar positions (WITH border !important override) ===");
-        foreach (var kv in colors.OrderBy(x => x.Value.minY))
+        foreach (var kv in colors.OrderBy(x => x.Value.minX))
         {
             int w = kv.Value.maxX - kv.Value.minX + 1;
             int h = kv.Value.maxY - kv.Value.minY + 1;
-            _output.WriteLine($"  {kv.Key}: rows {kv.Value.minY}-{kv.Value.maxY} ({h}px), cols {kv.Value.minX}-{kv.Value.maxX} ({w}px)");
+            _output.WriteLine($"{kv.Key}: rows {kv.Value.minY}-{kv.Value.maxY} ({h}px), cols {kv.Value.minX}-{kv.Value.maxX} ({w}px)");
         }
 
-        _output.WriteLine("\n=== Reference positions (from Acid3 spec) ===");
-        _output.WriteLine("  All bars: rows 19-152 (133px)");
-        _output.WriteLine("  Expected score at: y~230");
-        _output.WriteLine("  Body content edge: y~57");
-        
-        int maxBarBottom = 0, minBarTop = int.MaxValue;
-        foreach (var kv in colors)
+        // All 6 bars should be found
+        Assert.True(colors.Count >= 5, $"Expected at least 5 colored bars, found {colors.Count}");
+
+        // Bars should be in a single horizontal line (not wrapping).
+        // Check that the x-ranges form a left-to-right sequence.
+        var sorted = colors.OrderBy(kv => kv.Value.minX).ToList();
+        for (int i = 0; i < sorted.Count - 1; i++)
         {
-            if (kv.Value.maxY > maxBarBottom) maxBarBottom = kv.Value.maxY;
-            if (kv.Value.minY < minBarTop) minBarTop = kv.Value.minY;
+            Assert.True(sorted[i].Value.maxX < sorted[i + 1].Value.maxX,
+                $"Bar '{sorted[i].Key}' (maxX={sorted[i].Value.maxX}) should be left of '{sorted[i + 1].Key}' (maxX={sorted[i + 1].Value.maxX})");
         }
-        if (colors.Count > 0)
-            _output.WriteLine($"\n  All bars span: rows {minBarTop}-{maxBarBottom} ({maxBarBottom - minBarTop + 1}px total)");
+
+        // Total vertical span should be reasonable (under 200px, not 500+).
+        // With 1px border (!important override), bars should be compact.
+        int maxBarBottom = colors.Values.Max(v => v.maxY);
+        int minBarTop = colors.Values.Min(v => v.minY);
+        int totalHeight = maxBarBottom - minBarTop + 1;
+        _output.WriteLine($"All bars span: rows {minBarTop}-{maxBarBottom} ({totalHeight}px)");
+        Assert.True(totalHeight < 200,
+            $"Bar vertical span is {totalHeight}px — expected <200 (with 1px border override). " +
+            "Are the bars wrapping or using 2em borders?");
     }
 }
