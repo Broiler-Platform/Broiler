@@ -407,7 +407,10 @@ internal static class CssLayoutEngine
             maxbottom += box.ActualHeight - (maxbottom - startY);
 
         // handle width setting
-        if (box.IsInline && 0 <= curx - startX && curx - startX < box.ActualWidth)
+        // CSS 2.1 §10.3.9: inline-block boxes handle their own sizing in
+        // FlowInlineBlock — do not register them here when processing
+        // their own internal content (box == blockbox).
+        if (box.IsInline && box != blockbox && 0 <= curx - startX && curx - startX < box.ActualWidth)
         {
             // hack for actual width handling
             curx += box.ActualWidth - (curx - startX);
