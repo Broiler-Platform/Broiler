@@ -6,11 +6,12 @@ using Xunit.Abstractions;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// CSS2.1 §10.8: After ApplyVerticalAlignment raises inline-blocks
-/// (e.g. vertical-align: 2em), the block container's content height
-/// (maxBottom) must reflect the post-alignment positions, not the
-/// pre-alignment positions.  Inflated maxBottom pushes subsequent
-/// siblings too far down (Acid3 score text regression).
+/// CSS2.1 §10.6.3 / §10.8: When vertical-align raises inline-blocks
+/// above the flow start, the upward extent is visual overflow and must
+/// NOT inflate the block container's auto height.  Only content that
+/// extends below the flow start contributes to maxBottom.
+/// An inflated maxBottom pushes subsequent siblings too far down
+/// (Acid3 colored bars appear "too far at top" relative to the score).
 /// </summary>
 public class VerticalAlignMaxBottomTests
 {
@@ -18,17 +19,19 @@ public class VerticalAlignMaxBottomTests
     public VerticalAlignMaxBottomTests(ITestOutputHelper output) => _output = output;
 
     /// <summary>
-    /// When an inline-block is raised by vertical-align, the containing
-    /// block's height reflects the full line box height (from the topmost
-    /// box top to the baseline) per CSS 2.1 §10.6.3.  A subsequent
-    /// sibling should be positioned after this height plus padding.
+    /// When an inline-block is raised by vertical-align above the flow
+    /// start, the upward extent is visual overflow per CSS 2.1 §10.6.3
+    /// and does NOT inflate the container's auto height.  Only content
+    /// that extends below the flow start contributes to maxBottom.
     /// </summary>
     [Fact]
     public void VerticalAlign_Raised_InlineBlock_DoesNot_Inflate_ContainerHeight()
     {
         // The .container div has an inline-block child raised by
-        // vertical-align: 40px.  The line box height includes the full
-        // upward extent from the box top to the baseline.
+        // vertical-align: 40px.  The box is entirely above the baseline
+        // (font: 0/0 makes the baseline the content edge top).
+        // The container's auto height = 0 (no content below baseline)
+        // + padding-bottom 10px = 10px.
         var html = @"<!DOCTYPE html>
 <html><head><style>
 * { margin: 0; padding: 0; border: none; }
@@ -44,11 +47,6 @@ body { margin: 0; background: white; }
 
         using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
 
-        // The .after div should start just below the .container div.
-        // The container's line box height = vertical-align (40px) +
-        // inline-block height (20px) = 60px (from box top to baseline).
-        // Plus padding-bottom 10px = 70px total.
-
         // Find the first row of blue pixels (the .after div)
         int firstBlueRow = -1;
         for (int y = 0; y < bitmap.Height; y++)
@@ -63,14 +61,13 @@ body { margin: 0; background: white; }
 
         _output.WriteLine($"First blue row: {firstBlueRow}");
 
-        // CSS 2.1 §10.6.3: The container's auto height = line box height
-        // (topmost to bottommost = 60px) + padding-bottom (10px) = 70px.
-        // The blue div should start around y=70 (with some tolerance for
-        // font-metric rounding at near-zero font sizes).
+        // CSS 2.1 §10.6.3: Upward overflow from vertical-align does NOT
+        // inflate the container's auto height.  The container is only
+        // padding-bottom (10px), so the blue div starts around y=10.
         Assert.True(firstBlueRow >= 0, "Blue div (.after) not found");
-        Assert.True(firstBlueRow < 80,
-            $"Blue div starts at y={firstBlueRow} — expected ~70 (<80). " +
-            "Container height should reflect the line box height (not be inflated by double-counting).");
+        Assert.True(firstBlueRow < 30,
+            $"Blue div starts at y={firstBlueRow} — expected ~10 (<30). " +
+            "Container height should not be inflated by upward visual overflow.");
     }
 
     /// <summary>
