@@ -20,6 +20,13 @@ public sealed class CssBlock
         PseudoClass = pseudoClass;
     }
 
+    /// <summary>
+    /// Whether this block originated from the user-agent default stylesheet.
+    /// CSS2.1 §6.4.1: Author declarations override UA declarations
+    /// regardless of specificity.
+    /// </summary>
+    public bool IsUserAgent { get; internal set; }
+
     public string Class { get; }
     public List<CssBlockSelectorItem> Selectors { get; }
     public IDictionary<string, string> Properties => _properties;
@@ -66,6 +73,7 @@ public sealed class CssBlock
     public CssBlock Clone()
     {
         var clone = new CssBlock(Class, new Dictionary<string, string>(_properties), Selectors != null ? [.. Selectors] : null, Hover, PseudoClass);
+        clone.IsUserAgent = IsUserAgent;
         if (_importantProperties != null)
             clone._importantProperties = new HashSet<string>(_importantProperties, StringComparer.OrdinalIgnoreCase);
         return clone;

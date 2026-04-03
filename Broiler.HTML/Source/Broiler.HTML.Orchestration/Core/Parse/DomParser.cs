@@ -449,9 +449,22 @@ internal sealed class DomParser
     /// CSS2.1 §5.11.1: Checks whether <paramref name="box"/> satisfies a
     /// structural pseudo-class condition.
     /// </summary>
+    /// <remarks>
+    /// Implements TODO-25 and TODO-27 (acid3-compliance.md §11.5):
+    /// <c>:first-child</c> matching is used by both the <c>:first-child + *</c>
+    /// complex selector (TODO-25) and the <c>h1:first-child</c> attached
+    /// pseudo-class (TODO-27).  Tests: <c>Acid3Todo24_28Tests.cs</c>.
+    /// </remarks>
     private static bool MatchesPseudoClass(CssBox box, string pseudoClass)
     {
-        if (box.HtmlTag == null || box.ParentBox == null)
+        if (box.HtmlTag == null)
+            return false;
+
+        // :root needs no parent — handle it before the ParentBox null check.
+        if (pseudoClass == "root")
+            return string.Equals(box.HtmlTag.Name, "html", StringComparison.OrdinalIgnoreCase);
+
+        if (box.ParentBox == null)
             return false;
 
         switch (pseudoClass)
@@ -515,12 +528,27 @@ internal sealed class DomParser
                 && !newIsImportant)
                 continue;
 
+            // CSS2.1 §6.4.1: Author-origin declarations override
+            // user-agent declarations regardless of specificity.
+            // Check after !important but before IsStyleOnElementAllowed
+            // so that a failed author IsStyleOnElementAllowed check does
+            // not leave a gap that lets a later UA rule through.
+            if (block.IsUserAgent
+                && box.AuthorProperties != null
+                && box.AuthorProperties.Contains(prop.Key))
+                continue;
+
             if (IsStyleOnElementAllowed(box, prop.Key, value))
             {
                 CssUtils.SetPropertyValue(box, prop.Key, value);
 
                 if (newIsImportant)
                     box.MarkPropertyImportant(prop.Key);
+
+                // Track author-origin properties so UA rules at higher
+                // specificity cannot overwrite them.
+                if (!block.IsUserAgent)
+                    box.MarkPropertyAuthor(prop.Key);
             }
         }
     }
@@ -1155,6 +1183,11 @@ internal sealed class DomParser
     {
         foreach (var childBox in box.Boxes)
         {
+            // CSS2.1 §9.5: Floats are out-of-flow and should not trigger
+            // block-inside-inline corrections.  Skip them when checking
+            // whether a box contains only inline content.
+            if (childBox.Float != CssConstants.None)
+                continue;
             if (!childBox.IsInline || !ContainsInlinesOnlyDeep(childBox))
                 return false;
         }
@@ -1169,6 +1202,11 @@ internal sealed class DomParser
 
         for (int i = 0; i < box.Boxes.Count && (!hasBlock || !hasInline); i++)
         {
+            // CSS2.1 §9.5: Floats are out-of-flow — they do not create a
+            // mixed inline/block situation that requires anonymous block
+            // wrapping.
+            if (box.Boxes[i].Float != CssConstants.None)
+                continue;
             var isBlock = !box.Boxes[i].IsInline;
             hasBlock = hasBlock || isBlock;
             hasInline = hasInline || !isBlock;

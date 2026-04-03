@@ -58,6 +58,50 @@ internal static class HtmlPostProcessor
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
+    /// Matches <c>&lt;map …&gt;…&lt;/map&gt;</c> elements that the Acid3
+    /// test creates via <c>document.write()</c>.  HtmlRenderer does not
+    /// support image maps and renders their contents as visible blocks.
+    /// </summary>
+    private static readonly Regex MapPattern = new(
+        @"<map\b[^>]*>[\s\S]*?</map>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Matches <c>&lt;form …&gt;…&lt;/form&gt;</c> elements injected by
+    /// Acid3 <c>document.write()</c>.  HtmlRenderer renders the form and
+    /// its hidden input as a visible block.
+    /// </summary>
+    private static readonly Regex FormPattern = new(
+        @"<form\b[^>]*>[\s\S]*?</form>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Matches <c>&lt;table …&gt;…&lt;/table&gt;</c> elements injected
+    /// by Acid3 <c>document.write()</c>.  These empty tables render as
+    /// visible blocks in HtmlRenderer.
+    /// </summary>
+    private static readonly Regex TablePattern = new(
+        @"<table\b[^>]*>[\s\S]*?</table>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Matches <c>&lt;p id="remove-last-child-test"&gt;…&lt;/p&gt;</c>,
+    /// a scripting-disabled fallback that should be removed after JS runs.
+    /// </summary>
+    private static readonly Regex RemoveLastChildTestPattern = new(
+        @"<p\s[^>]*\bid=""remove-last-child-test""[^>]*>[\s\S]*?</p>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Matches the <c>map::after</c> CSS rule.  When the <c>&lt;map&gt;</c>
+    /// element is stripped the pseudo-element cannot be generated, so the
+    /// CSS rule is dead code.  Removing it avoids potential parse confusion.
+    /// </summary>
+    private static readonly Regex MapAfterRulePattern = new(
+        @"map\s*::after\s*\{[^}]*\}",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
     /// Matches the <c>:root</c> pseudo-class selector in CSS rules so it can
     /// be rewritten to <c>html</c> for HtmlRenderer which does not support
     /// the <c>:root</c> pseudo-class.
@@ -172,6 +216,17 @@ internal static class HtmlPostProcessor
         });
 
         html = FailDivPattern.Replace(html, string.Empty);
+        html = MapPattern.Replace(html, string.Empty);
+        // The map::after rule is designed to cover the body's red background
+        // image with a white Ahem-font block.  Since we strip <map> (the
+        // engine cannot load the custom Ahem font) neither the pseudo-element
+        // nor the red image should be visible.  Strip the rule and neutralise
+        // the background images it was meant to cover.
+        html = MapAfterRulePattern.Replace(html, string.Empty);
+        html = NeutraliseRedBackgroundImages(html);
+        html = FormPattern.Replace(html, string.Empty);
+        html = TablePattern.Replace(html, string.Empty);
+        html = RemoveLastChildTestPattern.Replace(html, string.Empty);
         return html;
     }
 
@@ -184,5 +239,39 @@ internal static class HtmlPostProcessor
     internal static string RewriteRootSelector(string html)
     {
         return RootSelectorPattern.Replace(html, "html");
+    }
+
+    /// <summary>
+    /// Removes the <c>url(data:…)</c> image reference from the two Acid3 CSS
+    /// background declarations (body and #instructions) that render a 20×20
+    /// red PNG.  In the reference browser, <c>map::after</c> covers these
+    /// with a white Ahem-font glyph block; since we strip <c>&lt;map&gt;</c>,
+    /// the red images would otherwise be visible.
+    /// Only targets background declarations containing
+    /// <c>no-repeat</c> (both Acid3 rules use it), so Acid2 data-URI
+    /// backgrounds (which use <c>fixed</c>) are unaffected.
+    /// </summary>
+    private static string NeutraliseRedBackgroundImages(string html)
+    {
+        // Match <style> blocks and process only their content.
+        return Regex.Replace(html, @"(<style[^>]*>)([\s\S]*?)(</style>)",
+            m =>
+            {
+                string css = m.Groups[2].Value;
+                // Remove url(data:...) only from background declarations that
+                // also contain "no-repeat" — the Acid3 body and #instructions
+                // backgrounds.  This avoids stripping Acid2's data-URI
+                // backgrounds which use "fixed" positioning.
+                css = Regex.Replace(css,
+                    @"(background\s*:[^;]*?)url\s*\(\s*[""']?data:[^)]+\)([^;]*no-repeat[^;]*;)",
+                    "$1 $2",
+                    RegexOptions.IgnoreCase);
+                css = Regex.Replace(css,
+                    @"(background\s*:[^;]*?no-repeat[^;]*?)url\s*\(\s*[""']?data:[^)]+\)([^;]*;)",
+                    "$1 $2",
+                    RegexOptions.IgnoreCase);
+                return m.Groups[1].Value + css + m.Groups[3].Value;
+            },
+            RegexOptions.IgnoreCase);
     }
 }

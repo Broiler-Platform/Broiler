@@ -128,6 +128,53 @@ body { background: url(data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAA
     }
 
     /// <summary>
+    /// TODO-24 (CSSOM): Verifies that background-position is correctly extracted
+    /// from the shorthand — both the non-integer percentage (99.8392283%) and the
+    /// 1px length value.
+    /// </summary>
+    [Fact]
+    public void Todo24_Background_Shorthand_DataUri_Expands_BackgroundPosition()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head><style>
+body { background: url(data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==) no-repeat 99.8392283% 1px white; }
+</style></head>
+<body>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.body);
+document.getElementById('result').textContent = 'bg-position=' + (cs.backgroundPosition || cs.getPropertyValue('background-position'));
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("bg-position=99.8392283% 1px", result);
+    }
+
+    /// <summary>
+    /// TODO-24 (CSSOM): Verifies that background-attachment defaults to "scroll"
+    /// when not explicitly specified in the shorthand.
+    /// </summary>
+    [Fact]
+    public void Todo24_Background_Shorthand_DataUri_Expands_BackgroundAttachment()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head><style>
+body { background: url(data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==) no-repeat 99.8392283% 1px white; }
+</style></head>
+<body>
+<div id=""result""></div>
+<script>
+var cs = window.getComputedStyle(document.body);
+document.getElementById('result').textContent = 'bg-attachment=' + (cs.backgroundAttachment || cs.getPropertyValue('background-attachment'));
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("bg-attachment=scroll", result);
+    }
+
+    /// <summary>
     /// TODO-24 (CSSOM): Verifies that explicit background-color longhand is NOT
     /// overridden by background shorthand expansion (CSS cascade precedence).
     /// </summary>
@@ -420,5 +467,64 @@ div { background: lime; width: 50px; height: 50px; }
         Assert.Equal(0, pixel.Red);
         Assert.True(pixel.Green > 100); // lime green
         Assert.Equal(0, pixel.Blue);
+    }
+
+    /// <summary>
+    /// TODO-28 (CSSOM): Verifies that <c>&lt;form&gt;</c> elements do not render
+    /// visible borders when styled with zero-size or default styling.
+    /// Acid3 uses <c>document.write()</c> to inject form elements that must remain
+    /// invisible.
+    /// </summary>
+    [Fact]
+    public void Todo28_Form_Element_No_Visible_Border()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head><style>
+* { margin: 0; padding: 0; }
+body { background: white; }
+form { display: block; width: 0; height: 0; overflow: hidden; }
+</style></head>
+<body>
+<form id=""target""><input type=""hidden"" /></form>
+<div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+var cs = window.getComputedStyle(el);
+var r = [];
+r.push('width=' + (cs.width || 'NULL'));
+r.push('height=' + (cs.height || 'NULL'));
+r.push('overflow=' + (cs.overflow || 'NULL'));
+document.getElementById('result').textContent = r.join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("width=0", result);
+        Assert.Contains("height=0", result);
+        Assert.Contains("overflow=hidden", result);
+    }
+
+    /// <summary>
+    /// TODO-28 (Rendering): Verifies that <c>&lt;table&gt;</c> elements with zero
+    /// dimensions do not produce visible boxes.
+    /// </summary>
+    [Fact]
+    public void Todo28_Table_Element_No_Visible_Box()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head><style>
+* { margin: 0; padding: 0; }
+body { background: white; }
+table { width: 0; height: 0; border: none; border-collapse: collapse; }
+</style></head>
+<body>
+<table id=""target""><tr><td></td></tr></table>
+<div style=""background: lime; width: 50px; height: 50px;"">test</div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+        // With zero-size table, the lime div should be visible in the upper portion
+        var limePixel = bitmap.GetPixel(25, 25);
+        Assert.True(limePixel.Green > 100, $"Expected green for lime div, got R={limePixel.Red} G={limePixel.Green} B={limePixel.Blue}");
     }
 }

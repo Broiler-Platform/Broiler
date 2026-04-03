@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using Broiler.HTML.Adapters.Adapters;
+using Broiler.HTML.Utils.Core.Utils;
 
 namespace Broiler.HTML.Dom.Core.Dom;
 
@@ -102,6 +103,20 @@ internal sealed class CssLineBox
         if (!Rectangles.TryGetValue(b, out RectangleF r))
             return;
 
+        // CSS 2.1 §10.8.1: For inline-block boxes, vertical-align adjusts
+        // the position of the entire atomic box.  Move the box's rectangle
+        // and its Location/ActualBottom directly.
+        if (b.Display == CssConstants.InlineBlock)
+        {
+            if (Math.Abs(baseline - r.Top) > 0.01)
+            {
+                Rectangles[b] = new RectangleF(r.X, (float)baseline, r.Width, r.Height);
+                b.Location = new PointF(b.Location.X, (float)baseline);
+                b.ActualBottom = baseline + r.Height;
+            }
+            return;
+        }
+
         //Save top of words related to the top of rectangle
         double gap = 0f;
 
@@ -117,9 +132,9 @@ internal sealed class CssLineBox
                 gap = firstw.Top - r.Top;
         }
 
-        //New top that words will have
-        //float newtop = baseline - (Height - OwnerBox.FontDescent - 3); //OLD
-        double newtop = baseline; // -GetBaseLineHeight(b, g); //OLD
+        // The `baseline` parameter is the desired word.Top (visual text
+        // top coordinate) already computed by ApplyVerticalAlignment.
+        double newtop = baseline;
 
         if (b.ParentBox != null && b.ParentBox.Rectangles.ContainsKey(this) && r.Height < b.ParentBox.Rectangles[this].Height)
         {

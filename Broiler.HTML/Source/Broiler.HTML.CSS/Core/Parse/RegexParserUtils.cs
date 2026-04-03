@@ -15,7 +15,10 @@ internal static partial class RegexParserUtils
     public const string CssFontStyle = "(normal|italic|oblique)";
     public const string CssFontVariant = "(normal|small-caps)";
     public const string CssFontWeight = "(normal|bold|bolder|lighter|100|200|300|400|500|600|700|800|900)";
-    public const string CssFontSize = "(" + CssLength + "|" + CssPercentage + "|xx-small|x-small|small|medium|large|x-large|xx-large|larger|smaller)";
+    // CSS 2.1 §4.3.2: The unit identifier may be omitted for zero values.
+    // Accept bare "0" so that shorthand "font: 0/0 …" (used by Acid3) is
+    // correctly split into font-size:0 and line-height:0.
+    public const string CssFontSize = "(" + CssLength + "|" + CssPercentage + "|0|xx-small|x-small|small|medium|large|x-large|xx-large|larger|smaller)";
     public const string CssFontSizeAndLineHeight = CssFontSize + @"(\/" + CssLineHeight + @")?(\s|$)";
 
     [GeneratedRegex(CssMediaTypes, RegexOptions.IgnoreCase | RegexOptions.Singleline)]

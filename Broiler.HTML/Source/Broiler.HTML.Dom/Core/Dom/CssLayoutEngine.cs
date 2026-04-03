@@ -144,14 +144,106 @@ internal static class CssLayoutEngine
             linebox.AssignRectanglesToBoxes();
         }
 
+        // CSS2.1 §10.8: After vertical alignment adjusts inline-block
+        // positions (e.g. vertical-align: 2em raises boxes), recalculate
+        // maxBottom from the actual post-alignment positions.
+        //
+        // CSS2.1 §10.8.1: The line box height is the distance between
+        // the uppermost box top and the lowermost box bottom.  When
+        // positive vertical-align raises inline-blocks above the flow
+        // start, the line box extends upward.  The full line box height
+        // must be reflected in the block's content height so that
+        // subsequent siblings are positioned correctly.
+        //
+        // Example: Acid3's .buckets div has font: 0/0 (baseline at
+        // content edge) and bucket6 extends 162px above the baseline.
+        // The line box height is 162px, so the div's auto height = 162px
+        // (plus padding/border).
+        maxBottom = starty;
+        double minTop = starty;
+        foreach (var linebox in blockBox.LineBoxes)
+        {
+            foreach (var rect in linebox.Rectangles.Values)
+            {
+                maxBottom = Math.Max(maxBottom, rect.Bottom);
+                minTop = Math.Min(minTop, rect.Top);
+            }
+            foreach (var word in linebox.Words)
+            {
+                maxBottom = Math.Max(maxBottom, word.Bottom);
+                minTop = Math.Min(minTop, word.Top);
+            }
+        }
+        // CSS2.1 §10.8.1: The line box height is the distance between
+        // the uppermost box top and the lowermost box bottom.  When
+        // inline-level boxes overflow above the starting flow position
+        // (minTop < starty), the full line box height must be reflected
+        // in maxBottom so subsequent siblings are positioned correctly.
+        if (minTop < starty)
+        {
+            double lineBoxHeight = maxBottom - minTop;
+            maxBottom = Math.Max(maxBottom, starty + lineBoxHeight);
+
+            // CSS2.1 §9.4.2: Line boxes are laid out beginning at the
+            // top of the containing block.  When vertical-align raises
+            // inline-blocks above the flow start, the entire line box
+            // content must be shifted downward so it renders within the
+            // block container's content area (from starty to
+            // starty + lineBoxHeight) instead of overflowing above.
+            // The shift amount is computed from the global minTop across
+            // ALL line boxes in the block (lines 162-176), so it must be
+            // applied uniformly to all line boxes.
+            double shift = starty - minTop;
+            foreach (var linebox in blockBox.LineBoxes)
+            {
+                // Shift line box rectangle positions
+                var keys = new List<CssBox>(linebox.Rectangles.Keys);
+                foreach (var box in keys)
+                {
+                    var r = linebox.Rectangles[box];
+                    linebox.Rectangles[box] = new RectangleF(r.X, (float)(r.Y + shift), r.Width, r.Height);
+
+                    // For inline-block boxes, also update the CssBox's
+                    // own Location and ActualBottom (used by the paint system).
+                    if (box.Display == CssConstants.InlineBlock)
+                    {
+                        box.Location = new PointF(box.Location.X, (float)(box.Location.Y + shift));
+                        box.ActualBottom += shift;
+                    }
+
+                    // Update the box's own Rectangles copy (assigned
+                    // earlier by AssignRectanglesToBoxes).
+                    if (box.Rectangles.ContainsKey(linebox))
+                        box.Rectangles[linebox] = linebox.Rectangles[box];
+                }
+
+                // Shift word positions
+                foreach (var word in linebox.Words)
+                    word.Top += shift;
+            }
+        }
+
         // CSS2.1 §10.8: The "strut" — each line box starts with an
         // imaginary zero-width inline box with the block container's font
         // and line-height properties.  This establishes the minimum line
         // box height for inline formatting contexts.
         // The strut only affects content height when height is 'auto';
         // an explicit height (CSS2.1 §10.6.3) overrides the content height.
+        // CSS2.1 §9.4.2: The strut only contributes to height when the
+        // inline formatting context has actual inline content (words or
+        // inline-level boxes).  An empty block should have zero content
+        // height from the IFC.
         bool hasExplicitHeight = blockBox.Height != null && blockBox.Height != CssConstants.Auto;
-        if (blockBox.ActualLineHeight > 0 && !hasExplicitHeight)
+        bool hasInlineContent = false;
+        foreach (var lb in blockBox.LineBoxes)
+        {
+            if (lb.Words.Count > 0 || lb.Rectangles.Count > 0)
+            {
+                hasInlineContent = true;
+                break;
+            }
+        }
+        if (blockBox.ActualLineHeight > 0 && !hasExplicitHeight && hasInlineContent)
             maxBottom = Math.Max(maxBottom, starty + blockBox.ActualLineHeight);
 
         blockBox.ActualBottom = maxBottom + blockBox.ActualPaddingBottom + blockBox.ActualBorderBottomWidth;
@@ -201,6 +293,17 @@ internal static class CssLayoutEngine
 
         foreach (CssBox b in box.Boxes)
         {
+            // CSS2.1 §9.2.4: display:none elements generate no boxes and
+            // must not participate in layout — skip them entirely.
+            if (b.Display == CssConstants.None)
+                continue;
+
+            // CSS2.1 §9.5: Floated elements are out of normal flow and
+            // must not participate in the inline formatting context.
+            // Their positioning is handled separately in PerformLayoutImp.
+            if (b.Float != CssConstants.None)
+                continue;
+
             double leftspacing = (b.Position != CssConstants.Absolute && b.Position != CssConstants.Fixed) ? b.ActualMarginLeft + b.ActualBorderLeftWidth + b.ActualPaddingLeft : 0;
             double rightspacing = (b.Position != CssConstants.Absolute && b.Position != CssConstants.Fixed) ? b.ActualMarginRight + b.ActualBorderRightWidth + b.ActualPaddingRight : 0;
 
@@ -347,7 +450,10 @@ internal static class CssLayoutEngine
             maxbottom += box.ActualHeight - (maxbottom - startY);
 
         // handle width setting
-        if (box.IsInline && 0 <= curx - startX && curx - startX < box.ActualWidth)
+        // CSS 2.1 §10.3.9: inline-block boxes handle their own sizing in
+        // FlowInlineBlock — do not register them here when processing
+        // their own internal content (box == blockbox).
+        if (box.IsInline && box != blockbox && 0 <= curx - startX && curx - startX < box.ActualWidth)
         {
             // hack for actual width handling
             curx += box.ActualWidth - (curx - startX);
@@ -403,6 +509,14 @@ internal static class CssLayoutEngine
             b.GetMinMaxWidth(out double prefMin, out double prefMax);
             if (double.IsNaN(prefMin)) prefMin = 0;
             if (double.IsNaN(prefMax)) prefMax = 0;
+            // GetMinMaxWidth returns border-box widths (content + padding +
+            // border).  Convert to content-only widths so the shrink-to-fit
+            // calculation matches the content-only `available` value and the
+            // padding/border added back at ibBoxWidth below.
+            double ownPaddingBorder = b.ActualBorderLeftWidth + b.ActualBorderRightWidth
+                + b.ActualPaddingLeft + b.ActualPaddingRight;
+            prefMin = Math.Max(0, prefMin - ownPaddingBorder);
+            prefMax = Math.Max(0, prefMax - ownPaddingBorder);
             double available = Math.Max(0, limitRight - curx - rightspacing
                 - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
                 - b.ActualPaddingLeft - b.ActualPaddingRight);
@@ -651,34 +765,65 @@ internal static class CssLayoutEngine
         // an ascent/height ratio near 0.8 (e.g. OS/2 sTypoAscender is
         // typically ~80% of UPM). This matches common browser heuristics.
         const double TypicalAscentRatio = 0.8;
-        double baseline = float.MinValue;
+
+        // CSS2.1 §10.8: The "strut" — an imaginary zero-width inline box
+        // with the block container's font and line-height — establishes
+        // the initial baseline of the line box.  This is critical when the
+        // parent has font-size: 0 (e.g. .buckets { font: 0/0 }): the strut
+        // baseline is at the top of the content area and must not be
+        // overridden by child inline-block font metrics.
+        double lineTop = double.MaxValue;
+        foreach (var rect in lineBox.Rectangles.Values)
+            lineTop = Math.Min(lineTop, rect.Top);
+
+        // Start with the strut baseline (parent's font ascent from line top).
+        double parentFontHeight = lineBox.OwnerBox?.ActualFont.Height ?? 0;
+        double baseline = (lineTop < double.MaxValue)
+            ? lineTop + parentFontHeight * TypicalAscentRatio
+            : float.MinValue;
+
+        // Non-inline-block boxes also contribute to the baseline.
         foreach (var box in lineBox.Rectangles.Keys)
         {
-            double boxBaseline = lineBox.Rectangles[box].Top
-                + box.ActualFont.Height * TypicalAscentRatio;
-            baseline = Math.Max(baseline, boxBaseline);
+            if (box.Display != CssConstants.InlineBlock)
+            {
+                double boxBaseline = lineBox.Rectangles[box].Top
+                    + box.ActualFont.Height * TypicalAscentRatio;
+                baseline = Math.Max(baseline, boxBaseline);
+            }
         }
 
-        // Compute line box top and bottom for top/bottom/text-top/text-bottom alignment.
-        double lineTop = double.MaxValue;
+        // Compute line box bottom for top/bottom/text-top/text-bottom alignment.
         double lineBottom = double.MinValue;
         foreach (var rect in lineBox.Rectangles.Values)
-        {
-            lineTop = Math.Min(lineTop, rect.Top);
             lineBottom = Math.Max(lineBottom, rect.Bottom);
-        }
 
         var boxes = new List<CssBox>(lineBox.Rectangles.Keys);
         foreach (CssBox box in boxes)
         {
+            // For inline text boxes, SetBaseLine receives the desired
+            // word-top position, so baseline-relative values must be
+            // converted from baseline Y to word-top Y by subtracting
+            // the box's ascent.
+            //
+            // For inline-block boxes, CSS 2.1 §10.8.1: the baseline of
+            // an inline-block with no in-flow line boxes is the bottom
+            // margin edge.  SetBaseLine positions the box by its top, so
+            // we must subtract the box height to convert from the desired
+            // bottom-edge position to the top-edge position.
+            bool isInlineBlock = box.Display == CssConstants.InlineBlock;
+            double boxAscent = isInlineBlock
+                ? lineBox.Rectangles[box].Height
+                : box.ActualFont.Height * TypicalAscentRatio;
+
             //Important notes on http://www.w3.org/TR/CSS21/tables.html#height-layout
             switch (box.VerticalAlign)
             {
                 case CssConstants.Sub:
-                    lineBox.SetBaseLine(g, box, baseline + lineBox.Rectangles[box].Height * .5f);
+                    lineBox.SetBaseLine(g, box, baseline - boxAscent + lineBox.Rectangles[box].Height * .5f);
                     break;
                 case CssConstants.Super:
-                    lineBox.SetBaseLine(g, box, baseline - lineBox.Rectangles[box].Height * .2f);
+                    lineBox.SetBaseLine(g, box, baseline - boxAscent - lineBox.Rectangles[box].Height * .2f);
                     break;
                 case CssConstants.TextTop:
                 case CssConstants.Top:
@@ -705,8 +850,8 @@ internal static class CssLayoutEngine
                     if (lineBox.Rectangles.ContainsKey(box) && baseline > float.MinValue)
                     {
                         double boxHeight = lineBox.Rectangles[box].Height;
-                        double parentFontHeight = box.ParentBox?.ActualFont.Height ?? 0;
-                        double halfXHeight = parentFontHeight * 0.25;
+                        double parentFont = box.ParentBox?.ActualFont.Height ?? 0;
+                        double halfXHeight = parentFont * 0.25;
                         lineBox.SetBaseLine(g, box, baseline + halfXHeight - boxHeight / 2);
                     }
                     break;
@@ -727,12 +872,12 @@ internal static class CssLayoutEngine
                         if (!double.IsNaN(offset) && offset != 0)
                         {
                             // Positive values move the box UP (raise).
-                            lineBox.SetBaseLine(g, box, baseline - offset);
+                            lineBox.SetBaseLine(g, box, baseline - boxAscent - offset);
                             break;
                         }
                     }
                     //case: baseline
-                    lineBox.SetBaseLine(g, box, baseline);
+                    lineBox.SetBaseLine(g, box, baseline - boxAscent);
                     break;
             }
         }

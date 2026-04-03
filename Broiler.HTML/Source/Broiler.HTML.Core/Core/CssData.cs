@@ -46,7 +46,10 @@ public sealed class CssData
             bool merged = false;
             foreach (var block in list)
             {
-                if (!block.EqualsSelector(cssBlock))
+                // CSS2.1 §6.4.1: Do not merge blocks from different
+                // cascade origins (UA vs author) so that per-property
+                // origin tracking is preserved.
+                if (!block.EqualsSelector(cssBlock) || block.IsUserAgent != cssBlock.IsUserAgent)
                     continue;
 
                 merged = true;
@@ -107,5 +110,18 @@ public sealed class CssData
         clone.FontFaces.AddRange(FontFaces);
 
         return clone;
+    }
+
+    /// <summary>
+    /// Marks every block in this <see cref="CssData"/> as originating from
+    /// the user-agent default stylesheet.  CSS2.1 §6.4.1: Author-origin
+    /// declarations override UA declarations regardless of specificity.
+    /// </summary>
+    internal void MarkAllBlocksAsUserAgent()
+    {
+        foreach (var mid in _mediaBlocks.Values)
+            foreach (var blocks in mid.Values)
+                foreach (var block in blocks)
+                    block.IsUserAgent = true;
     }
 }
