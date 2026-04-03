@@ -108,5 +108,16 @@ public class Acid3BarPositionTest
         Assert.True(totalHeight < 200,
             $"Bar vertical span is {totalHeight}px — expected <200 (with 1px border override). " +
             "Are the bars wrapping or using 2em borders?");
+
+        // CSS2.1 §9.4.2 + §10.8.1: After the line box height projection
+        // shifts inline-blocks downward, bars should be positioned below
+        // the h1 heading (within the .buckets container), not at the top
+        // of the viewport.
+        // h1 line: font-size 100px × line-height 1.2 = 120px, minus
+        // margin-bottom -40px = 80px.  Body padding-top 40px + border 1px
+        // → content starts at ~41px → bars should start around y=100+.
+        Assert.True(minBarTop > 80,
+            $"Bar top at y={minBarTop} — expected >80 (below the h1 heading). " +
+            "Bars should be shifted downward into the .buckets container, not overflow above.");
     }
 }

@@ -71,6 +71,25 @@ body { margin: 0; background: white; }
         Assert.True(firstBlueRow >= 50 && firstBlueRow <= 90,
             $"Blue div starts at y={firstBlueRow} — expected ~70 (60px line box + 10px padding). " +
             "Line box height from raised inline-block should be projected downward.");
+
+        // CSS2.1 §9.4.2: The red box should be shifted downward into the
+        // container (starting at y=0, not at a negative position).
+        // After the line box shift, the box renders within the container
+        // bounds (from y=0 to y=60) instead of overflowing above.
+        int firstRedRow = -1;
+        for (int y = 0; y < bitmap.Height; y++)
+        {
+            var p = bitmap.GetPixel(5, y);
+            if (p.Red > 200 && p.Green < 30 && p.Blue < 30)
+            {
+                firstRedRow = y;
+                break;
+            }
+        }
+        _output.WriteLine($"First red row: {firstRedRow}");
+        Assert.True(firstRedRow >= 0, "Red box not found");
+        Assert.True(firstRedRow >= 0 && firstRedRow <= 45,
+            $"Red box starts at y={firstRedRow} — expected 0-45 (shifted into container bounds).");
     }
 
     /// <summary>
