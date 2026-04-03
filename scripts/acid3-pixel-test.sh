@@ -67,7 +67,7 @@ ACID3_HTML="file://$ACID3_DIR/acid3.html"
 dotnet run --project "$REPO_ROOT/src/Broiler.Cli" -- \
     --capture-image "$ACID3_HTML" \
     --output "$BROILER_OUTPUT" \
-    --width 1024 --height 768 --full-page
+    --width 1024 --height 768
 
 if [[ -f "$BROILER_OUTPUT" ]]; then
     echo "  ✓ Broiler render saved to: $BROILER_OUTPUT"

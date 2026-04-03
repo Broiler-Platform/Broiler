@@ -527,6 +527,7 @@ public class CaptureService
             return html;
 
         using var context = new JSContext();
+        RegisterRuntimeExtensions(context);
         var bridge = new DomBridge();
         bridge.Attach(context, html, url);
 
@@ -865,5 +866,102 @@ public class CaptureService
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         context["window"] = window;
+    }
+
+    /// <summary>
+    /// Registers runtime polyfills (<c>queueMicrotask</c>, <c>WeakRef</c>,
+    /// <c>FinalizationRegistry</c>) on the <see cref="JSContext"/> so that
+    /// the CLI script-execution environment matches the App's
+    /// <see cref="ScriptEngine.RegisterRuntimeExtensions"/> setup.
+    /// </summary>
+    private static void RegisterRuntimeExtensions(JSContext context)
+    {
+        // queueMicrotask(fn) — execute callback (no-op queue; runs inline)
+        context["queueMicrotask"] = new JSFunction((in Arguments a) =>
+        {
+            if (a.Length > 0 && a[0] is JSFunction fn)
+            {
+                try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.queueMicrotask",
+                        $"Callback error: {ex.Message}", ex);
+                }
+            }
+            return JSUndefined.Value;
+        }, "queueMicrotask", 1);
+
+        // WeakRef polyfill
+        RegisterWeakRefPolyfill(context);
+
+        // FinalizationRegistry polyfill
+        RegisterFinalizationRegistryPolyfill(context);
+    }
+
+    /// <summary>
+    /// Registers a minimal <c>WeakRef</c> constructor backed by
+    /// <see cref="WeakReference{T}"/>.
+    /// </summary>
+    private static void RegisterWeakRefPolyfill(JSContext context)
+    {
+        try
+        {
+            var existing = context.Eval("typeof WeakRef");
+            if (existing is JSString s && s.ToString() != "undefined")
+                return;
+        }
+        catch { /* not present — install polyfill */ }
+
+        var weakRefCtor = new JSFunction((in Arguments args) =>
+        {
+            if (args.Length == 0)
+                throw new InvalidOperationException("WeakRef requires a target object.");
+
+            var target = args[0];
+            var weakRef = new WeakReference<JSValue>(target);
+
+            var instance = new JSObject();
+            instance.FastAddValue((KeyString)"deref", new JSFunction((in Arguments _) =>
+            {
+                return weakRef.TryGetTarget(out var t) ? t : JSUndefined.Value;
+            }, "deref", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return instance;
+        }, "WeakRef", 1);
+
+        context["WeakRef"] = weakRefCtor;
+    }
+
+    /// <summary>
+    /// Registers a minimal <c>FinalizationRegistry</c> constructor.
+    /// </summary>
+    private static void RegisterFinalizationRegistryPolyfill(JSContext context)
+    {
+        try
+        {
+            var existing = context.Eval("typeof FinalizationRegistry");
+            if (existing is JSString s && s.ToString() != "undefined")
+                return;
+        }
+        catch { /* not present — install polyfill */ }
+
+        var registryCtor = new JSFunction((in Arguments args) =>
+        {
+            var instance = new JSObject();
+
+            instance.FastAddValue((KeyString)"register", new JSFunction((in Arguments _) =>
+            {
+                return JSUndefined.Value;
+            }, "register", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            instance.FastAddValue((KeyString)"unregister", new JSFunction((in Arguments _) =>
+            {
+                return JSBoolean.False;
+            }, "unregister", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+
+            return instance;
+        }, "FinalizationRegistry", 1);
+
+        context["FinalizationRegistry"] = registryCtor;
     }
 }
