@@ -88,8 +88,8 @@ body { margin: 0; background: white; }
         }
         _output.WriteLine($"First red row: {firstRedRow}");
         Assert.True(firstRedRow >= 0, "Red box not found");
-        Assert.True(firstRedRow >= 0 && firstRedRow <= 45,
-            $"Red box starts at y={firstRedRow} — expected 0-45 (shifted into container bounds).");
+        Assert.True(firstRedRow <= 45,
+            $"Red box starts at y={firstRedRow} — expected ≤45 (shifted into container bounds).");
     }
 
     /// <summary>

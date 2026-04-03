@@ -190,6 +190,9 @@ internal static class CssLayoutEngine
             // content must be shifted downward so it renders within the
             // block container's content area (from starty to
             // starty + lineBoxHeight) instead of overflowing above.
+            // The shift amount is computed from the global minTop across
+            // ALL line boxes in the block (lines 162-176), so it must be
+            // applied uniformly to all line boxes.
             double shift = starty - minTop;
             foreach (var linebox in blockBox.LineBoxes)
             {
