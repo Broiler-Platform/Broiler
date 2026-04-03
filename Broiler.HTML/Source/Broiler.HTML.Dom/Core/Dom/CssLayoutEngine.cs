@@ -183,6 +183,41 @@ internal static class CssLayoutEngine
         {
             double lineBoxHeight = maxBottom - minTop;
             maxBottom = Math.Max(maxBottom, starty + lineBoxHeight);
+
+            // CSS2.1 §9.4.2: Line boxes are laid out beginning at the
+            // top of the containing block.  When vertical-align raises
+            // inline-blocks above the flow start, the entire line box
+            // content must be shifted downward so it renders within the
+            // block container's content area (from starty to
+            // starty + lineBoxHeight) instead of overflowing above.
+            double shift = starty - minTop;
+            foreach (var linebox in blockBox.LineBoxes)
+            {
+                // Shift line box rectangle positions
+                var keys = new List<CssBox>(linebox.Rectangles.Keys);
+                foreach (var box in keys)
+                {
+                    var r = linebox.Rectangles[box];
+                    linebox.Rectangles[box] = new RectangleF(r.X, (float)(r.Y + shift), r.Width, r.Height);
+
+                    // For inline-block boxes, also update the CssBox's
+                    // own Location and ActualBottom (used by the paint system).
+                    if (box.Display == CssConstants.InlineBlock)
+                    {
+                        box.Location = new PointF(box.Location.X, (float)(box.Location.Y + shift));
+                        box.ActualBottom += shift;
+                    }
+
+                    // Update the box's own Rectangles copy (assigned
+                    // earlier by AssignRectanglesToBoxes).
+                    if (box.Rectangles.ContainsKey(linebox))
+                        box.Rectangles[linebox] = linebox.Rectangles[box];
+                }
+
+                // Shift word positions
+                foreach (var word in linebox.Words)
+                    word.Top += shift;
+            }
         }
 
         // CSS2.1 §10.8: The "strut" — each line box starts with an
