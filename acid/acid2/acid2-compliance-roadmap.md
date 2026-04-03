@@ -4,8 +4,8 @@
 
 | Metric | Value |
 |---|---|
-| Overall pixel match (at `#top`) | **97.11%** |
-| Content-area match | **0.95%** (218 / 22,932 pixels) |
+| Overall pixel match (at `#top`) | **97.11%** *(high due to shared white background — not indicative of rendering fidelity)* |
+| Content-area match | **0.95%** (218 / 22,932 pixels) *(primary metric — measures face content fidelity)* |
 | Red-pixel leak (CSS failure indicator) | 100 in Broiler, 0 in Chromium |
 | Test dimensions | 1024 × 768 |
 | Render target | `acid2.html#top` (face test area) |
@@ -47,8 +47,9 @@ Broiler's output.
 | Broiler | 86–196 | 53–125 | 1,785 |
 
 Broiler's content area is truncated: it renders content down to y=125 only,
-whereas the reference extends to y=275. Everything below the eyes region is
-completely absent.
+whereas the reference extends to y=275.  **This means all content below the
+eyes region — the nose, smile, and chin (the majority of the face) — is
+completely absent from the Broiler render.**
 
 ---
 

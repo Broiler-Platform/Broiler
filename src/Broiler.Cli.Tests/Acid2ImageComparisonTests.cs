@@ -168,7 +168,14 @@ public class Acid2ImageComparisonTests
     ///
     /// Current baseline: ~1,785 content pixels in Broiler.
     /// Reference has: ~22,512 content pixels.
-    /// Threshold: at least 500 (well below current baseline to catch regressions).
+    /// Threshold: at least 500 (well below current baseline to catch
+    /// regressions without false failures).
+    ///
+    /// As rendering improves, this threshold should be progressively
+    /// tightened toward the reference target of ~22,512:
+    ///   - After Phase 1–3 (scalp/ears/forehead): raise to ~5,000
+    ///   - After Phase 4–6 (eyes/nose/smile):     raise to ~15,000
+    ///   - After Phase 7–10 (chin/parser/table):   raise to ~20,000
     /// </summary>
     [Fact]
     public void Acid2_ContentPixelCount_AboveMinimum()
