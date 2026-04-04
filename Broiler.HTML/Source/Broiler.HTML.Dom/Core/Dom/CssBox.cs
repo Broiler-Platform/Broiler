@@ -550,9 +550,16 @@ internal class CssBox : CssBoxProperties, IDisposable
                         var precedingFloats = CssBoxHelper.CollectPrecedingFloatsInBfc(this);
 
                         // CSS2.1 §9.5.1 rule 4: A floating box's outer top
-                        // may not be higher than the top of its containing block.
+                        // (margin edge) may not be higher than the top of its
+                        // containing block.  `top` already includes the margin
+                        // contribution (from MarginTopCollapse), so the outer
+                        // (margin-edge) top = top - ActualMarginTop.  The
+                        // constraint outer_top >= ClientTop translates to:
+                        //   top >= ClientTop + ActualMarginTop
+                        // This allows negative margins to pull the float above
+                        // the content-area edge while still honoring the rule.
                         if (ParentBox != null)
-                            top = Math.Max(top, ParentBox.ClientTop);
+                            top = Math.Max(top, ParentBox.ClientTop + ActualMarginTop);
 
                         // CSS2.1 §9.5.1 rule 6: The outer top of a floating
                         // box may not be higher than the outer top of any
