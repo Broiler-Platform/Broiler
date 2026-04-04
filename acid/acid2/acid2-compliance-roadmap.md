@@ -622,7 +622,6 @@ dotnet test src/Broiler.Cli.Tests --filter "FullyQualifiedName~Acid2"
 |---|---|---|---|
 | 2026-04-03 | 0.95% | Initial baseline — face invisible | — |
 | 2026-04-04 | 80.00% | Fixed table stripping in HtmlPostProcessor; fixed percentage min-height/max-height; fixed GetPreviousInFlowSibling abs-pos check | §2.0, §2.13, chin (§2.18, §2.19) |
-| | | | |
 
 ### Recommended Next Steps (ordered by expected impact)
 
