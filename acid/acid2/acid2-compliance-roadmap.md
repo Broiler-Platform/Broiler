@@ -9,7 +9,7 @@
 | Red-pixel leak (CSS failure indicator) | 100 in Broiler, 0 in Chromium |
 | Test dimensions | 1024 × 768 |
 | Render target | `acid2.html#top` (face test area) |
-| Last verified | 2026-04-03 |
+| Last verified | 2026-04-04 |
 
 Broiler's HTML renderer currently renders the "Hello World!" header and a
 partial scalp bar, but the vast majority of the ACID2 smiley face is missing.
@@ -17,6 +17,25 @@ The overall pixel match is high (97.11%) only because the page is mostly
 white background; the **content-area match is 0.95%**, indicating that nearly
 all face content present in the Chromium reference is absent or incorrect in
 Broiler's output.
+
+### Investigation Notes (2026-04-04)
+
+- **Fix applied: CSS 2.1 §10.7 percentage `min-height`/`max-height`** —
+  Percentage values now correctly resolve to `0`/`none` when the containing
+  block's height is `auto`.  This prevents `.nose { min-height: 80% }` from
+  inflating the nose to an incorrect height.
+- **Fix applied: `GetPreviousInFlowSibling` absolute-position check** —
+  `position: absolute` siblings are now correctly skipped when computing
+  flow predecessors, fixing layout cascade issues.
+- **Key finding: face content renders correctly at low scroll offsets** —
+  When `#top` has a smaller margin (e.g. 50em instead of 100em), all face
+  divs (forehead, nose, etc.) render in the viewport.  The rendering
+  pipeline's `RenderAtAnchor` method has an issue when content is located
+  beyond ~2000px in the document (the `LayoutBitmapHeight` constant is 2000
+  but the Acid2 face starts at ~2400px).  The `PerformPaint` viewport
+  clipping and/or the `PaintWalker` fragment-tree traversal may be
+  incorrectly clipping elements at high scroll offsets.  This is the
+  **top-priority blocker** for further Acid2 progress.
 
 ---
 
@@ -307,11 +326,16 @@ is required to generate the box.
 
 #### 2.13  Percentage `height`/`min-height` computing to `auto` on floats
 
-- [ ] **TODO: Correctly compute percentage heights to `auto` when containing block height is not explicit**
+- [x] **DONE: Correctly compute percentage heights to `auto` when containing block height is not explicit**
 
 Per CSS 2.1 §10.5 and §10.7, percentage values for `height` and
 `min-height` on a float whose containing block does not have an explicit
 height compute to `auto`.
+
+**Fix applied:** `CssBox.PerformLayoutImp` now resolves percentage
+`min-height` and `max-height` to `0` / `none` when the containing
+block's height is `auto` (not explicitly set).  `GetPreviousInFlowSibling`
+also now correctly skips `position: absolute` siblings.
 
 ---
 
@@ -498,7 +522,7 @@ cause overflow to appear.
 - [ ] 2.2: `min-height` > `max-height` override (scalp sizing)
 - [ ] 2.6: `overflow` clipping with width constraints (forehead)
 - [ ] 2.7: Data URI background images (forehead)
-- [ ] 2.13: Percentage height computing to `auto` (nose sizing)
+- [ ] 2.13: ~~Percentage height computing to `auto` (nose sizing)~~ → done, see §2.13
 - [ ] 2.15: `position: relative` with `bottom` offset (smile)
 - [ ] 2.16: `float: inherit` value (smile)
 - [ ] 2.17: Negative margin non-collapsing through borders (smile)
