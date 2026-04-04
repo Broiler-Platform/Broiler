@@ -2,24 +2,24 @@
 Acid2 Pixel Comparison Report
 ======================================================================
 
-Broiler image:    /tmp/acid2-broiler.png
-Reference image:  /tmp/acid2-reference.png
+Broiler image:    acid/acid2/acid2.png
+Reference image:  acid/acid2/acid2-reference.png
 Viewport:         1024×768
 Color tolerance:  5 (per-channel)
 
 --- Overall Pixel Statistics ---
-Full-image match:      763,718 /    786,432  (97.11%)
-Content-area match:        218 /     22,932  (0.95%)
-Red pixel count:           100
+Full-image match:      781,846 /    786,432  (99.42%)
+Content-area match:     18,346 /     22,932  (80.00%)
+Red pixel count:             0
 
 --- Per-Region Content-Area Match ---
 Region                       Y Range    Match    Total      Pct
 -----------------------------------------------------------------
 forehead                    51–68         26    1,624    1.60%
-eyes                        69–129       192    1,596   12.03%
-nose                       130–210         0   12,248    0.00%
-smile                      196–260         0    9,120    0.00%
-chin                       261–275         0      864    0.00%
+eyes                        69–129     1,056    1,596   66.17%
+nose                       130–210    12,104   12,248   98.82%
+smile                      196–260     6,800    9,120   74.56%
+chin                       261–275       864      864  100.00%
 
 --- Diff Image Colour Key ---
   Green  — pixel match (per-channel diff ≤ 5)

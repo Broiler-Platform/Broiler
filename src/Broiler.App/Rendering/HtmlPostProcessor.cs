@@ -225,9 +225,27 @@ internal static class HtmlPostProcessor
         html = MapAfterRulePattern.Replace(html, string.Empty);
         html = NeutraliseRedBackgroundImages(html);
         html = FormPattern.Replace(html, string.Empty);
-        html = TablePattern.Replace(html, string.Empty);
+        // Note: TablePattern is intentionally NOT applied here.
+        // Stripping all <table> elements destroys structural tables used by
+        // Acid2 (e.g. the <table> that implicitly closes a <p>, enabling the
+        // p + table + p sibling combinator).  Acid3's document.write() tables
+        // should be stripped via StripTables() in the Acid3-specific pipeline.
         html = RemoveLastChildTestPattern.Replace(html, string.Empty);
         return html;
+    }
+
+    /// <summary>
+    /// Strips all <c>&lt;table&gt;…&lt;/table&gt;</c> elements.  This is
+    /// intended for Acid3 post-processing where <c>document.write()</c>
+    /// injects empty tables that render as visible blocks in HtmlRenderer.
+    /// <para>
+    /// <b>Do not use in the general pipeline</b> — Acid2 and other pages
+    /// rely on structural <c>&lt;table&gt;</c> elements for correct layout.
+    /// </para>
+    /// </summary>
+    internal static string StripTables(string html)
+    {
+        return TablePattern.Replace(html, string.Empty);
     }
 
     /// <summary>

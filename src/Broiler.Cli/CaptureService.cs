@@ -683,6 +683,17 @@ public class CaptureService
     }
 
     /// <summary>
+    /// Strips all <c>&lt;table&gt;…&lt;/table&gt;</c> elements.
+    /// Intended for Acid3-specific post-processing only — structural tables
+    /// in other pages (e.g. Acid2) must be preserved.
+    /// Delegates to <see cref="HtmlPostProcessor.StripTables"/>.
+    /// </summary>
+    internal static string StripTables(string html)
+    {
+        return HtmlPostProcessor.StripTables(html);
+    }
+
+    /// <summary>
     /// Decodes a <c>data:</c> URI to its text content.
     /// Supports <c>data:text/javascript,...</c> (percent-encoded) and
     /// <c>data:text/javascript;base64,...</c> formats.

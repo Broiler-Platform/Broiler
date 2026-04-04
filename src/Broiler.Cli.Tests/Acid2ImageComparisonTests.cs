@@ -1,5 +1,7 @@
+using Broiler.App.Rendering;
 using Broiler.HTML.Image;
 using SkiaSharp;
+using System.Drawing;
 
 namespace Broiler.Cli.Tests;
 
@@ -164,18 +166,14 @@ public class Acid2ImageComparisonTests
     /// <summary>
     /// Count non-white content pixels across the full viewport and verify
     /// that the render contains at least a minimum amount of content.
-    /// As more ACID2 features are implemented, this threshold should increase.
+    /// Note: <c>RenderToImage</c> renders from position 0 (the intro
+    /// section), not the <c>#top</c> face region.  The face-region content
+    /// pixel count is validated by <see cref="Acid2_RenderAtAnchor_HasFaceContent"/>.
     ///
-    /// Current baseline: ~1,785 content pixels in Broiler.
-    /// Reference has: ~22,512 content pixels.
-    /// Threshold: at least 500 (well below current baseline to catch
-    /// regressions without false failures).
-    ///
-    /// As rendering improves, this threshold should be progressively
-    /// tightened toward the reference target of ~22,512:
-    ///   - After Phase 1–3 (scalp/ears/forehead): raise to ~5,000
-    ///   - After Phase 4–6 (eyes/nose/smile):     raise to ~15,000
-    ///   - After Phase 7–10 (chin/parser/table):   raise to ~20,000
+    /// Current baseline: ~8,990 content pixels (intro section + fixed-
+    /// position scalp bar + partial face content from position 0).
+    /// Threshold: at least 5,000 (catches regressions without being
+    /// overly sensitive to minor layout changes).
     /// </summary>
     [Fact]
     public void Acid2_ContentPixelCount_AboveMinimum()
@@ -193,10 +191,10 @@ public class Acid2ImageComparisonTests
                 contentPixels++;
         }
 
-        Assert.True(contentPixels >= 500,
+        Assert.True(contentPixels >= 5000,
             $"Content pixel count ({contentPixels}) is below minimum threshold " +
-            $"of 500. Reference has ~22,512 content pixels. " +
-            "A very low count indicates a rendering regression.");
+            $"of 5,000. Expected ~8,990 content pixels from position 0. " +
+            "A low count indicates a rendering regression.");
     }
 
     // ──────── Milestone 4: No complete rendering failure ────────
@@ -230,5 +228,90 @@ public class Acid2ImageComparisonTests
         Assert.True(redCount < total / 2,
             $"Render is majority red ({redCount}/{total} pixels) — " +
             "stylesheet loading failure (.picture background override missing).");
+    }
+
+    // ──────── Milestone 5: Anchor-aware rendering ────────
+
+    /// <summary>
+    /// Render the Acid2 page scrolled to the <c>#top</c> anchor using the
+    /// same container-based <c>RenderAtAnchor</c> approach as the CLI, and
+    /// verify that the face content is visible.  This catches regressions
+    /// where the rendering pipeline (layout → anchor lookup → paint) fails
+    /// at high scroll offsets.
+    /// </summary>
+    [Fact]
+    public void Acid2_RenderAtAnchor_HasFaceContent()
+    {
+        var html = LoadAcid2Html();
+        int w = 1024, h = 768;
+
+        using var container = new HtmlContainer();
+        container.AvoidAsyncImagesLoading = true;
+        container.AvoidImagesLateLoading = true;
+        container.MaxSize = new SizeF(w, 99999);
+        container.SetHtml(html);
+
+        using var layoutBmp = new SKBitmap(w, 2000, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var layoutCanvas = new SKCanvas(layoutBmp);
+        layoutCanvas.Clear(SKColors.White);
+        container.PerformLayout(layoutCanvas, new RectangleF(0, 0, w, 99999));
+
+        var rect = container.GetElementRectangle("top");
+        Assert.NotNull(rect);
+        float scrollY = rect.Value.Y;
+
+        container.Location = new System.Drawing.PointF(0, scrollY);
+        container.MaxSize = new SizeF(w, h);
+
+        using var bitmap = new SKBitmap(w, h, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.White);
+        canvas.Save();
+        canvas.Translate(0, -scrollY);
+        container.PerformPaint(canvas, new RectangleF(0, scrollY, w, h));
+        canvas.Restore();
+
+        int nonWhitePixels = 0;
+        for (int y = 0; y < bitmap.Height; y++)
+        for (int x = 0; x < bitmap.Width; x++)
+        {
+            var px = bitmap.GetPixel(x, y);
+            if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+                nonWhitePixels++;
+        }
+
+        // The raw Acid2 HTML rendered at #top should have substantial face
+        // content (~21,593 pixels).  Use a threshold of 15,000 to catch
+        // regressions without being overly sensitive to minor layout changes.
+        Assert.True(nonWhitePixels >= 15000,
+            $"Acid2 render at #top has only {nonWhitePixels} content pixels. " +
+            "Expected at least 15,000 (reference: ~22,512). " +
+            "This may indicate a regression in anchor-based rendering.");
+    }
+
+    // ──────── Milestone 6: Post-processor preserves Acid2 structure ────────
+
+    /// <summary>
+    /// Verify that <see cref="HtmlPostProcessor.Process"/> does not strip
+    /// the <c>&lt;table&gt;</c> elements that are essential to the Acid2
+    /// face structure.  The <c>&lt;table&gt;</c> implicitly closes a
+    /// <c>&lt;p&gt;</c> tag, enabling the <c>p + table + p</c> sibling
+    /// combinator that hides <c>p.bad</c>.
+    /// </summary>
+    [Fact]
+    public void Acid2_PostProcessor_PreservesTables()
+    {
+        var html = LoadAcid2Html();
+        int tablesBefore = System.Text.RegularExpressions.Regex.Matches(
+            html, @"<table", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Count;
+
+        var processed = HtmlPostProcessor.Process(html);
+        int tablesAfter = System.Text.RegularExpressions.Regex.Matches(
+            processed, @"<table", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Count;
+
+        Assert.True(tablesAfter >= tablesBefore,
+            $"HtmlPostProcessor.Process() stripped {tablesBefore - tablesAfter} " +
+            $"table(s) from Acid2 HTML (before: {tablesBefore}, after: {tablesAfter}). " +
+            "Acid2 requires <table> elements for correct face layout.");
     }
 }
