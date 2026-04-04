@@ -843,21 +843,41 @@ internal class CssBox : CssBoxProperties, IDisposable
 
             if (MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight))
             {
-                double maxH = CssValueParser.ParseLength(MaxHeight, ContainingBlock.Size.Height, GetEmHeight());
-                if (contentHeight > maxH)
+                // CSS2.1 §10.7: If the containing block's height is not
+                // specified explicitly and this element is not absolutely
+                // positioned, a percentage max-height is treated as 'none'.
+                bool maxIsPercentageAuto = MaxHeight.Contains('%')
+                    && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+                    && (ContainingBlock.Height == CssConstants.Auto || string.IsNullOrEmpty(ContainingBlock.Height));
+
+                if (!maxIsPercentageAuto)
                 {
-                    contentHeight = maxH;
-                    constrained = true;
+                    double maxH = CssValueParser.ParseLength(MaxHeight, ContainingBlock.Size.Height, GetEmHeight());
+                    if (contentHeight > maxH)
+                    {
+                        contentHeight = maxH;
+                        constrained = true;
+                    }
                 }
             }
 
             if (MinHeight != "0" && !string.IsNullOrEmpty(MinHeight))
             {
-                double minH = CssValueParser.ParseLength(MinHeight, ContainingBlock.Size.Height, GetEmHeight());
-                if (contentHeight < minH)
+                // CSS2.1 §10.7: If the containing block's height is not
+                // specified explicitly and this element is not absolutely
+                // positioned, a percentage min-height is treated as '0'.
+                bool minIsPercentageAuto = MinHeight.Contains('%')
+                    && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+                    && (ContainingBlock.Height == CssConstants.Auto || string.IsNullOrEmpty(ContainingBlock.Height));
+
+                if (!minIsPercentageAuto)
                 {
-                    contentHeight = minH;
-                    constrained = true;
+                    double minH = CssValueParser.ParseLength(MinHeight, ContainingBlock.Size.Height, GetEmHeight());
+                    if (contentHeight < minH)
+                    {
+                        contentHeight = minH;
+                        constrained = true;
+                    }
                 }
             }
 

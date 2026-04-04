@@ -77,7 +77,7 @@ internal sealed class DomUtils
             while ((sib.Display == CssConstants.None || sib.Position == CssConstants.Absolute || sib.Position == CssConstants.Fixed) && index - diff - 1 >= 0)
                 sib = b.ParentBox.Boxes[index - ++diff];
 
-            return (sib.Display == CssConstants.None || sib.Position == CssConstants.Fixed) ? null : sib;
+            return (sib.Display == CssConstants.None || sib.Position == CssConstants.Absolute || sib.Position == CssConstants.Fixed) ? null : sib;
         }
 
         return null;
