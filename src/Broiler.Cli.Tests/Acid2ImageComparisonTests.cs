@@ -659,4 +659,242 @@ public class Acid2ImageComparisonTests
             "Margin collapsing with clear should position the smile " +
             "elements so they render visible content in this region.");
     }
+
+    // ──────── P2: §2.15 — position:relative with bottom offset ────────
+
+    /// <summary>
+    /// CSS 2.1 §9.4.3: When <c>top</c> is <c>auto</c> and <c>bottom</c>
+    /// is specified, the visual offset is <c>dy = -bottom</c>.  A box with
+    /// <c>position: relative; bottom: -20px</c> should be pushed 20px
+    /// downward from its normal flow position.
+    /// </summary>
+    [Fact]
+    public void CssPositionRelativeBottomOffset_MovesElementDown()
+    {
+        const string html = @"
+            <html><body style='margin:0; padding:0'>
+                <div style='width:100px; height:50px; background:#0000ff;
+                            position:relative; bottom:-20px;'></div>
+                <div style='width:100px; height:50px; background:#00ff00;'></div>
+            </body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+
+        // The blue box starts at y=0 in flow, then bottom:-20px means
+        // dy = -(-20px) = +20px offset.  The blue box visually renders
+        // at y=20 (not y=0).  Row y=0 should be white (no blue).
+        int blueAtY0 = 0;
+        int blueAtY25 = 0;
+        for (int x = 0; x < 100; x++)
+        {
+            var px0 = bitmap.GetPixel(x, 0);
+            if (px0.Blue > 200 && px0.Red < 50 && px0.Green < 50)
+                blueAtY0++;
+
+            var px25 = bitmap.GetPixel(x, 25);
+            if (px25.Blue > 200 && px25.Red < 50 && px25.Green < 50)
+                blueAtY25++;
+        }
+
+        // With bottom:-20px offset, blue should NOT appear at y=0 but
+        // SHOULD appear at y=25.
+        Assert.True(blueAtY25 > 50,
+            $"Expected blue pixels at y=25 (found {blueAtY25}). " +
+            "position:relative with bottom:-20px should push the box " +
+            "20px downward (dy = -bottom = +20px).");
+    }
+
+    // ──────── P2: §2.17 — Negative margin non-collapsing through borders ────────
+
+    /// <summary>
+    /// CSS 2.1 §8.3.1: Margins of elements that have borders do not
+    /// collapse through the parent.  A child with <c>margin-bottom: -1em</c>
+    /// inside a parent with bottom border should not collapse its margin
+    /// with elements outside the parent.
+    /// </summary>
+    [Fact]
+    public void CssNegativeMarginDoesNotCollapseThroughBorders()
+    {
+        const string html = @"
+            <html><body style='margin:0; padding:0'>
+                <div style='border-top: 1px solid black; border-bottom: 1px solid black;'>
+                    <div style='width:100px; height:50px; background:#0000ff;
+                                margin-bottom:-10px;'></div>
+                </div>
+                <div style='width:100px; height:50px; background:#00ff00;'></div>
+            </body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+
+        // The parent has borders, so the child's -10px margin should NOT
+        // collapse through.  The green box should start at approx y=52
+        // (1px top border + 50px blue + 1px bottom border = 52px).
+        // Without border, the green would start at y=41 (50-10+1=41).
+        int greenRows = 0;
+        int firstGreenY = -1;
+        for (int y = 0; y < bitmap.Height; y++)
+        {
+            bool hasGreen = false;
+            for (int x = 0; x < 100; x++)
+            {
+                var px = bitmap.GetPixel(x, y);
+                if (px.Green > 200 && px.Red < 50 && px.Blue < 50)
+                {
+                    hasGreen = true;
+                    break;
+                }
+            }
+            if (hasGreen)
+            {
+                greenRows++;
+                if (firstGreenY < 0) firstGreenY = y;
+            }
+        }
+
+        // Green should appear (parent's border prevents full margin collapse).
+        Assert.True(greenRows > 30,
+            $"Green box has only {greenRows} rows (first at y={firstGreenY}). " +
+            "Expected ~50 rows.  Parent borders should prevent negative " +
+            "margin from collapsing through per CSS 2.1 §8.3.1.");
+    }
+
+    // ──────── P3: §2.21 — display:table and anonymous table cells ────────
+
+    /// <summary>
+    /// CSS 2.1 §17.2.1: Children of a <c>display: table</c> element that
+    /// are not table-row or table-cell should be wrapped in anonymous
+    /// table-cell boxes.  Verify that a <c>&lt;ul&gt;</c> with
+    /// <c>display: table</c> renders its <c>&lt;li&gt;</c> children
+    /// with table layout.
+    /// </summary>
+    [Fact]
+    public void CssDisplayTable_AnonymousTableCells_RenderCorrectly()
+    {
+        const string html = @"
+            <html><head><style>
+                ul { display: table; padding: 0; margin: 0; }
+                ul li { padding: 0; margin: 0; list-style: none; }
+                ul li.cell { display: table-cell; width: 50px; height: 50px; background: #0000ff; }
+                ul li.block { display: block; width: 50px; height: 50px; background: #00ff00; }
+            </style></head>
+            <body style='margin:0; padding:0'>
+                <ul>
+                    <li class='cell'></li>
+                    <li class='block'></li>
+                </ul>
+            </body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 300, 200);
+
+        // The table-cell li should render as a cell.  The block li should
+        // be wrapped in an anonymous table-cell.  Both should appear as
+        // side-by-side cells in a table row.
+        int bluePixels = 0;
+        int greenPixels = 0;
+        for (int y = 0; y < 60; y++)
+        for (int x = 0; x < 200; x++)
+        {
+            var px = bitmap.GetPixel(x, y);
+            if (px.Blue > 200 && px.Red < 50 && px.Green < 50) bluePixels++;
+            if (px.Green > 200 && px.Red < 50 && px.Blue < 50) greenPixels++;
+        }
+
+        // Both cells should render with visible content.
+        Assert.True(bluePixels > 500,
+            $"Only {bluePixels} blue pixels.  The display:table-cell " +
+            "li element should render with its blue background.");
+        Assert.True(greenPixels > 500,
+            $"Only {greenPixels} green pixels.  The block li should be " +
+            "wrapped in an anonymous table-cell and render with green " +
+            "background (CSS 2.1 §17.2.1).");
+    }
+
+    // ──────── P3: §2.22 — overflow:hidden clipping ────────
+
+    /// <summary>
+    /// CSS 2.1 §11.1.1: <c>overflow: hidden</c> clips content at the
+    /// padding edge of the element.  A tall child inside a short parent
+    /// with <c>overflow: hidden</c> should be clipped to the parent's
+    /// height.
+    /// </summary>
+    [Fact]
+    public void CssOverflowHidden_ClipsContentToParentBounds()
+    {
+        const string html = @"
+            <html><body style='margin:0; padding:0'>
+                <div style='width:100px; height:50px; overflow:hidden;'>
+                    <div style='width:100px; height:200px; background:#0000ff;'></div>
+                </div>
+                <div style='width:100px; height:50px; background:#00ff00;'></div>
+            </body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 300);
+
+        // The blue box is 200px tall but clipped to 50px by overflow:hidden.
+        // The green box should start at y=50 (not y=200).
+        int blueAtY40 = 0;
+        int blueAtY60 = 0;
+        int greenAtY60 = 0;
+        for (int x = 0; x < 100; x++)
+        {
+            var px40 = bitmap.GetPixel(x, 40);
+            if (px40.Blue > 200 && px40.Red < 50 && px40.Green < 50)
+                blueAtY40++;
+
+            var px60 = bitmap.GetPixel(x, 60);
+            if (px60.Blue > 200 && px60.Red < 50 && px60.Green < 50)
+                blueAtY60++;
+            if (px60.Green > 200 && px60.Red < 50 && px60.Blue < 50)
+                greenAtY60++;
+        }
+
+        // Blue should be visible at y=40 (within the 50px clipped area)
+        Assert.True(blueAtY40 > 50,
+            $"Expected blue at y=40 (found {blueAtY40}). " +
+            "The blue child should be visible within the clipped parent.");
+
+        // At y=60, the blue should be clipped and green should appear
+        Assert.True(blueAtY60 < 10,
+            $"Found {blueAtY60} blue pixels at y=60 — overflow:hidden " +
+            "should clip the blue child to the parent's 50px height.");
+    }
+
+    // ──────── P1: §2.9 — background-attachment:fixed test ────────
+
+    /// <summary>
+    /// CSS 2.1 §14.2.1: <c>background-attachment: fixed</c> tiles the
+    /// background relative to the viewport origin, not the element's
+    /// padding box.  Verify that a small data-URI image with fixed
+    /// attachment renders as a non-empty background.
+    /// </summary>
+    [Fact]
+    public void CssBackgroundAttachmentFixed_RendersFromViewportOrigin()
+    {
+        // Use a 1x1 yellow pixel PNG as background with fixed attachment.
+        const string html = @"
+            <html><body style='margin:0; padding:0'>
+                <div style='width:100px; height:100px; margin-top:50px;
+                            background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mP4%2F58BAAT%2FAf9jgNErAAAAAElFTkSuQmCC) fixed;'></div>
+            </body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+
+        // The background is a 1x1 yellow pixel (#FFFF00) tiled from viewport
+        // origin.  Within the 100x100 div (starting at y=50), the yellow
+        // background should fill the box.
+        int yellowPixels = 0;
+        for (int y = 50; y < 150; y++)
+        for (int x = 0; x < 100; x++)
+        {
+            var px = bitmap.GetPixel(x, y);
+            if (px.Red > 200 && px.Green > 200 && px.Blue < 80)
+                yellowPixels++;
+        }
+
+        Assert.True(yellowPixels > 1000,
+            $"Only {yellowPixels} yellow pixels found in the fixed-" +
+            "background div.  Expected ~10,000 (100×100).  " +
+            "background-attachment:fixed should tile the 1x1 yellow " +
+            "pixel from the viewport origin.");
+    }
 }
