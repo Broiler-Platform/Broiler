@@ -363,12 +363,12 @@ public class Acid2ImageComparisonTests
             }
         }
 
-        // 4em at default 12px = 48px.  Allow some tolerance (60px) for
-        // border/padding and anti-aliasing, but reject viewport-wide runs
-        // which would indicate percentage width resolved incorrectly.
-        Assert.True(maxBlackRunWidth <= 200,
+        // 4em at default 12px = 48px.  Allow tolerance for border/padding
+        // and font-size variance, but reject viewport-wide runs which would
+        // indicate percentage width resolved against the wrong container.
+        Assert.True(maxBlackRunWidth <= 80,
             $"Widest horizontal black run in scalp region is {maxBlackRunWidth}px. " +
-            "Expected ≤200px (max-width: 4em ≈ 48px + tolerance). " +
+            "Expected ≤80px (max-width: 4em ≈ 48px + tolerance). " +
             "position:fixed may be resolving percentage width against the " +
             "wrong containing block instead of the viewport.");
     }
@@ -410,7 +410,7 @@ public class Acid2ImageComparisonTests
         Assert.True(blueRows >= 90,
             $"Blue box height ({blueRows}px) is below 90px. " +
             "CSS 2.1 §10.7 requires min-height to override max-height " +
-            "when min-height > max-height.  Expected ≥100px.");
+            "when min-height > max-height.  Expected ≥90px.");
     }
 
     /// <summary>
@@ -639,7 +639,7 @@ public class Acid2ImageComparisonTests
                 smileContentPixels++;
         }
 
-        Assert.True(smileContentPixels > 100,
+        Assert.True(smileContentPixels > 500,
             $"Smile region (y:300..500, x:100..500) has only " +
             $"{smileContentPixels} content pixels (excluding white/red). " +
             "Margin collapsing with clear should position the smile " +

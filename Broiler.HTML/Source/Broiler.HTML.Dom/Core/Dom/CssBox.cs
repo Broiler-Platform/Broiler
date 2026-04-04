@@ -346,9 +346,20 @@ internal class CssBox : CssBoxProperties, IDisposable
             // Because their width and height are set by CssTable
             if (Display != CssConstants.TableCell && Display != CssConstants.Table)
             {
-                double width = ContainingBlock.Size.Width
-                               - ContainingBlock.ActualPaddingLeft - ContainingBlock.ActualPaddingRight
-                               - ContainingBlock.ActualBorderLeftWidth - ContainingBlock.ActualBorderRightWidth;
+                // CSS2.1 §9.6.1: The containing block for a fixed-position
+                // element is the viewport (initial containing block).
+                // Use the viewport width for percentage/auto resolution.
+                double width;
+                if (Position == CssConstants.Fixed && ContainerInt != null)
+                {
+                    width = ContainerInt.PageSize.Width;
+                }
+                else
+                {
+                    width = ContainingBlock.Size.Width
+                            - ContainingBlock.ActualPaddingLeft - ContainingBlock.ActualPaddingRight
+                            - ContainingBlock.ActualBorderLeftWidth - ContainingBlock.ActualBorderRightWidth;
+                }
 
                 if (Width != CssConstants.Auto && !string.IsNullOrEmpty(Width))
                 {
@@ -848,6 +859,12 @@ internal class CssBox : CssBoxProperties, IDisposable
             double contentHeight = ActualBottom - Location.Y - ActualPaddingTop - ActualPaddingBottom - ActualBorderTopWidth - ActualBorderBottomWidth;
             bool constrained = false;
 
+            // CSS2.1 §9.6.1: For fixed-position elements, percentage
+            // heights resolve against the viewport, not the parent.
+            double cbHeight = (Position == CssConstants.Fixed && ContainerInt != null)
+                ? ContainerInt.PageSize.Height
+                : ContainingBlock.Size.Height;
+
             if (MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight))
             {
                 // CSS2.1 §10.7: If the containing block's height is not
@@ -859,7 +876,7 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                 if (!maxIsPercentageAuto)
                 {
-                    double maxH = CssValueParser.ParseLength(MaxHeight, ContainingBlock.Size.Height, GetEmHeight());
+                    double maxH = CssValueParser.ParseLength(MaxHeight, cbHeight, GetEmHeight());
                     if (contentHeight > maxH)
                     {
                         contentHeight = maxH;
@@ -879,7 +896,7 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                 if (!minIsPercentageAuto)
                 {
-                    double minH = CssValueParser.ParseLength(MinHeight, ContainingBlock.Size.Height, GetEmHeight());
+                    double minH = CssValueParser.ParseLength(MinHeight, cbHeight, GetEmHeight());
                     if (contentHeight < minH)
                     {
                         contentHeight = minH;
