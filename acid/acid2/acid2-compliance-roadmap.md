@@ -152,8 +152,11 @@ HTML 4 DTD, making `p, table, p.bad` siblings.  The `p + table + p` rule
 should then apply `margin-top: 3em` to `p.bad`, pushing it under the
 absolutely-positioned table and hiding it.
 
-**Observed:** 100 red pixels detected in the Broiler render (eyes region),
-indicating `p.bad`'s red border is partially visible.
+**Observed:** ~~100 red pixels detected in the Broiler render (eyes region),
+indicating `p.bad`'s red border is partially visible.~~ **Updated
+2026-04-04:** Red pixel count is now 0.  The `p.bad` red border is no
+longer visible, but the structural effect of the `<table>` implicit `<p>`
+closure on layout still needs full verification.
 
 ---
 
@@ -279,11 +282,11 @@ paint order errors.
 
 ---
 
-### Phase 5 — Nose (y 130–210) — Completely Missing
+### Phase 5 — Nose (y 130–210) — 98.82% Match
 
 #### 2.11  Float layout with negative margins
 
-- [ ] **TODO: Fix float layout with negative top/bottom margins**
+- [ ] **TODO: Fix float layout with negative top/bottom margins** *(partially resolved)*
 
 **CSS under test:**
 ```css
@@ -299,14 +302,16 @@ Percentage `height` and `min-height` on a float with no fixed-height
 containing block compute to `auto` (§10.5, §10.7), so `max-height: 3em`
 wins.
 
-**Observed:** Zero content pixels in the nose region.  The entire nose
-structure is missing from the Broiler render.
+**Observed (updated 2026-04-04):** The nose region now renders at 98.82%
+match (12,104/12,248 pixels).  Negative margins are partially functional.
+The remaining 1.18% gap likely stems from sub-pixel rounding in the
+negative margin offset calculation.
 
 ---
 
 #### 2.12  `::before` and `::after` pseudo-elements with border tricks
 
-- [ ] **TODO: Implement `::before`/`::after` content generation with border drawing**
+- [ ] **TODO: Implement `::before`/`::after` content generation with border drawing** *(partially resolved — nostrils mostly render)*
 
 **CSS under test:**
 ```css
@@ -339,7 +344,7 @@ also now correctly skips `position: absolute` siblings.
 
 ---
 
-### Phase 6 — Smile (y 196–260) — Completely Missing
+### Phase 6 — Smile (y 196–260) — 74.56% Match
 
 #### 2.14  Margin collapsing with `clear` and negative clearance
 
@@ -401,11 +406,11 @@ so the `<strong>`'s `margin-bottom: -1em` should not collapse outward.
 
 ---
 
-### Phase 7 — Chin (y 261–275) — Completely Missing
+### Phase 7 — Chin (y 261–275) — 100% Match ✅
 
 #### 2.18  `line-height` and `display: inline` layout
 
-- [ ] **TODO: Fix `line-height` with `display: inline` child inside block**
+- [x] **DONE: `line-height` with `display: inline` child renders correctly** *(chin region 100% match)*
 
 **CSS under test:**
 ```css
@@ -423,12 +428,16 @@ should produce a single line box.
 
 #### 2.19  Data URI background image with `no-repeat fixed`
 
-- [ ] **TODO: Support `background` shorthand with `no-repeat fixed` and data URI**
+- [x] **DONE: `background` shorthand with `no-repeat fixed` and data URI renders correctly** *(chin region 100% match)*
 
 The chin uses a 64×64 red square PNG as a non-repeating fixed background.
 Since the face is scrolled to `#top` (far down the page), the fixed
 background position should place the red square outside the visible area,
 making only the yellow background visible.
+
+**Observed (updated 2026-04-04):** The chin region is at 100% pixel match
+with the Chromium reference, indicating that the data URI background
+with `no-repeat fixed` is being handled correctly in this context.
 
 ---
 
@@ -509,37 +518,56 @@ cause overflow to appear.
 > fully visible (nose 98.82%, smile 74.56%, chin 100%).
 
 - [x] ~~Face invisible due to table stripping in HtmlPostProcessor~~ → **fixed**
-- [ ] 2.11: Float layout with negative margins (nose) — partially working
-- [ ] 2.12: `::before`/`::after` pseudo-elements with border tricks (nose)
-- [ ] 2.14: Margin collapsing with `clear` and negative clearance (smile)
-- [ ] 2.1: `position: fixed` viewport-relative positioning (scalp)
+- [ ] 2.11: Float layout with negative margins (nose) — 98.82% match, nearly resolved
+  - **Action:** Investigate sub-pixel rounding in negative margin offset (`-2em`, `-1em`) at `CssBox.PerformLayoutImp`.  Compare float Y position with Chromium DevTools computed values.
+- [ ] 2.12: `::before`/`::after` pseudo-elements with border tricks (nose) — partially working
+  - **Action:** Verify `content: ''` generates a box for `::before`/`::after` when `display: block` is set.  Check border-color assignment on zero-height elements.
+- [ ] 2.14: Margin collapsing with `clear` and negative clearance (smile) — 74.56% match
+  - **Action:** Implement negative clearance calculation per §8.3.1.  The `.empty` box collapses, and its child's `-6em` margin interacts with `.smile`'s `clear: both`.
+- [ ] 2.1: `position: fixed` viewport-relative positioning (scalp) — 1.60% match
+  - **Action:** Fix `position: fixed` containing block resolution in `CssBox` to use viewport (not parent) as reference per §9.6.1.  The scalp bar renders at y=105–125 instead of y=51–68.
 
-### Priority P1 — High (major face features missing)
+### Priority P1 — High (major face features degraded)
 
-- [ ] 2.8: `<object>` fallback content rendering (eyes)
-- [ ] 2.9: `background-attachment: fixed` (eyes)
-- [ ] 2.10: Paint order per Appendix E (eyes)
+- [ ] 2.8: `<object>` fallback content rendering (eyes) — 66.17% match
+  - **Action:** Implement `<object>` element fallback chain — when `data` attribute references unsupported content, render inner `<object>` children.  Start with `DomParser` fallback logic.
+- [ ] 2.9: `background-attachment: fixed` (eyes) — partially working
+  - **Action:** Implement fixed background positioning relative to viewport in `CssBox` background painting.  The data URI PNG background should tile from viewport origin.
+- [ ] 2.10: Paint order per Appendix E (eyes) — partially working
+  - **Action:** Audit `PaintWalker` stacking order: block-level children paint first, then floats, then inline content.  Red background of `.eyes` must be fully covered.
 - [ ] 2.4: Compound attribute selectors (ears)
+  - **Action:** Verify `[class~=one].first.one` compound selector matching in `CssParser`.  Test against `<blockquote class="first one">`.
 - [ ] 2.5: Float shrink-to-fit in abs-pos blocks (ears)
-- [ ] 2.18: `line-height` + `display: inline` layout (chin)
+  - **Action:** Implement shrink-to-fit width calculation for absolutely-positioned blocks containing only floats.  The container should shrink-wrap to 48px.
+- [x] ~~2.18: `line-height` + `display: inline` layout (chin)~~ → **done** (100% match)
+- [x] ~~2.19: Data URI `no-repeat fixed` background (chin)~~ → **done** (100% match)
 
 ### Priority P2 — Medium (detail features)
 
 - [ ] 2.2: `min-height` > `max-height` override (scalp sizing)
+  - **Action:** Ensure `min-height` (1em = 12px) overrides `max-height` (2mm ≈ 7.6px) per §10.7 in height resolution.  Verify `mm` unit conversion accuracy.
 - [ ] 2.6: `overflow` clipping with width constraints (forehead)
+  - **Action:** Verify `overflow: visible` on `.forehead` allows child overflow, then `overflow: hidden` on `html` clips it.  Check `CssBox` clip rect propagation.
 - [ ] 2.7: Data URI background images (forehead)
-- [ ] 2.13: ~~Percentage height computing to `auto` (nose sizing)~~ → done, see §2.13
+  - **Action:** Verify 1×1 yellow pixel data URI PNG loads and tiles correctly as `.forehead` background.  Check `CssBox` background image decoding for `data:image/png;base64,...` URIs.
+- [x] 2.13: ~~Percentage height computing to `auto` (nose sizing)~~ → done, see §2.13
 - [ ] 2.15: `position: relative` with `bottom` offset (smile)
+  - **Action:** Verify `bottom: -1em` on `position: relative` shifts the element downward by 1em.  Check `CssBox` relative positioning logic.
 - [ ] 2.16: `float: inherit` value (smile)
+  - **Action:** Implement `inherit` value for the `float` property in `CssParser` / `CssBox`.  The `<em>` should inherit `float: right` from its parent `<span>`.
 - [ ] 2.17: Negative margin non-collapsing through borders (smile)
-- [ ] 2.19: `background` shorthand with `no-repeat fixed` (chin)
+  - **Action:** Ensure `MarginBottomCollapse` checks for parent borders before collapsing.  The `<em>` has `border-top`/`border-bottom`, blocking `<strong>`'s `-1em` margin collapse.
 
 ### Priority P3 — Low (parser and table edge cases)
 
 - [ ] 2.3: Adjacent sibling `+` combinator with implicit `<p>` closure
+  - **Action:** Verify `DomParser` implicitly closes `<p>` when `<table>` is encountered (HTML 4 DTD), making `p, table, p.bad` siblings for the `+` combinator.
 - [ ] 2.20: CSS comment parsing and error recovery
+  - **Action:** Add test cases for each malformed CSS rule in the Acid2 test and verify `CssParser` recovers correctly, ignoring invalid declarations.
 - [ ] 2.21: `display: table` and anonymous table cells
+  - **Action:** Implement `display: table` layout mode and anonymous table cell wrapping in `CssLayoutEngine`.  The `<ul>` should render as a table row.
 - [ ] 2.22: `overflow: hidden` image container clipping
+  - **Action:** Fix `overflow: hidden` with explicit `height: 10px` to clip image content.  Check `CssBox` overflow clipping path.
 
 ---
 
@@ -583,5 +611,51 @@ dotnet test src/Broiler.Cli.Tests --filter "FullyQualifiedName~Acid2"
 | Phase 0 complete | >5% | 0 | ✅ Achieved (80%) |
 | Phase 1–3 complete | >40% | 0 | ✅ Achieved (80%) |
 | Phase 4–6 complete | >80% | 0 | ✅ Achieved (80%) |
-| Phase 7–10 complete | >95% | 0 | ⬜ |
+| Phase 7–10 complete | >95% | 0 | ⬜ Next target |
 | Full compliance | 100% | 0 | ⬜ |
+
+---
+
+## 6  Progress Tracking
+
+| Date | Content Match | Key Change | Resolved Items |
+|---|---|---|---|
+| 2026-04-03 | 0.95% | Initial baseline — face invisible | — |
+| 2026-04-04 | 80.00% | Fixed table stripping in HtmlPostProcessor; fixed percentage min-height/max-height; fixed GetPreviousInFlowSibling abs-pos check | §2.0, §2.13, chin (§2.18, §2.19) |
+
+### Recommended Next Steps (ordered by expected impact)
+
+1. **Fix `position: fixed` viewport positioning (§2.1)** — The forehead/scalp
+   region is at 1.60% match.  Correcting `position: fixed` to use the viewport
+   as the containing block per §9.6.1 should recover ~1,600 pixels (forehead)
+   and improve the overall content match by ~7 percentage points.
+
+2. **Implement `<object>` fallback rendering (§2.8)** — The eyes are at 66.17%
+   match.  The nested `<object>` fallback chain is the primary blocker for the
+   eye region.  Implementing this in `DomParser` should improve eye match
+   toward 90%+.
+
+3. **Fix margin collapsing with clear/negative clearance (§2.14)** — The smile
+   is at 74.56% match.  Negative clearance calculation is the key remaining
+   issue.  Improving this should push the smile region above 90%.
+
+4. **Audit paint order (§2.10)** — Combined with the `<object>` fix, correcting
+   the CSS 2.1 Appendix E paint order should eliminate remaining red background
+   bleed in the eyes region.
+
+5. **Parser edge cases (§2.20, §2.21)** — These are lower priority but should
+   be addressed before declaring full compliance.  CSS error recovery and
+   `display: table` layout are independently testable.
+
+### Completion Summary
+
+| Category | Total Items | Done | In Progress | Remaining |
+|---|---|---|---|---|
+| Phase 0 (Stylesheet) | 1 | 1 | 0 | 0 |
+| Phase 1–3 (Scalp/Ears/Forehead) | 7 | 0 | 0 | 7 |
+| Phase 4 (Eyes) | 3 | 0 | 3 | 0 |
+| Phase 5 (Nose) | 3 | 1 | 2 | 0 |
+| Phase 6 (Smile) | 4 | 0 | 1 | 3 |
+| Phase 7 (Chin) | 2 | 2 | 0 | 0 |
+| Phase 8–10 (Parser/Table) | 3 | 0 | 0 | 3 |
+| **Total** | **23** | **4** | **6** | **13** |
