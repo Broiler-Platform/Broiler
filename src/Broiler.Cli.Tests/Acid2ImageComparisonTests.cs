@@ -897,4 +897,222 @@ public class Acid2ImageComparisonTests
             "background-attachment:fixed should tile the 1x1 yellow " +
             "pixel from the viewport origin.");
     }
+
+    // ──────── P2: §2.7 — Data URI background image rendering ────────
+
+    /// <summary>
+    /// Verify that a <c>data:image/png;base64,…</c> URI is loaded and
+    /// rendered as a CSS background image.  The Acid2 forehead region uses
+    /// a 1×1 yellow pixel PNG as the background of <c>.forehead</c>.
+    /// </summary>
+    [Fact]
+    public void CssDataUriBackgroundImage_RendersCorrectly()
+    {
+        // 1x1 yellow pixel PNG (same as Acid2 .forehead background)
+        const string html = @"
+            <html><body style='margin:0; padding:0'>
+                <div style='width:80px; height:80px;
+                            background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR42mP4%2F58BAAT%2FAf9jgNErAAAAAElFTkSuQmCC);'></div>
+            </body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+
+        int yellowPixels = 0;
+        for (int y = 0; y < 80; y++)
+        for (int x = 0; x < 80; x++)
+        {
+            var px = bitmap.GetPixel(x, y);
+            if (px.Red > 200 && px.Green > 200 && px.Blue < 80)
+                yellowPixels++;
+        }
+
+        // A 1x1 yellow pixel tiled over 80×80 should produce ~6,400 yellow pixels.
+        Assert.True(yellowPixels > 2000,
+            $"Only {yellowPixels} yellow pixels from data URI background. " +
+            "Expected ~6,400 (80×80).  The data:image/png;base64 URI " +
+            "should load and tile as a background image.");
+    }
+
+    // ──────── P2: §2.6 — Overflow with width constraints ────────
+
+    /// <summary>
+    /// Verify that child elements wider than their parent render without
+    /// clipping when the parent has <c>overflow: visible</c> (default).
+    /// The Acid2 <c>.forehead</c> has <c>width: 8em</c> with children
+    /// at <c>width: 12em</c>, and no overflow clipping.
+    /// </summary>
+    [Fact]
+    public void CssOverflowVisible_DoesNotClipWiderChildren()
+    {
+        const string html = @"
+            <html><body style='margin:0; padding:0'>
+                <div style='width:50px; height:50px; border: 1px solid black;'>
+                    <div style='width:100px; height:20px; background:#0000ff;'></div>
+                </div>
+            </body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+
+        // The blue child is 100px wide inside a 50px parent.  With default
+        // overflow:visible, the blue should extend past the parent's right edge.
+        int blueAtX70 = 0;
+        for (int y = 1; y < 21; y++)
+        {
+            var px = bitmap.GetPixel(70, y);
+            if (px.Blue > 200 && px.Red < 50 && px.Green < 50)
+                blueAtX70++;
+        }
+
+        Assert.True(blueAtX70 > 10,
+            $"Only {blueAtX70} blue pixels at x=70 (beyond parent's 50px width). " +
+            "Default overflow:visible should allow the wider child to paint " +
+            "beyond the parent's bounds.");
+    }
+
+    // ──────── P0: §2.12 — ::before/::after with border tricks ────────
+
+    /// <summary>
+    /// Verify that <c>::before</c> and <c>::after</c> pseudo-elements
+    /// with <c>content: ''</c> (empty string) still generate boxes that
+    /// render their CSS borders.  The Acid2 nose uses border tricks on
+    /// pseudo-elements to create triangle shapes.
+    /// </summary>
+    [Fact]
+    public void CssPseudoElementBorderTrick_RendersTriangles()
+    {
+        // A simplified version of the Acid2 nose border trick:
+        // ::before with display:block, no content, zero height,
+        // but colored borders creates a triangle shape.
+        const string html = @"
+            <html><head><style>
+                .trick { width: 40px; height: 0; }
+                .trick::before {
+                    display: block;
+                    content: '';
+                    height: 0;
+                    border-style: none solid solid;
+                    border-color: transparent #0000ff transparent #0000ff;
+                    border-width: 20px;
+                }
+            </style></head>
+            <body style='margin:0; padding:0'>
+                <div class='trick'></div>
+            </body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 100);
+
+        // The ::before pseudo-element should create a downward-pointing
+        // triangle from borders.  Check for blue pixels from the border.
+        int bluePixels = 0;
+        for (int y = 0; y < 40; y++)
+        for (int x = 0; x < 80; x++)
+        {
+            var px = bitmap.GetPixel(x, y);
+            if (px.Blue > 200 && px.Red < 50 && px.Green < 50)
+                bluePixels++;
+        }
+
+        Assert.True(bluePixels > 100,
+            $"Only {bluePixels} blue pixels from ::before border trick. " +
+            "Pseudo-elements with content:'' should generate boxes that " +
+            "render CSS borders (triangle shapes via border trick).");
+    }
+
+    // ──────── P1: §2.5 — Shrink-to-fit width for abs-pos ────────
+
+    /// <summary>
+    /// CSS 2.1 §10.3.7: Absolutely positioned non-replaced elements with
+    /// <c>width: auto</c> use shrink-to-fit width.  The element's width
+    /// should be determined by its content, not the containing block.
+    /// </summary>
+    [Fact]
+    public void CssAbsolutePositionShrinkToFit_UsesContentWidth()
+    {
+        const string html = @"
+            <html><body style='margin:0; padding:0'>
+                <div style='position:relative; width:400px; height:200px;'>
+                    <div style='position:absolute; top:0; left:0;
+                                border:2px solid black;'>
+                        <div style='float:right; width:80px; height:40px;
+                                    background:#0000ff;'></div>
+                    </div>
+                </div>
+            </body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 500, 200);
+
+        // The absolute box should shrink-to-fit around the 80px float.
+        // With 2px border on each side, total width = 84px.
+        // Check that blue pixels exist around x=0..84 but NOT at x=200+.
+        int blueLeft = 0;
+        int blueRight = 0;
+        for (int y = 0; y < 50; y++)
+        for (int x = 0; x < bitmap.Width; x++)
+        {
+            var px = bitmap.GetPixel(x, y);
+            if (px.Blue > 200 && px.Red < 50 && px.Green < 50)
+            {
+                if (x < 100) blueLeft++;
+                else if (x >= 200) blueRight++;
+            }
+        }
+
+        Assert.True(blueLeft > 500,
+            $"Only {blueLeft} blue pixels in left region (x<100). " +
+            "The absolutely positioned box should shrink-to-fit around " +
+            "the 80px float.");
+        Assert.True(blueRight < 50,
+            $"Found {blueRight} blue pixels in right region (x≥200). " +
+            "Shrink-to-fit should prevent the box from being as wide " +
+            "as the containing block.");
+    }
+
+    // ──────── P1: §2.10 — Paint order verification ────────
+
+    /// <summary>
+    /// CSS 2.1 Appendix E: In-flow block backgrounds paint first, then
+    /// float backgrounds, then inline content.  Verify that a float
+    /// paints over a block's background but under inline text.
+    /// </summary>
+    [Fact]
+    public void CssPaintOrder_FloatOverBlockBackground()
+    {
+        const string html = @"
+            <html><body style='margin:0; padding:0'>
+                <div style='width:200px; height:50px; background:#0000ff;'>
+                    <div style='float:left; width:100px; height:50px;
+                                background:#00ff00;'></div>
+                </div>
+            </body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 300, 100);
+
+        // The float (green) should paint over the parent block background (blue).
+        // Left half should be green (float), right half should be blue (block bg).
+        int greenLeft = 0;
+        int blueRight = 0;
+        for (int y = 0; y < 50; y++)
+        {
+            for (int x = 0; x < 90; x++)
+            {
+                var px = bitmap.GetPixel(x, y);
+                if (px.Green > 200 && px.Red < 50 && px.Blue < 50)
+                    greenLeft++;
+            }
+            for (int x = 110; x < 200; x++)
+            {
+                var px = bitmap.GetPixel(x, y);
+                if (px.Blue > 200 && px.Red < 50 && px.Green < 50)
+                    blueRight++;
+            }
+        }
+
+        Assert.True(greenLeft > 1000,
+            $"Only {greenLeft} green pixels in float region (x<90). " +
+            "The float should paint over the parent block's blue " +
+            "background per CSS 2.1 Appendix E.");
+        Assert.True(blueRight > 1000,
+            $"Only {blueRight} blue pixels in block background region (x>110). " +
+            "The block background should be visible where the float doesn't cover.");
+    }
 }
