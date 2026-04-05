@@ -45,6 +45,13 @@ public sealed class ScriptExtractor : IScriptExtractor
         @"(?:^|\s)defer(?:\s|$|=)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    /// <summary>
+    /// Matches the <c>async</c> attribute on a script tag (standalone or with a value).
+    /// </summary>
+    private static readonly Regex AsyncAttrPattern = new(
+        @"(?:^|\s)async(?:\s|$|=)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     // Match <script type="module"> tags (inline only, no src)
     private static readonly Regex ModuleScriptPattern = new(
         @"<script\s[^>]*type\s*=\s*[""']module[""'][^>]*>(?<content>[\s\S]*?)</script>",
@@ -110,6 +117,7 @@ public sealed class ScriptExtractor : IScriptExtractor
     {
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
+        var asyncScripts = new List<string>();
 
         foreach (Match match in AnyScriptPattern.Matches(html))
         {
@@ -120,6 +128,7 @@ public sealed class ScriptExtractor : IScriptExtractor
                 continue;
 
             var isDefer = DeferAttrPattern.IsMatch(attrs);
+            var isAsync = AsyncAttrPattern.IsMatch(attrs);
             string? scriptContent = null;
 
             // Check for data: URI src attribute
@@ -154,11 +163,13 @@ public sealed class ScriptExtractor : IScriptExtractor
 
             if (isDefer)
                 deferredScripts.Add(scriptContent);
+            else if (isAsync)
+                asyncScripts.Add(scriptContent);
             else
                 scripts.Add(scriptContent);
         }
 
-        return new ScriptExtractionResult(scripts, deferredScripts);
+        return new ScriptExtractionResult(scripts, deferredScripts, asyncScripts);
     }
 
     /// <inheritdoc />
