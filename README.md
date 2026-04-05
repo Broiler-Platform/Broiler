@@ -20,13 +20,18 @@ Broiler is a lightweight, extensible web browser for Windows built entirely in m
 │  │                                       │  │
 │  │          HtmlPanel (Renderer)         │  │
 │  │      ┌─────────────────────────┐      │  │
-│  │      │    HtmlRenderer.WPF     │      │  │
-│  │      │    (HTML/CSS Engine)     │      │  │
+│  │      │    Broiler.HTML         │      │  │
+│  │      │    (HTML/CSS Engine)    │      │  │
 │  │      └──────────┬──────────────┘      │  │
 │  │                 │                     │  │
 │  │      ┌──────────▼──────────────┐      │  │
-│  │      │   YantraJS (JSContext)  │      │  │
-│  │      │   (JavaScript Engine)   │      │  │
+│  │      │  Broiler.HtmlBridge    │      │  │
+│  │      │  (DOM ↔ JS Bridge)     │      │  │
+│  │      └──────────┬──────────────┘      │  │
+│  │                 │                     │  │
+│  │      ┌──────────▼──────────────┐      │  │
+│  │      │  Broiler.JavaScript    │      │  │
+│  │      │  (JavaScript Engine)   │      │  │
 │  │      └─────────────────────────┘      │  │
 │  │                                       │  │
 │  └───────────────────────────────────────┘  │
@@ -38,11 +43,10 @@ Broiler is a lightweight, extensible web browser for Windows built entirely in m
 | Component | Description |
 |-----------|-------------|
 | `Broiler.App` | WPF application entry point and main window |
-| `Broiler.App.Rendering` | Modular rendering pipeline (page loading, script extraction, JS execution) |
+| `Broiler.HtmlBridge` | Bridge component connecting HTML rendering with JavaScript execution (DomBridge, ScriptEngine, shared utilities) |
 | `Broiler.HTML.Dom` | Shared HTML parsing and DOM utilities (WHATWG tokenizer, serialization) |
-| `HtmlRenderer.WPF` | WPF adapter for the HTML rendering engine |
-| `HtmlRenderer.Core` | Cross-platform HTML/CSS parsing and rendering |
-| `YantraJS.Core` | JavaScript engine with ES2020+ support |
+| `Broiler.HTML` | Cross-platform HTML/CSS parsing and rendering engine |
+| `Broiler.JavaScript` | JavaScript engine with ES2020+ support |
 
 ## Building
 
@@ -228,30 +232,32 @@ Given the following HTML page:
 
 ### Architecture
 
-The `DomBridge` class parses the page HTML and registers a `document` global on
-the YantraJS `JSContext` before scripts execute.  This enables bidirectional
-communication: JavaScript can query the DOM, and property changes (e.g. setting
-`document.title`) are reflected back to the bridge.
+The `DomBridge` class (in `Broiler.HtmlBridge`) parses the page HTML and
+registers a `document` global on the YantraJS `JSContext` before scripts
+execute.  This enables bidirectional communication: JavaScript can query the
+DOM, and property changes (e.g. setting `document.title`) are reflected back
+to the bridge.
 
 ```
 PageContent (HTML + Scripts)
        │
        ▼
-┌──────────────┐
-│ ScriptEngine │
-│  ┌─────────┐ │
-│  │DomBridge│──▶ Parses HTML → registers document object
-│  └─────────┘ │
-│  ┌─────────┐ │
-│  │JSContext │──▶ Executes scripts with document available
-│  └─────────┘ │
-└──────────────┘
+┌────────────────────────────────────────┐
+│         Broiler.HtmlBridge             │
+│  ┌──────────┐   ┌──────────────────┐  │
+│  │DomBridge │──▶│ HtmlTreeBuilder  │  │  Parses HTML → DomElement tree
+│  └──────────┘   └──────────────────┘  │
+│  ┌──────────┐   ┌──────────────────┐  │
+│  │Script    │──▶│ JSContext         │  │  Executes scripts with DOM
+│  │Engine    │   │ (Broiler.JS)     │  │
+│  └──────────┘   └──────────────────┘  │
+└────────────────────────────────────────┘
 ```
 
-### Shared Components (DomBridge ↔ Broiler.HTML)
+### Shared Components (Broiler.HtmlBridge ↔ Broiler.HTML)
 
 The WHATWG-aligned HTML tokenizer and serialization utilities are shared between
-the DomBridge JavaScript bridge and the Broiler.HTML rendering engine:
+the HtmlBridge and the Broiler.HTML rendering engine:
 
 ```
 Broiler.HTML.Dom (shared layer)
@@ -262,14 +268,31 @@ Broiler.HTML.Dom (shared layer)
        ├──▶ Broiler.HTML rendering pipeline
        │    (HtmlParser → CssBox tree → layout → paint)
        │
-       └──▶ Broiler.App DomBridge
+       └──▶ Broiler.HtmlBridge
             (HtmlTreeBuilder → DomElement tree → JS bridge)
 ```
 
 | Shared Component | Location | Used By |
 |------------------|----------|---------|
-| `HtmlTokenizer` | `Broiler.HTML.Dom/Core/Parse/` | `HtmlParser` (CSS rendering), `HtmlTreeBuilder` (DomBridge) |
+| `HtmlTokenizer` | `Broiler.HTML.Dom/Core/Parse/` | `HtmlParser` (CSS rendering), `HtmlTreeBuilder` (HtmlBridge) |
 | `HtmlSerializer` | `Broiler.HTML.Dom/Core/Utils/` | `DomBridge.Serialization` (DOM → HTML) |
+
+### Broiler.HtmlBridge Contents
+
+The `Broiler.HtmlBridge` project is a standalone class library (net8.0) that
+bridges `Broiler.HTML` and `Broiler.JavaScript`.  It contains:
+
+| Component | Description |
+|-----------|-------------|
+| `DomBridge` (10 partial files) | DOM ↔ JavaScript bridge: element conversion, event dispatch, CSS, selectors, traversal, serialization |
+| `ScriptEngine` / `IScriptEngine` | Orchestrates JS execution with DOM interaction |
+| `HtmlTreeBuilder` | WHATWG-aligned tree builder: `HtmlToken` → `DomElement` tree |
+| `ScriptExtractor` / `IScriptExtractor` | Extracts `<script>` tags from HTML |
+| `InteractiveSession` | Step-through timer/animation REPL |
+| `MicroTaskQueue` | Promise/microtask queue per HTML Living Standard |
+| `ContentSecurityPolicy` | CSP Level 3 script-src enforcement |
+| `RenderLogger` | Diagnostic logging (console.log bridge) |
+| Rendering utilities | `HtmlPostProcessor`, `CssBoxModel`, `RenderingStages`, `ImagePipeline`, `CssTextProperties` |
 
 ## License
 

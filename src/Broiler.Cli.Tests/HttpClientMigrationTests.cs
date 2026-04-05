@@ -135,7 +135,7 @@ document.getElementById('result').textContent = url;
     [Fact]
     public void ScriptExtractor_Uses_HttpClient()
     {
-        var assembly = LoadAssembly("Broiler.Cli");
+        var assembly = LoadAssembly("Broiler.HtmlBridge");
 
         var extractorType = assembly.GetTypes()
             .First(t => t.Name == "ScriptExtractor");
