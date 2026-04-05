@@ -1,7 +1,7 @@
 using Broiler.JavaScript.Engine;
 using System;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Holds a live JavaScript context and DOM bridge, allowing the caller to

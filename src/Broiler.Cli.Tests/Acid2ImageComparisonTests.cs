@@ -1,4 +1,4 @@
-using Broiler.App.Rendering;
+using Broiler.HtmlBridge;
 using Broiler.HTML.Image;
 using SkiaSharp;
 using System.Drawing;

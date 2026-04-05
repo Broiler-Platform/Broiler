@@ -14,40 +14,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\Broiler.App\Rendering\RenderLogger.cs" Link="RenderLogger.cs" />
-    <Compile Include="..\Broiler.App\Rendering\DomBridge.cs" Link="DomBridge.cs" />
-    <Compile Include="..\Broiler.App\Rendering\DomBridge.Selectors.cs" Link="DomBridge.Selectors.cs" />
-    <Compile Include="..\Broiler.App\Rendering\DomBridge.Css.cs" Link="DomBridge.Css.cs" />
-    <Compile Include="..\Broiler.App\Rendering\DomBridge.Registration.cs" Link="DomBridge.Registration.cs" />
-    <Compile Include="..\Broiler.App\Rendering\DomBridge.JsObjects.cs" Link="DomBridge.JsObjects.cs" />
-    <Compile Include="..\Broiler.App\Rendering\DomBridge.StyleSheets.cs" Link="DomBridge.StyleSheets.cs" />
-    <Compile Include="..\Broiler.App\Rendering\DomBridge.Events.cs" Link="DomBridge.Events.cs" />
-    <Compile Include="..\Broiler.App\Rendering\DomBridge.Traversal.cs" Link="DomBridge.Traversal.cs" />
-    <Compile Include="..\Broiler.App\Rendering\DomBridge.Utilities.cs" Link="DomBridge.Utilities.cs" />
-    <Compile Include="..\Broiler.App\Rendering\DomBridge.Serialization.cs" Link="DomBridge.Serialization.cs" />
-    <Compile Include="..\Broiler.App\Rendering\HtmlTreeBuilder.cs" Link="HtmlTreeBuilder.cs" />
-    <Compile Include="..\Broiler.App\Rendering\RenderingStages.cs" Link="RenderingStages.cs" />
-    <Compile Include="..\Broiler.App\Rendering\CssBoxModel.cs" Link="CssBoxModel.cs" />
-    <Compile Include="..\Broiler.App\Rendering\ImagePipeline.cs" Link="ImagePipeline.cs" />
-    <Compile Include="..\Broiler.App\Rendering\CssTextProperties.cs" Link="CssTextProperties.cs" />
-    <Compile Include="..\Broiler.App\Rendering\HtmlPostProcessor.cs" Link="HtmlPostProcessor.cs" />
-    <Compile Include="..\Broiler.App\Rendering\IScriptExtractor.cs" Link="IScriptExtractor.cs" />
-    <Compile Include="..\Broiler.App\Rendering\ScriptExtractor.cs" Link="ScriptExtractor.cs" />
-    <Compile Include="..\Broiler.App\Rendering\PageContent.cs" Link="PageContent.cs" />
-    <Compile Include="..\Broiler.App\Rendering\IScriptEngine.cs" Link="IScriptEngine.cs" />
-    <Compile Include="..\Broiler.App\Rendering\ScriptEngine.cs" Link="ScriptEngine.cs" />
-    <Compile Include="..\Broiler.App\Rendering\ContentSecurityPolicy.cs" Link="ContentSecurityPolicy.cs" />
-    <Compile Include="..\Broiler.App\Rendering\MicroTaskQueue.cs" Link="MicroTaskQueue.cs" />
-    <Compile Include="..\Broiler.App\Rendering\ScriptExecutionResult.cs" Link="ScriptExecutionResult.cs" />
-    <Compile Include="..\Broiler.App\Rendering\ScriptProfilingHook.cs" Link="ScriptProfilingHook.cs" />
-    <Compile Include="..\Broiler.App\Rendering\InteractiveSession.cs" Link="InteractiveSession.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Image\Broiler.HTML.Image.csproj" />
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML\Broiler.HTML.csproj" />
     <!-- Meta-package includes Core + all satellite assemblies (Clr, Compiler, Modules, BuiltIns, Debugger) -->
     <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />
+    <!-- Bridge component connecting HTML rendering with JavaScript execution -->
+    <ProjectReference Include="..\Broiler.HtmlBridge\Broiler.HtmlBridge.csproj" />
   </ItemGroup>
 
 </Project>

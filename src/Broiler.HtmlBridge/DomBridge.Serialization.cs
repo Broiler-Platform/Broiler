@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using Broiler.HTML.Dom.Core.Utils;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// DOM → HTML serialisation — converts the in-memory DOM tree back to

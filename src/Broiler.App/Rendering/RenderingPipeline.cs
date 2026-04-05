@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Broiler.HtmlBridge;
 
 namespace Broiler.App.Rendering;
 

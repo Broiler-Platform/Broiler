@@ -10,7 +10,7 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Registers a minimal <c>document</c> object on a <see cref="JSContext"/>

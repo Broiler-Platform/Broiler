@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>CSS display property values.</summary>
 public enum CssDisplay { Block, Inline, InlineBlock, None, Flex, Grid }

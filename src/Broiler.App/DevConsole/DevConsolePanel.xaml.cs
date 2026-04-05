@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using Broiler.App.Rendering;
+using Broiler.HtmlBridge;
 using Broiler.DevConsole;
 using Broiler.HTML.Dom.Core.Dom;
 

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Broiler.HTML.Dom.Core.Parse;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// A simplified WHATWG-aligned HTML tree builder that converts a stream of
