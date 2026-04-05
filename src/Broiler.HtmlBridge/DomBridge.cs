@@ -433,10 +433,34 @@ public sealed partial class DomBridge
                 var prop = declaration[..colonIdx].Trim();
                 var val = declaration[(colonIdx + 1)..].Trim();
                 if (!string.IsNullOrEmpty(prop) && IsAcceptableCssValue(prop, val))
+                {
                     result[prop] = val;
+                    // Map vendor-prefixed property to unprefixed equivalent (TODO-G9)
+                    var unprefixed = StripVendorPrefix(prop);
+                    if (unprefixed != prop && !result.ContainsKey(unprefixed))
+                        result[unprefixed] = val;
+                }
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// Strips vendor prefixes (<c>-webkit-</c>, <c>-moz-</c>, <c>-ms-</c>, <c>-o-</c>)
+    /// from a CSS property name, returning the unprefixed equivalent.
+    /// Returns the original name unchanged if it has no vendor prefix.
+    /// </summary>
+    private static string StripVendorPrefix(string property)
+    {
+        if (property.StartsWith("-webkit-", StringComparison.OrdinalIgnoreCase))
+            return property[8..];
+        if (property.StartsWith("-moz-", StringComparison.OrdinalIgnoreCase))
+            return property[5..];
+        if (property.StartsWith("-ms-", StringComparison.OrdinalIgnoreCase))
+            return property[4..];
+        if (property.StartsWith("-o-", StringComparison.OrdinalIgnoreCase))
+            return property[3..];
+        return property;
     }
 
     /// <summary>
