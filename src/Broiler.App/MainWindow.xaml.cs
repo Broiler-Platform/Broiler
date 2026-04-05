@@ -288,7 +288,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Updates the star button to reflect whether the current URL is a favourite.
+    /// Updates the star button to reflect whether the current URL is a favorite.
     /// </summary>
     private void UpdateFavoriteButton()
     {
@@ -306,7 +306,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Rebuilds the visual favourite buttons from the current list.
+    /// Rebuilds the visual favorite buttons from the current list.
     /// </summary>
     private void RefreshFavoritesBar()
     {
@@ -351,9 +351,12 @@ public partial class MainWindow : Window
         if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
         {
             var host = uri.Host;
-            if (host.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
-                host = host[4..];
-            return host;
+            if (!string.IsNullOrEmpty(host))
+            {
+                if (host.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
+                    host = host[4..];
+                return host;
+            }
         }
 
         return url.Length > 30 ? url[..27] + "…" : url;

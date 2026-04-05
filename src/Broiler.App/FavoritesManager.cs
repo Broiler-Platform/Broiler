@@ -6,8 +6,8 @@ using System.Text.Json;
 namespace Broiler.App;
 
 /// <summary>
-/// Manages a persistent list of favourite URLs.
-/// Favourites are stored as a JSON array in a file inside the user's
+/// Manages a persistent list of favorite URLs.
+/// Favorites are stored as a JSON array in a file inside the user's
 /// application-data directory so they survive across sessions.
 /// </summary>
 public sealed class FavoritesManager
@@ -15,7 +15,7 @@ public sealed class FavoritesManager
     private readonly string _filePath;
     private readonly List<string> _favorites = [];
 
-    /// <summary>Current snapshot of favourites (read-only).</summary>
+    /// <summary>Current snapshot of favorites (read-only).</summary>
     public IReadOnlyList<string> Favorites => _favorites;
 
     public FavoritesManager()
@@ -32,7 +32,7 @@ public sealed class FavoritesManager
         _filePath = filePath;
     }
 
-    /// <summary>Load favourites from disk. Safe to call at any time.</summary>
+    /// <summary>Load favorites from disk. Safe to call at any time.</summary>
     public void Load()
     {
         _favorites.Clear();
@@ -72,7 +72,7 @@ public sealed class FavoritesManager
     }
 
     /// <summary>
-    /// Adds a URL to the favourites list (no duplicates).
+    /// Adds a URL to the favorites list (no duplicates).
     /// Returns <c>true</c> if the URL was added, <c>false</c> if it was already present.
     /// </summary>
     public bool Add(string url)
@@ -88,7 +88,7 @@ public sealed class FavoritesManager
     }
 
     /// <summary>
-    /// Removes a URL from the favourites list.
+    /// Removes a URL from the favorites list.
     /// Returns <c>true</c> if it was found and removed.
     /// </summary>
     public bool Remove(string url) => _favorites.Remove(url);
