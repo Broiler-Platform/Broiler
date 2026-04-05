@@ -809,6 +809,23 @@ internal class CssBox : CssBoxProperties, IDisposable
                         if (childBox.Float != CssConstants.None)
                             childBox.PerformLayout(g);
                     }
+
+                    // CSS2.1 §10.6.7: Elements that establish a new block
+                    // formatting context (BFC) must include descendant floats
+                    // in their auto-height calculation.  The inline path above
+                    // does not call MarginBottomCollapse(), so BFC elements
+                    // with only floated children would otherwise have zero
+                    // content height.
+                    bool isBfc = Float != CssConstants.None
+                        || Display == CssConstants.InlineBlock
+                        || Display == CssConstants.TableCell
+                        || (Overflow != null && Overflow != CssConstants.Visible)
+                        || Position == CssConstants.Absolute
+                        || Position == CssConstants.Fixed;
+                    if (isBfc)
+                    {
+                        ActualBottom = MarginBottomCollapse();
+                    }
                 }
                 else if (Boxes.Count > 0)
                 {
@@ -1308,7 +1325,7 @@ internal class CssBox : CssBoxProperties, IDisposable
 
         // CSS2.1 §8.3.1: Margins collapse through the parent only when
         // the parent has no bottom padding and no bottom border.
-        if (ParentBox != null && ParentBox.Boxes.IndexOf(this) == ParentBox.Boxes.Count - 1 && _parentBox.ActualMarginBottom < 0.1
+        if (Boxes.Count > 0 && ParentBox != null && ParentBox.Boxes.IndexOf(this) == ParentBox.Boxes.Count - 1 && _parentBox.ActualMarginBottom < 0.1
             && ActualPaddingBottom < 0.1 && ActualBorderBottomWidth < 0.1)
         {
             var lastChildBottomMargin = Boxes[Boxes.Count - 1].ActualMarginBottom;

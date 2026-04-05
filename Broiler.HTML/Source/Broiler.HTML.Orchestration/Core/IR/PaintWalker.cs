@@ -647,7 +647,7 @@ internal static class PaintWalker
                 fixedNoZIndex ??= new List<Fragment>();
                 fixedNoZIndex.Add(child);
             }
-            else if (child.CreatesStackingContext || child.Style.Position == "relative")
+            else if (child.CreatesStackingContext || child.Style.Position is "relative" or "absolute")
             {
                 // Steps 6–7: positioned descendants (CSS2.1 App. E)
                 positioned ??= new List<Fragment>();
