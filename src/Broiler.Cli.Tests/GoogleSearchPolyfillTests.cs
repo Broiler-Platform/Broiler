@@ -3,7 +3,7 @@ using Broiler.HtmlBridge;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// Tests for the Google Search compliance polyfills (TODO-G1 through TODO-G19).
+/// Tests for the Google Search compliance polyfills (TODO-G1 through TODO-G21).
 /// These validate that the JavaScript environment exposes all APIs needed for
 /// Google Search scripts to execute without errors.
 /// </summary>
@@ -449,5 +449,109 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("IO_OK", result);
         Assert.Contains("TE_OK", result);
         Assert.Contains("IMG_OK", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G9: -webkit- CSS prefix mapping (via getComputedStyle)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Webkit_Prefixed_Property_Mapped_To_Unprefixed()
+    {
+        var result = ExecJs(@"
+            var div = document.createElement('div');
+            div.style.cssText = '-webkit-transform: rotate(45deg)';
+            document.body.appendChild(div);
+            var cs = window.getComputedStyle(div);
+            document.getElementById('result').textContent =
+                'WEBKIT:' + (cs['-webkit-transform'] || cs.webkitTransform || 'NONE') +
+                ',STD:' + (cs['transform'] || cs.transform || 'NONE');
+        ");
+        Assert.Contains("rotate(45deg)", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G12: MutationObserver with _records tracking
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void MutationObserver_Has_Records_Array()
+    {
+        var result = ExecJs(@"
+            var obs = new MutationObserver(function() {});
+            document.getElementById('result').textContent =
+                'HAS_RECORDS:' + Array.isArray(obs._records) +
+                ',LEN:' + obs._records.length;
+        ");
+        Assert.Contains("HAS_RECORDS:true", result);
+        Assert.Contains("LEN:0", result);
+    }
+
+    [Fact]
+    public void MutationObserver_TakeRecords_Returns_And_Clears()
+    {
+        var result = ExecJs(@"
+            var obs = new MutationObserver(function() {});
+            obs._records.push({ type: 'childList' });
+            var taken = obs.takeRecords();
+            document.getElementById('result').textContent =
+                'TAKEN:' + taken.length +
+                ',AFTER:' + obs._records.length;
+        ");
+        Assert.Contains("TAKEN:1", result);
+        Assert.Contains("AFTER:0", result);
+    }
+
+    [Fact]
+    public void MutationObserver_Disconnect_Clears_Records()
+    {
+        var result = ExecJs(@"
+            var obs = new MutationObserver(function() {});
+            obs._records.push({ type: 'attributes' });
+            obs.disconnect();
+            document.getElementById('result').textContent =
+                'RECORDS:' + obs._records.length +
+                ',TARGETS:' + obs._targets.length;
+        ");
+        Assert.Contains("RECORDS:0", result);
+        Assert.Contains("TARGETS:0", result);
+    }
+
+    [Fact]
+    public void MutationObserver_Notify_Invokes_Callback()
+    {
+        var result = ExecJs(@"
+            var received = null;
+            var obs = new MutationObserver(function(records) { received = records; });
+            obs._notify([{ type: 'childList', target: document.body }]);
+            document.getElementById('result').textContent =
+                'CALLED:' + (received !== null) +
+                ',LEN:' + (received ? received.length : -1) +
+                ',TYPE:' + (received ? received[0].type : 'none');
+        ");
+        Assert.Contains("CALLED:true", result);
+        Assert.Contains("LEN:1", result);
+        Assert.Contains("TYPE:childList", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G20: Async script detection
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void ScriptExtractor_Separates_Async_Scripts()
+    {
+        var extractor = new ScriptExtractor();
+        var html = @"<html><head>
+            <script>var a = 1;</script>
+            <script async>var b = 2;</script>
+            <script defer>var c = 3;</script>
+            <script async src=""data:text/javascript,var d = 4;""></script>
+        </head><body></body></html>";
+
+        var result = extractor.ExtractAll(html);
+        Assert.Single(result.Scripts);           // 'var a = 1;'
+        Assert.Single(result.DeferredScripts);   // 'var c = 3;'
+        Assert.Equal(2, result.AsyncScripts.Count); // 'var b = 2;' + 'var d = 4;'
     }
 }
