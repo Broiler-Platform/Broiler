@@ -1,0 +1,453 @@
+using Broiler.HtmlBridge;
+
+namespace Broiler.Cli.Tests;
+
+/// <summary>
+/// Tests for the Google Search compliance polyfills (TODO-G1 through TODO-G19).
+/// These validate that the JavaScript environment exposes all APIs needed for
+/// Google Search scripts to execute without errors.
+/// </summary>
+public class GoogleSearchPolyfillTests
+{
+    /// <summary>
+    /// Helper: execute JS in a DomBridge-attached context and return the result.
+    /// </summary>
+    private static string ExecJs(string jsCode)
+    {
+        var html = $@"<!doctype html>
+<html><head><title>Test</title></head>
+<body>
+<div id=""result""></div>
+<script>
+{jsCode}
+</script>
+</body>
+</html>";
+        return CaptureService.ExecuteScriptsWithDom(html, "https://www.google.com");
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G1: DOM query null-vs-undefined
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void GetElementById_Returns_Null_Not_Undefined_For_Missing_Element()
+    {
+        var result = ExecJs(@"
+            var el = document.getElementById('nonexistent');
+            document.getElementById('result').textContent = (el === null) ? 'NULL' : 'NOT_NULL:' + typeof el;
+        ");
+        Assert.Contains("NULL", result);
+    }
+
+    [Fact]
+    public void QuerySelector_Returns_Null_Not_Undefined_For_Missing_Element()
+    {
+        var result = ExecJs(@"
+            var el = document.querySelector('#nonexistent');
+            document.getElementById('result').textContent = (el === null) ? 'NULL' : 'NOT_NULL:' + typeof el;
+        ");
+        Assert.Contains("NULL", result);
+    }
+
+    [Fact]
+    public void QuerySelectorAll_Returns_Empty_Array_For_No_Matches()
+    {
+        var result = ExecJs(@"
+            var els = document.querySelectorAll('.nonexistent');
+            document.getElementById('result').textContent = 'LEN:' + els.length;
+        ");
+        Assert.Contains("LEN:0", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G2: performance.now()
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Performance_Now_Returns_Number()
+    {
+        var result = ExecJs(@"
+            var t = performance.now();
+            document.getElementById('result').textContent = 'TYPE:' + typeof t + ',GTE0:' + (t >= 0);
+        ");
+        Assert.Contains("TYPE:number", result);
+        Assert.Contains("GTE0:true", result);
+    }
+
+    [Fact]
+    public void Performance_TimeOrigin_Is_Number()
+    {
+        var result = ExecJs(@"
+            document.getElementById('result').textContent = 'TYPE:' + typeof performance.timeOrigin + ',GT0:' + (performance.timeOrigin > 0);
+        ");
+        Assert.Contains("TYPE:number", result);
+        Assert.Contains("GT0:true", result);
+    }
+
+    [Fact]
+    public void Performance_GetEntriesByType_Returns_Array()
+    {
+        var result = ExecJs(@"
+            var entries = performance.getEntriesByType('resource');
+            document.getElementById('result').textContent = 'IS_ARRAY:' + Array.isArray(entries);
+        ");
+        Assert.Contains("IS_ARRAY:true", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G3: navigator.sendBeacon()
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Navigator_SendBeacon_Returns_True()
+    {
+        var result = ExecJs(@"
+            var ok = navigator.sendBeacon('/log', 'data');
+            document.getElementById('result').textContent = 'RESULT:' + ok;
+        ");
+        Assert.Contains("RESULT:true", result);
+    }
+
+    [Fact]
+    public void Navigator_UserAgent_Is_String()
+    {
+        var result = ExecJs(@"
+            document.getElementById('result').textContent = 'UA:' + typeof navigator.userAgent + ',HAS:' + (navigator.userAgent.length > 0);
+        ");
+        Assert.Contains("UA:string", result);
+        Assert.Contains("HAS:true", result);
+    }
+
+    [Fact]
+    public void Navigator_Language_Is_String()
+    {
+        var result = ExecJs(@"
+            document.getElementById('result').textContent = 'LANG:' + navigator.language;
+        ");
+        Assert.Contains("LANG:en-US", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G4: clientWidth / clientHeight
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Html_Element_Has_ClientWidth()
+    {
+        var result = ExecJs(@"
+            var html = document.documentElement || document.querySelector('html');
+            document.getElementById('result').textContent = 'CW:' + html.clientWidth;
+        ");
+        Assert.Contains("CW:1024", result);
+    }
+
+    [Fact]
+    public void Body_Element_Has_ClientHeight()
+    {
+        var result = ExecJs(@"
+            var body = document.body || document.querySelector('body');
+            document.getElementById('result').textContent = 'CH:' + body.clientHeight;
+        ");
+        Assert.Contains("CH:768", result);
+    }
+
+    [Fact]
+    public void Window_InnerWidth_Returns_Viewport_Width()
+    {
+        var result = ExecJs(@"
+            document.getElementById('result').textContent = 'W:' + window.innerWidth + ',H:' + window.innerHeight;
+        ");
+        Assert.Contains("W:1024", result);
+        Assert.Contains("H:768", result);
+    }
+
+    [Fact]
+    public void Element_GetBoundingClientRect_Returns_Object()
+    {
+        var result = ExecJs(@"
+            var body = document.body || document.querySelector('body');
+            var rect = body.getBoundingClientRect();
+            document.getElementById('result').textContent = 'W:' + rect.width + ',H:' + rect.height + ',TOP:' + rect.top;
+        ");
+        Assert.Contains("TOP:0", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G6: Image() constructor
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Image_Constructor_Creates_Object()
+    {
+        var result = ExecJs(@"
+            var img = new Image();
+            img.src = 'test.png';
+            document.getElementById('result').textContent = 'SRC:' + img.src + ',W:' + img.width;
+        ");
+        Assert.Contains("SRC:test.png", result);
+        Assert.Contains("W:0", result);
+    }
+
+    [Fact]
+    public void Image_Constructor_With_Dimensions()
+    {
+        var result = ExecJs(@"
+            var img = new Image(100, 200);
+            document.getElementById('result').textContent = 'W:' + img.width + ',H:' + img.height;
+        ");
+        Assert.Contains("W:100", result);
+        Assert.Contains("H:200", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G7: document.cookie stub
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Document_Cookie_Read_Returns_String()
+    {
+        var result = ExecJs(@"
+            document.getElementById('result').textContent = 'TYPE:' + typeof document.cookie;
+        ");
+        Assert.Contains("TYPE:string", result);
+    }
+
+    [Fact]
+    public void Document_Cookie_Write_Does_Not_Throw()
+    {
+        var result = ExecJs(@"
+            document.cookie = 'test=value; path=/';
+            document.getElementById('result').textContent = 'OK:true';
+        ");
+        Assert.Contains("OK:true", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G10: IntersectionObserver
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void IntersectionObserver_Constructor_Exists()
+    {
+        var result = ExecJs(@"
+            document.getElementById('result').textContent = 'TYPE:' + typeof IntersectionObserver;
+        ");
+        Assert.Contains("TYPE:function", result);
+    }
+
+    [Fact]
+    public void IntersectionObserver_Observe_Invokes_Callback()
+    {
+        var result = ExecJs(@"
+            var called = false;
+            var obs = new IntersectionObserver(function(entries) { called = true; });
+            obs.observe(document.getElementById('result'));
+            document.getElementById('result').textContent = 'CALLED:' + called;
+        ");
+        Assert.Contains("CALLED:true", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G11: ResizeObserver
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void ResizeObserver_Constructor_Exists()
+    {
+        var result = ExecJs(@"
+            document.getElementById('result').textContent = 'TYPE:' + typeof ResizeObserver;
+        ");
+        Assert.Contains("TYPE:function", result);
+    }
+
+    [Fact]
+    public void ResizeObserver_Observe_Does_Not_Throw()
+    {
+        var result = ExecJs(@"
+            var obs = new ResizeObserver(function() {});
+            obs.observe(document.getElementById('result'));
+            obs.disconnect();
+            document.getElementById('result').textContent = 'OK:true';
+        ");
+        Assert.Contains("OK:true", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G13: TextEncoder / TextDecoder
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void TextEncoder_Encode_Returns_Uint8Array()
+    {
+        var result = ExecJs(@"
+            var encoder = new TextEncoder();
+            var bytes = encoder.encode('Hello');
+            document.getElementById('result').textContent = 'LEN:' + bytes.length + ',B0:' + bytes[0];
+        ");
+        Assert.Contains("LEN:5", result);
+        Assert.Contains("B0:72", result); // 'H' = 72
+    }
+
+    [Fact]
+    public void TextDecoder_Decode_Returns_String()
+    {
+        var result = ExecJs(@"
+            var encoder = new TextEncoder();
+            var decoder = new TextDecoder();
+            var bytes = encoder.encode('Test');
+            var str = decoder.decode(bytes);
+            document.getElementById('result').textContent = 'STR:' + str;
+        ");
+        Assert.Contains("STR:Test", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G14: URL / URLSearchParams
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void URLSearchParams_Get_Returns_Value()
+    {
+        var result = ExecJs(@"
+            var params = new URLSearchParams('?q=hello&lang=en');
+            document.getElementById('result').textContent = 'Q:' + params.get('q') + ',LANG:' + params.get('lang');
+        ");
+        Assert.Contains("Q:hello", result);
+        Assert.Contains("LANG:en", result);
+    }
+
+    [Fact]
+    public void URLSearchParams_Has_Returns_Boolean()
+    {
+        var result = ExecJs(@"
+            var params = new URLSearchParams('q=test');
+            document.getElementById('result').textContent = 'HAS_Q:' + params.has('q') + ',HAS_X:' + params.has('x');
+        ");
+        Assert.Contains("HAS_Q:true", result);
+        Assert.Contains("HAS_X:false", result);
+    }
+
+    [Fact]
+    public void URL_Constructor_Parses_Href()
+    {
+        var result = ExecJs(@"
+            var u = new URL('https://www.google.com/search?q=test#top');
+            document.getElementById('result').textContent =
+                'HOST:' + u.hostname + ',PATH:' + u.pathname + ',SEARCH:' + u.search + ',HASH:' + u.hash;
+        ");
+        Assert.Contains("HOST:www.google.com", result);
+        Assert.Contains("PATH:/search", result);
+        Assert.Contains("SEARCH:?q=test", result);
+        Assert.Contains("HASH:#top", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G16: AbortController
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void AbortController_Constructor_Exists()
+    {
+        var result = ExecJs(@"
+            var ac = new AbortController();
+            document.getElementById('result').textContent = 'ABORTED:' + ac.signal.aborted;
+        ");
+        Assert.Contains("ABORTED:false", result);
+    }
+
+    [Fact]
+    public void AbortController_Abort_Sets_Signal()
+    {
+        var result = ExecJs(@"
+            var ac = new AbortController();
+            ac.abort();
+            document.getElementById('result').textContent = 'ABORTED:' + ac.signal.aborted;
+        ");
+        Assert.Contains("ABORTED:true", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G17: CustomEvent (verify existing)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void CustomEvent_Constructor_Exists()
+    {
+        var result = ExecJs(@"
+            var ev = new CustomEvent('test', { detail: 42 });
+            document.getElementById('result').textContent = 'TYPE:' + ev.type + ',DETAIL:' + ev.detail;
+        ");
+        Assert.Contains("TYPE:test", result);
+        Assert.Contains("DETAIL:42", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  TODO-G18: crypto.getRandomValues()
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Crypto_GetRandomValues_Fills_Array()
+    {
+        var result = ExecJs(@"
+            var arr = new Uint8Array(4);
+            crypto.getRandomValues(arr);
+            document.getElementById('result').textContent = 'LEN:' + arr.length;
+        ");
+        Assert.Contains("LEN:4", result);
+    }
+
+    [Fact]
+    public void Crypto_RandomUUID_Returns_String()
+    {
+        var result = ExecJs(@"
+            var uuid = crypto.randomUUID();
+            document.getElementById('result').textContent = 'LEN:' + uuid.length + ',DASHES:' + (uuid.indexOf('-') > 0);
+        ");
+        Assert.Contains("LEN:36", result);
+        Assert.Contains("DASHES:true", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  Window.screen properties
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Window_Screen_Has_Dimensions()
+    {
+        var result = ExecJs(@"
+            document.getElementById('result').textContent = 'W:' + screen.width + ',H:' + screen.height;
+        ");
+        Assert.Contains("W:1024", result);
+        Assert.Contains("H:768", result);
+    }
+
+    // ---------------------------------------------------------------
+    //  Combined: Google-style script should not crash
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void GoogleStyle_Init_Script_Runs_Without_Crash()
+    {
+        var result = ExecJs(@"
+            var results = [];
+            try { performance.now(); results.push('PERF_OK'); } catch(e) { results.push('PERF_NO'); }
+            try { navigator.sendBeacon('/log', 'data'); results.push('BEACON_OK'); } catch(e) { results.push('BEACON_NO'); }
+            try { var html = document.documentElement || document.querySelector('html'); results.push('DIM_OK:' + html.clientWidth); } catch(e) { results.push('DIM_NO'); }
+            try { new URL('https://www.google.com/search?q=test'); results.push('URL_OK'); } catch(e) { results.push('URL_NO'); }
+            try { new AbortController(); results.push('ABORT_OK'); } catch(e) { results.push('ABORT_NO'); }
+            try { var obs = new IntersectionObserver(function() {}); obs.disconnect(); results.push('IO_OK'); } catch(e) { results.push('IO_NO'); }
+            try { new TextEncoder().encode('test'); results.push('TE_OK'); } catch(e) { results.push('TE_NO'); }
+            try { var img = new Image(); img.src = 'pixel.gif'; results.push('IMG_OK'); } catch(e) { results.push('IMG_NO'); }
+            document.getElementById('result').textContent = results.join(',');
+        ");
+        Assert.Contains("PERF_OK", result);
+        Assert.Contains("BEACON_OK", result);
+        Assert.Contains("DIM_OK:1024", result);
+        Assert.Contains("URL_OK", result);
+        Assert.Contains("ABORT_OK", result);
+        Assert.Contains("IO_OK", result);
+        Assert.Contains("TE_OK", result);
+        Assert.Contains("IMG_OK", result);
+    }
+}

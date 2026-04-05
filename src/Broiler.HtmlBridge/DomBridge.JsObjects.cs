@@ -2068,6 +2068,109 @@ public sealed partial class DomBridge
             }
         }
 
+        // -- TODO-G4 / TODO-G19: Box model properties for all elements --
+        // clientWidth/clientHeight, offsetWidth/offsetHeight, scrollWidth/scrollHeight,
+        // scrollTop/scrollLeft, and getBoundingClientRect()
+        {
+            var isRoot = tag == "html" || tag == "body";
+            var vpW = _viewportWidth;
+            var vpH = _viewportHeight;
+
+            obj.FastAddProperty(
+                (KeyString)"clientWidth",
+                new JSFunction((in Arguments _) => new JSNumber(isRoot ? vpW : 0), "get clientWidth"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
+                (KeyString)"clientHeight",
+                new JSFunction((in Arguments _) => new JSNumber(isRoot ? vpH : 0), "get clientHeight"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
+                (KeyString)"offsetWidth",
+                new JSFunction((in Arguments _) => new JSNumber(isRoot ? vpW : 0), "get offsetWidth"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
+                (KeyString)"offsetHeight",
+                new JSFunction((in Arguments _) => new JSNumber(isRoot ? vpH : 0), "get offsetHeight"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
+                (KeyString)"scrollWidth",
+                new JSFunction((in Arguments _) => new JSNumber(isRoot ? vpW : 0), "get scrollWidth"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
+                (KeyString)"scrollHeight",
+                new JSFunction((in Arguments _) => new JSNumber(isRoot ? vpH : 0), "get scrollHeight"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
+                (KeyString)"scrollTop",
+                new JSFunction((in Arguments _) => new JSNumber(0), "get scrollTop"),
+                new JSFunction((in Arguments _) => JSUndefined.Value, "set scrollTop"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
+                (KeyString)"scrollLeft",
+                new JSFunction((in Arguments _) => new JSNumber(0), "get scrollLeft"),
+                new JSFunction((in Arguments _) => JSUndefined.Value, "set scrollLeft"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
+                (KeyString)"offsetTop",
+                new JSFunction((in Arguments _) => new JSNumber(0), "get offsetTop"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
+                (KeyString)"offsetLeft",
+                new JSFunction((in Arguments _) => new JSNumber(0), "get offsetLeft"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
+                (KeyString)"offsetParent",
+                new JSFunction((in Arguments _) => JSNull.Value, "get offsetParent"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // getBoundingClientRect() — returns DOMRect-like object
+            var w = isRoot ? vpW : 0;
+            var h = isRoot ? vpH : 0;
+            obj.FastAddValue(
+                (KeyString)"getBoundingClientRect",
+                new JSFunction((in Arguments _) =>
+                {
+                    var rect = new JSObject();
+                    rect.FastAddValue((KeyString)"x", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"y", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"top", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"left", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"right", new JSNumber(w), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"bottom", new JSNumber(h), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"width", new JSNumber(w), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"height", new JSNumber(h), JSPropertyAttributes.EnumerableConfigurableValue);
+                    return rect;
+                }, "getBoundingClientRect", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // getClientRects() — returns array with one DOMRect for root elements
+            obj.FastAddValue(
+                (KeyString)"getClientRects",
+                new JSFunction((in Arguments a2) =>
+                {
+                    var rect = new JSObject();
+                    rect.FastAddValue((KeyString)"x", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"y", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"top", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"left", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"right", new JSNumber(w), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"bottom", new JSNumber(h), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"width", new JSNumber(w), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"height", new JSNumber(h), JSPropertyAttributes.EnumerableConfigurableValue);
+                    return isRoot ? new JSArray(new JSValue[] { rect }) : new JSArray();
+                }, "getClientRects", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+
         // -- Phase 6: SVG DOM interfaces --
 
         // SVG element properties — provide SVGAnimatedLength stubs for dimensional attributes

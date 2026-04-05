@@ -55,6 +55,10 @@ public sealed partial class DomBridge
     /// </summary>
     private string? _localBasePath;
 
+    // viewport dimensions for window.innerWidth/innerHeight and element box-model properties
+    private int _viewportWidth = 1024;
+    private int _viewportHeight = 768;
+
     // window.location fields
     private string _pageUrl = string.Empty;
     private string _pageProtocol = string.Empty;
@@ -109,6 +113,18 @@ public sealed partial class DomBridge
         }
         ParseHtml(html);
         RegisterDocument(context);
+    }
+
+    /// <summary>
+    /// Sets the viewport dimensions used by <c>window.innerWidth</c>,
+    /// <c>window.innerHeight</c>, and element box-model properties
+    /// (<c>clientWidth</c>, <c>clientHeight</c>, etc.) on <c>&lt;html&gt;</c>
+    /// and <c>&lt;body&gt;</c> elements.
+    /// </summary>
+    public void SetViewportSize(int width, int height)
+    {
+        _viewportWidth = width;
+        _viewportHeight = height;
     }
 
     /// <summary>
