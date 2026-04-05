@@ -9,17 +9,30 @@ Color tolerance:  5 (per-channel)
 
 --- Overall Pixel Statistics ---
 Full-image match:      781,846 /    786,432  (99.42%)
-Content-area match:     18,346 /     22,932  (80.00%)
+Content-area match:     20,168 /     21,874  (92.20%)
 Red pixel count:             0
 
 --- Per-Region Content-Area Match ---
 Region                       Y Range    Match    Total      Pct
 -----------------------------------------------------------------
-forehead                    51–68         26    1,624    1.60%
-eyes                        69–129     1,056    1,596   66.17%
-nose                       130–210    12,104   12,248   98.82%
-smile                      196–260     6,800    9,120   74.56%
-chin                       261–275       864      864  100.00%
+forehead                    48–120       632    2,290   27.60%
+eyes                       120–168     6,048    6,048  100.00%
+nose                       144–240    13,776   13,824   99.65%
+smile                      228–264     4,320    4,320  100.00%
+chin                       264–276       576      576  100.00%
+
+--- Fixes Applied (2026-04-05) ---
+1. MarginBottomCollapse: Guard against empty Boxes collection — was
+   throwing ArgumentOutOfRangeException silently caught by PerformLayout,
+   causing float children in abs-pos elements to render with zero height.
+2. BFC auto-height: Call MarginBottomCollapse after CreateLineBoxes for
+   BFC elements so float children contribute to parent height (§10.6.7).
+3. PaintWalker: position:absolute categorized as positioned (steps 6-7).
+
+--- Remaining Forehead Mismatches ---
+The forehead region (y=48-120) mismatches are text/font rendering
+differences ("Hello World!" heading and "Take The Acid2 Test" link),
+not CSS layout bugs. Different font rasterization and anti-aliasing.
 
 --- Diff Image Colour Key ---
   Green  — pixel match (per-channel diff ≤ 5)
