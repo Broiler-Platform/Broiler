@@ -1643,18 +1643,19 @@ public sealed partial class DomBridge
                     if (!input || input.length === 0) return '';
                     var bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
                     var result = '';
-                    for (var i = 0; i < bytes.length; ) {
+                    var len = bytes.length;
+                    for (var i = 0; i < len; ) {
                         var b = bytes[i];
                         if (b < 0x80) {
                             result += String.fromCharCode(b);
                             i++;
-                        } else if ((b & 0xE0) === 0xC0) {
+                        } else if ((b & 0xE0) === 0xC0 && i + 1 < len) {
                             result += String.fromCharCode(((b & 0x1F) << 6) | (bytes[i+1] & 0x3F));
                             i += 2;
-                        } else if ((b & 0xF0) === 0xE0) {
+                        } else if ((b & 0xF0) === 0xE0 && i + 2 < len) {
                             result += String.fromCharCode(((b & 0x0F) << 12) | ((bytes[i+1] & 0x3F) << 6) | (bytes[i+2] & 0x3F));
                             i += 3;
-                        } else if ((b & 0xF8) === 0xF0) {
+                        } else if ((b & 0xF8) === 0xF0 && i + 3 < len) {
                             var cp = ((b & 0x07) << 18) | ((bytes[i+1] & 0x3F) << 12) | ((bytes[i+2] & 0x3F) << 6) | (bytes[i+3] & 0x3F);
                             cp -= 0x10000;
                             result += String.fromCharCode(0xD800 + (cp >> 10), 0xDC00 + (cp & 0x3FF));
@@ -1734,11 +1735,11 @@ public sealed partial class DomBridge
                             var lastSlash = baseNoQuery.lastIndexOf('/');
                             url = baseNoQuery.substring(0, lastSlash + 1) + url;
                         } else if (url.charAt(0) === '/') {
-                            var m = base.match(/^(https?:\/\/[^\/]+)/);
+                            var m = base.match(/^([a-zA-Z][a-zA-Z0-9+\-.]*:\/\/[^\/]+)/);
                             url = (m ? m[1] : '') + url;
                         }
                     }
-                    var match = url.match(/^(https?):\/\/([^\/:]+)(:\d+)?(\/[^?#]*)(\?[^#]*)?(#.*)?$/);
+                    var match = url.match(/^([a-zA-Z][a-zA-Z0-9+\-.]*):\/\/([^\/:]+)(:\d+)?(\/[^?#]*)?(\?[^#]*)?(#.*)?$/);
                     if (match) {
                         this.protocol = match[1] + ':';
                         this.hostname = match[2];
@@ -1782,7 +1783,7 @@ public sealed partial class DomBridge
                 };
             ");
 
-        // TODO-G18: window.crypto.getRandomValues() — basic stub
+        // TODO-G18: window.crypto.getRandomValues() — cryptographically secure
         var cryptoObj = new JSObject();
         cryptoObj.FastAddValue(
             (KeyString)"getRandomValues",
@@ -1790,16 +1791,16 @@ public sealed partial class DomBridge
             {
                 if (a.Length == 0) return JSUndefined.Value;
                 var arr = a[0];
-                // Fill typed array with random values
-                var rng = new Random();
                 if (arr is JSObject arrObj)
                 {
                     var lengthProp = arrObj[(KeyString)"length"];
                     if (lengthProp != null && !lengthProp.IsUndefined && !lengthProp.IsNull)
                     {
                         var len = (int)lengthProp.DoubleValue;
+                        var buffer = new byte[len];
+                        System.Security.Cryptography.RandomNumberGenerator.Fill(buffer);
                         for (var i = 0; i < len; i++)
-                            arrObj[(KeyString)i.ToString()] = new JSNumber(rng.Next(0, 256));
+                            arrObj[(KeyString)i.ToString()] = new JSNumber(buffer[i]);
                     }
                 }
                 return arr;
