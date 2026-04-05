@@ -291,14 +291,14 @@ all three exceptions and allow Google's scripts to complete initialization.
 | `document.getElementById`    | ✅          | ✅          | Works            |
 | `document.querySelector`     | ✅          | ✅          | Works            |
 | `document.addEventListener`  | ✅          | ✅          | Works            |
-| `window.navigator.sendBeacon`| ✅          | ❌          | Missing          |
-| `window.performance.now()`   | ✅          | ❌          | Missing          |
+| `window.navigator.sendBeacon`| ✅          | ✅          | ✅ Implemented   |
+| `window.performance.now()`   | ✅          | ✅          | ✅ Implemented   |
 | `window.requestAnimationFrame`| ✅         | ✅          | Works            |
-| `Image()` constructor        | ✅          | ❌          | Missing          |
-| `element.clientWidth`        | ✅          | ⚠️          | Returns 0/undef  |
-| `element.getBoundingClientRect`| ✅        | ❌          | Missing          |
-| `document.cookie`            | ✅          | ❌          | Missing          |
-| `window.crypto`              | ✅          | ❌          | Missing          |
+| `Image()` constructor        | ✅          | ✅          | ✅ Implemented   |
+| `element.clientWidth`        | ✅          | ✅          | ✅ Implemented   |
+| `element.getBoundingClientRect`| ✅        | ✅          | ✅ Implemented   |
+| `document.cookie`            | ✅          | ✅          | ✅ Implemented   |
+| `window.crypto`              | ✅          | ✅          | ✅ Implemented   |
 
 ---
 
@@ -308,29 +308,35 @@ all three exceptions and allow Google's scripts to complete initialization.
 
 These issues are blocking **any** visible content from appearing.
 
-- [ ] **TODO-G1**: Fix DOM query null-vs-undefined return values
+- [x] **TODO-G1**: Fix DOM query null-vs-undefined return values
   - Ensure `getElementById()`, `querySelector()`, `querySelectorAll()` return
     `null` (JSNull) instead of `undefined` (JSUndefined) when no match found
-  - This is the root cause of all three JS exceptions
+  - ✅ **Verified**: Already returns `JSNull.Value` — confirmed by tests
   - **Files**: `src/Broiler.HtmlBridge/DomBridge.Registration.cs`
   - **Priority**: P0 — blocks all Google JS from executing
 
-- [ ] **TODO-G2**: Add `performance.now()` polyfill
+- [x] **TODO-G2**: Add `performance.now()` polyfill
   - Google's metrics/logging code depends on `performance.now()` for timing
-  - Return `DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()` or similar
+  - ✅ **Implemented**: `performance.now()`, `performance.timeOrigin`,
+    `performance.getEntriesByType()`, `performance.mark()`, `performance.measure()`
   - **Files**: `src/Broiler.HtmlBridge/DomBridge.Registration.cs`
   - **Priority**: P0 — blocks Google metrics initialization
 
-- [ ] **TODO-G3**: Add `navigator.sendBeacon()` stub
+- [x] **TODO-G3**: Add `navigator.sendBeacon()` stub
   - Google's logging code calls `navigator.sendBeacon(url, data)`
-  - Return `true` (no-op) to prevent exceptions
+  - ✅ **Implemented**: Full `navigator` object with `sendBeacon()`, `userAgent`,
+    `language`, `languages`, `cookieEnabled`, `onLine`, `platform`, `vendor`
   - **Files**: `src/Broiler.HtmlBridge/DomBridge.Registration.cs`
   - **Priority**: P0 — prevents logging code from crashing
 
-- [ ] **TODO-G4**: Implement `element.clientWidth` / `clientHeight`
+- [x] **TODO-G4**: Implement `element.clientWidth` / `clientHeight`
   - Google's scripts check element dimensions for responsive layout
-  - Return viewport width/height for `<html>` and `<body>`, 0 for others
-  - **Files**: `src/Broiler.HtmlBridge/DomBridge.Registration.cs`
+  - ✅ **Implemented**: `clientWidth`/`clientHeight`, `offsetWidth`/`offsetHeight`,
+    `scrollWidth`/`scrollHeight`, `scrollTop`/`scrollLeft`, `offsetTop`/`offsetLeft`,
+    `offsetParent` on all element proxies + `window.innerWidth`/`innerHeight`/
+    `outerWidth`/`outerHeight` + `window.screen`
+  - **Files**: `src/Broiler.HtmlBridge/DomBridge.JsObjects.cs`,
+    `src/Broiler.HtmlBridge/DomBridge.Registration.cs`, `src/Broiler.HtmlBridge/DomBridge.cs`
   - **Priority**: P0 — blocks responsive layout code
 
 ### Phase 2: High — Enable Content Rendering (P1)
@@ -343,15 +349,16 @@ These issues prevent specific content elements from appearing.
   - **Files**: `src/Broiler.Cli/CaptureService.cs`, HTML-Renderer image loading
   - **Priority**: P1 — logo is the most prominent visual element
 
-- [ ] **TODO-G6**: Implement `Image()` constructor in JS engine
+- [x] **TODO-G6**: Implement `Image()` constructor in JS engine
   - Google's `onload` handler creates `new Image()` for beacon pixels
-  - Return a stub object with `src` setter
+  - ✅ **Implemented**: `Image(width, height)` constructor with `src`, `width`,
+    `height`, `alt`, `complete`, `naturalWidth`, `naturalHeight`, `onload`, `onerror`
   - **Files**: `src/Broiler.HtmlBridge/DomBridge.Registration.cs`
   - **Priority**: P1 — prevents onload handler from crashing
 
-- [ ] **TODO-G7**: Add `document.cookie` stub
+- [x] **TODO-G7**: Add `document.cookie` stub
   - Google's scripts read/write cookies for preferences
-  - Return empty string for reads, no-op for writes
+  - ✅ **Implemented**: In-memory get/set with basic cookie string accumulation
   - **Files**: `src/Broiler.HtmlBridge/DomBridge.Registration.cs`
   - **Priority**: P1 — prevents preference code from crashing
 
@@ -370,14 +377,15 @@ These issues prevent specific content elements from appearing.
   - Map `-webkit-` prefixes to their unprefixed equivalents
   - **Priority**: P2
 
-- [ ] **TODO-G10**: Add `IntersectionObserver` polyfill
+- [x] **TODO-G10**: Add `IntersectionObserver` polyfill
   - Used for lazy-loading and visibility detection
-  - Stub: immediately invoke callback with `isIntersecting: true`
+  - ✅ **Implemented**: Constructor, `observe()` (immediately invokes callback with
+    `isIntersecting: true`), `unobserve()`, `disconnect()`, `takeRecords()`
   - **Priority**: P2
 
-- [ ] **TODO-G11**: Add `ResizeObserver` polyfill
+- [x] **TODO-G11**: Add `ResizeObserver` polyfill
   - Used for responsive element resizing
-  - Stub: no-op `observe()`/`disconnect()`
+  - ✅ **Implemented**: Constructor, `observe()`, `unobserve()`, `disconnect()`
   - **Priority**: P2
 
 - [ ] **TODO-G12**: Improve `MutationObserver` to track mutations
@@ -385,12 +393,17 @@ These issues prevent specific content elements from appearing.
   - Google's scripts rely on mutation tracking for dynamic updates
   - **Priority**: P2
 
-- [ ] **TODO-G13**: Add `TextEncoder`/`TextDecoder` polyfills
+- [x] **TODO-G13**: Add `TextEncoder`/`TextDecoder` polyfills
   - Used by Google's data encoding/decoding code
+  - ✅ **Implemented**: Full UTF-8 `encode()`/`encodeInto()`/`decode()` with
+    surrogate pair handling
   - **Priority**: P2
 
-- [ ] **TODO-G14**: Add `URL`/`URLSearchParams` polyfills
+- [x] **TODO-G14**: Add `URL`/`URLSearchParams` polyfills
   - Used by Google's URL manipulation code
+  - ✅ **Implemented**: `URLSearchParams` with `get`, `getAll`, `has`, `set`,
+    `append`, `delete`, `toString`, `forEach`; `URL` constructor with protocol,
+    hostname, port, host, pathname, search, hash, origin, href, searchParams
   - **Priority**: P2
 
 ### Phase 4: Low — Polish and Edge Cases (P3)
@@ -399,20 +412,28 @@ These issues prevent specific content elements from appearing.
   - Google uses `@media (-webkit-min-device-pixel-ratio:1.25)` for retina
   - **Priority**: P3
 
-- [ ] **TODO-G16**: Add `AbortController` polyfill
+- [x] **TODO-G16**: Add `AbortController` polyfill
   - Used for cancellable fetch requests
+  - ✅ **Implemented**: `AbortController` with `signal.aborted`, `signal.reason`,
+    `signal.onabort`, `signal.addEventListener`, `signal.throwIfAborted`, `abort()`
   - **Priority**: P3
 
-- [ ] **TODO-G17**: Add `CustomEvent` constructor
-  - `Event` constructor exists but `CustomEvent` with `detail` does not
+- [x] **TODO-G17**: Add `CustomEvent` constructor
+  - ✅ **Verified**: `CustomEvent` constructor with `type`, `detail`, `bubbles`,
+    `cancelable` already exists (registered via `context.Eval`)
   - **Priority**: P3
 
-- [ ] **TODO-G18**: Add `window.crypto.getRandomValues()` stub
+- [x] **TODO-G18**: Add `window.crypto.getRandomValues()` stub
   - Used for unique ID generation
+  - ✅ **Implemented**: `crypto.getRandomValues()` with random byte filling +
+    `crypto.randomUUID()` backed by `Guid.NewGuid()`
   - **Priority**: P3
 
-- [ ] **TODO-G19**: Add `element.getBoundingClientRect()` implementation
+- [x] **TODO-G19**: Add `element.getBoundingClientRect()` implementation
   - Returns element position/size; used by Google for positioning
+  - ✅ **Implemented**: Returns DOMRect-like object with x, y, top, left, right,
+    bottom, width, height; viewport dimensions for `<html>` and `<body>`,
+    zero-sized rect for other elements. Also added `getClientRects()`.
   - **Priority**: P3
 
 - [ ] **TODO-G20**: Distinguish `async` scripts from synchronous
@@ -453,10 +474,11 @@ These issues prevent specific content elements from appearing.
 | Test Class                          | Tests | Description                     |
 |-------------------------------------|-------|---------------------------------|
 | `GoogleSearchComplianceTests`       | 8     | Structural rendering validation |
+| `GoogleSearchPolyfillTests`         | 33    | JS polyfill API validation      |
 
 Tests use a self-contained, minimal Google-like HTML (no network dependency)
 to validate that Broiler can render the essential visual structure of a
-Google Search homepage.
+Google Search homepage and that all required JS APIs are available.
 
 ---
 
@@ -470,11 +492,12 @@ Google Search homepage.
 | M4        | Layout broadly correct (elements in right zones)| >30% region match  | 2026-06-07     | 2026-06-09     |
 | M5        | Close visual match to Chromium reference         | >60% content match | 2026-06-28     | 2026-06-30     |
 
-### Current: Pre-M1 (blank page)
+### Current: Phase 1–4 JS polyfills complete
 
-The immediate priority is achieving M1 by fixing TODO-G1 (null-vs-undefined),
-which should unblock Google's script initialization chain and allow the HTML
-content to render.
+All JavaScript API polyfills required for Google Search compliance have been
+implemented (TODO-G1 through TODO-G19, excluding CSS engine and rendering
+pipeline changes). The remaining open items (TODO-G5, G8, G9, G12, G15, G20,
+G21) require changes to the CSS rendering engine or HTML processing pipeline.
 
 ### Draft and Review Schedule
 
