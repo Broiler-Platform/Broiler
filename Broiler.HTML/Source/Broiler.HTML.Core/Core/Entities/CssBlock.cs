@@ -3,6 +3,26 @@ using System.Collections.Generic;
 
 namespace Broiler.HTML.Core.Core.Entities;
 
+/// <summary>
+/// Represents a CSS attribute selector condition like [type="text"] or [hidden].
+/// </summary>
+public readonly struct CssAttributeCondition
+{
+    public CssAttributeCondition(string name, string op, string value)
+    {
+        Name = name;
+        Op = op;
+        Value = value;
+    }
+
+    /// <summary>Attribute name (e.g. "type", "hidden").</summary>
+    public string Name { get; }
+    /// <summary>Match operator: "=", "~=", "|=", "^=", "$=", "*=", or null for presence-only.</summary>
+    public string Op { get; }
+    /// <summary>Expected value, or null for presence-only checks like [hidden].</summary>
+    public string Value { get; }
+}
+
 public sealed class CssBlock
 {
     private readonly Dictionary<string, string> _properties;
@@ -37,6 +57,9 @@ public sealed class CssBlock
     /// (e.g. "first-child" for <c>h1:first-child</c>).  CSS2.1 §5.11.
     /// </summary>
     public string PseudoClass { get; internal set; }
+
+    /// <summary>Attribute selector conditions extracted from the CSS selector.</summary>
+    public List<CssAttributeCondition> AttributeConditions { get; internal set; }
 
     /// <summary>
     /// Property names in this block that were declared with <c>!important</c>.

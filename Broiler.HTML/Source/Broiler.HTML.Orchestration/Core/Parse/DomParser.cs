@@ -281,6 +281,13 @@ internal sealed class DomParser
             assignable = false;
         }
 
+        // Check attribute conditions (from CSS attribute selectors)
+        if (assignable && block.AttributeConditions != null && block.AttributeConditions.Count > 0)
+        {
+            if (box.HtmlTag == null || !MatchesAttributeConditions(box.HtmlTag, block.AttributeConditions))
+                assignable = false;
+        }
+
         // CSS2.1 §5.11: Check structural pseudo-class on the terminal selector.
         if (assignable && block.PseudoClass != null)
         {
@@ -340,6 +347,63 @@ internal sealed class DomParser
             }
         }
 
+        return true;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when the given HTML tag satisfies all attribute
+    /// selector conditions (e.g. [type="text"], [hidden]).
+    /// </summary>
+    private static bool MatchesAttributeConditions(HtmlTag tag, List<CssAttributeCondition> conditions)
+    {
+        foreach (var cond in conditions)
+        {
+            if (cond.Op == null)
+            {
+                // Presence check: [hidden]
+                if (!tag.HasAttribute(cond.Name))
+                    return false;
+            }
+            else
+            {
+                var attrVal = tag.TryGetAttribute(cond.Name);
+                if (attrVal == null)
+                    return false;
+
+                switch (cond.Op)
+                {
+                    case "=":
+                        if (!string.Equals(attrVal, cond.Value, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                    case "~=":
+                        if (!(" " + attrVal + " ").Contains(" " + cond.Value + " ", StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                    case "|=":
+                        if (!string.Equals(attrVal, cond.Value, StringComparison.OrdinalIgnoreCase) &&
+                            !attrVal.StartsWith(cond.Value + "-", StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                    case "^=":
+                        if (!attrVal.StartsWith(cond.Value, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                    case "$=":
+                        if (!attrVal.EndsWith(cond.Value, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                    case "*=":
+                        if (!attrVal.Contains(cond.Value, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                    default:
+                        if (!string.Equals(attrVal, cond.Value, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                }
+            }
+        }
         return true;
     }
 
