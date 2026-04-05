@@ -1392,6 +1392,430 @@ public sealed partial class DomBridge
         context["requestAnimationFrame"] = window[(KeyString)"requestAnimationFrame"];
         context["cancelAnimationFrame"] = window[(KeyString)"cancelAnimationFrame"];
 
+        // ---------------------------------------------------------------
+        //  Google Search Compliance: Phase 1 (P0) — Critical polyfills
+        // ---------------------------------------------------------------
+
+        // TODO-G2: performance object with performance.now() and timeOrigin
+        var performanceTimeOrigin = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var performanceObj = new JSObject();
+        performanceObj.FastAddValue(
+            (KeyString)"timeOrigin",
+            new JSNumber(performanceTimeOrigin),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        performanceObj.FastAddValue(
+            (KeyString)"now",
+            new JSFunction((in Arguments _) =>
+            {
+                var elapsed = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - performanceTimeOrigin;
+                return new JSNumber(elapsed);
+            }, "now", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        // performance.getEntriesByType() — stub returning empty array
+        performanceObj.FastAddValue(
+            (KeyString)"getEntriesByType",
+            new JSFunction((in Arguments _) => new JSArray(), "getEntriesByType", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        // performance.mark() / performance.measure() — no-op stubs
+        performanceObj.FastAddValue(
+            (KeyString)"mark",
+            new JSFunction((in Arguments _) => JSUndefined.Value, "mark", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        performanceObj.FastAddValue(
+            (KeyString)"measure",
+            new JSFunction((in Arguments _) => JSUndefined.Value, "measure", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue(
+            (KeyString)"performance",
+            performanceObj,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        context["performance"] = performanceObj;
+
+        // TODO-G3: navigator object with sendBeacon, userAgent, language, etc.
+        var navigatorObj = new JSObject();
+        navigatorObj.FastAddValue(
+            (KeyString)"userAgent",
+            new JSString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Broiler/1.0"),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        navigatorObj.FastAddValue(
+            (KeyString)"language",
+            new JSString("en-US"),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        navigatorObj.FastAddValue(
+            (KeyString)"languages",
+            new JSArray(new JSValue[] { new JSString("en-US"), new JSString("en") }),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        navigatorObj.FastAddValue(
+            (KeyString)"cookieEnabled",
+            JSBoolean.True,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        navigatorObj.FastAddValue(
+            (KeyString)"onLine",
+            JSBoolean.True,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        navigatorObj.FastAddValue(
+            (KeyString)"platform",
+            new JSString("Win32"),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        navigatorObj.FastAddValue(
+            (KeyString)"vendor",
+            new JSString(""),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        // sendBeacon(url, data) — no-op, returns true
+        navigatorObj.FastAddValue(
+            (KeyString)"sendBeacon",
+            new JSFunction((in Arguments _) => JSBoolean.True, "sendBeacon", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue(
+            (KeyString)"navigator",
+            navigatorObj,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        context["navigator"] = navigatorObj;
+
+        // TODO-G4: window.innerWidth / innerHeight
+        var vpWidth = _viewportWidth;
+        var vpHeight = _viewportHeight;
+        window.FastAddProperty(
+            (KeyString)"innerWidth",
+            new JSFunction((in Arguments _) => new JSNumber(vpWidth), "get innerWidth"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty(
+            (KeyString)"innerHeight",
+            new JSFunction((in Arguments _) => new JSNumber(vpHeight), "get innerHeight"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty(
+            (KeyString)"outerWidth",
+            new JSFunction((in Arguments _) => new JSNumber(vpWidth), "get outerWidth"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty(
+            (KeyString)"outerHeight",
+            new JSFunction((in Arguments _) => new JSNumber(vpHeight), "get outerHeight"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        // window.screen — basic stub for screen dimensions
+        var screenObj = new JSObject();
+        screenObj.FastAddValue((KeyString)"width", new JSNumber(vpWidth), JSPropertyAttributes.EnumerableConfigurableValue);
+        screenObj.FastAddValue((KeyString)"height", new JSNumber(vpHeight), JSPropertyAttributes.EnumerableConfigurableValue);
+        screenObj.FastAddValue((KeyString)"availWidth", new JSNumber(vpWidth), JSPropertyAttributes.EnumerableConfigurableValue);
+        screenObj.FastAddValue((KeyString)"availHeight", new JSNumber(vpHeight), JSPropertyAttributes.EnumerableConfigurableValue);
+        screenObj.FastAddValue((KeyString)"colorDepth", new JSNumber(24), JSPropertyAttributes.EnumerableConfigurableValue);
+        screenObj.FastAddValue((KeyString)"pixelDepth", new JSNumber(24), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"screen", screenObj, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["screen"] = screenObj;
+
+        // ---------------------------------------------------------------
+        //  Google Search Compliance: Phase 2 (P1) — Content rendering
+        // ---------------------------------------------------------------
+
+        // TODO-G6: Image() constructor — returns stub object with src property
+        context.Eval(@"
+                function Image(width, height) {
+                    this.src = '';
+                    this.width = width || 0;
+                    this.height = height || 0;
+                    this.alt = '';
+                    this.complete = false;
+                    this.naturalWidth = 0;
+                    this.naturalHeight = 0;
+                    this.onload = null;
+                    this.onerror = null;
+                    this.addEventListener = function() {};
+                    this.removeEventListener = function() {};
+                }
+            ");
+
+        // TODO-G7: document.cookie — get/set stub (in-memory, non-persistent)
+        var cookieStore = "";
+        document.FastAddProperty(
+            (KeyString)"cookie",
+            new JSFunction((in Arguments _) => new JSString(cookieStore), "get cookie"),
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                {
+                    var val = a[0].ToString();
+                    // Simplified: just append cookie value (real browsers parse/update)
+                    if (!string.IsNullOrEmpty(cookieStore))
+                        cookieStore += "; " + val;
+                    else
+                        cookieStore = val;
+                }
+                return JSUndefined.Value;
+            }, "set cookie"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // ---------------------------------------------------------------
+        //  Google Search Compliance: Phase 3 (P2) — Fidelity polyfills
+        // ---------------------------------------------------------------
+
+        // TODO-G10: IntersectionObserver — stub that immediately invokes callback
+        context.Eval(@"
+                function IntersectionObserver(callback, options) {
+                    this._callback = callback;
+                    this._targets = [];
+                }
+                IntersectionObserver.prototype.observe = function(target) {
+                    this._targets.push(target);
+                    // Immediately report as intersecting
+                    var entry = {
+                        target: target,
+                        isIntersecting: true,
+                        intersectionRatio: 1.0,
+                        boundingClientRect: { top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0 },
+                        intersectionRect: { top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0 },
+                        rootBounds: null,
+                        time: 0
+                    };
+                    try { this._callback([entry], this); } catch(e) {}
+                };
+                IntersectionObserver.prototype.unobserve = function(target) {
+                    this._targets = this._targets.filter(function(t) { return t !== target; });
+                };
+                IntersectionObserver.prototype.disconnect = function() {
+                    this._targets = [];
+                };
+                IntersectionObserver.prototype.takeRecords = function() {
+                    return [];
+                };
+            ");
+
+        // TODO-G11: ResizeObserver — no-op stub
+        context.Eval(@"
+                function ResizeObserver(callback) {
+                    this._callback = callback;
+                }
+                ResizeObserver.prototype.observe = function() {};
+                ResizeObserver.prototype.unobserve = function() {};
+                ResizeObserver.prototype.disconnect = function() {};
+            ");
+
+        // TODO-G13: TextEncoder / TextDecoder — basic UTF-8 stubs
+        context.Eval(@"
+                function TextEncoder() {
+                    this.encoding = 'utf-8';
+                }
+                TextEncoder.prototype.encode = function(str) {
+                    str = str || '';
+                    var arr = [];
+                    for (var i = 0; i < str.length; i++) {
+                        var c = str.charCodeAt(i);
+                        if (c < 0x80) {
+                            arr.push(c);
+                        } else if (c < 0x800) {
+                            arr.push(0xC0 | (c >> 6));
+                            arr.push(0x80 | (c & 0x3F));
+                        } else if (c >= 0xD800 && c <= 0xDBFF && i + 1 < str.length) {
+                            var next = str.charCodeAt(i + 1);
+                            if (next >= 0xDC00 && next <= 0xDFFF) {
+                                var cp = ((c - 0xD800) << 10) + (next - 0xDC00) + 0x10000;
+                                arr.push(0xF0 | (cp >> 18));
+                                arr.push(0x80 | ((cp >> 12) & 0x3F));
+                                arr.push(0x80 | ((cp >> 6) & 0x3F));
+                                arr.push(0x80 | (cp & 0x3F));
+                                i++;
+                            } else {
+                                arr.push(0xEF); arr.push(0xBF); arr.push(0xBD);
+                            }
+                        } else {
+                            arr.push(0xE0 | (c >> 12));
+                            arr.push(0x80 | ((c >> 6) & 0x3F));
+                            arr.push(0x80 | (c & 0x3F));
+                        }
+                    }
+                    return new Uint8Array(arr);
+                };
+                TextEncoder.prototype.encodeInto = function(str, dest) {
+                    var encoded = this.encode(str);
+                    var len = Math.min(encoded.length, dest.length);
+                    for (var i = 0; i < len; i++) dest[i] = encoded[i];
+                    return { read: str.length, written: len };
+                };
+
+                function TextDecoder(encoding) {
+                    this.encoding = (encoding || 'utf-8').toLowerCase();
+                    this.fatal = false;
+                    this.ignoreBOM = false;
+                }
+                TextDecoder.prototype.decode = function(input) {
+                    if (!input || input.length === 0) return '';
+                    var bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+                    var result = '';
+                    var len = bytes.length;
+                    for (var i = 0; i < len; ) {
+                        var b = bytes[i];
+                        if (b < 0x80) {
+                            result += String.fromCharCode(b);
+                            i++;
+                        } else if ((b & 0xE0) === 0xC0 && i + 1 < len) {
+                            result += String.fromCharCode(((b & 0x1F) << 6) | (bytes[i+1] & 0x3F));
+                            i += 2;
+                        } else if ((b & 0xF0) === 0xE0 && i + 2 < len) {
+                            result += String.fromCharCode(((b & 0x0F) << 12) | ((bytes[i+1] & 0x3F) << 6) | (bytes[i+2] & 0x3F));
+                            i += 3;
+                        } else if ((b & 0xF8) === 0xF0 && i + 3 < len) {
+                            var cp = ((b & 0x07) << 18) | ((bytes[i+1] & 0x3F) << 12) | ((bytes[i+2] & 0x3F) << 6) | (bytes[i+3] & 0x3F);
+                            cp -= 0x10000;
+                            result += String.fromCharCode(0xD800 + (cp >> 10), 0xDC00 + (cp & 0x3FF));
+                            i += 4;
+                        } else {
+                            result += '\uFFFD';
+                            i++;
+                        }
+                    }
+                    return result;
+                };
+            ");
+
+        // TODO-G14: URL / URLSearchParams polyfills
+        context.Eval(@"
+                function URLSearchParams(init) {
+                    this._params = [];
+                    if (typeof init === 'string') {
+                        var s = init.charAt(0) === '?' ? init.substring(1) : init;
+                        var pairs = s.split('&');
+                        for (var i = 0; i < pairs.length; i++) {
+                            var kv = pairs[i].split('=');
+                            if (kv[0]) this._params.push([decodeURIComponent(kv[0]), decodeURIComponent(kv[1] || '')]);
+                        }
+                    } else if (init && typeof init === 'object') {
+                        var keys = Object.keys(init);
+                        for (var j = 0; j < keys.length; j++) {
+                            this._params.push([keys[j], String(init[keys[j]])]);
+                        }
+                    }
+                }
+                URLSearchParams.prototype.get = function(name) {
+                    for (var i = 0; i < this._params.length; i++) {
+                        if (this._params[i][0] === name) return this._params[i][1];
+                    }
+                    return null;
+                };
+                URLSearchParams.prototype.getAll = function(name) {
+                    var r = [];
+                    for (var i = 0; i < this._params.length; i++) {
+                        if (this._params[i][0] === name) r.push(this._params[i][1]);
+                    }
+                    return r;
+                };
+                URLSearchParams.prototype.has = function(name) { return this.get(name) !== null; };
+                URLSearchParams.prototype.set = function(name, value) {
+                    var found = false;
+                    for (var i = 0; i < this._params.length; i++) {
+                        if (this._params[i][0] === name) {
+                            if (!found) { this._params[i][1] = String(value); found = true; }
+                            else { this._params.splice(i, 1); i--; }
+                        }
+                    }
+                    if (!found) this._params.push([name, String(value)]);
+                };
+                URLSearchParams.prototype.append = function(name, value) {
+                    this._params.push([name, String(value)]);
+                };
+                URLSearchParams.prototype['delete'] = function(name) {
+                    this._params = this._params.filter(function(p) { return p[0] !== name; });
+                };
+                URLSearchParams.prototype.toString = function() {
+                    return this._params.map(function(p) {
+                        return encodeURIComponent(p[0]) + '=' + encodeURIComponent(p[1]);
+                    }).join('&');
+                };
+                URLSearchParams.prototype.forEach = function(cb) {
+                    for (var i = 0; i < this._params.length; i++) cb(this._params[i][1], this._params[i][0], this);
+                };
+            ");
+
+        context.Eval(@"
+                function URL(url, base) {
+                    if (base) {
+                        if (url.indexOf('://') === -1 && url.charAt(0) !== '/') {
+                            var baseNoQuery = base.split('?')[0].split('#')[0];
+                            var lastSlash = baseNoQuery.lastIndexOf('/');
+                            url = baseNoQuery.substring(0, lastSlash + 1) + url;
+                        } else if (url.charAt(0) === '/') {
+                            var m = base.match(/^([a-zA-Z][a-zA-Z0-9+\-.]*:\/\/[^\/]+)/);
+                            url = (m ? m[1] : '') + url;
+                        }
+                    }
+                    var match = url.match(/^([a-zA-Z][a-zA-Z0-9+\-.]*):\/\/([^\/:]+)(:\d+)?(\/[^?#]*)?(\?[^#]*)?(#.*)?$/);
+                    if (match) {
+                        this.protocol = match[1] + ':';
+                        this.hostname = match[2];
+                        this.port = match[3] ? match[3].substring(1) : '';
+                        this.host = this.hostname + (this.port ? ':' + this.port : '');
+                        this.pathname = match[4] || '/';
+                        this.search = match[5] || '';
+                        this.hash = match[6] || '';
+                        this.origin = this.protocol + '//' + this.host;
+                        this.href = url;
+                    } else {
+                        this.href = url;
+                        this.protocol = ''; this.hostname = ''; this.port = '';
+                        this.host = ''; this.pathname = url; this.search = '';
+                        this.hash = ''; this.origin = '';
+                    }
+                    this.searchParams = new URLSearchParams(this.search);
+                }
+                URL.prototype.toString = function() { return this.href; };
+                URL.prototype.toJSON = function() { return this.href; };
+            ");
+
+        // ---------------------------------------------------------------
+        //  Google Search Compliance: Phase 4 (P3) — Polish and edge cases
+        // ---------------------------------------------------------------
+
+        // TODO-G16: AbortController / AbortSignal — basic stubs
+        context.Eval(@"
+                function AbortController() {
+                    this.signal = { aborted: false, reason: undefined, onabort: null,
+                        addEventListener: function() {}, removeEventListener: function() {},
+                        throwIfAborted: function() { if (this.aborted) throw new DOMException('The operation was aborted.', 'AbortError'); }
+                    };
+                }
+                AbortController.prototype.abort = function(reason) {
+                    this.signal.aborted = true;
+                    this.signal.reason = reason || new DOMException('The operation was aborted.', 'AbortError');
+                    if (typeof this.signal.onabort === 'function') {
+                        try { this.signal.onabort(); } catch(e) {}
+                    }
+                };
+            ");
+
+        // TODO-G18: window.crypto.getRandomValues() — cryptographically secure
+        var cryptoObj = new JSObject();
+        cryptoObj.FastAddValue(
+            (KeyString)"getRandomValues",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0) return JSUndefined.Value;
+                var arr = a[0];
+                if (arr is JSObject arrObj)
+                {
+                    var lengthProp = arrObj[(KeyString)"length"];
+                    if (lengthProp != null && !lengthProp.IsUndefined && !lengthProp.IsNull)
+                    {
+                        var len = (int)lengthProp.DoubleValue;
+                        var buffer = new byte[len];
+                        System.Security.Cryptography.RandomNumberGenerator.Fill(buffer);
+                        for (var i = 0; i < len; i++)
+                            arrObj[(KeyString)i.ToString()] = new JSNumber(buffer[i]);
+                    }
+                }
+                return arr;
+            }, "getRandomValues", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        cryptoObj.FastAddValue(
+            (KeyString)"randomUUID",
+            new JSFunction((in Arguments _) => new JSString(Guid.NewGuid().ToString()), "randomUUID", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue(
+            (KeyString)"crypto",
+            cryptoObj,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        context["crypto"] = cryptoObj;
+
         // DOMException constructor
         RegisterDOMException(context);
 
