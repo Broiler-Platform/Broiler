@@ -39,6 +39,7 @@ Broiler is a lightweight, extensible web browser for Windows built entirely in m
 |-----------|-------------|
 | `Broiler.App` | WPF application entry point and main window |
 | `Broiler.App.Rendering` | Modular rendering pipeline (page loading, script extraction, JS execution) |
+| `Broiler.HTML.Dom` | Shared HTML parsing and DOM utilities (WHATWG tokenizer, serialization) |
 | `HtmlRenderer.WPF` | WPF adapter for the HTML rendering engine |
 | `HtmlRenderer.Core` | Cross-platform HTML/CSS parsing and rendering |
 | `YantraJS.Core` | JavaScript engine with ES2020+ support |
@@ -246,6 +247,29 @@ PageContent (HTML + Scripts)
 │  └─────────┘ │
 └──────────────┘
 ```
+
+### Shared Components (DomBridge ↔ Broiler.HTML)
+
+The WHATWG-aligned HTML tokenizer and serialization utilities are shared between
+the DomBridge JavaScript bridge and the Broiler.HTML rendering engine:
+
+```
+Broiler.HTML.Dom (shared layer)
+├── Core/Parse/HtmlTokenizer    ← WHATWG §13.2.5 tokenizer
+├── Core/Parse/HtmlParser       ← CSS box-tree parser (uses HtmlTokenizer)
+└── Core/Utils/HtmlSerializer   ← HtmlEncode, VoidTags, shorthand helpers
+       │
+       ├──▶ Broiler.HTML rendering pipeline
+       │    (HtmlParser → CssBox tree → layout → paint)
+       │
+       └──▶ Broiler.App DomBridge
+            (HtmlTreeBuilder → DomElement tree → JS bridge)
+```
+
+| Shared Component | Location | Used By |
+|------------------|----------|---------|
+| `HtmlTokenizer` | `Broiler.HTML.Dom/Core/Parse/` | `HtmlParser` (CSS rendering), `HtmlTreeBuilder` (DomBridge) |
+| `HtmlSerializer` | `Broiler.HTML.Dom/Core/Utils/` | `DomBridge.Serialization` (DOM → HTML) |
 
 ## License
 
