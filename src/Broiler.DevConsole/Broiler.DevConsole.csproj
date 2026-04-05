@@ -14,11 +14,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\Broiler.App\Rendering\RenderLogger.cs" Link="RenderLogger.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Dom\Broiler.HTML.Dom.csproj" />
+    <!-- Bridge component provides RenderLogger and shared types -->
+    <ProjectReference Include="..\Broiler.HtmlBridge\Broiler.HtmlBridge.csproj" />
   </ItemGroup>
 
 </Project>

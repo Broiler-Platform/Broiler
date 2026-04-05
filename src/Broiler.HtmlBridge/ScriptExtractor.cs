@@ -5,7 +5,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Extracts the contents of <c>&lt;script&gt;</c> tags from HTML using a

@@ -1,5 +1,5 @@
-using Broiler.App.Rendering;
-using RenderImageFormat = Broiler.App.Rendering.ImageFormat;
+using Broiler.HtmlBridge;
+using RenderImageFormat = Broiler.HtmlBridge.ImageFormat;
 
 namespace Broiler.Cli.Tests;
 

@@ -1,6 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
-using Broiler.App.Rendering;
+using Broiler.HtmlBridge;
 using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.Image;
 using Broiler.JavaScript.BuiltIns.Null;

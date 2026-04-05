@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Lightweight Content Security Policy (CSP) model used to gate dangerous

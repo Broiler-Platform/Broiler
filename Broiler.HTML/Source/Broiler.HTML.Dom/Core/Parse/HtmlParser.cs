@@ -6,6 +6,14 @@ using System.Collections.Generic;
 
 namespace Broiler.HTML.Dom.Core.Parse;
 
+/// <summary>
+/// Parses an HTML string into a <see cref="CssBox"/> tree for CSS layout.
+/// Uses the shared WHATWG-aligned <see cref="HtmlTokenizer"/> (originally
+/// from the DomBridge in Broiler.App) instead of a hand-rolled scanner,
+/// giving more accurate tokenisation of tags, attributes, comments,
+/// raw-text elements (<c>&lt;style&gt;</c> / <c>&lt;script&gt;</c>), and
+/// processing instructions.
+/// </summary>
 internal static class HtmlParser
 {
     /// <summary>
@@ -26,201 +34,89 @@ internal static class HtmlParser
         var root = CssBoxHelper.CreateBlock(baseUrl);
         var curBox = root;
 
-        int endIdx = 0;
-        int startIdx = 0;
-
-        while (startIdx >= 0)
+        var tokenizer = new HtmlTokenizer();
+        foreach (var token in tokenizer.Tokenize(source))
         {
-            var tagIdx = source.IndexOf('<', startIdx);
-            if (tagIdx >= 0 && tagIdx < source.Length)
+            switch (token.Type)
             {
-                // add the html text as anon css box to the structure
-                AddTextBox(source, startIdx, tagIdx, ref curBox, baseUrl);
-
-                if (source[tagIdx + 1] == '!')
+                case TokenType.Character:
                 {
-                    if (source[tagIdx + 2] == '-')
+                    // Add text content as anonymous css box (mirrors AddTextBox)
+                    var data = token.Data;
+                    if (!string.IsNullOrEmpty(data))
                     {
-                        // skip the html comment elements (<!-- bla -->)
-                        startIdx = source.IndexOf("-->", tagIdx + 2);
-                        endIdx = startIdx > 0 ? startIdx + 3 : tagIdx + 2;
+                        var abox = CssBoxHelper.CreateBox(curBox, baseUrl);
+                        abox.Text = data.AsMemory();
+                    }
+                    break;
+                }
+
+                case TokenType.StartTag:
+                {
+                    var tagName = token.Name;
+                    if (string.IsNullOrEmpty(tagName))
+                        break;
+
+                    var isSingle = HtmlUtils.IsSingleTag(tagName) || token.SelfClosing;
+
+                    // Decode attribute values to match original ExtractAttributes
+                    // behaviour (WebUtility.HtmlDecode on each value).
+                    Dictionary<string, string> attrs = null;
+                    if (token.Attributes.Count > 0)
+                    {
+                        attrs = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
+                        foreach (var kvp in token.Attributes)
+                            attrs[kvp.Key] = HtmlUtils.DecodeHtml(kvp.Value);
+                    }
+
+                    var tag = new HtmlTag(tagName, isSingle, attrs);
+
+                    // HTML 4 DTD / HTML5 §12.2.6.4.7: implicitly close an open <p>
+                    // when a block-level element that cannot be a child of <p>
+                    // is encountered.
+                    if (!isSingle && curBox.HtmlTag != null
+                        && curBox.HtmlTag.Name.Equals("p", StringComparison.OrdinalIgnoreCase)
+                        && _pClosingTags.Contains(tagName)
+                        && curBox.ParentBox != null)
+                    {
+                        curBox = curBox.ParentBox;
+                    }
+
+                    if (isSingle)
+                    {
+                        // the current box is not changed
+                        CssBoxHelper.CreateBox(tag, baseUrl, curBox);
                     }
                     else
                     {
-                        // skip the html crap elements (<!crap bla>)
-                        startIdx = source.IndexOf(">", tagIdx + 2);
-                        endIdx = startIdx > 0 ? startIdx + 1 : tagIdx + 2;
+                        // go one level down, make the new box the current box
+                        curBox = CssBoxHelper.CreateBox(tag, baseUrl, curBox);
                     }
+                    break;
                 }
-                else
+
+                case TokenType.EndTag:
                 {
-                    // parse element tag to css box structure
-                    endIdx = ParseHtmlTag(source, tagIdx, ref curBox, baseUrl) + 1;
-
-                    if (curBox.HtmlTag != null && curBox.HtmlTag.Name.Equals(HtmlConstants.Style, StringComparison.OrdinalIgnoreCase))
+                    var tagName = token.Name;
+                    if (!HtmlUtils.IsSingleTag(tagName) && curBox.ParentBox != null)
                     {
-                        var endIdxS = endIdx;
-                        endIdx = source.IndexOf("</style>", endIdx, StringComparison.OrdinalIgnoreCase);
-                        if (endIdx > -1)
-                            AddTextBox(source, endIdxS, endIdx, ref curBox, baseUrl);
+                        // need to find the parent tag to go one level up
+                        curBox = DomUtils.FindParent(curBox.ParentBox, tagName, curBox);
                     }
+                    break;
                 }
-            }
 
-            startIdx = tagIdx > -1 && endIdx > 0 ? endIdx : -1;
-        }
+                case TokenType.Comment:
+                case TokenType.Doctype:
+                    // Skip comments and doctype declarations
+                    // (consistent with original behaviour)
+                    break;
 
-        // handle pieces of html without proper structure
-        if (endIdx > -1 && endIdx < source.Length)
-        {
-            // there is text after the end of last element
-            var endText = source.AsMemory(endIdx, source.Length - endIdx);
-            if (!endText.Span.IsWhiteSpace())
-            {
-                var abox = CssBoxHelper.CreateBox(root, baseUrl);
-                abox.Text = endText;
+                case TokenType.EndOfFile:
+                    break;
             }
         }
 
         return root;
-    }
-
-    private static void AddTextBox(string source, int startIdx, int tagIdx, ref CssBox curBox, Uri baseUrl)
-    {
-        if (tagIdx <= startIdx)
-            return;
-
-        var abox = CssBoxHelper.CreateBox(curBox, baseUrl);
-        abox.Text = source.AsMemory(startIdx, tagIdx - startIdx);
-    }
-
-    private static int ParseHtmlTag(string source, int tagIdx, ref CssBox curBox, Uri baseUrl)
-    {
-        var endIdx = source.IndexOf('>', tagIdx + 1);
-        if (endIdx <= 0)
-            return endIdx;
-
-        var length = endIdx - tagIdx + 1 - (source[endIdx - 1] == '/' ? 1 : 0);
-        if (ParseHtmlTag(source, tagIdx, length, out string tagName, out Dictionary<string, string> tagAttributes))
-        {
-            if (!HtmlUtils.IsSingleTag(tagName) && curBox.ParentBox != null)
-            {
-                // need to find the parent tag to go one level up
-                curBox = DomUtils.FindParent(curBox.ParentBox, tagName, curBox);
-            }
-        }
-        else if (!string.IsNullOrEmpty(tagName))
-        {
-            //new SubString(source, lastEnd + 1, tagmatch.Index - lastEnd - 1)
-            var isSingle = HtmlUtils.IsSingleTag(tagName) || source[endIdx - 1] == '/';
-            var tag = new HtmlTag(tagName, isSingle, tagAttributes);
-
-            // HTML 4 DTD / HTML5 §12.2.6.4.7: implicitly close an open <p>
-            // when a block-level element that cannot be a child of <p> is encountered.
-            if (!isSingle && curBox.HtmlTag != null
-                && curBox.HtmlTag.Name.Equals("p", StringComparison.OrdinalIgnoreCase)
-                && _pClosingTags.Contains(tagName)
-                && curBox.ParentBox != null)
-            {
-                curBox = curBox.ParentBox;
-            }
-
-            if (isSingle)
-            {
-                // the current box is not changed
-                CssBoxHelper.CreateBox(tag, baseUrl, curBox);
-            }
-            else
-            {
-                // go one level down, make the new box the current box
-                curBox = CssBoxHelper.CreateBox(tag, baseUrl, curBox);
-            }
-        }
-        else
-        {
-            endIdx = tagIdx + 1;
-        }
-
-        return endIdx;
-    }
-
-    private static bool ParseHtmlTag(string source, int idx, int length, out string name, out Dictionary<string, string> attributes)
-    {
-        idx++;
-        length = length - (source[idx + length - 3] == '/' ? 3 : 2);
-
-        // Check if is end tag
-        var isClosing = false;
-        if (source[idx] == '/')
-        {
-            idx++;
-            length--;
-            isClosing = true;
-        }
-
-        int spaceIdx = idx;
-        while (spaceIdx < idx + length && !char.IsWhiteSpace(source, spaceIdx))
-            spaceIdx++;
-
-        // Get the name of the tag
-        name = source.Substring(idx, spaceIdx - idx).ToLower();
-
-        attributes = null;
-        if (!isClosing && idx + length > spaceIdx)
-            ExtractAttributes(source, spaceIdx, length - (spaceIdx - idx), out attributes);
-
-        return isClosing;
-    }
-
-    private static void ExtractAttributes(string source, int idx, int length, out Dictionary<string, string> attributes)
-    {
-        attributes = null;
-
-        int startIdx = idx;
-        while (startIdx < idx + length)
-        {
-            while (startIdx < idx + length && char.IsWhiteSpace(source, startIdx))
-                startIdx++;
-
-            var endIdx = startIdx + 1;
-            while (endIdx < idx + length && !char.IsWhiteSpace(source, endIdx) && source[endIdx] != '=')
-                endIdx++;
-
-            if (startIdx < idx + length)
-            {
-                var key = source.Substring(startIdx, endIdx - startIdx);
-                var value = "";
-
-                startIdx = endIdx + 1;
-                while (startIdx < idx + length && (char.IsWhiteSpace(source, startIdx) || source[startIdx] == '='))
-                    startIdx++;
-
-                bool hasPChar = false;
-                if (startIdx < idx + length)
-                {
-                    char pChar = source[startIdx];
-                    if (pChar == '"' || pChar == '\'')
-                    {
-                        hasPChar = true;
-                        startIdx++;
-                    }
-
-                    endIdx = startIdx + (hasPChar ? 0 : 1);
-                    while (endIdx < idx + length && (hasPChar ? source[endIdx] != pChar : !char.IsWhiteSpace(source, endIdx)))
-                        endIdx++;
-
-                    value = source.Substring(startIdx, endIdx - startIdx);
-                    value = HtmlUtils.DecodeHtml(value);
-                }
-
-                if (key.Length != 0)
-                {
-                    attributes ??= new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
-                    attributes[key.ToLower()] = value;
-                }
-
-                startIdx = endIdx + (hasPChar ? 2 : 1);
-            }
-        }
     }
 }

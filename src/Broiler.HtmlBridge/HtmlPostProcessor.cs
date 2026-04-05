@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Sanitises post-script-execution HTML before it is handed to the

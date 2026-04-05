@@ -9,7 +9,7 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// DOM event dispatch — capture → target → bubble propagation and

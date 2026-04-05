@@ -12,6 +12,8 @@
     <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.WPF\Broiler.HTML.WPF.csproj" />
     <!-- Meta-package includes Core + all satellite assemblies (Clr, Compiler, Modules, BuiltIns, Debugger) -->
     <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />
+    <!-- Bridge component connecting HTML rendering with JavaScript execution -->
+    <ProjectReference Include="..\Broiler.HtmlBridge\Broiler.HtmlBridge.csproj" />
     <ProjectReference Include="..\Broiler.DevConsole\Broiler.DevConsole.csproj" />
   </ItemGroup>
 

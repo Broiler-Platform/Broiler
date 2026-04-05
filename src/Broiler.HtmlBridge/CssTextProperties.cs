@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>CSS text-overflow property values.</summary>
 public enum CssTextOverflow { Clip, Ellipsis }

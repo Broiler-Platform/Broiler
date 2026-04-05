@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>Supported image format types.</summary>
 public enum ImageFormat { Png, Jpeg, Gif, Bmp, Svg, WebP, Unknown }

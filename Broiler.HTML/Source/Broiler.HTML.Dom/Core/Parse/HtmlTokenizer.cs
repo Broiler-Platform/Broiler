@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HTML.Dom.Core.Parse;
 
 /// <summary>Identifies the kind of <see cref="HtmlToken"/>.</summary>
-public enum TokenType
+internal enum TokenType
 {
     /// <summary>A DOCTYPE token.</summary>
     Doctype,
@@ -23,7 +23,7 @@ public enum TokenType
 
 /// <summary>A single token emitted by <see cref="HtmlTokenizer"/>.</summary>
 /// <remarks>Creates a new <see cref="HtmlToken"/>.</remarks>
-public sealed class HtmlToken(TokenType type, string name = null, string data = null,
+internal sealed class HtmlToken(TokenType type, string name = null, string data = null,
     bool selfClosing = false, Dictionary<string, string> attributes = null)
 {
     /// <summary>The kind of token.</summary>
@@ -41,8 +41,10 @@ public sealed class HtmlToken(TokenType type, string name = null, string data = 
 /// <summary>
 /// Simplified WHATWG-aligned HTML tokenizer (§13.2.5) that processes an
 /// HTML string character-by-character.
+/// Shared between Broiler.HTML rendering pipeline and the DomBridge
+/// JavaScript execution bridge.
 /// </summary>
-public sealed class HtmlTokenizer
+internal sealed class HtmlTokenizer
 {
     private enum State
     {

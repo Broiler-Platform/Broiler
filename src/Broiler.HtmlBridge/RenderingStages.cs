@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>Types of paint commands produced during the paint stage.</summary>
 public enum PaintCommandType { Background, Border, Text, Image, BoxShadow, Group, TextShadow }

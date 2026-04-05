@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Abstraction over a JavaScript execution engine.

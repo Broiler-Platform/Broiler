@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Broiler.HTML.Dom.Core.Parse;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// A simplified WHATWG-aligned HTML tree builder that converts a stream of
 /// <see cref="HtmlToken"/> objects into a DOM tree of <see cref="DomElement"/> nodes.
+/// Now uses the shared <see cref="HtmlTokenizer"/> from Broiler.HTML.Dom.
 /// </summary>
 public sealed class HtmlTreeBuilder
 {

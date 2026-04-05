@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Broiler.App.Rendering;
+namespace Broiler.HtmlBridge;
 
 /// <summary>
 /// Holds the result of extracting all scripts from an HTML page,

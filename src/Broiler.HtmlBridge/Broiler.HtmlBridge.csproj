@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Broiler.HtmlBridge</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Bridge component connecting Broiler.HTML (rendering engine) with Broiler.JavaScript (JS engine). Provides DomBridge, ScriptEngine, and shared rendering utilities.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler" />
+    <InternalsVisibleTo Include="Broiler.Cli" />
+    <InternalsVisibleTo Include="Broiler.Cli.Tests" />
+    <InternalsVisibleTo Include="Broiler.DevConsole" />
+    <InternalsVisibleTo Include="Broiler.DevConsole.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Dom\Broiler.HTML.Dom.csproj" />
+    <!-- Meta-package includes Core + all satellite assemblies (Clr, Compiler, Modules, BuiltIns, Debugger) -->
+    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />
+  </ItemGroup>
+
+</Project>

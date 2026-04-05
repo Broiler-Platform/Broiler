@@ -1,6 +1,6 @@
 using SkiaSharp;
 using Broiler.HTML.Image;
-using Broiler.App.Rendering;
+using Broiler.HtmlBridge;
 
 namespace Broiler.Cli.Tests;
 

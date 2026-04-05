@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Broiler.App.Rendering;
+using Broiler.HtmlBridge;
 using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.WPF;
 
