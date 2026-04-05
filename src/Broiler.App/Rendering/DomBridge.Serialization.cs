@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Broiler.HTML.Dom.Core.Utils;
 
 namespace Broiler.App.Rendering;
 
 /// <summary>
 /// DOM → HTML serialisation — converts the in-memory DOM tree back to
 /// an HTML string after JavaScript execution.
+/// Uses shared serialization helpers from Broiler.HTML.Dom.
 /// </summary>
 public sealed partial class DomBridge
 {
@@ -16,12 +18,6 @@ public sealed partial class DomBridge
     // ------------------------------------------------------------------
 
     private const int MaxSerializationDepth = 1024;
-
-    private static readonly HashSet<string> SerializerVoidTags = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "area", "base", "br", "col", "embed", "hr", "img", "input",
-        "link", "meta", "param", "source", "track", "wbr"
-    };
 
     /// <summary>
     /// Serialises the current DOM tree back to an HTML string.
@@ -83,11 +79,11 @@ public sealed partial class DomBridge
 
         // Emit id attribute
         if (!string.IsNullOrEmpty(element.Id))
-            sb.Append(" id=\"").Append(HtmlEncode(element.Id)).Append('"');
+            sb.Append(" id=\"").Append(HtmlSerializer.HtmlEncode(element.Id)).Append('"');
 
         // Emit class attribute
         if (!string.IsNullOrEmpty(element.ClassName))
-            sb.Append(" class=\"").Append(HtmlEncode(element.ClassName)).Append('"');
+            sb.Append(" class=\"").Append(HtmlSerializer.HtmlEncode(element.ClassName)).Append('"');
 
         // Emit remaining attributes (skip id/class since already emitted)
         foreach (var kvp in element.Attributes)
@@ -95,7 +91,7 @@ public sealed partial class DomBridge
             if (string.Equals(kvp.Key, "id", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(kvp.Key, "class", StringComparison.OrdinalIgnoreCase))
                 continue;
-            sb.Append(' ').Append(kvp.Key).Append("=\"").Append(HtmlEncode(kvp.Value)).Append('"');
+            sb.Append(' ').Append(kvp.Key).Append("=\"").Append(HtmlSerializer.HtmlEncode(kvp.Value)).Append('"');
         }
 
         // Emit inline style from the style dictionary.
@@ -107,10 +103,10 @@ public sealed partial class DomBridge
             sb.Append(" style=\"");
             var first = true;
             // Emit shorthands first, then longhands, preserving original order within each group.
-            foreach (var kvp in element.Style.OrderBy(kv => IsShorthandProperty(kv.Key) ? 0 : 1))
+            foreach (var kvp in element.Style.OrderBy(kv => HtmlSerializer.IsShorthandProperty(kv.Key) ? 0 : 1))
             {
                 if (!first) sb.Append("; ");
-                sb.Append(kvp.Key).Append(": ").Append(HtmlEncode(kvp.Value));
+                sb.Append(kvp.Key).Append(": ").Append(HtmlSerializer.HtmlEncode(kvp.Value));
                 first = false;
             }
             sb.Append('"');
@@ -119,7 +115,7 @@ public sealed partial class DomBridge
         sb.Append('>');
 
         // Void elements have no closing tag
-        if (SerializerVoidTags.Contains(tag))
+        if (HtmlSerializer.VoidTags.Contains(tag))
             return;
 
         // Raw text elements (<script>, <style>) must not HTML-encode their content
@@ -133,7 +129,7 @@ public sealed partial class DomBridge
         }
         else if (!string.IsNullOrEmpty(element.TextContent))
         {
-            sb.Append(isRawText ? element.TextContent : HtmlEncode(element.TextContent));
+            sb.Append(isRawText ? element.TextContent : HtmlSerializer.HtmlEncode(element.TextContent));
         }
         else if (!string.IsNullOrEmpty(element.InnerHtml))
         {
@@ -141,29 +137,5 @@ public sealed partial class DomBridge
         }
 
         sb.Append("</").Append(tag).Append('>');
-    }
-
-    private static string HtmlEncode(string value)
-    {
-        return value
-            .Replace("&", "&amp;")
-            .Replace("<", "&lt;")
-            .Replace(">", "&gt;")
-            .Replace("\"", "&quot;");
-    }
-
-    /// <summary>
-    /// Returns <c>true</c> when <paramref name="property"/> is a CSS shorthand
-    /// that, if emitted after its longhands, would reset those longhands to
-    /// initial values (e.g. <c>margin</c> resets <c>margin-left</c>).
-    /// </summary>
-    private static bool IsShorthandProperty(string property)
-    {
-        return property switch
-        {
-            "margin" or "padding" or "border" or "background"
-                or "font" or "list-style" or "outline" => true,
-            _ => false,
-        };
     }
 }

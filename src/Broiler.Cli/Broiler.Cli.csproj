@@ -26,7 +26,6 @@
     <Compile Include="..\Broiler.App\Rendering\DomBridge.Utilities.cs" Link="DomBridge.Utilities.cs" />
     <Compile Include="..\Broiler.App\Rendering\DomBridge.Serialization.cs" Link="DomBridge.Serialization.cs" />
     <Compile Include="..\Broiler.App\Rendering\HtmlTreeBuilder.cs" Link="HtmlTreeBuilder.cs" />
-    <Compile Include="..\Broiler.App\Rendering\HtmlTokenizer.cs" Link="HtmlTokenizer.cs" />
     <Compile Include="..\Broiler.App\Rendering\RenderingStages.cs" Link="RenderingStages.cs" />
     <Compile Include="..\Broiler.App\Rendering\CssBoxModel.cs" Link="CssBoxModel.cs" />
     <Compile Include="..\Broiler.App\Rendering\ImagePipeline.cs" Link="ImagePipeline.cs" />
