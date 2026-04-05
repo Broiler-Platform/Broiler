@@ -76,3 +76,10 @@ tests/wpt/package-lock.json
 # Pixel comparison generated reports
 acid3-report.txt
 acid3-current.png
+
+# Google compliance generated artifacts
+docs/google-compliance/google-broiler.png
+docs/google-compliance/google-reference.png
+docs/google-compliance/google-diff.png
+docs/google-compliance/google-report.txt
+docs/google-compliance/google-js-errors.log
