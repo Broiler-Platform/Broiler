@@ -295,15 +295,29 @@ public sealed partial class DomBridge
                 function MutationObserver(callback) {
                     this._callback = callback;
                     this._targets = [];
+                    this._records = [];
                 }
                 MutationObserver.prototype.observe = function(target, options) {
                     this._targets.push({ target: target, options: options || {} });
                 };
                 MutationObserver.prototype.disconnect = function() {
                     this._targets = [];
+                    this._records = [];
                 };
                 MutationObserver.prototype.takeRecords = function() {
-                    return [];
+                    var r = this._records.slice();
+                    this._records = [];
+                    return r;
+                };
+                MutationObserver.prototype._notify = function(records) {
+                    if (records && records.length > 0) {
+                        for (var i = 0; i < records.length; i++) {
+                            this._records.push(records[i]);
+                        }
+                        var pending = this._records.slice();
+                        this._records = [];
+                        try { this._callback(pending, this); } catch(e) {}
+                    }
                 };
             ");
 
