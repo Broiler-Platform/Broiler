@@ -9,6 +9,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition x:Name="ConsoleRow" Height="0"/>
@@ -26,6 +27,8 @@
                     <Button x:Name="RefreshButton" Content="⟳" Width="32" Height="28" Margin="2"
                             Click="RefreshButton_Click" ToolTip="Refresh"/>
                 </StackPanel>
+                <Button x:Name="FavoriteButton" DockPanel.Dock="Right" Content="☆" Width="32" Height="28" Margin="4,0,0,0"
+                        Click="FavoriteButton_Click" ToolTip="Add to Favorites"/>
                 <Button x:Name="GoButton" DockPanel.Dock="Right" Content="Go" Width="48" Height="28" Margin="4,0,0,0"
                         Click="GoButton_Click"/>
                 <TextBox x:Name="UrlTextBox" Height="28" VerticalContentAlignment="Center" Padding="4,0"
@@ -33,23 +36,34 @@
             </DockPanel>
         </Border>
 
+        <!-- Favorites Bar -->
+        <Border Grid.Row="1" Background="#E8E8E8" BorderBrush="#CCCCCC" BorderThickness="0,0,0,1" Padding="2,1">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Left" Text="★ Favorites" VerticalAlignment="Center"
+                           Margin="4,0,6,0" FontSize="11" Foreground="#555555"/>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="FavoritesPanel" Orientation="Horizontal"/>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
         <!-- HTML Rendering Area -->
-        <htmlRenderer:HtmlPanel x:Name="HtmlPanel" Grid.Row="1"
+        <htmlRenderer:HtmlPanel x:Name="HtmlPanel" Grid.Row="2"
                                 AvoidImagesLateLoading="True"
                                 AvoidAsyncImagesLoading="True"
                                 LinkClicked="HtmlPanel_LinkClicked"/>
 
         <!-- Console Splitter (only visible when console is open) -->
-        <GridSplitter x:Name="ConsoleSplitter" Grid.Row="2" Height="4" Background="#3E3E3E"
+        <GridSplitter x:Name="ConsoleSplitter" Grid.Row="3" Height="4" Background="#3E3E3E"
                       HorizontalAlignment="Stretch" VerticalAlignment="Center"
                       Visibility="Collapsed"/>
 
         <!-- Developer Console Panel -->
-        <devConsole:DevConsolePanel x:Name="DevConsole" Grid.Row="3"
+        <devConsole:DevConsolePanel x:Name="DevConsole" Grid.Row="4"
                                     Visibility="Collapsed"/>
 
         <!-- Status Bar -->
-        <StatusBar Grid.Row="4">
+        <StatusBar Grid.Row="5">
             <StatusBarItem>
                 <TextBlock x:Name="StatusText" Text="Ready"/>
             </StatusBarItem>

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
 using Broiler.App.Rendering;
@@ -21,6 +22,7 @@ public partial class MainWindow : Window
     private readonly List<string> _history = [];
     private int _historyIndex = -1;
     private readonly RenderingPipeline _pipeline;
+    private readonly FavoritesManager _favoritesManager = new();
     private bool _consoleVisible;
 
     /// <summary>
@@ -43,8 +45,12 @@ public partial class MainWindow : Window
 
         DevConsole.CloseRequested += ToggleConsole;
 
+        _favoritesManager.Load();
+        RefreshFavoritesBar();
+
         Closed += (_, _) =>
         {
+            _favoritesManager.Save();
             StopInteractiveRendering();
             _pipeline.Dispose();
             DevConsole.Dispose();
@@ -129,6 +135,7 @@ public partial class MainWindow : Window
     {
         UrlTextBox.Text = url;
         UpdateNavigationButtons();
+        UpdateFavoriteButton();
 
         // Stop any in-progress interactive rendering from a previous page.
         StopInteractiveRendering();
@@ -256,6 +263,103 @@ public partial class MainWindow : Window
     {
         BackButton.IsEnabled = _historyIndex > 0;
         ForwardButton.IsEnabled = _historyIndex < _history.Count - 1;
+    }
+
+    private void FavoriteButton_Click(object sender, RoutedEventArgs e)
+    {
+        var url = UrlTextBox.Text;
+        if (string.IsNullOrWhiteSpace(url) || url == "about:blank")
+            return;
+
+        if (_favoritesManager.Contains(url))
+        {
+            _favoritesManager.Remove(url);
+            FavoriteButton.Content = "☆";
+            FavoriteButton.ToolTip = "Add to Favorites";
+        }
+        else
+        {
+            _favoritesManager.Add(url);
+            FavoriteButton.Content = "★";
+            FavoriteButton.ToolTip = "Remove from Favorites";
+        }
+
+        RefreshFavoritesBar();
+    }
+
+    /// <summary>
+    /// Updates the star button to reflect whether the current URL is a favorite.
+    /// </summary>
+    private void UpdateFavoriteButton()
+    {
+        var url = UrlTextBox.Text;
+        if (_favoritesManager.Contains(url))
+        {
+            FavoriteButton.Content = "★";
+            FavoriteButton.ToolTip = "Remove from Favorites";
+        }
+        else
+        {
+            FavoriteButton.Content = "☆";
+            FavoriteButton.ToolTip = "Add to Favorites";
+        }
+    }
+
+    /// <summary>
+    /// Rebuilds the visual favorite buttons from the current list.
+    /// </summary>
+    private void RefreshFavoritesBar()
+    {
+        FavoritesPanel.Children.Clear();
+
+        foreach (var url in _favoritesManager.Favorites)
+        {
+            var label = GetFavoriteLabel(url);
+
+            var btn = new Button
+            {
+                Content = label,
+                Tag = url,
+                Margin = new Thickness(2, 0, 2, 0),
+                Padding = new Thickness(6, 2, 6, 2),
+                FontSize = 11,
+                Cursor = Cursors.Hand,
+                ToolTip = url,
+                Background = System.Windows.Media.Brushes.Transparent,
+                BorderThickness = new Thickness(0)
+            };
+
+            btn.Click += FavoriteItem_Click;
+            FavoritesPanel.Children.Add(btn);
+        }
+    }
+
+    private void FavoriteItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is string url)
+        {
+            NavigateTo(url);
+        }
+    }
+
+    /// <summary>
+    /// Derives a short display label from a URL – uses the host name when
+    /// available, otherwise falls back to the full URL truncated.
+    /// </summary>
+    private static string GetFavoriteLabel(string url)
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            var host = uri.Host;
+            if (!string.IsNullOrEmpty(host))
+            {
+                if (host.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
+                    host = host[4..];
+                return host;
+            }
+        }
+
+        return url.Length > 30 ? url[..27] + "…" : url;
     }
 
     private void Window_KeyDown(object sender, KeyEventArgs e)

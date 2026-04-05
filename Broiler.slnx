@@ -14,6 +14,7 @@
     <Project Path="Broiler.HTML/Source/Broiler.HTML/Broiler.HTML.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/Broiler.App.Tests/Broiler.App.Tests.csproj" />
     <Project Path="src/Broiler.App/Broiler.App.csproj" />
     <Project Path="src/Broiler.HtmlBridge/Broiler.HtmlBridge.csproj" />
     <Project Path="src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj" />
