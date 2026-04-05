@@ -43,8 +43,23 @@ public sealed partial class DomBridge
         {
             if (string.Equals(child.TagName, "style", StringComparison.OrdinalIgnoreCase))
                 results.Add(child);
+            else if (IsExternalStylesheet(child))
+                results.Add(child);
             CollectStyleElements(child, results);
         }
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> if the element is a <c>&lt;link rel="stylesheet" href="..."&gt;</c>.
+    /// </summary>
+    private static bool IsExternalStylesheet(DomElement element)
+    {
+        if (!string.Equals(element.TagName, "link", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (!element.Attributes.TryGetValue("rel", out var rel) ||
+            !rel.Contains("stylesheet", StringComparison.OrdinalIgnoreCase))
+            return false;
+        return element.Attributes.ContainsKey("href");
     }
 
     /// <summary>

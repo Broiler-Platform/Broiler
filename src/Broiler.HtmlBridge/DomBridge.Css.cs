@@ -348,6 +348,8 @@ public sealed partial class DomBridge
             {
                 if (string.Equals(child.TagName, "style", StringComparison.OrdinalIgnoreCase))
                     styleElements.Add(child);
+                else if (IsExternalStylesheet(child))
+                    styleElements.Add(child);
 
                 // Don't descend into sub-document roots (they have their own style scope)
                 if (!child.TagName.StartsWith("#subdoc", StringComparison.OrdinalIgnoreCase))
@@ -391,6 +393,30 @@ public sealed partial class DomBridge
                 {
                     foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))
                         cssText.Append(' ').Append(rule);
+                }
+
+                // For <link rel="stylesheet"> elements, fetch external CSS content
+                if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
+                    cssText.Length == 0 &&
+                    styleEl.Attributes.TryGetValue("href", out var href) && !string.IsNullOrEmpty(href))
+                {
+                    if (styleEl.DomProperties.TryGetValue("_fetchedCss", out var cachedCss) && cachedCss is string cachedStr)
+                    {
+                        cssText.Append(cachedStr);
+                    }
+                    else
+                    {
+                        try
+                        {
+                            var fetchedCss = FetchExternalStylesheet(href);
+                            if (!string.IsNullOrEmpty(fetchedCss))
+                            {
+                                styleEl.DomProperties["_fetchedCss"] = fetchedCss;
+                                cssText.Append(fetchedCss);
+                            }
+                        }
+                        catch { /* ignore fetch failures */ }
+                    }
                 }
 
                 ParseAndApplyCssRules(cssText.ToString(), element, computed, computedSpecificity, vpWidth, vpHeight);
@@ -1469,5 +1495,33 @@ public sealed partial class DomBridge
         var valueStr = semiIdx >= 0 ? style[(colonIdx + 1)..semiIdx].Trim() : style[(colonIdx + 1)..].Trim();
         var px = ParseCssLengthToPixels(valueStr);
         return px >= 0 ? (int)px : 0;
+    }
+
+    /// <summary>
+    /// Fetches an external CSS stylesheet from an HTTP/HTTPS URL.
+    /// Returns the CSS text content, or <c>null</c> on failure.
+    /// </summary>
+    private static string? FetchExternalStylesheet(string url)
+    {
+        try
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                return null;
+            if (uri.Scheme.Equals("file", StringComparison.OrdinalIgnoreCase))
+            {
+                var path = uri.LocalPath;
+                return System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : null;
+            }
+            return SharedHttpClient.GetStringAsync(url)
+                .ConfigureAwait(false)
+                .GetAwaiter()
+                .GetResult();
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogError(LogCategory.HtmlRenderer, "DomBridge.FetchExternalStylesheet",
+                $"Failed to fetch stylesheet '{url}': {ex.Message}", ex);
+            return null;
+        }
     }
 }
