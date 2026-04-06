@@ -17,3 +17,4 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("Broiler.HTML.Core")]
 [assembly: InternalsVisibleTo("Broiler.HTML.CSS")]
 [assembly: InternalsVisibleTo("Broiler.HTML.Image.Tests")]
+[assembly: InternalsVisibleTo("Broiler.Cli.Tests")]

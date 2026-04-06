@@ -107,7 +107,32 @@ internal class CssBox : CssBoxProperties, IDisposable
     public bool IsBrElement => HtmlTag != null && HtmlTag.Name.Equals("br", StringComparison.InvariantCultureIgnoreCase);
     public bool IsInline => (Display == CssConstants.Inline || Display == CssConstants.InlineBlock) && !IsBrElement;
     public bool IsBlock => Display == CssConstants.Block;
-    public virtual bool IsClickable => HtmlTag != null && HtmlTag.Name == HtmlConstants.A && !HtmlTag.HasAttribute("id");
+    public virtual bool IsClickable
+    {
+        get
+        {
+            if (HtmlTag == null)
+                return false;
+
+            // <a> links (without only an id anchor)
+            if (HtmlTag.Name == HtmlConstants.A && !HtmlTag.HasAttribute("id"))
+                return true;
+
+            // <button> elements
+            if (HtmlTag.Name.Equals("button", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // <input type="submit|button|reset"> elements
+            if (HtmlTag.Name.Equals("input", StringComparison.OrdinalIgnoreCase))
+            {
+                var inputType = HtmlTag.TryGetAttribute("type")?.ToLowerInvariant() ?? "text";
+                if (inputType is "submit" or "button" or "reset")
+                    return true;
+            }
+
+            return false;
+        }
+    }
 
     public virtual bool IsFixed
     {
