@@ -50,6 +50,11 @@ internal static class CssDefaults
                           padding: 1px 2px; background-color: #ffffff;
                           font-size: 13.3333px; font-family: Arial, sans-serif; }
         input            { min-width: 173px; height: 1.2em; }
+        input[type=""hidden""] { display: none; min-width: 0; height: auto;
+                          border: none; padding: 0; }
+        input[type=""checkbox""],
+        input[type=""radio""] { min-width: 13px; width: 13px; height: 13px;
+                          padding: 0; }
         select           { min-width: 60px; height: 1.4em; }
         button           { padding: 1px 6px; background-color: #f0f0f0; text-align: center; }
         textarea         { min-width: 170px; min-height: 3em; }

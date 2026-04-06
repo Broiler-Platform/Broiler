@@ -59,8 +59,13 @@ public sealed class CssData
 
             if (!merged)
             {
-                // general block must be first
-                if (cssBlock.Selectors == null)
+                // General blocks (no ancestor/sibling selectors and no
+                // attribute conditions) are low specificity — insert first.
+                // Blocks with selectors or attribute conditions have higher
+                // specificity and must come later so they override general rules.
+                bool isGeneral = cssBlock.Selectors == null
+                    && (cssBlock.AttributeConditions == null || cssBlock.AttributeConditions.Count == 0);
+                if (isGeneral)
                     list.Insert(0, cssBlock);
                 else
                     list.Add(cssBlock);

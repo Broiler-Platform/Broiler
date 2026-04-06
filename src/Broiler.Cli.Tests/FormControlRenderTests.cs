@@ -12,6 +12,9 @@ namespace Broiler.Cli.Tests;
 /// - Value text injection (HtmlParser.cs)
 /// - Min-width / min-height in inline-block layout (CssLayoutEngine.cs)
 /// - Form stripping bug (HtmlPostProcessor should NOT strip form elements)
+/// - Hidden input display:none (CssDefaults.cs + CssBlock attribute selectors)
+/// - Attribute-conditioned CSS blocks preserved across Clone (CssBlock.cs)
+/// - Block ordering for attribute-conditioned rules (CssData.cs)
 /// </summary>
 public class FormControlRenderTests
 {
@@ -114,5 +117,82 @@ public class FormControlRenderTests
         using var bmp = HtmlRender.RenderToImage(processed, 600, 100);
         Assert.True(CountNonWhitePixels(bmp) > 50,
             "Form-wrapped controls should render visible pixels after post-processing");
+    }
+
+    /// <summary>
+    /// Hidden inputs must render as invisible (display:none).
+    /// Previously they rendered as visible 173px-wide inline-block boxes.
+    /// </summary>
+    [Fact]
+    public void InputHidden_Renders_Invisible()
+    {
+        var html = @"<html><body style='margin:0'><input type='hidden' name='x'></body></html>";
+        using var bmp = HtmlRender.RenderToImage(html, 400, 50);
+        Assert.Equal(0, CountNonWhitePixels(bmp));
+    }
+
+    /// <summary>
+    /// Regression: Author CSS targeting <c>input</c> must NOT cause hidden
+    /// input styles to bleed into all inputs.  This tests the
+    /// <see cref="Broiler.HTML.Core.Core.Entities.CssBlock.Clone"/> fix
+    /// that preserves <c>AttributeConditions</c> across cloning, and the
+    /// <see cref="Broiler.HTML.Core.Core.Entities.CssBlock.EqualsSelector"/>
+    /// fix that prevents merging blocks with different attribute conditions.
+    /// </summary>
+    [Fact]
+    public void AuthorCss_Does_Not_Break_InputVisibility()
+    {
+        var html = @"<html><body>
+        <style>input { color: red; }</style>
+        <input type='submit' value='Test'>
+        </body></html>";
+
+        using var bmp = HtmlRender.RenderToImage(html, 400, 100);
+        Assert.True(CountNonWhitePixels(bmp) > 10,
+            "Author CSS on input must not make submit buttons invisible");
+    }
+
+    /// <summary>
+    /// Author CSS attribute selectors (e.g. <c>input[type="submit"]</c>)
+    /// must still apply correctly when combined with UA stylesheet.
+    /// </summary>
+    [Fact]
+    public void AuthorAttrSelector_Applies_To_MatchingInputs()
+    {
+        var html = @"<html><body>
+        <style>
+            input[type=""submit""] { color: red; padding: 10px; }
+        </style>
+        <input type='submit' value='Test'>
+        </body></html>";
+
+        using var bmp = HtmlRender.RenderToImage(html, 400, 100);
+        Assert.True(CountNonWhitePixels(bmp) > 10,
+            "Author CSS attribute selector must apply to matching inputs");
+    }
+
+    /// <summary>
+    /// Compound class + attribute selector (e.g. <c>.buttons input[type="submit"]</c>)
+    /// must apply correctly.
+    /// </summary>
+    [Fact]
+    public void CompoundClassAndAttrSelector_Applies()
+    {
+        var html = @"<html><body>
+        <style>
+            .buttons input[type=""submit""] {
+                background:#f8f9fa; border:1px solid #f8f9fa;
+                color:#3c4043; font-size:14px; padding:10px 16px;
+            }
+        </style>
+        <div class='buttons'>
+            <input type='submit' value='Google Search'>
+            <input type='submit' value=""I'm Feeling Lucky"">
+        </div>
+        </body></html>";
+
+        using var bmp = HtmlRender.RenderToImage(html, 600, 100);
+        Assert.True(CountNonWhitePixels(bmp) > 10,
+            "Compound class + attribute selector buttons must be visible");
     }
 }
