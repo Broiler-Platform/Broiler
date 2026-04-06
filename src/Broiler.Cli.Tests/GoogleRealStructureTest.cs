@@ -70,7 +70,7 @@ public class GoogleRealStructureTest
         _output.WriteLine($"Button area (y=30-100): left={btnLeft}, right={btnRight}, width={width}");
         
         // Check that buttons are NOT full-width (should be content-sized, ~250px for both)
-        Assert.True(width < 500, 
+        Assert.True(width < 300, 
             $"Buttons should be content-sized (~250px), not full width. Got {width}px");
     }
 

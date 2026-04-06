@@ -1110,7 +1110,18 @@ internal sealed class DomParser
             // flex/grid container become flex/grid items — they must NOT
             // be rearranged by the block-inside-inline correction (which
             // wraps block children in anonymous boxes and merges them).
-            if (box.Display is "flex" or "inline-flex" or "grid" or "inline-grid")
+            //
+            // CSS2.1 §9.2.1.1 / §10.3.9: Inline-block boxes establish a
+            // new block formatting context for their children.  Block-level
+            // children inside an inline-block are valid and must NOT be
+            // split out by the block-inside-inline correction.  Without
+            // this skip, <span style="display:inline-block"> containing a
+            // <span style="display:block"> is incorrectly unwrapped,
+            // causing the block child to expand to the full container width
+            // instead of being constrained by the inline-block's
+            // shrink-to-fit sizing (e.g. Google.de button wrappers).
+            if (box.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
+                or CssConstants.InlineBlock)
             {
                 // Still recurse into children — the children themselves
                 // may contain nested inline contexts that need correction.
@@ -1251,7 +1262,13 @@ internal sealed class DomParser
         // CSS Flexbox §4 / CSS Grid §7: All direct children of a
         // flex/grid container are flex/grid items — do not wrap inline
         // children in anonymous block boxes.
-        if (box.Display is not ("flex" or "inline-flex" or "grid" or "inline-grid")
+        //
+        // CSS2.1 §9.2.1.1 / §10.3.9: Inline-block boxes establish a new
+        // block formatting context — their children (block or inline) are
+        // laid out internally and must not be rearranged by this
+        // correction.
+        if (box.Display is not ("flex" or "inline-flex" or "grid" or "inline-grid"
+                or CssConstants.InlineBlock)
             && ContainsVariantBoxes(box))
         {
             for (int i = 0; i < box.Boxes.Count; i++)
@@ -1281,7 +1298,24 @@ internal sealed class DomParser
             // whether a box contains only inline content.
             if (childBox.Float != CssConstants.None)
                 continue;
-            if (!childBox.IsInline || !ContainsInlinesOnlyDeep(childBox))
+            if (!childBox.IsInline)
+                return false;
+
+            // CSS2.1 §9.2.1.1 / §10.3.9: Inline-block boxes establish a
+            // new block formatting context.  Their block-level children are
+            // contained within the inline-block and do NOT constitute
+            // "block inside inline" at the outer level.  Stop recursing
+            // into inline-block children so that, e.g., <span display:
+            // inline-block> containing <span display:block> does not
+            // trigger the block-inside-inline correction on the parent.
+            //
+            // Same applies to flex/grid containers — their children are
+            // laid out internally and must not be inspected here.
+            if (childBox.Display is CssConstants.InlineBlock
+                or "flex" or "inline-flex" or "grid" or "inline-grid")
+                continue;
+
+            if (!ContainsInlinesOnlyDeep(childBox))
                 return false;
         }
 

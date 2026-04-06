@@ -171,8 +171,21 @@ internal class CssBox : CssBoxProperties, IDisposable
 
             var box = ParentBox;
 
-            while (!box.IsBlock && box.Display != CssConstants.ListItem && box.Display != CssConstants.Table &&
-                   box.Display != CssConstants.TableCell && box.ParentBox != null)
+            // CSS2.1 §10.1: The containing block for a box is the nearest
+            // ancestor that is a block container.  Block containers include:
+            //   - block-level boxes (display:block, flex, grid)
+            //   - inline-block boxes (display:inline-block)
+            //   - list-item boxes
+            //   - table cells (display:table-cell)
+            //   - table boxes (display:table)
+            // Inline-block establishes a BFC (§9.4.1), so its block-level
+            // children must use it as their containing block.
+            while (!box.IsBlock
+                   && box.Display != CssConstants.InlineBlock
+                   && box.Display != CssConstants.ListItem
+                   && box.Display != CssConstants.Table
+                   && box.Display != CssConstants.TableCell
+                   && box.ParentBox != null)
             {
                 box = box.ParentBox;
             }
