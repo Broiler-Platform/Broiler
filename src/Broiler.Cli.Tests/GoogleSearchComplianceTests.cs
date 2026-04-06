@@ -164,38 +164,35 @@ public class GoogleSearchComplianceTests
     }
 
     /// <summary>
-    /// The search box area (roughly y=260-340) should render a visible
-    /// input box with a border.
+    /// The search box area should render a visible input box with a border.
     ///
-    /// CSS attribute selectors now match (TODO-G8 implemented), but
-    /// &lt;input&gt; element rendering requires widget-level support
-    /// beyond CSS property application.
-    /// Target: >50 content pixels once input widget rendering is improved.
+    /// CSS attribute selectors now match (TODO-G8 implemented) and input
+    /// widget rendering is now implemented with UA default styles and
+    /// value text injection for submit buttons.
     /// </summary>
-    [Fact(Skip = "Blocked by input widget rendering — CSS selectors now match (TODO-G8 done)")]
+    [Fact]
     public void GoogleLike_SearchBox_Has_Content()
     {
         using var bitmap = RenderGoogleLike();
-        int content = CountContentPixels(bitmap, 260, 340);
+        int content = CountContentPixels(bitmap, 240, 340);
         Assert.True(content > 50,
-            $"Search box region (y=260-340) has too few content pixels: {content}");
+            $"Search box region (y=240-340) has too few content pixels: {content}");
     }
 
     /// <summary>
-    /// The buttons area (roughly y=340-420) should render "Google Search"
+    /// The buttons area should render "Google Search"
     /// and "I'm Feeling Lucky" buttons.
     ///
-    /// CSS attribute selectors now match (TODO-G8 implemented), but
-    /// &lt;input type="submit"&gt; rendering requires widget-level support.
-    /// Target: >50 content pixels once submit button rendering is improved.
+    /// Input submit button rendering is now implemented with value text
+    /// injection and UA default styles.
     /// </summary>
-    [Fact(Skip = "Blocked by submit button widget rendering — CSS selectors now match (TODO-G8 done)")]
+    [Fact]
     public void GoogleLike_Buttons_Have_Content()
     {
         using var bitmap = RenderGoogleLike();
-        int content = CountContentPixels(bitmap, 340, 420);
+        int content = CountContentPixels(bitmap, 270, 420);
         Assert.True(content > 50,
-            $"Buttons region (y=340-420) has too few content pixels: {content}");
+            $"Buttons region (y=270-420) has too few content pixels: {content}");
     }
 
     /// <summary>

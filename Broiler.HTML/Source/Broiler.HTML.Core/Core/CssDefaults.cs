@@ -46,7 +46,11 @@ internal static class CssDefaults
         kbd, samp       { font-family: monospace }
         pre             { white-space: pre }
         button, textarea,
-        input, select   { display: inline-block }
+        input, select   { display: inline-block; border: 1px solid #767676;
+                          padding: 1px 2px; background-color: #ffffff;
+                          font-size: 13.3333px; font-family: Arial, sans-serif; }
+        button           { padding: 1px 6px; background-color: #f0f0f0; text-align: center; }
+        textarea         { min-width: 170px; min-height: 3em; }
         big             { font-size: 1.17em }
         small, sub, sup { font-size: .83em }
         sub             { vertical-align: sub }

@@ -85,7 +85,26 @@ internal static class HtmlParser
                     if (isSingle)
                     {
                         // the current box is not changed
-                        CssBoxHelper.CreateBox(tag, baseUrl, curBox);
+                        var singleBox = CssBoxHelper.CreateBox(tag, baseUrl, curBox);
+
+                        // For <input type="submit"> and <input type="button">,
+                        // inject the value attribute as visible text content so
+                        // the button label is rendered.
+                        if (tagName.Equals("input", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var inputType = tag.TryGetAttribute("type")?.ToLowerInvariant() ?? "text";
+                            if (inputType is "submit" or "button" or "reset")
+                            {
+                                var label = tag.TryGetAttribute("value");
+                                if (string.IsNullOrEmpty(label))
+                                    label = inputType == "submit" ? "Submit" : inputType == "reset" ? "Reset" : "";
+                                if (!string.IsNullOrEmpty(label))
+                                {
+                                    var textBox = CssBoxHelper.CreateBox(singleBox, baseUrl);
+                                    textBox.Text = label.AsMemory();
+                                }
+                            }
+                        }
                     }
                     else
                     {
