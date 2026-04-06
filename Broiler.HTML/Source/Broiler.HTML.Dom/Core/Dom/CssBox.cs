@@ -822,6 +822,25 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
             else
             {
+                // CSS Flexbox §8.2/§8.4: Map flex alignment properties to
+                // CSS2.1 text-align so that the inline formatting context
+                // fallback (FlowInlineBlock) produces visually aligned items.
+                // This only applies when the author has not set text-align
+                // explicitly (i.e. it still has the default 'left' value).
+                if (Display is "flex" or "inline-flex" or "grid" or "inline-grid")
+                {
+                    if (JustifyContent is "center" &&
+                        TextAlign is CssConstants.Left or "start" or "")
+                    {
+                        TextAlign = CssConstants.Center;
+                    }
+                    else if (JustifyContent is "flex-end" or "end" &&
+                        TextAlign is CssConstants.Left or "start" or "")
+                    {
+                        TextAlign = CssConstants.Right;
+                    }
+                }
+
                 //If there's just inline boxes, create LineBoxes
                 if (DomUtils.ContainsInlinesOnly(this))
                 {

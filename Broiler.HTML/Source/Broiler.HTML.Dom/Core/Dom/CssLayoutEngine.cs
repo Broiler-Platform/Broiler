@@ -426,6 +426,17 @@ internal static class CssLayoutEngine
                     FlowInlineBlock(g, blockbox, b, limitRight, linespacing, startx,
                         leftspacing, rightspacing,
                         ref line, ref curx, ref cury, ref maxRight, ref maxbottom);
+
+                    // CSS Flexbox §9.4: flex-direction:column stacks items
+                    // vertically — force a line break after each flex item so
+                    // the next item starts on a new row.
+                    if (box.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
+                        && box.FlexDirection is "column" or "column-reverse")
+                    {
+                        cury = maxbottom;
+                        curx = startx;
+                        line = new CssLineBox(blockbox);
+                    }
                 }
                 else
                 {
@@ -546,6 +557,20 @@ internal static class CssLayoutEngine
                 - b.ActualPaddingLeft - b.ActualPaddingRight;
             if (minContentW > ibContentWidth)
                 ibContentWidth = minContentW;
+        }
+
+        // CSS 2.1 §10.4: Apply max-width constraint.
+        // max-width limits the computed width from above.  When both
+        // min-width and max-width are specified, min-width wins if it
+        // exceeds max-width (CSS2.1 §10.4).
+        if (b.MaxWidth != "none" && !string.IsNullOrEmpty(b.MaxWidth))
+        {
+            double maxW = CssValueParser.ParseLength(b.MaxWidth, containerWidth, b.GetEmHeight());
+            double maxContentW = maxW
+                - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
+                - b.ActualPaddingLeft - b.ActualPaddingRight;
+            if (maxContentW < ibContentWidth)
+                ibContentWidth = maxContentW;
         }
 
         double ibBoxWidth = ibContentWidth
