@@ -907,11 +907,13 @@ internal sealed class DomParser
                     {
                         // HTML5 §4.10.5.3.7: The size attribute on <input>
                         // specifies the visible width in average-character
-                        // units.  Approximate using 8.05px per character
+                        // units.  Approximate using ~8px per character
                         // (roughly 1ex at 13.3333px Arial, matching
                         // Chromium's default rendering of size=20 → ~173px).
+                        const double AvgCharWidthPx = 8.05;
+                        const double InputPaddingBorderPx = 12; // padding + border on both sides
                         if (int.TryParse(value, out int chars) && chars > 0)
-                            box.Width = $"{chars * 8.05 + 12}px"; // +12 accounts for padding + border
+                            box.Width = $"{chars * AvgCharWidthPx + InputPaddingBorderPx}px";
                     }
                     break;
                 case HtmlConstants.Valign:
