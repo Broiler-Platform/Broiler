@@ -1,3 +1,4 @@
+using System.IO;
 using Broiler.HTML.Image;
 using SkiaSharp;
 using Xunit;
@@ -48,7 +49,7 @@ public class GoogleRealStructureTest
 
         using var bmp = HtmlRender.RenderToImage(html, 800, 200);
         using var data = bmp.Encode(SKEncodedImageFormat.Png, 100);
-        using var f = System.IO.File.OpenWrite("/tmp/google_buttons.png");
+        using var f = System.IO.File.OpenWrite(Path.Combine(Path.GetTempPath(), "google_buttons.png"));
         data.SaveTo(f);
         
         // Analyze button area (y=30-100)
@@ -129,7 +130,7 @@ a{color:#4b11a8;text-decoration:none}
 
         using var bmp = HtmlRender.RenderToImage(html, 800, 600);
         using var data = bmp.Encode(SKEncodedImageFormat.Png, 100);
-        using var f = System.IO.File.OpenWrite("/tmp/google_fullpage.png");
+        using var f = System.IO.File.OpenWrite(Path.Combine(Path.GetTempPath(), "google_fullpage.png"));
         data.SaveTo(f);
 
         // Check for dark (text) pixels in the button area (roughly y=200-350)
@@ -260,7 +261,7 @@ a{color:#4b11a8;text-decoration:none}
 
         using var bmp = HtmlRender.RenderToImage(html, 800, 120);
         using var data = bmp.Encode(SKEncodedImageFormat.Png, 100);
-        using var f = System.IO.File.OpenWrite("/tmp/google_modern_buttons.png");
+        using var f = System.IO.File.OpenWrite(Path.Combine(Path.GetTempPath(), "google_modern_buttons.png"));
         data.SaveTo(f);
 
         int darkPixels = 0;
@@ -380,7 +381,7 @@ input{font-family:inherit}
 
         using var bmp = HtmlRender.RenderToImage(html, 800, 200);
         using var data = bmp.Encode(SKEncodedImageFormat.Png, 100);
-        using var f = System.IO.File.OpenWrite("/tmp/google_real_html.png");
+        using var f = System.IO.File.OpenWrite(Path.Combine(Path.GetTempPath(), "google_real_html.png"));
         data.SaveTo(f);
 
         // Check for dark (text) pixels in the button area (y=30-100)
