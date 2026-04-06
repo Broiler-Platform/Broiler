@@ -162,11 +162,16 @@ internal sealed class GraphicsAdapter : RGraphics
             if (i >= str.Length)
             {
                 point.Y += (float)(glyphTypeface.Baseline * font.Size * 96d / 72d);
-                point.X += (float)(rtl ? 96d / 72d * font.Size * width : 0);
 
                 glyphRendered = true;
                 var wpfPoint = Utilities.Utils.ConvertRound(point);
-                var glyphRun = new GlyphRun(glyphTypeface, rtl ? 1 : 0,
+
+                // Always use bidiLevel 0 (LTR) because the CSS layout engine
+                // (CssLayoutEngine.ApplyRightToLeft) already handles word-level
+                // RTL positioning.  Using bidiLevel 1 here would reverse the
+                // individual characters within a word, turning e.g. "Broiler"
+                // into "reliorB".
+                var glyphRun = new GlyphRun(glyphTypeface, 0,
                     false, 96d / 72d * font.Size, 1.0f, glyphs,
                     wpfPoint, widths, null, null, null, null, null, null);
 
@@ -181,8 +186,9 @@ internal sealed class GraphicsAdapter : RGraphics
 
         if (!glyphRendered)
         {
-            var formattedText = new FormattedText(str, CultureInfo.CurrentCulture, rtl ? FlowDirection.RightToLeft : FlowDirection.LeftToRight, ((FontAdapter)font).Font, 96d / 72d * font.Size, colorConv, 1.0);
-            point.X += (float)(rtl ? formattedText.Width : 0);
+            // Always use LeftToRight flow direction — the layout engine has
+            // already positioned each word correctly for RTL contexts.
+            var formattedText = new FormattedText(str, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ((FontAdapter)font).Font, 96d / 72d * font.Size, colorConv, 1.0);
             _g.DrawText(formattedText, Utilities.Utils.ConvertRound(point));
         }
     }

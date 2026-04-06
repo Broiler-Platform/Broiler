@@ -182,7 +182,12 @@ public class HtmlControl : Control
         context.PushClip(new RectangleGeometry(new Rect(Padding.Left + BorderThickness.Left, Padding.Top + BorderThickness.Top, htmlWidth, htmlHeight)));
         _htmlContainer.Location = new Point(Padding.Left + BorderThickness.Left, Padding.Top + BorderThickness.Top);
         _htmlContainer.PerformPaint(context, new Rect(Padding.Left + BorderThickness.Left, Padding.Top + BorderThickness.Top, htmlWidth, htmlHeight));
-        context.Pop();
+        context.Pop(); // pop clip
+
+        if (windows != null)
+        {
+            context.Pop(); // pop transform
+        }
 
         if (!_lastScrollOffset.Equals(_htmlContainer.ScrollOffset))
         {
