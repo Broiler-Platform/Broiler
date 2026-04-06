@@ -12,6 +12,9 @@ namespace Broiler.HTML.Dom.Core.Dom;
 
 internal static class CssLayoutEngine
 {
+    // Temporary debug log for flex layout tracing
+    internal static List<string>? DebugLog;
+
     /// <summary>
     /// Approximate ratio of font ascent to total font height for typical
     /// Latin fonts.  Used to compute baseline position when full font
@@ -312,6 +315,12 @@ internal static class CssLayoutEngine
 
             curx += leftspacing;
 
+            // DEBUG: trace flex child routing
+            if (box.Display is "flex" or "inline-flex" or "grid" or "inline-grid")
+            {
+                DebugLog?.Add($"FLEX-CHILD tag={b.HtmlTag?.Name ?? "anon"} display={b.Display} words={b.Words.Count} boxes={b.Boxes.Count} curx={curx:F1} cury={cury:F1} maxbot={maxbottom:F1} limitR={limitRight:F1}");
+            }
+
             if (b.Words.Count > 0)
             {
                 bool wrapNoWrapBox = false;
@@ -426,6 +435,9 @@ internal static class CssLayoutEngine
                     FlowInlineBlock(g, blockbox, b, limitRight, linespacing, startx,
                         leftspacing, rightspacing,
                         ref line, ref curx, ref cury, ref maxRight, ref maxbottom);
+
+                    if (box.Display is "flex" or "inline-flex" or "grid" or "inline-grid")
+                        DebugLog?.Add($"  AFTER-FIB loc=({b.Location.X:F1},{b.Location.Y:F1}) size=({b.Size.Width:F1},{b.Size.Height:F1}) curx={curx:F1} cury={cury:F1} maxbot={maxbottom:F1}");
                 }
                 else
                 {
