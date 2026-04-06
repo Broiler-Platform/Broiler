@@ -333,6 +333,165 @@ a{color:#4b11a8;text-decoration:none}
     }
 
     /// <summary>
+    /// Test with the ACTUAL Google.de HTML structure including hidden inputs
+    /// in the same td cell as the button spans. Hidden inputs must be display:none.
+    /// </summary>
+    [Fact]
+    public void GoogleRealHtml_HiddenInputsAndButtons()
+    {
+        // Exact structure from live Google.de page (simplified CSS)
+        var html = @"<!doctype html>
+<html><head><style>
+body{margin:0;overflow-y:scroll}
+input{font-family:inherit}
+.ds{display:inline-box;display:inline-block;margin:3px 0 4px;margin-left:4px}
+.lsbb{background:#f3f5f6;border:solid 1px;border-color:#d2d2d2 #70757a #70757a #d2d2d2;height:30px}
+.lsbb{display:block}
+.lsb{background:url(/images/nav_logo229.png) 0 -261px repeat-x;color:#1f1f1f;border:none;cursor:pointer;height:30px;margin:0;outline:0;font:15px sans-serif;vertical-align:top}
+.lst{height:25px;width:496px}
+.gsfi,.lst{font:18px sans-serif}
+</style></head>
+<body bgcolor='#fff'>
+<center>
+<form action='/search' name='f'>
+<table cellpadding='0' cellspacing='0'>
+<tr valign='top'>
+<td width='25%'>&nbsp;</td>
+<td align='center' nowrap=''>
+  <input name='ie' value='ISO-8859-1' type='hidden'>
+  <input value='en' name='hl' type='hidden'>
+  <input name='source' type='hidden' value='hp'>
+  <input name='biw' type='hidden'>
+  <input name='bih' type='hidden'>
+  <div class='ds' style='height:32px;margin:4px 0'>
+    <input class='lst' style='margin:0;padding:5px 8px 0 6px;vertical-align:top;color:#1f1f1f' autocomplete='off' value='' title='Google Search' maxlength='2048' name='q' size='57'>
+  </div>
+  <br style='line-height:0'>
+  <span class='ds'><span class='lsbb'><input class='lsb' value='Google Search' name='btnG' type='submit'></span></span>
+  <span class='ds'><span class='lsbb'><input class='lsb' value='Im Feeling Lucky' name='btnI' type='submit'><input value='xxx' name='iflsig' type='hidden'></span></span>
+</td>
+<td width='25%' align='left'></td>
+</tr></tbody>
+</table>
+<input id='gbv' name='gbv' type='hidden' value='1'>
+</form>
+</center>
+</body></html>";
+
+        using var bmp = HtmlRender.RenderToImage(html, 800, 200);
+        using var data = bmp.Encode(SKEncodedImageFormat.Png, 100);
+        using var f = System.IO.File.OpenWrite("/tmp/google_real_html.png");
+        data.SaveTo(f);
+
+        // Check for dark (text) pixels in the button area (y=30-100)
+        int darkInBtnArea = 0;
+        for (int y = 30; y < 100; y++)
+            for (int x = 0; x < bmp.Width; x++)
+            {
+                var px = bmp.GetPixel(x, y);
+                if (px.Red < 100 && px.Green < 100 && px.Blue < 100)
+                    darkInBtnArea++;
+            }
+        _output.WriteLine($"Button area dark pixels (y=30-100): {darkInBtnArea}");
+        Assert.True(darkInBtnArea > 20,
+            $"Button text must be visible (dark pixels={darkInBtnArea})");
+
+        // Check for full-width gray lines (indicates escaped blocks)
+        int fullWidthGrayLines = 0;
+        for (int y = 0; y < bmp.Height; y++)
+        {
+            int left = bmp.Width, right = 0;
+            for (int x = 0; x < bmp.Width; x++)
+            {
+                var px = bmp.GetPixel(x, y);
+                if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+                {
+                    if (x < left) left = x;
+                    if (x > right) right = x;
+                }
+            }
+            if (right - left + 1 > 600)
+            {
+                fullWidthGrayLines++;
+                if (fullWidthGrayLines <= 3)
+                    _output.WriteLine($"Full-width line at y={y}: extent=[{left},{right}] width={right - left + 1}");
+            }
+        }
+        _output.WriteLine($"Total full-width lines: {fullWidthGrayLines}");
+
+        // Hidden inputs should NOT create visible boxes - there should be
+        // no full-width lines (which would indicate hidden inputs rendered visible)
+        Assert.True(fullWidthGrayLines < 5,
+            $"Hidden inputs should not create visible boxes ({fullWidthGrayLines} full-width lines)");
+
+        // Check that button backgrounds (.lsbb) are NOT full-width
+        for (int y = 30; y < 100; y++)
+        {
+            int gLeft = bmp.Width, gRight = 0;
+            for (int x = 0; x < bmp.Width; x++)
+            {
+                var px = bmp.GetPixel(x, y);
+                if (px.Red >= 0xF0 && px.Green >= 0xF0 && px.Blue >= 0xF0
+                    && (px.Red < 0xFE || px.Green < 0xFE || px.Blue < 0xFE))
+                {
+                    if (x < gLeft) gLeft = x;
+                    if (x > gRight) gRight = x;
+                }
+            }
+            int gWidth = (gRight >= gLeft) ? gRight - gLeft + 1 : 0;
+            if (gWidth > 400)
+            {
+                _output.WriteLine($"WIDE gray at y={y}: width={gWidth}");
+                Assert.Fail($"Button background at y={y} should not be full-width ({gWidth}px)");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Verify that author CSS targeting input elements does not break
+    /// hidden input display:none UA rule. Google.de has input{font-family:inherit}
+    /// which could trigger attribute condition loss during CSS merging.
+    /// </summary>
+    [Fact]
+    public void AuthorInputCss_DoesNotBreak_HiddenInputDisplayNone()
+    {
+        var html = @"<html><body style='margin:0'>
+<style>input{font-family:inherit}</style>
+<input type='hidden' name='x' value='test'>
+<input type='submit' value='Submit'>
+</body></html>";
+
+        using var bmp = HtmlRender.RenderToImage(html, 400, 60);
+
+        // The hidden input should be invisible
+        // Only the submit button should render
+        int darkPixels = 0;
+        for (int y = 0; y < bmp.Height; y++)
+            for (int x = 0; x < bmp.Width; x++)
+            {
+                var px = bmp.GetPixel(x, y);
+                if (px.Red < 100 && px.Green < 100 && px.Blue < 100)
+                    darkPixels++;
+            }
+        _output.WriteLine($"Dark pixels: {darkPixels}");
+        Assert.True(darkPixels > 10, "Submit button text should be visible");
+
+        // The total non-white area should be reasonable (not expanded by hidden input)
+        int nonWhite = 0;
+        for (int y = 0; y < bmp.Height; y++)
+            for (int x = 0; x < bmp.Width; x++)
+            {
+                var px = bmp.GetPixel(x, y);
+                if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+                    nonWhite++;
+            }
+        _output.WriteLine($"Non-white pixels: {nonWhite}");
+        // Should be less than 5000 - a hidden input would add ~17000 pixels
+        Assert.True(nonWhite < 10000,
+            $"Hidden input should not render visible area ({nonWhite} non-white pixels)");
+    }
+
+    /// <summary>
     /// Test footer link spacing with Google's actual footer structure.
     /// No whitespace between a tags means no gap.
     /// </summary>
