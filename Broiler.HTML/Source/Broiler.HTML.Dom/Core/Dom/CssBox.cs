@@ -846,6 +846,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                     bool isBfc = Float != CssConstants.None
                         || Display == CssConstants.InlineBlock
                         || Display == CssConstants.TableCell
+                        || Display is "flex" or "inline-flex" or "grid" or "inline-grid"
                         || (Overflow != null && Overflow != CssConstants.Visible)
                         || Position == CssConstants.Absolute
                         || Position == CssConstants.Fixed;

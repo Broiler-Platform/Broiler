@@ -186,4 +186,69 @@ input[type=""submit""] { background:#f8f9fa; border:1px solid #f8f9fa;
         Assert.True(buttonDark > 20,
             $"Buttons in flex container should have visible text (dark={buttonDark})");
     }
+
+    /// <summary>
+    /// Regression: Author CSS setting display:block on submit buttons inside
+    /// a display:flex container must NOT cause buttons to span full container
+    /// width. Flex items should use shrink-to-fit sizing regardless of their
+    /// computed display value. This was the core bug from the Google Search
+    /// screenshot where buttons rendered as full-width gray bars.
+    /// </summary>
+    [Fact]
+    public void FlexChild_DisplayBlock_NotFullWidth()
+    {
+        var html = @"<html><body style='margin:0'>
+<style>
+.flexparent { display:flex; width:800px; }
+.blockchild { display:block; }
+</style>
+<div class='flexparent'>
+    <input class='blockchild' type='submit' value='Google Suche'>
+    <input class='blockchild' type='submit' value='Auf gut Glueck!'>
+</div>
+</body></html>";
+
+        using var bmp = HtmlRender.RenderToImage(html, 800, 60);
+
+        // Check that buttons don't span full width
+        bool foundWideRow = false;
+        for (int y = 0; y < bmp.Height; y++)
+        {
+            var (l, r) = FindHorizontalExtent(bmp, y);
+            if (l >= 0 && (r - l + 1) > 700)
+            {
+                foundWideRow = true;
+                output.WriteLine($"WIDE ROW at y={y}: left={l} right={r} width={r - l + 1}");
+                break;
+            }
+        }
+        Assert.False(foundWideRow,
+            "display:block submit buttons inside display:flex should NOT span full 800px width");
+    }
+
+    /// <summary>
+    /// display:grid container children should also use shrink-to-fit sizing.
+    /// </summary>
+    [Fact]
+    public void GridChild_UsesContentSizing()
+    {
+        var html = @"<html><body style='margin:0'>
+<div style='display:grid; width:800px'>
+    <input type='submit' value='Search'>
+</div>
+</body></html>";
+
+        using var bmp = HtmlRender.RenderToImage(html, 800, 60);
+
+        int totalNonWhite = 0;
+        for (int y = 0; y < bmp.Height; y++)
+        for (int x = 0; x < bmp.Width; x++)
+        {
+            var px = bmp.GetPixel(x, y);
+            if (px.Red < 250 || px.Green < 250 || px.Blue < 250)
+                totalNonWhite++;
+        }
+        Assert.True(totalNonWhite > 20,
+            $"Grid container child should render (nonWhite={totalNonWhite})");
+    }
 }

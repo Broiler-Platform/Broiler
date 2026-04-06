@@ -406,7 +406,19 @@ internal static class CssLayoutEngine
             }
             else
             {
-                if (b.Display == CssConstants.InlineBlock)
+                // Determine if this child should use inline-block sizing:
+                // 1. Explicit display:inline-block
+                // 2. display:inline-flex / inline-grid (inline-level flex/grid)
+                // 3. Direct child of a flex/grid container (all children
+                //    become flex/grid items with shrink-to-fit sizing per
+                //    CSS Flexbox §4 / CSS Grid §6; since Broiler lacks a
+                //    true flex/grid engine, use FlowInlineBlock as a
+                //    reasonable approximation)
+                bool useInlineBlockFlow = b.Display == CssConstants.InlineBlock
+                    || b.Display is "inline-flex" or "inline-grid"
+                    || box.Display is "flex" or "inline-flex" or "grid" or "inline-grid";
+
+                if (useInlineBlockFlow)
                 {
                     // CSS 2.1 §10.3.9/§10.6.6: Inline-block boxes are laid
                     // out as blocks internally, then placed atomically in
