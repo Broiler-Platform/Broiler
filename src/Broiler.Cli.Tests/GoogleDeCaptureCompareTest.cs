@@ -157,9 +157,7 @@ input{font-family:inherit}
 
         int fullWidth = CountFullWidthLines(bmp, 700);
         _output.WriteLine($"Full-width lines (>700px): {fullWidth}");
-        Assert.True(fullWidth == 0,
-            $"No full-width gray lines (found {fullWidth}) — " +
-            "indicates .lsbb blocks escaping inline-block container");
+        Assert.Equal(0, fullWidth);
     }
 
     [Fact]
