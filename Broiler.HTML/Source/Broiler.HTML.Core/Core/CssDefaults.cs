@@ -55,6 +55,10 @@ internal static class CssDefaults
         input[type=""checkbox""],
         input[type=""radio""] { min-width: 13px; width: 13px; height: 13px;
                           padding: 0; }
+        input[type=""submit""],
+        input[type=""button""],
+        input[type=""reset""] { min-width: 0; padding: 1px 6px;
+                          background-color: #f0f0f0; text-align: center; }
         select           { min-width: 60px; height: 1.4em; }
         button           { padding: 1px 6px; background-color: #f0f0f0; text-align: center; }
         textarea         { min-width: 170px; min-height: 3em; }

@@ -94,6 +94,20 @@ public sealed partial class DomBridge
             sb.Append(' ').Append(kvp.Key).Append("=\"").Append(HtmlSerializer.HtmlEncode(kvp.Value)).Append('"');
         }
 
+        // For <input> elements, if the IDL value property was set via
+        // JavaScript (stored as DomProperties["_value"]) but no content
+        // attribute "value" exists, emit it so the CSS rendering engine's
+        // HtmlParser can inject the text content for submit/button/reset
+        // inputs and show placeholder text for text-like inputs.
+        if (string.Equals(tag, "input", StringComparison.OrdinalIgnoreCase)
+            && !element.Attributes.ContainsKey("value")
+            && element.DomProperties.TryGetValue("_value", out var idlValue)
+            && idlValue is string idlStr
+            && !string.IsNullOrEmpty(idlStr))
+        {
+            sb.Append(" value=\"").Append(HtmlSerializer.HtmlEncode(idlStr)).Append('"');
+        }
+
         // Emit inline style from the style dictionary.
         // CSS shorthand properties (e.g. "margin", "border", "padding") must
         // appear before their longhand counterparts ("margin-left", etc.) so

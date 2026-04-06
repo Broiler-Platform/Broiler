@@ -105,8 +105,10 @@ internal class CssBox : CssBoxProperties, IDisposable
     public override bool AvoidGeometryAntialias => ContainerInt?.AvoidGeometryAntialias ?? false;
 
     public bool IsBrElement => HtmlTag != null && HtmlTag.Name.Equals("br", StringComparison.InvariantCultureIgnoreCase);
-    public bool IsInline => (Display == CssConstants.Inline || Display == CssConstants.InlineBlock) && !IsBrElement;
-    public bool IsBlock => Display == CssConstants.Block;
+    public bool IsInline => (Display == CssConstants.Inline || Display == CssConstants.InlineBlock
+        || Display == "inline-flex" || Display == "inline-grid") && !IsBrElement;
+    public bool IsBlock => Display == CssConstants.Block || Display == "flex"
+        || Display == "grid";
     public virtual bool IsClickable
     {
         get
