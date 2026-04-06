@@ -3,6 +3,7 @@ using Broiler.HTML.Core.Core;
 using Broiler.HTML.CSS.Core;
 using Broiler.HTML.Rendering.Core.Handlers;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -11,8 +12,8 @@ namespace Broiler.HTML.Adapters;
 
 public abstract class RAdapter : IColorResolver, IResourceFactory, IFontCreator, IAdapter
 {
-    private readonly Dictionary<Color, RBrush> _brushesCache = [];
-    private readonly Dictionary<Color, RPen> _penCache = [];
+    private readonly ConcurrentDictionary<Color, RBrush> _brushesCache = new();
+    private readonly ConcurrentDictionary<Color, RPen> _penCache = new();
     private readonly FontsHandler _fontsHandler;
 
     private CssData _defaultCssData;
@@ -38,18 +39,12 @@ public abstract class RAdapter : IColorResolver, IResourceFactory, IFontCreator,
 
     public RPen GetPen(Color color)
     {
-        if (!_penCache.TryGetValue(color, out RPen pen))
-            _penCache[color] = pen = CreatePen(color);
-
-        return pen;
+        return _penCache.GetOrAdd(color, c => CreatePen(c));
     }
 
     public RBrush GetSolidBrush(Color color)
     {
-        if (!_brushesCache.TryGetValue(color, out RBrush brush))
-            _brushesCache[color] = brush = CreateSolidBrush(color);
-
-        return brush;
+        return _brushesCache.GetOrAdd(color, c => CreateSolidBrush(c));
     }
 
     public RBrush GetLinearGradientBrush(RectangleF rect, Color color1, Color color2, double angle) => CreateLinearGradientBrush(rect, color1, color2, angle);
