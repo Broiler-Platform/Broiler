@@ -942,13 +942,28 @@ internal static class CssLayoutEngine
 
     private static void ApplyCenterAlignment(RGraphics g, CssLineBox line)
     {
-        if (line.Words.Count == 0)
+        if (line.Words.Count == 0 && line.Rectangles.Count == 0)
             return;
 
-        CssRect lastWord = line.Words[line.Words.Count - 1];
         double right = line.OwnerBox.ActualRight - line.OwnerBox.ActualPaddingRight - line.OwnerBox.ActualBorderRightWidth;
-        double diff = right - lastWord.Right - lastWord.OwnerBox.ActualBorderRightWidth - lastWord.OwnerBox.ActualPaddingRight;
-        diff /= 2;
+
+        // Find the rightmost content edge from both words and inline-block rectangles.
+        // Lines may contain only inline-block elements (e.g. form controls inside
+        // <center>) with no direct text words.
+        double contentRight = 0;
+        if (line.Words.Count > 0)
+        {
+            CssRect lastWord = line.Words[line.Words.Count - 1];
+            contentRight = lastWord.Right + lastWord.OwnerBox.ActualBorderRightWidth + lastWord.OwnerBox.ActualPaddingRight;
+        }
+
+        foreach (var kvp in line.Rectangles)
+        {
+            if (kvp.Value.Right > contentRight)
+                contentRight = kvp.Value.Right;
+        }
+
+        double diff = (right - contentRight) / 2;
 
         if (diff <= 0)
             return;
@@ -956,24 +971,36 @@ internal static class CssLayoutEngine
         foreach (CssRect word in line.Words)
             word.Left += diff;
 
-        if (line.Rectangles.Count <= 0)
-            return;
-
         foreach (CssBox b in ToList(line.Rectangles.Keys))
         {
             RectangleF r = line.Rectangles[b];
             line.Rectangles[b] = new RectangleF((float)(r.X + diff), r.Y, r.Width, r.Height);
+            ShiftInlineBlockBox(b, diff);
         }
     }
 
     private static void ApplyRightAlignment(RGraphics g, CssLineBox line)
     {
-        if (line.Words.Count == 0)
+        if (line.Words.Count == 0 && line.Rectangles.Count == 0)
             return;
 
-        CssRect lastWord = line.Words[line.Words.Count - 1];
         double right = line.OwnerBox.ActualRight - line.OwnerBox.ActualPaddingRight - line.OwnerBox.ActualBorderRightWidth;
-        double diff = right - lastWord.Right - lastWord.OwnerBox.ActualBorderRightWidth - lastWord.OwnerBox.ActualPaddingRight;
+
+        // Find the rightmost content edge from both words and inline-block rectangles.
+        double contentRight = 0;
+        if (line.Words.Count > 0)
+        {
+            CssRect lastWord = line.Words[line.Words.Count - 1];
+            contentRight = lastWord.Right + lastWord.OwnerBox.ActualBorderRightWidth + lastWord.OwnerBox.ActualPaddingRight;
+        }
+
+        foreach (var kvp in line.Rectangles)
+        {
+            if (kvp.Value.Right > contentRight)
+                contentRight = kvp.Value.Right;
+        }
+
+        double diff = right - contentRight;
 
         if (diff <= 0)
             return;
@@ -981,13 +1008,79 @@ internal static class CssLayoutEngine
         foreach (CssRect word in line.Words)
             word.Left += diff;
 
-        if (line.Rectangles.Count <= 0)
-            return;
-
         foreach (CssBox b in ToList(line.Rectangles.Keys))
         {
             RectangleF r = line.Rectangles[b];
             line.Rectangles[b] = new RectangleF((float)(r.X + diff), r.Y, r.Width, r.Height);
+            ShiftInlineBlockBox(b, diff);
+        }
+    }
+
+    /// <summary>
+    /// Shifts an inline-block box and all its descendant boxes horizontally.
+    /// Called by <see cref="ApplyCenterAlignment"/> and <see cref="ApplyRightAlignment"/>
+    /// to ensure the box's actual <see cref="CssBox.Location"/> matches the shifted
+    /// line-box rectangle, so background, border, and child content paint at the
+    /// correct position.  CSS 2.1 §9.4.2.
+    /// </summary>
+    private static void ShiftInlineBlockBox(CssBox b, double dx)
+    {
+        if (b.Display != CssConstants.InlineBlock)
+            return;
+
+        b.Location = new PointF((float)(b.Location.X + dx), b.Location.Y);
+
+        // Shift all descendant boxes so child content (text, nested boxes)
+        // renders at the correct position.
+        ShiftDescendantBoxes(b, dx);
+
+        // Shift rectangles already assigned to the inline-block from its own
+        // line boxes (via BubbleRectangles + AssignRectanglesToBoxes that ran
+        // before centering).  Without this, the FragmentTreeBuilder captures
+        // stale InlineRects at the original position, causing double borders.
+        ShiftAssignedRectangles(b, dx);
+    }
+
+    private static void ShiftDescendantBoxes(CssBox parent, double dx)
+    {
+        foreach (var child in parent.Boxes)
+        {
+            child.Location = new PointF((float)(child.Location.X + dx), child.Location.Y);
+
+            // Shift rectangles already assigned to this child.
+            ShiftAssignedRectangles(child, dx);
+
+            ShiftDescendantBoxes(child, dx);
+        }
+
+        // Shift words and rectangles within this box's own line boxes.
+        foreach (var lineBox in parent.LineBoxes)
+        {
+            foreach (var word in lineBox.Words)
+                word.Left += dx;
+
+            foreach (var key in ToList(lineBox.Rectangles.Keys))
+            {
+                var r = lineBox.Rectangles[key];
+                lineBox.Rectangles[key] = new RectangleF((float)(r.X + dx), r.Y, r.Width, r.Height);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Shifts all per-line-box rectangles that have been assigned to a box
+    /// (via <see cref="CssLineBox.AssignRectanglesToBoxes"/>) by <paramref name="dx"/>
+    /// pixels horizontally.
+    /// </summary>
+    private static void ShiftAssignedRectangles(CssBox box, double dx)
+    {
+        if (box.Rectangles.Count == 0)
+            return;
+
+        foreach (var key in ToList(box.Rectangles.Keys))
+        {
+            var r = box.Rectangles[key];
+            box.Rectangles[key] = new RectangleF((float)(r.X + dx), r.Y, r.Width, r.Height);
         }
     }
 
