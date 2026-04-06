@@ -1106,6 +1106,19 @@ internal sealed class DomParser
     {
         try
         {
+            // CSS Flexbox §4 / CSS Grid §7: All direct children of a
+            // flex/grid container become flex/grid items — they must NOT
+            // be rearranged by the block-inside-inline correction (which
+            // wraps block children in anonymous boxes and merges them).
+            if (box.Display is "flex" or "inline-flex" or "grid" or "inline-grid")
+            {
+                // Still recurse into children — the children themselves
+                // may contain nested inline contexts that need correction.
+                foreach (var childBox in box.Boxes)
+                    CorrectBlockInsideInline(childBox, baseUrl);
+                return;
+            }
+
             if (DomUtils.ContainsInlinesOnly(box) && !ContainsInlinesOnlyDeep(box))
             {
                 var tempRightBox = CorrectBlockInsideInlineImp(box, baseUrl);
@@ -1235,7 +1248,11 @@ internal sealed class DomParser
 
     private static void CorrectInlineBoxesParent(CssBox box, Uri baseUrl)
     {
-        if (ContainsVariantBoxes(box))
+        // CSS Flexbox §4 / CSS Grid §7: All direct children of a
+        // flex/grid container are flex/grid items — do not wrap inline
+        // children in anonymous block boxes.
+        if (box.Display is not ("flex" or "inline-flex" or "grid" or "inline-grid")
+            && ContainsVariantBoxes(box))
         {
             for (int i = 0; i < box.Boxes.Count; i++)
             {
