@@ -523,6 +523,19 @@ internal static class CssLayoutEngine
             ibContentWidth = Math.Min(Math.Max(prefMin, available), prefMax);
         }
 
+        // CSS 2.1 §10.4: Apply min-width constraint.
+        // min-width takes priority over computed width (including
+        // shrink-to-fit for auto-width inline-blocks).
+        if (b.MinWidth != "0" && !string.IsNullOrEmpty(b.MinWidth))
+        {
+            double minW = CssValueParser.ParseLength(b.MinWidth, containerWidth, b.GetEmHeight());
+            double minContentW = minW
+                - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
+                - b.ActualPaddingLeft - b.ActualPaddingRight;
+            if (minContentW > ibContentWidth)
+                ibContentWidth = minContentW;
+        }
+
         double ibBoxWidth = ibContentWidth
             + b.ActualBorderLeftWidth + b.ActualBorderRightWidth
             + b.ActualPaddingLeft + b.ActualPaddingRight;
@@ -575,6 +588,17 @@ internal static class CssLayoutEngine
         else
         {
             ibHeight = Math.Max(0, b.ActualBottom - b.Location.Y);
+        }
+
+        // CSS 2.1 §10.7: Apply min-height constraint for inline-blocks.
+        if (b.MinHeight != "0" && !string.IsNullOrEmpty(b.MinHeight))
+        {
+            double minH = CssValueParser.ParseLength(b.MinHeight, containerWidth, b.GetEmHeight());
+            double minBoxH = minH
+                + b.ActualBorderTopWidth + b.ActualBorderBottomWidth
+                + b.ActualPaddingTop + b.ActualPaddingBottom;
+            if (minBoxH > ibHeight)
+                ibHeight = minBoxH;
         }
 
         b.ActualBottom = b.Location.Y + ibHeight;

@@ -87,9 +87,12 @@ internal static class HtmlParser
                         // the current box is not changed
                         var singleBox = CssBoxHelper.CreateBox(tag, baseUrl, curBox);
 
-                        // For <input type="submit"> and <input type="button">,
-                        // inject the value attribute as visible text content so
-                        // the button label is rendered.
+                        // Inject visible text content for <input> elements.
+                        // Submit/button/reset: always show label (default to
+                        //   "Submit"/"Reset" when value is absent).
+                        // Text-like inputs (text, search, email, url, tel,
+                        //   number, password): render the value attribute so
+                        //   the text appears inside the input box.
                         if (tagName.Equals("input", StringComparison.OrdinalIgnoreCase))
                         {
                             var inputType = tag.TryGetAttribute("type")?.ToLowerInvariant() ?? "text";
@@ -102,6 +105,16 @@ internal static class HtmlParser
                                 {
                                     var textBox = CssBoxHelper.CreateBox(singleBox, baseUrl);
                                     textBox.Text = label.AsMemory();
+                                }
+                            }
+                            else if (inputType is "text" or "search" or "email"
+                                     or "url" or "tel" or "number" or "password")
+                            {
+                                var val = tag.TryGetAttribute("value");
+                                if (!string.IsNullOrEmpty(val))
+                                {
+                                    var textBox = CssBoxHelper.CreateBox(singleBox, baseUrl);
+                                    textBox.Text = val.AsMemory();
                                 }
                             }
                         }

@@ -903,6 +903,16 @@ internal sealed class DomParser
                         box.Height = TranslateLength(value);
                     else if (tag.Name.Equals(HtmlConstants.Font, StringComparison.OrdinalIgnoreCase))
                         box.FontSize = value;
+                    else if (tag.Name.Equals(HtmlConstants.Input, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // HTML5 §4.10.5.3.7: The size attribute on <input>
+                        // specifies the visible width in average-character
+                        // units.  Approximate using 8.05px per character
+                        // (roughly 1ex at 13.3333px Arial, matching
+                        // Chromium's default rendering of size=20 → ~173px).
+                        if (int.TryParse(value, out int chars) && chars > 0)
+                            box.Width = $"{chars * 8.05 + 12}px"; // +12 accounts for padding + border
+                    }
                     break;
                 case HtmlConstants.Valign:
                     box.VerticalAlign = value.ToLower();

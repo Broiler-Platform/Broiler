@@ -49,6 +49,8 @@ internal static class CssDefaults
         input, select   { display: inline-block; border: 1px solid #767676;
                           padding: 1px 2px; background-color: #ffffff;
                           font-size: 13.3333px; font-family: Arial, sans-serif; }
+        input            { min-width: 173px; height: 1.2em; }
+        select           { min-width: 60px; height: 1.4em; }
         button           { padding: 1px 6px; background-color: #f0f0f0; text-align: center; }
         textarea         { min-width: 170px; min-height: 3em; }
         big             { font-size: 1.17em }
