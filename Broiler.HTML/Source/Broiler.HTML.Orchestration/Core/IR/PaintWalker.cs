@@ -56,11 +56,48 @@ internal static class PaintWalker
 
         if (canvasBg.A > 0)
         {
-            items.Add(new FillRectItem { Bounds = viewport, Color = canvasBg });
+            // CSS Compositing §2.11: When the root element has opacity < 1,
+            // the canvas background must be composited as if the element's
+            // background is rendered at that opacity over the initial white
+            // backdrop.  Similarly, a semi-transparent background color
+            // (e.g. rgba(…)) is composited over white.
+            var htmlFragment = source ?? FindFirstBlockChild(root);
+            float rootOpacity = 1f;
+            if (htmlFragment != null
+                && htmlFragment.Style.Opacity != null
+                && float.TryParse(htmlFragment.Style.Opacity,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var op))
+            {
+                rootOpacity = Math.Clamp(op, 0f, 1f);
+            }
+
+            Color finalBg = CompositOverWhite(canvasBg, rootOpacity);
+            items.Add(new FillRectItem { Bounds = viewport, Color = finalBg });
             return source;
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Composites a foreground color over a white backdrop, applying an
+    /// additional opacity factor.  Uses the "source over" Porter-Duff model.
+    /// </summary>
+    private static Color CompositOverWhite(Color fg, float opacity)
+    {
+        float a = (fg.A / 255f) * opacity;
+        if (a >= 1f) return fg;
+        if (a <= 0f) return Color.White;
+
+        int r = (int)Math.Round(fg.R * a + 255 * (1 - a));
+        int g = (int)Math.Round(fg.G * a + 255 * (1 - a));
+        int b = (int)Math.Round(fg.B * a + 255 * (1 - a));
+
+        return Color.FromArgb(255,
+            Math.Clamp(r, 0, 255),
+            Math.Clamp(g, 0, 255),
+            Math.Clamp(b, 0, 255));
     }
 
     /// <summary>

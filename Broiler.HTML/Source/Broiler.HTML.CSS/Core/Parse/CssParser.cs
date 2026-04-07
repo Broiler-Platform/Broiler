@@ -910,6 +910,16 @@ internal sealed class CssParser
             "word-break" => lower is "normal" or "break-all" or "keep-all" or "break-word",
             "overflow-wrap" or "word-wrap" => lower is "normal" or "break-word" or "anywhere",
             "box-sizing" => lower is "content-box" or "border-box",
+            "mix-blend-mode" => lower is "normal" or "multiply" or "screen" or "overlay" or "darken"
+                or "lighten" or "color-dodge" or "color-burn" or "hard-light" or "soft-light"
+                or "difference" or "exclusion" or "hue" or "saturation" or "color" or "luminosity"
+                or "plus-lighter",
+            "background-blend-mode" => lower is "normal" or "multiply" or "screen" or "overlay" or "darken"
+                or "lighten" or "color-dodge" or "color-burn" or "hard-light" or "soft-light"
+                or "difference" or "exclusion" or "hue" or "saturation" or "color" or "luminosity",
+            "isolation" => lower is "auto" or "isolate",
+            "background-clip" => lower is "border-box" or "padding-box" or "content-box" or "text",
+            "filter" => lower is "none" || lower.Contains('('),
             _ => true, // Unknown property — accept any value
         };
     }
@@ -969,8 +979,8 @@ internal sealed class CssParser
             }
         }
 
-        // Tokenise the rest.
-        string[] tokens = remaining.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+        // Tokenise the rest, respecting parenthesised groups (e.g. rgb(…), rgba(…), hsl(…)).
+        string[] tokens = SplitBackgroundTokens(remaining);
 
         foreach (var token in tokens)
         {
@@ -1057,6 +1067,39 @@ internal sealed class CssParser
     {
         if (_valueParser.IsColorValid(propValue))
             properties[propName] = propValue;
+    }
+
+    /// <summary>
+    /// Splits a CSS background shorthand value into whitespace-separated tokens,
+    /// respecting parenthesised groups so that <c>rgb(150, 150, 150)</c> stays as
+    /// a single token instead of being split at the commas and spaces.
+    /// </summary>
+    private static string[] SplitBackgroundTokens(string value)
+    {
+        var parts = new List<string>();
+        var sb = new System.Text.StringBuilder();
+        int depth = 0;
+        foreach (char c in value)
+        {
+            if (c == '(') depth++;
+            else if (c == ')' && depth > 0) depth--;
+
+            if ((c == ' ' || c == '\t') && depth == 0)
+            {
+                if (sb.Length > 0)
+                {
+                    parts.Add(sb.ToString());
+                    sb.Clear();
+                }
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
+        if (sb.Length > 0)
+            parts.Add(sb.ToString());
+        return parts.ToArray();
     }
 
     /// <summary>

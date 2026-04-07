@@ -114,6 +114,14 @@ public sealed class ComputedStyle
 
     public string Opacity { get; init; } = "1";
 
+    // --- Compositing ---
+
+    public string MixBlendMode { get; init; } = "normal";
+    public string BackgroundBlendMode { get; init; } = "normal";
+    public string Filter { get; init; } = "none";
+    public string Isolation { get; init; } = "auto";
+    public string BackgroundClip { get; init; } = "border-box";
+
     // --- Flex ---
 
     public string FlexDirection { get; init; } = "row";

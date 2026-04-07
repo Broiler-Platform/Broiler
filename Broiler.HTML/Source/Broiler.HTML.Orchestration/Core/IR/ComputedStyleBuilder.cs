@@ -116,6 +116,13 @@ internal static class ComputedStyleBuilder
             // Opacity
             Opacity = box.Opacity,
 
+            // Compositing
+            MixBlendMode = box.MixBlendMode,
+            BackgroundBlendMode = box.BackgroundBlendMode,
+            Filter = box.Filter,
+            Isolation = box.Isolation,
+            BackgroundClip = box.BackgroundClip,
+
             // Flex
             FlexDirection = box.FlexDirection,
             JustifyContent = box.JustifyContent,

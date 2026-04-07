@@ -427,6 +427,11 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string ZIndex { get; set; } = CssConstants.Auto;
     public string BoxShadow { get; set; } = "none";
     public string TextShadow { get; set; } = "none";
+    public string MixBlendMode { get; set; } = "normal";
+    public string BackgroundBlendMode { get; set; } = "normal";
+    public string Filter { get; set; } = "none";
+    public string Isolation { get; set; } = "auto";
+    public string BackgroundClip { get; set; } = "border-box";
     public string FlexDirection { get; set; } = "row";
     public string JustifyContent { get; set; } = "flex-start";
     public string AlignItems { get; set; } = "stretch";
@@ -1222,6 +1227,11 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         _wordSpacing = p._wordSpacing;
         Opacity = p.Opacity;
         BoxShadow = p.BoxShadow;
+        MixBlendMode = p.MixBlendMode;
+        BackgroundBlendMode = p.BackgroundBlendMode;
+        Filter = p.Filter;
+        Isolation = p.Isolation;
+        BackgroundClip = p.BackgroundClip;
         FlexDirection = p.FlexDirection;
         JustifyContent = p.JustifyContent;
         AlignItems = p.AlignItems;
