@@ -24,7 +24,7 @@ public static class JSContextExtensions
         {
             if (ex is not InsufficientExecutionStackException)
             {
-                throw ex;
+                throw;
             }
         }
 #endif

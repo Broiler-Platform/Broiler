@@ -8,7 +8,6 @@ public class YDispatcher
 {
     public static object Queue(object input, Func<object,object> func)
     {
-        object r = null;
         TaskCompletionSource<object> result = new();
         ThreadPool.QueueUserWorkItem((input) => {
             result.SetResult(func(input));
