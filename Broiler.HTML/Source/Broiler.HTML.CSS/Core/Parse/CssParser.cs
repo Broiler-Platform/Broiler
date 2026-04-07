@@ -337,9 +337,83 @@ internal sealed class CssParser
         }
     }
 
+    /// <summary>
+    /// Decodes CSS escape sequences in a string.  A backslash followed by
+    /// 1–6 hex digits is replaced with the corresponding Unicode character;
+    /// an optional single trailing whitespace character is consumed.  A
+    /// backslash followed by any other character inserts that character.
+    /// </summary>
+    private static string DecodeCssEscapes(string input)
+    {
+        int backslash = input.IndexOf('\\');
+        if (backslash < 0)
+            return input;
+
+        var sb = new System.Text.StringBuilder(input.Length);
+        int i = 0;
+        while (i < input.Length)
+        {
+            if (input[i] == '\\' && i + 1 < input.Length)
+            {
+                i++;
+                if (IsHexDigit(input[i]))
+                {
+                    var hex = new System.Text.StringBuilder(6);
+                    while (i < input.Length && IsHexDigit(input[i]) && hex.Length < 6)
+                    {
+                        hex.Append(input[i]);
+                        i++;
+                    }
+                    // Consume optional trailing whitespace (one character).
+                    if (i < input.Length && (input[i] == ' ' || input[i] == '\t' || input[i] == '\n'
+                        || input[i] == '\r' || input[i] == '\f'))
+                        i++;
+                    int codePoint = int.Parse(hex.ToString(), System.Globalization.NumberStyles.HexNumber);
+                    if (codePoint > 0 && codePoint <= 0x10FFFF)
+                        sb.Append(char.ConvertFromUtf32(codePoint));
+                }
+                else
+                {
+                    sb.Append(input[i]);
+                    i++;
+                }
+            }
+            else
+            {
+                sb.Append(input[i]);
+                i++;
+            }
+        }
+        return sb.ToString();
+    }
+
+    private static bool IsHexDigit(char c) =>
+        (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+
+    /// <summary>
+    /// Lowercases only ASCII A–Z characters, leaving all other characters
+    /// (including non-ASCII Unicode) unchanged.  CSS type selectors in HTML
+    /// are case-insensitive only for the ASCII range (Selectors §3).
+    /// </summary>
+    private static string AsciiToLower(string input)
+    {
+        var chars = input.ToCharArray();
+        for (int i = 0; i < chars.Length; i++)
+            if (chars[i] >= 'A' && chars[i] <= 'Z')
+                chars[i] = (char)(chars[i] + 32);
+        return new string(chars);
+    }
+
     private CssBlock ParseCssBlockImp(string className, string blockSource)
     {
-        className = className.ToLower();
+        // Decode CSS Unicode escapes (e.g. \212A → U+212A) before
+        // lowercasing so that non-ASCII characters are preserved.
+        className = DecodeCssEscapes(className);
+
+        // CSS Selectors §3: type selectors in HTML are ASCII
+        // case-insensitive.  Use ASCII-only lowering to avoid
+        // Unicode case-folding (e.g. U+212A Kelvin sign → 'k').
+        className = AsciiToLower(className);
 
         // Strip attribute selectors: convert [class~=value] to .value,
         // and extract other attribute selectors as conditions.  This enables
@@ -1168,6 +1242,16 @@ internal sealed class CssParser
             //Check for family on the right
             string rightSide = propValue.Substring(mustBePos + mustBe.Length);
             string fontFamily = rightSide.Trim(); //Parser.Search(Parser.CssFontFamily, rightSide); //TODO: Would this be right?
+
+            // CSS 2.1 §15.8: The font shorthand requires both font-size and
+            // font-family.  If the font-family portion is empty after stripping
+            // quotes (e.g. font: 48px ''), the declaration is invalid and the
+            // entire shorthand must be discarded.  Commas are also stripped
+            // because they are only font-family list separators, never part of
+            // a font name, so "'', ''" is equally empty.
+            string strippedFamily = fontFamily.Trim('"', '\'', ' ', ',');
+            if (string.IsNullOrEmpty(strippedFamily))
+                return;
 
             //Check for font-size and line-height
             string fontSize = mustBe;

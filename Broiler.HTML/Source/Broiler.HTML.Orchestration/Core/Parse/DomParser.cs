@@ -420,7 +420,9 @@ internal sealed class DomParser
         if (selectorClass == "*")
             return true;
 
-        if (box.HtmlTag.Name.Equals(selectorClass, StringComparison.InvariantCultureIgnoreCase))
+        // CSS Selectors §3: type selectors in HTML are ASCII case-insensitive.
+        // Use OrdinalIgnoreCase to avoid Unicode case-folding (e.g. U+212A ≠ 'k').
+        if (box.HtmlTag.Name.Equals(selectorClass, StringComparison.OrdinalIgnoreCase))
             return true;
 
         if (box.HtmlTag.HasAttribute("class"))
