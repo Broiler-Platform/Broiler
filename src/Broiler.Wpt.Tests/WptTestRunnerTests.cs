@@ -258,7 +258,7 @@ document.getElementById('out').appendChild(p);
     [InlineData("/wpt/css/compositing/mix-blend-mode/mix-blend-mode-root-element-group.html", false)]
     [InlineData("C:\\wpt\\crashtests\\test.html", true)]
     [InlineData("/wpt/css/some-crash.htm", true)]
-    [InlineData("/wpt/css/crash-not-suffix.html", false)]
+    [InlineData("/wpt/css/crash-word-not-suffix.html", false)]
     public void IsCrashTest_Detects_Crash_Tests(string path, bool expected)
     {
         Assert.Equal(expected, WptTestRunner.IsCrashTest(path));
