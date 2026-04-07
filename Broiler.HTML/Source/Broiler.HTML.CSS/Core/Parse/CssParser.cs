@@ -919,6 +919,7 @@ internal sealed class CssParser
                 or "difference" or "exclusion" or "hue" or "saturation" or "color" or "luminosity",
             "isolation" => lower is "auto" or "isolate",
             "background-clip" => lower is "border-box" or "padding-box" or "content-box" or "text",
+            "filter" => lower is "none" || lower.Contains('('),
             _ => true, // Unknown property — accept any value
         };
     }

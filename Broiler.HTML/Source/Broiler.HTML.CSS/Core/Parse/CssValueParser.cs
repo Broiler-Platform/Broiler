@@ -520,10 +520,8 @@ internal sealed class CssValueParser
 
         // CSS Colors Level 4: values in [0, 1] are fractional alpha.
         // Values > 1 are treated as 0–255 integer alpha for backward compat.
-        if (val >= 0 && val <= 1.0)
-            return Math.Max(0, Math.Min(255, (int)Math.Round(val * 255)));
-
-        return Math.Max(0, Math.Min(255, (int)Math.Round(val)));
+        double normalized = (val >= 0 && val <= 1.0) ? val * 255 : val;
+        return Math.Clamp((int)Math.Round(normalized), 0, 255);
     }
 
     private static int ParseInt(string str, int idx, int length)
