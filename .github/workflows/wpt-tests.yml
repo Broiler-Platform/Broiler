@@ -19,12 +19,17 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Run WPT tests
+        id: wpt
         run: |
           ARGS=()
           if [ -n "${{ github.event.inputs.subset }}" ]; then
             ARGS+=(--subset "${{ github.event.inputs.subset }}")
           fi
-          bash scripts/run-wpt-tests.sh "${ARGS[@]}" || true
+          EXIT=0
+          bash scripts/run-wpt-tests.sh "${ARGS[@]}" || EXIT=$?
+          echo "exit_code=$EXIT" >> "$GITHUB_OUTPUT"
+          # Allow the step to succeed so artifacts are uploaded,
+          # but record the exit code for the final check step.
 
       - name: Print summary
         if: always()
@@ -47,3 +52,12 @@ jobs:
           path: |
             tests/wpt/results/wpt-results.log
             tests/wpt/results/wpt-summary.txt
+
+      - name: Check test result
+        if: always()
+        run: |
+          EXIT="${{ steps.wpt.outputs.exit_code }}"
+          if [ "$EXIT" != "0" ]; then
+            echo "::error::WPT tests failed (exit code $EXIT). See wpt-results.log for details."
+            exit 1
+          fi
