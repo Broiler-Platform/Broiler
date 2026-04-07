@@ -1246,7 +1246,9 @@ internal sealed class CssParser
             // CSS 2.1 §15.8: The font shorthand requires both font-size and
             // font-family.  If the font-family portion is empty after stripping
             // quotes (e.g. font: 48px ''), the declaration is invalid and the
-            // entire shorthand must be discarded.
+            // entire shorthand must be discarded.  Commas are also stripped
+            // because they are only font-family list separators, never part of
+            // a font name, so "'', ''" is equally empty.
             string strippedFamily = fontFamily.Trim('"', '\'', ' ', ',');
             if (string.IsNullOrEmpty(strippedFamily))
                 return;
