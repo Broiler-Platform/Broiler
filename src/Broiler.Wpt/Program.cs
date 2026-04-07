@@ -1,0 +1,127 @@
+namespace Broiler.Wpt;
+
+/// <summary>
+/// Entry point for the Broiler WPT (Web Platform Tests) runner.
+/// Accepts a WPT checkout directory and an optional reference-image
+/// directory, then renders each discovered test through the Broiler
+/// HTML/JavaScript stack and compares the output to the reference.
+/// </summary>
+public class Program
+{
+    public static int Main(string[] args)
+    {
+        string? wptPath = null;
+        string? referenceDir = null;
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--wpt-dir" when i + 1 < args.Length:
+                    wptPath = args[++i];
+                    break;
+                case "--reference-dir" when i + 1 < args.Length:
+                    referenceDir = args[++i];
+                    break;
+                case "--wpt-dir":
+                case "--reference-dir":
+                    Console.Error.WriteLine($"Error: '{args[i]}' requires a value.");
+                    PrintUsage();
+                    return 1;
+                case "--help":
+                    PrintUsage();
+                    return 0;
+                default:
+                    // Treat positional arg as the WPT directory for convenience.
+                    if (wptPath is null && !args[i].StartsWith('-'))
+                    {
+                        wptPath = args[i];
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine($"Error: Unrecognized argument '{args[i]}'.");
+                        PrintUsage();
+                        return 1;
+                    }
+                    break;
+            }
+        }
+
+        if (wptPath is null)
+        {
+            Console.Error.WriteLine("Error: A web-platform-tests checkout directory is required.");
+            PrintUsage();
+            return 1;
+        }
+
+        if (!Directory.Exists(wptPath))
+        {
+            Console.Error.WriteLine($"Error: Directory not found: {wptPath}");
+            return 1;
+        }
+
+        // Default reference directory to <wptPath>/references if not specified.
+        referenceDir ??= Path.Combine(wptPath, "references");
+
+        Console.WriteLine($"WPT directory : {Path.GetFullPath(wptPath)}");
+        Console.WriteLine($"Reference dir : {Path.GetFullPath(referenceDir)}");
+        Console.WriteLine();
+
+        var runner = new WptTestRunner();
+        int passed = 0, failed = 0, skipped = 0;
+        var failures = new List<string>();
+
+        foreach (var result in runner.RunAll(wptPath, referenceDir))
+        {
+            if (result.Skipped)
+            {
+                skipped++;
+                continue;
+            }
+
+            if (result.Passed)
+            {
+                passed++;
+                Console.WriteLine($"[PASS] {result.TestPath}");
+            }
+            else
+            {
+                failed++;
+                Console.WriteLine($"[FAIL] {result.TestPath}");
+                if (result.Message is not null)
+                    Console.WriteLine($"       {result.Message}");
+                failures.Add(result.TestPath);
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Results: {passed} passed, {failed} failed, {skipped} skipped");
+
+        if (failures.Count > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine("Failed tests:");
+            foreach (var path in failures)
+            {
+                Console.WriteLine($"  {path}");
+            }
+        }
+
+        return failed > 0 ? 1 : 0;
+    }
+
+    private static void PrintUsage()
+    {
+        Console.WriteLine("Usage: Broiler.Wpt <wpt-directory> [OPTIONS]");
+        Console.WriteLine("       Broiler.Wpt --wpt-dir <PATH> [--reference-dir <PATH>]");
+        Console.WriteLine();
+        Console.WriteLine("Arguments:");
+        Console.WriteLine("  <wpt-directory>            Path to the web-platform-tests checkout");
+        Console.WriteLine();
+        Console.WriteLine("Options:");
+        Console.WriteLine("  --wpt-dir <PATH>           Path to the web-platform-tests checkout");
+        Console.WriteLine("  --reference-dir <PATH>     Directory containing Chromium/Playwright reference PNGs");
+        Console.WriteLine("                             (default: <wpt-directory>/references)");
+        Console.WriteLine("  --help                     Show this help message");
+    }
+}

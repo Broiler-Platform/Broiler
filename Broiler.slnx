@@ -22,6 +22,8 @@
     <Project Path="src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj" />
     <Project Path="src/Broiler.DevConsole/Broiler.DevConsole.csproj" />
     <Project Path="src/Broiler.DevSite/Broiler.DevSite.csproj" />
+    <Project Path="src/Broiler.Wpt/Broiler.Wpt.csproj" />
+    <Project Path="src/Broiler.Wpt.Tests/Broiler.Wpt.Tests.csproj" />
   </Folder>
   <Folder Name="/Broiler.JavaScript/">
     <Project Path="Broiler.JavaScript/Broiler.JavaScript.Ast/Broiler.JavaScript.Ast.csproj" />
