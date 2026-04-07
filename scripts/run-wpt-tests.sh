@@ -130,13 +130,16 @@ if command -v npx &>/dev/null; then
     fi
     npx playwright install --with-deps chromium 2>&1 | tail -10
 
-    # Run the generator from tests/wpt so require('playwright') resolves
-    # from the local node_modules installed above.
-    if node "$SCRIPT_DIR/generate-wpt-references.js" \
+    # Set NODE_PATH so require('playwright') resolves from the local
+    # node_modules installed above (Node.js resolves modules relative to
+    # the requiring file's directory, not cwd).
+    if NODE_PATH="$REPO_ROOT/tests/wpt/node_modules" \
+        node "$SCRIPT_DIR/generate-wpt-references.js" \
         "$TEST_DIR" "$REFERENCE_DIR" --concurrency 8 2>&1; then
         echo "  ✓ Reference images generated"
     else
-        echo "  ⚠ Reference generation failed; continuing without references" >&2
+        echo "  ✗ Reference generation failed" >&2
+        exit 1
     fi
     popd > /dev/null
 else
