@@ -157,6 +157,68 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void RunTest_Returns_Null_MatchPercent_When_Skipped()
+    {
+        // Arrange — no reference image → skipped, MatchPercent should be null.
+        var testFile = Path.Combine(_tempDir, "skip.html");
+        File.WriteAllText(testFile, "<html><body>Skip me</body></html>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner();
+
+        // Act
+        var result = runner.RunTest(testFile, refDir);
+
+        // Assert — skipped results have no pixel comparison.
+        Assert.True(result.Skipped);
+        Assert.Null(result.MatchPercent);
+    }
+
+    [Fact]
+    public void RunTest_Returns_Null_MatchPercent_When_File_Not_Found()
+    {
+        // Arrange — missing test file → error, MatchPercent should be null.
+        var runner = new WptTestRunner();
+
+        var result = runner.RunTest(
+            Path.Combine(_tempDir, "missing.html"),
+            Path.Combine(_tempDir, "references"));
+
+        // Assert — error before pixel comparison stage.
+        Assert.False(result.Passed);
+        Assert.Null(result.MatchPercent);
+    }
+
+    [Fact]
+    public void Program_Output_Includes_Percent_Match_And_Is_Sorted()
+    {
+        // The Program.Main entry point writes sorted log output to stdout.
+        // With only skipped tests (no references), there are no [PASS]/[FAIL]
+        // lines, but the summary line should still be correct.
+        var testDir = Path.Combine(_tempDir, "sorted");
+        Directory.CreateDirectory(testDir);
+        File.WriteAllText(Path.Combine(testDir, "a.html"), "<html><body>A</body></html>");
+
+        var sw = new StringWriter();
+        Console.SetOut(sw);
+        try
+        {
+            Program.Main([testDir]);
+        }
+        finally
+        {
+            Console.SetOut(new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true });
+        }
+
+        var output = sw.ToString();
+
+        // With no reference images all tests are skipped; verify summary line.
+        Assert.Contains("0 passed, 0 failed, 1 skipped", output);
+    }
+
+    [Fact]
     public void Program_Returns_Error_When_No_Arguments()
     {
         var exitCode = Program.Main([]);

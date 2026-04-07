@@ -71,23 +71,39 @@ public class Program
         int passed = 0, failed = 0, skipped = 0;
         var failures = new List<string>();
 
-        foreach (var result in runner.RunAll(wptPath, referenceDir))
+        // Collect all results first so they can be sorted by percent match
+        // before writing to the logfile.
+        var allResults = runner.RunAll(wptPath, referenceDir).ToList();
+
+        // Separate skipped results (no percent match) from compared results,
+        // then sort compared results ascending by percent match so that the
+        // lowest-matching (most problematic) tests appear first.
+        var compared = allResults
+            .Where(r => !r.Skipped)
+            .OrderBy(r => r.MatchPercent ?? double.MaxValue)
+            .ToList();
+
+        foreach (var result in allResults)
         {
-            if (result.Skipped)
-            {
-                skipped++;
-                continue;
-            }
+            if (result.Skipped) skipped++;
+        }
+
+        foreach (var result in compared)
+        {
+            // Format the percent match tag when a comparison was performed.
+            string pctTag = result.MatchPercent.HasValue
+                ? $"({result.MatchPercent.Value:F1}%) "
+                : "";
 
             if (result.Passed)
             {
                 passed++;
-                Console.WriteLine($"[PASS] {result.TestPath}");
+                Console.WriteLine($"[PASS] {pctTag}{result.TestPath}");
             }
             else
             {
                 failed++;
-                Console.WriteLine($"[FAIL] {result.TestPath}");
+                Console.WriteLine($"[FAIL] {pctTag}{result.TestPath}");
                 if (result.Message is not null)
                     Console.WriteLine($"       {result.Message}");
                 failures.Add(result.TestPath);
