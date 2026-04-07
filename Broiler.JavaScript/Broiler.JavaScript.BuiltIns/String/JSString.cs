@@ -19,7 +19,7 @@ public partial class JSString : JSPrimitive
     /// <summary>
     /// Gets the underlying string value of this JSString instance.
     /// </summary>
-    public string StringValue => value;
+    public new string StringValue => value;
 
     KeyString _keyString;
 

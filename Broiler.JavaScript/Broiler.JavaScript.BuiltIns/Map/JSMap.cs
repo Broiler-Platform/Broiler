@@ -29,7 +29,7 @@ public partial class JSMap : JSObject
     }
 
     [JSExport("groupBy")]
-    internal static JSValue GroupBy(in Arguments a)
+    internal static new JSValue GroupBy(in Arguments a)
     {
         var (items, callbackfn) = a.Get2();
         if (items.IsNullOrUndefined)
