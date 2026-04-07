@@ -3268,7 +3268,7 @@ public sealed partial class DomBridge
                     throw new JSException("Failed to execute 'createElement': 1 argument required.");
                 var tagName = a[0].ToString();
                 ValidateElementName(tagName, _jsContext!);
-                tagName = tagName.ToLowerInvariant();
+                tagName = AsciiToLower(tagName);
                 var el = new DomElement(tagName, null, null, string.Empty);
                 el.OwnerDocRoot = docRoot;
                 _elements.Add(el);

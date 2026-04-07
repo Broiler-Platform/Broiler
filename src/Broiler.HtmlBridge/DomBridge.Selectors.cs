@@ -300,7 +300,10 @@ public sealed partial class DomBridge
             {
                 var start = pos;
                 while (pos < compound.Length && compound[pos] != '.' && compound[pos] != '#' && compound[pos] != ':' && compound[pos] != '[') pos++;
-                var tag = compound[start..pos].ToLowerInvariant();
+                // CSS Selectors §3: type selectors in HTML are ASCII
+                // case-insensitive.  Use ASCII-only lowering to avoid Unicode
+                // case-folding (e.g. U+212A Kelvin sign must NOT fold to 'k').
+                var tag = AsciiToLower(compound[start..pos]);
                 if (tag != "*")
                     tagFilter = tag;
             }
@@ -727,5 +730,19 @@ public sealed partial class DomBridge
     /// </summary>
     private static bool IsHexDigit(char c) =>
         (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+
+    /// <summary>
+    /// Lowercases only ASCII A–Z characters, leaving all other characters
+    /// (including non-ASCII Unicode) unchanged.  CSS type selectors in HTML
+    /// are case-insensitive only for the ASCII range (Selectors §3).
+    /// </summary>
+    private static string AsciiToLower(string input)
+    {
+        var chars = input.ToCharArray();
+        for (int i = 0; i < chars.Length; i++)
+            if (chars[i] >= 'A' && chars[i] <= 'Z')
+                chars[i] = (char)(chars[i] + 32);
+        return new string(chars);
+    }
 
 }

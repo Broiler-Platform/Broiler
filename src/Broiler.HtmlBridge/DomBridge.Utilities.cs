@@ -981,20 +981,23 @@ public sealed partial class DomBridge
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// Regex for valid XML Name: must start with a letter or underscore,
-    /// followed by letters, digits, hyphens, underscores, or dots.
+    /// Regex for valid XML Name: must start with a Unicode letter or underscore,
+    /// followed by Unicode letters, digits, hyphens, underscores, or dots.
+    /// Uses Unicode categories per XML 1.0 §2.3 to accept non-ASCII characters
+    /// such as U+212A (Kelvin sign).
     /// Colons are NOT allowed (use <see cref="ValidXmlQualifiedNamePattern"/> for qualified names).
     /// </summary>
     private static readonly Regex ValidXmlNamePattern = new(
-        @"^[a-zA-Z_][\w.\-]*$",
+        @"^[\p{L}_][\p{L}\p{N}_.\-]*$",
         RegexOptions.Compiled);
 
     /// <summary>
     /// Regex for valid XML QName: either a simple name or prefix:localName
     /// where both prefix and localName are valid XML names (no colons).
+    /// Uses Unicode categories per XML 1.0 §2.3.
     /// </summary>
     private static readonly Regex ValidXmlQualifiedNamePattern = new(
-        @"^[a-zA-Z_][\w.\-]*(?::[a-zA-Z_][\w.\-]*)?$",
+        @"^[\p{L}_][\p{L}\p{N}_.\-]*(?::[\p{L}_][\p{L}\p{N}_.\-]*)?$",
         RegexOptions.Compiled);
 
     /// <summary>
