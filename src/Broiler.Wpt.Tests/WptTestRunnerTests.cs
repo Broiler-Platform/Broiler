@@ -201,6 +201,7 @@ document.getElementById('out').appendChild(p);
         Directory.CreateDirectory(testDir);
         File.WriteAllText(Path.Combine(testDir, "a.html"), "<html><body>A</body></html>");
 
+        var originalOut = Console.Out;
         var sw = new StringWriter();
         Console.SetOut(sw);
         try
@@ -209,7 +210,7 @@ document.getElementById('out').appendChild(p);
         }
         finally
         {
-            Console.SetOut(new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true });
+            Console.SetOut(originalOut);
         }
 
         var output = sw.ToString();

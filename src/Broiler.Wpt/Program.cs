@@ -83,10 +83,9 @@ public class Program
             .OrderBy(r => r.MatchPercent ?? double.MaxValue)
             .ToList();
 
-        foreach (var result in allResults)
-        {
-            if (result.Skipped) skipped++;
-        }
+        // Count skipped results from the difference between total and compared
+        // (avoids an extra loop over allResults).
+        skipped = allResults.Count - compared.Count;
 
         foreach (var result in compared)
         {
