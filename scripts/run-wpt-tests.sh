@@ -123,17 +123,22 @@ echo "--- Step 2: Generating reference images with Chromium (Playwright) ---"
 if command -v npx &>/dev/null; then
     pushd "$REPO_ROOT/tests/wpt" > /dev/null
     if [[ -f package-lock.json ]]; then
-        npm ci --ignore-scripts 2>&1 | tail -10
+        npm ci 2>&1 | tail -10
     else
         echo "No package-lock.json found; using npm install instead of npm ci"
-        npm install --ignore-scripts 2>&1 | tail -10
+        npm install 2>&1 | tail -10
     fi
     npx playwright install --with-deps chromium 2>&1 | tail -10
-    popd > /dev/null
 
-    node "$SCRIPT_DIR/generate-wpt-references.js" \
-        "$TEST_DIR" "$REFERENCE_DIR" --concurrency 8 2>&1
-    echo "  ✓ Reference images generated"
+    # Run the generator from tests/wpt so require('playwright') resolves
+    # from the local node_modules installed above.
+    if node "$SCRIPT_DIR/generate-wpt-references.js" \
+        "$TEST_DIR" "$REFERENCE_DIR" --concurrency 8 2>&1; then
+        echo "  ✓ Reference images generated"
+    else
+        echo "  ⚠ Reference generation failed; continuing without references" >&2
+    fi
+    popd > /dev/null
 else
     echo "  ⚠ Node.js/npx not found — skipping reference generation"
     echo "    Tests without references will be reported as skipped."
