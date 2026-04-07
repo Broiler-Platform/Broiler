@@ -122,8 +122,8 @@ public static class ImageDecoder
         var header = System.Text.Encoding.UTF8.GetString(data, offset, scanLength - offset);
 
         // Check for XML declaration followed by <svg, or a direct <svg element
-        return header.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) &&
-               header.Contains("<svg", StringComparison.OrdinalIgnoreCase) ||
+        return (header.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) &&
+               header.Contains("<svg", StringComparison.OrdinalIgnoreCase)) ||
                header.StartsWith("<svg", StringComparison.OrdinalIgnoreCase);
     }
 

@@ -178,6 +178,11 @@ internal sealed class SkiaImageAdapter : RAdapter
         {
             data = ms.ToArray();
         }
+        else if (memoryStream.CanSeek)
+        {
+            data = new byte[memoryStream.Length - memoryStream.Position];
+            _ = memoryStream.Read(data, 0, data.Length);
+        }
         else
         {
             using var copy = new MemoryStream();
@@ -225,8 +230,8 @@ internal sealed class SkiaImageAdapter : RAdapter
         var header = System.Text.Encoding.UTF8.GetString(data, offset, scanLength - offset);
 
         // Check for XML declaration followed by <svg, or a direct <svg element
-        return header.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) &&
-               header.Contains("<svg", StringComparison.OrdinalIgnoreCase) ||
+        return (header.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) &&
+               header.Contains("<svg", StringComparison.OrdinalIgnoreCase)) ||
                header.StartsWith("<svg", StringComparison.OrdinalIgnoreCase);
     }
 
