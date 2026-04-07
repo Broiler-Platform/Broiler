@@ -22,6 +22,13 @@ internal sealed class WptTestResult
 
     /// <summary>Optional reason for skip or failure.</summary>
     public string? Message { get; init; }
+
+    /// <summary>
+    /// Percent match between the rendered output and the reference image
+    /// (0–100). Null when no comparison was performed (e.g. skipped or
+    /// error before the pixel comparison stage).
+    /// </summary>
+    public double? MatchPercent { get; init; }
 }
 
 /// <summary>
@@ -177,20 +184,26 @@ internal sealed class WptTestRunner
             }
 
             using var diff = PixelDiffRunner.Compare(rendered, reference);
+
+            // Compute percent match for every comparison so it can be
+            // included in the logfile output and used for sorting.
+            double matchPct = (1.0 - diff.DiffRatio) * 100;
+
             if (diff.IsMatch)
             {
                 return new WptTestResult
                 {
                     TestPath = testPath,
                     Passed = true,
+                    MatchPercent = matchPct,
                 };
             }
 
-            double matchPct = (1.0 - diff.DiffRatio) * 100;
             return new WptTestResult
             {
                 TestPath = testPath,
                 Passed = false,
+                MatchPercent = matchPct,
                 Message = $"Pixel mismatch: {matchPct:F1}% match ({diff.DiffPixelCount}/{diff.TotalPixelCount} pixels differ)",
             };
         }
