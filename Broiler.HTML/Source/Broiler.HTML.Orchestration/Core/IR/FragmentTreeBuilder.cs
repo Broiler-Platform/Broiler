@@ -184,6 +184,22 @@ internal static class FragmentTreeBuilder
                 System.Globalization.CultureInfo.InvariantCulture, out var opacity) && opacity < 1.0)
             return true;
 
+        // CSS Compositing §3: Elements with a mix-blend-mode other than 'normal'
+        // must create a stacking context.
+        if (!string.IsNullOrEmpty(box.MixBlendMode)
+            && !box.MixBlendMode.Equals("normal", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // CSS Compositing §2.2: 'isolation: isolate' creates a stacking context.
+        if (!string.IsNullOrEmpty(box.Isolation)
+            && box.Isolation.Equals("isolate", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // CSS Filter Effects §2: A filter other than 'none' creates a stacking context.
+        if (!string.IsNullOrEmpty(box.Filter)
+            && !box.Filter.Equals("none", StringComparison.OrdinalIgnoreCase))
+            return true;
+
         return false;
     }
 

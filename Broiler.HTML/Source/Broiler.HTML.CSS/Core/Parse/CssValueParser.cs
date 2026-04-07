@@ -366,7 +366,10 @@ internal sealed class CssValueParser
             }
             if (s < idx + length)
             {
-                a = ParseIntAtIndex(str, ref s);
+                // CSS Colors Level 4: the alpha value is a <number> between
+                // 0 and 1 (e.g. 0.5) or an <integer> 0–255.  Parse it as a
+                // float first, then normalise.
+                a = ParseAlphaAtIndex(str, s, idx + length);
             }
         }
 
@@ -490,6 +493,37 @@ internal sealed class CssValueParser
         startIdx = startIdx + len + 1;
 
         return val;
+    }
+
+    /// <summary>
+    /// Parses the alpha component of an rgba() color value.  The alpha can be
+    /// an integer (0–255) or a float (0.0–1.0).  Returns an integer in the
+    /// range [0, 255].
+    /// </summary>
+    private static int ParseAlphaAtIndex(string str, int startIdx, int endIdx)
+    {
+        // Skip leading whitespace and commas/separators.
+        while (startIdx < endIdx && (char.IsWhiteSpace(str[startIdx]) || str[startIdx] == ','))
+            startIdx++;
+
+        // Collect the numeric portion (digits, '.', '-').
+        int numEnd = startIdx;
+        while (numEnd < endIdx && (char.IsDigit(str[numEnd]) || str[numEnd] == '.' || str[numEnd] == '-'))
+            numEnd++;
+
+        if (numEnd <= startIdx)
+            return -1;
+
+        var numStr = str.Substring(startIdx, numEnd - startIdx);
+        if (!double.TryParse(numStr, NumberStyles.Float, CultureInfo.InvariantCulture, out double val))
+            return -1;
+
+        // CSS Colors Level 4: values in [0, 1] are fractional alpha.
+        // Values > 1 are treated as 0–255 integer alpha for backward compat.
+        if (val >= 0 && val <= 1.0)
+            return Math.Max(0, Math.Min(255, (int)Math.Round(val * 255)));
+
+        return Math.Max(0, Math.Min(255, (int)Math.Round(val)));
     }
 
     private static int ParseInt(string str, int idx, int length)

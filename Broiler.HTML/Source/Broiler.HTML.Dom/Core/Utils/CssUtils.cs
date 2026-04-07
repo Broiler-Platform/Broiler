@@ -158,6 +158,21 @@ internal static class CssUtils
             case "opacity":
                 cssBox.Opacity = value;
                 break;
+            case "mix-blend-mode":
+                cssBox.MixBlendMode = value;
+                break;
+            case "background-blend-mode":
+                cssBox.BackgroundBlendMode = value;
+                break;
+            case "filter":
+                cssBox.Filter = value;
+                break;
+            case "isolation":
+                cssBox.Isolation = value;
+                break;
+            case "background-clip":
+                cssBox.BackgroundClip = value;
+                break;
             case "box-shadow":
                 cssBox.BoxShadow = value;
                 break;
