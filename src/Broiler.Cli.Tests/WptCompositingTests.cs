@@ -620,7 +620,7 @@ body { margin: 0; }
         // Sample center of the overlapping region
         var pixel = bitmap.GetPixel(50, 50);
         // Difference of red (#FF0000) on yellow (#FFFF00):
-        // R: |FF-FF| = 0, G: |00-FF| = FF, B: |00-00| = 0 → green
+        // R: abs(FF-FF) = 0, G: abs(00-FF) = FF, B: abs(00-00) = 0 → green
         Assert.True(pixel.Red < 30, $"Expected near-zero red but got {pixel.Red}");
         Assert.True(pixel.Green > 200, $"Expected high green but got {pixel.Green}");
         Assert.True(pixel.Blue < 30, $"Expected near-zero blue but got {pixel.Blue}");
