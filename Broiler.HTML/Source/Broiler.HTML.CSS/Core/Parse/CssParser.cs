@@ -988,19 +988,40 @@ internal sealed class CssParser
             if (string.IsNullOrEmpty(t))
                 continue;
 
-            // attachment
+            // CSS3 background-size separator: skip '/' and any following
+            // size values (e.g. "0em / 15438983.37cm auto").
+            if (t == "/")
+            {
+                // Everything after '/' until the next non-size token is
+                // background-size; consume but don't store (not rendered).
+                continue;
+            }
+
+            // attachment (CSS3 adds 'local' to scroll|fixed)
             if (t.Equals("scroll", StringComparison.OrdinalIgnoreCase) ||
-                t.Equals("fixed", StringComparison.OrdinalIgnoreCase))
+                t.Equals("fixed", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("local", StringComparison.OrdinalIgnoreCase))
             {
                 attachment = t.ToLowerInvariant();
                 continue;
             }
 
-            // repeat
+            // CSS3 background-origin / background-clip box values —
+            // accept but don't change rendering (not yet implemented).
+            if (t.Equals("content-box", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("padding-box", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("border-box", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            // repeat (CSS3 adds 'space' and 'round')
             if (t.Equals("repeat", StringComparison.OrdinalIgnoreCase) ||
                 t.Equals("repeat-x", StringComparison.OrdinalIgnoreCase) ||
                 t.Equals("repeat-y", StringComparison.OrdinalIgnoreCase) ||
-                t.Equals("no-repeat", StringComparison.OrdinalIgnoreCase))
+                t.Equals("no-repeat", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("space", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("round", StringComparison.OrdinalIgnoreCase))
             {
                 repeat = t.ToLowerInvariant();
                 continue;
@@ -1028,6 +1049,15 @@ internal sealed class CssParser
             if (t.Equals("none", StringComparison.OrdinalIgnoreCase))
             {
                 image = "none";
+                continue;
+            }
+
+            // CSS3 background-size keywords (after '/') — accept but
+            // don't change rendering (cover/contain/auto not yet implemented).
+            if (t.Equals("auto", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("cover", StringComparison.OrdinalIgnoreCase) ||
+                t.Equals("contain", StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
             }
 

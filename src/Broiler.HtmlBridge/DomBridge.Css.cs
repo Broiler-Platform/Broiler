@@ -659,15 +659,26 @@ public sealed partial class DomBridge
                 continue;
             }
 
-            // background-attachment
-            if (lower is "scroll" or "fixed")
+            // background-attachment (CSS3 adds 'local')
+            if (lower is "scroll" or "fixed" or "local")
             {
                 attachment ??= lower;
                 continue;
             }
 
-            // background-repeat
-            if (lower is "repeat" or "repeat-x" or "repeat-y" or "no-repeat")
+            // CSS3 background-origin / background-clip box values —
+            // accept but don't change rendering (not yet implemented).
+            if (lower is "content-box" or "padding-box" or "border-box")
+            {
+                continue;
+            }
+
+            // CSS3 background-size separator — skip '/' and size tokens
+            if (lower == "/")
+                continue;
+
+            // background-repeat (CSS3 adds 'space' and 'round')
+            if (lower is "repeat" or "repeat-x" or "repeat-y" or "no-repeat" or "space" or "round")
             {
                 repeat ??= lower;
                 continue;
@@ -689,6 +700,10 @@ public sealed partial class DomBridge
 
             // inherit — skip
             if (lower == "inherit")
+                continue;
+
+            // CSS3 background-size keywords — accept but don't render
+            if (lower is "auto" or "cover" or "contain")
                 continue;
 
             // Remaining token → treat as color (named color, hex, rgb(), etc.)

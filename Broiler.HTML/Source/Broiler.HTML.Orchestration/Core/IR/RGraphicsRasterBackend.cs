@@ -60,8 +60,11 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                 case RestoreItem:
                     g.PopClip();
                     break;
-                case OpacityItem:
-                    // Opacity not directly supported by RGraphics; skip for now
+                case OpacityItem opacityItem:
+                    g.SaveOpacityLayer(opacityItem.Opacity);
+                    break;
+                case RestoreOpacityItem:
+                    g.RestoreOpacityLayer();
                     break;
             }
         }

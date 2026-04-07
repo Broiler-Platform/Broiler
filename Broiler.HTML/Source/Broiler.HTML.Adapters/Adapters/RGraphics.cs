@@ -41,5 +41,19 @@ public abstract class RGraphics : IDisposable
     public abstract void DrawPath(RPen pen, RGraphicsPath path);
     public abstract void DrawPath(RBrush brush, RGraphicsPath path);
     public abstract void DrawPolygon(RBrush brush, PointF[] points);
+
+    /// <summary>
+    /// Saves the canvas state and begins a new compositing layer with the given opacity (0.0–1.0).
+    /// All drawing operations until <see cref="RestoreOpacityLayer"/> are composited as a group
+    /// at the specified opacity. Default implementation is a no-op (platform may not support layers).
+    /// </summary>
+    public virtual void SaveOpacityLayer(float opacity) { }
+
+    /// <summary>
+    /// Restores the canvas state from a previous <see cref="SaveOpacityLayer"/> call,
+    /// compositing the layer with the specified opacity. Default is a no-op.
+    /// </summary>
+    public virtual void RestoreOpacityLayer() { }
+
     public abstract void Dispose();
 }

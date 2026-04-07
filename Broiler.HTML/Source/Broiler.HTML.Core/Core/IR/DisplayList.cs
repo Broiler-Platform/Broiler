@@ -30,6 +30,7 @@ public sealed class DisplayList
 [JsonDerivedType(typeof(ClipItem), "Clip")]
 [JsonDerivedType(typeof(RestoreItem), "Restore")]
 [JsonDerivedType(typeof(OpacityItem), "Opacity")]
+[JsonDerivedType(typeof(RestoreOpacityItem), "RestoreOpacity")]
 [JsonDerivedType(typeof(DrawLineItem), "DrawLine")]
 [JsonDerivedType(typeof(DrawSvgRectItem), "DrawSvgRect")]
 [JsonDerivedType(typeof(DrawSvgEllipseItem), "DrawSvgEllipse")]
@@ -131,6 +132,9 @@ public sealed class OpacityItem : DisplayItem
 {
     public float Opacity { get; init; }
 }
+
+/// <summary>Restores from an opacity layer pushed by <see cref="OpacityItem"/>.</summary>
+public sealed class RestoreOpacityItem : DisplayItem { }
 
 /// <summary>Draws a line between two points (Phase 3).</summary>
 public sealed class DrawLineItem : DisplayItem

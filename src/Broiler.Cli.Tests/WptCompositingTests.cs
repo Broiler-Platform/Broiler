@@ -22,7 +22,8 @@ public class WptCompositingTests
     /// <summary>
     /// WPT: css/compositing/background-blending/crashtests/bgblend-root-change.html
     /// A crash test with background-blend-mode: overlay on the root element.
-    /// Must not throw.
+    /// Must not throw.  The CSS3 background shorthand with 'local',
+    /// 'content-box', 'space', and '/ size' tokens must be accepted.
     /// </summary>
     [Fact]
     public void Bgblend_Root_Change_Does_Not_Crash()
@@ -39,6 +40,33 @@ body { background-color: green; }
         using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.True(bitmap.Width > 0);
+    }
+
+    /// <summary>
+    /// Verifies the CSS3 background shorthand with 'local', 'content-box',
+    /// 'space' repeat, and '/ size' syntax is properly parsed rather than
+    /// discarded as invalid.  When the shorthand is accepted it resets
+    /// background-color to transparent.
+    /// </summary>
+    [Fact]
+    public void Bgblend_Root_Change_CSS3_Background_Shorthand_Accepted()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head><style>
+* {
+  background-blend-mode: overlay;
+  background: url(data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=) local content-box space space 0em / 15438983.37cm auto;
+}
+</style></head>
+<body><p>Test</p></body>
+</html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        // The background shorthand resets background-color to transparent.
+        // The extreme size makes the image invisible → white page.
+        var pixel = bitmap.GetPixel(100, 100);
+        Assert.True(pixel.Red >= 245 && pixel.Green >= 245 && pixel.Blue >= 245,
+            $"Expected near-white page (background shorthand accepted) but got ({pixel.Red},{pixel.Green},{pixel.Blue})");
     }
 
     /// <summary>
@@ -88,10 +116,10 @@ Test
     /// <summary>
     /// WPT: css/compositing/root-element-filter.html
     /// A test with filter: invert(1) on the root element.
-    /// Must not throw; the filter property must be accepted.
+    /// The root background (#000) should be inverted to white.
     /// </summary>
     [Fact]
-    public void Root_Element_Filter_Does_Not_Crash()
+    public void Root_Element_Filter_Invert_Canvas_Background()
     {
         var html = @"<!DOCTYPE html>
 <html style=""filter: invert(1); background: #000"">
@@ -103,6 +131,12 @@ Test
         using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.True(bitmap.Width > 0);
+
+        // The canvas background should be inverted: #000 → #FFF (white)
+        var pixel = bitmap.GetPixel(150, 150);
+        Assert.InRange(pixel.Red, 250, 255);
+        Assert.InRange(pixel.Green, 250, 255);
+        Assert.InRange(pixel.Blue, 250, 255);
     }
 
     // ──────────── Root element opacity/transparency ──────────────────────
@@ -184,10 +218,11 @@ Test
     /// <summary>
     /// WPT: css/compositing/root-element-background-margin-opacity-ref.html
     /// Reference for root-element-background-margin-opacity: positioned element
-    /// with opacity: 0.5 and green background.
+    /// with opacity: 0.5 and green background.  Now that non-root opacity is
+    /// rendered via SaveLayer, verify the composited color.
     /// </summary>
     [Fact]
-    public void Root_Element_Background_Margin_Opacity_Ref_Does_Not_Crash()
+    public void Root_Element_Background_Margin_Opacity_Ref_Renders_SemiTransparent()
     {
         var html = @"<!DOCTYPE html>
 <html>
@@ -198,6 +233,13 @@ Test
 
         using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
         Assert.NotNull(bitmap);
+
+        // green (#008000) at 0.5 opacity over white (255,255,255):
+        //   R = 0*0.5 + 255*0.5 = 128, G = 128*0.5 + 255*0.5 = 192, B = 0*0.5 + 255*0.5 = 128
+        var pixel = bitmap.GetPixel(100, 100);
+        Assert.InRange(pixel.Red, 125, 131);
+        Assert.InRange(pixel.Green, 189, 195);
+        Assert.InRange(pixel.Blue, 125, 131);
     }
 
     // ──────────── mix-blend-mode tests ───────────────────────────────────

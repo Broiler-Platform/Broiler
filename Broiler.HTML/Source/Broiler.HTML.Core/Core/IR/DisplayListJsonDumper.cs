@@ -113,6 +113,7 @@ public static class DisplayListJsonDumper
                 break;
 
             case RestoreItem:
+            case RestoreOpacityItem:
                 // No additional properties — remove trailing comma from bounds
                 break;
 
@@ -147,6 +148,7 @@ public static class DisplayListJsonDumper
         ClipItem => "Clip",
         RestoreItem => "Restore",
         OpacityItem => "Opacity",
+        RestoreOpacityItem => "RestoreOpacity",
         DrawLineItem => "DrawLine",
         _ => item.GetType().Name,
     };

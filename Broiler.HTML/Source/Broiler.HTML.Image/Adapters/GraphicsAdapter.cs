@@ -1,3 +1,4 @@
+using System;
 using System.Drawing;
 using Broiler.HTML.Adapters.Adapters;
 using SkiaSharp;
@@ -131,6 +132,18 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
 
         path.Close();
         canvas.DrawPath(path, ((BrushAdapter)brush).Paint);
+    }
+
+    public override void SaveOpacityLayer(float opacity)
+    {
+        byte alpha = (byte)Math.Clamp((int)(opacity * 255), 0, 255);
+        using var paint = new SKPaint { Color = new SKColor(255, 255, 255, alpha) };
+        canvas.SaveLayer(paint);
+    }
+
+    public override void RestoreOpacityLayer()
+    {
+        canvas.Restore();
     }
 
     public override void Dispose()
