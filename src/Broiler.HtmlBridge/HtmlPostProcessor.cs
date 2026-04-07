@@ -224,7 +224,11 @@ internal static class HtmlPostProcessor
         // the background images it was meant to cover.
         html = MapAfterRulePattern.Replace(html, string.Empty);
         html = NeutraliseRedBackgroundImages(html);
-        html = FormPattern.Replace(html, string.Empty);
+        // Note: FormPattern is intentionally NOT applied here.
+        // Stripping all <form> elements destroys form controls (inputs,
+        // buttons, selects) on real web pages.  Acid3's document.write()
+        // forms that need stripping should use StripForms() in the
+        // Acid3-specific pipeline (similar to StripTables).
         // Note: TablePattern is intentionally NOT applied here.
         // Stripping all <table> elements destroys structural tables used by
         // Acid2 (e.g. the <table> that implicitly closes a <p>, enabling the
@@ -246,6 +250,21 @@ internal static class HtmlPostProcessor
     internal static string StripTables(string html)
     {
         return TablePattern.Replace(html, string.Empty);
+    }
+
+    /// <summary>
+    /// Strips all <c>&lt;form&gt;…&lt;/form&gt;</c> elements.  This is
+    /// intended for Acid3 post-processing where <c>document.write()</c>
+    /// injects form elements that render as visible blocks in HtmlRenderer.
+    /// <para>
+    /// <b>Do not use in the general pipeline</b> — real web pages rely on
+    /// <c>&lt;form&gt;</c> elements to wrap their input controls, buttons,
+    /// and other form widgets.
+    /// </para>
+    /// </summary>
+    internal static string StripForms(string html)
+    {
+        return FormPattern.Replace(html, string.Empty);
     }
 
     /// <summary>

@@ -3,6 +3,26 @@ using System.Collections.Generic;
 
 namespace Broiler.HTML.Core.Core.Entities;
 
+/// <summary>
+/// Represents a CSS attribute selector condition like [type="text"] or [hidden].
+/// </summary>
+public readonly struct CssAttributeCondition
+{
+    public CssAttributeCondition(string name, string op, string value)
+    {
+        Name = name;
+        Op = op;
+        Value = value;
+    }
+
+    /// <summary>Attribute name (e.g. "type", "hidden").</summary>
+    public string Name { get; }
+    /// <summary>Match operator: "=", "~=", "|=", "^=", "$=", "*=", or null for presence-only.</summary>
+    public string Op { get; }
+    /// <summary>Expected value, or null for presence-only checks like [hidden].</summary>
+    public string Value { get; }
+}
+
 public sealed class CssBlock
 {
     private readonly Dictionary<string, string> _properties;
@@ -37,6 +57,9 @@ public sealed class CssBlock
     /// (e.g. "first-child" for <c>h1:first-child</c>).  CSS2.1 §5.11.
     /// </summary>
     public string PseudoClass { get; internal set; }
+
+    /// <summary>Attribute selector conditions extracted from the CSS selector.</summary>
+    public List<CssAttributeCondition> AttributeConditions { get; internal set; }
 
     /// <summary>
     /// Property names in this block that were declared with <c>!important</c>.
@@ -76,6 +99,8 @@ public sealed class CssBlock
         clone.IsUserAgent = IsUserAgent;
         if (_importantProperties != null)
             clone._importantProperties = new HashSet<string>(_importantProperties, StringComparer.OrdinalIgnoreCase);
+        if (AttributeConditions != null)
+            clone.AttributeConditions = [.. AttributeConditions];
         return clone;
     }
 
@@ -141,6 +166,39 @@ public sealed class CssBlock
                 if (!Equals(other.Selectors[i].AdjacentSibling, Selectors[i].AdjacentSibling))
                     return false;
             }
+        }
+
+        // CSS2.1 §5.8.1: Attribute selectors change specificity and must
+        // not be merged with blocks that have different (or no) attribute
+        // conditions.  For example, input[type="hidden"] must remain
+        // separate from a plain input rule.
+        if (!EqualsAttributeConditions(other.AttributeConditions, AttributeConditions))
+            return false;
+
+        return true;
+    }
+
+    private static bool EqualsAttributeConditions(List<CssAttributeCondition> a, List<CssAttributeCondition> b)
+    {
+        bool aEmpty = a == null || a.Count == 0;
+        bool bEmpty = b == null || b.Count == 0;
+
+        if (aEmpty && bEmpty)
+            return true;
+        if (aEmpty != bEmpty)
+            return false;
+
+        if (a.Count != b.Count)
+            return false;
+
+        for (int i = 0; i < a.Count; i++)
+        {
+            if (!string.Equals(a[i].Name, b[i].Name, StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (!string.Equals(a[i].Op, b[i].Op, StringComparison.Ordinal))
+                return false;
+            if (!string.Equals(a[i].Value, b[i].Value, StringComparison.OrdinalIgnoreCase))
+                return false;
         }
 
         return true;

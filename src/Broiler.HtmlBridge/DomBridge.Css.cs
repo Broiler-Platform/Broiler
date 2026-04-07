@@ -348,6 +348,8 @@ public sealed partial class DomBridge
             {
                 if (string.Equals(child.TagName, "style", StringComparison.OrdinalIgnoreCase))
                     styleElements.Add(child);
+                else if (IsExternalStylesheet(child))
+                    styleElements.Add(child);
 
                 // Don't descend into sub-document roots (they have their own style scope)
                 if (!child.TagName.StartsWith("#subdoc", StringComparison.OrdinalIgnoreCase))
@@ -391,6 +393,30 @@ public sealed partial class DomBridge
                 {
                     foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))
                         cssText.Append(' ').Append(rule);
+                }
+
+                // For <link rel="stylesheet"> elements, fetch external CSS content
+                if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
+                    cssText.Length == 0 &&
+                    styleEl.Attributes.TryGetValue("href", out var href) && !string.IsNullOrEmpty(href))
+                {
+                    if (styleEl.DomProperties.TryGetValue("_fetchedCss", out var cachedCss) && cachedCss is string cachedStr)
+                    {
+                        cssText.Append(cachedStr);
+                    }
+                    else
+                    {
+                        try
+                        {
+                            var fetchedCss = FetchExternalStylesheet(href);
+                            if (!string.IsNullOrEmpty(fetchedCss))
+                            {
+                                styleEl.DomProperties["_fetchedCss"] = fetchedCss;
+                                cssText.Append(fetchedCss);
+                            }
+                        }
+                        catch { /* ignore fetch failures */ }
+                    }
                 }
 
                 ParseAndApplyCssRules(cssText.ToString(), element, computed, computedSpecificity, vpWidth, vpHeight);
@@ -1309,6 +1335,49 @@ public sealed partial class DomBridge
                     return px >= 0 && viewportWidth <= px;
                 }
                 return true; // No value = bare feature check; width exists
+            case "color":
+                // Bare (color) without value → true if device has color
+                return true;
+            case "-webkit-min-device-pixel-ratio":
+                if (value != null && double.TryParse(value, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var minDpr))
+                    return 1.0 >= minDpr;
+                return false;
+            case "-webkit-max-device-pixel-ratio":
+                if (value != null && double.TryParse(value, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var maxDpr))
+                    return 1.0 <= maxDpr;
+                return false;
+            case "min-device-pixel-ratio":
+                if (value != null && double.TryParse(value, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var minDpr2))
+                    return 1.0 >= minDpr2;
+                return false;
+            case "max-device-pixel-ratio":
+                if (value != null && double.TryParse(value, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var maxDpr2))
+                    return 1.0 <= maxDpr2;
+                return false;
+            case "min-resolution":
+                if (value != null)
+                    return EvaluateResolutionCondition(value, isMin: true);
+                return false;
+            case "max-resolution":
+                if (value != null)
+                    return EvaluateResolutionCondition(value, isMin: false);
+                return false;
+            case "pointer":
+                return value != null && value.Trim().Equals("fine", StringComparison.OrdinalIgnoreCase);
+            case "any-pointer":
+                return value != null && value.Trim().Equals("fine", StringComparison.OrdinalIgnoreCase);
+            case "hover":
+                return value != null && value.Trim().Equals("hover", StringComparison.OrdinalIgnoreCase);
+            case "any-hover":
+                return value != null && value.Trim().Equals("hover", StringComparison.OrdinalIgnoreCase);
+            case "prefers-color-scheme":
+                return value != null && value.Trim().Equals("light", StringComparison.OrdinalIgnoreCase);
+            case "prefers-reduced-motion":
+                return value != null && value.Trim().Equals("no-preference", StringComparison.OrdinalIgnoreCase);
             default:
                 return false;
         }
@@ -1344,6 +1413,48 @@ public sealed partial class DomBridge
             System.Globalization.CultureInfo.InvariantCulture, out var raw))
             return raw;
         return -1;
+    }
+
+    /// <summary>
+    /// Evaluates a CSS resolution value for min-resolution / max-resolution media features.
+    /// Our virtual device is 96dpi (1dppx).
+    /// </summary>
+    private static bool EvaluateResolutionCondition(string value, bool isMin)
+    {
+        const double DeviceDpi = 96.0;
+        const double DeviceDppx = 1.0;
+
+        var v = value.Trim().ToLowerInvariant();
+        double target;
+
+        if (v.EndsWith("dppx"))
+        {
+            if (!double.TryParse(v[..^4], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out target))
+                return false;
+            return isMin ? DeviceDppx >= target : DeviceDppx <= target;
+        }
+        if (v.EndsWith("dpi"))
+        {
+            if (!double.TryParse(v[..^3], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out target))
+                return false;
+            return isMin ? DeviceDpi >= target : DeviceDpi <= target;
+        }
+        if (v.EndsWith("dpcm"))
+        {
+            if (!double.TryParse(v[..^4], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out target))
+                return false;
+            // 1dpcm = 2.54dpi; our device is 96dpi = ~37.8dpcm
+            double deviceDpcm = DeviceDpi / 2.54;
+            return isMin ? deviceDpcm >= target : deviceDpcm <= target;
+        }
+        // Plain number — treat as dpi
+        if (double.TryParse(v, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out target))
+            return isMin ? DeviceDpi >= target : DeviceDpi <= target;
+        return false;
     }
 
     /// <summary>
@@ -1384,5 +1495,33 @@ public sealed partial class DomBridge
         var valueStr = semiIdx >= 0 ? style[(colonIdx + 1)..semiIdx].Trim() : style[(colonIdx + 1)..].Trim();
         var px = ParseCssLengthToPixels(valueStr);
         return px >= 0 ? (int)px : 0;
+    }
+
+    /// <summary>
+    /// Fetches an external CSS stylesheet from an HTTP/HTTPS URL.
+    /// Returns the CSS text content, or <c>null</c> on failure.
+    /// </summary>
+    private static string? FetchExternalStylesheet(string url)
+    {
+        try
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                return null;
+            if (uri.Scheme.Equals("file", StringComparison.OrdinalIgnoreCase))
+            {
+                var path = uri.LocalPath;
+                return System.IO.File.Exists(path) ? System.IO.File.ReadAllText(path) : null;
+            }
+            return SharedHttpClient.GetStringAsync(url)
+                .ConfigureAwait(false)
+                .GetAwaiter()
+                .GetResult();
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogError(LogCategory.HtmlRenderer, "DomBridge.FetchExternalStylesheet",
+                $"Failed to fetch stylesheet '{url}': {ex.Message}", ex);
+            return null;
+        }
     }
 }

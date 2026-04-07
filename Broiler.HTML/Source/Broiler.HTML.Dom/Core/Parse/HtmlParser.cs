@@ -85,7 +85,39 @@ internal static class HtmlParser
                     if (isSingle)
                     {
                         // the current box is not changed
-                        CssBoxHelper.CreateBox(tag, baseUrl, curBox);
+                        var singleBox = CssBoxHelper.CreateBox(tag, baseUrl, curBox);
+
+                        // Inject visible text content for <input> elements.
+                        // Submit/button/reset: always show label (default to
+                        //   "Submit"/"Reset" when value is absent).
+                        // Text-like inputs (text, search, email, url, tel,
+                        //   number, password): render the value attribute so
+                        //   the text appears inside the input box.
+                        if (tagName.Equals("input", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var inputType = tag.TryGetAttribute("type")?.ToLowerInvariant() ?? "text";
+                            if (inputType is "submit" or "button" or "reset")
+                            {
+                                var label = tag.TryGetAttribute("value");
+                                if (string.IsNullOrEmpty(label))
+                                    label = inputType == "submit" ? "Submit" : inputType == "reset" ? "Reset" : "";
+                                if (!string.IsNullOrEmpty(label))
+                                {
+                                    var textBox = CssBoxHelper.CreateBox(singleBox, baseUrl);
+                                    textBox.Text = label.AsMemory();
+                                }
+                            }
+                            else if (inputType is "text" or "search" or "email"
+                                     or "url" or "tel" or "number" or "password")
+                            {
+                                var val = tag.TryGetAttribute("value");
+                                if (!string.IsNullOrEmpty(val))
+                                {
+                                    var textBox = CssBoxHelper.CreateBox(singleBox, baseUrl);
+                                    textBox.Text = val.AsMemory();
+                                }
+                            }
+                        }
                     }
                     else
                     {

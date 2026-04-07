@@ -281,6 +281,13 @@ internal sealed class DomParser
             assignable = false;
         }
 
+        // Check attribute conditions (from CSS attribute selectors)
+        if (assignable && block.AttributeConditions != null && block.AttributeConditions.Count > 0)
+        {
+            if (box.HtmlTag == null || !MatchesAttributeConditions(box.HtmlTag, block.AttributeConditions))
+                assignable = false;
+        }
+
         // CSS2.1 §5.11: Check structural pseudo-class on the terminal selector.
         if (assignable && block.PseudoClass != null)
         {
@@ -340,6 +347,63 @@ internal sealed class DomParser
             }
         }
 
+        return true;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when the given HTML tag satisfies all attribute
+    /// selector conditions (e.g. [type="text"], [hidden]).
+    /// </summary>
+    private static bool MatchesAttributeConditions(HtmlTag tag, List<CssAttributeCondition> conditions)
+    {
+        foreach (var cond in conditions)
+        {
+            if (cond.Op == null)
+            {
+                // Presence check: [hidden]
+                if (!tag.HasAttribute(cond.Name))
+                    return false;
+            }
+            else
+            {
+                var attrVal = tag.TryGetAttribute(cond.Name);
+                if (attrVal == null)
+                    return false;
+
+                switch (cond.Op)
+                {
+                    case "=":
+                        if (!string.Equals(attrVal, cond.Value, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                    case "~=":
+                        if (!(" " + attrVal + " ").Contains(" " + cond.Value + " ", StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                    case "|=":
+                        if (!string.Equals(attrVal, cond.Value, StringComparison.OrdinalIgnoreCase) &&
+                            !attrVal.StartsWith(cond.Value + "-", StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                    case "^=":
+                        if (!attrVal.StartsWith(cond.Value, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                    case "$=":
+                        if (!attrVal.EndsWith(cond.Value, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                    case "*=":
+                        if (!attrVal.Contains(cond.Value, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                    default:
+                        if (!string.Equals(attrVal, cond.Value, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                        break;
+                }
+            }
+        }
         return true;
     }
 
@@ -839,6 +903,18 @@ internal sealed class DomParser
                         box.Height = TranslateLength(value);
                     else if (tag.Name.Equals(HtmlConstants.Font, StringComparison.OrdinalIgnoreCase))
                         box.FontSize = value;
+                    else if (tag.Name.Equals(HtmlConstants.Input, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // HTML5 §4.10.5.3.7: The size attribute on <input>
+                        // specifies the visible width in average-character
+                        // units.  Approximate using ~8px per character
+                        // (roughly 1ex at 13.3333px Arial, matching
+                        // Chromium's default rendering of size=20 → ~173px).
+                        const double AvgCharWidthPx = 8.05;
+                        const double InputPaddingBorderPx = 12; // padding + border on both sides
+                        if (int.TryParse(value, out int chars) && chars > 0)
+                            box.Width = $"{chars * AvgCharWidthPx + InputPaddingBorderPx}px";
+                    }
                     break;
                 case HtmlConstants.Valign:
                     box.VerticalAlign = value.ToLower();
@@ -1030,6 +1106,30 @@ internal sealed class DomParser
     {
         try
         {
+            // CSS Flexbox §4 / CSS Grid §7: All direct children of a
+            // flex/grid container become flex/grid items — they must NOT
+            // be rearranged by the block-inside-inline correction (which
+            // wraps block children in anonymous boxes and merges them).
+            //
+            // CSS2.1 §9.2.1.1 / §10.3.9: Inline-block boxes establish a
+            // new block formatting context for their children.  Block-level
+            // children inside an inline-block are valid and must NOT be
+            // split out by the block-inside-inline correction.  Without
+            // this skip, <span style="display:inline-block"> containing a
+            // <span style="display:block"> is incorrectly unwrapped,
+            // causing the block child to expand to the full container width
+            // instead of being constrained by the inline-block's
+            // shrink-to-fit sizing (e.g. Google.de button wrappers).
+            if (box.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
+                or CssConstants.InlineBlock)
+            {
+                // Still recurse into children — the children themselves
+                // may contain nested inline contexts that need correction.
+                foreach (var childBox in box.Boxes)
+                    CorrectBlockInsideInline(childBox, baseUrl);
+                return;
+            }
+
             if (DomUtils.ContainsInlinesOnly(box) && !ContainsInlinesOnlyDeep(box))
             {
                 var tempRightBox = CorrectBlockInsideInlineImp(box, baseUrl);
@@ -1159,7 +1259,17 @@ internal sealed class DomParser
 
     private static void CorrectInlineBoxesParent(CssBox box, Uri baseUrl)
     {
-        if (ContainsVariantBoxes(box))
+        // CSS Flexbox §4 / CSS Grid §7: All direct children of a
+        // flex/grid container are flex/grid items — do not wrap inline
+        // children in anonymous block boxes.
+        //
+        // CSS2.1 §9.2.1.1 / §10.3.9: Inline-block boxes establish a new
+        // block formatting context — their children (block or inline) are
+        // laid out internally and must not be rearranged by this
+        // correction.
+        if (box.Display is not ("flex" or "inline-flex" or "grid" or "inline-grid"
+                or CssConstants.InlineBlock)
+            && ContainsVariantBoxes(box))
         {
             for (int i = 0; i < box.Boxes.Count; i++)
             {
@@ -1188,7 +1298,24 @@ internal sealed class DomParser
             // whether a box contains only inline content.
             if (childBox.Float != CssConstants.None)
                 continue;
-            if (!childBox.IsInline || !ContainsInlinesOnlyDeep(childBox))
+            if (!childBox.IsInline)
+                return false;
+
+            // CSS2.1 §9.2.1.1 / §10.3.9: Inline-block boxes establish a
+            // new block formatting context.  Their block-level children are
+            // contained within the inline-block and do NOT constitute
+            // "block inside inline" at the outer level.  Stop recursing
+            // into inline-block children so that, e.g., <span display:
+            // inline-block> containing <span display:block> does not
+            // trigger the block-inside-inline correction on the parent.
+            //
+            // Same applies to flex/grid containers — their children are
+            // laid out internally and must not be inspected here.
+            if (childBox.Display is CssConstants.InlineBlock
+                or "flex" or "inline-flex" or "grid" or "inline-grid")
+                continue;
+
+            if (!ContainsInlinesOnlyDeep(childBox))
                 return false;
         }
 

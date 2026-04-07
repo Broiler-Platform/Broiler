@@ -342,9 +342,10 @@ internal sealed class CssParser
         className = className.ToLower();
 
         // Strip attribute selectors: convert [class~=value] to .value,
-        // and remove other attribute selectors.  This enables CSS2.1 §5.8.1
-        // attribute selectors used in the Acid2 test.
-        className = StripAttributeSelectors(className);
+        // and extract other attribute selectors as conditions.  This enables
+        // CSS2.1 §5.8.1 attribute selectors used in the Acid2 test.
+        List<CssAttributeCondition> attrConditions = null;
+        className = StripAttributeSelectors(className, out attrConditions);
         if (string.IsNullOrEmpty(className))
             return null;
 
@@ -410,6 +411,8 @@ internal sealed class CssParser
                 var block = new CssBlock(firstClass + pseudoElement, properties, selectors);
                 MarkImportantProperties(block, importantProps);
                 ApplyStructuralPseudo(block, structuralPseudo, structuralOnTerminal);
+                if (attrConditions != null)
+                    block.AttributeConditions = attrConditions;
                 return block;
             }
 
@@ -421,6 +424,8 @@ internal sealed class CssParser
                 var block = new CssBlock(firstClass, properties, selectors, psedoClass == "hover");
                 MarkImportantProperties(block, importantProps);
                 ApplyStructuralPseudo(block, structuralPseudo, structuralOnTerminal);
+                if (attrConditions != null)
+                    block.AttributeConditions = attrConditions;
                 return block;
             }
         }
@@ -987,8 +992,10 @@ internal sealed class CssParser
     /// result is an invalid/empty selector (e.g. bare <c>[class=a b]</c>
     /// per CSS2.1 grammar).
     /// </summary>
-    private static string StripAttributeSelectors(string selector)
+    private static string StripAttributeSelectors(string selector, out List<CssAttributeCondition> conditions)
     {
+        conditions = null;
+
         if (selector.IndexOf('[') < 0)
             return selector;
 
@@ -1036,13 +1043,36 @@ internal sealed class CssParser
                     }
                 }
                 // Other attribute selectors (e.g. [dir="rtl"], [hidden]):
-                // we cannot match by attribute, so discard the entire rule
-                // to avoid the stripped selector matching too broadly.
-                // Without this, *[DIR="rtl"] would become * and apply
-                // direction: rtl to every element.
+                // parse and store as attribute conditions so they can be
+                // checked at match time instead of discarding the rule.
                 else
                 {
-                    return null;
+                    conditions ??= [];
+                    var eqIdx = inner.IndexOfAny(['=', '~', '|', '^', '$', '*']);
+                    if (eqIdx >= 0)
+                    {
+                        string attrName, attrOp, attrValue;
+                        // Check for two-character operators (e.g., ~=, |=, ^=, $=, *=)
+                        if (eqIdx > 0 && "~|^$*".Contains(inner[eqIdx]) && eqIdx + 1 < inner.Length && inner[eqIdx + 1] == '=')
+                        {
+                            attrName = inner[..eqIdx].Trim();
+                            attrOp = inner.Substring(eqIdx, 2);
+                            attrValue = inner[(eqIdx + 2)..].Trim().Trim('"', '\'');
+                        }
+                        else
+                        {
+                            attrName = inner[..eqIdx].Trim();
+                            attrOp = "=";
+                            attrValue = inner[(eqIdx + 1)..].Trim().Trim('"', '\'');
+                        }
+                        conditions.Add(new CssAttributeCondition(attrName, attrOp, attrValue));
+                    }
+                    else
+                    {
+                        // Presence-only: [hidden], [disabled]
+                        conditions.Add(new CssAttributeCondition(inner.Trim(), null, null));
+                    }
+                    // Don't add to sb — strip from selector text
                 }
             }
             else

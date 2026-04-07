@@ -544,10 +544,18 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
 
     internal void HandleLinkClicked(object parent, PointF location, CssBox link)
     {
+        // Resolve the target URL: for <a> links use href, for form submit
+        // buttons walk up to the enclosing <form> and use its action attribute.
+        string targetUrl = link.HrefLink;
+        if (string.IsNullOrEmpty(targetUrl) && IsFormSubmitControl(link))
+        {
+            targetUrl = FindFormAction(link);
+        }
+
         EventHandler<HtmlLinkClickedEventArgs> clickHandler = LinkClicked;
         if (clickHandler != null)
         {
-            var args = new HtmlLinkClickedEventArgs(ResolveHref(link.HrefLink), link.HtmlTag.Attributes);
+            var args = new HtmlLinkClickedEventArgs(ResolveHref(targetUrl ?? string.Empty), link.HtmlTag.Attributes);
             try
             {
                 clickHandler(this, args);
@@ -560,10 +568,10 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
                 return;
         }
 
-        if (string.IsNullOrEmpty(link.HrefLink))
+        if (string.IsNullOrEmpty(targetUrl))
             return;
 
-        if (link.HrefLink == "#")
+        if (targetUrl == "#")
         {
             EventHandler<HtmlScrollEventArgs> scrollHandler = ScrollChange;
             if (scrollHandler != null)
@@ -572,12 +580,12 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
                 HandleMouseMove(parent, location);
             }
         }
-        else if (link.HrefLink.StartsWith("#") && link.HrefLink.Length > 1)
+        else if (targetUrl.StartsWith("#") && targetUrl.Length > 1)
         {
             EventHandler<HtmlScrollEventArgs> scrollHandler = ScrollChange;
             if (scrollHandler != null)
             {
-                var rect = GetElementRectangle(link.HrefLink.Substring(1));
+                var rect = GetElementRectangle(targetUrl.Substring(1));
                 if (rect.HasValue)
                 {
                     scrollHandler(this, new HtmlScrollEventArgs(rect.Value.Location));
@@ -587,11 +595,49 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
         }
         else
         {
-            var href = ResolveHref(link.HrefLink);
+            var href = ResolveHref(targetUrl);
             var nfo = new ProcessStartInfo(href) { UseShellExecute = true };
             Process.Start(nfo);
 
         }
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> if the given box represents a form submit control
+    /// (<c>&lt;input type="submit"&gt;</c>, <c>&lt;button&gt;</c>, etc.).
+    /// </summary>
+    private static bool IsFormSubmitControl(CssBox box)
+    {
+        if (box.HtmlTag == null) return false;
+        var name = box.HtmlTag.Name;
+        if (name.Equals("button", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (name.Equals("input", StringComparison.OrdinalIgnoreCase))
+        {
+            var inputType = box.HtmlTag.TryGetAttribute("type")?.ToLowerInvariant() ?? "text";
+            return inputType is "submit" or "button" or "reset";
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Walks up the box tree from a form submit control to find the
+    /// enclosing <c>&lt;form&gt;</c> element and returns its <c>action</c>
+    /// attribute value.  Returns <c>null</c> if no form is found.
+    /// </summary>
+    private static string FindFormAction(CssBox box)
+    {
+        var current = box.ParentBox;
+        while (current != null)
+        {
+            if (current.HtmlTag != null &&
+                current.HtmlTag.Name.Equals("form", StringComparison.OrdinalIgnoreCase))
+            {
+                return current.HtmlTag.TryGetAttribute("action");
+            }
+            current = current.ParentBox;
+        }
+        return null;
     }
 
     internal void AddHoverBox(CssBox box, CssBlock block)

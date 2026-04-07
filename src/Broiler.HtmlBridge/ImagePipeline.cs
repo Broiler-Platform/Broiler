@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Net.Http;
 using System.Text.RegularExpressions;
 
 namespace Broiler.HtmlBridge;
@@ -120,6 +121,60 @@ public static class ImageDecoder
         }
         catch (FormatException)
         {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Shared <see cref="HttpClient"/> for fetching external images.
+    /// </summary>
+    private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
+
+    /// <summary>
+    /// Resolves and downloads an external image from an HTTP/HTTPS/file URL.
+    /// Relative URLs are resolved against the <paramref name="pageUrl"/>.
+    /// Returns the raw image bytes, or <c>null</c> on failure.
+    /// </summary>
+    public static byte[]? FetchExternalImageBytes(string imageUrl, string? pageUrl)
+    {
+        try
+        {
+            // Resolve relative URLs against the page URL
+            string resolvedUrl;
+            if (Uri.TryCreate(imageUrl, UriKind.Absolute, out _))
+            {
+                resolvedUrl = imageUrl;
+            }
+            else if (!string.IsNullOrEmpty(pageUrl)
+                  && Uri.TryCreate(pageUrl, UriKind.Absolute, out var baseUri)
+                  && Uri.TryCreate(baseUri, imageUrl, out var resolved))
+            {
+                resolvedUrl = resolved.AbsoluteUri;
+            }
+            else
+            {
+                return null;
+            }
+
+            // Handle file:// URLs — read from local filesystem
+            if (resolvedUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+            {
+                var uri = new Uri(resolvedUrl);
+                var path = uri.LocalPath;
+                return System.IO.File.Exists(path) ? System.IO.File.ReadAllBytes(path) : null;
+            }
+
+            // Synchronous HTTP fetch
+            var bytes = SharedHttpClient.GetByteArrayAsync(resolvedUrl)
+                .ConfigureAwait(false)
+                .GetAwaiter()
+                .GetResult();
+            return bytes;
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogError(LogCategory.HtmlRenderer, "ImageDecoder.FetchExternalImageBytes",
+                $"Failed to fetch external image '{imageUrl}': {ex.Message}", ex);
             return null;
         }
     }

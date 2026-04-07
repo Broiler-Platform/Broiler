@@ -30,6 +30,16 @@ internal sealed class DomUtils
 
     public static bool ContainsInlinesOnly(CssBox box)
     {
+        // CSS Flexbox §4 / CSS Grid §6: All direct children of a flex or
+        // grid container become flex/grid items, which are sized using
+        // shrink-to-fit (similar to inline-block).  Since Broiler does
+        // not implement a true flex/grid layout engine, force the inline
+        // formatting context so children are routed to FlowInlineBlock
+        // for content-based sizing instead of the block path (which
+        // would make them expand to full container width).
+        if (box.Display is "flex" or "inline-flex" or "grid" or "inline-grid")
+            return true;
+
         foreach (CssBox b in box.Boxes)
         {
             // CSS2.1 §9.5: Floats are out-of-flow.  Their computed display

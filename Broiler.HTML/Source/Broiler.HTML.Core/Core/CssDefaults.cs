@@ -46,7 +46,22 @@ internal static class CssDefaults
         kbd, samp       { font-family: monospace }
         pre             { white-space: pre }
         button, textarea,
-        input, select   { display: inline-block }
+        input, select   { display: inline-block; border: 1px solid #767676;
+                          padding: 1px 2px; background-color: #ffffff;
+                          font-size: 13.3333px; font-family: Arial, sans-serif; }
+        input            { min-width: 173px; height: 1.2em; }
+        input[type=""hidden""] { display: none; min-width: 0; height: auto;
+                          border: none; padding: 0; }
+        input[type=""checkbox""],
+        input[type=""radio""] { min-width: 13px; width: 13px; height: 13px;
+                          padding: 0; }
+        input[type=""submit""],
+        input[type=""button""],
+        input[type=""reset""] { min-width: 0; padding: 1px 6px;
+                          background-color: #f0f0f0; text-align: center; }
+        select           { min-width: 60px; height: 1.4em; }
+        button           { padding: 1px 6px; background-color: #f0f0f0; text-align: center; }
+        textarea         { min-width: 170px; min-height: 3em; }
         big             { font-size: 1.17em }
         small, sub, sup { font-size: .83em }
         sub             { vertical-align: sub }

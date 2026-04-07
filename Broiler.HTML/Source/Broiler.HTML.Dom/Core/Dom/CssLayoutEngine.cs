@@ -406,7 +406,19 @@ internal static class CssLayoutEngine
             }
             else
             {
-                if (b.Display == CssConstants.InlineBlock)
+                // Determine if this child should use inline-block sizing:
+                // 1. Explicit display:inline-block
+                // 2. display:inline-flex / inline-grid (inline-level flex/grid)
+                // 3. Direct child of a flex/grid container (all children
+                //    become flex/grid items with shrink-to-fit sizing per
+                //    CSS Flexbox §4 / CSS Grid §6; since Broiler lacks a
+                //    true flex/grid engine, use FlowInlineBlock as a
+                //    reasonable approximation)
+                bool useInlineBlockFlow = b.Display == CssConstants.InlineBlock
+                    || b.Display is "inline-flex" or "inline-grid"
+                    || box.Display is "flex" or "inline-flex" or "grid" or "inline-grid";
+
+                if (useInlineBlockFlow)
                 {
                     // CSS 2.1 §10.3.9/§10.6.6: Inline-block boxes are laid
                     // out as blocks internally, then placed atomically in
@@ -414,6 +426,17 @@ internal static class CssLayoutEngine
                     FlowInlineBlock(g, blockbox, b, limitRight, linespacing, startx,
                         leftspacing, rightspacing,
                         ref line, ref curx, ref cury, ref maxRight, ref maxbottom);
+
+                    // CSS Flexbox §9.4: flex-direction:column stacks items
+                    // vertically — force a line break after each flex item so
+                    // the next item starts on a new row.
+                    if (box.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
+                        && box.FlexDirection is "column" or "column-reverse")
+                    {
+                        cury = maxbottom;
+                        curx = startx;
+                        line = new CssLineBox(blockbox);
+                    }
                 }
                 else
                 {
@@ -523,6 +546,33 @@ internal static class CssLayoutEngine
             ibContentWidth = Math.Min(Math.Max(prefMin, available), prefMax);
         }
 
+        // CSS 2.1 §10.4: Apply min-width constraint.
+        // min-width takes priority over computed width (including
+        // shrink-to-fit for auto-width inline-blocks).
+        if (b.MinWidth != "0" && !string.IsNullOrEmpty(b.MinWidth))
+        {
+            double minW = CssValueParser.ParseLength(b.MinWidth, containerWidth, b.GetEmHeight());
+            double minContentW = minW
+                - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
+                - b.ActualPaddingLeft - b.ActualPaddingRight;
+            if (minContentW > ibContentWidth)
+                ibContentWidth = minContentW;
+        }
+
+        // CSS 2.1 §10.4: Apply max-width constraint.
+        // max-width limits the computed width from above.  When both
+        // min-width and max-width are specified, min-width wins if it
+        // exceeds max-width (CSS2.1 §10.4).
+        if (b.MaxWidth != "none" && !string.IsNullOrEmpty(b.MaxWidth))
+        {
+            double maxW = CssValueParser.ParseLength(b.MaxWidth, containerWidth, b.GetEmHeight());
+            double maxContentW = maxW
+                - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
+                - b.ActualPaddingLeft - b.ActualPaddingRight;
+            if (maxContentW < ibContentWidth)
+                ibContentWidth = maxContentW;
+        }
+
         double ibBoxWidth = ibContentWidth
             + b.ActualBorderLeftWidth + b.ActualBorderRightWidth
             + b.ActualPaddingLeft + b.ActualPaddingRight;
@@ -575,6 +625,17 @@ internal static class CssLayoutEngine
         else
         {
             ibHeight = Math.Max(0, b.ActualBottom - b.Location.Y);
+        }
+
+        // CSS 2.1 §10.7: Apply min-height constraint for inline-blocks.
+        if (b.MinHeight != "0" && !string.IsNullOrEmpty(b.MinHeight))
+        {
+            double minH = CssValueParser.ParseLength(b.MinHeight, containerWidth, b.GetEmHeight());
+            double minBoxH = minH
+                + b.ActualBorderTopWidth + b.ActualBorderBottomWidth
+                + b.ActualPaddingTop + b.ActualPaddingBottom;
+            if (minBoxH > ibHeight)
+                ibHeight = minBoxH;
         }
 
         b.ActualBottom = b.Location.Y + ibHeight;
@@ -918,13 +979,28 @@ internal static class CssLayoutEngine
 
     private static void ApplyCenterAlignment(RGraphics g, CssLineBox line)
     {
-        if (line.Words.Count == 0)
+        if (line.Words.Count == 0 && line.Rectangles.Count == 0)
             return;
 
-        CssRect lastWord = line.Words[line.Words.Count - 1];
         double right = line.OwnerBox.ActualRight - line.OwnerBox.ActualPaddingRight - line.OwnerBox.ActualBorderRightWidth;
-        double diff = right - lastWord.Right - lastWord.OwnerBox.ActualBorderRightWidth - lastWord.OwnerBox.ActualPaddingRight;
-        diff /= 2;
+
+        // Find the rightmost content edge from both words and inline-block rectangles.
+        // Lines may contain only inline-block elements (e.g. form controls inside
+        // <center>) with no direct text words.
+        double contentRight = 0;
+        if (line.Words.Count > 0)
+        {
+            CssRect lastWord = line.Words[line.Words.Count - 1];
+            contentRight = lastWord.Right + lastWord.OwnerBox.ActualBorderRightWidth + lastWord.OwnerBox.ActualPaddingRight;
+        }
+
+        foreach (var kvp in line.Rectangles)
+        {
+            if (kvp.Value.Right > contentRight)
+                contentRight = kvp.Value.Right;
+        }
+
+        double diff = (right - contentRight) / 2;
 
         if (diff <= 0)
             return;
@@ -932,24 +1008,36 @@ internal static class CssLayoutEngine
         foreach (CssRect word in line.Words)
             word.Left += diff;
 
-        if (line.Rectangles.Count <= 0)
-            return;
-
         foreach (CssBox b in ToList(line.Rectangles.Keys))
         {
             RectangleF r = line.Rectangles[b];
             line.Rectangles[b] = new RectangleF((float)(r.X + diff), r.Y, r.Width, r.Height);
+            ShiftInlineBlockBox(b, diff);
         }
     }
 
     private static void ApplyRightAlignment(RGraphics g, CssLineBox line)
     {
-        if (line.Words.Count == 0)
+        if (line.Words.Count == 0 && line.Rectangles.Count == 0)
             return;
 
-        CssRect lastWord = line.Words[line.Words.Count - 1];
         double right = line.OwnerBox.ActualRight - line.OwnerBox.ActualPaddingRight - line.OwnerBox.ActualBorderRightWidth;
-        double diff = right - lastWord.Right - lastWord.OwnerBox.ActualBorderRightWidth - lastWord.OwnerBox.ActualPaddingRight;
+
+        // Find the rightmost content edge from both words and inline-block rectangles.
+        double contentRight = 0;
+        if (line.Words.Count > 0)
+        {
+            CssRect lastWord = line.Words[line.Words.Count - 1];
+            contentRight = lastWord.Right + lastWord.OwnerBox.ActualBorderRightWidth + lastWord.OwnerBox.ActualPaddingRight;
+        }
+
+        foreach (var kvp in line.Rectangles)
+        {
+            if (kvp.Value.Right > contentRight)
+                contentRight = kvp.Value.Right;
+        }
+
+        double diff = right - contentRight;
 
         if (diff <= 0)
             return;
@@ -957,13 +1045,79 @@ internal static class CssLayoutEngine
         foreach (CssRect word in line.Words)
             word.Left += diff;
 
-        if (line.Rectangles.Count <= 0)
-            return;
-
         foreach (CssBox b in ToList(line.Rectangles.Keys))
         {
             RectangleF r = line.Rectangles[b];
             line.Rectangles[b] = new RectangleF((float)(r.X + diff), r.Y, r.Width, r.Height);
+            ShiftInlineBlockBox(b, diff);
+        }
+    }
+
+    /// <summary>
+    /// Shifts an inline-block box and all its descendant boxes horizontally.
+    /// Called by <see cref="ApplyCenterAlignment"/> and <see cref="ApplyRightAlignment"/>
+    /// to ensure the box's actual <see cref="CssBox.Location"/> matches the shifted
+    /// line-box rectangle, so background, border, and child content paint at the
+    /// correct position.  CSS 2.1 §9.4.2.
+    /// </summary>
+    private static void ShiftInlineBlockBox(CssBox b, double dx)
+    {
+        if (b.Display != CssConstants.InlineBlock)
+            return;
+
+        b.Location = new PointF((float)(b.Location.X + dx), b.Location.Y);
+
+        // Shift all descendant boxes so child content (text, nested boxes)
+        // renders at the correct position.
+        ShiftDescendantBoxes(b, dx);
+
+        // Shift rectangles already assigned to the inline-block from its own
+        // line boxes (via BubbleRectangles + AssignRectanglesToBoxes that ran
+        // before centering).  Without this, the FragmentTreeBuilder captures
+        // stale InlineRects at the original position, causing double borders.
+        ShiftAssignedRectangles(b, dx);
+    }
+
+    private static void ShiftDescendantBoxes(CssBox parent, double dx)
+    {
+        foreach (var child in parent.Boxes)
+        {
+            child.Location = new PointF((float)(child.Location.X + dx), child.Location.Y);
+
+            // Shift rectangles already assigned to this child.
+            ShiftAssignedRectangles(child, dx);
+
+            ShiftDescendantBoxes(child, dx);
+        }
+
+        // Shift words and rectangles within this box's own line boxes.
+        foreach (var lineBox in parent.LineBoxes)
+        {
+            foreach (var word in lineBox.Words)
+                word.Left += dx;
+
+            foreach (var key in ToList(lineBox.Rectangles.Keys))
+            {
+                var r = lineBox.Rectangles[key];
+                lineBox.Rectangles[key] = new RectangleF((float)(r.X + dx), r.Y, r.Width, r.Height);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Shifts all per-line-box rectangles that have been assigned to a box
+    /// (via <see cref="CssLineBox.AssignRectanglesToBoxes"/>) by <paramref name="dx"/>
+    /// pixels horizontally.
+    /// </summary>
+    private static void ShiftAssignedRectangles(CssBox box, double dx)
+    {
+        if (box.Rectangles.Count == 0)
+            return;
+
+        foreach (var key in ToList(box.Rectangles.Keys))
+        {
+            var r = box.Rectangles[key];
+            box.Rectangles[key] = new RectangleF((float)(r.X + dx), r.Y, r.Width, r.Height);
         }
     }
 

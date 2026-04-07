@@ -105,9 +105,36 @@ internal class CssBox : CssBoxProperties, IDisposable
     public override bool AvoidGeometryAntialias => ContainerInt?.AvoidGeometryAntialias ?? false;
 
     public bool IsBrElement => HtmlTag != null && HtmlTag.Name.Equals("br", StringComparison.InvariantCultureIgnoreCase);
-    public bool IsInline => (Display == CssConstants.Inline || Display == CssConstants.InlineBlock) && !IsBrElement;
-    public bool IsBlock => Display == CssConstants.Block;
-    public virtual bool IsClickable => HtmlTag != null && HtmlTag.Name == HtmlConstants.A && !HtmlTag.HasAttribute("id");
+    public bool IsInline => (Display == CssConstants.Inline || Display == CssConstants.InlineBlock
+        || Display == "inline-flex" || Display == "inline-grid") && !IsBrElement;
+    public bool IsBlock => Display == CssConstants.Block || Display == "flex"
+        || Display == "grid";
+    public virtual bool IsClickable
+    {
+        get
+        {
+            if (HtmlTag == null)
+                return false;
+
+            // <a> links (without only an id anchor)
+            if (HtmlTag.Name == HtmlConstants.A && !HtmlTag.HasAttribute("id"))
+                return true;
+
+            // <button> elements
+            if (HtmlTag.Name.Equals("button", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // <input type="submit|button|reset"> elements
+            if (HtmlTag.Name.Equals("input", StringComparison.OrdinalIgnoreCase))
+            {
+                var inputType = HtmlTag.TryGetAttribute("type")?.ToLowerInvariant() ?? "text";
+                if (inputType is "submit" or "button" or "reset")
+                    return true;
+            }
+
+            return false;
+        }
+    }
 
     public virtual bool IsFixed
     {
@@ -144,8 +171,21 @@ internal class CssBox : CssBoxProperties, IDisposable
 
             var box = ParentBox;
 
-            while (!box.IsBlock && box.Display != CssConstants.ListItem && box.Display != CssConstants.Table &&
-                   box.Display != CssConstants.TableCell && box.ParentBox != null)
+            // CSS2.1 §10.1: The containing block for a box is the nearest
+            // ancestor that is a block container.  Block containers include:
+            //   - block-level boxes (display:block, flex, grid)
+            //   - inline-block boxes (display:inline-block)
+            //   - list-item boxes
+            //   - table cells (display:table-cell)
+            //   - table boxes (display:table)
+            // Inline-block establishes a BFC (§9.4.1), so its block-level
+            // children must use it as their containing block.
+            while (!box.IsBlock
+                   && box.Display != CssConstants.InlineBlock
+                   && box.Display != CssConstants.ListItem
+                   && box.Display != CssConstants.Table
+                   && box.Display != CssConstants.TableCell
+                   && box.ParentBox != null)
             {
                 box = box.ParentBox;
             }
@@ -795,6 +835,25 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
             else
             {
+                // CSS Flexbox §8.2/§8.4: Map flex alignment properties to
+                // CSS2.1 text-align so that the inline formatting context
+                // fallback (FlowInlineBlock) produces visually aligned items.
+                // This only applies when the author has not set text-align
+                // explicitly (i.e. it still has the default 'left' value).
+                if (Display is "flex" or "inline-flex" or "grid" or "inline-grid")
+                {
+                    if (JustifyContent is "center" &&
+                        TextAlign is CssConstants.Left or "start" or "")
+                    {
+                        TextAlign = CssConstants.Center;
+                    }
+                    else if (JustifyContent is "flex-end" or "end" &&
+                        TextAlign is CssConstants.Left or "start" or "")
+                    {
+                        TextAlign = CssConstants.Right;
+                    }
+                }
+
                 //If there's just inline boxes, create LineBoxes
                 if (DomUtils.ContainsInlinesOnly(this))
                 {
@@ -819,6 +878,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                     bool isBfc = Float != CssConstants.None
                         || Display == CssConstants.InlineBlock
                         || Display == CssConstants.TableCell
+                        || Display is "flex" or "inline-flex" or "grid" or "inline-grid"
                         || (Overflow != null && Overflow != CssConstants.Visible)
                         || Position == CssConstants.Absolute
                         || Position == CssConstants.Fixed;
