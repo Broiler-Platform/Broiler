@@ -72,7 +72,7 @@ internal sealed class WptTestRunner
     /// Runs a single test: renders the HTML with the Broiler stack and
     /// compares the result against a Chromium/Playwright reference image.
     /// </summary>
-    internal WptTestResult RunTest(string testPath, string referenceDir)
+    internal WptTestResult RunTest(string testPath, string referenceDir, string? wptRoot = null)
     {
         if (!File.Exists(testPath))
         {
@@ -85,14 +85,23 @@ internal sealed class WptTestRunner
         }
 
         // Derive the reference image path by mirroring the test path
-        // structure under the reference directory.
-        string relativePath = Path.GetRelativePath(
-            Path.GetDirectoryName(testPath) ?? string.Empty,
-            testPath);
+        // structure under the reference directory.  When wptRoot is
+        // provided the full sub-directory hierarchy is preserved so
+        // that tests in different directories don't collide.
+        string relativePath;
+        if (wptRoot is not null)
+        {
+            relativePath = Path.GetRelativePath(wptRoot, testPath);
+        }
+        else
+        {
+            relativePath = Path.GetFileName(testPath);
+        }
 
         // Reference images use .png extension regardless of test format.
-        string referenceName = Path.ChangeExtension(Path.GetFileName(testPath), ".png");
-        string referencePath = Path.Combine(referenceDir, referenceName);
+        string referencePath = Path.Combine(
+            referenceDir,
+            Path.ChangeExtension(relativePath, ".png"));
 
         string html;
         try
@@ -196,7 +205,7 @@ internal sealed class WptTestRunner
     {
         foreach (var testPath in DiscoverTests(wptRoot))
         {
-            yield return RunTest(testPath, referenceDir);
+            yield return RunTest(testPath, referenceDir, wptRoot);
         }
     }
 
@@ -231,19 +240,15 @@ internal sealed class WptTestRunner
             }
 
             bool isDefer = attrs.Contains("defer", StringComparison.OrdinalIgnoreCase);
-            string? scriptContent = null;
 
             // Inline script
             var content = match.Groups["content"].Value.Trim();
-            if (!string.IsNullOrEmpty(content))
-                scriptContent = content;
-
-            if (scriptContent == null) continue;
+            if (string.IsNullOrEmpty(content)) continue;
 
             if (isDefer)
-                deferredScripts.Add(scriptContent);
+                deferredScripts.Add(content);
             else
-                scripts.Add(scriptContent);
+                scripts.Add(content);
         }
 
         if (scripts.Count == 0 && deferredScripts.Count == 0)
