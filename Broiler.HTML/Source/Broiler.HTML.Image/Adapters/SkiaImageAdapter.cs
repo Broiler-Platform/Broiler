@@ -170,8 +170,101 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     protected override RImage ImageFromStreamInt(Stream memoryStream)
     {
-        var bitmap = SKBitmap.Decode(memoryStream);
+        // Read the stream into a byte array so we can inspect the content
+        // before attempting a bitmap decode.  SKBitmap.Decode silently
+        // returns null for formats it cannot handle (e.g. SVG).
+        byte[] data;
+        if (memoryStream is MemoryStream ms)
+        {
+            data = ms.ToArray();
+        }
+        else if (memoryStream.CanSeek)
+        {
+            data = new byte[memoryStream.Length - memoryStream.Position];
+            _ = memoryStream.Read(data, 0, data.Length);
+        }
+        else
+        {
+            using var copy = new MemoryStream();
+            memoryStream.CopyTo(copy);
+            data = copy.ToArray();
+        }
+
+        if (IsSvgData(data))
+        {
+            return RasterizeSvg(data);
+        }
+
+        var bitmap = SKBitmap.Decode(data);
         return bitmap != null ? new ImageAdapter(bitmap) : null;
+    }
+
+    /// <summary>
+    /// Rasterizes SVG data to an <see cref="SKBitmap"/> using Svg.Skia.
+    /// Parses width/height/viewBox from the SVG root element to determine
+    /// output dimensions, falling back to 300×150 (the HTML default for
+    /// replaced elements with no intrinsic size).
+    /// </summary>
+    private static RImage RasterizeSvg(byte[] data)
+    {
+        var svgContent = System.Text.Encoding.UTF8.GetString(data);
+
+        using var svg = new Svg.Skia.SKSvg();
+        svg.FromSvg(svgContent);
+
+        if (svg.Picture == null)
+            return null;
+
+        // Determine output dimensions from the SKPicture cull rect,
+        // which Svg.Skia derives from width/height/viewBox attributes.
+        var bounds = svg.Picture.CullRect;
+        int width = (int)Math.Ceiling(bounds.Width);
+        int height = (int)Math.Ceiling(bounds.Height);
+
+        // Fallback: HTML spec default for replaced elements with no intrinsic size.
+        if (width <= 0) width = 300;
+        if (height <= 0) height = 150;
+
+        var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.Transparent);
+        canvas.DrawPicture(svg.Picture);
+
+        return new ImageAdapter(bitmap);
+    }
+
+    /// <summary>
+    /// Determines whether the given byte array contains SVG image data by
+    /// looking for an XML declaration (&lt;?xml) or an &lt;svg root element
+    /// within the first 1 KB of content (after skipping leading whitespace
+    /// and any UTF-8 BOM).
+    /// </summary>
+    private static bool IsSvgData(byte[] data)
+    {
+        if (data == null || data.Length < 4)
+            return false;
+
+        // Skip UTF-8 BOM if present
+        int offset = 0;
+        if (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF)
+            offset = 3;
+
+        // Skip leading whitespace
+        while (offset < data.Length && (data[offset] == ' ' || data[offset] == '\t' ||
+               data[offset] == '\r' || data[offset] == '\n'))
+            offset++;
+
+        if (offset >= data.Length)
+            return false;
+
+        // Scan the first 1 KB for SVG markers
+        int scanLength = Math.Min(data.Length, offset + 1024);
+        var header = System.Text.Encoding.UTF8.GetString(data, offset, scanLength - offset);
+
+        // Check for XML declaration followed by <svg, or a direct <svg element
+        return (header.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) &&
+               header.Contains("<svg", StringComparison.OrdinalIgnoreCase)) ||
+               header.StartsWith("<svg", StringComparison.OrdinalIgnoreCase);
     }
 
     protected override RFont CreateFontInt(string family, double size, FontStyle style)
