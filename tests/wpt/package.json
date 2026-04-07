@@ -1,0 +1,12 @@
+{
+  "name": "broiler-wpt-references",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright-based reference image generator for WPT tests",
+  "scripts": {
+    "generate": "node ../../scripts/generate-wpt-references.js"
+  },
+  "dependencies": {
+    "playwright": "1.59.1"
+  }
+}

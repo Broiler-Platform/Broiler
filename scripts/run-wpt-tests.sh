@@ -113,27 +113,55 @@ if [[ -n "$SUBSET" ]]; then
 fi
 echo ""
 
-# --- Step 2: Build Broiler.Wpt ----------------------------------------------
+# --- Step 2: Generate Chromium reference images (Playwright) -----------------
 
-echo "--- Step 2: Building Broiler.Wpt ---"
+REFERENCE_DIR="$REPO_ROOT/tests/wpt/references"
+
+echo "--- Step 2: Generating reference images with Chromium (Playwright) ---"
+
+# Install Playwright dependencies if needed.
+if command -v npx &>/dev/null; then
+    pushd "$REPO_ROOT/tests/wpt" > /dev/null
+    npm ci --ignore-scripts 2>&1 | tail -3
+    npx playwright install --with-deps chromium 2>&1 | tail -5
+    popd > /dev/null
+
+    node "$SCRIPT_DIR/generate-wpt-references.js" \
+        "$TEST_DIR" "$REFERENCE_DIR" --concurrency 8 2>&1
+    echo "  ✓ Reference images generated"
+else
+    echo "  ⚠ Node.js/npx not found — skipping reference generation"
+    echo "    Tests without references will be reported as skipped."
+fi
+echo ""
+
+# --- Step 3: Build Broiler.Wpt ----------------------------------------------
+
+echo "--- Step 3: Building Broiler.Wpt ---"
 dotnet build "$REPO_ROOT/src/Broiler.Wpt/Broiler.Wpt.csproj" \
     --configuration Release --nologo --verbosity quiet 2>&1
 echo "  ✓ Build succeeded"
 echo ""
 
-# --- Step 3: Run the WPT test suite -----------------------------------------
+# --- Step 4: Run the WPT test suite -----------------------------------------
 
-echo "--- Step 3: Running WPT tests ---"
+echo "--- Step 4: Running WPT tests ---"
 echo "  Test directory: $TEST_DIR"
 echo "  Writing results to: $LOGFILE"
 echo ""
 
 # Run Broiler.Wpt and tee output to both console and log file.
 # The tool returns exit code 1 if any tests fail, which is expected.
+# Build the reference-dir argument — only pass it if the directory exists.
+REF_ARGS=()
+if [[ -d "$REFERENCE_DIR" ]]; then
+    REF_ARGS+=(--reference-dir "$REFERENCE_DIR")
+fi
+
 set +e
 dotnet run --project "$REPO_ROOT/src/Broiler.Wpt" \
     --configuration Release --no-build -- \
-    --wpt-dir "$TEST_DIR" 2>&1 | tee "$LOGFILE"
+    --wpt-dir "$TEST_DIR" "${REF_ARGS[@]}" 2>&1 | tee "$LOGFILE"
 WPT_EXIT=$?
 set -e
 
@@ -142,7 +170,7 @@ echo "=== WPT Test Run Complete ==="
 echo "Exit code : $WPT_EXIT"
 echo "Log file  : $LOGFILE"
 
-# --- Step 4: Generate summary -----------------------------------------------
+# --- Step 5: Generate summary -----------------------------------------------
 
 echo ""
 echo "--- Summary ---"
