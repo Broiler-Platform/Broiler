@@ -66,6 +66,7 @@ fuzz-failures/
 node_modules/
 package*.json
 !tests/wpt/package.json
+!tests/wpt/package-lock.json
 *.log
 capture.png
 
@@ -73,7 +74,6 @@ capture.png
 tests/wpt/results/
 tests/wpt/checkout/
 tests/wpt/references/
-tests/wpt/package-lock.json
 
 # Pixel comparison generated reports
 acid3-report.txt

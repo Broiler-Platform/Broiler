@@ -122,7 +122,12 @@ echo "--- Step 2: Generating reference images with Chromium (Playwright) ---"
 # Install Playwright dependencies if needed.
 if command -v npx &>/dev/null; then
     pushd "$REPO_ROOT/tests/wpt" > /dev/null
-    npm ci --ignore-scripts 2>&1 | tail -10
+    if [[ -f package-lock.json ]]; then
+        npm ci --ignore-scripts 2>&1 | tail -10
+    else
+        echo "No package-lock.json found; using npm install instead of npm ci"
+        npm install --ignore-scripts 2>&1 | tail -10
+    fi
     npx playwright install --with-deps chromium 2>&1 | tail -10
     popd > /dev/null
 
