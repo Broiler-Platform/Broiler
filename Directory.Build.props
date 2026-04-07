@@ -30,7 +30,7 @@
 
       Reason  : 1,466 warnings across 20+ projects. Fixing every instance
                 would touch hundreds of files and risk breaking existing
-                behaviour.  The codebase has a mix of projects with and
+                behavior.  The codebase has a mix of projects with and
                 without <Nullable>enable</Nullable>, and many APIs pass
                 null by design.
       Future  : Incrementally enable nullable and resolve warnings on a
