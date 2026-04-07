@@ -114,6 +114,77 @@ Test
     }
 
     /// <summary>
+    /// Regression: exact WPT HTML for bgblend-root-change.html including
+    /// extreme CSS values (position: sticky, very large box-shadow, Q unit,
+    /// complex background shorthand). Must not throw.
+    /// </summary>
+    [Fact]
+    public void Bgblend_Root_Change_Exact_WPT_HTML_Does_Not_Crash()
+    {
+        // Exact CSS from the WPT file (scripts stripped — they add a MathML
+        // element on load, which Broiler does not support but must not crash).
+        var html = @"<style>
+* {
+  position: sticky;
+  border-left: double 488200679.54Q hsla(-39 5% 68% / 7%) !important;
+  box-shadow: 172vmax 60991vmax 32in 106cm hsl(-57532411.87deg, 70%, 54%);
+  background-blend-mode: overlay;
+  background: url(data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=) local content-box space space 0em / 15438983.37cm auto;
+}
+</style>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+        Assert.NotNull(bitmap);
+        Assert.True(bitmap.Width > 0);
+    }
+
+    /// <summary>
+    /// Regression: exact WPT HTML for root-element-background-contain-hidden-crash.html
+    /// including contain: layout, *:first-child selector, and object element.
+    /// Must not throw.
+    /// </summary>
+    [Fact]
+    public void Root_Element_Background_Contain_Hidden_Exact_WPT_HTML_Does_Not_Crash()
+    {
+        var html = @"<style>
+* {
+  background-color: red;
+  contain: layout;
+}
+*:first-child {
+  visibility: hidden;
+  background-image: url(data:image/gif;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAIAAABt+uBvAAAAAXNSR0IArs4c6QAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9wDGhYvCNVA1EIAAAAZdEVYdENvbW1lbnQAQ3JlYXRlZCB3aXRoIEdJTVBXgQ4XAAAAjklEQVR42u3QIQEAMAgAsHNNVspTgARY1BZh0ZWP3VcgSJAgQYIECRKEIEGCBAkSJEgQggQJEiRIkCBBCBIkSJAgQYIECUKQIEGCBAkSJAhBggQJEiRIkCAECRIkSJAgQYIEIUiQIEGCBAkShCBBggQJEiRIEIIECRIkSJAgQYIQJEiQIEGCBAlCkCBBdwaeugIthHvZ+AAAAABJRU5ErkJggg==)
+}
+</style>
+<object data=""x""></object>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+        Assert.NotNull(bitmap);
+    }
+
+    /// <summary>
+    /// Regression: exact WPT HTML for root-element-filter-background-clip-text-crash.html
+    /// including filter: sepia(1), background-clip: text, and object element.
+    /// Must not throw.
+    /// </summary>
+    [Fact]
+    public void Root_Element_Filter_BackgroundClip_Text_Exact_WPT_HTML_Does_Not_Crash()
+    {
+        var html = @"<!doctype html>
+<style>
+* {
+  filter: sepia(1);
+  background-color: rgb(179, 31, 172);
+  background-clip: text;
+}
+</style>
+<object id=""a""></object>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+        Assert.NotNull(bitmap);
+    }
+
+    /// <summary>
     /// WPT: css/compositing/root-element-filter.html
     /// A test with filter: invert(1) on the root element.
     /// The root background (#000) should be inverted to white.

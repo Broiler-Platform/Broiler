@@ -49,6 +49,32 @@ internal sealed class WptTestRunner
     };
 
     /// <summary>
+    /// Determines whether a test file is a WPT "crash test".
+    /// Crash tests only verify that the renderer does not crash; no pixel
+    /// comparison is performed.  A test is considered a crash test if:
+    /// <list type="bullet">
+    ///   <item>It resides under a <c>crashtests</c> directory, or</item>
+    ///   <item>Its file name (without extension) ends with <c>-crash</c>.</item>
+    /// </list>
+    /// </summary>
+    internal static bool IsCrashTest(string testPath)
+    {
+        // Normalize separators so the check works on all platforms.
+        string normalized = testPath.Replace('\\', '/');
+
+        // Check for a "crashtests" path segment.
+        if (normalized.Contains("/crashtests/", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Check for a "-crash" suffix in the file name (before the extension).
+        string nameWithoutExt = Path.GetFileNameWithoutExtension(testPath);
+        if (nameWithoutExt.EndsWith("-crash", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
     /// Regex to extract inline and external <c>&lt;script&gt;</c> blocks.
     /// Mirrors the pattern used by <see cref="Broiler.Cli.CaptureService"/>.
     /// </summary>
@@ -161,6 +187,18 @@ internal sealed class WptTestRunner
 
         using (rendered)
         {
+            // WPT crash tests only verify the renderer doesn't crash.
+            // If rendering succeeded, the test passes — skip pixel comparison.
+            if (IsCrashTest(testPath))
+            {
+                return new WptTestResult
+                {
+                    TestPath = testPath,
+                    Passed = true,
+                    Message = "Crash test: rendering completed without error.",
+                };
+            }
+
             // If no reference image exists, the test is skipped.
             if (!File.Exists(referencePath))
             {

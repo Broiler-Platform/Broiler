@@ -247,4 +247,66 @@ document.getElementById('out').appendChild(p);
         var exitCode = Program.Main(["--help"]);
         Assert.Equal(0, exitCode);
     }
+
+    // ──────────── Crash test detection ──────────────────────────────────
+
+    [Theory]
+    [InlineData("/wpt/css/compositing/background-blending/crashtests/bgblend-root-change.html", true)]
+    [InlineData("/wpt/css/compositing/root-element-background-contain-hidden-crash.html", true)]
+    [InlineData("/wpt/css/compositing/root-element-filter-background-clip-text-crash.html", true)]
+    [InlineData("/wpt/css/compositing/root-element-opacity.html", false)]
+    [InlineData("/wpt/css/compositing/mix-blend-mode/mix-blend-mode-root-element-group.html", false)]
+    [InlineData("C:\\wpt\\crashtests\\test.html", true)]
+    [InlineData("/wpt/css/some-crash.htm", true)]
+    [InlineData("/wpt/css/crash-not-suffix.html", false)]
+    public void IsCrashTest_Detects_Crash_Tests(string path, bool expected)
+    {
+        Assert.Equal(expected, WptTestRunner.IsCrashTest(path));
+    }
+
+    [Fact]
+    public void RunTest_CrashTest_Passes_Without_Reference_Image()
+    {
+        // Arrange — crash test file in a "crashtests" directory.
+        var crashDir = Path.Combine(_tempDir, "crashtests");
+        Directory.CreateDirectory(crashDir);
+
+        var testFile = Path.Combine(crashDir, "simple-crash.html");
+        File.WriteAllText(testFile, @"<!DOCTYPE html>
+<html><body><p>Crash test</p></body></html>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner();
+
+        // Act
+        var result = runner.RunTest(testFile, refDir);
+
+        // Assert — crash test passes because rendering didn't throw.
+        Assert.True(result.Passed);
+        Assert.False(result.Skipped);
+        Assert.Contains("Crash test", result.Message);
+    }
+
+    [Fact]
+    public void RunTest_CrashTest_By_Filename_Suffix_Passes()
+    {
+        // Arrange — file name ends with "-crash".
+        var testFile = Path.Combine(_tempDir, "my-test-crash.html");
+        File.WriteAllText(testFile, @"<!DOCTYPE html>
+<html><body><div style=""background-color: red"">Test</div></body></html>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner();
+
+        // Act
+        var result = runner.RunTest(testFile, refDir);
+
+        // Assert — crash test passes without pixel comparison.
+        Assert.True(result.Passed);
+        Assert.False(result.Skipped);
+    }
 }
