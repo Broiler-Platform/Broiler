@@ -73,6 +73,11 @@ internal static class PaintWalker
             }
 
             Color finalBg = CompositOverWhite(canvasBg, rootOpacity);
+
+            // CSS Filter Effects §8: When the root element has filter: invert(N),
+            // the filter applies to the canvas background.
+            finalBg = ApplyRootFilter(htmlFragment, finalBg);
+
             items.Add(new FillRectItem { Bounds = viewport, Color = finalBg });
             return source;
         }
@@ -98,6 +103,52 @@ internal static class PaintWalker
             Math.Clamp(r, 0, 255),
             Math.Clamp(g, 0, 255),
             Math.Clamp(b, 0, 255));
+    }
+
+    /// <summary>
+    /// Applies CSS filter functions on the root/html fragment to the canvas background color.
+    /// Currently supports <c>invert()</c>; other filter functions are silently ignored.
+    /// </summary>
+    private static Color ApplyRootFilter(Fragment? htmlFragment, Color color)
+    {
+        if (htmlFragment == null) return color;
+
+        string? filter = htmlFragment.Style.Filter;
+        if (string.IsNullOrEmpty(filter) || filter == "none") return color;
+
+        // Parse invert(N) where N is 0..1 (or 0%..100%)
+        var invertMatch = System.Text.RegularExpressions.Regex.Match(filter, @"invert\(\s*([^)]+)\s*\)");
+        if (invertMatch.Success)
+        {
+            string valStr = invertMatch.Groups[1].Value.Trim();
+            float amount = 1f;
+            if (valStr.EndsWith("%"))
+            {
+                if (float.TryParse(valStr.AsSpan(0, valStr.Length - 1),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var pct))
+                    amount = pct / 100f;
+            }
+            else if (float.TryParse(valStr,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var val))
+            {
+                amount = val;
+            }
+            amount = Math.Clamp(amount, 0f, 1f);
+
+            // invert(amount): result = value × (1 - amount) + (255 - value) × amount
+            int r = (int)Math.Round(color.R * (1 - amount) + (255 - color.R) * amount);
+            int g = (int)Math.Round(color.G * (1 - amount) + (255 - color.G) * amount);
+            int b = (int)Math.Round(color.B * (1 - amount) + (255 - color.B) * amount);
+
+            return Color.FromArgb(color.A,
+                Math.Clamp(r, 0, 255),
+                Math.Clamp(g, 0, 255),
+                Math.Clamp(b, 0, 255));
+        }
+
+        return color;
     }
 
     /// <summary>
@@ -164,11 +215,15 @@ internal static class PaintWalker
 
         // CSS3: opacity: 0 means fully transparent — skip the entire
         // stacking context (element and all descendants).
+        float fragmentOpacity = 1f;
         if (style.Opacity != null
-            && double.TryParse(style.Opacity, System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var parsedOpacity)
-            && parsedOpacity <= 0.0)
-            return;
+            && float.TryParse(style.Opacity, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var parsedOpacity))
+        {
+            if (parsedOpacity <= 0.0f)
+                return;
+            fragmentOpacity = Math.Clamp(parsedOpacity, 0f, 1f);
+        }
 
         var bounds = fragment.Bounds;
 
@@ -178,6 +233,16 @@ internal static class PaintWalker
             bool hasContent = fragment.Lines != null && fragment.Lines.Count > 0;
             if (!hasContent && fragment.Children.Count == 0)
                 return;
+        }
+
+        // CSS3: 0 < opacity < 1 creates a compositing group — all
+        // descendant content is rendered into a separate layer, then
+        // composited back at the specified opacity.
+        // Note: fragmentOpacity is already clamped to [0,1] above.
+        bool hasOpacity = fragmentOpacity < 1f;
+        if (hasOpacity)
+        {
+            items.Add(new OpacityItem { Bounds = bounds, Opacity = fragmentOpacity });
         }
 
         // Overflow clipping — CSS2.1 §11.1.1: clip at the padding edge of the box
@@ -223,6 +288,10 @@ internal static class PaintWalker
         // Restore clip
         if (clipped)
             items.Add(new RestoreItem { Bounds = bounds });
+
+        // Restore opacity layer (must come after clip restore)
+        if (hasOpacity)
+            items.Add(new RestoreOpacityItem { Bounds = bounds });
     }
 
     private static void EmitBackground(Fragment fragment, List<DisplayItem> items)
@@ -1108,6 +1177,8 @@ internal static class PaintWalker
             },
             ClipItem c => new ClipItem { Bounds = ob, ClipRect = OffsetRect(c.ClipRect, dx, dy) },
             RestoreItem => new RestoreItem { Bounds = ob },
+            OpacityItem o => new OpacityItem { Bounds = ob, Opacity = o.Opacity },
+            RestoreOpacityItem => new RestoreOpacityItem { Bounds = ob },
             DrawLineItem l => new DrawLineItem
             {
                 Bounds = ob,
