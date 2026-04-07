@@ -1,0 +1,49 @@
+name: WPT Tests
+on:
+  workflow_dispatch:
+    inputs:
+      subset:
+        description: 'WPT subset to test (e.g. "css/css-flexbox", leave empty for all)'
+        required: false
+        default: ''
+permissions:
+  contents: read
+jobs:
+  wpt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Run WPT tests
+        run: |
+          ARGS=()
+          if [ -n "${{ github.event.inputs.subset }}" ]; then
+            ARGS+=(--subset "${{ github.event.inputs.subset }}")
+          fi
+          bash scripts/run-wpt-tests.sh "${ARGS[@]}" || true
+
+      - name: Print summary
+        if: always()
+        run: |
+          SUMMARY="tests/wpt/results/wpt-summary.txt"
+          if [ -f "$SUMMARY" ]; then
+            echo "### WPT Test Summary" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat "$SUMMARY"
+          else
+            echo "No summary file found."
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wpt-results
+          path: |
+            tests/wpt/results/wpt-results.log
+            tests/wpt/results/wpt-summary.txt
