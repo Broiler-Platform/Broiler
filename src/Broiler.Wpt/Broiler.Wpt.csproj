@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Broiler.Wpt</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.Wpt.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Image\Broiler.HTML.Image.csproj" />
+    <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML\Broiler.HTML.csproj" />
+    <!-- Meta-package includes Core + all satellite assemblies (Clr, Compiler, Modules, BuiltIns, Debugger) -->
+    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />
+    <!-- Bridge component connecting HTML rendering with JavaScript execution -->
+    <ProjectReference Include="..\Broiler.HtmlBridge\Broiler.HtmlBridge.csproj" />
+  </ItemGroup>
+
+</Project>
