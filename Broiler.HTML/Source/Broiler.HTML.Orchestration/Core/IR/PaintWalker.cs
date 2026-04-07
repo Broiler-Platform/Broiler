@@ -245,6 +245,15 @@ internal static class PaintWalker
             items.Add(new OpacityItem { Bounds = bounds, Opacity = fragmentOpacity });
         }
 
+        // CSS Compositing §3: mix-blend-mode creates a compositing layer
+        // that blends with the backdrop using the specified blend mode.
+        bool hasBlendMode = !string.IsNullOrEmpty(style.MixBlendMode)
+            && !style.MixBlendMode.Equals("normal", StringComparison.OrdinalIgnoreCase);
+        if (hasBlendMode)
+        {
+            items.Add(new BlendModeItem { Bounds = bounds, Mode = style.MixBlendMode });
+        }
+
         // Overflow clipping — CSS2.1 §11.1.1: clip at the padding edge of the box
         bool clipped = false;
         if (style.Overflow == "hidden")
@@ -289,7 +298,11 @@ internal static class PaintWalker
         if (clipped)
             items.Add(new RestoreItem { Bounds = bounds });
 
-        // Restore opacity layer (must come after clip restore)
+        // Restore blend mode layer (must come after clip restore, before opacity restore)
+        if (hasBlendMode)
+            items.Add(new RestoreBlendModeItem { Bounds = bounds });
+
+        // Restore opacity layer (must come after clip and blend mode restore)
         if (hasOpacity)
             items.Add(new RestoreOpacityItem { Bounds = bounds });
     }
@@ -1179,6 +1192,8 @@ internal static class PaintWalker
             RestoreItem => new RestoreItem { Bounds = ob },
             OpacityItem o => new OpacityItem { Bounds = ob, Opacity = o.Opacity },
             RestoreOpacityItem => new RestoreOpacityItem { Bounds = ob },
+            BlendModeItem bm => new BlendModeItem { Bounds = ob, Mode = bm.Mode },
+            RestoreBlendModeItem => new RestoreBlendModeItem { Bounds = ob },
             DrawLineItem l => new DrawLineItem
             {
                 Bounds = ob,

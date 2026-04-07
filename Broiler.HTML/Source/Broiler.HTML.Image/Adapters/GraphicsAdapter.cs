@@ -149,6 +149,38 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
         canvas.Restore();
     }
 
+    public override void SaveBlendLayer(string blendMode)
+    {
+        var skBlendMode = blendMode?.ToLowerInvariant() switch
+        {
+            "multiply" => SKBlendMode.Multiply,
+            "screen" => SKBlendMode.Screen,
+            "overlay" => SKBlendMode.Overlay,
+            "darken" => SKBlendMode.Darken,
+            "lighten" => SKBlendMode.Lighten,
+            "color-dodge" => SKBlendMode.ColorDodge,
+            "color-burn" => SKBlendMode.ColorBurn,
+            "hard-light" => SKBlendMode.HardLight,
+            "soft-light" => SKBlendMode.SoftLight,
+            "difference" => SKBlendMode.Difference,
+            "exclusion" => SKBlendMode.Exclusion,
+            "hue" => SKBlendMode.Hue,
+            "saturation" => SKBlendMode.Saturation,
+            "color" => SKBlendMode.Color,
+            "luminosity" => SKBlendMode.Luminosity,
+            "plus-lighter" => SKBlendMode.Plus,
+            _ => SKBlendMode.SrcOver, // "normal"
+        };
+
+        using var paint = new SKPaint { BlendMode = skBlendMode };
+        canvas.SaveLayer(paint);
+    }
+
+    public override void RestoreBlendLayer()
+    {
+        canvas.Restore();
+    }
+
     public override void Dispose()
     {
         if (dispose)

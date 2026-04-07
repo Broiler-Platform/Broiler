@@ -55,5 +55,18 @@ public abstract class RGraphics : IDisposable
     /// </summary>
     public virtual void RestoreOpacityLayer() { }
 
+    /// <summary>
+    /// Saves the canvas state and begins a new compositing layer with the given CSS blend mode.
+    /// All drawing operations until <see cref="RestoreBlendLayer"/> are composited using
+    /// the specified blend mode. Default implementation is a no-op.
+    /// </summary>
+    public virtual void SaveBlendLayer(string blendMode) { }
+
+    /// <summary>
+    /// Restores the canvas state from a previous <see cref="SaveBlendLayer"/> call.
+    /// Default is a no-op.
+    /// </summary>
+    public virtual void RestoreBlendLayer() { }
+
     public abstract void Dispose();
 }

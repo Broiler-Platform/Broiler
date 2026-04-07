@@ -590,4 +590,134 @@ div { filter: blur(5px); width: 100px; height: 100px; background: red; }
         using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
         Assert.NotNull(bitmap);
     }
+
+    // ──────────── Pixel-level blend mode verification ─────────────────────
+
+    /// <summary>
+    /// Verifies that mix-blend-mode: difference actually produces blended
+    /// pixels. Red (#FF0000) over yellow (#FFFF00) with blend mode
+    /// 'difference' should produce (|FF-FF|, |00-FF|, |00-00|) = (0, FF, 0)
+    /// i.e. green output, not just the unblended foreground color.
+    /// </summary>
+    [Fact]
+    public void MixBlendMode_Difference_Produces_Blended_Output()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head><style>
+body { margin: 0; }
+.parent { width: 100px; height: 100px; background: #FFFF00; }
+.child { width: 100px; height: 100px; background: #FF0000; mix-blend-mode: difference; }
+</style></head>
+<body>
+<div class=""parent"">
+  <div class=""child""></div>
+</div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        Assert.NotNull(bitmap);
+
+        // Sample center of the overlapping region
+        var pixel = bitmap.GetPixel(50, 50);
+        // Difference of red (#FF0000) on yellow (#FFFF00):
+        // R: abs(FF-FF) = 0, G: abs(00-FF) = FF, B: abs(00-00) = 0 → green
+        Assert.True(pixel.Red < 30, $"Expected near-zero red but got {pixel.Red}");
+        Assert.True(pixel.Green > 200, $"Expected high green but got {pixel.Green}");
+        Assert.True(pixel.Blue < 30, $"Expected near-zero blue but got {pixel.Blue}");
+    }
+
+    /// <summary>
+    /// Verifies that mix-blend-mode: multiply produces darker output.
+    /// A white (#FFFFFF) element with multiply over green (#00FF00) should
+    /// remain green (white * green = green). A gray element should produce
+    /// darker green.
+    /// </summary>
+    [Fact]
+    public void MixBlendMode_Multiply_Produces_Darker_Output()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head><style>
+body { margin: 0; }
+.parent { width: 100px; height: 100px; background: #00FF00; }
+.child { width: 100px; height: 100px; background: #808080; mix-blend-mode: multiply; }
+</style></head>
+<body>
+<div class=""parent"">
+  <div class=""child""></div>
+</div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        Assert.NotNull(bitmap);
+
+        var pixel = bitmap.GetPixel(50, 50);
+        // Multiply: green * gray → darker green
+        // R: (0x00 * 0x80) / 255 ≈ 0, G: (0xFF * 0x80) / 255 ≈ 0x80, B: 0
+        Assert.True(pixel.Red < 20, $"Expected near-zero red but got {pixel.Red}");
+        Assert.True(pixel.Green > 100 && pixel.Green < 180,
+            $"Expected green around 128 (multiply) but got {pixel.Green}");
+        Assert.True(pixel.Blue < 20, $"Expected near-zero blue but got {pixel.Blue}");
+    }
+
+    /// <summary>
+    /// Verifies that mix-blend-mode: screen produces lighter output.
+    /// Screen blending of blue (#0000FF) over red (#FF0000) should
+    /// produce magenta (FF, 00, FF).
+    /// </summary>
+    [Fact]
+    public void MixBlendMode_Screen_Produces_Lighter_Output()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head><style>
+body { margin: 0; }
+.parent { width: 100px; height: 100px; background: #FF0000; }
+.child { width: 100px; height: 100px; background: #0000FF; mix-blend-mode: screen; }
+</style></head>
+<body>
+<div class=""parent"">
+  <div class=""child""></div>
+</div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        Assert.NotNull(bitmap);
+
+        var pixel = bitmap.GetPixel(50, 50);
+        // Screen: R: FF+00 - FF*00/255 = FF, G: 0, B: 00+FF - 00*FF/255 = FF → magenta
+        Assert.True(pixel.Red > 200, $"Expected high red but got {pixel.Red}");
+        Assert.True(pixel.Green < 30, $"Expected near-zero green but got {pixel.Green}");
+        Assert.True(pixel.Blue > 200, $"Expected high blue but got {pixel.Blue}");
+    }
+
+    /// <summary>
+    /// Verifies that mix-blend-mode: overlay on the rotated-clip test
+    /// produces the expected lime-colored output (overlay of red on lime
+    /// results in lime because the backdrop is > 0.5 in the green channel).
+    /// </summary>
+    [Fact]
+    public void MixBlendMode_Overlay_Rotated_Clip_Produces_Green()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>div { width: 100px; height: 100px; }</style>
+</head><body style=""margin:0"">
+<div style=""background: lime; overflow: hidden"">
+  <div>
+    <div style=""background: lime; overflow: hidden"">
+      <div style=""background: red; mix-blend-mode: overlay""></div>
+    </div>
+  </div>
+</div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+        Assert.NotNull(bitmap);
+
+        var pixel = bitmap.GetPixel(50, 50);
+        // Overlay of red (#FF0000) on lime (#00FF00):
+        // The green channel of lime is > 0.5, so overlay uses screen formula for G.
+        // Result should have a green component (not pure red).
+        Assert.True(pixel.Green > 100,
+            $"Expected green channel present after overlay blending but got G={pixel.Green}");
+    }
 }

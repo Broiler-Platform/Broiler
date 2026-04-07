@@ -66,6 +66,12 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                 case RestoreOpacityItem:
                     g.RestoreOpacityLayer();
                     break;
+                case BlendModeItem blendItem:
+                    g.SaveBlendLayer(blendItem.Mode);
+                    break;
+                case RestoreBlendModeItem:
+                    g.RestoreBlendLayer();
+                    break;
             }
         }
     }

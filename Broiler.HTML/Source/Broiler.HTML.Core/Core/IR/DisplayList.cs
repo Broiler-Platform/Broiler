@@ -36,6 +36,8 @@ public sealed class DisplayList
 [JsonDerivedType(typeof(DrawSvgEllipseItem), "DrawSvgEllipse")]
 [JsonDerivedType(typeof(DrawSvgTextItem), "DrawSvgText")]
 [JsonDerivedType(typeof(DrawSvgLineItem), "DrawSvgLine")]
+[JsonDerivedType(typeof(BlendModeItem), "BlendMode")]
+[JsonDerivedType(typeof(RestoreBlendModeItem), "RestoreBlendMode")]
 public abstract class DisplayItem
 {
     public RectangleF Bounds { get; init; }
@@ -135,6 +137,16 @@ public sealed class OpacityItem : DisplayItem
 
 /// <summary>Restores from an opacity layer pushed by <see cref="OpacityItem"/>.</summary>
 public sealed class RestoreOpacityItem : DisplayItem { }
+
+/// <summary>Begins a compositing layer with the specified CSS blend mode.</summary>
+public sealed class BlendModeItem : DisplayItem
+{
+    /// <summary>CSS mix-blend-mode value (e.g. "multiply", "screen", "overlay").</summary>
+    public string Mode { get; init; } = "normal";
+}
+
+/// <summary>Restores from a blend mode layer pushed by <see cref="BlendModeItem"/>.</summary>
+public sealed class RestoreBlendModeItem : DisplayItem { }
 
 /// <summary>Draws a line between two points (Phase 3).</summary>
 public sealed class DrawLineItem : DisplayItem
