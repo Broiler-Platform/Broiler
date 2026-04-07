@@ -118,9 +118,13 @@ function ensureDir(filePath) {
                     timeout: PAGE_LOAD_TIMEOUT,
                 });
                 await page.screenshot({ path: outPath, fullPage: false });
-            } catch {
-                // Silently skip files that fail to render — they will be
+            } catch (err) {
+                // Log the failure path for diagnostics; the file will be
                 // reported as "skipped" by the Broiler.Wpt runner.
+                if (errors === 0 || errors % 100 === 0) {
+                    const rel = path.relative(testDir, testFile);
+                    console.error(`  ⚠ Failed: ${rel}: ${err.message || err}`);
+                }
                 errors++;
             }
 

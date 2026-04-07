@@ -122,8 +122,8 @@ echo "--- Step 2: Generating reference images with Chromium (Playwright) ---"
 # Install Playwright dependencies if needed.
 if command -v npx &>/dev/null; then
     pushd "$REPO_ROOT/tests/wpt" > /dev/null
-    npm ci --ignore-scripts 2>&1 | tail -3
-    npx playwright install --with-deps chromium 2>&1 | tail -5
+    npm ci --ignore-scripts 2>&1 | tail -10
+    npx playwright install --with-deps chromium 2>&1 | tail -10
     popd > /dev/null
 
     node "$SCRIPT_DIR/generate-wpt-references.js" \
