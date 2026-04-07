@@ -136,8 +136,11 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
 
     public override void SaveOpacityLayer(float opacity)
     {
+        // SkiaSharp SaveLayer uses only the alpha channel of the paint's
+        // color to modulate the layer during compositing; RGB values are
+        // irrelevant when no shader/color-filter is applied.
         byte alpha = (byte)Math.Clamp((int)(opacity * 255), 0, 255);
-        using var paint = new SKPaint { Color = new SKColor(255, 255, 255, alpha) };
+        using var paint = new SKPaint { Color = new SKColor(0, 0, 0, alpha) };
         canvas.SaveLayer(paint);
     }
 

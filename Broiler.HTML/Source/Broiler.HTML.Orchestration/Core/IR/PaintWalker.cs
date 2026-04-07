@@ -238,6 +238,7 @@ internal static class PaintWalker
         // CSS3: 0 < opacity < 1 creates a compositing group — all
         // descendant content is rendered into a separate layer, then
         // composited back at the specified opacity.
+        // Note: fragmentOpacity is already clamped to [0,1] above.
         bool hasOpacity = fragmentOpacity < 1f;
         if (hasOpacity)
         {
