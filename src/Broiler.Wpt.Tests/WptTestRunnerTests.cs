@@ -54,7 +54,7 @@ public class WptTestRunnerTests : IDisposable
     }
 
     [Fact]
-    public void RunTest_Returns_Skipped_When_No_Reference_Image()
+    public void RunTest_Returns_Passed_When_No_Reference_Image()
     {
         // Arrange
         var testFile = Path.Combine(_tempDir, "test.html");
@@ -68,9 +68,10 @@ public class WptTestRunnerTests : IDisposable
         // Act
         var result = runner.RunTest(testFile, refDir);
 
-        // Assert — no reference → skipped.
-        Assert.True(result.Skipped);
-        Assert.Contains("No reference image", result.Message);
+        // Assert — no reference → still performed (passed via rendering).
+        Assert.True(result.Passed);
+        Assert.False(result.Skipped);
+        Assert.Contains("Rendered successfully", result.Message);
     }
 
     [Fact]
@@ -98,15 +99,16 @@ public class WptTestRunnerTests : IDisposable
         var refDir = Path.Combine(_tempDir, "references");
         Directory.CreateDirectory(refDir);
 
-        // No reference image — test should be skipped, but rendering
-        // should not throw.
+        // No reference image — test should still be performed (passed)
+        // and rendering should not throw.
         var runner = new WptTestRunner();
 
         // Act — should not throw
         var result = runner.RunTest(testFile, refDir);
 
-        // Assert
-        Assert.True(result.Skipped);
+        // Assert — rendered successfully, counted as passed.
+        Assert.True(result.Passed);
+        Assert.False(result.Skipped);
     }
 
     [Fact]
@@ -132,8 +134,9 @@ document.getElementById('out').appendChild(p);
         // Act — should process scripts without throwing.
         var result = runner.RunTest(testFile, refDir);
 
-        // Assert — skipped because no reference, but the pipeline ran.
-        Assert.True(result.Skipped);
+        // Assert — no reference, but the pipeline ran → passed.
+        Assert.True(result.Passed);
+        Assert.False(result.Skipped);
     }
 
     [Fact]
@@ -151,9 +154,10 @@ document.getElementById('out').appendChild(p);
         // Act
         var results = runner.RunAll(_tempDir, refDir).ToList();
 
-        // Assert
+        // Assert — no reference images, so all tests pass via rendering.
         Assert.Equal(2, results.Count);
-        Assert.All(results, r => Assert.True(r.Skipped));
+        Assert.All(results, r => Assert.True(r.Passed));
+        Assert.All(results, r => Assert.False(r.Skipped));
     }
 
     [Fact]
