@@ -192,13 +192,45 @@ internal sealed class SkiaImageAdapter : RAdapter
 
         if (IsSvgData(data))
         {
-            throw new NotSupportedException(
-                "SVG images cannot be decoded by SkBitmap.Decode. " +
-                "Use an SVG-capable renderer (e.g. SkiaSharp.Extended.Svg) or convert the SVG to a raster format before loading.");
+            return RasterizeSvg(data);
         }
 
         var bitmap = SKBitmap.Decode(data);
         return bitmap != null ? new ImageAdapter(bitmap) : null;
+    }
+
+    /// <summary>
+    /// Rasterizes SVG data to an <see cref="SKBitmap"/> using Svg.Skia.
+    /// Parses width/height/viewBox from the SVG root element to determine
+    /// output dimensions, falling back to 300×150 (the HTML default for
+    /// replaced elements with no intrinsic size).
+    /// </summary>
+    private static RImage RasterizeSvg(byte[] data)
+    {
+        var svgContent = System.Text.Encoding.UTF8.GetString(data);
+
+        using var svg = new Svg.Skia.SKSvg();
+        svg.FromSvg(svgContent);
+
+        if (svg.Picture == null)
+            return null;
+
+        // Determine output dimensions from the SKPicture cull rect,
+        // which Svg.Skia derives from width/height/viewBox attributes.
+        var bounds = svg.Picture.CullRect;
+        int width = (int)Math.Ceiling(bounds.Width);
+        int height = (int)Math.Ceiling(bounds.Height);
+
+        // Fallback: HTML spec default for replaced elements with no intrinsic size.
+        if (width <= 0) width = 300;
+        if (height <= 0) height = 150;
+
+        var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.Transparent);
+        canvas.DrawPicture(svg.Picture);
+
+        return new ImageAdapter(bitmap);
     }
 
     /// <summary>

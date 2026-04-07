@@ -1,15 +1,16 @@
 using System;
 using System.IO;
 using Broiler.HtmlBridge;
+using SkiaSharp;
 using RenderImageFormat = Broiler.HtmlBridge.ImageFormat;
 
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// Tests for SVG image detection and handling.
+/// Tests for SVG image detection and rendering.
 /// Verifies that SVG data is properly detected by <see cref="ImageDecoder.DetectFormatFromBytes"/>
-/// and that <c>SkiaImageAdapter.ImageFromStreamInt</c> throws a meaningful
-/// <see cref="NotSupportedException"/> for SVG input instead of silently returning null.
+/// and that <c>SkiaImageAdapter.ImageFromStreamInt</c> rasterizes SVG input to a bitmap
+/// via Svg.Skia instead of silently returning null.
 /// </summary>
 public class SvgImageRenderingTests
 {
@@ -79,29 +80,86 @@ public class SvgImageRenderingTests
         Assert.Equal(RenderImageFormat.Svg, ImageDecoder.DetectFormat("data:image/svg+xml;base64,PHN2Zw=="));
     }
 
-    // ────────────────────── SkiaImageAdapter SVG rejection ──────────────────────
+    // ────────────────────── SVG rasterization via Svg.Skia ──────────────────────
 
     [Fact]
-    public void HtmlRender_SvgImage_Throws_NotSupportedException()
+    public void HtmlRender_SvgImage_Is_Rendered_As_Bitmap()
     {
-        // Construct an HTML page with an <img> whose src is a data-URI SVG.
-        // The rendering engine will attempt to decode the image via
-        // SkiaImageAdapter.ImageFromStreamInt, which should throw
-        // NotSupportedException for SVG data.  The error is caught by
-        // ImageLoadHandler and reported — so the render completes without
-        // crashing, but the image is not displayed.
+        // A red 50×50 SVG as a data-URI.  The rendering engine should
+        // rasterize it via Svg.Skia and display it in the output bitmap.
         var svgDataUri = "data:image/svg+xml;base64," +
             Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
-                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"50\" height=\"50\"><rect fill=\"red\" width=\"50\" height=\"50\"/></svg>"));
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"50\" height=\"50\">" +
+                "<rect fill=\"red\" width=\"50\" height=\"50\"/></svg>"));
 
-        var html = $@"<!DOCTYPE html><html><body><img src=""{svgDataUri}"" width=""50"" height=""50""/></body></html>";
+        var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
+                   $@"<img src=""{svgDataUri}"" width=""50"" height=""50""/></body></html>";
 
-        // The render should complete without throwing — the exception is
-        // handled internally and the image simply isn't shown.
         using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(200, bitmap.Width);
         Assert.Equal(200, bitmap.Height);
+
+        // The top-left area (where the 50×50 red SVG should be) must
+        // contain red pixels — proving the SVG was rasterized.
+        var pixel = bitmap.GetPixel(10, 10);
+        Assert.True(pixel.Red > 200, $"Expected red channel > 200, got {pixel.Red}");
+        Assert.True(pixel.Green < 50, $"Expected green channel < 50, got {pixel.Green}");
+        Assert.True(pixel.Blue < 50, $"Expected blue channel < 50, got {pixel.Blue}");
+    }
+
+    [Fact]
+    public void HtmlRender_SvgImage_Blue_Circle_Rendered()
+    {
+        var svgDataUri = "data:image/svg+xml;base64," +
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">" +
+                "<circle cx=\"50\" cy=\"50\" r=\"50\" fill=\"blue\"/></svg>"));
+
+        var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
+                   $@"<img src=""{svgDataUri}"" width=""100"" height=""100""/></body></html>";
+
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
+        Assert.NotNull(bitmap);
+
+        // Center of the circle (50,50) should be blue.
+        var pixel = bitmap.GetPixel(50, 50);
+        Assert.True(pixel.Blue > 200, $"Expected blue channel > 200, got {pixel.Blue}");
+        Assert.True(pixel.Red < 50, $"Expected red channel < 50, got {pixel.Red}");
+    }
+
+    [Fact]
+    public void HtmlRender_SvgImage_With_ViewBox_Rendered()
+    {
+        // SVG with viewBox and no explicit width/height — should use viewBox dimensions.
+        var svgDataUri = "data:image/svg+xml;base64," +
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 80 60\">" +
+                "<rect fill=\"green\" width=\"80\" height=\"60\"/></svg>"));
+
+        var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
+                   $@"<img src=""{svgDataUri}"" width=""80"" height=""60""/></body></html>";
+
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
+        Assert.NotNull(bitmap);
+
+        // The green rect should be visible at the top-left.
+        var pixel = bitmap.GetPixel(10, 10);
+        Assert.True(pixel.Green > 100, $"Expected green channel > 100, got {pixel.Green}");
+    }
+
+    [Fact]
+    public void HtmlRender_EmptySvg_Does_Not_Crash()
+    {
+        var svgDataUri = "data:image/svg+xml;base64," +
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>"));
+
+        var html = $@"<!DOCTYPE html><html><body><img src=""{svgDataUri}""/></body></html>";
+
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
+        Assert.NotNull(bitmap);
+        Assert.Equal(200, bitmap.Width);
     }
 
     [Fact]
@@ -115,5 +173,77 @@ public class SvgImageRenderingTests
         using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
         Assert.NotNull(bitmap);
         Assert.Equal(200, bitmap.Width);
+    }
+
+    [Fact]
+    public void HtmlRender_SvgImage_ComplexSvg_With_Path()
+    {
+        // A simple SVG with a path element (triangle) - tests path rendering.
+        var svgDataUri = "data:image/svg+xml;base64," +
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"100\">" +
+                "<path d=\"M10,90 L50,10 L90,90 Z\" fill=\"orange\" stroke=\"black\" stroke-width=\"2\"/>" +
+                "</svg>"));
+
+        var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
+                   $@"<img src=""{svgDataUri}"" width=""100"" height=""100""/></body></html>";
+
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
+        Assert.NotNull(bitmap);
+        Assert.Equal(200, bitmap.Width);
+
+        // The triangle is in the top-left 100×100 area.
+        // At (50, 50) we should have the orange fill.
+        var pixel = bitmap.GetPixel(50, 50);
+        Assert.True(pixel.Red > 150, $"Expected red channel > 150 (orange), got {pixel.Red}");
+        Assert.True(pixel.Green > 100, $"Expected green channel > 100 (orange), got {pixel.Green}");
+    }
+
+    [Fact]
+    public void HtmlRender_SvgImage_With_Text()
+    {
+        // SVG with text element — verifies text rendering doesn't crash.
+        var svgDataUri = "data:image/svg+xml;base64," +
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"50\">" +
+                "<rect fill=\"white\" width=\"200\" height=\"50\"/>" +
+                "<text x=\"10\" y=\"30\" font-size=\"20\" fill=\"black\">Hello SVG</text>" +
+                "</svg>"));
+
+        var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
+                   $@"<img src=""{svgDataUri}"" width=""200"" height=""50""/></body></html>";
+
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 300, 200);
+        Assert.NotNull(bitmap);
+        Assert.Equal(300, bitmap.Width);
+    }
+
+    [Fact]
+    public void HtmlRender_MultipleSvgImages()
+    {
+        // Two different SVG images side by side.
+        var redSvg = "data:image/svg+xml;base64," +
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"50\" height=\"50\">" +
+                "<rect fill=\"red\" width=\"50\" height=\"50\"/></svg>"));
+        var blueSvg = "data:image/svg+xml;base64," +
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"50\" height=\"50\">" +
+                "<rect fill=\"blue\" width=\"50\" height=\"50\"/></svg>"));
+
+        var html = $@"<!DOCTYPE html><html><body style=""margin:0;padding:0"">" +
+                   $@"<img src=""{redSvg}"" width=""50"" height=""50""/>" +
+                   $@"<img src=""{blueSvg}"" width=""50"" height=""50""/></body></html>";
+
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 200, 200);
+        Assert.NotNull(bitmap);
+
+        // First image area should be red
+        var redPixel = bitmap.GetPixel(10, 10);
+        Assert.True(redPixel.Red > 200, $"Expected red pixel, got R={redPixel.Red}");
+
+        // Second image area should be blue (starts at x≈50)
+        var bluePixel = bitmap.GetPixel(60, 10);
+        Assert.True(bluePixel.Blue > 200, $"Expected blue pixel, got B={bluePixel.Blue}");
     }
 }
