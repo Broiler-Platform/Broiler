@@ -149,6 +149,105 @@ internal static class HtmlParser
             }
         }
 
+        // HTML5 §12.2: Ensure the tree contains implicit <html> and <body>
+        // elements so that CSS selectors targeting these tags (or the
+        // universal '*' selector) match the correct tree structure and
+        // the canvas background / filter propagation in PaintWalker works.
+        EnsureImplicitStructure(root, baseUrl);
+
         return root;
     }
+
+    /// <summary>
+    /// If the parsed tree lacks an explicit <c>&lt;html&gt;</c> or
+    /// <c>&lt;body&gt;</c> element, create them and re-parent the
+    /// existing children to match the structure browsers produce.
+    /// </summary>
+    private static void EnsureImplicitStructure(CssBox root, Uri baseUrl)
+    {
+        CssBox htmlBox = null;
+        foreach (var child in root.Boxes)
+        {
+            if (child.HtmlTag != null &&
+                child.HtmlTag.Name.Equals("html", StringComparison.OrdinalIgnoreCase))
+            {
+                htmlBox = child;
+                break;
+            }
+        }
+
+        if (htmlBox != null)
+        {
+            // <html> exists — make sure it contains a <body>.
+            EnsureBodyElement(htmlBox, baseUrl);
+            return;
+        }
+
+        // No <html> element — create one and move all children under it.
+        // Snapshot existing children before mutating the tree.
+        var children = new List<CssBox>(root.Boxes);
+
+        // Detach all children from root.
+        foreach (var child in children)
+            child.ParentBox = null;
+
+        // Build the html > head + body structure under root.
+        htmlBox = CssBoxHelper.CreateBox(new HtmlTag("html", false), baseUrl, root);
+        htmlBox.Display = CssConstants.Block;
+
+        var headBox = CssBoxHelper.CreateBox(new HtmlTag("head", false), baseUrl, htmlBox);
+        headBox.Display = CssConstants.None;
+
+        var bodyBox = CssBoxHelper.CreateBox(new HtmlTag("body", false), baseUrl, htmlBox);
+        bodyBox.Display = CssConstants.Block;
+
+        // Sort original children into head vs body content.
+        foreach (var child in children)
+        {
+            bool isHeadContent = child.HtmlTag != null &&
+                _headElements.Contains(child.HtmlTag.Name);
+
+            child.ParentBox = isHeadContent ? headBox : bodyBox;
+        }
+    }
+
+    /// <summary>
+    /// Ensures an existing <c>&lt;html&gt;</c> box contains a
+    /// <c>&lt;body&gt;</c> element. If not, wraps non-head children
+    /// in a <c>&lt;body&gt;</c>.
+    /// </summary>
+    private static void EnsureBodyElement(CssBox htmlBox, Uri baseUrl)
+    {
+        foreach (var child in htmlBox.Boxes)
+        {
+            if (child.HtmlTag != null &&
+                child.HtmlTag.Name.Equals("body", StringComparison.OrdinalIgnoreCase))
+                return; // <body> already exists
+        }
+
+        // No <body> — create one and move non-head children into it.
+        var bodyBox = CssBoxHelper.CreateBox(new HtmlTag("body", false), baseUrl);
+        bodyBox.Display = CssConstants.Block;
+
+        var children = new List<CssBox>(htmlBox.Boxes);
+        foreach (var child in children)
+        {
+            if (child.HtmlTag != null &&
+                (child.HtmlTag.Name.Equals("head", StringComparison.OrdinalIgnoreCase) ||
+                 _headElements.Contains(child.HtmlTag.Name)))
+                continue;
+
+            child.ParentBox = bodyBox;
+        }
+
+        bodyBox.ParentBox = htmlBox;
+    }
+
+    /// <summary>
+    /// Elements that belong in <c>&lt;head&gt;</c> rather than <c>&lt;body&gt;</c>.
+    /// </summary>
+    private static readonly HashSet<string> _headElements = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "style", "link", "meta", "title", "base", "script", "noscript"
+    };
 }

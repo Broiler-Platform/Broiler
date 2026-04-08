@@ -138,8 +138,9 @@ internal sealed class CssValueParser
         double factor;
 
         //Number of the length
+        int unitLen = unit == CssConstants.Rem ? 3 : unit == CssConstants.Q ? 1 : 2;
         string number = hasUnit
-            ? length.Substring(0, length.Length - (unit == CssConstants.Rem ? 3 : 2))
+            ? length.Substring(0, length.Length - unitLen)
             : length;
 
         //TODO: Units behave different in paper and in screen!
@@ -179,6 +180,9 @@ internal sealed class CssValueParser
             case CssConstants.Pc:
                 factor = 16f; // 1 pica = 12 points
                 break;
+            case CssConstants.Q:
+                factor = 37.795275591f / 40f; // 1Q = 1/40 cm ≈ 0.945 px
+                break;
             default:
                 factor = 0f;
                 break;
@@ -210,6 +214,17 @@ internal sealed class CssValueParser
                 hasUnit = true;
                 break;
             default:
+                // Check for single-character units (e.g. "Q" / "q")
+                if (length.Length >= 2)
+                {
+                    char lastChar = char.ToLowerInvariant(length[length.Length - 1]);
+                    char prevChar = length[length.Length - 2];
+                    if (lastChar == 'q' && (char.IsDigit(prevChar) || prevChar == '.'))
+                    {
+                        hasUnit = true;
+                        return CssConstants.Q;
+                    }
+                }
                 hasUnit = false;
                 unit = defaultUnit ?? string.Empty;
                 break;
@@ -235,19 +250,19 @@ internal sealed class CssValueParser
                 {
                     return GetColorByHex(str, idx, length, out color);
                 }
-                else if (length > 10 && CommonUtils.SubStringEquals(str, idx, 4, "rgb(") && str[length - 1] == ')')
+                else if (length > 10 && CommonUtils.SubStringEquals(str, idx, 4, "rgb(") && str[idx + length - 1] == ')')
                 {
                     return GetColorByRgb(str, idx, length, out color);
                 }
-                else if (length > 13 && CommonUtils.SubStringEquals(str, idx, 5, "rgba(") && str[length - 1] == ')')
+                else if (length > 13 && CommonUtils.SubStringEquals(str, idx, 5, "rgba(") && str[idx + length - 1] == ')')
                 {
                     return GetColorByRgba(str, idx, length, out color);
                 }
-                else if (length > 9 && CommonUtils.SubStringEquals(str, idx, 4, "hsl(") && str[length - 1] == ')')
+                else if (length > 9 && CommonUtils.SubStringEquals(str, idx, 4, "hsl(") && str[idx + length - 1] == ')')
                 {
                     return GetColorByHsl(str, idx, length, out color);
                 }
-                else if (length > 12 && CommonUtils.SubStringEquals(str, idx, 5, "hsla(") && str[length - 1] == ')')
+                else if (length > 12 && CommonUtils.SubStringEquals(str, idx, 5, "hsla(") && str[idx + length - 1] == ')')
                 {
                     return GetColorByHsla(str, idx, length, out color);
                 }
@@ -388,10 +403,14 @@ internal sealed class CssValueParser
         try
         {
             var inner = str.Substring(idx + 4, length - idx - 5); // content between "hsl(" and ")"
+
+            // CSS Color Level 4: support both comma-separated and space-separated syntax.
+            // Comma: hsl(H, S%, L%)
+            // Space: hsl(H S% L%) or hsl(H S% L% / A)
             var parts = inner.Split(',');
             if (parts.Length == 3)
             {
-                var h = double.Parse(parts[0].Trim(), CultureInfo.InvariantCulture);
+                var h = double.Parse(StripAngleUnit(parts[0].Trim()), CultureInfo.InvariantCulture);
                 var sTrimmed = parts[1].Trim();
                 var s = double.Parse(sTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
                 if (sTrimmed.EndsWith('%')) s /= 100.0;
@@ -403,6 +422,10 @@ internal sealed class CssValueParser
                 color = Color.FromArgb(r, g, b);
                 return true;
             }
+
+            // Space-separated: hsl(H S% L%) or hsl(H S% L% / A)
+            if (parts.Length == 1)
+                return ParseSpaceSeparatedHsl(inner, out color);
         }
         catch { /* fall through */ }
         color = Color.Empty;
@@ -414,10 +437,12 @@ internal sealed class CssValueParser
         try
         {
             var inner = str.Substring(idx + 5, length - idx - 6); // content between "hsla(" and ")"
+
+            // CSS Color Level 4: support both comma-separated and space-separated syntax.
             var parts = inner.Split(',');
             if (parts.Length == 4)
             {
-                var h = double.Parse(parts[0].Trim(), CultureInfo.InvariantCulture);
+                var h = double.Parse(StripAngleUnit(parts[0].Trim()), CultureInfo.InvariantCulture);
                 var sTrimmed = parts[1].Trim();
                 var s = double.Parse(sTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
                 if (sTrimmed.EndsWith('%')) s /= 100.0;
@@ -431,10 +456,65 @@ internal sealed class CssValueParser
                 color = Color.FromArgb(alpha, r, g, b);
                 return true;
             }
+
+            // Space-separated: hsla(H S% L% / A)
+            if (parts.Length == 1)
+                return ParseSpaceSeparatedHsl(inner, out color);
         }
         catch { /* fall through */ }
         color = Color.Empty;
         return false;
+    }
+
+    /// <summary>
+    /// Parses CSS Color Level 4 space-separated hsl/hsla syntax:
+    /// <c>H S% L%</c> or <c>H S% L% / A</c>.
+    /// H may have a unit suffix (e.g. <c>deg</c>).
+    /// A may be a number (0–1) or percentage.
+    /// </summary>
+    private static bool ParseSpaceSeparatedHsl(string inner, out Color color)
+    {
+        color = Color.Empty;
+        try
+        {
+            double alpha = 1.0;
+            string hslPart = inner;
+            int slashIdx = inner.IndexOf('/');
+            if (slashIdx >= 0)
+            {
+                hslPart = inner.Substring(0, slashIdx).Trim();
+                var alphaPart = inner.Substring(slashIdx + 1).Trim();
+                if (alphaPart.EndsWith('%'))
+                {
+                    alpha = double.Parse(alphaPart.TrimEnd('%'), CultureInfo.InvariantCulture) / 100.0;
+                }
+                else
+                {
+                    alpha = double.Parse(alphaPart, CultureInfo.InvariantCulture);
+                }
+            }
+
+            var tokens = hslPart.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length < 3) return false;
+
+            // Strip angle-unit suffixes (deg, grad, rad, turn)
+            var hStr = StripAngleUnit(tokens[0].Trim());
+            var h = double.Parse(hStr, CultureInfo.InvariantCulture);
+
+            var sTrimmed = tokens[1].Trim();
+            var s = double.Parse(sTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
+            if (sTrimmed.EndsWith('%')) s /= 100.0;
+
+            var lTrimmed = tokens[2].Trim();
+            var l = double.Parse(lTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
+            if (lTrimmed.EndsWith('%')) l /= 100.0;
+
+            HslToRgb(h, s, l, out int r, out int g, out int b);
+            int a = Math.Max(0, Math.Min(255, (int)Math.Round(alpha * 255)));
+            color = Color.FromArgb(a, r, g, b);
+            return true;
+        }
+        catch { return false; }
     }
 
     /// <summary>
@@ -462,6 +542,20 @@ internal sealed class CssValueParser
         r = Math.Max(0, Math.Min(255, (int)Math.Round((r1 + m) * 255)));
         g = Math.Max(0, Math.Min(255, (int)Math.Round((g1 + m) * 255)));
         b = Math.Max(0, Math.Min(255, (int)Math.Round((b1 + m) * 255)));
+    }
+
+    /// <summary>
+    /// Strips CSS angle-unit suffixes (<c>deg</c>, <c>grad</c>, <c>rad</c>,
+    /// <c>turn</c>) from a hue value string, returning just the number.
+    /// </summary>
+    private static string StripAngleUnit(string value)
+    {
+        foreach (var suffix in new[] { "deg", "grad", "rad", "turn" })
+        {
+            if (value.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                return value.Substring(0, value.Length - suffix.Length);
+        }
+        return value;
     }
 
     private bool GetColorByName(string str, int idx, int length, out Color color)

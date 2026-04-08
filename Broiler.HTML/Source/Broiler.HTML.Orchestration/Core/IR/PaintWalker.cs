@@ -107,7 +107,7 @@ internal static class PaintWalker
 
     /// <summary>
     /// Applies CSS filter functions on the root/html fragment to the canvas background color.
-    /// Currently supports <c>invert()</c>; other filter functions are silently ignored.
+    /// Supports <c>invert()</c> and <c>sepia()</c>; other filter functions are silently ignored.
     /// </summary>
     private static Color ApplyRootFilter(Fragment? htmlFragment, Color color)
     {
@@ -148,6 +148,46 @@ internal static class PaintWalker
                 Math.Clamp(b, 0, 255));
         }
 
+        // Parse sepia(N) where N is 0..1 (or 0%..100%)
+        // sepia transform matrix (CSS Filter Effects Module Level 1):
+        //   R' = min(255, 0.393R + 0.769G + 0.189B)
+        //   G' = min(255, 0.349R + 0.686G + 0.168B)
+        //   B' = min(255, 0.272R + 0.534G + 0.131B)
+        var sepiaMatch = System.Text.RegularExpressions.Regex.Match(filter, @"sepia\(\s*([^)]+)\s*\)");
+        if (sepiaMatch.Success)
+        {
+            string valStr = sepiaMatch.Groups[1].Value.Trim();
+            float amount = 1f;
+            if (valStr.EndsWith("%"))
+            {
+                if (float.TryParse(valStr.AsSpan(0, valStr.Length - 1),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var pct))
+                    amount = pct / 100f;
+            }
+            else if (float.TryParse(valStr,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var val))
+            {
+                amount = val;
+            }
+            amount = Math.Clamp(amount, 0f, 1f);
+
+            // Sepia matrix applied with interpolation: result = original × (1-amount) + sepia × amount
+            double sr = 0.393 * color.R + 0.769 * color.G + 0.189 * color.B;
+            double sg = 0.349 * color.R + 0.686 * color.G + 0.168 * color.B;
+            double sb = 0.272 * color.R + 0.534 * color.G + 0.131 * color.B;
+
+            int r = (int)Math.Round(color.R * (1 - amount) + Math.Min(255, sr) * amount);
+            int g = (int)Math.Round(color.G * (1 - amount) + Math.Min(255, sg) * amount);
+            int b = (int)Math.Round(color.B * (1 - amount) + Math.Min(255, sb) * amount);
+
+            return Color.FromArgb(color.A,
+                Math.Clamp(r, 0, 255),
+                Math.Clamp(g, 0, 255),
+                Math.Clamp(b, 0, 255));
+        }
+
         return color;
     }
 
@@ -167,6 +207,14 @@ internal static class PaintWalker
         // CSS2.1 §14.2 step 1: Use the root element's (html) background.
         // The html element is the first block child of the anonymous wrapper.
         Fragment? htmlFragment = FindFirstBlockChild(root);
+
+        // Fallback: even with implicit <html>/<body> generation in HtmlParser,
+        // edge cases (e.g. inline-only content or unknown element types) may
+        // still produce no block-level child.  Try the first visible child of
+        // any display type as the de-facto root for canvas background propagation.
+        if (htmlFragment == null)
+            htmlFragment = FindFirstVisibleChild(root);
+
         if (htmlFragment == null)
             return (Color.Empty, null);
 
@@ -177,6 +225,8 @@ internal static class PaintWalker
         // use the first visible block child of the root element (i.e. the body).
         // The head element is display:none, so we skip it.
         Fragment? bodyFragment = FindFirstBlockChild(htmlFragment);
+        if (bodyFragment == null)
+            bodyFragment = FindFirstVisibleChild(htmlFragment);
         if (bodyFragment != null && bodyFragment.Style.ActualBackgroundColor.A > 0)
             return (bodyFragment.Style.ActualBackgroundColor, bodyFragment);
 
@@ -195,6 +245,22 @@ internal static class PaintWalker
                 continue;
             if (child.Style.Display is "block" or "list-item" or "table")
                 return child;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the first visible child fragment regardless of display type.
+    /// Used as a fallback when the HTML parser doesn't generate block-level
+    /// wrapper elements (<c>&lt;html&gt;</c> / <c>&lt;body&gt;</c>).
+    /// </summary>
+    private static Fragment? FindFirstVisibleChild(Fragment parent)
+    {
+        foreach (var child in parent.Children)
+        {
+            if (child.Style.Display == "none")
+                continue;
+            return child;
         }
         return null;
     }

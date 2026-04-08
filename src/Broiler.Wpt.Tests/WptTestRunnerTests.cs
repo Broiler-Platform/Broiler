@@ -247,4 +247,51 @@ document.getElementById('out').appendChild(p);
         var exitCode = Program.Main(["--help"]);
         Assert.Equal(0, exitCode);
     }
+
+    // ──────────── Crash/rendering tests still compare pixels ──────────
+
+    [Fact]
+    public void RunTest_CrashTestDir_Still_Compared_Against_Reference()
+    {
+        // Arrange — a crash test file under a "crashtests" directory
+        // should still be compared pixel-by-pixel (not auto-passed).
+        var crashDir = Path.Combine(_tempDir, "crashtests");
+        Directory.CreateDirectory(crashDir);
+
+        var testFile = Path.Combine(crashDir, "simple-crash.html");
+        File.WriteAllText(testFile, @"<!DOCTYPE html>
+<html><body><p>Crash test</p></body></html>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner();
+
+        // Act
+        var result = runner.RunTest(testFile, refDir);
+
+        // Assert — no reference image → skipped, NOT auto-passed.
+        Assert.True(result.Skipped);
+        Assert.Contains("No reference image", result.Message);
+    }
+
+    [Fact]
+    public void RunTest_CrashSuffix_Still_Compared_Against_Reference()
+    {
+        // Arrange — file name ends with "-crash", should still need a reference.
+        var testFile = Path.Combine(_tempDir, "my-test-crash.html");
+        File.WriteAllText(testFile, @"<!DOCTYPE html>
+<html><body><div style=""background-color: red"">Test</div></body></html>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner();
+
+        // Act
+        var result = runner.RunTest(testFile, refDir);
+
+        // Assert — no reference image → skipped, NOT auto-passed.
+        Assert.True(result.Skipped);
+    }
 }
