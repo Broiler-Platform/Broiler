@@ -37,6 +37,30 @@ internal sealed class CssLength
             return;
         }
 
+        // Check for 4-character units (e.g. "vmin", "vmax")
+        if (length.Length >= 5)
+        {
+            var last4 = length.Substring(length.Length - 4, 4);
+            if (last4.Equals(CssConstants.Vmin, StringComparison.OrdinalIgnoreCase))
+            {
+                Unit = CssUnit.Vmin;
+                IsRelative = true;
+                string vmNumber = length.Substring(0, length.Length - 4);
+                if (!double.TryParse(vmNumber, NumberStyles.Number, NumberFormatInfo.InvariantInfo, out _number))
+                    HasError = true;
+                return;
+            }
+            if (last4.Equals(CssConstants.Vmax, StringComparison.OrdinalIgnoreCase))
+            {
+                Unit = CssUnit.Vmax;
+                IsRelative = true;
+                string vmNumber = length.Substring(0, length.Length - 4);
+                if (!double.TryParse(vmNumber, NumberStyles.Number, NumberFormatInfo.InvariantInfo, out _number))
+                    HasError = true;
+                return;
+            }
+        }
+
         // Check for 3-character units first (e.g. "rem")
         if (length.Length >= 4 && length.EndsWith(CssConstants.Rem, StringComparison.Ordinal))
         {
@@ -85,6 +109,19 @@ internal sealed class CssLength
                 Unit = CssUnit.Picas;
                 break;
             default:
+                // Check for viewport units (case-insensitive)
+                if (u.Equals(CssConstants.Vh, StringComparison.OrdinalIgnoreCase))
+                {
+                    Unit = CssUnit.Vh;
+                    IsRelative = true;
+                    break;
+                }
+                if (u.Equals(CssConstants.Vw, StringComparison.OrdinalIgnoreCase))
+                {
+                    Unit = CssUnit.Vw;
+                    IsRelative = true;
+                    break;
+                }
                 HasError = true;
                 return;
         }
@@ -167,6 +204,18 @@ internal sealed class CssLength
                     break;
                 case CssUnit.Rem:
                     u = "rem";
+                    break;
+                case CssUnit.Vh:
+                    u = "vh";
+                    break;
+                case CssUnit.Vw:
+                    u = "vw";
+                    break;
+                case CssUnit.Vmin:
+                    u = "vmin";
+                    break;
+                case CssUnit.Vmax:
+                    u = "vmax";
                     break;
             }
 

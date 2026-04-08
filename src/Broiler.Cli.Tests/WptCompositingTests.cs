@@ -992,4 +992,201 @@ html {
         Assert.InRange(pBelow.Green, 250, 255);
         Assert.InRange(pBelow.Blue, 250, 255);
     }
+
+    // ──────────── Viewport unit tests ────────────────────────────────────
+    // CSS viewport-relative units (vh, vw, vmin, vmax) must resolve
+    // correctly against the rendering viewport dimensions.
+
+    /// <summary>
+    /// WPT: css/compositing/root-element-background-image-transparency-001-ref.html
+    /// This reference file uses <c>height: 100vh</c> on the body. Without
+    /// viewport unit support, the height resolves to 0 and the background
+    /// image is not rendered.
+    /// </summary>
+    [Fact]
+    public void Viewport_Height_100vh_Fills_Full_Height()
+    {
+        var html = @"<!DOCTYPE html>
+<html>
+<head><style>
+html { background-color: white; }
+body { margin: 0; background-color: green; height: 100vh; }
+</style></head>
+<body></body>
+</html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 300);
+        // With 100vh, the body should fill the full viewport height (300px).
+        // The center and bottom should both be green.
+        var pCenter = bitmap.GetPixel(100, 150);
+        Assert.InRange(pCenter.Green, 100, 130);
+        Assert.InRange(pCenter.Red, 0, 10);
+        Assert.InRange(pCenter.Blue, 0, 10);
+
+        var pBottom = bitmap.GetPixel(100, 280);
+        Assert.InRange(pBottom.Green, 100, 130);
+        Assert.InRange(pBottom.Red, 0, 10);
+        Assert.InRange(pBottom.Blue, 0, 10);
+    }
+
+    /// <summary>
+    /// Verifies <c>width: 50vw</c> resolves to half the viewport width.
+    /// </summary>
+    [Fact]
+    public void Viewport_Width_50vw_Resolves_Correctly()
+    {
+        var html = @"<!DOCTYPE html>
+<html>
+<head><style>
+body { margin: 0; }
+div { width: 50vw; height: 100px; background-color: red; }
+</style></head>
+<body><div></div></body>
+</html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 400, 200);
+        // 50vw on a 400px viewport = 200px wide red div.
+        // At x=100 (inside div), should be red.
+        var pInside = bitmap.GetPixel(100, 50);
+        Assert.InRange(pInside.Red, 200, 255);
+        Assert.InRange(pInside.Green, 0, 20);
+
+        // At x=300 (outside div), should be white.
+        var pOutside = bitmap.GetPixel(300, 50);
+        Assert.InRange(pOutside.Red, 245, 255);
+        Assert.InRange(pOutside.Green, 245, 255);
+    }
+
+    /// <summary>
+    /// Verifies <c>vmin</c> and <c>vmax</c> resolve correctly: vmin uses the
+    /// smaller viewport dimension, vmax uses the larger.
+    /// </summary>
+    [Fact]
+    public void Viewport_Vmin_Vmax_Resolve_Correctly()
+    {
+        // 400×200 viewport → vmin=200, vmax=400
+        // 50vmin = 100px, 50vmax = 200px
+        var html = @"<!DOCTYPE html>
+<html>
+<head><style>
+body { margin: 0; }
+.a { width: 50vmin; height: 50px; background-color: blue; }
+.b { width: 50vmax; height: 50px; background-color: red; }
+</style></head>
+<body>
+<div class=""a""></div>
+<div class=""b""></div>
+</body>
+</html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 400, 200);
+        // .a (50vmin=100px): x=50 should be blue, x=150 should be white
+        var pA = bitmap.GetPixel(50, 25);
+        Assert.InRange(pA.Blue, 200, 255);
+        Assert.InRange(pA.Red, 0, 20);
+
+        // .b (50vmax=200px): x=150 should be red
+        var pB = bitmap.GetPixel(150, 75);
+        Assert.InRange(pB.Red, 200, 255);
+        Assert.InRange(pB.Blue, 0, 20);
+    }
+
+    // ──────────── Video element placeholder tests ────────────────────────
+    // <video> elements should render as replaced elements with a black
+    // placeholder matching the default browser dimensions (300×150).
+
+    /// <summary>
+    /// WPT: css/compositing/mix-blend-mode/reference/mix-blend-mode-video-notref.html
+    /// Verifies that a <c>&lt;video&gt;</c> element is replaced with a black
+    /// placeholder box. The default intrinsic size is 300×150px.
+    /// </summary>
+    [Fact]
+    public void Video_Element_Renders_As_Black_Placeholder()
+    {
+        var html = @"<!DOCTYPE html>
+<html>
+<head><style>
+body { margin: 0; background-color: white; }
+</style></head>
+<body>
+<video autoplay>
+    <source src=""video.mp4"" type=""video/mp4"">
+    Fallback text should NOT be visible.
+</video>
+</body>
+</html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 400, 300);
+        // The video placeholder should render as a 300×150 black box.
+        var pInside = bitmap.GetPixel(150, 75);
+        Assert.InRange(pInside.Red, 0, 20);
+        Assert.InRange(pInside.Green, 0, 20);
+        Assert.InRange(pInside.Blue, 0, 20);
+
+        // Outside the placeholder (to the right) should be white.
+        var pOutside = bitmap.GetPixel(350, 75);
+        Assert.InRange(pOutside.Red, 245, 255);
+        Assert.InRange(pOutside.Green, 245, 255);
+        Assert.InRange(pOutside.Blue, 245, 255);
+    }
+
+    /// <summary>
+    /// Verifies that explicit width/height on <c>&lt;video&gt;</c> is
+    /// respected in the placeholder dimensions.
+    /// </summary>
+    [Fact]
+    public void Video_Element_Respects_Explicit_Dimensions()
+    {
+        var html = @"<!DOCTYPE html>
+<html>
+<head><style>
+body { margin: 0; background-color: white; }
+</style></head>
+<body>
+<video width=""200"" height=""100"" autoplay>
+    <source src=""video.mp4"" type=""video/mp4"">
+</video>
+</body>
+</html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 400, 300);
+        // 200×100 black box
+        var pInside = bitmap.GetPixel(100, 50);
+        Assert.InRange(pInside.Red, 0, 20);
+        Assert.InRange(pInside.Green, 0, 20);
+        Assert.InRange(pInside.Blue, 0, 20);
+
+        // At x=250 (outside 200px width) should be white.
+        var pOutside = bitmap.GetPixel(250, 50);
+        Assert.InRange(pOutside.Red, 245, 255);
+        Assert.InRange(pOutside.Green, 245, 255);
+    }
+
+    /// <summary>
+    /// Verifies that fallback text inside <c>&lt;video&gt;</c> is not visible
+    /// (browsers that support video hide fallback content).
+    /// </summary>
+    [Fact]
+    public void Video_Element_Hides_Fallback_Content()
+    {
+        var html = @"<!DOCTYPE html>
+<html>
+<head><style>
+body { margin: 0; background-color: white; font-size: 20px; }
+</style></head>
+<body>
+<video>
+    This is fallback text that should NOT be visible.
+</video>
+</body>
+</html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 400, 300);
+        // The video placeholder should be a 300×150 black box.
+        // The fallback text "This is fallback text..." should NOT be rendered.
+        var pCenter = bitmap.GetPixel(150, 75);
+        Assert.InRange(pCenter.Red, 0, 20);
+        Assert.InRange(pCenter.Green, 0, 20);
+        Assert.InRange(pCenter.Blue, 0, 20);
+    }
 }

@@ -310,6 +310,13 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
         if (Root == null)
             return;
 
+        // Set viewport dimensions for CSS viewport-relative units (vh, vw, vmin, vmax).
+        // MaxSize represents the actual rendering viewport when set; PageSize is the
+        // fallback (may be 99999 in auto-size scenarios).
+        float vpW = MaxSize.Width > 0 ? Math.Min(MaxSize.Width, PageSize.Width) : PageSize.Width;
+        float vpH = MaxSize.Height > 0 ? Math.Min(MaxSize.Height, PageSize.Height) : PageSize.Height;
+        CssValueParser.SetViewportSize(vpW, vpH);
+
         // if width is not restricted we set it to large value to get the actual later
         Root.Size = new SizeF(MaxSize.Width > 0 ? MaxSize.Width : 99999, 0);
         Root.Location = Location;
