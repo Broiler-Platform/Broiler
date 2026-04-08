@@ -1081,4 +1081,76 @@ document.getElementById('out').appendChild(p);
             $"Expected green content at (500,130), got R={greenRight.Red} G={greenRight.Green} B={greenRight.Blue}. " +
             "Green content div should span the full container width.");
     }
+
+    // ──────── WPT reference-image integration tests ───────────────────
+
+    /// <summary>
+    /// Resolves the repository root by walking up from the test assembly
+    /// directory until the <c>tests/wpt</c> folder is found.
+    /// </summary>
+    private static string FindRepoRoot()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir != null)
+        {
+            if (Directory.Exists(Path.Combine(dir, "tests", "wpt")))
+                return dir;
+            dir = Directory.GetParent(dir)?.FullName;
+        }
+        throw new DirectoryNotFoundException(
+            "Could not locate repository root (tests/wpt not found).");
+    }
+
+    [Fact]
+    public void Wpt_Overflow009_MatchesReference()
+    {
+        // CSS2 §11.1.1: overflow:hidden must clip overflowing content and
+        // position subsequent siblings immediately after the border-box.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "visufx", "overflow-009.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "visufx", "overflow-009.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"overflow-009 should pass (match ≥ threshold). " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_FloatPageBreakInsideAvoid6Print_MatchesReference()
+    {
+        // CSS2 §13.3.1 / §9.5.2: floated elements inside a container with
+        // page-break-inside:avoid must render correctly with proper clear
+        // and full-width content after the floats.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "pagination",
+            "float-page-break-inside-avoid-6-print.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "pagination",
+            "float-page-break-inside-avoid-6-print.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"float-page-break-inside-avoid-6-print should pass (match ≥ threshold). " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
 }

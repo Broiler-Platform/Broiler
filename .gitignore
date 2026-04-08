@@ -73,7 +73,9 @@ capture.png
 # WPT testsuite results (generated at runtime)
 tests/wpt/results/
 tests/wpt/checkout/
-tests/wpt/references/
+# Ignore bulk-generated WPT references but allow curated CSS regression images.
+tests/wpt/references/*
+!tests/wpt/references/css/
 
 # Pixel comparison generated reports
 acid3-report.txt
