@@ -1636,7 +1636,7 @@ internal sealed class CssParser
         if (!string.IsNullOrEmpty(value))
         {
             int idx = 0;
-            while ((idx = CommonUtils.GetNextSubString(value, idx, out int length)) > -1)
+            while ((idx = GetNextBorderToken(value, idx, out int length)) > -1)
             {
                 // CSS2.1 §8.5.1: Each token must match exactly one of width,
                 // style, or color.  Use exclusive matching (width > style > color)
@@ -1665,13 +1665,44 @@ internal sealed class CssParser
         }
     }
 
+    /// <summary>
+    /// Like <see cref="CommonUtils.GetNextSubString"/> but treats parenthesised
+    /// groups (e.g. <c>hsla(-39 5% 68% / 7%)</c>) as a single token so that
+    /// CSS Color Level 4 functional notation is not split by spaces.
+    /// </summary>
+    private static int GetNextBorderToken(string str, int idx, out int length)
+    {
+        while (idx < str.Length && char.IsWhiteSpace(str[idx]))
+            idx++;
+
+        if (idx >= str.Length)
+        {
+            length = 0;
+            return -1;
+        }
+
+        var endIdx = idx;
+        int depth = 0;
+        while (endIdx < str.Length)
+        {
+            char ch = str[endIdx];
+            if (ch == '(') depth++;
+            else if (ch == ')') { depth--; if (depth <= 0) { endIdx++; break; } }
+            else if (char.IsWhiteSpace(ch) && depth == 0) break;
+            endIdx++;
+        }
+
+        length = endIdx - idx;
+        return length > 0 ? idx : -1;
+    }
+
     private static string ParseBorderWidth(string str, int idx, int length)
     {
         // CSS2.1: '0' is a valid <length> that requires no unit.
         if (length == 1 && str[idx] == '0')
             return "0";
 
-        if ((length > 2 && char.IsDigit(str[idx])) || (length > 3 && str[idx] == '.'))
+        if ((length > 1 && char.IsDigit(str[idx])) || (length > 2 && str[idx] == '.'))
         {
             string unit = null;
             if (CommonUtils.SubStringEquals(str, idx + length - 2, 2, CssConstants.Px))
@@ -1694,6 +1725,14 @@ internal sealed class CssParser
             if (unit != null)
             {
                 if (CssValueParser.IsFloat(str, idx, length - 2))
+                    return str.Substring(idx, length);
+            }
+
+            // Single-character units (e.g. Q — quarter-millimeter)
+            if (unit == null && length > 1)
+            {
+                char lastChar = char.ToLowerInvariant(str[idx + length - 1]);
+                if (lastChar == 'q' && CssValueParser.IsFloat(str, idx, length - 1))
                     return str.Substring(idx, length);
             }
         }

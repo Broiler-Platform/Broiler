@@ -111,6 +111,9 @@ internal static class CssConstants
     public const string Pt = "pt";
     public const string Pc = "pc";
     public const string Rem = "rem";
+
+    /// <summary>Quarter-millimeter: 1Q = 1/40 cm ≈ 0.945 px at 96 dpi.</summary>
+    public const string Q = "q";
     public const double FontSize = 11f;
     public const string DefaultFont = "Segoe UI";
 }
