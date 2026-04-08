@@ -161,10 +161,10 @@ internal sealed class DomParser
             // instead.  Since this renderer cannot decode media streams, render
             // them as inline-block boxes with the default intrinsic dimensions
             // (300×150 for video, 300×32 for audio) and a black background.
-            if (box.HtmlTag.Name.Equals("video", StringComparison.OrdinalIgnoreCase) ||
-                box.HtmlTag.Name.Equals("audio", StringComparison.OrdinalIgnoreCase))
+            bool isVideo = box.HtmlTag.Name.Equals("video", StringComparison.OrdinalIgnoreCase);
+            bool isAudio = !isVideo && box.HtmlTag.Name.Equals("audio", StringComparison.OrdinalIgnoreCase);
+            if (isVideo || isAudio)
             {
-                bool isVideo = box.HtmlTag.Name.Equals("video", StringComparison.OrdinalIgnoreCase);
                 box.Display = CssConstants.InlineBlock;
 
                 // Honour explicit width/height HTML attributes; fall back to the

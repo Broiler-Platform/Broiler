@@ -43,6 +43,22 @@ internal static class HtmlPostProcessor
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
+    /// Extracts the <c>width</c> HTML attribute value from an element's
+    /// attribute string (e.g. <c> width="200"</c>).
+    /// </summary>
+    private static readonly Regex VideoWidthPattern = new(
+        @"\bwidth\s*=\s*[""']?(\d+)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Extracts the <c>height</c> HTML attribute value from an element's
+    /// attribute string (e.g. <c> height="150"</c>).
+    /// </summary>
+    private static readonly Regex VideoHeightPattern = new(
+        @"\bheight\s*=\s*[""']?(\d+)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
     /// Matches <c>&lt;object …&gt;…&lt;/object&gt;</c> elements including
     /// their inline fallback content.
     /// </summary>
@@ -198,8 +214,8 @@ internal static class HtmlPostProcessor
             var attrs = m.Groups["attrs"].Value;
 
             // Extract explicit width/height from the original <video> attributes.
-            var wMatch = Regex.Match(attrs, @"\bwidth\s*=\s*[""']?(\d+)", RegexOptions.IgnoreCase);
-            var hMatch = Regex.Match(attrs, @"\bheight\s*=\s*[""']?(\d+)", RegexOptions.IgnoreCase);
+            var wMatch = VideoWidthPattern.Match(attrs);
+            var hMatch = VideoHeightPattern.Match(attrs);
 
             string w = wMatch.Success ? wMatch.Groups[1].Value + "px" : "300px";
             string h = hMatch.Success ? hMatch.Groups[1].Value + "px" : "150px";

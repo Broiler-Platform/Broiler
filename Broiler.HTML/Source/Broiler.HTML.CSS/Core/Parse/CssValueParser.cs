@@ -19,6 +19,22 @@ internal sealed class CssValueParser
     [ThreadStatic]
     private static SizeF _viewportSize;
 
+    /// <summary>Pre-computed factor for 1vh (viewport height / 100).</summary>
+    [ThreadStatic]
+    private static double _vhFactor;
+
+    /// <summary>Pre-computed factor for 1vw (viewport width / 100).</summary>
+    [ThreadStatic]
+    private static double _vwFactor;
+
+    /// <summary>Pre-computed factor for 1vmin (min dimension / 100).</summary>
+    [ThreadStatic]
+    private static double _vminFactor;
+
+    /// <summary>Pre-computed factor for 1vmax (max dimension / 100).</summary>
+    [ThreadStatic]
+    private static double _vmaxFactor;
+
     /// <summary>
     /// Sets the viewport dimensions used by <see cref="ParseLength"/> to
     /// resolve CSS viewport-relative units.
@@ -26,6 +42,10 @@ internal sealed class CssValueParser
     public static void SetViewportSize(float width, float height)
     {
         _viewportSize = new SizeF(width, height);
+        _vwFactor = width * 0.01;
+        _vhFactor = height * 0.01;
+        _vminFactor = Math.Min(width, height) * 0.01;
+        _vmaxFactor = Math.Max(width, height) * 0.01;
     }
 
     public CssValueParser(IColorResolver colorResolver)
@@ -219,19 +239,19 @@ internal sealed class CssValueParser
                 break;
             case CssConstants.Vh:
                 // CSS Values 3 §5.1.2: 1vh = 1% of viewport height
-                factor = _viewportSize.Height / 100.0;
+                factor = _vhFactor;
                 break;
             case CssConstants.Vw:
                 // CSS Values 3 §5.1.2: 1vw = 1% of viewport width
-                factor = _viewportSize.Width / 100.0;
+                factor = _vwFactor;
                 break;
             case CssConstants.Vmin:
                 // CSS Values 3 §5.1.2: 1vmin = 1% of min(vw, vh)
-                factor = Math.Min(_viewportSize.Width, _viewportSize.Height) / 100.0;
+                factor = _vminFactor;
                 break;
             case CssConstants.Vmax:
                 // CSS Values 3 §5.1.2: 1vmax = 1% of max(vw, vh)
-                factor = Math.Max(_viewportSize.Width, _viewportSize.Height) / 100.0;
+                factor = _vmaxFactor;
                 break;
             default:
                 factor = 0f;
