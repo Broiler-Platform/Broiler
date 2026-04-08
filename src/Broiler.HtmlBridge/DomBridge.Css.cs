@@ -653,6 +653,19 @@ public sealed partial class DomBridge
                 image ??= token;
                 continue;
             }
+
+            // CSS gradient functions (linear-gradient, radial-gradient, etc.)
+            if (lower.StartsWith("linear-gradient(") ||
+                lower.StartsWith("radial-gradient(") ||
+                lower.StartsWith("conic-gradient(") ||
+                lower.StartsWith("repeating-linear-gradient(") ||
+                lower.StartsWith("repeating-radial-gradient(") ||
+                lower.StartsWith("repeating-conic-gradient("))
+            {
+                image ??= token;
+                continue;
+            }
+
             if (lower == "none")
             {
                 image ??= "none";

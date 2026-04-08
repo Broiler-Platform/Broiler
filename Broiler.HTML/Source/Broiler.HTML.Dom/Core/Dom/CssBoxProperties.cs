@@ -895,7 +895,18 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (_actualBackgroundGradient.IsEmpty)
-                _actualBackgroundGradient = GetActualColor(BackgroundGradient);
+            {
+                // "none" is the initial value and means no gradient; resolve to
+                // fully-transparent so callers can simply check A > 0.  Without
+                // this guard, GetActualColor("none") falls back to Color.Black
+                // (opaque), which would cause EmitBackground to paint unintended
+                // black fills.
+                if (string.IsNullOrEmpty(BackgroundGradient) ||
+                    string.Equals(BackgroundGradient, "none", StringComparison.OrdinalIgnoreCase))
+                    _actualBackgroundGradient = System.Drawing.Color.FromArgb(0, 0, 0, 0);
+                else
+                    _actualBackgroundGradient = GetActualColor(BackgroundGradient);
+            }
 
             return _actualBackgroundGradient;
         }

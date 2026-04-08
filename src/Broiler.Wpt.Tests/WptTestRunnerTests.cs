@@ -248,13 +248,34 @@ document.getElementById('out').appendChild(p);
         Assert.Equal(0, exitCode);
     }
 
-    // ──────────── Crash/rendering tests still compare pixels ──────────
+    // ──────────── Crash test detection ──────────────────────────────
 
     [Fact]
-    public void RunTest_CrashTestDir_Still_Compared_Against_Reference()
+    public void IsCrashTest_Detects_CrashTestDir()
+    {
+        Assert.True(WptTestRunner.IsCrashTest("/wpt/css/compositing/crashtests/bgblend-root-change.html"));
+        Assert.True(WptTestRunner.IsCrashTest("C:\\wpt\\crashtests\\test.html"));
+    }
+
+    [Fact]
+    public void IsCrashTest_Detects_CrashSuffix()
+    {
+        Assert.True(WptTestRunner.IsCrashTest("/wpt/css/compositing/root-element-background-contain-hidden-crash.html"));
+        Assert.True(WptTestRunner.IsCrashTest("/wpt/my-test-crash.htm"));
+    }
+
+    [Fact]
+    public void IsCrashTest_Returns_False_For_Normal_Tests()
+    {
+        Assert.False(WptTestRunner.IsCrashTest("/wpt/css/compositing/root-element-opacity.html"));
+        Assert.False(WptTestRunner.IsCrashTest("/wpt/css/compositing/root-element-background-margin-opacity.html"));
+    }
+
+    [Fact]
+    public void RunTest_CrashTestDir_AutoPasses_Without_Reference()
     {
         // Arrange — a crash test file under a "crashtests" directory
-        // should still be compared pixel-by-pixel (not auto-passed).
+        // should auto-pass when rendering succeeds (no reference needed).
         var crashDir = Path.Combine(_tempDir, "crashtests");
         Directory.CreateDirectory(crashDir);
 
@@ -270,15 +291,15 @@ document.getElementById('out').appendChild(p);
         // Act
         var result = runner.RunTest(testFile, refDir);
 
-        // Assert — no reference image → skipped, NOT auto-passed.
-        Assert.True(result.Skipped);
-        Assert.Contains("No reference image", result.Message);
+        // Assert — crash test auto-passes when rendering doesn't throw.
+        Assert.True(result.Passed);
+        Assert.Contains("Crash test", result.Message);
     }
 
     [Fact]
-    public void RunTest_CrashSuffix_Still_Compared_Against_Reference()
+    public void RunTest_CrashSuffix_AutoPasses_Without_Reference()
     {
-        // Arrange — file name ends with "-crash", should still need a reference.
+        // Arrange — file name ends with "-crash", should auto-pass.
         var testFile = Path.Combine(_tempDir, "my-test-crash.html");
         File.WriteAllText(testFile, @"<!DOCTYPE html>
 <html><body><div style=""background-color: red"">Test</div></body></html>");
@@ -291,7 +312,7 @@ document.getElementById('out').appendChild(p);
         // Act
         var result = runner.RunTest(testFile, refDir);
 
-        // Assert — no reference image → skipped, NOT auto-passed.
-        Assert.True(result.Skipped);
+        // Assert — crash test auto-passes when rendering doesn't throw.
+        Assert.True(result.Passed);
     }
 }

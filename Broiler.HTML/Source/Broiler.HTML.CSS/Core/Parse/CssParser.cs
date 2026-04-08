@@ -979,6 +979,16 @@ internal sealed class CssParser
             }
         }
 
+        // Extract CSS gradient functions (linear-gradient, radial-gradient, etc.)
+        // before tokenising so they are not rejected as unrecognised tokens.
+        string? gradientFunc = null;
+        if (image == null)
+        {
+            gradientFunc = ExtractGradientFunction(ref remaining);
+            if (gradientFunc != null)
+                image = gradientFunc;
+        }
+
         // Tokenise the rest, respecting parenthesised groups (e.g. rgb(…), rgba(…), hsl(…)).
         string[] tokens = SplitBackgroundTokens(remaining);
 
@@ -1091,6 +1101,17 @@ internal sealed class CssParser
         properties["background-position"] = positionParts.Count > 0
             ? string.Join(" ", positionParts)
             : "0% 0%";
+
+        // For uniform CSS gradients (e.g. linear-gradient(green, green)),
+        // store the solid color as background-gradient so the paint walker
+        // can render it within the element's box (the canvas propagation
+        // path only looks at background-color).
+        if (gradientFunc != null)
+        {
+            string? uniformColor = TryExtractUniformGradientColor(gradientFunc);
+            if (uniformColor != null)
+                properties["background-gradient"] = uniformColor;
+        }
     }
 
     private void ParseColorProperty(string propName, string propValue, Dictionary<string, string> properties)
@@ -1130,6 +1151,147 @@ internal sealed class CssParser
         if (sb.Length > 0)
             parts.Add(sb.ToString());
         return parts.ToArray();
+    }
+
+    /// <summary>
+    /// CSS gradient function prefixes recognised in the <c>background</c> shorthand.
+    /// </summary>
+    private static readonly string[] GradientPrefixes =
+    [
+        "linear-gradient(",
+        "radial-gradient(",
+        "conic-gradient(",
+        "repeating-linear-gradient(",
+        "repeating-radial-gradient(",
+        "repeating-conic-gradient(",
+    ];
+
+    /// <summary>
+    /// Extracts a CSS gradient function (e.g. <c>linear-gradient(green, green)</c>)
+    /// from <paramref name="remaining"/>, removing it from the string.
+    /// Returns the full gradient token, or <c>null</c> if none was found.
+    /// </summary>
+    private static string? ExtractGradientFunction(ref string remaining)
+    {
+        foreach (var prefix in GradientPrefixes)
+        {
+            int start = remaining.IndexOf(prefix, StringComparison.OrdinalIgnoreCase);
+            if (start < 0) continue;
+
+            // Walk forward, tracking nested parentheses.
+            int depth = 0;
+            int end = start + prefix.Length;
+            bool closed = false;
+            for (; end < remaining.Length; end++)
+            {
+                if (remaining[end] == '(') depth++;
+                else if (remaining[end] == ')')
+                {
+                    if (depth == 0) { end++; closed = true; break; }
+                    depth--;
+                }
+            }
+
+            if (closed)
+            {
+                string func = remaining.Substring(start, end - start);
+                remaining = remaining.Remove(start, end - start);
+                return func;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// If <paramref name="gradientFunc"/> represents a uniform gradient (all
+    /// color stops resolve to the same color), returns that color as a CSS
+    /// string; otherwise returns <c>null</c>.
+    /// <para>
+    /// Example: <c>linear-gradient(green, green)</c> → <c>"green"</c>.
+    /// </para>
+    /// </summary>
+    private string? TryExtractUniformGradientColor(string gradientFunc)
+    {
+        // Strip the function name and outer parentheses.
+        int openParen = gradientFunc.IndexOf('(');
+        if (openParen < 0) return null;
+
+        string inner = gradientFunc.Substring(openParen + 1).TrimEnd(')').Trim();
+        if (string.IsNullOrEmpty(inner)) return null;
+
+        // Split on top-level commas (respecting nested parentheses like rgb()).
+        var stops = SplitOnTopLevelCommas(inner);
+        if (stops.Count < 2) return null;
+
+        // The first token may be an angle/direction (e.g. "to right", "180deg").
+        // Try the last two stops first; if they are the same color, that's our
+        // uniform color.
+        string lastStop = stops[^1].Trim();
+        string prevStop = stops[^2].Trim();
+
+        // Strip position hints (e.g. "green 50%" → "green").
+        lastStop = StripPositionHint(lastStop);
+        prevStop = StripPositionHint(prevStop);
+
+        if (!_valueParser.IsColorValid(lastStop) || !_valueParser.IsColorValid(prevStop))
+            return null;
+
+        // Check if both colors resolve to the same value.
+        Color c1 = _valueParser.GetActualColor(lastStop);
+        Color c2 = _valueParser.GetActualColor(prevStop);
+        if (c1 == c2)
+            return lastStop;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Splits a string on commas that are not inside parentheses.
+    /// </summary>
+    private static List<string> SplitOnTopLevelCommas(string value)
+    {
+        var parts = new List<string>();
+        var sb = new System.Text.StringBuilder();
+        int depth = 0;
+        foreach (char c in value)
+        {
+            if (c == '(') depth++;
+            else if (c == ')' && depth > 0) depth--;
+
+            if (c == ',' && depth == 0)
+            {
+                parts.Add(sb.ToString());
+                sb.Clear();
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
+        if (sb.Length > 0)
+            parts.Add(sb.ToString());
+        return parts;
+    }
+
+    /// <summary>
+    /// Removes trailing length/percentage position hints from a gradient
+    /// color-stop token (e.g. <c>"green 50%"</c> → <c>"green"</c>).
+    /// </summary>
+    private static string StripPositionHint(string stop)
+    {
+        // A stop may be "color pos" or just "color". Split and take the
+        // first token that is not a length/percentage.
+        var parts = stop.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length <= 1)
+            return stop;
+
+        // Walk from the end; drop trailing length/percentage values.
+        int end = parts.Length;
+        while (end > 1 && (CssValueParser.IsValidLength(parts[end - 1]) || parts[end - 1].EndsWith("%")))
+            end--;
+
+        return string.Join(' ', parts[..end]);
     }
 
     /// <summary>
