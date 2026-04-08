@@ -46,32 +46,34 @@ internal static class PaintWalker
 
     /// <summary>
     /// CSS2.1 §14.2: The background of the root element becomes the background of the canvas.
-    /// If the root element has a transparent background, the body element's background is used.
+    /// If the root element has a transparent background AND no background-image,
+    /// the body element's background is used instead.  Color and image are propagated
+    /// as a unit from the same cascade step.
     /// Returns the fragment whose background was propagated (so it can be suppressed during
     /// normal painting), or <c>null</c> if no propagation occurred.
     /// </summary>
     private static Fragment? EmitCanvasBackground(Fragment root, RectangleF viewport, List<DisplayItem> items)
     {
-        var (canvasBg, source) = FindCanvasBackground(root);
+        // Find which element supplies the canvas background (color + image
+        // as a unit, per CSS2.1 §14.2).
+        var (canvasBg, colorSource, imgSource) = FindCanvasBackgroundAndImage(root);
+
+        // Determine root opacity for canvas compositing.
+        // CSS Compositing §2.11: the root element's opacity applies to
+        // the canvas background (both color and image).
+        var htmlFragment = colorSource ?? imgSource ?? FindFirstBlockChild(root) ?? FindFirstVisibleChild(root);
+        float rootOpacity = 1f;
+        if (htmlFragment != null
+            && htmlFragment.Style.Opacity != null
+            && float.TryParse(htmlFragment.Style.Opacity,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var op))
+        {
+            rootOpacity = Math.Clamp(op, 0f, 1f);
+        }
 
         if (canvasBg.A > 0)
         {
-            // CSS Compositing §2.11: When the root element has opacity < 1,
-            // the canvas background must be composited as if the element's
-            // background is rendered at that opacity over the initial white
-            // backdrop.  Similarly, a semi-transparent background color
-            // (e.g. rgba(…)) is composited over white.
-            var htmlFragment = source ?? FindFirstBlockChild(root);
-            float rootOpacity = 1f;
-            if (htmlFragment != null
-                && htmlFragment.Style.Opacity != null
-                && float.TryParse(htmlFragment.Style.Opacity,
-                    System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out var op))
-            {
-                rootOpacity = Math.Clamp(op, 0f, 1f);
-            }
-
             Color finalBg = CompositOverWhite(canvasBg, rootOpacity);
 
             // CSS Filter Effects §8: When the root element has filter: invert(N),
@@ -79,10 +81,124 @@ internal static class PaintWalker
             finalBg = ApplyRootFilter(htmlFragment, finalBg);
 
             items.Add(new FillRectItem { Bounds = viewport, Color = finalBg });
-            return source;
         }
 
-        return null;
+        // CSS2.1 §14.2: The root element's background-image is also
+        // propagated to the canvas.  The image source comes from the
+        // same cascade step as the color (root → html → body as a unit).
+        if (imgSource != null && imgSource.BackgroundImageHandle != null)
+        {
+            // When the root has opacity < 1, wrap the background image
+            // in an opacity layer so it composites correctly over the
+            // canvas (white backdrop).
+            bool needsOpacity = rootOpacity < 1f;
+            if (needsOpacity)
+                items.Add(new OpacityItem { Bounds = viewport, Opacity = rootOpacity });
+
+            var repeat = imgSource.Style.BackgroundRepeat;
+            var posStr = imgSource.Style.BackgroundPosition;
+
+            var tileOrigin = new PointF(viewport.X, viewport.Y);
+
+            // Apply background-position offset.
+            if (!string.IsNullOrEmpty(posStr))
+            {
+                float imgW = 0, imgH = 0;
+                if (imgSource.BackgroundImageHandle is Broiler.HTML.Adapters.Adapters.RImage bgImg)
+                {
+                    imgW = (float)bgImg.Width;
+                    imgH = (float)bgImg.Height;
+                }
+
+                var parts = posStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                string xVal = null, yVal = null;
+                foreach (var p in parts)
+                {
+                    if (IsHorizontalKeyword(p))
+                        xVal = p;
+                    else if (IsVerticalKeyword(p))
+                        yVal = p;
+                    else if (p.Equals("center", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (xVal == null) xVal = p;
+                        else if (yVal == null) yVal = p;
+                    }
+                    else
+                    {
+                        if (xVal == null) xVal = p;
+                        else if (yVal == null) yVal = p;
+                    }
+                }
+
+                tileOrigin.X += ParsePositionValue(xVal, viewport.Width, imgW);
+                tileOrigin.Y += ParsePositionValue(yVal, viewport.Height, imgH);
+            }
+
+            items.Add(new DrawTiledImageItem
+            {
+                Bounds = viewport,
+                ImageHandle = imgSource.BackgroundImageHandle,
+                SourceRect = RectangleF.Empty,
+                FillRect = viewport,
+                TileOrigin = tileOrigin,
+                Repeat = repeat,
+            });
+
+            if (needsOpacity)
+                items.Add(new RestoreOpacityItem { Bounds = viewport });
+
+            // Return the image source fragment so its background image
+            // is not painted again at the element's box position.
+            return imgSource;
+        }
+
+        return colorSource;
+    }
+
+    /// <summary>
+    /// Finds the canvas background color AND image source per CSS2.1 §14.2.
+    /// The cascade is: root → html → body, but body is only considered when
+    /// html has BOTH transparent background-color AND no background-image.
+    /// Returns (color, colorSource, imageSource).
+    /// </summary>
+    private static (Color Color, Fragment? ColorSource, Fragment? ImageSource) FindCanvasBackgroundAndImage(Fragment root)
+    {
+        // Check root itself.
+        if (root.Style.ActualBackgroundColor.A > 0 || root.BackgroundImageHandle != null)
+            return (root.Style.ActualBackgroundColor, root,
+                root.BackgroundImageHandle != null ? root : null);
+
+        // Step 1: html element.
+        Fragment? html = FindFirstBlockChild(root) ?? FindFirstVisibleChild(root);
+        if (html == null)
+            return (Color.Empty, null, null);
+
+        bool htmlHasBg = html.Style.ActualBackgroundColor.A > 0;
+        bool htmlHasImg = html.BackgroundImageHandle != null;
+
+        if (htmlHasBg || htmlHasImg)
+        {
+            return (html.Style.ActualBackgroundColor,
+                htmlHasBg ? html : null,
+                htmlHasImg ? html : null);
+        }
+
+        // Step 2: html has no background at all → fall back to body.
+        Fragment? body = FindFirstBlockChild(html) ?? FindFirstVisibleChild(html);
+        if (body == null)
+            return (Color.Empty, null, null);
+
+        bool bodyHasBg = body.Style.ActualBackgroundColor.A > 0;
+        bool bodyHasImg = body.BackgroundImageHandle != null;
+
+        if (bodyHasBg || bodyHasImg)
+        {
+            return (body.Style.ActualBackgroundColor,
+                bodyHasBg ? body : null,
+                bodyHasImg ? body : null);
+        }
+
+        return (Color.Empty, null, null);
     }
 
     /// <summary>
@@ -192,48 +308,6 @@ internal static class PaintWalker
     }
 
     /// <summary>
-    /// Walks the fragment tree to find the canvas background color per CSS2.1 §14.2.
-    /// The root fragment is typically an anonymous wrapper created by the HTML parser.
-    /// Its first block child is the <c>html</c> element, whose first visible block
-    /// child is the <c>body</c> element (the <c>head</c> element is <c>display:none</c>).
-    /// Returns the resolved color and the fragment it was taken from.
-    /// </summary>
-    private static (Color Color, Fragment? Source) FindCanvasBackground(Fragment root)
-    {
-        // Check root itself (rare — the anonymous wrapper usually has no background)
-        if (root.Style.ActualBackgroundColor.A > 0)
-            return (root.Style.ActualBackgroundColor, root);
-
-        // CSS2.1 §14.2 step 1: Use the root element's (html) background.
-        // The html element is the first block child of the anonymous wrapper.
-        Fragment? htmlFragment = FindFirstBlockChild(root);
-
-        // Fallback: even with implicit <html>/<body> generation in HtmlParser,
-        // edge cases (e.g. inline-only content or unknown element types) may
-        // still produce no block-level child.  Try the first visible child of
-        // any display type as the de-facto root for canvas background propagation.
-        if (htmlFragment == null)
-            htmlFragment = FindFirstVisibleChild(root);
-
-        if (htmlFragment == null)
-            return (Color.Empty, null);
-
-        if (htmlFragment.Style.ActualBackgroundColor.A > 0)
-            return (htmlFragment.Style.ActualBackgroundColor, htmlFragment);
-
-        // CSS2.1 §14.2 step 2: If the root element's background is transparent,
-        // use the first visible block child of the root element (i.e. the body).
-        // The head element is display:none, so we skip it.
-        Fragment? bodyFragment = FindFirstBlockChild(htmlFragment);
-        if (bodyFragment == null)
-            bodyFragment = FindFirstVisibleChild(htmlFragment);
-        if (bodyFragment != null && bodyFragment.Style.ActualBackgroundColor.A > 0)
-            return (bodyFragment.Style.ActualBackgroundColor, bodyFragment);
-
-        return (Color.Empty, null);
-    }
-
-    /// <summary>
     /// Returns the first child fragment that is a visible block-level element,
     /// skipping <c>display:none</c> children (e.g. <c>&lt;head&gt;</c>).
     /// </summary>
@@ -339,8 +413,10 @@ internal static class PaintWalker
         if (!ReferenceEquals(fragment, propagatedFrom))
             EmitBackground(fragment, items);
 
-        // Background image
-        EmitBackgroundImage(fragment, items, viewport);
+        // Background image — CSS2.1 §14.2: also skip if this fragment's
+        // background image was propagated to the canvas.
+        if (!ReferenceEquals(fragment, propagatedFrom))
+            EmitBackgroundImage(fragment, items, viewport);
 
         // Borders
         EmitBorders(fragment, items);

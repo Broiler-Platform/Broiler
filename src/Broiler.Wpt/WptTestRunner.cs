@@ -241,11 +241,15 @@ internal sealed class WptTestRunner
         // Post-process HTML (strip scripts, clean up for rendering).
         html = HtmlPostProcessor.Process(html);
 
+        // Derive the base URL from the test file so that relative sub-resource
+        // paths (background images, stylesheets, etc.) resolve correctly.
+        var testBaseUrl = new Uri(Path.GetFullPath(testPath)).AbsoluteUri;
+
         // Render via Broiler HTML stack.
         SKBitmap rendered;
         try
         {
-            rendered = HtmlRender.RenderToImage(html, _width, _height, SKColors.White);
+            rendered = HtmlRender.RenderToImage(html, _width, _height, SKColors.White, baseUrl: testBaseUrl);
         }
         catch (Exception ex)
         {
