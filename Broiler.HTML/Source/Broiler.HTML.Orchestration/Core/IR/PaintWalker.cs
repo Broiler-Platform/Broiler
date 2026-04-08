@@ -390,8 +390,17 @@ internal static class PaintWalker
             if (style.ActualBackgroundGradient.A > 0 &&
                 style.ActualBackgroundGradient != style.ActualBackgroundColor)
             {
-                // Emit primary color; gradient rendering deferred to raster backend
-                items.Add(new FillRectItem { Bounds = rect, Color = style.ActualBackgroundColor });
+                // When the background-color has alpha (typical two-color gradient),
+                // paint the background-color as the base layer; gradient rendering
+                // is deferred to the raster backend.
+                // When background-color is transparent (e.g. uniform CSS gradient
+                // like linear-gradient(green, green) in a background shorthand),
+                // paint the gradient color directly within the element's box.
+                // This avoids canvas propagation of the gradient colour.
+                var fillColor = style.ActualBackgroundColor.A > 0
+                    ? style.ActualBackgroundColor
+                    : style.ActualBackgroundGradient;
+                items.Add(new FillRectItem { Bounds = rect, Color = fillColor });
             }
             else if (style.ActualBackgroundColor.A > 0)
             {

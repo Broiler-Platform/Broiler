@@ -76,6 +76,27 @@ internal sealed class WptTestRunner
     }
 
     /// <summary>
+    /// Determines whether the given test path is a WPT crash test.
+    /// Crash tests are identified by:
+    /// <list type="bullet">
+    ///   <item>The path contains a <c>/crashtests/</c> directory segment.</item>
+    ///   <item>The filename (without extension) ends with <c>-crash</c>.</item>
+    /// </list>
+    /// Crash tests pass when rendering completes without throwing; no pixel
+    /// comparison is required.
+    /// </summary>
+    internal static bool IsCrashTest(string testPath)
+    {
+        // Normalise separators so the check works on both Unix and Windows paths.
+        if (testPath.Contains("/crashtests/", StringComparison.OrdinalIgnoreCase) ||
+            testPath.Contains("\\crashtests\\", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var name = Path.GetFileNameWithoutExtension(testPath);
+        return name.EndsWith("-crash", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Runs a single test: renders the HTML with the Broiler stack and
     /// compares the result against a Chromium/Playwright reference image.
     /// </summary>
@@ -161,6 +182,19 @@ internal sealed class WptTestRunner
 
         using (rendered)
         {
+            // WPT crash tests only verify the renderer doesn't crash.
+            // No pixel comparison is needed; the test passes if rendering
+            // completed without throwing.
+            if (IsCrashTest(testPath))
+            {
+                return new WptTestResult
+                {
+                    TestPath = testPath,
+                    Passed = true,
+                    Message = "Crash test: rendering completed without error.",
+                };
+            }
+
             // If no reference image exists, the test is skipped.
             if (!File.Exists(referencePath))
             {
