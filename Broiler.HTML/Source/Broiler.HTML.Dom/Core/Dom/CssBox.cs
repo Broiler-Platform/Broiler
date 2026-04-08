@@ -894,7 +894,16 @@ internal class CssBox : CssBoxProperties, IDisposable
                     foreach (var childBox in Boxes)
                     {
                         if (childBox.Float != CssConstants.None)
+                        {
                             childBox.PerformLayout(g);
+
+                            // CSS2.1 §13.3.1: When page-break-inside:avoid is
+                            // set on a float's containing block, move the float
+                            // to the next page if it would otherwise cross a
+                            // page boundary.
+                            if (PageBreakInside == CssConstants.Avoid)
+                                childBox.BreakPage();
+                        }
                     }
 
                     // CSS2.1 §10.6.7: Elements that establish a new block
@@ -918,7 +927,16 @@ internal class CssBox : CssBoxProperties, IDisposable
                 else if (Boxes.Count > 0)
                 {
                     foreach (var childBox in Boxes)
+                    {
                         childBox.PerformLayout(g);
+
+                        // CSS2.1 §13.3.1: When page-break-inside:avoid is
+                        // set, move floated children to the next page if they
+                        // would cross a page boundary.
+                        if (childBox.Float != CssConstants.None
+                            && PageBreakInside == CssConstants.Avoid)
+                            childBox.BreakPage();
+                    }
 
                     ActualRight = CalculateActualRight();
                     ActualBottom = MarginBottomCollapse();

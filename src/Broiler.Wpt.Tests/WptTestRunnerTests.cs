@@ -863,4 +863,118 @@ document.getElementById('out').appendChild(p);
         Assert.Equal(42.5, diag["averageChannelDelta"]);
         Assert.Equal(100, diag["maxChannelDelta"]);
     }
+
+    // ──────────── CSS2 regression tests ──────────────────────────────
+
+    [Fact]
+    public void Overflow_Hidden_Clamps_Layout_Height()
+    {
+        // CSS2.1 §11.1.1: A box with overflow:hidden and an explicit height
+        // must clip overflowing content.  Siblings after the box must be
+        // positioned as if the content was clipped (i.e. immediately after
+        // the box's border-box, not pushed down by overflowing content).
+        const string html = @"<!DOCTYPE html>
+<html><body style=""margin:0"">
+<div style=""width:200px; height:100px; overflow:hidden; background:white"">
+    <div style=""width:180px; height:300px; background:green""></div>
+</div>
+<div id=""after"" style=""width:200px; height:50px; background:blue""></div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 400, 400);
+
+        // The blue box should start at y~104 (100px box + 4px border area).
+        // If overflow clipping is broken, it would be pushed to ~304px.
+        var pixel = bitmap.GetPixel(100, 130);
+        Assert.True(pixel.Blue > 200 && pixel.Red < 50 && pixel.Green < 50,
+            $"Expected blue at (100,130), got R={pixel.Red} G={pixel.Green} B={pixel.Blue}. " +
+            "The blue box should appear immediately after the overflow:hidden container.");
+    }
+
+    [Fact]
+    public void Overflow_Auto_Clamps_Layout_Height()
+    {
+        // overflow:auto should also clamp layout height, same as hidden.
+        const string html = @"<!DOCTYPE html>
+<html><body style=""margin:0"">
+<div style=""width:200px; height:100px; overflow:auto; background:white"">
+    <div style=""width:180px; height:300px; background:green""></div>
+</div>
+<div id=""after"" style=""width:200px; height:50px; background:blue""></div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 400, 400);
+
+        var pixel = bitmap.GetPixel(100, 130);
+        Assert.True(pixel.Blue > 200 && pixel.Red < 50 && pixel.Green < 50,
+            $"Expected blue at (100,130), got R={pixel.Red} G={pixel.Green} B={pixel.Blue}. " +
+            "The blue box should appear immediately after the overflow:auto container.");
+    }
+
+    [Fact]
+    public void Overflow_Scroll_Clamps_Layout_Height()
+    {
+        // overflow:scroll should also clamp layout height, same as hidden.
+        const string html = @"<!DOCTYPE html>
+<html><body style=""margin:0"">
+<div style=""width:200px; height:100px; overflow:scroll; background:white"">
+    <div style=""width:180px; height:300px; background:green""></div>
+</div>
+<div id=""after"" style=""width:200px; height:50px; background:blue""></div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 400, 400);
+
+        var pixel = bitmap.GetPixel(100, 130);
+        Assert.True(pixel.Blue > 200 && pixel.Red < 50 && pixel.Green < 50,
+            $"Expected blue at (100,130), got R={pixel.Red} G={pixel.Green} B={pixel.Blue}. " +
+            "The blue box should appear immediately after the overflow:scroll container.");
+    }
+
+    [Fact]
+    public void InlineSvg_Renders_As_InlineBlock()
+    {
+        // Inline <svg> elements must be treated as replaced inline-block
+        // elements.  The SVG content should be rendered inside the element
+        // bounds, and the element should take up space in the layout.
+        const string html = @"<!DOCTYPE html>
+<html><body style=""margin:0"">
+<svg xmlns=""http://www.w3.org/2000/svg"" width=""100"" height=""100"">
+  <rect x=""0"" y=""0"" width=""100"" height=""100"" fill=""green""/>
+</svg>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 200, 200);
+
+        // The SVG should render a green rectangle.  Check center of the
+        // SVG area for green pixels.
+        var pixel = bitmap.GetPixel(50, 50);
+        Assert.True(pixel.Green > 100,
+            $"Expected green content at (50,50), got R={pixel.Red} G={pixel.Green} B={pixel.Blue}. " +
+            "Inline SVG should render as a replaced inline-block element.");
+    }
+
+    [Fact]
+    public void Float_PageBreakInsideAvoid_DoesNotCrash()
+    {
+        // Floated elements inside a container with page-break-inside:avoid
+        // should not crash during layout.
+        const string html = @"<!DOCTYPE html>
+<html><body style=""margin:0"">
+<div style=""page-break-inside:avoid"">
+    <div style=""float:left; width:100px; height:100px; background:blue""></div>
+    <div style=""float:left; width:100px; height:100px; background:red""></div>
+    <div style=""clear:both""></div>
+    <div style=""height:50px; background:green""></div>
+</div>
+</body></html>";
+
+        // Should render without throwing.
+        using var bitmap = HtmlRender.RenderToImage(html, 400, 300);
+
+        // Verify the blue float is present.
+        var pixel = bitmap.GetPixel(50, 50);
+        Assert.True(pixel.Blue > 200 && pixel.Red < 50 && pixel.Green < 50,
+            $"Expected blue float at (50,50), got R={pixel.Red} G={pixel.Green} B={pixel.Blue}.");
+    }
 }

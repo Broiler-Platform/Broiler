@@ -191,6 +191,40 @@ internal sealed class DomParser
                 foreach (var child in box.Boxes)
                     child.Display = CssConstants.None;
             }
+
+            // SVG §7.1: Inline <svg> elements are replaced elements rendered as
+            // inline-block boxes.  Their child elements (rect, circle, path, etc.)
+            // are not CSS-visible — the SVG subtree is serialised to markup and
+            // rendered later by SvgRenderer via PaintWalker.
+            if (!isVideo && !isAudio &&
+                box.HtmlTag.Name.Equals("svg", StringComparison.OrdinalIgnoreCase))
+            {
+                box.Display = CssConstants.InlineBlock;
+
+                // Honour width/height from CSS style or HTML attributes.
+                if (string.IsNullOrEmpty(box.Width) || box.Width == CssConstants.Auto)
+                {
+                    var attrW = box.HtmlTag.TryGetAttribute("width");
+                    box.Width = !string.IsNullOrEmpty(attrW)
+                        ? NormaliseDimensionAttribute(attrW)
+                        : "300px";
+                }
+                if (string.IsNullOrEmpty(box.Height) || box.Height == CssConstants.Auto)
+                {
+                    var attrH = box.HtmlTag.TryGetAttribute("height");
+                    box.Height = !string.IsNullOrEmpty(attrH)
+                        ? NormaliseDimensionAttribute(attrH)
+                        : "150px";
+                }
+
+                // Overflow hidden to clip SVG content at the element bounds.
+                if (string.IsNullOrEmpty(box.Overflow) || box.Overflow == CssConstants.Visible)
+                    box.Overflow = CssConstants.Hidden;
+
+                // Hide child boxes so the CSS layout engine ignores SVG internals.
+                foreach (var child in box.Boxes)
+                    child.Display = CssConstants.None;
+            }
         }
 
         // CSS2.1 §9.7: Relationships between 'display', 'position', and 'float'.
@@ -1416,5 +1450,30 @@ internal sealed class DomParser
         }
 
         return hasBlock && hasInline;
+    }
+
+    /// <summary>
+    /// Normalises an HTML dimension attribute value (width/height) to a CSS
+    /// length.  Pure numeric values (e.g. "100") get a "px" suffix; values
+    /// that already carry a unit or percentage (e.g. "100%", "10em") are
+    /// returned unchanged after trimming.
+    /// </summary>
+    private static string NormaliseDimensionAttribute(string value)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0)
+            return "0px";
+
+        // If the value already ends with a known unit or %, keep it as-is.
+        if (trimmed[^1] == '%'
+            || trimmed.EndsWith("px", StringComparison.OrdinalIgnoreCase)
+            || trimmed.EndsWith("em", StringComparison.OrdinalIgnoreCase)
+            || trimmed.EndsWith("pt", StringComparison.OrdinalIgnoreCase)
+            || trimmed.EndsWith("vw", StringComparison.OrdinalIgnoreCase)
+            || trimmed.EndsWith("vh", StringComparison.OrdinalIgnoreCase))
+            return trimmed;
+
+        // Otherwise treat as a unitless pixel value.
+        return trimmed + "px";
     }
 }

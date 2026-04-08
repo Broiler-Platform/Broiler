@@ -291,7 +291,12 @@ internal static class CssLayoutEngine
 
         // CSS2.1 §10.6.3: When height is not 'auto', the used value is the
         // specified value.  Content may overflow (controlled by 'overflow').
-        if (hasExplicitHeight && blockBox.Overflow == CssConstants.Hidden && blockBox.ActualBottom - blockBox.Location.Y > blockBox.ActualHeight)
+        // For overflow:hidden, overflow:auto, and overflow:scroll the box's
+        // layout height is clamped to the specified height so that subsequent
+        // siblings are not pushed down by overflowing content.
+        if (hasExplicitHeight
+            && blockBox.Overflow is CssConstants.Hidden or CssConstants.Auto or CssConstants.Scroll
+            && blockBox.ActualBottom - blockBox.Location.Y > blockBox.ActualHeight)
             blockBox.ActualBottom = blockBox.Location.Y + blockBox.ActualHeight;
     }
 

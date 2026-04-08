@@ -67,6 +67,14 @@ internal static class FragmentTreeBuilder
             }
         }
 
+        // Inline <svg> elements: serialise the SVG subtree back to markup
+        // so that PaintWalker can render it via SvgRenderer.
+        if (svgContent == null && box.HtmlTag != null &&
+            box.HtmlTag.Name.Equals("svg", StringComparison.OrdinalIgnoreCase))
+        {
+            svgContent = SerializeSvgSubtree(box);
+        }
+
         // Capture per-line-box rectangles for inline elements (used for backgrounds/borders)
         List<RectangleF>? inlineRects = null;
         if (box.Rectangles.Count > 0)
@@ -275,5 +283,73 @@ internal static class FragmentTreeBuilder
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Serialises an inline <c>&lt;svg&gt;</c> CssBox subtree back to SVG
+    /// markup so that <see cref="PaintWalker"/> can render it via
+    /// <see cref="SvgRenderer"/>.
+    /// </summary>
+    private static string SerializeSvgSubtree(CssBox svgBox)
+    {
+        var sb = new StringBuilder();
+        SerializeSvgBox(svgBox, sb);
+        var result = sb.ToString();
+        return string.IsNullOrWhiteSpace(result) ? null : result;
+    }
+
+    private static void SerializeSvgBox(CssBox box, StringBuilder sb)
+    {
+        if (box.HtmlTag != null)
+        {
+            sb.Append('<').Append(box.HtmlTag.Name);
+            if (box.HtmlTag.HasAttributes())
+            {
+                foreach (var attr in box.HtmlTag.Attributes)
+                {
+                    sb.Append(' ').Append(attr.Key).Append("=\"");
+                    AppendXmlEscaped(sb, attr.Value);
+                    sb.Append('"');
+                }
+            }
+
+            if (box.HtmlTag.IsSingle)
+            {
+                sb.Append("/>");
+                return;
+            }
+
+            sb.Append('>');
+        }
+
+        if (!box.Text.IsEmpty)
+            AppendXmlEscaped(sb, box.Text.ToString());
+
+        foreach (var child in box.Boxes)
+            SerializeSvgBox(child, sb);
+
+        if (box.HtmlTag != null && !box.HtmlTag.IsSingle)
+            sb.Append("</").Append(box.HtmlTag.Name).Append('>');
+    }
+
+    /// <summary>
+    /// Appends <paramref name="text"/> to <paramref name="sb"/>, escaping
+    /// the five XML special characters: <c>&amp;</c>, <c>&lt;</c>,
+    /// <c>&gt;</c>, <c>&quot;</c>, and <c>&apos;</c>.
+    /// </summary>
+    private static void AppendXmlEscaped(StringBuilder sb, string text)
+    {
+        foreach (var ch in text)
+        {
+            switch (ch)
+            {
+                case '&':  sb.Append("&amp;");  break;
+                case '<':  sb.Append("&lt;");   break;
+                case '>':  sb.Append("&gt;");   break;
+                case '"':  sb.Append("&quot;"); break;
+                case '\'': sb.Append("&apos;"); break;
+                default:   sb.Append(ch);       break;
+            }
+        }
     }
 }
