@@ -7,6 +7,27 @@ using SkiaSharp;
 namespace Broiler.Wpt;
 
 /// <summary>
+/// Categorizes the root cause of a WPT test failure for fast triage.
+/// </summary>
+internal enum FailureCategory
+{
+    /// <summary>No failure (test passed or was skipped).</summary>
+    None,
+    /// <summary>The test file could not be read from disk.</summary>
+    FileIO,
+    /// <summary>JavaScript execution threw an exception.</summary>
+    ScriptError,
+    /// <summary>The Broiler rendering pipeline threw an exception.</summary>
+    RenderingError,
+    /// <summary>The reference image could not be decoded.</summary>
+    ReferenceDecodeError,
+    /// <summary>Rendered output did not match the reference image.</summary>
+    PixelMismatch,
+    /// <summary>Catch-all for failures that don't fit another category.</summary>
+    Unknown,
+}
+
+/// <summary>
 /// Result of rendering and comparing a single WPT test case.
 /// </summary>
 internal sealed class WptTestResult
@@ -29,6 +50,18 @@ internal sealed class WptTestResult
     /// error before the pixel comparison stage).
     /// </summary>
     public double? MatchPercent { get; init; }
+
+    /// <summary>
+    /// Root cause category for failed tests.  <see cref="FailureCategory.None"/>
+    /// for passing or skipped tests.
+    /// </summary>
+    public FailureCategory Category { get; init; }
+
+    /// <summary>
+    /// Stack trace captured when the failure originated from an exception.
+    /// Null when no exception was thrown.
+    /// </summary>
+    public string? StackTrace { get; init; }
 }
 
 /// <summary>
@@ -109,6 +142,7 @@ internal sealed class WptTestRunner
                 TestPath = testPath,
                 Passed = false,
                 Message = "Test file not found.",
+                Category = FailureCategory.FileIO,
             };
         }
 
@@ -143,6 +177,8 @@ internal sealed class WptTestRunner
                 TestPath = testPath,
                 Passed = false,
                 Message = $"Failed to read test file: {ex.Message}",
+                Category = FailureCategory.FileIO,
+                StackTrace = ex.StackTrace,
             };
         }
 
@@ -158,6 +194,8 @@ internal sealed class WptTestRunner
                 TestPath = testPath,
                 Passed = false,
                 Message = $"Script execution failed: {ex.Message}",
+                Category = FailureCategory.ScriptError,
+                StackTrace = ex.StackTrace,
             };
         }
 
@@ -177,6 +215,8 @@ internal sealed class WptTestRunner
                 TestPath = testPath,
                 Passed = false,
                 Message = $"Rendering failed: {ex.Message}",
+                Category = FailureCategory.RenderingError,
+                StackTrace = ex.StackTrace,
             };
         }
 
@@ -214,6 +254,7 @@ internal sealed class WptTestRunner
                     TestPath = testPath,
                     Passed = false,
                     Message = $"Failed to decode reference image: {referencePath}",
+                    Category = FailureCategory.ReferenceDecodeError,
                 };
             }
 
@@ -239,6 +280,7 @@ internal sealed class WptTestRunner
                 Passed = false,
                 MatchPercent = matchPct,
                 Message = $"Pixel mismatch: {matchPct:F1}% match ({diff.DiffPixelCount}/{diff.TotalPixelCount} pixels differ)",
+                Category = FailureCategory.PixelMismatch,
             };
         }
     }
