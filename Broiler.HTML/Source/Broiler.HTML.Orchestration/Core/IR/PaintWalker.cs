@@ -410,9 +410,11 @@ internal static class PaintWalker
             items.Add(new BlendModeItem { Bounds = bounds, Mode = "normal" });
         }
 
-        // Overflow clipping — CSS2.1 §11.1.1: clip at the padding edge of the box
+        // Overflow clipping — CSS2.1 §11.1.1: clip at the padding edge of the box.
+        // For static rendering, overflow:auto and overflow:scroll clip content
+        // identically to overflow:hidden (no scrollbar UI).
         bool clipped = false;
-        if (style.Overflow == "hidden")
+        if (style.Overflow is "hidden" or "auto" or "scroll")
         {
             var border = fragment.Border;
             var clipRect = new RectangleF(
@@ -1077,7 +1079,7 @@ internal static class PaintWalker
 
         // Overflow clipping — paired with RestoreItem at the end
         bool clipped = false;
-        if (style.Overflow == "hidden")
+        if (style.Overflow is "hidden" or "auto" or "scroll")
         {
             var border = fragment.Border;
             var clipRect = new RectangleF(
@@ -1149,7 +1151,7 @@ internal static class PaintWalker
 
         // Overflow clipping — paired with RestoreItem at the end
         bool clipped = false;
-        if (style.Overflow == "hidden")
+        if (style.Overflow is "hidden" or "auto" or "scroll")
         {
             var border = fragment.Border;
             var clipRect = new RectangleF(
