@@ -121,6 +121,16 @@ internal sealed class WptTestRunner
     };
 
     /// <summary>
+    /// Regex that detects <c>&lt;video&gt;</c> elements with a <c>&lt;source&gt;</c>
+    /// child pointing to an external media file.  Broiler cannot decode video
+    /// streams, so tests that depend on video playback produce fundamentally
+    /// different output from browsers and should be skipped.
+    /// </summary>
+    private static readonly Regex VideoWithSourcePattern = new(
+        @"<video\b[^>]*>[\s\S]*?<source\b[^>]*\bsrc\s*=",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
     /// Regex to extract inline and external <c>&lt;script&gt;</c> blocks.
     /// Mirrors the pattern used by <see cref="Broiler.Cli.CaptureService"/>.
     /// </summary>
@@ -138,13 +148,77 @@ internal sealed class WptTestRunner
     }
 
     /// <summary>
-    /// Recursively discovers all test files under <paramref name="wptRoot"/>.
+    /// Directory segments that indicate a file is not an actual test.
+    /// Per WPT conventions, <c>reference/</c> and <c>reftest/</c> hold
+    /// reference comparison files, <c>support/</c> holds shared resources,
+    /// and <c>test-plan/</c> holds specification documentation.
+    /// </summary>
+    private static readonly string[] NonTestDirSegments =
+    {
+        "/reference/", "\\reference\\",
+        "/references/", "\\references\\",
+        "/reftest/", "\\reftest\\",
+        "/support/", "\\support\\",
+        "/test-plan/", "\\test-plan\\",
+    };
+
+    /// <summary>
+    /// Recursively discovers all test files under <paramref name="wptRoot"/>,
+    /// excluding non-test files per WPT conventions (reference files, support
+    /// resources, test-plan documentation, and ReSpec source files).
     /// </summary>
     internal static IEnumerable<string> DiscoverTests(string wptRoot)
     {
         return Directory.EnumerateFiles(wptRoot, "*.*", SearchOption.AllDirectories)
-            .Where(f => TestExtensions.Contains(Path.GetExtension(f)))
+            .Where(f => TestExtensions.Contains(Path.GetExtension(f)) && !IsNonTestFile(f))
             .OrderBy(f => f, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Determines whether the given file path is a WPT non-test file that
+    /// should be excluded from test execution.  Non-test files include:
+    /// <list type="bullet">
+    ///   <item>Files in <c>reference/</c>, <c>reftest/</c>, or <c>support/</c> directories.</item>
+    ///   <item>Files in <c>test-plan/</c> directories (spec documentation).</item>
+    ///   <item>Files ending in <c>-ref.html/.htm/.xhtml</c> or <c>-notref.html/.htm/.xhtml</c>
+    ///         (WPT reference/mismatch reference files).</item>
+    ///   <item>Files with a <c>.src.html</c> extension (ReSpec source files).</item>
+    /// </list>
+    /// </summary>
+    internal static bool IsNonTestFile(string filePath)
+    {
+        // Check for non-test directory segments.
+        foreach (var segment in NonTestDirSegments)
+        {
+            if (filePath.Contains(segment, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        // ReSpec source files: *.src.html
+        var fileName = Path.GetFileName(filePath);
+        if (fileName.EndsWith(".src.html", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".src.htm", StringComparison.OrdinalIgnoreCase) ||
+            fileName.EndsWith(".src.xhtml", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // WPT reference / mismatch reference files: *-ref.html, *-notref.html
+        var nameWithoutExt = Path.GetFileNameWithoutExtension(filePath);
+        if (nameWithoutExt.EndsWith("-ref", StringComparison.OrdinalIgnoreCase) ||
+            nameWithoutExt.EndsWith("-notref", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Determines whether the given HTML content requires media playback
+    /// (e.g. <c>&lt;video&gt;</c> with an external <c>&lt;source&gt;</c>).
+    /// Broiler cannot decode video/audio streams, so these tests produce
+    /// fundamentally different output and should be skipped.
+    /// </summary>
+    internal static bool IsMediaPlaybackTest(string htmlContent)
+    {
+        return VideoWithSourcePattern.IsMatch(htmlContent);
     }
 
     /// <summary>
@@ -218,6 +292,18 @@ internal sealed class WptTestRunner
                 Message = $"Failed to read test file: {ex.Message}",
                 Category = FailureCategory.FileIO,
                 StackTrace = ex.StackTrace,
+            };
+        }
+
+        // Skip tests that require media playback (video/audio streams)
+        // which Broiler cannot decode.
+        if (IsMediaPlaybackTest(html))
+        {
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Skipped = true,
+                Message = "Test requires media playback (video/audio) which is not supported.",
             };
         }
 

@@ -48,6 +48,40 @@ public class WptTestRunnerTests : IDisposable
     }
 
     [Fact]
+    public void DiscoverTests_Excludes_NonTest_Files()
+    {
+        // Arrange — create actual test files mixed with non-test WPT artefacts.
+        var testDir = Path.Combine(_tempDir, "css", "compositing");
+        var refDir = Path.Combine(testDir, "reference");
+        var supportDir = Path.Combine(testDir, "support");
+        var testPlanDir = Path.Combine(testDir, "test-plan");
+        Directory.CreateDirectory(testDir);
+        Directory.CreateDirectory(refDir);
+        Directory.CreateDirectory(supportDir);
+        Directory.CreateDirectory(testPlanDir);
+
+        // Actual test files (should be discovered).
+        File.WriteAllText(Path.Combine(testDir, "mix-blend-mode-basic.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(testDir, "root-element-opacity.html"), "<html></html>");
+
+        // Non-test files (should be excluded).
+        File.WriteAllText(Path.Combine(refDir, "mix-blend-mode-video-notref.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(supportDir, "helper.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(testPlanDir, "test-plan.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(testPlanDir, "test-plan.src.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(testDir, "opacity-ref.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(testDir, "opacity-notref.html"), "<html></html>");
+
+        // Act
+        var tests = WptTestRunner.DiscoverTests(_tempDir).ToList();
+
+        // Assert — only the two actual test files should be discovered.
+        Assert.Equal(2, tests.Count);
+        Assert.Contains(tests, t => t.EndsWith("mix-blend-mode-basic.html"));
+        Assert.Contains(tests, t => t.EndsWith("root-element-opacity.html"));
+    }
+
+    [Fact]
     public void DiscoverTests_Returns_Empty_For_Empty_Directory()
     {
         var tests = WptTestRunner.DiscoverTests(_tempDir).ToList();
@@ -270,6 +304,95 @@ document.getElementById('out').appendChild(p);
     {
         Assert.False(WptTestRunner.IsCrashTest("/wpt/css/compositing/root-element-opacity.html"));
         Assert.False(WptTestRunner.IsCrashTest("/wpt/css/compositing/root-element-background-margin-opacity.html"));
+    }
+
+    // ──────────── Non-test file detection ────────────────────────────
+
+    [Fact]
+    public void IsNonTestFile_Detects_Reference_Directory()
+    {
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/reference/mix-blend-mode-video-notref.html"));
+        Assert.True(WptTestRunner.IsNonTestFile("C:\\wpt\\css\\compositing\\reference\\some-ref.html"));
+    }
+
+    [Fact]
+    public void IsNonTestFile_Detects_Support_Directory()
+    {
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/support/helper.html"));
+        Assert.True(WptTestRunner.IsNonTestFile("C:\\wpt\\support\\utils.html"));
+    }
+
+    [Fact]
+    public void IsNonTestFile_Detects_TestPlan_Directory()
+    {
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/test-plan/test-plan.html"));
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/test-plan/css-blending-test-plan-proposal.html"));
+    }
+
+    [Fact]
+    public void IsNonTestFile_Detects_Src_Html_Extension()
+    {
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/test-plan/test-plan.src.html"));
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/spec.src.htm"));
+    }
+
+    [Fact]
+    public void IsNonTestFile_Detects_Ref_And_Notref_Suffixes()
+    {
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/root-element-opacity-ref.html"));
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/mix-blend-mode-video-notref.html"));
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/test-ref.htm"));
+        Assert.True(WptTestRunner.IsNonTestFile("/wpt/test-notref.xhtml"));
+    }
+
+    [Fact]
+    public void IsNonTestFile_Returns_False_For_Actual_Tests()
+    {
+        Assert.False(WptTestRunner.IsNonTestFile("/wpt/css/compositing/root-element-opacity.html"));
+        Assert.False(WptTestRunner.IsNonTestFile("/wpt/css/compositing/mix-blend-mode/mix-blend-mode-basic.html"));
+        Assert.False(WptTestRunner.IsNonTestFile("/wpt/css/selectors/test1.html"));
+    }
+
+    // ──────────── Media playback detection ───────────────────────────
+
+    [Fact]
+    public void IsMediaPlaybackTest_Detects_Video_With_Source()
+    {
+        var html = @"<html><body>
+<video autoplay>
+    <source type=""video/mp4"" src=""support/red_circle.mp4"">
+</video>
+</body></html>";
+        Assert.True(WptTestRunner.IsMediaPlaybackTest(html));
+    }
+
+    [Fact]
+    public void IsMediaPlaybackTest_Returns_False_For_No_Video()
+    {
+        var html = @"<html><body><p>No video here</p></body></html>";
+        Assert.False(WptTestRunner.IsMediaPlaybackTest(html));
+    }
+
+    [Fact]
+    public void RunTest_Skips_Media_Playback_Test()
+    {
+        var testFile = Path.Combine(_tempDir, "video-test.html");
+        File.WriteAllText(testFile, @"<!DOCTYPE html>
+<html><body>
+<video autoplay>
+    <source type=""video/mp4"" src=""support/video.mp4"">
+</video>
+<div>Overlay</div>
+</body></html>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner();
+        var result = runner.RunTest(testFile, refDir);
+
+        Assert.True(result.Skipped);
+        Assert.Contains("media playback", result.Message);
     }
 
     [Fact]
