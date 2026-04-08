@@ -2,7 +2,7 @@
   "profiles": {
     "Broiler.Cli": {
       "commandName": "Project",
-      "commandLineArgs": "--capture-image \"file:///D:\\Broiler\\acid\\acid3\\acid3.html\" --output cpature.png --width 800 --height 600"
+      "commandLineArgs": "--capture-image \"https://wpt.live/svg/as-image/external-resource-inline-sheet.html\" --output capture.png --width 800 --height 600"
     }
   }
 }

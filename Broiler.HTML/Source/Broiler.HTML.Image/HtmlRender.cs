@@ -15,8 +15,7 @@ public static class HtmlRender
         SKColor backgroundColor = default,
         CssData cssData = null,
         EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null,
-        EventHandler<HtmlImageLoadEventArgs> imageLoad = null,
-        string baseUrl = null)
+        EventHandler<HtmlImageLoadEventArgs> imageLoad = null, string baseUrl = null)
     {
         var bgColor = backgroundColor == default ? SKColors.White : backgroundColor;
 
@@ -36,7 +35,7 @@ public static class HtmlRender
             if (imageLoad != null)
                 container.ImageLoad += imageLoad;
 
-            container.SetHtml(html, cssData, baseUrl);
+            container.SetHtml(html, cssData, baseUrl:baseUrl);
 
             if (backgroundColor == default)
                 bgColor = ResolveCanvasBackground(container, bgColor);
@@ -125,11 +124,11 @@ public static class HtmlRender
         SKColor backgroundColor = default,
         CssData cssData = null,
         EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null,
-        EventHandler<HtmlImageLoadEventArgs> imageLoad = null)
+        EventHandler<HtmlImageLoadEventArgs> imageLoad = null, string baseUrl = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
 
-        using var bitmap = RenderToImage(html, width, height, backgroundColor, cssData, stylesheetLoad, imageLoad);
+        using var bitmap = RenderToImage(html, width, height, backgroundColor, cssData, stylesheetLoad, imageLoad, baseUrl:baseUrl);
         using var data = bitmap.Encode(format, quality);
         using var stream = File.OpenWrite(filePath);
         data.SaveTo(stream);
@@ -144,38 +143,6 @@ public static class HtmlRender
 
         using var g = new GraphicsAdapter(measureCanvas, clip);
         return HtmlRendererUtils.MeasureHtmlByRestrictions(g, container.HtmlContainerInt, minSize, maxSize);
-    }
-
-    private static SizeF RenderHtml(SKCanvas canvas, string html, PointF location, SizeF maxSize,
-        CssData cssData,
-        EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad,
-        EventHandler<HtmlImageLoadEventArgs> imageLoad)
-    {
-        SizeF actualSize = new(0, 0);
-
-        if (string.IsNullOrEmpty(html))
-            return actualSize;
-
-        using var container = new HtmlContainer();
-        container.Location = location;
-        container.MaxSize = maxSize;
-        container.AvoidAsyncImagesLoading = true;
-        container.AvoidImagesLateLoading = true;
-
-        if (stylesheetLoad != null)
-            container.StylesheetLoad += stylesheetLoad;
-        if (imageLoad != null)
-            container.ImageLoad += imageLoad;
-
-        container.SetHtml(html, cssData);
-
-        var clip = new RectangleF(location.X, location.Y, maxSize.Width, maxSize.Height);
-        container.PerformLayout(canvas, clip);
-        container.PerformPaint(canvas, clip);
-
-        actualSize = container.ActualSize;
-
-        return actualSize;
     }
 
     /// <summary>

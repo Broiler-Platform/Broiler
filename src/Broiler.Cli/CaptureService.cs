@@ -367,7 +367,7 @@ public class CaptureService
         }
         else
         {
-            HtmlRender.RenderToFile(html, options.Width, options.Height, options.OutputPath, format);
+            HtmlRender.RenderToFile(html, options.Width, options.Height, options.OutputPath, format, baseUrl:uri.ToString());
         }
     }
 
