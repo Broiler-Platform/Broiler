@@ -90,9 +90,10 @@ internal sealed class SkiaImageAdapter : RAdapter
         if (SKColor.TryParse(colorName, out var color))
             return Utilities.Utils.Convert(color);
 
-        // Fallback: try common color names
+        // Fallback: try common color names (CSS 2.1 basic + CSS Color Level 3 extended)
         return colorName.ToLowerInvariant() switch
         {
+            // CSS 2.1 §4.3.6 basic color keywords
             "white" => Color.FromArgb(255, 255, 255, 255),
             "black" => Color.FromArgb(255, 0, 0, 0),
             "red" => Color.FromArgb(255, 255, 0, 0),
@@ -111,8 +112,144 @@ internal sealed class SkiaImageAdapter : RAdapter
             "navy" => Color.FromArgb(255, 0, 0, 128),
             "fuchsia" or "magenta" => Color.FromArgb(255, 255, 0, 255),
             "transparent" => Color.FromArgb(0, 255, 255, 255),
-            _ => Color.FromArgb(255, 0, 0, 0), // default to black
+
+            // CSS Color Level 3 extended color keywords (used by WPT tests)
+            "lightgray" or "lightgrey" => Color.FromArgb(255, 211, 211, 211),
+            "darkgray" or "darkgrey" => Color.FromArgb(255, 169, 169, 169),
+            "dimgray" or "dimgrey" => Color.FromArgb(255, 105, 105, 105),
+            "lightslategray" or "lightslategrey" => Color.FromArgb(255, 119, 136, 153),
+            "slategray" or "slategrey" => Color.FromArgb(255, 112, 128, 144),
+            "darkslategray" or "darkslategrey" => Color.FromArgb(255, 47, 79, 79),
+            "gainsboro" => Color.FromArgb(255, 220, 220, 220),
+            "whitesmoke" => Color.FromArgb(255, 245, 245, 245),
+            "aliceblue" => Color.FromArgb(255, 240, 248, 255),
+            "ghostwhite" => Color.FromArgb(255, 248, 248, 255),
+            "snow" => Color.FromArgb(255, 255, 250, 250),
+            "seashell" => Color.FromArgb(255, 255, 245, 238),
+            "floralwhite" => Color.FromArgb(255, 255, 250, 240),
+            "linen" => Color.FromArgb(255, 250, 240, 230),
+            "antiquewhite" => Color.FromArgb(255, 250, 235, 215),
+            "oldlace" => Color.FromArgb(255, 253, 245, 230),
+            "papayawhip" => Color.FromArgb(255, 255, 239, 213),
+            "blanchedalmond" => Color.FromArgb(255, 255, 235, 205),
+            "bisque" => Color.FromArgb(255, 255, 228, 196),
+            "peachpuff" => Color.FromArgb(255, 255, 218, 185),
+            "navajowhite" => Color.FromArgb(255, 255, 222, 173),
+            "moccasin" => Color.FromArgb(255, 255, 228, 181),
+            "cornsilk" => Color.FromArgb(255, 255, 248, 220),
+            "ivory" => Color.FromArgb(255, 255, 255, 240),
+            "lemonchiffon" => Color.FromArgb(255, 255, 250, 205),
+            "lightyellow" => Color.FromArgb(255, 255, 255, 224),
+            "lightgoldenrodyellow" => Color.FromArgb(255, 250, 250, 210),
+            "beige" => Color.FromArgb(255, 245, 245, 220),
+            "wheat" => Color.FromArgb(255, 245, 222, 179),
+            "sandybrown" => Color.FromArgb(255, 244, 164, 96),
+            "goldenrod" => Color.FromArgb(255, 218, 165, 32),
+            "darkgoldenrod" => Color.FromArgb(255, 184, 134, 11),
+            "gold" => Color.FromArgb(255, 255, 215, 0),
+            "khaki" => Color.FromArgb(255, 240, 230, 140),
+            "darkkhaki" => Color.FromArgb(255, 189, 183, 107),
+            "tan" => Color.FromArgb(255, 210, 180, 140),
+            "burlywood" => Color.FromArgb(255, 222, 184, 135),
+            "peru" => Color.FromArgb(255, 205, 133, 63),
+            "chocolate" => Color.FromArgb(255, 210, 105, 30),
+            "sienna" => Color.FromArgb(255, 160, 82, 45),
+            "saddlebrown" => Color.FromArgb(255, 139, 69, 19),
+            "brown" => Color.FromArgb(255, 165, 42, 42),
+            "firebrick" => Color.FromArgb(255, 178, 34, 34),
+            "darkred" => Color.FromArgb(255, 139, 0, 0),
+            "indianred" => Color.FromArgb(255, 205, 92, 92),
+            "rosybrown" => Color.FromArgb(255, 188, 143, 143),
+            "lightcoral" => Color.FromArgb(255, 240, 128, 128),
+            "salmon" => Color.FromArgb(255, 250, 128, 114),
+            "darksalmon" => Color.FromArgb(255, 233, 150, 122),
+            "lightsalmon" => Color.FromArgb(255, 255, 160, 122),
+            "coral" => Color.FromArgb(255, 255, 127, 80),
+            "tomato" => Color.FromArgb(255, 255, 99, 71),
+            "orangered" => Color.FromArgb(255, 255, 69, 0),
+            "darkorange" => Color.FromArgb(255, 255, 140, 0),
+            "crimson" => Color.FromArgb(255, 220, 20, 60),
+            "deeppink" => Color.FromArgb(255, 255, 20, 147),
+            "hotpink" => Color.FromArgb(255, 255, 105, 180),
+            "lightpink" => Color.FromArgb(255, 255, 182, 193),
+            "pink" => Color.FromArgb(255, 255, 192, 203),
+            "palevioletred" => Color.FromArgb(255, 219, 112, 147),
+            "mediumvioletred" => Color.FromArgb(255, 199, 21, 133),
+            "orchid" => Color.FromArgb(255, 218, 112, 214),
+            "plum" => Color.FromArgb(255, 221, 160, 221),
+            "violet" => Color.FromArgb(255, 238, 130, 238),
+            "mediumpurple" => Color.FromArgb(255, 147, 112, 219),
+            "darkorchid" => Color.FromArgb(255, 153, 50, 204),
+            "darkviolet" => Color.FromArgb(255, 148, 0, 211),
+            "darkmagenta" => Color.FromArgb(255, 139, 0, 139),
+            "blueviolet" => Color.FromArgb(255, 138, 43, 226),
+            "indigo" => Color.FromArgb(255, 75, 0, 130),
+            "rebeccapurple" => Color.FromArgb(255, 102, 51, 153),
+            "slateblue" => Color.FromArgb(255, 106, 90, 205),
+            "darkslateblue" => Color.FromArgb(255, 72, 61, 139),
+            "mediumslateblue" => Color.FromArgb(255, 123, 104, 238),
+            "lavender" => Color.FromArgb(255, 230, 230, 250),
+            "thistle" => Color.FromArgb(255, 216, 191, 216),
+            "mistyrose" => Color.FromArgb(255, 255, 228, 225),
+            "lavenderblush" => Color.FromArgb(255, 255, 240, 245),
+            "honeydew" => Color.FromArgb(255, 240, 255, 240),
+            "mintcream" => Color.FromArgb(255, 245, 255, 250),
+            "azure" => Color.FromArgb(255, 240, 255, 255),
+            "lightsteelblue" => Color.FromArgb(255, 176, 196, 222),
+            "powderblue" => Color.FromArgb(255, 176, 224, 230),
+            "lightblue" => Color.FromArgb(255, 173, 216, 230),
+            "skyblue" => Color.FromArgb(255, 135, 206, 235),
+            "lightskyblue" => Color.FromArgb(255, 135, 206, 250),
+            "deepskyblue" => Color.FromArgb(255, 0, 191, 255),
+            "dodgerblue" => Color.FromArgb(255, 30, 144, 255),
+            "cornflowerblue" => Color.FromArgb(255, 100, 149, 237),
+            "steelblue" => Color.FromArgb(255, 70, 130, 180),
+            "royalblue" => Color.FromArgb(255, 65, 105, 225),
+            "mediumblue" => Color.FromArgb(255, 0, 0, 205),
+            "darkblue" => Color.FromArgb(255, 0, 0, 139),
+            "midnightblue" => Color.FromArgb(255, 25, 25, 112),
+            "cadetblue" => Color.FromArgb(255, 95, 158, 160),
+            "paleturquoise" => Color.FromArgb(255, 175, 238, 238),
+            "turquoise" => Color.FromArgb(255, 64, 224, 208),
+            "mediumturquoise" => Color.FromArgb(255, 72, 209, 204),
+            "darkturquoise" => Color.FromArgb(255, 0, 206, 209),
+            "lightcyan" => Color.FromArgb(255, 224, 255, 255),
+            "mediumaquamarine" => Color.FromArgb(255, 102, 205, 170),
+            "aquamarine" => Color.FromArgb(255, 127, 255, 212),
+            "darkseagreen" => Color.FromArgb(255, 143, 188, 143),
+            "mediumseagreen" => Color.FromArgb(255, 60, 179, 113),
+            "seagreen" => Color.FromArgb(255, 46, 139, 87),
+            "darkcyan" => Color.FromArgb(255, 0, 139, 139),
+            "lightseagreen" => Color.FromArgb(255, 32, 178, 170),
+            "lightgreen" => Color.FromArgb(255, 144, 238, 144),
+            "palegreen" => Color.FromArgb(255, 152, 251, 152),
+            "springgreen" => Color.FromArgb(255, 0, 255, 127),
+            "mediumspringgreen" => Color.FromArgb(255, 0, 250, 154),
+            "lawngreen" => Color.FromArgb(255, 124, 252, 0),
+            "chartreuse" => Color.FromArgb(255, 127, 255, 0),
+            "greenyellow" => Color.FromArgb(255, 173, 255, 47),
+            "yellowgreen" => Color.FromArgb(255, 154, 205, 50),
+            "limegreen" => Color.FromArgb(255, 50, 205, 50),
+            "forestgreen" => Color.FromArgb(255, 34, 139, 34),
+            "darkgreen" => Color.FromArgb(255, 0, 100, 0),
+            "olivedrab" => Color.FromArgb(255, 107, 142, 35),
+            "darkolivegreen" => Color.FromArgb(255, 85, 107, 47),
+
+            _ => ResolveExtendedColorName(colorName),
         };
+    }
+
+    /// <summary>
+    /// Fallback for CSS named colors not in the primary switch. Uses
+    /// <see cref="Color.FromName"/> which recognises .NET known colors
+    /// (case-insensitive). Returns black if the name is unrecognised.
+    /// </summary>
+    private static Color ResolveExtendedColorName(string colorName)
+    {
+        var c = Color.FromName(colorName);
+        if (c.IsKnownColor)
+            return Color.FromArgb(c.A, c.R, c.G, c.B);
+        return Color.FromArgb(255, 0, 0, 0);
     }
 
     protected override RPen CreatePen(Color color)

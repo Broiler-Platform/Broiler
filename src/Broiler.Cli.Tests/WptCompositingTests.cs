@@ -378,7 +378,8 @@ Test
 
     /// <summary>
     /// WPT: css/compositing/mix-blend-mode/mix-blend-mode-parent-with-border-radius.html
-    /// Uses mix-blend-mode: difference with parent border-radius. Must not crash.
+    /// Uses mix-blend-mode: difference with parent border-radius.
+    /// Verifies rendering produces content and a lightgray background.
     /// </summary>
     [Fact]
     public void MixBlendMode_Parent_With_BorderRadius_Does_Not_Crash()
@@ -397,11 +398,17 @@ body { background: lightgray; }
 
         using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
         Assert.NotNull(bitmap);
+
+        // Background must be lightgray (#D3D3D3), not black
+        var bg = bitmap.GetPixel(280, 280);
+        Assert.True(bg.Red >= 200 && bg.Green >= 200 && bg.Blue >= 200,
+            $"Background should be lightgray but got ({bg.Red},{bg.Green},{bg.Blue})");
     }
 
     /// <summary>
     /// WPT: css/compositing/mix-blend-mode/mix-blend-mode-parent-with-text.html
-    /// Uses mix-blend-mode: difference with negative margin. Must not crash.
+    /// Uses mix-blend-mode: difference with negative margin.
+    /// Verifies rendering produces content and a lightgray background.
     /// </summary>
     [Fact]
     public void MixBlendMode_Parent_With_Text_Does_Not_Crash()
@@ -422,11 +429,17 @@ body { background: lightgray; }
 
         using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
         Assert.NotNull(bitmap);
+
+        // Background must be lightgray (#D3D3D3), not black
+        var bg = bitmap.GetPixel(280, 280);
+        Assert.True(bg.Red >= 200 && bg.Green >= 200 && bg.Blue >= 200,
+            $"Background should be lightgray but got ({bg.Red},{bg.Green},{bg.Blue})");
     }
 
     /// <summary>
     /// WPT: css/compositing/mix-blend-mode/mix-blend-mode-overflowing-child.html
-    /// Uses mix-blend-mode: difference on an overflowing child. Must not crash.
+    /// Uses mix-blend-mode: difference on an overflowing child.
+    /// Verifies rendering produces content and a lightgray background.
     /// </summary>
     [Fact]
     public void MixBlendMode_Overflowing_Child_Does_Not_Crash()
@@ -445,6 +458,11 @@ body { background: lightgray; }
 
         using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
         Assert.NotNull(bitmap);
+
+        // Background must be lightgray (#D3D3D3), not black
+        var bg = bitmap.GetPixel(280, 280);
+        Assert.True(bg.Red >= 200 && bg.Green >= 200 && bg.Blue >= 200,
+            $"Background should be lightgray but got ({bg.Red},{bg.Green},{bg.Blue})");
     }
 
     // ──────────── Reference tests (no mix-blend-mode) ────────────────────
@@ -472,7 +490,7 @@ body { background: lightgray; }
 
     /// <summary>
     /// WPT: css/compositing/mix-blend-mode/reference/mix-blend-mode-parent-with-border-radius-ref.html
-    /// Yellow square with green circle — must not crash.
+    /// Yellow square with green circle — verifies lightgray background and yellow parent.
     /// </summary>
     [Fact]
     public void MixBlendMode_Parent_With_BorderRadius_Ref_Does_Not_Crash()
@@ -491,11 +509,16 @@ body { background: lightgray; }
 
         using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
         Assert.NotNull(bitmap);
+
+        // Background must be lightgray (#D3D3D3), not black
+        var bg = bitmap.GetPixel(280, 280);
+        Assert.True(bg.Red >= 200 && bg.Green >= 200 && bg.Blue >= 200,
+            $"Background should be lightgray but got ({bg.Red},{bg.Green},{bg.Blue})");
     }
 
     /// <summary>
     /// WPT: css/compositing/mix-blend-mode/reference/mix-blend-mode-parent-with-text-ref.html
-    /// Yellow square with green text — must not crash.
+    /// Yellow square with green text — verifies lightgray background and yellow container.
     /// </summary>
     [Fact]
     public void MixBlendMode_Parent_With_Text_Ref_Does_Not_Crash()
@@ -514,11 +537,23 @@ body { background: lightgray; }
 
         using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
         Assert.NotNull(bitmap);
+
+        // Background must be lightgray (#D3D3D3), not black
+        var bg = bitmap.GetPixel(280, 280);
+        Assert.True(bg.Red >= 200 && bg.Green >= 200 && bg.Blue >= 200,
+            $"Background should be lightgray but got ({bg.Red},{bg.Green},{bg.Blue})");
+
+        // The container should have a yellow (#FF0) background
+        // Sample at (15, 95) — near the bottom of the container, below the text area
+        var container = bitmap.GetPixel(15, 95);
+        Assert.Equal(255, container.Red);
+        Assert.Equal(255, container.Green);
+        Assert.Equal(0, container.Blue);
     }
 
     /// <summary>
     /// WPT: css/compositing/mix-blend-mode/reference/mix-blend-mode-overflowing-child-ref.html
-    /// Green squares with black intersection — must not crash.
+    /// Green squares with black intersection — verifies lightgray background and green container.
     /// </summary>
     [Fact]
     public void MixBlendMode_Overflowing_Child_Ref_Does_Not_Crash()
@@ -539,6 +574,11 @@ body { background: lightgray; }
 
         using var bitmap = HtmlRender.RenderToImage(html, 300, 300);
         Assert.NotNull(bitmap);
+
+        // Background must be lightgray (#D3D3D3), not black
+        var bg = bitmap.GetPixel(280, 280);
+        Assert.True(bg.Red >= 200 && bg.Green >= 200 && bg.Blue >= 200,
+            $"Background should be lightgray but got ({bg.Red},{bg.Green},{bg.Blue})");
     }
 
     /// <summary>
