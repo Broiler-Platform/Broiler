@@ -291,11 +291,39 @@ internal class CssBox : CssBoxProperties, IDisposable
     {
         Words.Clear();
 
+        // CSS2.1 §4.3.8: UAs should not render characters from the Unicode
+        // "control characters" category (C0 U+0000–U+001F except tab/LF/CR,
+        // and C1 U+007F–U+009F).  Strip them before word splitting.
+        var textSpan = _text.Span;
+        bool hasControl = false;
+        for (int i = 0; i < textSpan.Length; i++)
+        {
+            char c = textSpan[i];
+            if (c != '\t' && c != '\n' && c != '\r'
+                && (char.IsControl(c) || (c >= '\u007F' && c <= '\u009F')))
+            {
+                hasControl = true;
+                break;
+            }
+        }
+        if (hasControl)
+        {
+            var sb = new System.Text.StringBuilder(textSpan.Length);
+            for (int i = 0; i < textSpan.Length; i++)
+            {
+                char c = textSpan[i];
+                if (c == '\t' || c == '\n' || c == '\r'
+                    || (!char.IsControl(c) && (c < '\u007F' || c > '\u009F')))
+                    sb.Append(c);
+            }
+            _text = sb.ToString().AsMemory();
+        }
+
         int startIdx = 0;
         bool preserveSpaces = WhiteSpace == CssConstants.Pre || WhiteSpace == CssConstants.PreWrap;
         bool respoctNewline = preserveSpaces || WhiteSpace == CssConstants.PreLine;
 
-        var textSpan = _text.Span;
+        textSpan = _text.Span;
         while (startIdx < textSpan.Length)
         {
             while (startIdx < textSpan.Length && textSpan[startIdx] == '\r')

@@ -237,6 +237,11 @@ internal static class CssBoxHelper
             maxSum = Math.Max(maxSum, oldSum.Value);
     }
 
+    /// <summary>
+    /// CSS2.1 §9.5.2: Returns the maximum bottom outer edge of preceding
+    /// floats that the given box needs to clear, considering the box's
+    /// <c>clear</c> direction (<c>left</c>, <c>right</c>, or <c>both</c>).
+    /// </summary>
     public static double GetMaxFloatBottom(CssBox box)
     {
         double maxBottom = 0;
@@ -245,10 +250,11 @@ internal static class CssBoxHelper
         if (box.ParentBox == null)
             return maxBottom;
 
+        string clearDir = box.Clear;
         foreach (var sibling in box.ParentBox.Boxes)
         {
             if (sibling == box) break;
-            CollectMaxFloatBottom(sibling, ref maxBottom, ref considered);
+            CollectMaxFloatBottom(sibling, clearDir, ref maxBottom, ref considered);
         }
 
         if (considered != null && considered.Count > 0)
@@ -264,14 +270,22 @@ internal static class CssBoxHelper
 
     /// <summary>
     /// Collects the maximum bottom coordinate of floats in the same
-    /// block formatting context (BFC). Floated elements establish a
-    /// new BFC, so their descendant floats are excluded from clearance
-    /// calculations outside.
+    /// block formatting context (BFC) that match the <paramref name="clearDir"/>
+    /// direction.  Floated elements establish a new BFC, so their descendant
+    /// floats are excluded from clearance calculations outside.
     /// </summary>
-    private static void CollectMaxFloatBottom(CssBox box, ref double maxBottom, ref List<(string tag, double bottom)> considered)
+    private static void CollectMaxFloatBottom(CssBox box, string clearDir, ref double maxBottom, ref List<(string tag, double bottom)> considered)
     {
         if (box.Float != CssConstants.None)
         {
+            // CSS2.1 §9.5.2: Only consider floats in the matching direction.
+            // clear:left → only left floats, clear:right → only right floats,
+            // clear:both → all floats.
+            bool matchesDirection = clearDir == "both"
+                || string.Equals(box.Float, clearDir, StringComparison.OrdinalIgnoreCase);
+            if (!matchesDirection)
+                return;
+
             // Compute the float's margin-box bottom ("bottom outer edge"
             // per CSS2.1 §9.5.2) so that clearance positions the cleared
             // element below the float's full margin box.
@@ -297,7 +311,7 @@ internal static class CssBoxHelper
         }
 
         foreach (var child in box.Boxes)
-            CollectMaxFloatBottom(child, ref maxBottom, ref considered);
+            CollectMaxFloatBottom(child, clearDir, ref maxBottom, ref considered);
     }
 
     /// <summary>
