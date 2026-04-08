@@ -20,8 +20,8 @@ public enum MismatchCategory
     SubpixelAntiAliasing,
 
     /// <summary>
-    /// Pervasive low-to-moderate colour shift spread across many pixels
-    /// (e.g. gamma, colour-space, or blending differences).
+    /// Pervasive low-to-moderate color shift spread across many pixels
+    /// (e.g. gamma, color-space, or blending differences).
     /// </summary>
     ColorShift,
 
@@ -219,7 +219,7 @@ public static class MismatchClassifier
         {
             category = MismatchCategory.ColorShift;
             summary = $"Moderate avg channel delta ({avgDelta:F1}) across {affectedRows} row(s); "
-                    + "likely a colour or blending difference.";
+                    + "likely a color or blending difference.";
         }
         // 5. Default — significant structural / layout shift.
         else

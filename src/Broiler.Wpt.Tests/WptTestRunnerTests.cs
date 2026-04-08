@@ -530,7 +530,7 @@ document.getElementById('out').appendChild(p);
         var diag = MismatchClassifier.Classify(diff, 100, 100, 100, 100);
 
         Assert.Equal(MismatchCategory.ColorShift, diag.Category);
-        Assert.Contains("colour", diag.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("color", diag.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
