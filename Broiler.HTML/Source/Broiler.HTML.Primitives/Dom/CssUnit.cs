@@ -11,5 +11,9 @@ public enum CssUnit
     Milimeters,
     Points,
     Picas,
-    Rem
+    Rem,
+    Vh,
+    Vw,
+    Vmin,
+    Vmax
 }

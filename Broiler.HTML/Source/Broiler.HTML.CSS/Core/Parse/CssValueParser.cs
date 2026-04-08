@@ -10,6 +10,44 @@ internal sealed class CssValueParser
 {
     private readonly IColorResolver _colorResolver;
 
+    /// <summary>
+    /// Current viewport dimensions (in pixels) used to resolve CSS viewport
+    /// units (vh, vw, vmin, vmax).  Set by the layout engine before each
+    /// layout pass.  Defaults to 0×0 which causes viewport-unit lengths to
+    /// evaluate to zero.
+    /// </summary>
+    [ThreadStatic]
+    private static SizeF _viewportSize;
+
+    /// <summary>Pre-computed factor for 1vh (viewport height / 100).</summary>
+    [ThreadStatic]
+    private static double _vhFactor;
+
+    /// <summary>Pre-computed factor for 1vw (viewport width / 100).</summary>
+    [ThreadStatic]
+    private static double _vwFactor;
+
+    /// <summary>Pre-computed factor for 1vmin (min dimension / 100).</summary>
+    [ThreadStatic]
+    private static double _vminFactor;
+
+    /// <summary>Pre-computed factor for 1vmax (max dimension / 100).</summary>
+    [ThreadStatic]
+    private static double _vmaxFactor;
+
+    /// <summary>
+    /// Sets the viewport dimensions used by <see cref="ParseLength"/> to
+    /// resolve CSS viewport-relative units.
+    /// </summary>
+    public static void SetViewportSize(float width, float height)
+    {
+        _viewportSize = new SizeF(width, height);
+        _vwFactor = width * 0.01;
+        _vhFactor = height * 0.01;
+        _vminFactor = Math.Min(width, height) * 0.01;
+        _vmaxFactor = Math.Max(width, height) * 0.01;
+    }
+
     public CssValueParser(IColorResolver colorResolver)
     {
         ArgumentNullException.ThrowIfNull(colorResolver);
@@ -75,6 +113,13 @@ internal sealed class CssValueParser
         {
             number = value.Substring(0, value.Length - 3);
         }
+        // CSS Values 3 §5.1.2: 4-character viewport units (vmin, vmax)
+        else if (value.Length > 4 &&
+                 (value.EndsWith(CssConstants.Vmin, StringComparison.OrdinalIgnoreCase) ||
+                  value.EndsWith(CssConstants.Vmax, StringComparison.OrdinalIgnoreCase)))
+        {
+            number = value.Substring(0, value.Length - 4);
+        }
         else if (value.Length > 2)
         {
             // CSS2.1 §4.3.2: Non-zero lengths require a valid unit identifier.
@@ -92,6 +137,13 @@ internal sealed class CssValueParser
                     number = value.Substring(0, value.Length - 2);
                     break;
                 default:
+                    // CSS Values 3 §5.1.2: 2-character viewport units (vh, vw)
+                    if (unit.Equals(CssConstants.Vh, StringComparison.OrdinalIgnoreCase) ||
+                        unit.Equals(CssConstants.Vw, StringComparison.OrdinalIgnoreCase))
+                    {
+                        number = value.Substring(0, value.Length - 2);
+                        break;
+                    }
                     return false; // unrecognized unit
             }
         }
@@ -138,7 +190,9 @@ internal sealed class CssValueParser
         double factor;
 
         //Number of the length
-        int unitLen = unit == CssConstants.Rem ? 3 : unit == CssConstants.Q ? 1 : 2;
+        int unitLen = unit == CssConstants.Rem ? 3 :
+                      unit == CssConstants.Vmin || unit == CssConstants.Vmax ? 4 :
+                      unit == CssConstants.Q ? 1 : 2;
         string number = hasUnit
             ? length.Substring(0, length.Length - unitLen)
             : length;
@@ -183,6 +237,22 @@ internal sealed class CssValueParser
             case CssConstants.Q:
                 factor = 37.795275591f / 40f; // 1Q = 1/40 cm ≈ 0.945 px
                 break;
+            case CssConstants.Vh:
+                // CSS Values 3 §5.1.2: 1vh = 1% of viewport height
+                factor = _vhFactor;
+                break;
+            case CssConstants.Vw:
+                // CSS Values 3 §5.1.2: 1vw = 1% of viewport width
+                factor = _vwFactor;
+                break;
+            case CssConstants.Vmin:
+                // CSS Values 3 §5.1.2: 1vmin = 1% of min(vw, vh)
+                factor = _vminFactor;
+                break;
+            case CssConstants.Vmax:
+                // CSS Values 3 §5.1.2: 1vmax = 1% of max(vw, vh)
+                factor = _vmaxFactor;
+                break;
             default:
                 factor = 0f;
                 break;
@@ -193,6 +263,18 @@ internal sealed class CssValueParser
 
     private static string GetUnit(string length, string defaultUnit, out bool hasUnit)
     {
+        // Check for 4-character units first (e.g. "vmin", "vmax")
+        if (length.Length >= 5)
+        {
+            var last4 = length.Substring(length.Length - 4, 4);
+            if (last4.Equals(CssConstants.Vmin, StringComparison.OrdinalIgnoreCase) ||
+                last4.Equals(CssConstants.Vmax, StringComparison.OrdinalIgnoreCase))
+            {
+                hasUnit = true;
+                return last4.ToLowerInvariant();
+            }
+        }
+
         // Check for 3-character units first (e.g. "rem")
         if (length.Length >= 4 && length.EndsWith(CssConstants.Rem, StringComparison.Ordinal))
         {
@@ -214,6 +296,13 @@ internal sealed class CssValueParser
                 hasUnit = true;
                 break;
             default:
+                // Check for 2-character viewport units (vh, vw)
+                if (unit.Equals(CssConstants.Vh, StringComparison.OrdinalIgnoreCase) ||
+                    unit.Equals(CssConstants.Vw, StringComparison.OrdinalIgnoreCase))
+                {
+                    hasUnit = true;
+                    return unit.ToLowerInvariant();
+                }
                 // Check for single-character units (e.g. "Q" / "q")
                 if (length.Length >= 2)
                 {

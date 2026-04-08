@@ -34,6 +34,31 @@ internal static class HtmlPostProcessor
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
+    /// Matches <c>&lt;video …&gt;…&lt;/video&gt;</c> elements including
+    /// their fallback content.  Browsers that support video never display
+    /// the fallback content, rendering the element as a replaced box.
+    /// </summary>
+    private static readonly Regex VideoContentPattern = new(
+        @"<video(?<attrs>[^>]*)>[\s\S]*?</video>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Extracts the <c>width</c> HTML attribute value from an element's
+    /// attribute string (e.g. <c> width="200"</c>).
+    /// </summary>
+    private static readonly Regex VideoWidthPattern = new(
+        @"\bwidth\s*=\s*[""']?(\d+)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Extracts the <c>height</c> HTML attribute value from an element's
+    /// attribute string (e.g. <c> height="150"</c>).
+    /// </summary>
+    private static readonly Regex VideoHeightPattern = new(
+        @"\bheight\s*=\s*[""']?(\d+)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
     /// Matches <c>&lt;object …&gt;…&lt;/object&gt;</c> elements including
     /// their inline fallback content.
     /// </summary>
@@ -128,6 +153,7 @@ internal static class HtmlPostProcessor
         // the Acid2 test (the eyes are formed by nested <object> elements with
         // image fallback).  Acid3 tests that need object stripping call
         // StripObjectContent() directly; the default pipeline preserves them.
+        html = ReplaceVideoWithPlaceholder(html);
         html = StripHiddenTestArtifacts(html);
         html = RewriteRootSelector(html);
         return html;
@@ -162,6 +188,40 @@ internal static class HtmlPostProcessor
     {
         return IframeContentPattern.Replace(html, m =>
             $"<iframe{m.Groups["attrs"].Value}></iframe>");
+    }
+
+    /// <summary>
+    /// Replaces every <c>&lt;video&gt;…&lt;/video&gt;</c> element with a
+    /// styled placeholder <c>&lt;div&gt;</c> that matches the default replaced
+    /// element rendering in browsers: a <c>300×150</c> black inline-block box.
+    /// <para>
+    /// Per the HTML5 spec §4.8.9, user agents that support video never show
+    /// the fallback content between the tags; they display the video poster
+    /// frame or first frame instead.  Since Broiler cannot decode video
+    /// streams, this placeholder approximates what a browser renders when the
+    /// video cannot be loaded.
+    /// </para>
+    /// <para>
+    /// Any <c>width</c> / <c>height</c> HTML attributes on the original
+    /// <c>&lt;video&gt;</c> tag are preserved on the placeholder so that
+    /// explicit sizing is respected.
+    /// </para>
+    /// </summary>
+    internal static string ReplaceVideoWithPlaceholder(string html)
+    {
+        return VideoContentPattern.Replace(html, m =>
+        {
+            var attrs = m.Groups["attrs"].Value;
+
+            // Extract explicit width/height from the original <video> attributes.
+            var wMatch = VideoWidthPattern.Match(attrs);
+            var hMatch = VideoHeightPattern.Match(attrs);
+
+            string w = wMatch.Success ? wMatch.Groups[1].Value + "px" : "300px";
+            string h = hMatch.Success ? hMatch.Groups[1].Value + "px" : "150px";
+
+            return $"<div style=\"display:inline-block;width:{w};height:{h};background-color:black\"></div>";
+        });
     }
 
     /// <summary>

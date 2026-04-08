@@ -154,6 +154,43 @@ internal sealed class DomParser
             // Phase 2: Populate BoxKind and DOM-attribute properties on the box
             // so layout code can use these instead of accessing HtmlTag directly.
             AssignBoxKindAndAttributes(box);
+
+            // HTML5 §4.8.9: <video> and <audio> are replaced elements. Browsers
+            // that support these media types never display the fallback content
+            // between the tags; they render the poster frame or first frame
+            // instead.  Since this renderer cannot decode media streams, render
+            // them as inline-block boxes with the default intrinsic dimensions
+            // (300×150 for video, 300×32 for audio) and a black background.
+            bool isVideo = box.HtmlTag.Name.Equals("video", StringComparison.OrdinalIgnoreCase);
+            bool isAudio = !isVideo && box.HtmlTag.Name.Equals("audio", StringComparison.OrdinalIgnoreCase);
+            if (isVideo || isAudio)
+            {
+                box.Display = CssConstants.InlineBlock;
+
+                // Honour explicit width/height HTML attributes; fall back to the
+                // default intrinsic size per the HTML spec.
+                if (string.IsNullOrEmpty(box.Width) || box.Width == CssConstants.Auto)
+                {
+                    var attrW = box.HtmlTag.TryGetAttribute("width");
+                    box.Width = !string.IsNullOrEmpty(attrW) ? attrW + "px" : "300px";
+                }
+                if (string.IsNullOrEmpty(box.Height) || box.Height == CssConstants.Auto)
+                {
+                    var attrH = box.HtmlTag.TryGetAttribute("height");
+                    box.Height = !string.IsNullOrEmpty(attrH) ? attrH + "px" : (isVideo ? "150px" : "32px");
+                }
+
+                // Black background to approximate the default media player frame.
+                if (string.IsNullOrEmpty(box.BackgroundColor) ||
+                    box.BackgroundColor.Equals("transparent", StringComparison.OrdinalIgnoreCase))
+                {
+                    box.BackgroundColor = "black";
+                }
+
+                // Hide all children (fallback content, <source>, <track>, etc.)
+                foreach (var child in box.Boxes)
+                    child.Display = CssConstants.None;
+            }
         }
 
         // CSS2.1 §9.7: Relationships between 'display', 'position', and 'float'.

@@ -112,6 +112,18 @@ internal static class CssConstants
     public const string Pc = "pc";
     public const string Rem = "rem";
 
+    /// <summary>Viewport-height unit: 1vh = 1% of viewport height.</summary>
+    public const string Vh = "vh";
+
+    /// <summary>Viewport-width unit: 1vw = 1% of viewport width.</summary>
+    public const string Vw = "vw";
+
+    /// <summary>Viewport-min unit: 1vmin = 1% of the smaller viewport dimension.</summary>
+    public const string Vmin = "vmin";
+
+    /// <summary>Viewport-max unit: 1vmax = 1% of the larger viewport dimension.</summary>
+    public const string Vmax = "vmax";
+
     /// <summary>Quarter-millimeter: 1Q = 1/40 cm ≈ 0.945 px at 96 dpi.</summary>
     public const string Q = "q";
     public const double FontSize = 11f;
