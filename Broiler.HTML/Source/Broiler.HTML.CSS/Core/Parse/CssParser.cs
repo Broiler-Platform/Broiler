@@ -1687,8 +1687,12 @@ internal sealed class CssParser
         {
             char ch = str[endIdx];
             if (ch == '(') depth++;
-            else if (ch == ')') { depth--; if (depth <= 0) { endIdx++; break; } }
-            else if (char.IsWhiteSpace(ch) && depth == 0) break;
+            else if (ch == ')')
+            {
+                depth--;
+                if (depth <= 0) { endIdx++; break; }
+            }
+            else if (char.IsWhiteSpace(ch) && depth <= 0) break;
             endIdx++;
         }
 

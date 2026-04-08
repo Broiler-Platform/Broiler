@@ -410,7 +410,7 @@ internal sealed class CssValueParser
             var parts = inner.Split(',');
             if (parts.Length == 3)
             {
-                var h = double.Parse(parts[0].Trim().TrimEnd('d', 'e', 'g'), CultureInfo.InvariantCulture);
+                var h = double.Parse(StripAngleUnit(parts[0].Trim()), CultureInfo.InvariantCulture);
                 var sTrimmed = parts[1].Trim();
                 var s = double.Parse(sTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
                 if (sTrimmed.EndsWith('%')) s /= 100.0;
@@ -442,7 +442,7 @@ internal sealed class CssValueParser
             var parts = inner.Split(',');
             if (parts.Length == 4)
             {
-                var h = double.Parse(parts[0].Trim().TrimEnd('d', 'e', 'g'), CultureInfo.InvariantCulture);
+                var h = double.Parse(StripAngleUnit(parts[0].Trim()), CultureInfo.InvariantCulture);
                 var sTrimmed = parts[1].Trim();
                 var s = double.Parse(sTrimmed.TrimEnd('%'), CultureInfo.InvariantCulture);
                 if (sTrimmed.EndsWith('%')) s /= 100.0;
@@ -498,15 +498,7 @@ internal sealed class CssValueParser
             if (tokens.Length < 3) return false;
 
             // Strip angle-unit suffixes (deg, grad, rad, turn)
-            var hStr = tokens[0].Trim();
-            foreach (var suffix in new[] { "deg", "grad", "rad", "turn" })
-            {
-                if (hStr.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-                {
-                    hStr = hStr.Substring(0, hStr.Length - suffix.Length);
-                    break;
-                }
-            }
+            var hStr = StripAngleUnit(tokens[0].Trim());
             var h = double.Parse(hStr, CultureInfo.InvariantCulture);
 
             var sTrimmed = tokens[1].Trim();
@@ -550,6 +542,20 @@ internal sealed class CssValueParser
         r = Math.Max(0, Math.Min(255, (int)Math.Round((r1 + m) * 255)));
         g = Math.Max(0, Math.Min(255, (int)Math.Round((g1 + m) * 255)));
         b = Math.Max(0, Math.Min(255, (int)Math.Round((b1 + m) * 255)));
+    }
+
+    /// <summary>
+    /// Strips CSS angle-unit suffixes (<c>deg</c>, <c>grad</c>, <c>rad</c>,
+    /// <c>turn</c>) from a hue value string, returning just the number.
+    /// </summary>
+    private static string StripAngleUnit(string value)
+    {
+        foreach (var suffix in new[] { "deg", "grad", "rad", "turn" })
+        {
+            if (value.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                return value.Substring(0, value.Length - suffix.Length);
+        }
+        return value;
     }
 
     private bool GetColorByName(string str, int idx, int length, out Color color)

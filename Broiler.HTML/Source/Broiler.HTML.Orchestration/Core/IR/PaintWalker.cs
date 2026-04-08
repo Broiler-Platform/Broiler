@@ -208,10 +208,10 @@ internal static class PaintWalker
         // The html element is the first block child of the anonymous wrapper.
         Fragment? htmlFragment = FindFirstBlockChild(root);
 
-        // Fallback: Broiler's HTML parser does not auto-generate <html>/<body>
-        // when they are absent in the source.  If no block-level child exists,
-        // try the first visible child of any display type — it acts as the
-        // de-facto root element for canvas background propagation.
+        // Fallback: even with implicit <html>/<body> generation in HtmlParser,
+        // edge cases (e.g. inline-only content or unknown element types) may
+        // still produce no block-level child.  Try the first visible child of
+        // any display type as the de-facto root for canvas background propagation.
         if (htmlFragment == null)
             htmlFragment = FindFirstVisibleChild(root);
 
