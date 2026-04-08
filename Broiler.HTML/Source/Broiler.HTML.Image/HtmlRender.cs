@@ -15,7 +15,7 @@ public static class HtmlRender
         SKColor backgroundColor = default,
         CssData cssData = null,
         EventHandler<HtmlStylesheetLoadEventArgs> stylesheetLoad = null,
-        EventHandler<HtmlImageLoadEventArgs> imageLoad = null, string baseUrl = null)
+        EventHandler<HtmlImageLoadEventArgs> imageLoad = null)
     {
         var bgColor = backgroundColor == default ? SKColors.White : backgroundColor;
 
@@ -35,7 +35,7 @@ public static class HtmlRender
             if (imageLoad != null)
                 container.ImageLoad += imageLoad;
 
-            container.SetHtml(html, cssData, baseUrl:baseUrl);
+            container.SetHtml(html, cssData);
 
             if (backgroundColor == default)
                 bgColor = ResolveCanvasBackground(container, bgColor);
