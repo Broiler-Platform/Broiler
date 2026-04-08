@@ -122,6 +122,7 @@ internal static class ComputedStyleBuilder
             Filter = box.Filter,
             Isolation = box.Isolation,
             BackgroundClip = box.BackgroundClip,
+            Transform = box.Transform,
 
             // Flex
             FlexDirection = box.FlexDirection,

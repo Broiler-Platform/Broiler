@@ -98,6 +98,11 @@ public sealed partial class DomBridge
         ["list-style-type"] = "disc",
         ["list-style-position"] = "outside",
         ["content"] = "normal",
+        ["transform"] = "none",
+        ["mix-blend-mode"] = "normal",
+        ["background-blend-mode"] = "normal",
+        ["isolation"] = "auto",
+        ["filter"] = "none",
     };
 
     private static readonly Regex StyleTagPattern = new(
