@@ -171,6 +171,9 @@ if [[ -d "$REFERENCE_DIR" ]]; then
     REF_ARGS+=(--reference-dir "$REFERENCE_DIR")
 fi
 
+JSON_REPORT="$OUTPUT_DIR/wpt-results.json"
+REF_ARGS+=(--json-output "$JSON_REPORT")
+
 set +e
 dotnet run --project "$REPO_ROOT/src/Broiler.Wpt" \
     --configuration Release --no-build -- \
@@ -238,6 +241,19 @@ if [[ -f "$LOGFILE" ]]; then
                     echo ""
                 fi
             done
+
+            # Count PixelMismatch sub-categories from [FAIL] [PixelMismatch] [SubCat] tags.
+            # NOTE: This list must stay in sync with the MismatchCategory
+            # enum in Broiler.HTML/Source/Broiler.HTML.Image/MismatchClassifier.cs.
+            echo "PixelMismatch Sub-Categories:"
+            for SUBCAT in SizeMismatch SubpixelAntiAliasing ColorShift LayoutShift MissingContent MinorDiff; do
+                SCOUNT="$(grep -c "^\[FAIL\] \[PixelMismatch\] \[$SUBCAT\]" "$LOGFILE" 2>/dev/null || true)"
+                SCOUNT="${SCOUNT:-0}"
+                if [[ "$SCOUNT" -gt 0 ]]; then
+                    echo "  $SUBCAT: $SCOUNT failure(s)"
+                fi
+            done
+            echo ""
 
             # Include the full Root Cause Analysis section if present.
             if grep -q "^=== Root Cause Analysis ===$" "$LOGFILE"; then

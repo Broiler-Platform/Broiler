@@ -1,4 +1,5 @@
 using System.IO;
+using Broiler.HTML.Image;
 
 namespace Broiler.Wpt.Tests;
 
@@ -434,5 +435,309 @@ document.getElementById('out').appendChild(p);
         var output = sw.ToString();
         // The [FAIL] line should include a [Category] tag.
         Assert.Matches(@"\[FAIL\] \[\w+\]", output);
+    }
+
+    // ──────────── MismatchClassifier ─────────────────────────────────
+
+    [Fact]
+    public void MismatchClassifier_SizeMismatch_When_Dimensions_Differ()
+    {
+        var diff = new PixelDiffResult
+        {
+            DiffRatio = 1.0,
+            DiffPixelCount = 100,
+            TotalPixelCount = 100,
+            IsMatch = false,
+        };
+
+        var diag = MismatchClassifier.Classify(diff, 100, 100, 200, 200);
+
+        Assert.Equal(MismatchCategory.SizeMismatch, diag.Category);
+        Assert.Contains("dimensions differ", diag.Summary);
+    }
+
+    [Fact]
+    public void MismatchClassifier_MinorDiff_When_Few_Pixels_Differ()
+    {
+        // DiffRatio < 0.01 → MinorDiff
+        var mismatches = new List<PixelMismatch>
+        {
+            new(10, 10, 200, 0, 0, 255, 100, 0, 0, 255),
+        };
+        var diff = new PixelDiffResult
+        {
+            DiffRatio = 0.005,
+            DiffPixelCount = 5,
+            TotalPixelCount = 1000,
+            IsMatch = false,
+            Mismatches = mismatches,
+        };
+
+        var diag = MismatchClassifier.Classify(diff, 100, 100, 100, 100);
+
+        Assert.Equal(MismatchCategory.MinorDiff, diag.Category);
+        Assert.Contains("Near-match", diag.Summary);
+    }
+
+    [Fact]
+    public void MismatchClassifier_SubpixelAntiAliasing_When_Small_Deltas()
+    {
+        // Small per-channel delta → SubpixelAntiAliasing
+        var mismatches = new List<PixelMismatch>();
+        for (int i = 0; i < 100; i++)
+        {
+            // ~10 avg delta per channel
+            mismatches.Add(new PixelMismatch(i, 0,
+                (byte)(128 + 10), 128, 128, 255,
+                128, 128, 128, 255));
+        }
+        var diff = new PixelDiffResult
+        {
+            DiffRatio = 0.05,
+            DiffPixelCount = 100,
+            TotalPixelCount = 2000,
+            IsMatch = false,
+            Mismatches = mismatches,
+        };
+
+        var diag = MismatchClassifier.Classify(diff, 100, 100, 100, 100);
+
+        Assert.Equal(MismatchCategory.SubpixelAntiAliasing, diag.Category);
+        Assert.Contains("anti-aliasing", diag.Summary);
+    }
+
+    [Fact]
+    public void MismatchClassifier_ColorShift_When_Moderate_Deltas()
+    {
+        // Moderate per-channel delta → ColorShift
+        var mismatches = new List<PixelMismatch>();
+        for (int i = 0; i < 100; i++)
+        {
+            // ~50 avg delta per channel
+            mismatches.Add(new PixelMismatch(i, i,
+                200, 100, 50, 255,
+                150, 50, 0, 255));
+        }
+        var diff = new PixelDiffResult
+        {
+            DiffRatio = 0.05,
+            DiffPixelCount = 100,
+            TotalPixelCount = 2000,
+            IsMatch = false,
+            Mismatches = mismatches,
+        };
+
+        var diag = MismatchClassifier.Classify(diff, 100, 100, 100, 100);
+
+        Assert.Equal(MismatchCategory.ColorShift, diag.Category);
+        Assert.Contains("colour", diag.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void MismatchClassifier_LayoutShift_When_Large_Deltas()
+    {
+        // High per-channel delta → LayoutShift
+        var mismatches = new List<PixelMismatch>();
+        for (int i = 0; i < 100; i++)
+        {
+            // ~255 delta → high
+            mismatches.Add(new PixelMismatch(i, i,
+                255, 0, 0, 255,
+                0, 255, 0, 255));
+        }
+        var diff = new PixelDiffResult
+        {
+            DiffRatio = 0.10,
+            DiffPixelCount = 200,
+            TotalPixelCount = 2000,
+            IsMatch = false,
+            Mismatches = mismatches,
+        };
+
+        var diag = MismatchClassifier.Classify(diff, 100, 100, 100, 100);
+
+        Assert.Equal(MismatchCategory.LayoutShift, diag.Category);
+        Assert.Contains("layout", diag.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void MismatchClassifier_MissingContent_When_White_To_NonWhite()
+    {
+        // Majority of mismatches are white↔non-white → MissingContent
+        var mismatches = new List<PixelMismatch>();
+        for (int i = 0; i < 100; i++)
+        {
+            // actual is white, baseline has content
+            mismatches.Add(new PixelMismatch(i, 0,
+                255, 255, 255, 255,
+                200, 0, 0, 255));
+        }
+        var diff = new PixelDiffResult
+        {
+            DiffRatio = 0.05,
+            DiffPixelCount = 100,
+            TotalPixelCount = 2000,
+            IsMatch = false,
+            Mismatches = mismatches,
+        };
+
+        var diag = MismatchClassifier.Classify(diff, 100, 100, 100, 100);
+
+        Assert.Equal(MismatchCategory.MissingContent, diag.Category);
+        Assert.Contains("missing", diag.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void MismatchClassifier_Reports_Diagnostics_Metrics()
+    {
+        var mismatches = new List<PixelMismatch>
+        {
+            new(0, 0, 200, 100, 50, 255, 100, 50, 0, 255),
+            new(5, 10, 150, 80, 30, 255, 100, 50, 0, 255),
+        };
+        var diff = new PixelDiffResult
+        {
+            DiffRatio = 0.02,
+            DiffPixelCount = 2,
+            TotalPixelCount = 100,
+            IsMatch = false,
+            Mismatches = mismatches,
+        };
+
+        var diag = MismatchClassifier.Classify(diff, 10, 10, 10, 10);
+
+        Assert.True(diag.AverageChannelDelta > 0);
+        Assert.True(diag.MaxChannelDelta > 0);
+        Assert.Equal(2, diag.AffectedRows);  // rows 0, 10
+        Assert.Equal(2, diag.AffectedColumns); // cols 0, 5
+        Assert.NotNull(diag.Summary);
+    }
+
+    // ──────────── JSON output ────────────────────────────────────────
+
+    [Fact]
+    public void Program_Json_Output_Creates_Valid_Json_File()
+    {
+        var testDir = Path.Combine(_tempDir, "json-test");
+        Directory.CreateDirectory(testDir);
+
+        var testFile = Path.Combine(testDir, "t.html");
+        File.WriteAllText(testFile, "<html><body>T</body></html>");
+
+        var refDir = Path.Combine(testDir, "references");
+        Directory.CreateDirectory(refDir);
+        // Write invalid PNG to trigger a failure with diagnostics.
+        File.WriteAllText(Path.Combine(refDir, "t.png"), "not-a-png");
+
+        var jsonPath = Path.Combine(_tempDir, "report.json");
+
+        var originalOut = Console.Out;
+        var sw = new StringWriter();
+        Console.SetOut(sw);
+        try
+        {
+            Program.Main([
+                "--wpt-dir", testDir,
+                "--reference-dir", refDir,
+                "--json-output", jsonPath,
+            ]);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        // Verify JSON file was created and is valid.
+        Assert.True(File.Exists(jsonPath), "JSON report file should exist");
+
+        var json = File.ReadAllText(jsonPath);
+        var doc = System.Text.Json.JsonDocument.Parse(json);
+
+        // Check top-level structure.
+        Assert.True(doc.RootElement.TryGetProperty("timestamp", out _));
+        Assert.True(doc.RootElement.TryGetProperty("summary", out var summaryEl));
+        Assert.True(doc.RootElement.TryGetProperty("results", out var resultsEl));
+
+        Assert.True(summaryEl.TryGetProperty("failed", out var failedEl));
+        Assert.True(failedEl.GetInt32() > 0);
+
+        Assert.True(resultsEl.GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public void Program_Output_Includes_SubCategory_Tag_For_PixelMismatch()
+    {
+        // When a PixelMismatch failure occurs, the [FAIL] line should
+        // include both [PixelMismatch] and a sub-category tag.
+        var testDir = Path.Combine(_tempDir, "subcat");
+        Directory.CreateDirectory(testDir);
+
+        // Create two test files: one with a reference that produces a mismatch.
+        var testFile = Path.Combine(testDir, "m.html");
+        File.WriteAllText(testFile, @"<!DOCTYPE html>
+<html><body style=""margin:0""><div style=""width:100px;height:100px;background:red""></div></body></html>");
+
+        var refDir = Path.Combine(testDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        // Create a valid but different reference image (all blue).
+        using var refBmp = new SkiaSharp.SKBitmap(1024, 768, SkiaSharp.SKColorType.Rgba8888, SkiaSharp.SKAlphaType.Premul);
+        refBmp.Erase(SkiaSharp.SKColors.Blue);
+        using var stream = File.OpenWrite(Path.Combine(refDir, "m.png"));
+        refBmp.Encode(stream, SkiaSharp.SKEncodedImageFormat.Png, 100);
+
+        var originalOut = Console.Out;
+        var sw = new StringWriter();
+        Console.SetOut(sw);
+        try
+        {
+            Program.Main(["--wpt-dir", testDir, "--reference-dir", refDir]);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        var output = sw.ToString();
+
+        // Should have [FAIL] [PixelMismatch] [<SubCategory>]
+        Assert.Matches(@"\[FAIL\] \[PixelMismatch\] \[\w+\]", output);
+        // Root Cause Analysis should mention sub-categories.
+        Assert.Contains("Root Cause Analysis", output);
+    }
+
+    [Fact]
+    public void WptTestResult_ToJsonObject_Includes_MismatchDiagnostics()
+    {
+        var result = new WptTestResult
+        {
+            TestPath = "/test.html",
+            Passed = false,
+            MatchPercent = 85.5,
+            Category = FailureCategory.PixelMismatch,
+            Message = "Pixel mismatch",
+            MismatchDiagnostics = new MismatchDiagnostics
+            {
+                Category = MismatchCategory.ColorShift,
+                AverageChannelDelta = 42.5,
+                MaxChannelDelta = 100,
+                AffectedRows = 50,
+                AffectedColumns = 30,
+                Summary = "Colour shift detected.",
+            },
+        };
+
+        var json = result.ToJsonObject();
+
+        Assert.Equal("/test.html", json["testPath"]);
+        Assert.Equal(false, json["passed"]);
+        Assert.Equal(85.5, json["matchPercent"]);
+        Assert.Equal("PixelMismatch", json["category"]);
+
+        Assert.IsType<Dictionary<string, object?>>(json["mismatchDiagnostics"]);
+        var diag = (Dictionary<string, object?>)json["mismatchDiagnostics"]!;
+        Assert.Equal("ColorShift", diag["subCategory"]);
+        Assert.Equal(42.5, diag["averageChannelDelta"]);
+        Assert.Equal(100, diag["maxChannelDelta"]);
     }
 }
