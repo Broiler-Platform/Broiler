@@ -170,7 +170,7 @@ internal sealed class CssValueParser
         double factor;
 
         //Number of the length
-        int unitLen = unit == CssConstants.Rem || unit == CssConstants.Rem ? 3 :
+        int unitLen = unit == CssConstants.Rem ? 3 :
                       unit == CssConstants.Vmin || unit == CssConstants.Vmax ? 4 :
                       unit == CssConstants.Q ? 1 : 2;
         string number = hasUnit
