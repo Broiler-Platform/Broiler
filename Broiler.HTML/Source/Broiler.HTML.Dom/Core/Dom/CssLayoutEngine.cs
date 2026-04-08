@@ -100,6 +100,47 @@ internal static class CssLayoutEngine
             }
         }
 
+        // CSS2.1 §10.4/§10.7: Apply min-width / min-height constraints
+        // for replaced elements (images).  These are applied after intrinsic
+        // sizing and aspect-ratio adjustments.
+        var minWidth = new CssLength(imageWord.OwnerBox.MinWidth);
+        if (minWidth.Number > 0)
+        {
+            double minWidthVal = minWidth.Unit == CssUnit.Pixels
+                ? minWidth.Number
+                : minWidth.IsPercentage
+                    ? minWidth.Number * imageWord.OwnerBox.ContainingBlock.Size.Width
+                    : -1;
+            if (minWidthVal > 0 && imageWord.Width < minWidthVal)
+            {
+                if (imageWord.Image != null && !hasImageTagHeight)
+                {
+                    double ratio = minWidthVal / imageWord.Width;
+                    imageWord.Height *= ratio;
+                }
+                imageWord.Width = minWidthVal;
+            }
+        }
+
+        var minHeight = new CssLength(imageWord.OwnerBox.MinHeight);
+        if (minHeight.Number > 0)
+        {
+            double minHeightVal = minHeight.Unit == CssUnit.Pixels
+                ? minHeight.Number
+                : minHeight.IsPercentage
+                    ? minHeight.Number * imageWord.OwnerBox.ContainingBlock.Size.Height
+                    : -1;
+            if (minHeightVal > 0 && imageWord.Height < minHeightVal)
+            {
+                if (imageWord.Image != null && !hasImageTagWidth)
+                {
+                    double ratio = minHeightVal / imageWord.Height;
+                    imageWord.Width *= ratio;
+                }
+                imageWord.Height = minHeightVal;
+            }
+        }
+
         imageWord.Height += imageWord.OwnerBox.ActualBorderBottomWidth + imageWord.OwnerBox.ActualBorderTopWidth + imageWord.OwnerBox.ActualPaddingTop + imageWord.OwnerBox.ActualPaddingBottom;
     }
 

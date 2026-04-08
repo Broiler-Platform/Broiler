@@ -563,6 +563,16 @@ internal sealed class DomParser
         if (box.HtmlTag == null)
             return false;
 
+        // CSS2.1 §5.11.4: :lang(xx) matches elements whose language is
+        // determined by the 'lang' attribute (or xml:lang) on the element
+        // or any ancestor.
+        if (pseudoClass.StartsWith("lang(", StringComparison.OrdinalIgnoreCase)
+            && pseudoClass.EndsWith(")"))
+        {
+            string langArg = pseudoClass.Substring(5, pseudoClass.Length - 6).Trim();
+            return MatchesLangPseudoClass(box, langArg);
+        }
+
         // :root needs no parent — handle it before the ParentBox null check.
         if (pseudoClass == "root")
             return string.Equals(box.HtmlTag.Name, "html", StringComparison.OrdinalIgnoreCase);
@@ -611,6 +621,33 @@ internal sealed class DomParser
             default:
                 return false;
         }
+    }
+
+    /// <summary>
+    /// CSS2.1 §5.11.4: Determines whether the given box matches the
+    /// <c>:lang(xx)</c> pseudo-class.  Walks ancestor elements looking
+    /// for a <c>lang</c> (or <c>xml:lang</c>) attribute whose value
+    /// equals or is a hyphen-separated sub-tag prefix of <paramref name="lang"/>.
+    /// </summary>
+    private static bool MatchesLangPseudoClass(CssBox box, string lang)
+    {
+        for (var current = box; current != null; current = current.ParentBox)
+        {
+            if (current.HtmlTag == null) continue;
+            var attrLang = current.HtmlTag.TryGetAttribute("lang")
+                        ?? current.HtmlTag.TryGetAttribute("xml:lang");
+            if (attrLang != null)
+            {
+                // CSS2.1: match if the attribute value equals the argument
+                // or begins with it followed by a hyphen.
+                if (attrLang.Equals(lang, StringComparison.OrdinalIgnoreCase))
+                    return true;
+                if (attrLang.StartsWith(lang + "-", StringComparison.OrdinalIgnoreCase))
+                    return true;
+                return false;  // Found a lang attribute but it doesn't match.
+            }
+        }
+        return false;
     }
 
     private static void AssignCssBlock(CssBox box, CssBlock block)
