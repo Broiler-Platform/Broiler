@@ -41,7 +41,7 @@ Within each stacking context, the following layers are painted in order
 - [x] For step 2 and step 7: stacking contexts sorted by z-index, then document order as tie-breaker *(partial — `positioned.Sort((a, b) => a.StackLevel.CompareTo(b.StackLevel))` exists; stable sort preserves document order as tie-breaker, but StackLevel is always 0)*
 - [x] Positioned elements with `z-index: auto` do not create new stacking contexts *(deviation: see E.1 item 4 above — `IsStackingContext()` does not distinguish `z-index: auto` from explicit z-index values)*
 - [x] `opacity < 1` creates a stacking context (CSS3, but commonly implemented) *(implemented — `IsStackingContext()` checks `opacity < 1.0`)*
-- [x] `transform` not `none` creates a stacking context (CSS3, but commonly implemented) *(not implemented — no `transform` property handling in `IsStackingContext()`)*
+- [x] `transform` not `none` creates a stacking context (CSS3, but commonly implemented) *(implemented — `IsStackingContext()` checks `box.Transform != "none"`)*
 
 ## E.3 Notes
 
