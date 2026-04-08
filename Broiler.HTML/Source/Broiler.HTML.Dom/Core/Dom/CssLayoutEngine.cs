@@ -295,7 +295,7 @@ internal static class CssLayoutEngine
         // layout height is clamped to the specified height so that subsequent
         // siblings are not pushed down by overflowing content.
         if (hasExplicitHeight
-            && blockBox.Overflow is CssConstants.Hidden or "auto" or "scroll"
+            && blockBox.Overflow is CssConstants.Hidden or CssConstants.Auto or CssConstants.Scroll
             && blockBox.ActualBottom - blockBox.Location.Y > blockBox.ActualHeight)
             blockBox.ActualBottom = blockBox.Location.Y + blockBox.ActualHeight;
     }

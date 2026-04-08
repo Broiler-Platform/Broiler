@@ -96,6 +96,7 @@ internal static class CssConstants
     public const string XXSmall = "xx-small";
     public const string Visible = "visible";
     public const string Hidden = "hidden";
+    public const string Scroll = "scroll";
     public const string Dotted = "dotted";
     public const string Dashed = "dashed";
     public const string Double = "double";

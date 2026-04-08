@@ -306,7 +306,11 @@ internal static class FragmentTreeBuilder
             if (box.HtmlTag.HasAttributes())
             {
                 foreach (var attr in box.HtmlTag.Attributes)
-                    sb.Append(' ').Append(attr.Key).Append("=\"").Append(attr.Value).Append('"');
+                {
+                    sb.Append(' ').Append(attr.Key).Append("=\"");
+                    AppendXmlEscaped(sb, attr.Value);
+                    sb.Append('"');
+                }
             }
 
             if (box.HtmlTag.IsSingle)
@@ -319,12 +323,33 @@ internal static class FragmentTreeBuilder
         }
 
         if (!box.Text.IsEmpty)
-            sb.Append(box.Text);
+            AppendXmlEscaped(sb, box.Text.ToString());
 
         foreach (var child in box.Boxes)
             SerializeSvgBox(child, sb);
 
         if (box.HtmlTag != null && !box.HtmlTag.IsSingle)
             sb.Append("</").Append(box.HtmlTag.Name).Append('>');
+    }
+
+    /// <summary>
+    /// Appends <paramref name="text"/> to <paramref name="sb"/>, escaping
+    /// the five XML special characters: <c>&amp;</c>, <c>&lt;</c>,
+    /// <c>&gt;</c>, <c>&quot;</c>, and <c>&apos;</c>.
+    /// </summary>
+    private static void AppendXmlEscaped(StringBuilder sb, string text)
+    {
+        foreach (var ch in text)
+        {
+            switch (ch)
+            {
+                case '&':  sb.Append("&amp;");  break;
+                case '<':  sb.Append("&lt;");   break;
+                case '>':  sb.Append("&gt;");   break;
+                case '"':  sb.Append("&quot;"); break;
+                case '\'': sb.Append("&apos;"); break;
+                default:   sb.Append(ch);       break;
+            }
+        }
     }
 }

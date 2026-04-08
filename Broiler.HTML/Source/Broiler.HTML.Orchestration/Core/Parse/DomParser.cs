@@ -206,14 +206,14 @@ internal sealed class DomParser
                 {
                     var attrW = box.HtmlTag.TryGetAttribute("width");
                     box.Width = !string.IsNullOrEmpty(attrW)
-                        ? (char.IsDigit(attrW[^1]) ? attrW + "px" : attrW)
+                        ? NormaliseDimensionAttribute(attrW)
                         : "300px";
                 }
                 if (string.IsNullOrEmpty(box.Height) || box.Height == CssConstants.Auto)
                 {
                     var attrH = box.HtmlTag.TryGetAttribute("height");
                     box.Height = !string.IsNullOrEmpty(attrH)
-                        ? (char.IsDigit(attrH[^1]) ? attrH + "px" : attrH)
+                        ? NormaliseDimensionAttribute(attrH)
                         : "150px";
                 }
 
@@ -1450,5 +1450,30 @@ internal sealed class DomParser
         }
 
         return hasBlock && hasInline;
+    }
+
+    /// <summary>
+    /// Normalises an HTML dimension attribute value (width/height) to a CSS
+    /// length.  Pure numeric values (e.g. "100") get a "px" suffix; values
+    /// that already carry a unit or percentage (e.g. "100%", "10em") are
+    /// returned unchanged after trimming.
+    /// </summary>
+    private static string NormaliseDimensionAttribute(string value)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0)
+            return "0px";
+
+        // If the value already ends with a known unit or %, keep it as-is.
+        if (trimmed[^1] == '%'
+            || trimmed.EndsWith("px", StringComparison.OrdinalIgnoreCase)
+            || trimmed.EndsWith("em", StringComparison.OrdinalIgnoreCase)
+            || trimmed.EndsWith("pt", StringComparison.OrdinalIgnoreCase)
+            || trimmed.EndsWith("vw", StringComparison.OrdinalIgnoreCase)
+            || trimmed.EndsWith("vh", StringComparison.OrdinalIgnoreCase))
+            return trimmed;
+
+        // Otherwise treat as a unitless pixel value.
+        return trimmed + "px";
     }
 }
