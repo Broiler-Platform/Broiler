@@ -227,6 +227,8 @@ if [[ -f "$LOGFILE" ]]; then
             echo "Subset   : ${SUBSET:-"(all)"}"
             echo ""
             # Count failures per category from [FAIL] [Category] tags.
+            # NOTE: This list must stay in sync with the FailureCategory
+            # enum in src/Broiler.Wpt/WptTestRunner.cs.
             for CAT in PixelMismatch ScriptError RenderingError FileIO ReferenceDecodeError Unknown; do
                 COUNT="$(grep -c "^\[FAIL\] \[$CAT\]" "$LOGFILE" 2>/dev/null || true)"
                 COUNT="${COUNT:-0}"
