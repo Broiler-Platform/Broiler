@@ -29,6 +29,38 @@ internal static class SvgRenderer
 
     private static void ParseElements(string svgXml, RectangleF bounds, List<DisplayItem> items)
     {
+        // Parse the viewBox from the root <svg> element to compute the
+        // coordinate transform.  When a viewBox is present, SVG coordinates
+        // are in viewBox space and must be scaled/translated to CSS bounds.
+        // Default preserveAspectRatio is "xMidYMid meet" — scale uniformly
+        // to fit, then centre in the viewport.
+        float sx = 1f, sy = 1f, tx = 0f, ty = 0f;
+        var svgMatch = Regex.Match(svgXml, @"<svg\s+([^>]*?)\/?>", RegexOptions.IgnoreCase);
+        if (svgMatch.Success)
+        {
+            var svgAttrs = ParseAttributes(svgMatch.Groups[1].Value);
+            if (svgAttrs.TryGetValue("viewBox", out var vb))
+            {
+                var parts = vb.Split(new[] { ' ', ',', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 4 &&
+                    float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float vbX) &&
+                    float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float vbY) &&
+                    float.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float vbW) &&
+                    float.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out float vbH) &&
+                    vbW > 0 && vbH > 0)
+                {
+                    // "xMidYMid meet": scale uniformly to fit, centre
+                    float scaleX = bounds.Width / vbW;
+                    float scaleY = bounds.Height / vbH;
+                    float scale = Math.Min(scaleX, scaleY);
+                    sx = scale;
+                    sy = scale;
+                    tx = -vbX * scale + (bounds.Width - vbW * scale) / 2f;
+                    ty = -vbY * scale + (bounds.Height - vbH * scale) / 2f;
+                }
+            }
+        }
+
         // <rect ... /> or <rect ...></rect>
         foreach (Match m in Regex.Matches(svgXml, @"<rect\s+([^/>]*)/?>" , RegexOptions.IgnoreCase))
         {
@@ -36,13 +68,13 @@ internal static class SvgRenderer
             items.Add(new DrawSvgRectItem
             {
                 Bounds = bounds,
-                X = GetFloat(attrs, "x"),
-                Y = GetFloat(attrs, "y"),
-                Width = GetFloat(attrs, "width"),
-                Height = GetFloat(attrs, "height"),
+                X = GetFloat(attrs, "x") * sx + tx,
+                Y = GetFloat(attrs, "y") * sy + ty,
+                Width = GetFloat(attrs, "width") * sx,
+                Height = GetFloat(attrs, "height") * sy,
                 Fill = GetColor(attrs, "fill", Color.Black),
                 Stroke = GetColor(attrs, "stroke", Color.Empty),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1),
+                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
             });
         }
 
@@ -54,13 +86,13 @@ internal static class SvgRenderer
             items.Add(new DrawSvgEllipseItem
             {
                 Bounds = bounds,
-                Cx = GetFloat(attrs, "cx"),
-                Cy = GetFloat(attrs, "cy"),
-                Rx = r,
-                Ry = r,
+                Cx = GetFloat(attrs, "cx") * sx + tx,
+                Cy = GetFloat(attrs, "cy") * sy + ty,
+                Rx = r * sx,
+                Ry = r * sy,
                 Fill = GetColor(attrs, "fill", Color.Black),
                 Stroke = GetColor(attrs, "stroke", Color.Empty),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1),
+                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
             });
         }
 
@@ -71,13 +103,13 @@ internal static class SvgRenderer
             items.Add(new DrawSvgEllipseItem
             {
                 Bounds = bounds,
-                Cx = GetFloat(attrs, "cx"),
-                Cy = GetFloat(attrs, "cy"),
-                Rx = GetFloat(attrs, "rx"),
-                Ry = GetFloat(attrs, "ry"),
+                Cx = GetFloat(attrs, "cx") * sx + tx,
+                Cy = GetFloat(attrs, "cy") * sy + ty,
+                Rx = GetFloat(attrs, "rx") * sx,
+                Ry = GetFloat(attrs, "ry") * sy,
                 Fill = GetColor(attrs, "fill", Color.Black),
                 Stroke = GetColor(attrs, "stroke", Color.Empty),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1),
+                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
             });
         }
 
@@ -88,12 +120,12 @@ internal static class SvgRenderer
             items.Add(new DrawSvgLineItem
             {
                 Bounds = bounds,
-                X1 = GetFloat(attrs, "x1"),
-                Y1 = GetFloat(attrs, "y1"),
-                X2 = GetFloat(attrs, "x2"),
-                Y2 = GetFloat(attrs, "y2"),
+                X1 = GetFloat(attrs, "x1") * sx + tx,
+                Y1 = GetFloat(attrs, "y1") * sy + ty,
+                X2 = GetFloat(attrs, "x2") * sx + tx,
+                Y2 = GetFloat(attrs, "y2") * sy + ty,
                 Stroke = GetColor(attrs, "stroke", Color.Black),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1),
+                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
             });
         }
 
@@ -105,9 +137,9 @@ internal static class SvgRenderer
             items.Add(new DrawSvgTextItem
             {
                 Bounds = bounds,
-                X = GetFloat(attrs, "x"),
-                Y = GetFloat(attrs, "y"),
-                FontSize = GetFloat(attrs, "font-size", 16),
+                X = GetFloat(attrs, "x") * sx + tx,
+                Y = GetFloat(attrs, "y") * sy + ty,
+                FontSize = GetFloat(attrs, "font-size", 16) * Math.Max(sx, sy),
                 FontFamily = attrs.GetValueOrDefault("font-family") ?? "Arial",
                 Fill = GetColor(attrs, "fill", Color.Black),
                 Text = m.Groups[2].Value.Trim(),
