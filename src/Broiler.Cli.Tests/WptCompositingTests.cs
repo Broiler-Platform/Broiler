@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using SkiaSharp;
 using Broiler.HTML.Image;
 
@@ -326,7 +327,7 @@ Test
     public void Root_Element_Background_Image_With_Opacity_Propagates_To_Canvas()
     {
         // 10x10 green SVG as base64 data URI.
-        var svgBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+        var svgBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(
             "<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><rect width='10' height='10' fill='green'/></svg>"));
         var html = $@"<!DOCTYPE html>
 <html>
@@ -362,7 +363,7 @@ body {{ margin: 0; }}
     public void Root_Element_Background_Image_Covers_Full_Canvas()
     {
         // 10x10 red SVG as base64 data URI.
-        var svgBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+        var svgBase64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(
             "<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><rect width='10' height='10' fill='red'/></svg>"));
         var html = $@"<!DOCTYPE html>
 <html>
