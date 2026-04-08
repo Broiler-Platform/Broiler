@@ -920,6 +920,7 @@ internal sealed class CssParser
             "isolation" => lower is "auto" or "isolate",
             "background-clip" => lower is "border-box" or "padding-box" or "content-box" or "text",
             "filter" => lower is "none" || lower.Contains('('),
+            "transform" => lower is "none" || lower.Contains('('),
             _ => true, // Unknown property — accept any value
         };
     }

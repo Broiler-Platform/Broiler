@@ -121,6 +121,7 @@ public sealed class ComputedStyle
     public string Filter { get; init; } = "none";
     public string Isolation { get; init; } = "auto";
     public string BackgroundClip { get; init; } = "border-box";
+    public string Transform { get; init; } = "none";
 
     // --- Flex ---
 

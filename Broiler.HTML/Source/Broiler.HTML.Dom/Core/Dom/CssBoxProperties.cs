@@ -432,6 +432,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string Filter { get; set; } = "none";
     public string Isolation { get; set; } = "auto";
     public string BackgroundClip { get; set; } = "border-box";
+    public string Transform { get; set; } = "none";
     public string FlexDirection { get; set; } = "row";
     public string JustifyContent { get; set; } = "flex-start";
     public string AlignItems { get; set; } = "stretch";

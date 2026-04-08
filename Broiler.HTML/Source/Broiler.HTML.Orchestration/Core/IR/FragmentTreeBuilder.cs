@@ -200,6 +200,12 @@ internal static class FragmentTreeBuilder
             && !box.Filter.Equals("none", StringComparison.OrdinalIgnoreCase))
             return true;
 
+        // CSS Transforms §6.1: An element with a transform other than 'none'
+        // creates a stacking context and a containing block.
+        if (!string.IsNullOrEmpty(box.Transform)
+            && !box.Transform.Equals("none", StringComparison.OrdinalIgnoreCase))
+            return true;
+
         return false;
     }
 

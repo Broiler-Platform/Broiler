@@ -99,6 +99,7 @@ internal static class CssUtils
             "list-style-image" => cssBox.ListStyleImage,
             "list-style-type" => cssBox.ListStyleType,
             "overflow" => cssBox.Overflow,
+            "transform" => cssBox.Transform,
             _ => null,
         };
     }
@@ -172,6 +173,9 @@ internal static class CssUtils
                 break;
             case "background-clip":
                 cssBox.BackgroundClip = value;
+                break;
+            case "transform":
+                cssBox.Transform = value;
                 break;
             case "box-shadow":
                 cssBox.BoxShadow = value;

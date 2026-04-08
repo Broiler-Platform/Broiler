@@ -40,7 +40,7 @@ internal static class PaintWalker
         if (viewport.Width > 0 && viewport.Height > 0)
             propagatedFrom = EmitCanvasBackground(root, viewport, items);
 
-        PaintFragment(root, items, propagatedFrom, viewport);
+        PaintFragment(root, items, propagatedFrom, viewport, isRoot: true);
         return new DisplayList { Items = items };
     }
 
@@ -339,7 +339,7 @@ internal static class PaintWalker
         return null;
     }
 
-    private static void PaintFragment(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default)
+    private static void PaintFragment(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default, bool isRoot = false)
     {
         var style = fragment.Style;
 
@@ -387,11 +387,27 @@ internal static class PaintWalker
 
         // CSS Compositing §3: mix-blend-mode creates a compositing layer
         // that blends with the backdrop using the specified blend mode.
-        bool hasBlendMode = !string.IsNullOrEmpty(style.MixBlendMode)
+        // CSS Compositing §3.1: The root element's mix-blend-mode must not
+        // be applied when compositing with the canvas (root uses normal).
+        bool hasBlendMode = !isRoot
+            && !string.IsNullOrEmpty(style.MixBlendMode)
             && !style.MixBlendMode.Equals("normal", StringComparison.OrdinalIgnoreCase);
         if (hasBlendMode)
         {
             items.Add(new BlendModeItem { Bounds = bounds, Mode = style.MixBlendMode });
+        }
+
+        // CSS Compositing §2.2: isolation: isolate creates an isolation group.
+        // This prevents children's blend modes from bleeding through to the
+        // element's backdrop.  A layer with SrcOver (normal) blending achieves
+        // this.  Only needed when no explicit opacity or blend mode layer is
+        // already being created (those layers implicitly create isolation).
+        bool hasIsolation = !hasOpacity && !hasBlendMode
+            && !string.IsNullOrEmpty(style.Isolation)
+            && style.Isolation.Equals("isolate", StringComparison.OrdinalIgnoreCase);
+        if (hasIsolation)
+        {
+            items.Add(new BlendModeItem { Bounds = bounds, Mode = "normal" });
         }
 
         // Overflow clipping — CSS2.1 §11.1.1: clip at the padding edge of the box
@@ -442,6 +458,10 @@ internal static class PaintWalker
 
         // Restore blend mode layer (must come after clip restore, before opacity restore)
         if (hasBlendMode)
+            items.Add(new RestoreBlendModeItem { Bounds = bounds });
+
+        // Restore isolation layer
+        if (hasIsolation)
             items.Add(new RestoreBlendModeItem { Bounds = bounds });
 
         // Restore opacity layer (must come after clip and blend mode restore)
@@ -565,6 +585,13 @@ internal static class PaintWalker
                 tileOrigin.Y += ParsePositionValue(yVal, imgRect.Height, imgH);
             }
 
+            // CSS Compositing §8: background-blend-mode specifies how the
+            // background image blends with the background color underneath.
+            bool hasBgBlend = !string.IsNullOrEmpty(fragment.Style.BackgroundBlendMode)
+                && !fragment.Style.BackgroundBlendMode.Equals("normal", StringComparison.OrdinalIgnoreCase);
+            if (hasBgBlend)
+                items.Add(new BlendModeItem { Bounds = imgRect, Mode = fragment.Style.BackgroundBlendMode });
+
             items.Add(new DrawTiledImageItem
             {
                 Bounds = imgRect,
@@ -574,6 +601,9 @@ internal static class PaintWalker
                 TileOrigin = tileOrigin,
                 Repeat = repeat,
             });
+
+            if (hasBgBlend)
+                items.Add(new RestoreBlendModeItem { Bounds = imgRect });
         }
     }
 
