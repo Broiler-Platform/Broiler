@@ -69,7 +69,7 @@ public class Program
 
         var runner = new WptTestRunner();
         int passed = 0, failed = 0, skipped = 0;
-        var failures = new List<string>();
+        var failures = new List<WptTestResult>();
 
         // Collect all results first so they can be sorted by percent match
         // before writing to the logfile.
@@ -102,10 +102,15 @@ public class Program
             else
             {
                 failed++;
-                Console.WriteLine($"[FAIL] {pctTag}{result.TestPath}");
+                string categoryTag = result.Category != FailureCategory.None
+                    ? $"[{result.Category}] "
+                    : "";
+                Console.WriteLine($"[FAIL] {categoryTag}{pctTag}{result.TestPath}");
                 if (result.Message is not null)
                     Console.WriteLine($"       {result.Message}");
-                failures.Add(result.TestPath);
+                if (result.StackTrace is not null)
+                    Console.WriteLine($"       StackTrace: {result.StackTrace}");
+                failures.Add(result);
             }
         }
 
@@ -116,9 +121,28 @@ public class Program
         {
             Console.WriteLine();
             Console.WriteLine("Failed tests:");
-            foreach (var path in failures)
+            foreach (var r in failures)
             {
-                Console.WriteLine($"  {path}");
+                Console.WriteLine($"  {r.TestPath}");
+            }
+
+            // --- Root cause analysis dashboard ---
+            Console.WriteLine();
+            Console.WriteLine("=== Root Cause Analysis ===");
+
+            var grouped = failures
+                .GroupBy(r => r.Category)
+                .OrderByDescending(g => g.Count());
+
+            foreach (var group in grouped)
+            {
+                Console.WriteLine($"  [{group.Key}] — {group.Count()} failure(s)");
+                foreach (var r in group)
+                {
+                    Console.WriteLine($"    • {r.TestPath}");
+                    if (r.Message is not null)
+                        Console.WriteLine($"      {r.Message}");
+                }
             }
         }
 

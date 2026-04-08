@@ -216,6 +216,35 @@ if [[ -f "$LOGFILE" ]]; then
         fi
     } > "$SUMMARY"
     echo "  Summary: $SUMMARY"
+
+    # Write a root-cause analysis report when there are failures.
+    if [[ "$FAILED" -gt 0 ]]; then
+        ANALYSIS="$OUTPUT_DIR/wpt-root-cause-analysis.txt"
+        {
+            echo "WPT Root Cause Analysis"
+            echo "======================="
+            echo "Date     : $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo "Subset   : ${SUBSET:-"(all)"}"
+            echo ""
+            # Count failures per category from [FAIL] [Category] tags.
+            for CAT in PixelMismatch ScriptError RenderingError FileIO ReferenceDecodeError Unknown; do
+                COUNT="$(grep -c "^\[FAIL\] \[$CAT\]" "$LOGFILE" 2>/dev/null || true)"
+                COUNT="${COUNT:-0}"
+                if [[ "$COUNT" -gt 0 ]]; then
+                    echo "$CAT: $COUNT failure(s)"
+                    grep "^\[FAIL\] \[$CAT\]" "$LOGFILE" | sed "s/^\[FAIL\] \[$CAT\] /  /" || true
+                    echo ""
+                fi
+            done
+
+            # Include the full Root Cause Analysis section if present.
+            if grep -q "^=== Root Cause Analysis ===$" "$LOGFILE"; then
+                echo "--- Detailed Root Cause Breakdown ---"
+                sed -n '/^=== Root Cause Analysis ===/,$ p' "$LOGFILE"
+            fi
+        } > "$ANALYSIS"
+        echo "  Analysis: $ANALYSIS"
+    fi
 fi
 
 echo ""

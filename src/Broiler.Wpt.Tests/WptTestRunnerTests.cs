@@ -315,4 +315,124 @@ document.getElementById('out').appendChild(p);
         // Assert — crash test auto-passes when rendering doesn't throw.
         Assert.True(result.Passed);
     }
+
+    // ──────────── Failure categorization ─────────────────────────────
+
+    [Fact]
+    public void RunTest_MissingFile_Returns_FileIO_Category()
+    {
+        var runner = new WptTestRunner();
+
+        var result = runner.RunTest(
+            Path.Combine(_tempDir, "nonexistent.html"),
+            Path.Combine(_tempDir, "references"));
+
+        Assert.False(result.Passed);
+        Assert.Equal(FailureCategory.FileIO, result.Category);
+    }
+
+    [Fact]
+    public void RunTest_Skipped_Returns_None_Category()
+    {
+        var testFile = Path.Combine(_tempDir, "skip-cat.html");
+        File.WriteAllText(testFile, "<html><body>Skip</body></html>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner();
+        var result = runner.RunTest(testFile, refDir);
+
+        Assert.True(result.Skipped);
+        Assert.Equal(FailureCategory.None, result.Category);
+    }
+
+    [Fact]
+    public void RunTest_Passed_Returns_None_Category()
+    {
+        // Crash tests auto-pass; verify they have Category.None.
+        var crashDir = Path.Combine(_tempDir, "crashtests");
+        Directory.CreateDirectory(crashDir);
+
+        var testFile = Path.Combine(crashDir, "cat-test.html");
+        File.WriteAllText(testFile, "<html><body>OK</body></html>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner();
+        var result = runner.RunTest(testFile, refDir);
+
+        Assert.True(result.Passed);
+        Assert.Equal(FailureCategory.None, result.Category);
+    }
+
+    [Fact]
+    public void Program_Output_Includes_Root_Cause_Analysis_For_Failures()
+    {
+        // When there are failures, the program should include a Root Cause
+        // Analysis section in its output.
+        var testDir = Path.Combine(_tempDir, "rca");
+        Directory.CreateDirectory(testDir);
+
+        // Create a test file that will fail (reference image is invalid).
+        var testFile = Path.Combine(testDir, "fail.html");
+        File.WriteAllText(testFile, "<html><body>Fail</body></html>");
+
+        var refDir = Path.Combine(testDir, "references");
+        Directory.CreateDirectory(refDir);
+        // Write an invalid PNG to force a ReferenceDecodeError.
+        File.WriteAllText(Path.Combine(refDir, "fail.png"), "not-a-png");
+
+        var originalOut = Console.Out;
+        var sw = new StringWriter();
+        Console.SetOut(sw);
+        try
+        {
+            Program.Main(["--wpt-dir", testDir, "--reference-dir", refDir]);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        var output = sw.ToString();
+
+        Assert.Contains("[FAIL]", output);
+        Assert.Contains("Root Cause Analysis", output);
+        Assert.Contains("[ReferenceDecodeError]", output);
+    }
+
+    [Fact]
+    public void Program_Output_Includes_Category_Tag_On_Fail_Lines()
+    {
+        // Verify that [FAIL] lines include a category tag like [FileIO].
+        // Use a missing-file scenario to trigger FileIO category.
+        // We can't directly cause a FileIO failure through Program.Main
+        // since it only runs discovered files, but we can check the
+        // reference decode error path.
+        var testDir = Path.Combine(_tempDir, "cat-tag");
+        Directory.CreateDirectory(testDir);
+        File.WriteAllText(Path.Combine(testDir, "t.html"), "<html><body>T</body></html>");
+
+        var refDir = Path.Combine(testDir, "references");
+        Directory.CreateDirectory(refDir);
+        File.WriteAllText(Path.Combine(refDir, "t.png"), "bad-data");
+
+        var originalOut = Console.Out;
+        var sw = new StringWriter();
+        Console.SetOut(sw);
+        try
+        {
+            Program.Main(["--wpt-dir", testDir, "--reference-dir", refDir]);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        var output = sw.ToString();
+        // The [FAIL] line should include a [Category] tag.
+        Assert.Matches(@"\[FAIL\] \[\w+\]", output);
+    }
 }

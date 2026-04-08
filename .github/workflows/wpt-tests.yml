@@ -48,6 +48,18 @@ jobs:
             echo "No summary file found."
           fi
 
+          ANALYSIS="tests/wpt/results/wpt-root-cause-analysis.txt"
+          if [ -f "$ANALYSIS" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Root Cause Analysis" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat "$ANALYSIS" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo ""
+            echo "--- Root Cause Analysis ---"
+            cat "$ANALYSIS"
+          fi
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -55,6 +67,7 @@ jobs:
           path: |
             tests/wpt/results/wpt-results.log
             tests/wpt/results/wpt-summary.txt
+            tests/wpt/results/wpt-root-cause-analysis.txt
 
       - name: Check test result
         if: always()
