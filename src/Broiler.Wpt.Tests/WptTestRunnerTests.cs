@@ -977,4 +977,108 @@ document.getElementById('out').appendChild(p);
         Assert.True(pixel.Blue > 200 && pixel.Red < 50 && pixel.Green < 50,
             $"Expected blue float at (50,50), got R={pixel.Red} G={pixel.Green} B={pixel.Blue}.");
     }
+
+    [Fact]
+    public void InlineSvg_ViewBox_Scales_To_Element_Bounds()
+    {
+        // SVG with viewBox should scale content to the CSS element bounds,
+        // not render at raw viewBox coordinates.
+        const string html = @"<!DOCTYPE html>
+<html><body style=""margin:0; padding:0"">
+<svg xmlns=""http://www.w3.org/2000/svg"" width=""400"" height=""400""
+     viewBox=""0 0 100 100"">
+  <rect x=""0"" y=""0"" width=""100"" height=""100"" fill=""green""/>
+</svg>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 500, 500);
+
+        // The green rect fills the entire viewBox (100×100) which is scaled
+        // to the 400×400 CSS element bounds.  Check that the center of the
+        // element (200,200) is green, proving viewBox→bounds scaling works.
+        var pixel = bitmap.GetPixel(200, 200);
+        Assert.True(pixel.Green > 100 && pixel.Red < 50 && pixel.Blue < 50,
+            $"Expected green at (200,200), got R={pixel.Red} G={pixel.Green} B={pixel.Blue}. " +
+            "SVG viewBox content should be scaled to the CSS element bounds.");
+
+        // Also check near the edge — at (390, 390) should still be green.
+        var edge = bitmap.GetPixel(390, 390);
+        Assert.True(edge.Green > 100 && edge.Red < 50 && edge.Blue < 50,
+            $"Expected green at (390,390), got R={edge.Red} G={edge.Green} B={edge.Blue}. " +
+            "SVG viewBox scaling should fill the entire element.");
+    }
+
+    [Fact]
+    public void OverflowHidden_Borders_Are_Visible()
+    {
+        // CSS2.1 §11.1.1: overflow:hidden clips content at the padding edge.
+        // The element's own borders and background should NOT be clipped.
+        const string html = @"<!DOCTYPE html>
+<html><body style=""margin:0; padding:0"">
+<div style=""width:200px; height:100px; overflow:hidden;
+            background:white; border:2px solid black"">
+    <div style=""width:180px; height:300px; background:green""></div>
+</div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 300, 200);
+
+        // Top border should be visible (black at y=0).
+        var topBorder = bitmap.GetPixel(100, 0);
+        Assert.True(topBorder.Red < 10 && topBorder.Green < 10 && topBorder.Blue < 10,
+            $"Expected black top border at (100,0), got R={topBorder.Red} G={topBorder.Green} B={topBorder.Blue}. " +
+            "Borders should not be clipped by overflow:hidden.");
+
+        // Left border should be visible (black at x=0, y=50).
+        var leftBorder = bitmap.GetPixel(0, 50);
+        Assert.True(leftBorder.Red < 10 && leftBorder.Green < 10 && leftBorder.Blue < 10,
+            $"Expected black left border at (0,50), got R={leftBorder.Red} G={leftBorder.Green} B={leftBorder.Blue}. " +
+            "Borders should not be clipped by overflow:hidden.");
+
+        // Bottom border should be visible (black at y=102 or y=103).
+        var bottomBorder = bitmap.GetPixel(100, 103);
+        Assert.True(bottomBorder.Red < 10 && bottomBorder.Green < 10 && bottomBorder.Blue < 10,
+            $"Expected black bottom border at (100,103), got R={bottomBorder.Red} G={bottomBorder.Green} B={bottomBorder.Blue}. " +
+            "Borders should not be clipped by overflow:hidden.");
+    }
+
+    [Fact]
+    public void Float_PageBreakInsideAvoid_CorrectLayout()
+    {
+        // Float boxes with page-break-inside:avoid should render with
+        // correct dimensions and the green content below the clear div
+        // should span the full container width.
+        const string html = @"<!DOCTYPE html>
+<html><body style=""margin:0; padding:0"">
+<div style=""page-break-inside:avoid"">
+    <div style=""float:left; width:200px; height:100px; background:blue; margin:10px""></div>
+    <div style=""float:left; width:200px; height:100px; background:red; margin:10px""></div>
+    <div style=""clear:both""></div>
+    <div style=""height:50px; background:green""></div>
+</div>
+</body></html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+
+        // Blue float: centered at (110, 60), should be blue.
+        var blue = bitmap.GetPixel(110, 60);
+        Assert.True(blue.Blue > 200 && blue.Red < 50 && blue.Green < 50,
+            $"Expected blue float at (110,60), got R={blue.Red} G={blue.Green} B={blue.Blue}.");
+
+        // Red float: at (330, 60), should be red.
+        var red = bitmap.GetPixel(330, 60);
+        Assert.True(red.Red > 200 && red.Blue < 50 && red.Green < 50,
+            $"Expected red float at (330,60), got R={red.Red} G={red.Green} B={red.Blue}.");
+
+        // Green content at (100, 130): after clear, should be green.
+        var green = bitmap.GetPixel(100, 130);
+        Assert.True(green.Green > 100 && green.Red < 50 && green.Blue < 50,
+            $"Expected green content at (100,130), got R={green.Red} G={green.Green} B={green.Blue}.");
+
+        // Green content should also be present far right (full width).
+        var greenRight = bitmap.GetPixel(500, 130);
+        Assert.True(greenRight.Green > 100 && greenRight.Red < 50 && greenRight.Blue < 50,
+            $"Expected green content at (500,130), got R={greenRight.Red} G={greenRight.Green} B={greenRight.Blue}. " +
+            "Green content div should span the full container width.");
+    }
 }

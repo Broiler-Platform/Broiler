@@ -410,9 +410,22 @@ internal static class PaintWalker
             items.Add(new BlendModeItem { Bounds = bounds, Mode = "normal" });
         }
 
+        // CSS2.1 §14.2: Background and borders are part of the element's
+        // own rendering and are NOT clipped by the element's overflow.
+        // They must be emitted before the overflow clip.
+        if (!ReferenceEquals(fragment, propagatedFrom))
+            EmitBackground(fragment, items);
+
+        if (!ReferenceEquals(fragment, propagatedFrom))
+            EmitBackgroundImage(fragment, items, viewport);
+
+        // Borders
+        EmitBorders(fragment, items);
+
         // Overflow clipping — CSS2.1 §11.1.1: clip at the padding edge of the box.
         // For static rendering, overflow:auto and overflow:scroll clip content
         // identically to overflow:hidden (no scrollbar UI).
+        // Applied after background/borders so they remain visible.
         bool clipped = false;
         if (style.Overflow is "hidden" or "auto" or "scroll")
         {
@@ -425,19 +438,6 @@ internal static class PaintWalker
             items.Add(new ClipItem { Bounds = bounds, ClipRect = clipRect });
             clipped = true;
         }
-
-        // Background color — CSS2.1 §14.2: skip if this fragment's background
-        // was propagated to the canvas (it is already painted as the canvas fill).
-        if (!ReferenceEquals(fragment, propagatedFrom))
-            EmitBackground(fragment, items);
-
-        // Background image — CSS2.1 §14.2: also skip if this fragment's
-        // background image was propagated to the canvas.
-        if (!ReferenceEquals(fragment, propagatedFrom))
-            EmitBackgroundImage(fragment, items, viewport);
-
-        // Borders
-        EmitBorders(fragment, items);
 
         // Replaced image (e.g. <img> elements)
         EmitReplacedImage(fragment, items);
@@ -1077,7 +1077,16 @@ internal static class PaintWalker
                 return;
         }
 
-        // Overflow clipping — paired with RestoreItem at the end
+        // CSS2.1 §14.2/§11.1.1: Background, background image, and borders
+        // are part of the element's own rendering and are NOT clipped by
+        // the element's overflow.  Emit them before the overflow clip.
+        if (!ReferenceEquals(fragment, propagatedFrom))
+            EmitBackground(fragment, items);
+        EmitBackgroundImage(fragment, items, viewport);
+        EmitBorders(fragment, items);
+
+        // Overflow clipping — paired with RestoreItem at the end.
+        // Applied after background/borders so they remain visible.
         bool clipped = false;
         if (style.Overflow is "hidden" or "auto" or "scroll")
         {
@@ -1091,11 +1100,6 @@ internal static class PaintWalker
             clipped = true;
         }
 
-        // Background, background image, borders, replaced image
-        if (!ReferenceEquals(fragment, propagatedFrom))
-            EmitBackground(fragment, items);
-        EmitBackgroundImage(fragment, items, viewport);
-        EmitBorders(fragment, items);
         EmitReplacedImage(fragment, items);
 
         // Recursively visit block children for their backgrounds
