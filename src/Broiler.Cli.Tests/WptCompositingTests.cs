@@ -791,4 +791,52 @@ body { margin: 0; }
         Assert.True(pixel.Green > 100,
             $"Expected green channel present after overlay blending but got G={pixel.Green}");
     }
+
+    // ──────────── Gradient rendering tests ────────────────────────────────
+
+    /// <summary>
+    /// WPT: css/compositing/root-element-background-margin-opacity.html
+    /// A uniform CSS gradient (linear-gradient(green, green)) with opacity
+    /// must render the gradient colour within the root element's box —
+    /// composited at the specified opacity over the white canvas — while
+    /// pixels outside the element remain white.
+    /// </summary>
+    [Fact]
+    public void Root_Element_Background_Margin_Opacity_Gradient_Renders_Correctly()
+    {
+        // Exact WPT test HTML (simplified, no external resources)
+        var html = @"<!DOCTYPE html>
+<style>
+html {
+  margin: 100px;
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(green, green) top left no-repeat;
+  opacity: 0.5;
+}
+</style>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 800, 600);
+
+        // Inside the element box (100-200, 100-200):
+        // Green (#008000 = R0 G128 B0) at 0.5 opacity over white →
+        //   R = 0*0.5 + 255*0.5 = 128
+        //   G = 128*0.5 + 255*0.5 = 192
+        //   B = 0*0.5 + 255*0.5 = 128
+        var pInside = bitmap.GetPixel(150, 150);
+        Assert.InRange(pInside.Red, 120, 140);
+        Assert.InRange(pInside.Green, 185, 200);
+        Assert.InRange(pInside.Blue, 120, 140);
+
+        // Outside the element box: white canvas preserved
+        var pAbove = bitmap.GetPixel(50, 50);
+        Assert.InRange(pAbove.Red, 250, 255);
+        Assert.InRange(pAbove.Green, 250, 255);
+        Assert.InRange(pAbove.Blue, 250, 255);
+
+        var pBelow = bitmap.GetPixel(300, 300);
+        Assert.InRange(pBelow.Red, 250, 255);
+        Assert.InRange(pBelow.Green, 250, 255);
+        Assert.InRange(pBelow.Blue, 250, 255);
+    }
 }
