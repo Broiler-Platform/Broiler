@@ -3,6 +3,8 @@ using Broiler.HtmlBridge;
 using Broiler.HTML.Image;
 using Broiler.JavaScript.Engine;
 using SkiaSharp;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Broiler.Wpt;
 
@@ -62,6 +64,43 @@ internal sealed class WptTestResult
     /// Null when no exception was thrown.
     /// </summary>
     public string? StackTrace { get; init; }
+
+    /// <summary>
+    /// Detailed diagnostics for <see cref="FailureCategory.PixelMismatch"/>
+    /// failures.  Null for all other categories.
+    /// </summary>
+    public MismatchDiagnostics? MismatchDiagnostics { get; init; }
+
+    /// <summary>
+    /// Serialises this result to a JSON-friendly dictionary.
+    /// </summary>
+    internal Dictionary<string, object?> ToJsonObject()
+    {
+        var obj = new Dictionary<string, object?>
+        {
+            ["testPath"] = TestPath,
+            ["passed"] = Passed,
+            ["skipped"] = Skipped,
+            ["matchPercent"] = MatchPercent,
+            ["category"] = Category.ToString(),
+            ["message"] = Message,
+        };
+
+        if (MismatchDiagnostics is { } diag)
+        {
+            obj["mismatchDiagnostics"] = new Dictionary<string, object?>
+            {
+                ["subCategory"] = diag.Category.ToString(),
+                ["averageChannelDelta"] = diag.AverageChannelDelta,
+                ["maxChannelDelta"] = diag.MaxChannelDelta,
+                ["affectedRows"] = diag.AffectedRows,
+                ["affectedColumns"] = diag.AffectedColumns,
+                ["summary"] = diag.Summary,
+            };
+        }
+
+        return obj;
+    }
 }
 
 /// <summary>
@@ -274,13 +313,20 @@ internal sealed class WptTestRunner
                 };
             }
 
+            // Classify the mismatch to provide actionable diagnostics.
+            var diagnostics = MismatchClassifier.Classify(
+                diff,
+                rendered.Width, rendered.Height,
+                reference.Width, reference.Height);
+
             return new WptTestResult
             {
                 TestPath = testPath,
                 Passed = false,
                 MatchPercent = matchPct,
-                Message = $"Pixel mismatch: {matchPct:F1}% match ({diff.DiffPixelCount}/{diff.TotalPixelCount} pixels differ)",
+                Message = $"Pixel mismatch: {matchPct:F1}% match ({diff.DiffPixelCount}/{diff.TotalPixelCount} pixels differ) — {diagnostics.Summary}",
                 Category = FailureCategory.PixelMismatch,
+                MismatchDiagnostics = diagnostics,
             };
         }
     }

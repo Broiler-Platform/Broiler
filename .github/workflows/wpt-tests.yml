@@ -68,6 +68,7 @@ jobs:
             tests/wpt/results/wpt-results.log
             tests/wpt/results/wpt-summary.txt
             tests/wpt/results/wpt-root-cause-analysis.txt
+            tests/wpt/results/wpt-results.json
 
       - name: Check test result
         if: always()
