@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using SkiaSharp;
 using Broiler.HTML.Image;
 
@@ -311,6 +313,116 @@ Test
         Assert.InRange(pixel.Red, 125, 131);
         Assert.InRange(pixel.Green, 189, 195);
         Assert.InRange(pixel.Blue, 125, 131);
+    }
+
+    /// <summary>
+    /// WPT: css/compositing/root-element-background-image-transparency-001.html
+    /// The root element has a background image and opacity: 0.5.
+    /// Per CSS2.1 §14.2, the root's background-image is propagated to the
+    /// canvas and rendered at 50% opacity over white.
+    /// Uses a base64-encoded data: URI SVG to avoid file-system dependencies.
+    /// </summary>
+    [Fact]
+    public void Root_Element_Background_Image_With_Opacity_Propagates_To_Canvas()
+    {
+        // 10x10 green SVG as base64 data URI.
+        var svgBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+            "<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><rect width='10' height='10' fill='green'/></svg>"));
+        var html = $@"<!DOCTYPE html>
+<html>
+<head><style>
+html {{
+  background: url(data:image/svg+xml;base64,{svgBase64});
+  opacity: 0.5;
+}}
+body {{ margin: 0; }}
+</style></head>
+<body></body>
+</html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+
+        // The green (#008000 = 0,128,0) SVG tiles the canvas at 50% opacity
+        // over white (255,255,255):
+        //   R = 0*0.5 + 255*0.5 ≈ 128
+        //   G = 128*0.5 + 255*0.5 ≈ 192
+        //   B = 0*0.5 + 255*0.5 ≈ 128
+        var pixel = bitmap.GetPixel(50, 50);
+        Assert.InRange(pixel.Red, 120, 135);
+        Assert.InRange(pixel.Green, 185, 200);
+        Assert.InRange(pixel.Blue, 120, 135);
+    }
+
+    /// <summary>
+    /// When the root element has a background-image but no opacity,
+    /// the image should tile across the entire canvas (not just the
+    /// element's box).
+    /// </summary>
+    [Fact]
+    public void Root_Element_Background_Image_Covers_Full_Canvas()
+    {
+        // 10x10 red SVG as base64 data URI.
+        var svgBase64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
+            "<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><rect width='10' height='10' fill='red'/></svg>"));
+        var html = $@"<!DOCTYPE html>
+<html>
+<head><style>
+html {{
+  background: url(data:image/svg+xml;base64,{svgBase64});
+}}
+body {{ margin: 0; }}
+</style></head>
+<body></body>
+</html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 100, 100);
+
+        // Red (#FF0000) should tile the entire canvas.
+        // Check a pixel in the corner away from any content.
+        var pixel = bitmap.GetPixel(95, 95);
+        Assert.InRange(pixel.Red, 250, 255);
+        Assert.InRange(pixel.Green, 0, 10);
+        Assert.InRange(pixel.Blue, 0, 10);
+    }
+
+    /// <summary>
+    /// Validates that the baseUrl parameter in HtmlRender.RenderToImage
+    /// enables relative sub-resource (image) resolution.
+    /// </summary>
+    [Fact]
+    public void RenderToImage_BaseUrl_Enables_Relative_Image_Resolution()
+    {
+        // Create a temporary SVG file to act as a relative resource.
+        var tempDir = Path.Combine(Path.GetTempPath(), "broiler-wpt-baseurl-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var svgPath = Path.Combine(tempDir, "green.svg");
+            File.WriteAllText(svgPath,
+                "<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><rect width='10' height='10' fill='green'/></svg>");
+
+            var html = @"<!DOCTYPE html>
+<html>
+<head><style>
+html { background: url(green.svg); }
+body { margin: 0; }
+</style></head>
+<body></body>
+</html>";
+
+            var baseUrl = new Uri(Path.Combine(tempDir, "test.html")).AbsoluteUri;
+            using var bitmap = HtmlRender.RenderToImage(html, 100, 100, baseUrl: baseUrl);
+
+            // The green SVG should tile across the canvas.
+            var pixel = bitmap.GetPixel(50, 50);
+            Assert.InRange(pixel.Green, 120, 135);
+            Assert.InRange(pixel.Red, 0, 10);
+            Assert.InRange(pixel.Blue, 0, 10);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
     }
 
     // ──────────── mix-blend-mode tests ───────────────────────────────────
