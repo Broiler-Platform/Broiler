@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSS2: overflow:hidden clips overflowing content</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .box {
+      width: 200px;
+      height: 100px;
+      overflow: hidden;
+      background: white;
+      border: 2px solid black;
+    }
+    .tall-content {
+      width: 180px;
+      height: 300px;
+      background: green;
+    }
+    .after {
+      width: 200px;
+      height: 50px;
+      background: blue;
+    }
+  </style>
+</head>
+<body>
+  <!-- Content overflows the box but should be clipped. The blue box
+       below should appear immediately after the 100px-high overflow
+       container, not pushed 300px down by the overflowing content. -->
+  <div class="box">
+    <div class="tall-content"></div>
+  </div>
+  <div class="after"></div>
+</body>
+</html>
