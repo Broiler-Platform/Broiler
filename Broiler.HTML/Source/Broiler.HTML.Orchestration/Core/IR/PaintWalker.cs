@@ -1082,7 +1082,8 @@ internal static class PaintWalker
         // the element's overflow.  Emit them before the overflow clip.
         if (!ReferenceEquals(fragment, propagatedFrom))
             EmitBackground(fragment, items);
-        EmitBackgroundImage(fragment, items, viewport);
+        if (!ReferenceEquals(fragment, propagatedFrom))
+            EmitBackgroundImage(fragment, items, viewport);
         EmitBorders(fragment, items);
 
         // Overflow clipping — paired with RestoreItem at the end.

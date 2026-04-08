@@ -35,13 +35,13 @@ internal static class SvgRenderer
         // Default preserveAspectRatio is "xMidYMid meet" — scale uniformly
         // to fit, then centre in the viewport.
         float sx = 1f, sy = 1f, tx = 0f, ty = 0f;
-        var svgMatch = Regex.Match(svgXml, @"<svg\s+([^>]*)>", RegexOptions.IgnoreCase);
+        var svgMatch = Regex.Match(svgXml, @"<svg\s+([^>]*?)\/?>", RegexOptions.IgnoreCase);
         if (svgMatch.Success)
         {
             var svgAttrs = ParseAttributes(svgMatch.Groups[1].Value);
             if (svgAttrs.TryGetValue("viewBox", out var vb))
             {
-                var parts = vb.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries);
+                var parts = vb.Split(new[] { ' ', ',', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length >= 4 &&
                     float.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float vbX) &&
                     float.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float vbY) &&
