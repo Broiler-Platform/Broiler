@@ -82,8 +82,9 @@ public class LogParserTests
             "",
         };
 
-        var entries = LogParser.ParseLines(lines);
+        var (entries, totalLines) = LogParser.ParseLines(lines);
 
+        Assert.Equal(4, totalLines);
         Assert.Equal(2, entries.Count);
         Assert.Equal("192.168.1.1", entries[0].RemoteHost);
         Assert.Equal("10.0.0.5", entries[1].RemoteHost);

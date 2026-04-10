@@ -6,15 +6,17 @@ namespace Broiler.LogAnalyzer;
 internal sealed class LogAnalyzerService
 {
     private readonly IReadOnlyList<LogEntry> _entries;
+    private readonly int _uniqueIpCount;
 
     internal LogAnalyzerService(IReadOnlyList<LogEntry> entries)
     {
         _entries = entries;
+        _uniqueIpCount = _entries.Select(e => e.RemoteHost).Distinct().Count();
     }
 
     internal int TotalRequests => _entries.Count;
 
-    internal int UniqueIpCount => _entries.Select(e => e.RemoteHost).Distinct().Count();
+    internal int UniqueIpCount => _uniqueIpCount;
 
     /// <summary>
     /// Returns status-code → count, ordered by status code.

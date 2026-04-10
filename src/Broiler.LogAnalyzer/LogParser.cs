@@ -77,16 +77,19 @@ internal static partial class LogParser
 
     /// <summary>
     /// Parses all valid entries from the given lines, skipping malformed lines.
+    /// Also returns the total number of lines processed.
     /// </summary>
-    internal static IReadOnlyList<LogEntry> ParseLines(IEnumerable<string> lines)
+    internal static (IReadOnlyList<LogEntry> Entries, int TotalLines) ParseLines(IEnumerable<string> lines)
     {
         var entries = new List<LogEntry>();
+        int totalLines = 0;
         foreach (var line in lines)
         {
+            totalLines++;
             var entry = ParseLine(line);
             if (entry is not null)
                 entries.Add(entry);
         }
-        return entries;
+        return (entries, totalLines);
     }
 }

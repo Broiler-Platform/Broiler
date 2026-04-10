@@ -66,9 +66,8 @@ public class Program
         int totalLines;
         try
         {
-            var lines = File.ReadAllLines(filePath);
-            totalLines = lines.Length;
-            entries = LogParser.ParseLines(lines);
+            var lines = File.ReadLines(filePath);
+            (entries, totalLines) = LogParser.ParseLines(lines);
         }
         catch (IOException ex)
         {

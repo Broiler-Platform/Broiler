@@ -17,7 +17,7 @@ public class LogAnalyzerServiceTests
 
     private static LogAnalyzerService CreateService()
     {
-        var entries = LogParser.ParseLines(SampleLines);
+        var (entries, _) = LogParser.ParseLines(SampleLines);
         return new LogAnalyzerService(entries);
     }
 
