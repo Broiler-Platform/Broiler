@@ -13,4 +13,8 @@
     <ProjectReference Include="..\Broiler.LogAnalyzer\Broiler.LogAnalyzer.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="ScottPlot.WPF" Version="5.0.55" />
+  </ItemGroup>
+
 </Project>

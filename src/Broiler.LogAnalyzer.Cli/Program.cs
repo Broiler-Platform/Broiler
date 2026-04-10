@@ -20,6 +20,7 @@ public class Program
         string? toStr = null;
         string? exportCsv = null;
         string? exportJson = null;
+        bool showCharts = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -52,6 +53,9 @@ public class Program
                     break;
                 case "--export-json" when i + 1 < args.Length:
                     exportJson = args[++i];
+                    break;
+                case "--chart":
+                    showCharts = true;
                     break;
                 case "--file":
                 case "--top":
@@ -201,11 +205,11 @@ public class Program
             Console.WriteLine($"Exported {analyzer.TotalRequests:N0} entries to JSON: {exportJson}");
         }
 
-        PrintReport(analyzer, top, skipped, filesProcessed);
+        PrintReport(analyzer, top, skipped, filesProcessed, showCharts);
         return 0;
     }
 
-    internal static void PrintReport(LogAnalyzerService analyzer, int top, int skippedLines, int filesProcessed)
+    internal static void PrintReport(LogAnalyzerService analyzer, int top, int skippedLines, int filesProcessed, bool showCharts = false)
     {
         string topLabel = top > 0 ? $"Top {top}" : "All";
 
@@ -327,6 +331,36 @@ public class Program
             }
             Console.WriteLine();
         }
+
+        // ── ASCII Charts (--chart) ──
+        if (showCharts)
+        {
+            Console.WriteLine("═══════════════════════════════════════════");
+            Console.WriteLine("              ASCII Charts");
+            Console.WriteLine("═══════════════════════════════════════════");
+            Console.WriteLine();
+
+            var endpointItems = analyzer.TopEndpoints(top)
+                .Select(e => (Label: e.Endpoint, e.Count))
+                .ToList();
+            if (endpointItems.Count > 0)
+            {
+                Console.Write(AsciiChartService.HorizontalBarChart($"{topLabel} Endpoints", endpointItems));
+                Console.WriteLine();
+            }
+
+            var ipItems = analyzer.TopIps(top)
+                .Select(e => (Label: e.Ip, e.Count))
+                .ToList();
+            if (ipItems.Count > 0)
+            {
+                Console.Write(AsciiChartService.HorizontalBarChart($"{topLabel} IPs", ipItems));
+                Console.WriteLine();
+            }
+
+            Console.Write(AsciiChartService.HourlySparkline(analyzer.HourlyDistribution()));
+            Console.WriteLine();
+        }
     }
 
     private static void PrintUsage()
@@ -346,6 +380,7 @@ public class Program
         Console.WriteLine("  --to <DATETIME>        Include entries up to this date/time (ISO 8601)");
         Console.WriteLine("  --export-csv <FILE>    Export entries to a CSV file");
         Console.WriteLine("  --export-json <FILE>   Export entries to a JSON file");
+        Console.WriteLine("  --chart                Display ASCII charts for top endpoints, IPs, and hourly distribution");
         Console.WriteLine("  --help                 Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");

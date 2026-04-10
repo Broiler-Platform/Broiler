@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 using Microsoft.Win32;
+using WpfColor = System.Windows.Media.Color;
 
 namespace Broiler.LogAnalyzer.Wpf;
 
@@ -22,6 +23,8 @@ public partial class MainWindow : Window
     private IReadOnlyList<LogEntry>? _allEntries;
     private LogAnalyzerService? _analyzer;
     private int _top = 10;
+    private bool _chartsLoaded;
+    private bool _perHostLoaded;
 
     public MainWindow()
     {
@@ -90,6 +93,8 @@ public partial class MainWindow : Window
         StatusText.Text = "Analyzing…";
         ResultsTextBox.Text = string.Empty;
         LogEntriesGrid.ItemsSource = null;
+        _chartsLoaded = false;
+        _perHostLoaded = false;
 
         try
         {
@@ -195,6 +200,89 @@ public partial class MainWindow : Window
         var list = filtered.ToList();
         LogEntriesGrid.ItemsSource = list;
         StatusText.Text = $"Showing {list.Count:N0} of {_allEntries.Count:N0} entries.";
+    }
+
+    // ── Lazy tab loading ────────────────────────────────────────────
+
+    private void ResultsTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_analyzer is null)
+            return;
+
+        if (ResultsTabControl.SelectedItem == ChartsTab && !_chartsLoaded)
+        {
+            PopulateCharts();
+            _chartsLoaded = true;
+        }
+        else if (ResultsTabControl.SelectedItem == PerHostTab && !_perHostLoaded)
+        {
+            PopulatePerHostDetails();
+            _perHostLoaded = true;
+        }
+    }
+
+    private void PopulateCharts()
+    {
+        if (_analyzer is null)
+            return;
+
+        ChartsPanel.Children.Clear();
+
+        // ── Status Code Bar Chart ──
+        var statusData = _analyzer.StatusCodeDistribution();
+        if (statusData.Count > 0)
+        {
+            var statusChart = new ScottPlot.WPF.WpfPlot { Height = 350 };
+            var labels = statusData.Select(s => s.StatusCode.ToString()).ToArray();
+            var values = statusData.Select(s => (double)s.Count).ToArray();
+            var positions = Enumerable.Range(0, statusData.Count).Select(i => (double)i).ToArray();
+            statusChart.Plot.Add.Bars(positions, values);
+            statusChart.Plot.Axes.Bottom.TickGenerator = new ScottPlot.TickGenerators.NumericManual(positions, labels);
+            statusChart.Plot.Title("Status Code Distribution");
+            statusChart.Plot.YLabel("Request Count");
+            statusChart.Plot.XLabel("Status Code");
+            statusChart.Refresh();
+
+            ChartsPanel.Children.Add(new TextBlock
+            {
+                Text = "Status Code Distribution",
+                FontSize = 16,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 8, 0, 4)
+            });
+            ChartsPanel.Children.Add(statusChart);
+        }
+
+        // ── Hourly Distribution Line Chart ──
+        var hourlyData = _analyzer.HourlyDistribution();
+        if (hourlyData.Count > 0)
+        {
+            var hourlyChart = new ScottPlot.WPF.WpfPlot { Height = 350 };
+            var hours = hourlyData.Select(h => (double)h.Hour).ToArray();
+            var counts = hourlyData.Select(h => (double)h.Count).ToArray();
+            hourlyChart.Plot.Add.Scatter(hours, counts);
+            hourlyChart.Plot.Title("Hourly Request Distribution");
+            hourlyChart.Plot.YLabel("Request Count");
+            hourlyChart.Plot.XLabel("Hour of Day");
+            hourlyChart.Refresh();
+
+            ChartsPanel.Children.Add(new TextBlock
+            {
+                Text = "Hourly Request Distribution",
+                FontSize = 16,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 16, 0, 4)
+            });
+            ChartsPanel.Children.Add(hourlyChart);
+        }
+    }
+
+    private void PopulatePerHostDetails()
+    {
+        if (_analyzer is null)
+            return;
+
+        PerHostGrid.ItemsSource = _analyzer.PerHostStatistics(_top);
     }
 
     // ── Analysis engine (background thread) ──────────────────────────
@@ -394,10 +482,10 @@ public partial class MainWindow : Window
 /// </summary>
 public sealed class StatusCodeToBrushConverter : IValueConverter
 {
-    private static readonly SolidColorBrush Success = new(Color.FromRgb(0xD4, 0xED, 0xDA)); // green
-    private static readonly SolidColorBrush Redirect = new(Color.FromRgb(0xFF, 0xF3, 0xCD)); // yellow
-    private static readonly SolidColorBrush ClientError = new(Color.FromRgb(0xFF, 0xE0, 0xB2)); // orange
-    private static readonly SolidColorBrush ServerError = new(Color.FromRgb(0xF8, 0xD7, 0xDA)); // red
+    private static readonly SolidColorBrush Success = new(WpfColor.FromRgb(0xD4, 0xED, 0xDA)); // green
+    private static readonly SolidColorBrush Redirect = new(WpfColor.FromRgb(0xFF, 0xF3, 0xCD)); // yellow
+    private static readonly SolidColorBrush ClientError = new(WpfColor.FromRgb(0xFF, 0xE0, 0xB2)); // orange
+    private static readonly SolidColorBrush ServerError = new(WpfColor.FromRgb(0xF8, 0xD7, 0xDA)); // red
     private static readonly SolidColorBrush Default = Brushes.Transparent;
 
     static StatusCodeToBrushConverter()
