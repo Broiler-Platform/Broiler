@@ -1,6 +1,6 @@
 # Roadmap: Broiler.LogAnalyzer Enhancements
 
-> **Status**: Active — created 2026-04-10  
+> **Status**: Active — created 2026-04-10 | Phase 1 complete  
 > **Tracking issue**: Create Roadmap Document for Broiler.LogAnalyzer Enhancements
 
 ---
@@ -366,43 +366,47 @@ Extend beyond the current CSV and JSON exports:
 
 Items are ordered by estimated impact and implementation complexity.
 
-| #  | Enhancement                                   | Component | Impact | Effort | Section |
-|----|-----------------------------------------------|-----------|--------|--------|---------|
-| 1  | DataGrid for log entries with sorting          | WPF       | High   | Medium | 3.1     |
-| 2  | Color-coded status rows                        | WPF       | High   | Low    | 3.3     |
-| 3  | Quick-filter toolbar                           | WPF       | High   | Medium | 3.2     |
-| 4  | Bot/crawler detection                          | Lib       | High   | Medium | 4.1     |
-| 5  | Automated natural-language summary             | Lib       | High   | Medium | 4.2     |
-| 6  | Bar chart for status codes                     | WPF       | High   | Medium | 5.1     |
-| 7  | Line chart for hourly distribution             | WPF       | High   | Medium | 5.1     |
-| 8  | HTML report export                             | Lib       | Medium | Medium | 7.1     |
-| 9  | `--format` flag for CLI                        | CLI       | Medium | Low    | 8.1     |
-| 10 | `--filter-endpoint` in CLI                     | CLI       | Medium | Low    | 8.2     |
-| 11 | Per-IP method and endpoint distribution        | Lib       | Medium | Medium | 6.2     |
-| 12 | Top referers and user agents                   | Lib       | Medium | Low    | 6.1     |
-| 13 | Average response size and requests/sec         | Lib       | Medium | Low    | 6.1     |
-| 14 | Tabbed results view                            | WPF       | Medium | Medium | 3.4     |
-| 15 | ASCII bar charts in CLI                        | CLI       | Medium | Low    | 5.2     |
-| 16 | Suspicious request detection                   | Lib       | Medium | Medium | 4.4     |
-| 17 | Drag-and-drop file support                     | WPF       | Medium | Low    | 10.1    |
-| 18 | Parallel file parsing                          | Lib       | Medium | Medium | 9.1     |
-| 19 | Dark/light theme support                       | WPF       | Low    | Medium | 10.1    |
-| 20 | Comparison mode                                | Lib+CLI   | Low    | High   | 6.3     |
-| 21 | Chart export (PNG/SVG)                         | WPF       | Low    | Medium | 5.3     |
-| 22 | `--follow` / live-tail mode                    | CLI       | Low    | High   | 8.3     |
-| 23 | BenchmarkDotNet project                        | Lib       | Low    | Low    | 9.3     |
-| 24 | Heatmap (hour × day-of-week)                   | WPF       | Low    | High   | 5.1     |
-| 25 | GeoIP integration                              | Lib       | Low    | High   | 4.4     |
+| #  | Enhancement                                   | Component | Impact | Effort | Section | Status |
+|----|-----------------------------------------------|-----------|--------|--------|---------|--------|
+| 1  | DataGrid for log entries with sorting          | WPF       | High   | Medium | 3.1     | ✅ Done |
+| 2  | Color-coded status rows                        | WPF       | High   | Low    | 3.3     | ✅ Done |
+| 3  | Quick-filter toolbar                           | WPF       | High   | Medium | 3.2     | ✅ Done |
+| 4  | Bot/crawler detection                          | Lib       | High   | Medium | 4.1     | Planned |
+| 5  | Automated natural-language summary             | Lib       | High   | Medium | 4.2     | Planned |
+| 6  | Bar chart for status codes                     | WPF       | High   | Medium | 5.1     | Planned |
+| 7  | Line chart for hourly distribution             | WPF       | High   | Medium | 5.1     | Planned |
+| 8  | HTML report export                             | Lib       | Medium | Medium | 7.1     | Planned |
+| 9  | `--format` flag for CLI                        | CLI       | Medium | Low    | 8.1     | Planned |
+| 10 | `--filter-endpoint` in CLI                     | CLI       | Medium | Low    | 8.2     | Planned |
+| 11 | Per-IP method and endpoint distribution        | Lib       | Medium | Medium | 6.2     | Planned |
+| 12 | Top referers and user agents                   | Lib       | Medium | Low    | 6.1     | ✅ Done |
+| 13 | Average response size and requests/sec         | Lib       | Medium | Low    | 6.1     | ✅ Done |
+| 14 | Tabbed results view                            | WPF       | Medium | Medium | 3.4     | ✅ Done |
+| 15 | ASCII bar charts in CLI                        | CLI       | Medium | Low    | 5.2     | Planned |
+| 16 | Suspicious request detection                   | Lib       | Medium | Medium | 4.4     | Planned |
+| 17 | Drag-and-drop file support                     | WPF       | Medium | Low    | 10.1    | Planned |
+| 18 | Parallel file parsing                          | Lib       | Medium | Medium | 9.1     | Planned |
+| 19 | Dark/light theme support                       | WPF       | Low    | Medium | 10.1    | Planned |
+| 20 | Comparison mode                                | Lib+CLI   | Low    | High   | 6.3     | Planned |
+| 21 | Chart export (PNG/SVG)                         | WPF       | Low    | Medium | 5.3     | Planned |
+| 22 | `--follow` / live-tail mode                    | CLI       | Low    | High   | 8.3     | Planned |
+| 23 | BenchmarkDotNet project                        | Lib       | Low    | Low    | 9.3     | Planned |
+| 24 | Heatmap (hour × day-of-week)                   | WPF       | Low    | High   | 5.1     | Planned |
+| 25 | GeoIP integration                              | Lib       | Low    | High   | 4.4     | Planned |
 
 ---
 
 ## 12. Milestones
 
-### Phase 1 — Interactive WPF & Core Metrics (TODOs 1–3, 12–13)
+### Phase 1 — Interactive WPF & Core Metrics (TODOs 1–3, 12–14) ✅ Complete
 
-Replace the plain-text output with a `DataGrid`, add color-coded status rows
-and a quick-filter toolbar. Extend the Lib with top referers, top user agents,
-average response size, and requests-per-second metrics.
+Replaced the plain-text output with a `DataGrid`, added color-coded status rows
+(`StatusCodeToBrushConverter`: green 2xx, yellow 3xx, orange 4xx, red 5xx),
+a quick-filter toolbar (status class, method, IP substring, endpoint substring),
+and a tabbed layout (Log Entries + Summary). Extended the Lib with
+`TopReferers(top)`, `TopUserAgents(top)`, `AverageResponseSize`, and
+`RequestsPerSecond`. CLI report now includes these new metrics. 20 new unit
+tests added in `LogAnalyzerServicePhase1Tests`.
 
 ### Phase 2 — Visualization & Charting (TODOs 6–7, 14–15)
 
