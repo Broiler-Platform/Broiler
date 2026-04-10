@@ -43,6 +43,19 @@ internal static class CssLayoutEngine
         else if (imageWord.Image != null)
         {
             imageWord.Width = imageWord.ImageRectangle == RectangleF.Empty ? imageWord.Image.Width : imageWord.ImageRectangle.Width;
+
+            // CSS2.1 §10.3.2: when both width and height are auto, clamp
+            // intrinsic width to the containing block width so the replaced
+            // element doesn't overflow its container unnecessarily.
+            if (!hasImageTagHeight && imageWord.OwnerBox.ContainingBlock != null)
+            {
+                double cbWidth = imageWord.OwnerBox.ContainingBlock.Size.Width;
+                if (cbWidth > 0 && imageWord.Width > cbWidth)
+                {
+                    imageWord.Width = cbWidth;
+                    scaleImageHeight = true;
+                }
+            }
         }
         else
         {

@@ -775,13 +775,22 @@ internal class CssBox : CssBoxProperties, IDisposable
                                 uncollapsedTop = hypotheticalTop;
                             }
 
-                            // clearance = max(amount to clear float, amount to
-                            // reach hypothetical position).  This can be negative.
-                            double clearance = Math.Max(
-                                maxFloatBottom - uncollapsedTop,
-                                hypotheticalTop - uncollapsedTop);
+                            // CSS2.2 §9.5.2: Only introduce clearance when the
+                            // hypothetical position (where the top border edge
+                            // would be if 'clear' were 'none') is NOT past the
+                            // relevant floats.  When the margin alone already
+                            // places the element past the float, no clearance is
+                            // needed and margin collapsing is preserved.
+                            if (hypotheticalTop < maxFloatBottom)
+                            {
+                                // clearance = max(amount to clear float, amount to
+                                // reach hypothetical position).  This can be negative.
+                                double clearance = Math.Max(
+                                    maxFloatBottom - uncollapsedTop,
+                                    hypotheticalTop - uncollapsedTop);
 
-                            top = uncollapsedTop + clearance;
+                                top = uncollapsedTop + clearance;
+                            }
                         }
                     }
 
