@@ -12,4 +12,8 @@
     <ProjectReference Include="..\Broiler.LogAnalyzer\Broiler.LogAnalyzer.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.LogAnalyzer.Tests" />
+  </ItemGroup>
+
 </Project>
