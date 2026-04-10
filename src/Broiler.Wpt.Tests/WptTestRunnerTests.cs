@@ -1234,6 +1234,33 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_ReplacedElementsMaxHeight20_MatchesReference()
+    {
+        // CSS2 §10.7: max-height on replaced elements should clamp height
+        // and scale width proportionally.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "visudet",
+            "replaced-elements-max-height-20.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "visudet",
+            "replaced-elements-max-height-20.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"replaced-elements-max-height-20 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_ReplacedElementsMinWidth40_MatchesReference()
     {
         // CSS2 §10.4: min-width should override explicit width when greater.
