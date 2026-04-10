@@ -496,6 +496,274 @@ public sealed class LogAnalyzerService
     }
 
     /// <summary>
+    /// Exports the analysis report as a Markdown-formatted string, including
+    /// summary metrics, status code distribution, top endpoints, top IPs,
+    /// error summary, and per-host statistics.
+    /// </summary>
+    public string ExportMarkdown(int top = 10)
+    {
+        var sb = new StringBuilder();
+        string topLabel = top > 0 ? $"Top {top}" : "All";
+
+        sb.AppendLine("# Apache Access Log Analysis");
+        sb.AppendLine();
+
+        sb.AppendLine("## Overview");
+        sb.AppendLine();
+        sb.AppendLine($"| Metric | Value |");
+        sb.AppendLine($"|--------|-------|");
+        sb.AppendLine($"| Total Requests | {_entries.Count:N0} |");
+        sb.AppendLine($"| Unique IPs | {UniqueIpCount:N0} |");
+        sb.AppendLine($"| Bytes Transferred | {_entries.Sum(e => e.ResponseSize):N0} |");
+        sb.AppendLine($"| Avg Response Size | {AverageResponseSize:F0} |");
+        sb.AppendLine($"| Requests/sec | {RequestsPerSecond:F2} |");
+        sb.AppendLine();
+
+        // Status Code Distribution
+        sb.AppendLine("## Status Code Distribution");
+        sb.AppendLine();
+        sb.AppendLine("| Status Code | Count | Percentage |");
+        sb.AppendLine("|-------------|-------|------------|");
+        foreach (var (code, count) in StatusCodeDistribution())
+        {
+            double pct = _entries.Count > 0 ? 100.0 * count / _entries.Count : 0;
+            sb.AppendLine($"| {code} | {count:N0} | {pct:F1}% |");
+        }
+        sb.AppendLine();
+
+        // HTTP Methods
+        sb.AppendLine("## HTTP Methods");
+        sb.AppendLine();
+        sb.AppendLine("| Method | Count | Percentage |");
+        sb.AppendLine("|--------|-------|------------|");
+        foreach (var (method, count) in MethodDistribution())
+        {
+            double pct = _entries.Count > 0 ? 100.0 * count / _entries.Count : 0;
+            sb.AppendLine($"| {method} | {count:N0} | {pct:F1}% |");
+        }
+        sb.AppendLine();
+
+        // Top Endpoints
+        sb.AppendLine($"## {topLabel} Endpoints");
+        sb.AppendLine();
+        sb.AppendLine("| Endpoint | Count |");
+        sb.AppendLine("|----------|-------|");
+        foreach (var (endpoint, count) in TopEndpoints(top))
+        {
+            sb.AppendLine($"| {endpoint} | {count:N0} |");
+        }
+        sb.AppendLine();
+
+        // Top IPs
+        sb.AppendLine($"## {topLabel} IPs");
+        sb.AppendLine();
+        sb.AppendLine("| IP | Count |");
+        sb.AppendLine("|----|-------|");
+        foreach (var (ip, count) in TopIps(top))
+        {
+            sb.AppendLine($"| {ip} | {count:N0} |");
+        }
+        sb.AppendLine();
+
+        // Error Summary
+        var errors = ErrorSummary();
+        if (errors.Count > 0)
+        {
+            sb.AppendLine("## Error Summary");
+            sb.AppendLine();
+            sb.AppendLine("| Category | Count | Percentage |");
+            sb.AppendLine("|----------|-------|------------|");
+            foreach (var (category, count) in errors)
+            {
+                double pct = _entries.Count > 0 ? 100.0 * count / _entries.Count : 0;
+                sb.AppendLine($"| {category} | {count:N0} | {pct:F1}% |");
+            }
+            sb.AppendLine();
+        }
+
+        // Per-Host Statistics
+        var hostStats = PerHostStatistics(top);
+        if (hostStats.Count > 0)
+        {
+            sb.AppendLine($"## {topLabel} Host Statistics");
+            sb.AppendLine();
+            sb.AppendLine("| Host | Requests | Bytes | Errors | Error Rate |");
+            sb.AppendLine("|------|----------|-------|--------|------------|");
+            foreach (var h in hostStats)
+            {
+                sb.AppendLine($"| {h.Host} | {h.Requests:N0} | {h.BytesTransferred:N0} | {h.ErrorCount:N0} | {h.ErrorRate:P1} |");
+            }
+            sb.AppendLine();
+        }
+
+        // Summary
+        sb.AppendLine("## Summary");
+        sb.AppendLine();
+        sb.AppendLine(GenerateSummary());
+        sb.AppendLine();
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Exports the analysis report as a self-contained HTML file with styled tables.
+    /// Includes summary metrics, status code distribution, top endpoints, top IPs,
+    /// error summary, per-host statistics, and an embedded hourly distribution chart.
+    /// </summary>
+    public string ExportHtml(int top = 10)
+    {
+        var sb = new StringBuilder();
+        string topLabel = top > 0 ? $"Top {top}" : "All";
+
+        sb.AppendLine("<!DOCTYPE html>");
+        sb.AppendLine("<html lang=\"en\">");
+        sb.AppendLine("<head>");
+        sb.AppendLine("<meta charset=\"UTF-8\">");
+        sb.AppendLine("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
+        sb.AppendLine("<title>Apache Access Log Analysis</title>");
+        sb.AppendLine("<style>");
+        sb.AppendLine("body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 2rem; color: #333; background: #f5f5f5; }");
+        sb.AppendLine("h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 0.5rem; }");
+        sb.AppendLine("h2 { color: #2c3e50; margin-top: 2rem; }");
+        sb.AppendLine("table { border-collapse: collapse; width: 100%; margin: 1rem 0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }");
+        sb.AppendLine("th { background: #3498db; color: #fff; padding: 0.75rem 1rem; text-align: left; }");
+        sb.AppendLine("td { padding: 0.5rem 1rem; border-bottom: 1px solid #eee; }");
+        sb.AppendLine("tr:hover td { background: #f0f7ff; }");
+        sb.AppendLine(".overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem 0; }");
+        sb.AppendLine(".metric-card { background: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; }");
+        sb.AppendLine(".metric-card .value { font-size: 2rem; font-weight: bold; color: #3498db; }");
+        sb.AppendLine(".metric-card .label { color: #666; margin-top: 0.5rem; }");
+        sb.AppendLine(".chart-container { background: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin: 1rem 0; }");
+        sb.AppendLine(".bar { display: inline-block; background: #3498db; height: 20px; margin: 2px 0; border-radius: 2px; min-width: 2px; }");
+        sb.AppendLine(".bar-row { display: flex; align-items: center; margin: 4px 0; }");
+        sb.AppendLine(".bar-label { min-width: 60px; text-align: right; padding-right: 10px; font-size: 0.9rem; }");
+        sb.AppendLine(".bar-value { padding-left: 8px; font-size: 0.9rem; color: #666; }");
+        sb.AppendLine(".summary { background: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin: 1rem 0; line-height: 1.6; }");
+        sb.AppendLine("</style>");
+        sb.AppendLine("</head>");
+        sb.AppendLine("<body>");
+
+        sb.AppendLine("<h1>Apache Access Log Analysis</h1>");
+
+        // Overview metric cards
+        sb.AppendLine("<h2>Overview</h2>");
+        sb.AppendLine("<div class=\"overview-grid\">");
+        AppendMetricCard(sb, _entries.Count.ToString("N0"), "Total Requests");
+        AppendMetricCard(sb, UniqueIpCount.ToString("N0"), "Unique IPs");
+        AppendMetricCard(sb, _entries.Sum(e => e.ResponseSize).ToString("N0"), "Bytes Transferred");
+        AppendMetricCard(sb, AverageResponseSize.ToString("F0"), "Avg Response Size");
+        AppendMetricCard(sb, RequestsPerSecond.ToString("F2"), "Requests/sec");
+        sb.AppendLine("</div>");
+
+        // Status Code Distribution table
+        sb.AppendLine("<h2>Status Code Distribution</h2>");
+        sb.AppendLine("<table><thead><tr><th>Status Code</th><th>Count</th><th>Percentage</th></tr></thead><tbody>");
+        foreach (var (code, count) in StatusCodeDistribution())
+        {
+            double pct = _entries.Count > 0 ? 100.0 * count / _entries.Count : 0;
+            sb.AppendLine($"<tr><td>{code}</td><td>{count:N0}</td><td>{pct:F1}%</td></tr>");
+        }
+        sb.AppendLine("</tbody></table>");
+
+        // HTTP Methods table
+        sb.AppendLine("<h2>HTTP Methods</h2>");
+        sb.AppendLine("<table><thead><tr><th>Method</th><th>Count</th><th>Percentage</th></tr></thead><tbody>");
+        foreach (var (method, count) in MethodDistribution())
+        {
+            double pct = _entries.Count > 0 ? 100.0 * count / _entries.Count : 0;
+            sb.AppendLine($"<tr><td>{HtmlEncode(method)}</td><td>{count:N0}</td><td>{pct:F1}%</td></tr>");
+        }
+        sb.AppendLine("</tbody></table>");
+
+        // Hourly Distribution chart (embedded bar chart)
+        var hourly = HourlyDistribution();
+        int maxHourly = hourly.Count > 0 ? hourly.Max(h => h.Count) : 0;
+        if (maxHourly > 0)
+        {
+            sb.AppendLine("<h2>Hourly Request Distribution</h2>");
+            sb.AppendLine("<div class=\"chart-container\">");
+            foreach (var (hour, count) in hourly)
+            {
+                int barWidth = maxHourly > 0 ? (int)(300.0 * count / maxHourly) : 0;
+                sb.AppendLine($"<div class=\"bar-row\"><span class=\"bar-label\">{hour:D2}:00</span><span class=\"bar\" style=\"width:{barWidth}px\"></span><span class=\"bar-value\">{count:N0}</span></div>");
+            }
+            sb.AppendLine("</div>");
+        }
+
+        // Top Endpoints
+        sb.AppendLine($"<h2>{HtmlEncode(topLabel)} Endpoints</h2>");
+        sb.AppendLine("<table><thead><tr><th>Endpoint</th><th>Count</th></tr></thead><tbody>");
+        foreach (var (endpoint, count) in TopEndpoints(top))
+        {
+            sb.AppendLine($"<tr><td>{HtmlEncode(endpoint)}</td><td>{count:N0}</td></tr>");
+        }
+        sb.AppendLine("</tbody></table>");
+
+        // Top IPs
+        sb.AppendLine($"<h2>{HtmlEncode(topLabel)} IPs</h2>");
+        sb.AppendLine("<table><thead><tr><th>IP</th><th>Count</th></tr></thead><tbody>");
+        foreach (var (ip, count) in TopIps(top))
+        {
+            sb.AppendLine($"<tr><td>{HtmlEncode(ip)}</td><td>{count:N0}</td></tr>");
+        }
+        sb.AppendLine("</tbody></table>");
+
+        // Error Summary
+        var errors = ErrorSummary();
+        if (errors.Count > 0)
+        {
+            sb.AppendLine("<h2>Error Summary</h2>");
+            sb.AppendLine("<table><thead><tr><th>Category</th><th>Count</th><th>Percentage</th></tr></thead><tbody>");
+            foreach (var (category, count) in errors)
+            {
+                double pct = _entries.Count > 0 ? 100.0 * count / _entries.Count : 0;
+                sb.AppendLine($"<tr><td>{HtmlEncode(category)}</td><td>{count:N0}</td><td>{pct:F1}%</td></tr>");
+            }
+            sb.AppendLine("</tbody></table>");
+        }
+
+        // Per-Host Statistics
+        var hostStats = PerHostStatistics(top);
+        if (hostStats.Count > 0)
+        {
+            sb.AppendLine($"<h2>{HtmlEncode(topLabel)} Host Statistics</h2>");
+            sb.AppendLine("<table><thead><tr><th>Host</th><th>Requests</th><th>Bytes</th><th>Errors</th><th>Error Rate</th></tr></thead><tbody>");
+            foreach (var h in hostStats)
+            {
+                sb.AppendLine($"<tr><td>{HtmlEncode(h.Host)}</td><td>{h.Requests:N0}</td><td>{h.BytesTransferred:N0}</td><td>{h.ErrorCount:N0}</td><td>{h.ErrorRate:P1}</td></tr>");
+            }
+            sb.AppendLine("</tbody></table>");
+        }
+
+        // Summary
+        sb.AppendLine("<h2>Summary</h2>");
+        sb.AppendLine($"<div class=\"summary\">{HtmlEncode(GenerateSummary())}</div>");
+
+        sb.AppendLine("</body>");
+        sb.AppendLine("</html>");
+
+        return sb.ToString();
+    }
+
+    private static void AppendMetricCard(StringBuilder sb, string value, string label)
+    {
+        sb.AppendLine($"<div class=\"metric-card\"><div class=\"value\">{HtmlEncode(value)}</div><div class=\"label\">{HtmlEncode(label)}</div></div>");
+    }
+
+    /// <summary>
+    /// Encodes a string for safe inclusion in HTML content.
+    /// </summary>
+    internal static string HtmlEncode(string value)
+    {
+        return value
+            .Replace("&", "&amp;")
+            .Replace("<", "&lt;")
+            .Replace(">", "&gt;")
+            .Replace("\"", "&quot;")
+            .Replace("'", "&#39;");
+    }
+
+    /// <summary>
     /// Escapes a value for safe inclusion in a CSV field.
     /// </summary>
     internal static string CsvEscape(string value)
