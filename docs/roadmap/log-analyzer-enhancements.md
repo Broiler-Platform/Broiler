@@ -1,6 +1,6 @@
 # Roadmap: Broiler.LogAnalyzer Enhancements
 
-> **Status**: Active — created 2026-04-10 | Phase 1–4 complete  
+> **Status**: Active — created 2026-04-10 | Phase 1–5 complete  
 > **Tracking issue**: Create Roadmap Document for Broiler.LogAnalyzer Enhancements
 
 ---
@@ -384,15 +384,15 @@ Items are ordered by estimated impact and implementation complexity.
 | 14 | Tabbed results view                            | WPF       | Medium | Medium | 3.4     | ✅ Done |
 | 15 | ASCII bar charts in CLI                        | CLI       | Medium | Low    | 5.2     | ✅ Done |
 | 16 | Suspicious request detection                   | Lib       | Medium | Medium | 4.4     | ✅ Done |
-| 17 | Drag-and-drop file support                     | WPF       | Medium | Low    | 10.1    | Planned |
-| 18 | Parallel file parsing                          | Lib       | Medium | Medium | 9.1     | Planned |
-| 19 | Dark/light theme support                       | WPF       | Low    | Medium | 10.1    | Planned |
-| 20 | Comparison mode                                | Lib+CLI   | Low    | High   | 6.3     | Planned |
-| 21 | Chart export (PNG/SVG)                         | WPF       | Low    | Medium | 5.3     | Planned |
-| 22 | `--follow` / live-tail mode                    | CLI       | Low    | High   | 8.3     | Planned |
-| 23 | BenchmarkDotNet project                        | Lib       | Low    | Low    | 9.3     | Planned |
-| 24 | Heatmap (hour × day-of-week)                   | WPF       | Low    | High   | 5.1     | Planned |
-| 25 | GeoIP integration                              | Lib       | Low    | High   | 4.4     | Planned |
+| 17 | Drag-and-drop file support                     | WPF       | Medium | Low    | 10.1    | ✅ Done |
+| 18 | Parallel file parsing                          | Lib       | Medium | Medium | 9.1     | ✅ Done |
+| 19 | Dark/light theme support                       | WPF       | Low    | Medium | 10.1    | ✅ Done |
+| 20 | Comparison mode                                | Lib+CLI   | Low    | High   | 6.3     | ✅ Done |
+| 21 | Chart export (PNG/SVG)                         | WPF       | Low    | Medium | 5.3     | ✅ Done |
+| 22 | `--follow` / live-tail mode                    | CLI       | Low    | High   | 8.3     | ✅ Done |
+| 23 | BenchmarkDotNet project                        | Lib       | Low    | Low    | 9.3     | ✅ Done |
+| 24 | Heatmap (hour × day-of-week)                   | WPF       | Low    | High   | 5.1     | ✅ Done |
+| 25 | GeoIP integration                              | Lib       | Low    | High   | 4.4     | ✅ Done |
 
 ---
 
@@ -444,7 +444,24 @@ substring filtering (wiring the existing `Filter(endpointPattern:)` method).
 Updated help text with new options and examples. 33 new unit and integration tests
 added in `Phase4ExportCliTests`.
 
-### Phase 5 — Advanced Features (TODOs 17–25)
+### Phase 5 — Advanced Features (TODOs 17–25) ✅ Complete
 
-Drag-and-drop, themes, comparison mode, chart export, live-tail mode,
-benchmarks, heatmaps, and GeoIP integration.
+Added drag-and-drop file support in WPF (`AllowDrop`, `DragOver`, `Drop`
+handlers accepting files and directories). Implemented parallel file parsing
+via `LogParser.ParseFilesParallel` using `Parallel.ForEach` with
+`ConcurrentBag` for thread-safe result collection. Added dark/light theme
+toggle in WPF with background/foreground switching. Implemented comparison
+mode with `LogAnalyzerService.Compare()` producing side-by-side metrics,
+`FormatComparison` (text) and `FormatComparisonMarkdown` (markdown) reports;
+CLI supports `--compare <PATH>` flag with format-aware output. Added chart
+export (PNG/SVG) via ScottPlot's `SavePng`/`SaveSvg` with export buttons
+in the Charts tab. CLI now supports `--follow` live-tail mode that monitors
+a file for new entries using `FileStream` seek-based polling. Added
+BenchmarkDotNet project (`Broiler.LogAnalyzer.Benchmarks`) with parser and
+service benchmarks covering parse rate, metric computation, and memory
+diagnostics. Added heatmap (hour × day-of-week) visualization in WPF using
+a color-coded `Grid` with GitHub-style green gradient and legend. Implemented
+GeoIP integration with `GeoIpService` featuring a pluggable `ILookupProvider`
+interface, a built-in RFC 1918/reserved IP classifier, and
+`GeographicDistribution()` method for country-level traffic analysis.
+29 new unit tests added in `Phase5AdvancedFeaturesTests`.

@@ -23,6 +23,8 @@ public class Program
         string? exportJson = null;
         string? format = null;
         bool showCharts = false;
+        string? comparePath = null;
+        bool follow = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -67,6 +69,12 @@ public class Program
                         return 1;
                     }
                     break;
+                case "--compare" when i + 1 < args.Length:
+                    comparePath = args[++i];
+                    break;
+                case "--follow":
+                    follow = true;
+                    break;
                 case "--chart":
                     showCharts = true;
                     break;
@@ -80,6 +88,7 @@ public class Program
                 case "--export-csv":
                 case "--export-json":
                 case "--format":
+                case "--compare":
                     Console.Error.WriteLine($"Error: '{args[i]}' requires a value.");
                     PrintUsage();
                     return 1;
@@ -210,6 +219,55 @@ public class Program
             }
         }
 
+        // Compare mode: parse the second dataset and output a comparison report.
+        if (comparePath is not null)
+        {
+            var compareFiles = LogFileDiscovery.Resolve(comparePath);
+            if (compareFiles.Count == 0)
+            {
+                if (Directory.Exists(comparePath))
+                    Console.Error.WriteLine($"Error: No access log files found in directory: '{comparePath}'");
+                else
+                    Console.Error.WriteLine($"Error: File or directory not found: '{comparePath}'");
+                return 1;
+            }
+
+            var compareEntries = new List<LogEntry>();
+            foreach (var logFile in compareFiles)
+            {
+                try
+                {
+                    var lines = LogFileDiscovery.ReadLines(logFile);
+                    var (entries, _) = LogParser.ParseLines(lines);
+                    compareEntries.AddRange(entries);
+                }
+                catch (IOException ex)
+                {
+                    Console.Error.WriteLine($"Warning: Error reading '{Path.GetFileName(logFile)}': {ex.Message}");
+                }
+            }
+
+            if (compareEntries.Count == 0)
+            {
+                Console.Error.WriteLine("Error: No valid log entries found in the comparison file.");
+                return 1;
+            }
+
+            var analyzerB = new LogAnalyzerService(compareEntries);
+            var comparison = LogAnalyzerService.Compare(analyzer, inputPath, analyzerB, comparePath, top);
+
+            switch (format)
+            {
+                case "markdown":
+                    Console.Write(LogAnalyzerService.FormatComparisonMarkdown(comparison));
+                    break;
+                default:
+                    Console.Write(LogAnalyzerService.FormatComparison(comparison));
+                    break;
+            }
+            return 0;
+        }
+
         // Export if requested.
         if (exportCsv is not null)
         {
@@ -241,6 +299,60 @@ public class Program
                 PrintReport(analyzer, top, skipped, filesProcessed, showCharts);
                 break;
         }
+
+        // Follow mode: live-tail the file for new entries.
+        if (follow)
+        {
+            if (!File.Exists(inputPath))
+            {
+                Console.Error.WriteLine("Error: '--follow' requires a single file path (not a directory).");
+                return 1;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("Following log file for new entries... (Ctrl+C to stop)");
+            Console.WriteLine();
+
+            long lastPosition = new FileInfo(inputPath).Length;
+            var cts = new CancellationTokenSource();
+            ConsoleCancelEventHandler cancelHandler = (_, e) => { e.Cancel = true; cts.Cancel(); };
+            Console.CancelKeyPress += cancelHandler;
+
+            while (!cts.Token.IsCancellationRequested)
+            {
+                var fileInfo = new FileInfo(inputPath);
+                if (fileInfo.Length > lastPosition)
+                {
+                    using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    stream.Seek(lastPosition, SeekOrigin.Begin);
+                    using var reader = new StreamReader(stream);
+
+                    string? line;
+                    int newEntries = 0;
+                    while ((line = reader.ReadLine()) is not null)
+                    {
+                        var entry = LogParser.ParseLine(line);
+                        if (entry is not null)
+                        {
+                            allEntries.Add(entry);
+                            newEntries++;
+                            Console.WriteLine($"  [{entry.Timestamp:HH:mm:ss}] {entry.Method} {entry.Endpoint} → {entry.StatusCode} ({entry.RemoteHost})");
+                        }
+                    }
+                    lastPosition = fileInfo.Length;
+
+                    if (newEntries > 0)
+                    {
+                        Console.WriteLine($"  --- {newEntries} new entries (total: {allEntries.Count:N0}) ---");
+                    }
+                }
+
+                Thread.Sleep(1000);
+            }
+
+            Console.CancelKeyPress -= cancelHandler;
+        }
+
         return 0;
     }
 
@@ -465,6 +577,8 @@ public class Program
         Console.WriteLine("  --export-csv <FILE>    Export entries to a CSV file");
         Console.WriteLine("  --export-json <FILE>   Export entries to a JSON file");
         Console.WriteLine("  --chart                Display ASCII charts for top endpoints, IPs, and hourly distribution");
+        Console.WriteLine("  --compare <PATH>       Compare primary log(s) with a second log file or directory");
+        Console.WriteLine("  --follow               Live-tail a log file, displaying new entries as they appear");
         Console.WriteLine("  --help                 Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");
@@ -478,6 +592,8 @@ public class Program
         Console.WriteLine("  Broiler.LogAnalyzer access.log --format json");
         Console.WriteLine("  Broiler.LogAnalyzer access.log --format html > report.html");
         Console.WriteLine("  Broiler.LogAnalyzer access.log --export-csv report.csv --export-json report.json");
+        Console.WriteLine("  Broiler.LogAnalyzer access.log --compare access.log.old");
+        Console.WriteLine("  Broiler.LogAnalyzer access.log --follow");
     }
 
     internal static string FormatBytes(long bytes)
