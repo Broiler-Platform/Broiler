@@ -22,9 +22,9 @@ public class Program
                     inputPath = args[++i];
                     break;
                 case "--top" when i + 1 < args.Length:
-                    if (!int.TryParse(args[++i], out top) || top <= 0)
+                    if (!int.TryParse(args[++i], out top) || top < 0)
                     {
-                        Console.Error.WriteLine("Error: '--top' must be a positive integer.");
+                        Console.Error.WriteLine("Error: '--top' must be a non-negative integer (0 = show all).");
                         return 1;
                     }
                     break;
@@ -113,6 +113,8 @@ public class Program
 
     internal static void PrintReport(LogAnalyzerService analyzer, int top, int skippedLines, int filesProcessed)
     {
+        string topLabel = top > 0 ? $"Top {top}" : "All";
+
         Console.WriteLine("═══════════════════════════════════════════");
         Console.WriteLine("       Apache Access Log Analysis");
         Console.WriteLine("═══════════════════════════════════════════");
@@ -144,7 +146,7 @@ public class Program
         Console.WriteLine();
 
         // ── Top Endpoints ──
-        Console.WriteLine($"── Top {top} Endpoints ─────────────────────");
+        Console.WriteLine($"── {topLabel} Endpoints ─────────────────────");
         foreach (var (endpoint, count) in analyzer.TopEndpoints(top))
         {
             Console.WriteLine($"  {count,8:N0}  {endpoint}");
@@ -152,12 +154,24 @@ public class Program
         Console.WriteLine();
 
         // ── Top IPs ──
-        Console.WriteLine($"── Top {top} IPs ────────────────────────────");
+        Console.WriteLine($"── {topLabel} IPs ────────────────────────────");
         foreach (var (ip, count) in analyzer.TopIps(top))
         {
             Console.WriteLine($"  {count,8:N0}  {ip}");
         }
         Console.WriteLine();
+
+        // ── Top 404 Endpoints ──
+        var top404 = analyzer.Top404Endpoints(top);
+        if (top404.Count > 0)
+        {
+            Console.WriteLine($"── {topLabel} 404 Endpoints ─────────────────");
+            foreach (var (endpoint, count) in top404)
+            {
+                Console.WriteLine($"  {count,8:N0}  {endpoint}");
+            }
+            Console.WriteLine();
+        }
     }
 
     private static void PrintUsage()
@@ -170,7 +184,7 @@ public class Program
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  --file <PATH>   Path to an access.log file or a directory containing them");
-        Console.WriteLine("  --top <N>       Number of top entries to display (default: 10)");
+        Console.WriteLine("  --top <N>       Number of top entries to display (default: 10, 0 = show all)");
         Console.WriteLine("  --help          Show this help message");
         Console.WriteLine();
         Console.WriteLine("Examples:");

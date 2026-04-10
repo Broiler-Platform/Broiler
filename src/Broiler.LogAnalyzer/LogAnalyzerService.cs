@@ -32,28 +32,45 @@ public sealed class LogAnalyzerService
 
     /// <summary>
     /// Returns the top N most-requested endpoints, ordered by descending count.
+    /// When <paramref name="top"/> is 0, all endpoints are returned.
     /// </summary>
     public IReadOnlyList<(string Endpoint, int Count)> TopEndpoints(int top = 10)
     {
-        return _entries
+        var query = _entries
             .GroupBy(e => e.Endpoint)
             .Select(g => (Endpoint: g.Key, Count: g.Count()))
-            .OrderByDescending(x => x.Count)
-            .Take(top)
-            .ToList();
+            .OrderByDescending(x => x.Count);
+
+        return (top > 0 ? query.Take(top) : query).ToList();
     }
 
     /// <summary>
     /// Returns the top N IPs by request count, ordered by descending count.
+    /// When <paramref name="top"/> is 0, all IPs are returned.
     /// </summary>
     public IReadOnlyList<(string Ip, int Count)> TopIps(int top = 10)
     {
-        return _entries
+        var query = _entries
             .GroupBy(e => e.RemoteHost)
             .Select(g => (Ip: g.Key, Count: g.Count()))
-            .OrderByDescending(x => x.Count)
-            .Take(top)
-            .ToList();
+            .OrderByDescending(x => x.Count);
+
+        return (top > 0 ? query.Take(top) : query).ToList();
+    }
+
+    /// <summary>
+    /// Returns the top N endpoints that returned HTTP 404, ordered by descending count.
+    /// When <paramref name="top"/> is 0, all 404 endpoints are returned.
+    /// </summary>
+    public IReadOnlyList<(string Endpoint, int Count)> Top404Endpoints(int top = 10)
+    {
+        var query = _entries
+            .Where(e => e.StatusCode == 404)
+            .GroupBy(e => e.Endpoint)
+            .Select(g => (Endpoint: g.Key, Count: g.Count()))
+            .OrderByDescending(x => x.Count);
+
+        return (top > 0 ? query.Take(top) : query).ToList();
     }
 
     /// <summary>

@@ -119,6 +119,37 @@ screenshot of `https://www.heise.de/` after every successful build and test run.
 The screenshot is uploaded as a build artifact named `website-capture`. This
 verifies the rendering pipeline remains functional on every change.
 
+### Log Analyzer Tool
+
+A command-line tool for analyzing Apache access log files. It supports single
+files, directories, rotated logs (`access.log.1`, `.2`, …), and
+gzip-compressed logs (`.gz`).
+
+```bash
+# Analyse a single file (default: top 10 results)
+dotnet run --project src/Broiler.LogAnalyzer.Cli -- access.log
+
+# Show the top 20 results
+dotnet run --project src/Broiler.LogAnalyzer.Cli -- --file /var/log/apache2/ --top 20
+
+# Show all results (no limit)
+dotnet run --project src/Broiler.LogAnalyzer.Cli -- --file /var/log/apache2/ --top 0
+```
+
+The report includes:
+
+| Section | Description |
+|---------|-------------|
+| Summary | Total requests, unique IPs, bytes transferred |
+| Status Code Distribution | Breakdown of HTTP status codes |
+| HTTP Methods | Request method distribution |
+| Top Endpoints | Most-requested endpoints |
+| Top IPs | Most-active IP addresses |
+| Top 404 Endpoints | Endpoints returning 404 — useful for detecting suspicious access patterns |
+
+Use `--top 0` to remove the default top-10 limit and display all entries for
+deeper investigation.
+
 ### Current Phase: Project Initialization
 
 - [x] Define project goals and design requirements

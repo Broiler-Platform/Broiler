@@ -136,6 +136,104 @@ public class LogAnalyzerServiceTests
         Assert.Empty(service.StatusCodeDistribution());
         Assert.Empty(service.TopEndpoints());
         Assert.Empty(service.TopIps());
+        Assert.Empty(service.Top404Endpoints());
         Assert.Empty(service.MethodDistribution());
+    }
+
+    [Fact]
+    public void Top404Endpoints_ReturnsOnly404Entries()
+    {
+        var service = CreateService();
+        var top = service.Top404Endpoints(10);
+
+        Assert.Single(top);
+        Assert.Equal("/about", top[0].Endpoint);
+        Assert.Equal(1, top[0].Count);
+    }
+
+    [Fact]
+    public void Top404Endpoints_OrderedByDescendingCount()
+    {
+        var lines = new[]
+        {
+            @"192.168.1.1 - - [10/Oct/2023:13:55:36 -0700] ""GET /missing HTTP/1.1"" 404 0 ""-"" ""Mozilla/5.0""",
+            @"192.168.1.1 - - [10/Oct/2023:13:55:37 -0700] ""GET /missing HTTP/1.1"" 404 0 ""-"" ""Mozilla/5.0""",
+            @"192.168.1.1 - - [10/Oct/2023:13:55:38 -0700] ""GET /gone HTTP/1.1"" 404 0 ""-"" ""Mozilla/5.0""",
+            @"192.168.1.1 - - [10/Oct/2023:13:55:39 -0700] ""GET /ok HTTP/1.1"" 200 100 ""-"" ""Mozilla/5.0""",
+        };
+        var (entries, _) = LogParser.ParseLines(lines);
+        var service = new LogAnalyzerService(entries);
+        var top = service.Top404Endpoints(10);
+
+        Assert.Equal(2, top.Count);
+        Assert.Equal("/missing", top[0].Endpoint);
+        Assert.Equal(2, top[0].Count);
+        Assert.Equal("/gone", top[1].Endpoint);
+        Assert.Equal(1, top[1].Count);
+    }
+
+    [Fact]
+    public void Top404Endpoints_LimitRespected()
+    {
+        var lines = new[]
+        {
+            @"192.168.1.1 - - [10/Oct/2023:13:55:36 -0700] ""GET /a HTTP/1.1"" 404 0 ""-"" ""Mozilla/5.0""",
+            @"192.168.1.1 - - [10/Oct/2023:13:55:37 -0700] ""GET /b HTTP/1.1"" 404 0 ""-"" ""Mozilla/5.0""",
+            @"192.168.1.1 - - [10/Oct/2023:13:55:38 -0700] ""GET /c HTTP/1.1"" 404 0 ""-"" ""Mozilla/5.0""",
+        };
+        var (entries, _) = LogParser.ParseLines(lines);
+        var service = new LogAnalyzerService(entries);
+        var top = service.Top404Endpoints(2);
+
+        Assert.Equal(2, top.Count);
+    }
+
+    [Fact]
+    public void Top404Endpoints_Empty_WhenNo404s()
+    {
+        var lines = new[]
+        {
+            @"192.168.1.1 - - [10/Oct/2023:13:55:36 -0700] ""GET /ok HTTP/1.1"" 200 100 ""-"" ""Mozilla/5.0""",
+        };
+        var (entries, _) = LogParser.ParseLines(lines);
+        var service = new LogAnalyzerService(entries);
+
+        Assert.Empty(service.Top404Endpoints());
+    }
+
+    [Fact]
+    public void TopEndpoints_ZeroReturnsAll()
+    {
+        var service = CreateService();
+        var all = service.TopEndpoints(0);
+
+        // Sample data has 5 distinct endpoints
+        Assert.Equal(5, all.Count);
+    }
+
+    [Fact]
+    public void TopIps_ZeroReturnsAll()
+    {
+        var service = CreateService();
+        var all = service.TopIps(0);
+
+        // Sample data has 3 distinct IPs
+        Assert.Equal(3, all.Count);
+    }
+
+    [Fact]
+    public void Top404Endpoints_ZeroReturnsAll()
+    {
+        var lines = new[]
+        {
+            @"192.168.1.1 - - [10/Oct/2023:13:55:36 -0700] ""GET /a HTTP/1.1"" 404 0 ""-"" ""Mozilla/5.0""",
+            @"192.168.1.1 - - [10/Oct/2023:13:55:37 -0700] ""GET /b HTTP/1.1"" 404 0 ""-"" ""Mozilla/5.0""",
+            @"192.168.1.1 - - [10/Oct/2023:13:55:38 -0700] ""GET /c HTTP/1.1"" 404 0 ""-"" ""Mozilla/5.0""",
+        };
+        var (entries, _) = LogParser.ParseLines(lines);
+        var service = new LogAnalyzerService(entries);
+        var all = service.Top404Endpoints(0);
+
+        Assert.Equal(3, all.Count);
     }
 }
