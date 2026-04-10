@@ -60,7 +60,7 @@
             <WrapPanel Orientation="Horizontal">
                 <TextBlock Text="Status:" VerticalAlignment="Center" Margin="0,0,4,0"/>
                 <ComboBox x:Name="FilterStatusCombo" Width="100" Margin="0,0,12,0"
-                          SelectionChanged="Filter_Changed">
+                          SelectionChanged="FilterSelection_Changed">
                     <ComboBoxItem Content="All" IsSelected="True"/>
                     <ComboBoxItem Content="2xx"/>
                     <ComboBoxItem Content="3xx"/>
@@ -70,19 +70,19 @@
 
                 <TextBlock Text="Method:" VerticalAlignment="Center" Margin="0,0,4,0"/>
                 <ComboBox x:Name="FilterMethodCombo" Width="90" Margin="0,0,12,0"
-                          SelectionChanged="Filter_Changed">
+                          SelectionChanged="FilterSelection_Changed">
                     <ComboBoxItem Content="All" IsSelected="True"/>
                 </ComboBox>
 
                 <TextBlock Text="IP:" VerticalAlignment="Center" Margin="0,0,4,0"/>
                 <TextBox x:Name="FilterIpTextBox" Width="120" Margin="0,0,12,0"
                          VerticalContentAlignment="Center" Padding="4,2"
-                         TextChanged="Filter_Changed"/>
+                         TextChanged="FilterText_Changed"/>
 
                 <TextBlock Text="Endpoint:" VerticalAlignment="Center" Margin="0,0,4,0"/>
                 <TextBox x:Name="FilterEndpointTextBox" Width="150" Margin="0,0,12,0"
                          VerticalContentAlignment="Center" Padding="4,2"
-                         TextChanged="Filter_Changed"/>
+                         TextChanged="FilterText_Changed"/>
 
                 <Button Content="Clear Filters" Padding="8,4" Click="ClearFilters_Click"/>
             </WrapPanel>

@@ -140,9 +140,8 @@ public partial class MainWindow : Window
         FilterMethodCombo.SelectedIndex = 0;
     }
 
-    private void Filter_Changed(object sender, RoutedEventArgs e) => ApplyFilters();
-    private void Filter_Changed(object sender, TextChangedEventArgs e) => ApplyFilters();
-    private void Filter_Changed(object sender, SelectionChangedEventArgs e) => ApplyFilters();
+    private void FilterText_Changed(object sender, TextChangedEventArgs e) => ApplyFilters();
+    private void FilterSelection_Changed(object sender, SelectionChangedEventArgs e) => ApplyFilters();
 
     private void ClearFilters_Click(object sender, RoutedEventArgs e)
     {

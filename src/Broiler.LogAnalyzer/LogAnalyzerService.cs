@@ -131,7 +131,7 @@ public sealed class LogAnalyzerService
     public IReadOnlyList<(string Referer, int Count)> TopReferers(int top = 10)
     {
         var query = _entries
-            .Where(e => !string.IsNullOrEmpty(e.Referer))
+            .Where(e => !string.IsNullOrEmpty(e.Referer) && e.Referer != "-")
             .GroupBy(e => e.Referer!)
             .Select(g => (Referer: g.Key, Count: g.Count()))
             .OrderByDescending(x => x.Count);
@@ -146,7 +146,7 @@ public sealed class LogAnalyzerService
     public IReadOnlyList<(string UserAgent, int Count)> TopUserAgents(int top = 10)
     {
         var query = _entries
-            .Where(e => !string.IsNullOrEmpty(e.UserAgent))
+            .Where(e => !string.IsNullOrEmpty(e.UserAgent) && e.UserAgent != "-")
             .GroupBy(e => e.UserAgent!)
             .Select(g => (UserAgent: g.Key, Count: g.Count()))
             .OrderByDescending(x => x.Count);
