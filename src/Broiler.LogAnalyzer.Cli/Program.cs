@@ -332,6 +332,53 @@ public class Program
             Console.WriteLine();
         }
 
+        // ── Bot / Crawler Detection ──
+        var bots = analyzer.DetectBots(top);
+        Console.WriteLine("── Bot / Crawler Detection ───────────────");
+        Console.WriteLine($"  Bot Requests:        {bots.BotRequests:N0}  ({bots.BotPercentage:F1}%)");
+        Console.WriteLine($"  Human Requests:      {bots.HumanRequests:N0}  ({100.0 - bots.BotPercentage:F1}%)");
+        if (bots.TopBots.Count > 0)
+        {
+            Console.WriteLine($"  {topLabel} Bot User-Agents:");
+            foreach (var (agent, count) in bots.TopBots)
+            {
+                Console.WriteLine($"    {count,8:N0}  {agent}");
+            }
+        }
+        Console.WriteLine();
+
+        // ── Suspicious Requests ──
+        var suspicious = analyzer.DetectSuspiciousRequests();
+        if (suspicious.Count > 0)
+        {
+            Console.WriteLine("── Suspicious Requests ───────────────────");
+            Console.WriteLine($"  Total Flagged:       {suspicious.Count:N0}");
+            var byCategory = suspicious
+                .GroupBy(s => s.Category)
+                .OrderByDescending(g => g.Count());
+            foreach (var group in byCategory)
+            {
+                Console.WriteLine($"  {group.Key,-22} {group.Count(),6:N0}");
+            }
+            Console.WriteLine();
+            // Show first few suspicious entries
+            int shown = 0;
+            foreach (var s in suspicious.Take(top > 0 ? top : suspicious.Count))
+            {
+                Console.WriteLine($"    [{s.Category}] {s.Entry.Method} {s.Entry.Endpoint} (from {s.Entry.RemoteHost})");
+                Console.WriteLine($"      → {s.Reason}");
+                shown++;
+            }
+            if (suspicious.Count > shown)
+                Console.WriteLine($"    … and {suspicious.Count - shown} more");
+            Console.WriteLine();
+        }
+
+        // ── Automated Summary ──
+        Console.WriteLine("── Summary ───────────────────────────────");
+        Console.WriteLine($"  {analyzer.GenerateSummary()}");
+        Console.WriteLine();
+
         // ── ASCII Charts (--chart) ──
         if (showCharts)
         {

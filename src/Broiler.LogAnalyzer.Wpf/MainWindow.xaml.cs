@@ -460,6 +460,50 @@ public partial class MainWindow : Window
             }
             sb.AppendLine();
         }
+
+        // ── Bot / Crawler Detection ──
+        var bots = analyzer.DetectBots(top);
+        sb.AppendLine("── Bot / Crawler Detection ───────────────");
+        sb.AppendLine($"  Bot Requests:        {bots.BotRequests:N0}  ({bots.BotPercentage:F1}%)");
+        sb.AppendLine($"  Human Requests:      {bots.HumanRequests:N0}  ({100.0 - bots.BotPercentage:F1}%)");
+        if (bots.TopBots.Count > 0)
+        {
+            sb.AppendLine($"  Top {top} Bot User-Agents:");
+            foreach (var (agent, count) in bots.TopBots)
+            {
+                sb.AppendLine($"    {count,8:N0}  {agent}");
+            }
+        }
+        sb.AppendLine();
+
+        // ── Suspicious Requests ──
+        var suspicious = analyzer.DetectSuspiciousRequests();
+        if (suspicious.Count > 0)
+        {
+            sb.AppendLine("── Suspicious Requests ───────────────────");
+            sb.AppendLine($"  Total Flagged:       {suspicious.Count:N0}");
+            var byCategory = suspicious
+                .GroupBy(s => s.Category)
+                .OrderByDescending(g => g.Count());
+            foreach (var group in byCategory)
+            {
+                sb.AppendLine($"  {group.Key,-22} {group.Count(),6:N0}");
+            }
+            sb.AppendLine();
+            foreach (var s in suspicious.Take(top))
+            {
+                sb.AppendLine($"    [{s.Category}] {s.Entry.Method} {s.Entry.Endpoint} (from {s.Entry.RemoteHost})");
+                sb.AppendLine($"      → {s.Reason}");
+            }
+            if (suspicious.Count > top)
+                sb.AppendLine($"    … and {suspicious.Count - top} more");
+            sb.AppendLine();
+        }
+
+        // ── Automated Summary ──
+        sb.AppendLine("── Summary ───────────────────────────────");
+        sb.AppendLine($"  {analyzer.GenerateSummary()}");
+        sb.AppendLine();
     }
 
     private static string FormatBytes(long bytes)
