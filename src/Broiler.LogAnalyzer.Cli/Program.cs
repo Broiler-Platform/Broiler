@@ -219,6 +219,8 @@ public class Program
         Console.WriteLine($"  Total Requests:      {analyzer.TotalRequests:N0}");
         Console.WriteLine($"  Unique IPs:          {analyzer.UniqueIpCount:N0}");
         Console.WriteLine($"  Bytes Transferred:   {FormatBytes(analyzer.TotalBytesTransferred)}");
+        Console.WriteLine($"  Avg Response Size:   {FormatBytes((long)analyzer.AverageResponseSize)}");
+        Console.WriteLine($"  Requests/sec:        {analyzer.RequestsPerSecond:F2}");
         if (skippedLines > 0)
             Console.WriteLine($"  Skipped Lines:       {skippedLines:N0}");
         Console.WriteLine();
@@ -298,6 +300,30 @@ public class Program
             foreach (var h in hostStats)
             {
                 Console.WriteLine($"  {h.Host,-20} {h.Requests,8:N0} {FormatBytes(h.BytesTransferred),12} {h.ErrorCount,8:N0} {h.ErrorRate,7:P1}");
+            }
+            Console.WriteLine();
+        }
+
+        // ── Top Referers ──
+        var topReferers = analyzer.TopReferers(top);
+        if (topReferers.Count > 0)
+        {
+            Console.WriteLine($"── {topLabel} Referers ─────────────────────");
+            foreach (var (referer, count) in topReferers)
+            {
+                Console.WriteLine($"  {count,8:N0}  {referer}");
+            }
+            Console.WriteLine();
+        }
+
+        // ── Top User Agents ──
+        var topAgents = analyzer.TopUserAgents(top);
+        if (topAgents.Count > 0)
+        {
+            Console.WriteLine($"── {topLabel} User Agents ──────────────────");
+            foreach (var (agent, count) in topAgents)
+            {
+                Console.WriteLine($"  {count,8:N0}  {agent}");
             }
             Console.WriteLine();
         }

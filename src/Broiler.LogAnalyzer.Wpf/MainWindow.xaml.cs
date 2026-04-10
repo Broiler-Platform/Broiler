@@ -1,23 +1,34 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Media;
 using Microsoft.Win32;
 
 namespace Broiler.LogAnalyzer.Wpf;
 
 /// <summary>
 /// Main window for the Broiler Log Analyzer WPF application.
-/// Allows users to select log files or directories, run analysis,
-/// and view formatted results.
+/// Provides a DataGrid for browsing log entries with column sorting,
+/// color-coded status rows, and a quick-filter toolbar.
 /// </summary>
 public partial class MainWindow : Window
 {
     private string? _selectedPath;
+    private IReadOnlyList<LogEntry>? _allEntries;
+    private LogAnalyzerService? _analyzer;
+    private int _top = 10;
 
     public MainWindow()
     {
         InitializeComponent();
     }
+
+    // ── Browse dialogs ───────────────────────────────────────────────
 
     private void BrowseFileButton_Click(object sender, RoutedEventArgs e)
     {
@@ -34,6 +45,7 @@ public partial class MainWindow : Window
             FilePathTextBox.Text = _selectedPath;
             AnalyzeButton.IsEnabled = true;
             ResultsTextBox.Text = string.Empty;
+            LogEntriesGrid.ItemsSource = null;
             StatusText.Text = "File selected. Click Analyze to start.";
         }
     }
@@ -51,9 +63,12 @@ public partial class MainWindow : Window
             FilePathTextBox.Text = _selectedPath;
             AnalyzeButton.IsEnabled = true;
             ResultsTextBox.Text = string.Empty;
+            LogEntriesGrid.ItemsSource = null;
             StatusText.Text = "Folder selected. Click Analyze to start.";
         }
     }
+
+    // ── Analyze ──────────────────────────────────────────────────────
 
     private async void AnalyzeButton_Click(object sender, RoutedEventArgs e)
     {
@@ -67,17 +82,32 @@ public partial class MainWindow : Window
             return;
         }
 
+        _top = top;
         AnalyzeButton.IsEnabled = false;
         BrowseFileButton.IsEnabled = false;
         BrowseFolderButton.IsEnabled = false;
+        FilterGroupBox.IsEnabled = false;
         StatusText.Text = "Analyzing…";
         ResultsTextBox.Text = string.Empty;
+        LogEntriesGrid.ItemsSource = null;
 
         try
         {
             var result = await Task.Run(() => RunAnalysis(_selectedPath, top));
-            ResultsTextBox.Text = result;
-            StatusText.Text = "Analysis complete.";
+            _allEntries = result.Entries;
+            _analyzer = result.Analyzer;
+
+            // Populate DataGrid
+            LogEntriesGrid.ItemsSource = _allEntries;
+
+            // Populate summary
+            ResultsTextBox.Text = result.Summary;
+
+            // Populate method filter combo with discovered methods
+            PopulateMethodFilter();
+
+            FilterGroupBox.IsEnabled = true;
+            StatusText.Text = $"Analysis complete — {_allEntries.Count:N0} entries loaded.";
         }
         catch (Exception ex)
         {
@@ -92,17 +122,102 @@ public partial class MainWindow : Window
         }
     }
 
+    // ── Quick-filter logic ───────────────────────────────────────────
+
+    private void PopulateMethodFilter()
+    {
+        FilterMethodCombo.Items.Clear();
+        FilterMethodCombo.Items.Add(new ComboBoxItem { Content = "All", IsSelected = true });
+
+        if (_allEntries is not null)
+        {
+            foreach (var method in _allEntries.Select(e => e.Method).Distinct().OrderBy(m => m))
+            {
+                FilterMethodCombo.Items.Add(new ComboBoxItem { Content = method });
+            }
+        }
+
+        FilterMethodCombo.SelectedIndex = 0;
+    }
+
+    private void Filter_Changed(object sender, RoutedEventArgs e) => ApplyFilters();
+    private void Filter_Changed(object sender, TextChangedEventArgs e) => ApplyFilters();
+    private void Filter_Changed(object sender, SelectionChangedEventArgs e) => ApplyFilters();
+
+    private void ClearFilters_Click(object sender, RoutedEventArgs e)
+    {
+        FilterStatusCombo.SelectedIndex = 0;
+        if (FilterMethodCombo.Items.Count > 0)
+            FilterMethodCombo.SelectedIndex = 0;
+        FilterIpTextBox.Text = string.Empty;
+        FilterEndpointTextBox.Text = string.Empty;
+        ApplyFilters();
+    }
+
+    private void ApplyFilters()
+    {
+        if (_allEntries is null)
+            return;
+
+        IEnumerable<LogEntry> filtered = _allEntries;
+
+        // Status code filter
+        if (FilterStatusCombo.SelectedItem is ComboBoxItem statusItem)
+        {
+            var statusText = statusItem.Content?.ToString();
+            if (statusText == "2xx")
+                filtered = filtered.Where(e => e.StatusCode >= 200 && e.StatusCode < 300);
+            else if (statusText == "3xx")
+                filtered = filtered.Where(e => e.StatusCode >= 300 && e.StatusCode < 400);
+            else if (statusText == "4xx")
+                filtered = filtered.Where(e => e.StatusCode >= 400 && e.StatusCode < 500);
+            else if (statusText == "5xx")
+                filtered = filtered.Where(e => e.StatusCode >= 500 && e.StatusCode < 600);
+        }
+
+        // Method filter
+        if (FilterMethodCombo.SelectedItem is ComboBoxItem methodItem)
+        {
+            var methodText = methodItem.Content?.ToString();
+            if (methodText is not null && methodText != "All")
+                filtered = filtered.Where(e => e.Method.Equals(methodText, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // IP filter
+        var ipFilter = FilterIpTextBox.Text?.Trim();
+        if (!string.IsNullOrEmpty(ipFilter))
+            filtered = filtered.Where(e => e.RemoteHost.Contains(ipFilter, StringComparison.OrdinalIgnoreCase));
+
+        // Endpoint filter
+        var endpointFilter = FilterEndpointTextBox.Text?.Trim();
+        if (!string.IsNullOrEmpty(endpointFilter))
+            filtered = filtered.Where(e => e.Endpoint.Contains(endpointFilter, StringComparison.OrdinalIgnoreCase));
+
+        var list = filtered.ToList();
+        LogEntriesGrid.ItemsSource = list;
+        StatusText.Text = $"Showing {list.Count:N0} of {_allEntries.Count:N0} entries.";
+    }
+
+    // ── Analysis engine (background thread) ──────────────────────────
+
+    private sealed record AnalysisResult(
+        IReadOnlyList<LogEntry> Entries,
+        LogAnalyzerService Analyzer,
+        string Summary);
+
     /// <summary>
-    /// Runs the log analysis on a background thread and returns the formatted report.
+    /// Runs the log analysis on a background thread and returns parsed entries,
+    /// the analyzer instance, and a formatted summary string.
     /// </summary>
-    private static string RunAnalysis(string inputPath, int top)
+    private static AnalysisResult RunAnalysis(string inputPath, int top)
     {
         var logFiles = LogFileDiscovery.Resolve(inputPath);
         if (logFiles.Count == 0)
         {
-            return Directory.Exists(inputPath)
+            var msg = Directory.Exists(inputPath)
                 ? $"No access log files found in directory: '{inputPath}'"
                 : $"File or directory not found: '{inputPath}'";
+            return new AnalysisResult([], new LogAnalyzerService([]), msg);
         }
 
         var sb = new StringBuilder();
@@ -129,18 +244,18 @@ public partial class MainWindow : Window
         if (allEntries.Count == 0)
         {
             sb.AppendLine("No valid log entries found.");
-            return sb.ToString();
+            return new AnalysisResult(allEntries, new LogAnalyzerService([]), sb.ToString());
         }
 
         var analyzer = new LogAnalyzerService(allEntries);
         int skipped = totalLines - allEntries.Count;
 
         FormatReport(sb, analyzer, top, skipped, filesProcessed);
-        return sb.ToString();
+        return new AnalysisResult(allEntries, analyzer, sb.ToString());
     }
 
     /// <summary>
-    /// Formats the analysis report into a string builder, mirroring the CLI output.
+    /// Formats the analysis report into a string builder, including new metrics.
     /// </summary>
     private static void FormatReport(StringBuilder sb, LogAnalyzerService analyzer, int top, int skippedLines, int filesProcessed)
     {
@@ -154,6 +269,8 @@ public partial class MainWindow : Window
         sb.AppendLine($"  Total Requests:      {analyzer.TotalRequests:N0}");
         sb.AppendLine($"  Unique IPs:          {analyzer.UniqueIpCount:N0}");
         sb.AppendLine($"  Bytes Transferred:   {FormatBytes(analyzer.TotalBytesTransferred)}");
+        sb.AppendLine($"  Avg Response Size:   {FormatBytes((long)analyzer.AverageResponseSize)}");
+        sb.AppendLine($"  Requests/sec:        {analyzer.RequestsPerSecond:F2}");
         if (skippedLines > 0)
             sb.AppendLine($"  Skipped Lines:       {skippedLines:N0}");
         sb.AppendLine();
@@ -232,6 +349,30 @@ public partial class MainWindow : Window
             }
             sb.AppendLine();
         }
+
+        // ── Top Referers ──
+        var topReferers = analyzer.TopReferers(top);
+        if (topReferers.Count > 0)
+        {
+            sb.AppendLine($"── Top {top} Referers ─────────────────────");
+            foreach (var (referer, count) in topReferers)
+            {
+                sb.AppendLine($"  {count,8:N0}  {referer}");
+            }
+            sb.AppendLine();
+        }
+
+        // ── Top User Agents ──
+        var topAgents = analyzer.TopUserAgents(top);
+        if (topAgents.Count > 0)
+        {
+            sb.AppendLine($"── Top {top} User Agents ──────────────────");
+            foreach (var (agent, count) in topAgents)
+            {
+                sb.AppendLine($"  {count,8:N0}  {agent}");
+            }
+            sb.AppendLine();
+        }
     }
 
     private static string FormatBytes(long bytes)
@@ -246,4 +387,44 @@ public partial class MainWindow : Window
         }
         return $"{value:F2} {suffixes[index]}";
     }
+}
+
+/// <summary>
+/// Converts an HTTP status code to a background brush for DataGrid row coloring.
+/// 2xx → light green, 3xx → light yellow, 4xx → light orange, 5xx → light red.
+/// </summary>
+public sealed class StatusCodeToBrushConverter : IValueConverter
+{
+    private static readonly SolidColorBrush Success = new(Color.FromRgb(0xD4, 0xED, 0xDA)); // green
+    private static readonly SolidColorBrush Redirect = new(Color.FromRgb(0xFF, 0xF3, 0xCD)); // yellow
+    private static readonly SolidColorBrush ClientError = new(Color.FromRgb(0xFF, 0xE0, 0xB2)); // orange
+    private static readonly SolidColorBrush ServerError = new(Color.FromRgb(0xF8, 0xD7, 0xDA)); // red
+    private static readonly SolidColorBrush Default = Brushes.Transparent;
+
+    static StatusCodeToBrushConverter()
+    {
+        Success.Freeze();
+        Redirect.Freeze();
+        ClientError.Freeze();
+        ServerError.Freeze();
+    }
+
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is int statusCode)
+        {
+            return statusCode switch
+            {
+                >= 200 and < 300 => Success,
+                >= 300 and < 400 => Redirect,
+                >= 400 and < 500 => ClientError,
+                >= 500 and < 600 => ServerError,
+                _ => Default,
+            };
+        }
+        return Default;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => throw new NotSupportedException();
 }

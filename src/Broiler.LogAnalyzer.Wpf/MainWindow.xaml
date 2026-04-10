@@ -1,11 +1,16 @@
 <Window x:Class="Broiler.LogAnalyzer.Wpf.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Broiler Log Analyzer" Height="600" Width="900"
+        xmlns:local="clr-namespace:Broiler.LogAnalyzer.Wpf"
+        Title="Broiler Log Analyzer" Height="700" Width="1100"
         WindowStartupLocation="CenterScreen"
-        MinHeight="400" MinWidth="600">
+        MinHeight="500" MinWidth="800">
+    <Window.Resources>
+        <local:StatusCodeToBrushConverter x:Key="StatusCodeToBrush"/>
+    </Window.Resources>
     <Grid Margin="12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -49,18 +54,88 @@
                     Click="AnalyzeButton_Click" IsEnabled="False"/>
         </Grid>
 
-        <!-- Results Display -->
-        <GroupBox Grid.Row="2" Header="Analysis Results" Padding="4">
-            <TextBox x:Name="ResultsTextBox"
-                     IsReadOnly="True" AcceptsReturn="True"
-                     VerticalScrollBarVisibility="Auto"
-                     HorizontalScrollBarVisibility="Auto"
-                     FontFamily="Consolas" FontSize="12"
-                     TextWrapping="NoWrap"/>
+        <!-- Quick-Filter Toolbar -->
+        <GroupBox Grid.Row="2" Header="Quick Filters" Padding="6" Margin="0,0,0,8"
+                  x:Name="FilterGroupBox" IsEnabled="False">
+            <WrapPanel Orientation="Horizontal">
+                <TextBlock Text="Status:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox x:Name="FilterStatusCombo" Width="100" Margin="0,0,12,0"
+                          SelectionChanged="Filter_Changed">
+                    <ComboBoxItem Content="All" IsSelected="True"/>
+                    <ComboBoxItem Content="2xx"/>
+                    <ComboBoxItem Content="3xx"/>
+                    <ComboBoxItem Content="4xx"/>
+                    <ComboBoxItem Content="5xx"/>
+                </ComboBox>
+
+                <TextBlock Text="Method:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <ComboBox x:Name="FilterMethodCombo" Width="90" Margin="0,0,12,0"
+                          SelectionChanged="Filter_Changed">
+                    <ComboBoxItem Content="All" IsSelected="True"/>
+                </ComboBox>
+
+                <TextBlock Text="IP:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <TextBox x:Name="FilterIpTextBox" Width="120" Margin="0,0,12,0"
+                         VerticalContentAlignment="Center" Padding="4,2"
+                         TextChanged="Filter_Changed"/>
+
+                <TextBlock Text="Endpoint:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                <TextBox x:Name="FilterEndpointTextBox" Width="150" Margin="0,0,12,0"
+                         VerticalContentAlignment="Center" Padding="4,2"
+                         TextChanged="Filter_Changed"/>
+
+                <Button Content="Clear Filters" Padding="8,4" Click="ClearFilters_Click"/>
+            </WrapPanel>
         </GroupBox>
 
+        <!-- Results — tabbed: Log Entries (DataGrid) + Summary (TextBox) -->
+        <TabControl Grid.Row="3" Margin="0,0,0,0">
+            <TabItem Header="Log Entries">
+                <DataGrid x:Name="LogEntriesGrid"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserSortColumns="True"
+                          CanUserReorderColumns="True"
+                          CanUserResizeColumns="True"
+                          SelectionMode="Extended"
+                          SelectionUnit="FullRow"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          AlternatingRowBackground="#F9F9F9"
+                          FontFamily="Consolas" FontSize="12"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling"
+                          EnableRowVirtualization="True"
+                          EnableColumnVirtualization="True">
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow">
+                            <Setter Property="Background"
+                                    Value="{Binding StatusCode, Converter={StaticResource StatusCodeToBrush}}"/>
+                        </Style>
+                    </DataGrid.RowStyle>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Remote Host" Binding="{Binding RemoteHost}" Width="130"/>
+                        <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss zzz}'}" Width="200"/>
+                        <DataGridTextColumn Header="Method" Binding="{Binding Method}" Width="70"/>
+                        <DataGridTextColumn Header="Endpoint" Binding="{Binding Endpoint}" Width="*"/>
+                        <DataGridTextColumn Header="Status" Binding="{Binding StatusCode}" Width="60"/>
+                        <DataGridTextColumn Header="Size" Binding="{Binding ResponseSize}" Width="80"/>
+                        <DataGridTextColumn Header="User Agent" Binding="{Binding UserAgent}" Width="200"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+            <TabItem Header="Summary">
+                <TextBox x:Name="ResultsTextBox"
+                         IsReadOnly="True" AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Auto"
+                         FontFamily="Consolas" FontSize="12"
+                         TextWrapping="NoWrap"/>
+            </TabItem>
+        </TabControl>
+
         <!-- Status Bar -->
-        <StatusBar Grid.Row="3" Margin="0,8,0,0">
+        <StatusBar Grid.Row="4" Margin="0,8,0,0">
             <StatusBarItem>
                 <TextBlock x:Name="StatusText" Text="Ready"/>
             </StatusBarItem>
