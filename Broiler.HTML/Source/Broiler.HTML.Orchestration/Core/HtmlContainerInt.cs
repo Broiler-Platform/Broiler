@@ -94,6 +94,16 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
 
     public SizeF PageSize { get; set; }
 
+    public SizeF ViewportSize
+    {
+        get
+        {
+            float w = MaxSize.Width > 0 ? Math.Min(MaxSize.Width, PageSize.Width) : PageSize.Width;
+            float h = MaxSize.Height > 0 ? Math.Min(MaxSize.Height, PageSize.Height) : PageSize.Height;
+            return new SizeF(w, h);
+        }
+    }
+
     public int MarginTop
     {
         get { return _marginTop; }

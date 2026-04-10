@@ -420,7 +420,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                 double width;
                 if (Position == CssConstants.Fixed && ContainerInt != null)
                 {
-                    width = ContainerInt.PageSize.Width;
+                    width = ContainerInt.ViewportSize.Width;
                 }
                 else
                 {
@@ -994,7 +994,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             // CSS2.1 §9.6.1: For fixed-position elements, percentage
             // heights resolve against the viewport, not the parent.
             double cbHeight = (Position == CssConstants.Fixed && ContainerInt != null)
-                ? ContainerInt.PageSize.Height
+                ? ContainerInt.ViewportSize.Height
                 : ContainingBlock.Size.Height;
 
             if (MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight))
@@ -1587,8 +1587,9 @@ internal class CssBox : CssBoxProperties, IDisposable
 
     protected override PointF GetActualLocation(string X, string Y)
     {
-        var left = CssValueParser.ParseLength(X, ContainerInt.PageSize.Width, GetEmHeight(), null);
-        var top = CssValueParser.ParseLength(Y, ContainerInt.PageSize.Height, GetEmHeight(), null);
+        var vpSize = ContainerInt.ViewportSize;
+        var left = CssValueParser.ParseLength(X, vpSize.Width, GetEmHeight(), null);
+        var top = CssValueParser.ParseLength(Y, vpSize.Height, GetEmHeight(), null);
 
         return new PointF((float)left, (float)top);
     }
