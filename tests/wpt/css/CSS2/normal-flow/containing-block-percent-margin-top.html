@@ -1,28 +1,11 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <title>CSS2: Percentage margin-top resolves against containing block width</title>
-  <style>
-    html, body { margin: 0; padding: 0; }
-    .container {
-      width: 200px;
-      background: white;
-    }
-    .child {
-      margin-top: 10%;
-      width: 200px;
-      height: 50px;
-      background: green;
-    }
-  </style>
-</head>
-<body>
-  <!-- CSS2.1 §8.3: Percentage margin-top/bottom are calculated with
-       respect to the WIDTH of the containing block (not the height).
-       With a 200px-wide container and margin-top: 10%, the child
-       should have a 20px top margin. -->
-  <div class="container">
-    <div class="child"></div>
-  </div>
-</body>
-</html>
+<link rel="author" title="Morten Stenshorne" href="mstensho@chromium.org">
+<link rel="help" href="https://www.w3.org/TR/CSS22/box.html#propdef-margin-top">
+<style>
+  #container { overflow:hidden; background:blue; }
+  #container > div { margin-top:50%; height:50px; }
+</style>
+<p>There should be a blue square below.</p>
+<div id="container" style="width:100px;">
+  <div></div>
+</div>

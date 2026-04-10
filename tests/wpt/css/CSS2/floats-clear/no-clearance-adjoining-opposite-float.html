@@ -1,28 +1,16 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <title>CSS2: No clearance adjoining opposite float</title>
-  <style>
-    html, body { margin: 0; padding: 0; }
-    .float-left {
-      float: left;
-      width: 100px;
-      height: 100px;
-      background: blue;
-    }
-    .clear-right {
-      clear: right;
-      width: 200px;
-      height: 50px;
-      background: green;
-    }
-  </style>
-</head>
-<body>
-  <!-- CSS2.1 §9.5.2: clear:right only clears right floats.  A left
-       float should not be cleared by clear:right, so the green box
-       should be at y=0 next to the float (or below if it doesn't fit). -->
-  <div class="float-left"></div>
-  <div class="clear-right"></div>
-</body>
-</html>
+<title>No clearance due to large top margin that takes us past the float</title>
+<meta name="assert" content="Check that we don't apply clearance when the top margin of the clearance candidate takes it past the relevant float, and that a preceding empty block with a right float that's adjoining to the clearance candidate doesn't cause confusion">
+<link rel="author" title="Morten Stenshorne" href="mstensho@chromium.org">
+<link rel="help" href="https://www.w3.org/TR/CSS22/visuren.html#flow-control" title="9.5.2 Controlling flow next to floats: the 'clear' property">
+<link rel="match" href="../../reference/nothing.html">
+<p>There should be nothing below.</p>
+<div style="float:left; width:10px; height:100px;"></div>
+<div>
+  <div>
+    <div style="float:right; width:10px; height:200px;"></div>
+  </div>
+  <div style="background:red;">
+    <div style="margin-top:150px; clear:left; background:hotpink;"></div>
+  </div>
+</div>
