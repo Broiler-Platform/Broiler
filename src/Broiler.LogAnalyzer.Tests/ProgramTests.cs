@@ -1,3 +1,5 @@
+using System.IO.Compression;
+
 namespace Broiler.LogAnalyzer.Tests;
 
 /// <summary>
@@ -119,6 +121,78 @@ public class ProgramTests
         finally
         {
             File.Delete(tempFile);
+        }
+    }
+
+    // ── Directory support ──
+
+    [Fact]
+    public void Main_DirectoryWithLogs_ReturnsZero()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"logtest-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            File.WriteAllLines(Path.Combine(tempDir, "access.log"), [
+                @"192.168.1.1 - - [10/Oct/2023:13:55:36 -0700] ""GET /a HTTP/1.1"" 200 100 ""-"" ""Mozilla/5.0""",
+            ]);
+            File.WriteAllLines(Path.Combine(tempDir, "access.log.1"), [
+                @"10.0.0.1 - - [09/Oct/2023:10:00:00 -0700] ""GET /b HTTP/1.1"" 200 200 ""-"" ""curl/7.68""",
+            ]);
+
+            var exitCode = Program.Main([tempDir]);
+            Assert.Equal(0, exitCode);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    [Fact]
+    public void Main_EmptyDirectory_ReturnsError()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"logtest-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var exitCode = Program.Main([tempDir]);
+            Assert.Equal(1, exitCode);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
+        }
+    }
+
+    // ── Gzip support ──
+
+    [Fact]
+    public void Main_DirectoryWithGzipLogs_ReturnsZero()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"logtest-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            File.WriteAllLines(Path.Combine(tempDir, "access.log"), [
+                @"192.168.1.1 - - [10/Oct/2023:13:55:36 -0700] ""GET /a HTTP/1.1"" 200 100 ""-"" ""Mozilla/5.0""",
+            ]);
+
+            // Create a gzip-compressed rotated log
+            var gzPath = Path.Combine(tempDir, "access.log.1.gz");
+            using (var fs = File.Create(gzPath))
+            using (var gz = new GZipStream(fs, CompressionMode.Compress))
+            using (var writer = new StreamWriter(gz))
+            {
+                writer.WriteLine(@"10.0.0.1 - - [09/Oct/2023:10:00:00 -0700] ""GET /b HTTP/1.1"" 200 200 ""-"" ""curl/7.68""");
+            }
+
+            var exitCode = Program.Main([tempDir]);
+            Assert.Equal(0, exitCode);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, true);
         }
     }
 }
