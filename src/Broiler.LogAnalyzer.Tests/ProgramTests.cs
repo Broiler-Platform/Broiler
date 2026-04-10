@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using Broiler.LogAnalyzer.Cli;
 
 namespace Broiler.LogAnalyzer.Tests;
 

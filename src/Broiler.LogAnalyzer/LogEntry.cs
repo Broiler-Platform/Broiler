@@ -4,7 +4,7 @@ namespace Broiler.LogAnalyzer;
 /// Represents a single parsed Apache access log entry.
 /// Supports both Common and Combined log formats.
 /// </summary>
-internal sealed record LogEntry(
+public sealed record LogEntry(
     string RemoteHost,
     string Ident,
     string User,

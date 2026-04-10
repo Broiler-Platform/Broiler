@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Broiler.LogAnalyzer\Broiler.LogAnalyzer.csproj" />
+    <ProjectReference Include="..\Broiler.LogAnalyzer.Cli\Broiler.LogAnalyzer.Cli.csproj" />
   </ItemGroup>
 
   <ItemGroup>
