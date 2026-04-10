@@ -44,18 +44,10 @@ internal static class CssLayoutEngine
         {
             imageWord.Width = imageWord.ImageRectangle == RectangleF.Empty ? imageWord.Image.Width : imageWord.ImageRectangle.Width;
 
-            // CSS2.1 §10.3.2: when both width and height are auto, clamp
-            // intrinsic width to the containing block width so the replaced
-            // element doesn't overflow its container unnecessarily.
-            if (!hasImageTagHeight && imageWord.OwnerBox.ContainingBlock != null)
-            {
-                double cbWidth = imageWord.OwnerBox.ContainingBlock.Size.Width;
-                if (cbWidth > 0 && imageWord.Width > cbWidth)
-                {
-                    imageWord.Width = cbWidth;
-                    scaleImageHeight = true;
-                }
-            }
+            // CSS2.1 §10.3.2: when width is auto the used value is the
+            // intrinsic width.  Do NOT clamp to the containing block —
+            // inline replaced elements are allowed to overflow their
+            // container.  Authors use max-width:100% to opt into clamping.
         }
         else
         {

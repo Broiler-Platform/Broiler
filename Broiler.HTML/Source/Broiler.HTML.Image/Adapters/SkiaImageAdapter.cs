@@ -338,74 +338,48 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     /// <summary>
     /// Rasterizes SVG data to an <see cref="SKBitmap"/> using Svg.Skia.
-    /// Parses width/height/viewBox from the SVG root element to determine
-    /// output dimensions per the CSS2.1 replaced element sizing rules,
-    /// falling back to 300×150 (the HTML default for replaced elements
-    /// with no intrinsic size).
+    /// Parses width/height from the SVG root element to determine output
+    /// dimensions.  Per the HTML spec, when the SVG does not specify both
+    /// explicit width AND height the intrinsic size is 300×150 (the default
+    /// replaced element size).  This matches browser behaviour (Chromium).
     /// </summary>
     private static RImage RasterizeSvg(byte[] data)
     {
         var svgContent = System.Text.Encoding.UTF8.GetString(data);
 
-        using var svg = new Svg.Skia.SKSvg();
-        svg.FromSvg(svgContent);
-
-        if (svg.Picture == null)
-            return null;
-
-        // Parse the SVG root element's width, height and viewBox attributes
-        // to determine the correct intrinsic dimensions per CSS2.1.
+        // Parse the SVG root element's width, height and viewBox attributes.
         var (svgWidth, svgHeight, vbRatio) = ParseSvgIntrinsicDimensions(svgContent);
 
         int width, height;
         if (svgWidth > 0 && svgHeight > 0)
         {
-            // Both intrinsic width and height present.
+            // Both intrinsic width and height present – use them directly.
             width = (int)Math.Ceiling(svgWidth);
             height = (int)Math.Ceiling(svgHeight);
-        }
-        else if (svgWidth > 0 && vbRatio > 0)
-        {
-            // Intrinsic width + aspect ratio → derive height.
-            width = (int)Math.Ceiling(svgWidth);
-            height = (int)Math.Ceiling(svgWidth / vbRatio);
-        }
-        else if (svgHeight > 0 && vbRatio > 0)
-        {
-            // Intrinsic height + aspect ratio → derive width.
-            height = (int)Math.Ceiling(svgHeight);
-            width = (int)Math.Ceiling(svgHeight * vbRatio);
-        }
-        else if (svgWidth > 0)
-        {
-            // Only intrinsic width, no ratio → default height.
-            width = (int)Math.Ceiling(svgWidth);
-            height = 150;
-        }
-        else if (svgHeight > 0)
-        {
-            // Only intrinsic height, no ratio → default width.
-            height = (int)Math.Ceiling(svgHeight);
-            width = 300;
         }
         else
         {
-            // No intrinsic width/height.  Use 300×150 default,
-            // adjusted by viewBox aspect ratio if available.
-            if (vbRatio > 0)
-            {
-                width = 300;
-                height = Math.Max(1, (int)Math.Ceiling(300.0 / vbRatio));
-            }
-            else
-            {
-                var bounds = svg.Picture.CullRect;
-                width = (int)Math.Ceiling(bounds.Width);
-                height = (int)Math.Ceiling(bounds.Height);
-                if (width <= 0) width = 300;
-                if (height <= 0) height = 150;
-            }
+            // HTML spec §4.8.2: When the SVG lacks both explicit width and
+            // height the natural size is the default 300×150.  Browsers
+            // (Chromium, Firefox) do NOT derive the missing dimension from
+            // the viewBox ratio or partial attributes – they always fall
+            // back to 300×150.
+            width = 300;
+            height = 150;
         }
+
+        // SVGs that use percentage-based dimensions internally (e.g.
+        // width="100%" on child elements) need explicit viewport dimensions
+        // on the root <svg> element for percentage resolution.  Inject the
+        // computed width/height before parsing when the root element is
+        // missing one or both attributes.
+        var svgForRender = EnsureSvgViewport(svgContent, svgWidth, svgHeight, width, height);
+
+        using var svg = new Svg.Skia.SKSvg();
+        svg.FromSvg(svgForRender);
+
+        if (svg.Picture == null)
+            return null;
 
         var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
         using var canvas = new SKCanvas(bitmap);
@@ -425,6 +399,39 @@ internal sealed class SkiaImageAdapter : RAdapter
         canvas.DrawPicture(svg.Picture);
 
         return new ImageAdapter(bitmap);
+    }
+
+    /// <summary>
+    /// Ensures the SVG root element has explicit width and height attributes
+    /// so that percentage-based child dimensions (e.g. width="100%") can
+    /// resolve correctly.  Returns the original content unchanged when both
+    /// attributes are already present.
+    /// </summary>
+    private static string EnsureSvgViewport(
+        string svgContent,
+        double parsedWidth, double parsedHeight,
+        int targetWidth, int targetHeight)
+    {
+        // Both intrinsic dimensions are present – nothing to inject.
+        if (parsedWidth > 0 && parsedHeight > 0)
+            return svgContent;
+
+        int svgIdx = svgContent.IndexOf("<svg", StringComparison.OrdinalIgnoreCase);
+        if (svgIdx < 0)
+            return svgContent;
+
+        int tagEnd = svgContent.IndexOf('>', svgIdx);
+        if (tagEnd < 0)
+            return svgContent;
+
+        var inject = "";
+        if (parsedWidth <= 0)
+            inject += $" width=\"{targetWidth}\"";
+        if (parsedHeight <= 0)
+            inject += $" height=\"{targetHeight}\"";
+
+        // Insert the attributes right after "<svg".
+        return svgContent.Insert(svgIdx + 4, inject);
     }
 
     /// <summary>
