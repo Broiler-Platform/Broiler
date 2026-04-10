@@ -158,6 +158,18 @@ public partial class MainWindow : Window
             sb.AppendLine($"  Skipped Lines:       {skippedLines:N0}");
         sb.AppendLine();
 
+        // ── Error Summary ──
+        var errors = analyzer.ErrorSummary();
+        if (errors.Count > 0)
+        {
+            sb.AppendLine("── Error Summary ─────────────────────────");
+            foreach (var (category, count) in errors)
+            {
+                sb.AppendLine($"  {category,-20} {count,8:N0}  ({100.0 * count / analyzer.TotalRequests:F1}%)");
+            }
+            sb.AppendLine();
+        }
+
         sb.AppendLine("── Status Code Distribution ──────────────");
         foreach (var (code, count) in analyzer.StatusCodeDistribution())
         {
@@ -169,6 +181,15 @@ public partial class MainWindow : Window
         foreach (var (method, count) in analyzer.MethodDistribution())
         {
             sb.AppendLine($"  {method,-8} {count,8:N0}  ({100.0 * count / analyzer.TotalRequests:F1}%)");
+        }
+        sb.AppendLine();
+
+        // ── Hourly Distribution ──
+        sb.AppendLine("── Hourly Request Distribution ───────────");
+        foreach (var (hour, count) in analyzer.HourlyDistribution())
+        {
+            if (count > 0)
+                sb.AppendLine($"  {hour:D2}:00  {count,8:N0}");
         }
         sb.AppendLine();
 
@@ -185,6 +206,32 @@ public partial class MainWindow : Window
             sb.AppendLine($"  {count,8:N0}  {ip}");
         }
         sb.AppendLine();
+
+        // ── Top 404 Endpoints ──
+        var top404 = analyzer.Top404Endpoints(top);
+        if (top404.Count > 0)
+        {
+            sb.AppendLine($"── Top {top} 404 Endpoints ─────────────────");
+            foreach (var (endpoint, count) in top404)
+            {
+                sb.AppendLine($"  {count,8:N0}  {endpoint}");
+            }
+            sb.AppendLine();
+        }
+
+        // ── Per-Host Statistics ──
+        var hostStats = analyzer.PerHostStatistics(top);
+        if (hostStats.Count > 0)
+        {
+            sb.AppendLine($"── Top {top} Host Statistics ──────────────");
+            sb.AppendLine($"  {"Host",-20} {"Reqs",8} {"Bytes",12} {"Errors",8} {"Err%",7}");
+            sb.AppendLine($"  {new string('─', 57)}");
+            foreach (var h in hostStats)
+            {
+                sb.AppendLine($"  {h.Host,-20} {h.Requests,8:N0} {FormatBytes(h.BytesTransferred),12} {h.ErrorCount,8:N0} {h.ErrorRate,7:P1}");
+            }
+            sb.AppendLine();
+        }
     }
 
     private static string FormatBytes(long bytes)

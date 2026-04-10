@@ -1,3 +1,7 @@
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+
 namespace Broiler.LogAnalyzer;
 
 /// <summary>
@@ -17,6 +21,11 @@ public sealed class LogAnalyzerService
     public int TotalRequests => _entries.Count;
 
     public int UniqueIpCount => _uniqueIpCount;
+
+    /// <summary>
+    /// Returns the underlying entries (useful for export).
+    /// </summary>
+    public IReadOnlyList<LogEntry> Entries => _entries;
 
     /// <summary>
     /// Returns status-code → count, ordered by status code.
@@ -89,4 +98,168 @@ public sealed class LogAnalyzerService
     /// Returns total bytes transferred across all entries.
     /// </summary>
     public long TotalBytesTransferred => _entries.Sum(e => e.ResponseSize);
+
+    // ── Filtering ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns a new <see cref="LogAnalyzerService"/> whose entries match all
+    /// supplied criteria. <c>null</c> parameters are ignored.
+    /// </summary>
+    /// <param name="minStatus">Inclusive minimum HTTP status code.</param>
+    /// <param name="maxStatus">Inclusive maximum HTTP status code.</param>
+    /// <param name="ip">Exact remote-host match (case-insensitive).</param>
+    /// <param name="endpointPattern">Substring that the endpoint must contain (case-insensitive).</param>
+    /// <param name="from">Inclusive minimum timestamp.</param>
+    /// <param name="to">Inclusive maximum timestamp.</param>
+    public LogAnalyzerService Filter(
+        int? minStatus = null,
+        int? maxStatus = null,
+        string? ip = null,
+        string? endpointPattern = null,
+        DateTimeOffset? from = null,
+        DateTimeOffset? to = null)
+    {
+        IEnumerable<LogEntry> filtered = _entries;
+
+        if (minStatus is not null)
+            filtered = filtered.Where(e => e.StatusCode >= minStatus.Value);
+        if (maxStatus is not null)
+            filtered = filtered.Where(e => e.StatusCode <= maxStatus.Value);
+        if (ip is not null)
+            filtered = filtered.Where(e => e.RemoteHost.Equals(ip, StringComparison.OrdinalIgnoreCase));
+        if (endpointPattern is not null)
+            filtered = filtered.Where(e => e.Endpoint.Contains(endpointPattern, StringComparison.OrdinalIgnoreCase));
+        if (from is not null)
+            filtered = filtered.Where(e => e.Timestamp >= from.Value);
+        if (to is not null)
+            filtered = filtered.Where(e => e.Timestamp <= to.Value);
+
+        return new LogAnalyzerService(filtered.ToList());
+    }
+
+    // ── Error Aggregation ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns error counts grouped by status-code class (4xx client errors and
+    /// 5xx server errors), ordered by descending total count.
+    /// </summary>
+    public IReadOnlyList<(string Category, int Count)> ErrorSummary()
+    {
+        var results = new List<(string Category, int Count)>();
+
+        int clientErrors = _entries.Count(e => e.StatusCode >= 400 && e.StatusCode < 500);
+        int serverErrors = _entries.Count(e => e.StatusCode >= 500 && e.StatusCode < 600);
+
+        if (clientErrors > 0)
+            results.Add(("4xx Client Errors", clientErrors));
+        if (serverErrors > 0)
+            results.Add(("5xx Server Errors", serverErrors));
+
+        return results.OrderByDescending(x => x.Count).ToList();
+    }
+
+    // ── Per-Host Statistics ────────────────────────────────────────────
+
+    /// <summary>
+    /// Statistics for a single remote host / IP.
+    /// </summary>
+    public sealed record HostStatistics(
+        string Host,
+        int Requests,
+        long BytesTransferred,
+        int ErrorCount,
+        double ErrorRate);
+
+    /// <summary>
+    /// Returns per-host statistics ordered by descending request count.
+    /// When <paramref name="top"/> is 0, all hosts are returned.
+    /// </summary>
+    public IReadOnlyList<HostStatistics> PerHostStatistics(int top = 10)
+    {
+        var query = _entries
+            .GroupBy(e => e.RemoteHost)
+            .Select(g =>
+            {
+                int requests = g.Count();
+                int errors = g.Count(e => e.StatusCode >= 400);
+                return new HostStatistics(
+                    Host: g.Key,
+                    Requests: requests,
+                    BytesTransferred: g.Sum(e => e.ResponseSize),
+                    ErrorCount: errors,
+                    ErrorRate: requests > 0 ? (double)errors / requests : 0);
+            })
+            .OrderByDescending(x => x.Requests);
+
+        return (top > 0 ? query.Take(top) : query).ToList();
+    }
+
+    // ── Hourly Distribution ────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns request counts per hour-of-day (0–23), always returning 24 entries
+    /// even if some hours have zero requests. Timestamps are evaluated in their
+    /// original offset (as recorded in the log).
+    /// </summary>
+    public IReadOnlyList<(int Hour, int Count)> HourlyDistribution()
+    {
+        var counts = new int[24];
+        foreach (var e in _entries)
+            counts[e.Timestamp.Hour]++;
+
+        return Enumerable.Range(0, 24)
+            .Select(h => (Hour: h, Count: counts[h]))
+            .ToList();
+    }
+
+    // ── Export ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Exports all entries to CSV format.
+    /// </summary>
+    public string ExportCsv()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("RemoteHost,Ident,User,Timestamp,Method,Endpoint,Protocol,StatusCode,ResponseSize,Referer,UserAgent");
+
+        foreach (var e in _entries)
+        {
+            sb.Append(CsvEscape(e.RemoteHost)).Append(',');
+            sb.Append(CsvEscape(e.Ident)).Append(',');
+            sb.Append(CsvEscape(e.User)).Append(',');
+            sb.Append(CsvEscape(e.Timestamp.ToString("o", CultureInfo.InvariantCulture))).Append(',');
+            sb.Append(CsvEscape(e.Method)).Append(',');
+            sb.Append(CsvEscape(e.Endpoint)).Append(',');
+            sb.Append(CsvEscape(e.Protocol)).Append(',');
+            sb.Append(e.StatusCode).Append(',');
+            sb.Append(e.ResponseSize).Append(',');
+            sb.Append(CsvEscape(e.Referer ?? "")).Append(',');
+            sb.AppendLine(CsvEscape(e.UserAgent ?? ""));
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Exports all entries to JSON format.
+    /// </summary>
+    public string ExportJson()
+    {
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        };
+        return JsonSerializer.Serialize(_entries, options);
+    }
+
+    /// <summary>
+    /// Escapes a value for safe inclusion in a CSV field.
+    /// </summary>
+    internal static string CsvEscape(string value)
+    {
+        if (value.Contains('"') || value.Contains(',') || value.Contains('\n') || value.Contains('\r'))
+            return '"' + value.Replace("\"", "\"\"") + '"';
+        return value;
+    }
 }
