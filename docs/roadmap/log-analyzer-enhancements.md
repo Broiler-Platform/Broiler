@@ -1,6 +1,6 @@
 # Roadmap: Broiler.LogAnalyzer Enhancements
 
-> **Status**: Active — created 2026-04-10 | Phase 1 complete  
+> **Status**: Active — created 2026-04-10 | Phase 1–3 complete  
 > **Tracking issue**: Create Roadmap Document for Broiler.LogAnalyzer Enhancements
 
 ---
@@ -371,8 +371,8 @@ Items are ordered by estimated impact and implementation complexity.
 | 1  | DataGrid for log entries with sorting          | WPF       | High   | Medium | 3.1     | ✅ Done |
 | 2  | Color-coded status rows                        | WPF       | High   | Low    | 3.3     | ✅ Done |
 | 3  | Quick-filter toolbar                           | WPF       | High   | Medium | 3.2     | ✅ Done |
-| 4  | Bot/crawler detection                          | Lib       | High   | Medium | 4.1     | Planned |
-| 5  | Automated natural-language summary             | Lib       | High   | Medium | 4.2     | Planned |
+| 4  | Bot/crawler detection                          | Lib       | High   | Medium | 4.1     | ✅ Done |
+| 5  | Automated natural-language summary             | Lib       | High   | Medium | 4.2     | ✅ Done |
 | 6  | Bar chart for status codes                     | WPF       | High   | Medium | 5.1     | ✅ Done |
 | 7  | Line chart for hourly distribution             | WPF       | High   | Medium | 5.1     | ✅ Done |
 | 8  | HTML report export                             | Lib       | Medium | Medium | 7.1     | Planned |
@@ -383,7 +383,7 @@ Items are ordered by estimated impact and implementation complexity.
 | 13 | Average response size and requests/sec         | Lib       | Medium | Low    | 6.1     | ✅ Done |
 | 14 | Tabbed results view                            | WPF       | Medium | Medium | 3.4     | ✅ Done |
 | 15 | ASCII bar charts in CLI                        | CLI       | Medium | Low    | 5.2     | ✅ Done |
-| 16 | Suspicious request detection                   | Lib       | Medium | Medium | 4.4     | Planned |
+| 16 | Suspicious request detection                   | Lib       | Medium | Medium | 4.4     | ✅ Done |
 | 17 | Drag-and-drop file support                     | WPF       | Medium | Low    | 10.1    | Planned |
 | 18 | Parallel file parsing                          | Lib       | Medium | Medium | 9.1     | Planned |
 | 19 | Dark/light theme support                       | WPF       | Low    | Medium | 10.1    | Planned |
@@ -420,10 +420,17 @@ and sparkline-style hourly distributions using Unicode block characters
 top endpoints, top IPs, and hourly distribution. 15 new unit tests added in
 `Phase2VisualizationTests`.
 
-### Phase 3 — Deeper Analysis (TODOs 4–5, 16)
+### Phase 3 — Deeper Analysis (TODOs 4–5, 16) ✅ Complete
 
-Implement bot detection, automated summaries, and suspicious request detection
-in the Lib layer. Surface these in both CLI and WPF.
+Added bot/crawler detection via User-Agent pattern matching (34 known bot
+patterns) with `IsBotUserAgent`, `DetectBots`, and `BotTrafficSummary`.
+Implemented suspicious request detection scanning for SQL injection, path
+traversal, shell injection, and XSS patterns via `DetectSuspiciousRequests`.
+Added automated natural-language summary generation via `GenerateSummary`
+covering traffic overview, peak hours, top contributors, error rates, bot
+traffic, and suspicious requests. All three features surfaced in both CLI
+(`PrintReport`) and WPF (`FormatReport`). 33 new unit tests added in
+`LogAnalyzerServicePhase3Tests`.
 
 ### Phase 4 — Export & CLI (TODOs 8–10)
 
