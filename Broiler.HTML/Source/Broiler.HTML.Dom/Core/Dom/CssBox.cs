@@ -345,7 +345,18 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     internal bool HeightPercentageResolvesToAuto()
     {
-        return Height.Contains('%') && (ContainingBlock.Height == CssConstants.Auto || string.IsNullOrEmpty(ContainingBlock.Height));
+        if (!Height.Contains('%'))
+            return false;
+
+        // CSS 2.1 §10.5: "A percentage height on the root element is
+        // relative to the initial containing block."  The initial
+        // containing block always has a definite height (the viewport),
+        // so percentage heights on the root element never resolve to auto.
+        if (ContainingBlock?.ParentBox == null)
+            return false;
+
+        return ContainingBlock.Height == CssConstants.Auto
+            || string.IsNullOrEmpty(ContainingBlock.Height);
     }
 
     public HtmlTag HtmlTag { get; }
@@ -591,6 +602,25 @@ internal class CssBox : CssBoxProperties, IDisposable
                 }
 
                 Size = new SizeF((float)width, Size.Height);
+
+                // CSS2.1 §10.5: Pre-resolve percentage heights so that children
+                // can use ContainingBlock.Size.Height for their own percentage
+                // height resolution.  Without this, children of an element with
+                // height:100% would see Size.Height = 0 (not yet set).
+                if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height)
+                    && Height.Contains('%') && !HeightPercentageResolvesToAuto())
+                {
+                    double cbHeight;
+                    if (Position == CssConstants.Fixed && ContainerInt != null)
+                        cbHeight = ContainerInt.ViewportSize.Height;
+                    else if (ContainingBlock?.ParentBox == null && ContainerInt != null)
+                        cbHeight = ContainerInt.ViewportSize.Height;
+                    else
+                        cbHeight = ContainingBlock.Size.Height;
+                    double preHeight = CssValueParser.ParseLength(Height, cbHeight, GetEmHeight());
+                    preHeight += ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+                    Size = new SizeF(Size.Width, (float)preHeight);
+                }
 
                 // CSS2.1 §10.3.3: For block-level, non-replaced elements in
                 // normal flow with an explicit width and auto margins, resolve
@@ -1174,7 +1204,29 @@ internal class CssBox : CssBoxProperties, IDisposable
             // percentage resolves to auto and this constraint is skipped.
             if (!HeightPercentageResolvesToAuto())
             {
-                double borderBoxHeight = ActualHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+                // CSS2.1 §10.5: Percentage heights resolve against the
+                // containing block's height, not the element's own size.
+                // ActualHeight uses Size.Height (the element's own height
+                // from child layout), which is wrong for percentage values.
+                // Resolve against the containing block's height instead.
+                double contentHeight;
+                if (Height.Contains('%'))
+                {
+                    double cbHeight;
+                    if (Position == CssConstants.Fixed && ContainerInt != null)
+                        cbHeight = ContainerInt.ViewportSize.Height;
+                    else if (ContainingBlock?.ParentBox == null && ContainerInt != null)
+                        cbHeight = ContainerInt.ViewportSize.Height;
+                    else
+                        cbHeight = ContainingBlock.Size.Height;
+                    contentHeight = CssValueParser.ParseLength(Height, cbHeight, GetEmHeight());
+                }
+                else
+                {
+                    contentHeight = ActualHeight;
+                }
+
+                double borderBoxHeight = contentHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
 
                 // CSS2.1 §10.6.3: An explicit height sets the content box
                 // height.  Content that exceeds this height overflows
@@ -1203,8 +1255,11 @@ internal class CssBox : CssBoxProperties, IDisposable
                 // CSS2.1 §10.7: If the containing block's height is not
                 // specified explicitly and this element is not absolutely
                 // positioned, a percentage max-height is treated as 'none'.
+                // Exception: the initial containing block always has a
+                // definite height (the viewport), per §10.5.
                 bool maxIsPercentageAuto = MaxHeight.Contains('%')
                     && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+                    && ContainingBlock?.ParentBox != null
                     && (ContainingBlock.Height == CssConstants.Auto || string.IsNullOrEmpty(ContainingBlock.Height));
 
                 if (!maxIsPercentageAuto)
@@ -1223,8 +1278,11 @@ internal class CssBox : CssBoxProperties, IDisposable
                 // CSS2.1 §10.7: If the containing block's height is not
                 // specified explicitly and this element is not absolutely
                 // positioned, a percentage min-height is treated as '0'.
+                // Exception: the initial containing block always has a
+                // definite height (the viewport), per §10.5.
                 bool minIsPercentageAuto = MinHeight.Contains('%')
                     && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+                    && ContainingBlock?.ParentBox != null
                     && (ContainingBlock.Height == CssConstants.Auto || string.IsNullOrEmpty(ContainingBlock.Height));
 
                 if (!minIsPercentageAuto)
