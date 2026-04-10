@@ -1492,4 +1492,30 @@ document.getElementById('out').appendChild(p);
             $"abspos-in-block-in-inline-in-relpos-inline should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
+
+    [Fact]
+    public void Wpt_InlineSvg100PercentInBody_MatchesReference()
+    {
+        // CSS2 / SVG: Inline SVG with 100% width/height should fill the body.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2",
+            "inline-svg-100-percent-in-body.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2",
+            "inline-svg-100-percent-in-body.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"inline-svg-100-percent-in-body should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
 }
