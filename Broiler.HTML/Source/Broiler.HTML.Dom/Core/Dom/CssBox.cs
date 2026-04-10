@@ -19,6 +19,16 @@ internal class CssBox : CssBoxProperties, IDisposable
 
     internal bool _tableFixed;
 
+    /// <summary>
+    /// When the block-inside-inline correction (CSS2.1 §9.2.1.1) splits a
+    /// positioned inline element into sibling anonymous blocks, the hoisted
+    /// blocks lose their parent–child relationship with the positioned
+    /// inline in the box tree.  This field links back to the original
+    /// positioned ancestor so that <see cref="FindPositionedContainingBlock"/>
+    /// can still find it.
+    /// </summary>
+    internal CssBox SplitPositionedAncestor { get; set; }
+
     protected bool _wordsSizeMeasured;
     private CssBox _listItemBox;
     private IImageLoadHandler _imageLoadHandler;
@@ -203,6 +213,9 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// block is the padding-box of the nearest ancestor with a computed
     /// position of <c>absolute</c>, <c>relative</c>, or <c>fixed</c>.
     /// Falls back to <see cref="ContainingBlock"/> if none is found.
+    /// Also checks <see cref="SplitPositionedAncestor"/> which links back
+    /// to positioned inlines that were restructured by the block-inside-
+    /// inline correction (CSS2.1 §9.2.1.1).
     /// </summary>
     private CssBox FindPositionedContainingBlock()
     {
@@ -212,11 +225,77 @@ internal class CssBox : CssBoxProperties, IDisposable
             if (box.Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed || box.ParentBox == null)
                 return box;
 
+            // If the block-inside-inline correction split a positioned inline
+            // and hoisted this branch out, SplitPositionedAncestor links back
+            // to the original positioned inline ancestor.
+            if (box.SplitPositionedAncestor is { } spa
+                && spa.Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed)
+                return spa;
+
             box = box.ParentBox;
         }
 
         return ContainingBlock;
     }
+
+    /// <summary>
+    /// CSS2.1 §10.1: When the containing block for an absolutely positioned
+    /// element is formed by an inline-level element, the containing block is
+    /// the bounding box around the padding boxes of the first and last inline
+    /// boxes generated for that element.  Returns the bounding rectangle in
+    /// absolute coordinates, or <see cref="RectangleF.Empty"/> if the inline
+    /// has no line-box rectangles and no laid-out children.
+    /// </summary>
+    private static RectangleF GetInlineBoundingBox(CssBox cb)
+    {
+        float minX = float.MaxValue, minY = float.MaxValue;
+        float maxX = float.MinValue, maxY = float.MinValue;
+
+        // First try the inline's own Rectangles (populated when the
+        // inline element has direct text words).
+        foreach (var rect in cb.Rectangles.Values)
+        {
+            if (rect.Left < minX) minX = rect.Left;
+            if (rect.Top < minY) minY = rect.Top;
+            if (rect.Right > maxX) maxX = rect.Right;
+            if (rect.Bottom > maxY) maxY = rect.Bottom;
+        }
+
+        // If the inline has no Rectangles (e.g. it only contains child
+        // boxes like inline-blocks), compute the bounding box from the
+        // child boxes' laid-out positions and sizes.
+        if (minX > maxX)
+        {
+            foreach (var child in cb.Boxes)
+            {
+                if (child.Size.Width <= 0 && child.Size.Height <= 0)
+                    continue;
+                float left = child.Location.X;
+                float top = child.Location.Y;
+                float right = left + child.Size.Width;
+                float bottom = (float)child.ActualBottom;
+                if (bottom <= top) bottom = top + child.Size.Height;
+
+                if (left < minX) minX = left;
+                if (top < minY) minY = top;
+                if (right > maxX) maxX = right;
+                if (bottom > maxY) maxY = bottom;
+            }
+        }
+
+        if (minX > maxX || minY > maxY)
+            return RectangleF.Empty;
+
+        return new RectangleF(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when the given box is a pure inline element
+    /// (not inline-block/inline-table etc.) whose containing-block extent
+    /// must be computed from its line-box rectangles per CSS2.1 §10.1.
+    /// </summary>
+    private static bool IsInlineContainingBlock(CssBox cb) =>
+        cb.Display == CssConstants.Inline;
 
     /// <summary>
     /// Returns true when <see cref="Height"/> is a percentage that resolves
@@ -428,9 +507,20 @@ internal class CssBox : CssBoxProperties, IDisposable
                 else if (Position == CssConstants.Absolute)
                 {
                     var cb = FindPositionedContainingBlock();
-                    width = cb.Size.Width
-                            - cb.ActualPaddingLeft - cb.ActualPaddingRight
-                            - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+                    if (IsInlineContainingBlock(cb))
+                    {
+                        // CSS2.1 §10.1: The containing block is the bounding
+                        // box of the first and last inline boxes of the inline
+                        // ancestor.  The width is the bounding box width.
+                        var bbox = GetInlineBoundingBox(cb);
+                        width = bbox != RectangleF.Empty ? bbox.Width : cb.Size.Width;
+                    }
+                    else
+                    {
+                        width = cb.Size.Width
+                                - cb.ActualPaddingLeft - cb.ActualPaddingRight
+                                - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+                    }
                 }
                 else
                 {
@@ -818,11 +908,35 @@ internal class CssBox : CssBoxProperties, IDisposable
                         var cb = FindPositionedContainingBlock();
                         // CSS2.1 §10.1: The containing block for an absolutely
                         // positioned element is the padding-box of the nearest
-                        // positioned ancestor.
-                        double cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
-                        double cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
-                        double cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
-                        double cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+                        // positioned ancestor.  When the ancestor is an inline
+                        // element, the containing block is the bounding box of
+                        // the first and last inline boxes generated for it.
+                        double cbPadLeft, cbPadTop, cbPadWidth, cbPadHeight;
+                        if (IsInlineContainingBlock(cb))
+                        {
+                            var bbox = GetInlineBoundingBox(cb);
+                            if (bbox != RectangleF.Empty)
+                            {
+                                cbPadLeft = bbox.Left;
+                                cbPadTop = bbox.Top;
+                                cbPadWidth = bbox.Width;
+                                cbPadHeight = bbox.Height;
+                            }
+                            else
+                            {
+                                cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
+                                cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
+                                cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+                                cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+                            }
+                        }
+                        else
+                        {
+                            cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
+                            cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
+                            cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+                            cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+                        }
 
                         float newX = Location.X, newY = Location.Y;
 

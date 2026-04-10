@@ -1274,6 +1274,16 @@ internal sealed class DomParser
     /// <param name="box">the box that has the problem</param>
     private static CssBox CorrectBlockInsideInlineImp(CssBox box, Uri baseUrl)
     {
+        // CSS2.1 §9.2.1.1: When an inline element contains a block-level
+        // child, the inline is broken around the block into anonymous block
+        // boxes.  If the inline had position:relative/absolute/fixed (i.e.
+        // established a containing block for absolutely-positioned descendants),
+        // the hoisted blocks lose their parent–child relationship in the box
+        // tree.  Record the original positioned ancestor so that
+        // FindPositionedContainingBlock() can still find it.
+        bool wasPositioned = box.Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed;
+        // Also inherit any split-positioned-ancestor from a higher level.
+        CssBox splitAncestor = wasPositioned ? box : box.SplitPositionedAncestor;
         if (box.Display == CssConstants.Inline)
             box.Display = CssConstants.Block;
 
@@ -1288,11 +1298,18 @@ internal sealed class DomParser
             var splitBox = box.Boxes[1];
             splitBox.ParentBox = null;
 
-            CorrectBlockSplitBadBox(box, splitBox, leftBlock, baseUrl);
+            CorrectBlockSplitBadBoxCore(box, splitBox, leftBlock, baseUrl, splitAncestor);
 
             // remove block that did not get any inner elements
             if (leftBlock.Boxes.Count < 1)
                 leftBlock.ParentBox = null;
+
+            // Propagate the positioned ancestor link to hoisted children.
+            if (splitAncestor != null)
+            {
+                foreach (var child in box.Boxes)
+                    PropagateSplitPositionedAncestor(child, splitAncestor);
+            }
 
             int minBoxes = leftBlock.ParentBox != null ? 2 : 1;
             if (box.Boxes.Count > minBoxes)
@@ -1301,6 +1318,9 @@ internal sealed class DomParser
                 var tempRightBox = CssBoxHelper.CreateBox(box, baseUrl, null, box.Boxes[minBoxes]);
                 while (box.Boxes.Count > minBoxes + 1)
                     box.Boxes[minBoxes + 1].ParentBox = tempRightBox;
+
+                if (splitAncestor != null)
+                    PropagateSplitPositionedAncestor(tempRightBox, splitAncestor);
 
                 return tempRightBox;
             }
@@ -1313,8 +1333,43 @@ internal sealed class DomParser
         return null;
     }
 
+    /// <summary>
+    /// Recursively propagate <see cref="CssBox.SplitPositionedAncestor"/>
+    /// down through a subtree that was hoisted out of a positioned inline
+    /// by the block-inside-inline correction.  Stops recursing when it
+    /// reaches a box that already has its own positioned role.
+    /// </summary>
+    private static void PropagateSplitPositionedAncestor(CssBox box, CssBox ancestor)
+    {
+        // Don't override if the box itself is positioned — it forms its
+        // own containing block.
+        if (box.Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed)
+            return;
+
+        box.SplitPositionedAncestor ??= ancestor;
+
+        foreach (var child in box.Boxes)
+            PropagateSplitPositionedAncestor(child, ancestor);
+    }
+
     private static void CorrectBlockSplitBadBox(CssBox parentBox, CssBox badBox, CssBox leftBlock, Uri baseUrl)
     {
+        CorrectBlockSplitBadBoxCore(parentBox, badBox, leftBlock, baseUrl, null);
+    }
+
+    /// <summary>
+    /// Core implementation of block-inside-inline split.  <paramref name="posAncestor"/>
+    /// tracks the closest positioned ancestor that was stripped away during
+    /// recursive splitting so that hoisted blocks can carry a
+    /// <see cref="CssBox.SplitPositionedAncestor"/> reference.
+    /// </summary>
+    private static void CorrectBlockSplitBadBoxCore(CssBox parentBox, CssBox badBox, CssBox leftBlock, Uri baseUrl, CssBox posAncestor)
+    {
+        // If the box being split is positioned, it becomes the reference
+        // for any blocks hoisted out of its subtree.
+        if (badBox.Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed)
+            posAncestor = badBox;
+
         CssBox leftbox = null;
         while (badBox.Boxes[0].IsInline && ContainsInlinesOnlyDeep(badBox.Boxes[0]))
         {
@@ -1330,12 +1385,16 @@ internal sealed class DomParser
         var splitBox = badBox.Boxes[0];
         if (!ContainsInlinesOnlyDeep(splitBox))
         {
-            CorrectBlockSplitBadBox(parentBox, splitBox, leftBlock, baseUrl);
+            CorrectBlockSplitBadBoxCore(parentBox, splitBox, leftBlock, baseUrl, posAncestor);
             splitBox.ParentBox = null;
         }
         else
         {
             splitBox.ParentBox = parentBox;
+            // The block being hoisted to parentBox was originally a
+            // descendant of a positioned inline.  Record the link.
+            if (posAncestor != null)
+                SetSplitAncestorDeep(splitBox, posAncestor);
         }
 
         if (badBox.Boxes.Count > 0)
@@ -1358,6 +1417,9 @@ internal sealed class DomParser
             }
 
             rightBox.SetAllBoxes(badBox);
+            // Also tag the right-side anonymous block.
+            if (posAncestor != null)
+                SetSplitAncestorDeep(rightBox, posAncestor);
         }
         else if (splitBox.ParentBox != null && parentBox.Boxes.Count > 1)
         {
@@ -1365,6 +1427,19 @@ internal sealed class DomParser
             if (splitBox.HtmlTag != null && splitBox.HtmlTag.Name == "br" && (leftbox != null || leftBlock.Boxes.Count > 1))
                 splitBox.Display = CssConstants.Inline;
         }
+    }
+
+    /// <summary>
+    /// Set <see cref="CssBox.SplitPositionedAncestor"/> on a box and all
+    /// its descendants, stopping at boxes that are themselves positioned.
+    /// </summary>
+    private static void SetSplitAncestorDeep(CssBox box, CssBox ancestor)
+    {
+        if (box.Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed)
+            return;
+        box.SplitPositionedAncestor ??= ancestor;
+        foreach (var child in box.Boxes)
+            SetSplitAncestorDeep(child, ancestor);
     }
 
     private static void CorrectInlineBoxesParent(CssBox box, Uri baseUrl)
