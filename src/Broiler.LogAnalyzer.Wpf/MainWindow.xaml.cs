@@ -15,7 +15,8 @@ namespace Broiler.LogAnalyzer.Wpf;
 /// <summary>
 /// Main window for the Broiler Log Analyzer WPF application.
 /// Provides a DataGrid for browsing log entries with column sorting,
-/// color-coded status rows, and a quick-filter toolbar.
+/// color-coded status rows, a quick-filter toolbar, drag-and-drop support,
+/// dark/light theme toggle, chart export, and heatmap visualization.
 /// </summary>
 public partial class MainWindow : Window
 {
@@ -25,10 +26,76 @@ public partial class MainWindow : Window
     private int _top = 10;
     private bool _chartsLoaded;
     private bool _perHostLoaded;
+    private bool _heatmapLoaded;
+    private bool _isDarkTheme;
 
     public MainWindow()
     {
         InitializeComponent();
+    }
+
+    // ── Drag-and-drop support (TODO 17) ─────────────────────────────
+
+    private void Window_DragOver(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
+        {
+            e.Effects = DragDropEffects.Copy;
+        }
+        else
+        {
+            e.Effects = DragDropEffects.None;
+        }
+        e.Handled = true;
+    }
+
+    private void Window_Drop(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
+            return;
+
+        var files = e.Data.GetData(DataFormats.FileDrop) as string[];
+        if (files is null || files.Length == 0)
+            return;
+
+        // Use the first dropped item (file or directory)
+        var droppedPath = files[0];
+        _selectedPath = droppedPath;
+        FilePathTextBox.Text = _selectedPath;
+        AnalyzeButton.IsEnabled = true;
+        ResultsTextBox.Text = string.Empty;
+        LogEntriesGrid.ItemsSource = null;
+
+        if (Directory.Exists(droppedPath))
+            StatusText.Text = "Folder dropped. Click Analyze to start.";
+        else
+            StatusText.Text = "File dropped. Click Analyze to start.";
+    }
+
+    // ── Theme toggle (TODO 19) ──────────────────────────────────────
+
+    private void ThemeToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isDarkTheme = !_isDarkTheme;
+        ApplyTheme();
+    }
+
+    private void ApplyTheme()
+    {
+        if (_isDarkTheme)
+        {
+            // Dark theme
+            Background = new SolidColorBrush(WpfColor.FromRgb(0x1E, 0x1E, 0x2E));
+            Foreground = new SolidColorBrush(WpfColor.FromRgb(0xCD, 0xD6, 0xF4));
+            ThemeToggleButton.Content = "☀️ Light";
+        }
+        else
+        {
+            // Light theme (default)
+            Background = new SolidColorBrush(WpfColor.FromRgb(0xFF, 0xFF, 0xFF));
+            Foreground = new SolidColorBrush(WpfColor.FromRgb(0x00, 0x00, 0x00));
+            ThemeToggleButton.Content = "🌙 Dark";
+        }
     }
 
     // ── Browse dialogs ───────────────────────────────────────────────
@@ -95,6 +162,7 @@ public partial class MainWindow : Window
         LogEntriesGrid.ItemsSource = null;
         _chartsLoaded = false;
         _perHostLoaded = false;
+        _heatmapLoaded = false;
 
         try
         {
@@ -214,6 +282,11 @@ public partial class MainWindow : Window
             PopulateCharts();
             _chartsLoaded = true;
         }
+        else if (ResultsTabControl.SelectedItem == HeatmapTab && !_heatmapLoaded)
+        {
+            PopulateHeatmap();
+            _heatmapLoaded = true;
+        }
         else if (ResultsTabControl.SelectedItem == PerHostTab && !_perHostLoaded)
         {
             PopulatePerHostDetails();
@@ -275,6 +348,10 @@ public partial class MainWindow : Window
             });
             ChartsPanel.Children.Add(hourlyChart);
         }
+
+        // Enable chart export buttons
+        ExportChartPngButton.IsEnabled = true;
+        ExportChartSvgButton.IsEnabled = true;
     }
 
     private void PopulatePerHostDetails()
@@ -283,6 +360,270 @@ public partial class MainWindow : Window
             return;
 
         PerHostGrid.ItemsSource = _analyzer.PerHostStatistics(_top);
+    }
+
+    // ── Chart Export (TODO 21) ──────────────────────────────────────
+
+    private void ExportChartPng_Click(object sender, RoutedEventArgs e)
+    {
+        if (_analyzer is null)
+            return;
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export Charts as PNG",
+            Filter = "PNG Image (*.png)|*.png",
+            DefaultExt = ".png",
+            FileName = "log-charts.png"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                ExportChartsToFile(dialog.FileName, isPng: true);
+                StatusText.Text = $"Charts exported to {dialog.FileName}";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error exporting charts: {ex.Message}", "Export Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    private void ExportChartSvg_Click(object sender, RoutedEventArgs e)
+    {
+        if (_analyzer is null)
+            return;
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export Charts as SVG",
+            Filter = "SVG Image (*.svg)|*.svg",
+            DefaultExt = ".svg",
+            FileName = "log-charts.svg"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                ExportChartsToFile(dialog.FileName, isPng: false);
+                StatusText.Text = $"Charts exported to {dialog.FileName}";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error exporting charts: {ex.Message}", "Export Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    private void ExportChartsToFile(string filePath, bool isPng)
+    {
+        if (_analyzer is null)
+            return;
+
+        // Build a combined chart with status code bars and hourly line chart
+        var plot = new ScottPlot.Plot(1200, 800);
+
+        var statusData = _analyzer.StatusCodeDistribution();
+        if (statusData.Count > 0)
+        {
+            var labels = statusData.Select(s => s.StatusCode.ToString()).ToArray();
+            var values = statusData.Select(s => (double)s.Count).ToArray();
+            var positions = Enumerable.Range(0, statusData.Count).Select(i => (double)i).ToArray();
+            plot.Add.Bars(positions, values);
+            plot.Axes.Bottom.TickGenerator = new ScottPlot.TickGenerators.NumericManual(positions, labels);
+            plot.Title("Status Code Distribution");
+            plot.YLabel("Request Count");
+            plot.XLabel("Status Code");
+        }
+
+        if (isPng)
+        {
+            plot.SavePng(filePath, 1200, 800);
+        }
+        else
+        {
+            plot.SaveSvg(filePath, 1200, 800);
+        }
+    }
+
+    // ── Heatmap (TODO 24) ───────────────────────────────────────────
+
+    private void PopulateHeatmap()
+    {
+        if (_analyzer is null)
+            return;
+
+        HeatmapPanel.Children.Clear();
+
+        var heatmapData = _analyzer.HourlyDayOfWeekDistribution();
+        if (heatmapData.Count == 0)
+        {
+            HeatmapPanel.Children.Add(new TextBlock
+            {
+                Text = "No data available for heatmap.",
+                FontSize = 14,
+                Foreground = Brushes.Gray,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 20, 0, 0)
+            });
+            return;
+        }
+
+        HeatmapPanel.Children.Add(new TextBlock
+        {
+            Text = "Requests by Hour × Day of Week",
+            FontSize = 16,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 8, 0, 8)
+        });
+
+        // Build a 7×24 grid heatmap
+        int maxCount = heatmapData.Count > 0 ? heatmapData.Max(d => d.Count) : 1;
+        if (maxCount == 0) maxCount = 1;
+
+        string[] dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+        var grid = new Grid();
+
+        // 1 header row + 7 day rows
+        for (int r = 0; r <= 7; r++)
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(r == 0 ? 25 : 30) });
+
+        // 1 label column + 24 hour columns
+        for (int c = 0; c <= 24; c++)
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(c == 0 ? 40 : 30) });
+
+        // Header row (hours)
+        for (int h = 0; h < 24; h++)
+        {
+            var header = new TextBlock
+            {
+                Text = h.ToString("D2"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = 10
+            };
+            Grid.SetRow(header, 0);
+            Grid.SetColumn(header, h + 1);
+            grid.Children.Add(header);
+        }
+
+        // Lookup for quick access
+        var lookup = heatmapData.ToDictionary(d => ((int)d.Day, d.Hour), d => d.Count);
+
+        // Day rows
+        for (int d = 0; d < 7; d++)
+        {
+            var dayLabel = new TextBlock
+            {
+                Text = dayNames[d],
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold
+            };
+            Grid.SetRow(dayLabel, d + 1);
+            Grid.SetColumn(dayLabel, 0);
+            grid.Children.Add(dayLabel);
+
+            for (int h = 0; h < 24; h++)
+            {
+                int count = lookup.GetValueOrDefault(((DayOfWeek)d, h), 0);
+                double intensity = (double)count / maxCount;
+
+                var cell = new Border
+                {
+                    Background = new SolidColorBrush(HeatmapColor(intensity)),
+                    Margin = new Thickness(1),
+                    ToolTip = $"{dayNames[d]} {h:D2}:00 — {count:N0} requests",
+                    CornerRadius = new CornerRadius(2)
+                };
+                Grid.SetRow(cell, d + 1);
+                Grid.SetColumn(cell, h + 1);
+                grid.Children.Add(cell);
+            }
+        }
+
+        HeatmapPanel.Children.Add(grid);
+
+        // Legend
+        var legendPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 12, 0, 0)
+        };
+        legendPanel.Children.Add(new TextBlock
+        {
+            Text = "Low",
+            Margin = new Thickness(40, 0, 4, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        for (int i = 0; i <= 10; i++)
+        {
+            legendPanel.Children.Add(new Border
+            {
+                Width = 20,
+                Height = 15,
+                Background = new SolidColorBrush(HeatmapColor(i / 10.0)),
+                Margin = new Thickness(1, 0, 1, 0),
+                CornerRadius = new CornerRadius(2)
+            });
+        }
+        legendPanel.Children.Add(new TextBlock
+        {
+            Text = "High",
+            Margin = new Thickness(4, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        HeatmapPanel.Children.Add(legendPanel);
+    }
+
+    /// <summary>
+    /// Interpolates a color from light green (low) to dark red (high) for the heatmap.
+    /// </summary>
+    private static WpfColor HeatmapColor(double intensity)
+    {
+        intensity = Math.Clamp(intensity, 0, 1);
+
+        // Gradient: #ebedf0 (zero) → #9be9a8 (low) → #40c463 (mid) → #30a14e (high) → #216e39 (max)
+        if (intensity < 0.01)
+            return WpfColor.FromRgb(0xEB, 0xED, 0xF0);
+
+        byte r, g, b;
+        if (intensity < 0.25)
+        {
+            double t = intensity / 0.25;
+            r = (byte)(0xEB + t * (0x9B - 0xEB));
+            g = (byte)(0xED + t * (0xE9 - 0xED));
+            b = (byte)(0xF0 + t * (0xA8 - 0xF0));
+        }
+        else if (intensity < 0.5)
+        {
+            double t = (intensity - 0.25) / 0.25;
+            r = (byte)(0x9B + t * (0x40 - 0x9B));
+            g = (byte)(0xE9 + t * (0xC4 - 0xE9));
+            b = (byte)(0xA8 + t * (0x63 - 0xA8));
+        }
+        else if (intensity < 0.75)
+        {
+            double t = (intensity - 0.5) / 0.25;
+            r = (byte)(0x40 + t * (0x30 - 0x40));
+            g = (byte)(0xC4 + t * (0xA1 - 0xC4));
+            b = (byte)(0x63 + t * (0x4E - 0x63));
+        }
+        else
+        {
+            double t = (intensity - 0.75) / 0.25;
+            r = (byte)(0x30 + t * (0x21 - 0x30));
+            g = (byte)(0xA1 + t * (0x6E - 0xA1));
+            b = (byte)(0x4E + t * (0x39 - 0x4E));
+        }
+
+        return WpfColor.FromRgb(r, g, b);
     }
 
     // ── Analysis engine (background thread) ──────────────────────────

@@ -5,7 +5,10 @@
         xmlns:scottplot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
         Title="Broiler Log Analyzer" Height="700" Width="1100"
         WindowStartupLocation="CenterScreen"
-        MinHeight="500" MinWidth="800">
+        MinHeight="500" MinWidth="800"
+        AllowDrop="True"
+        Drop="Window_Drop"
+        DragOver="Window_DragOver">
     <Window.Resources>
         <local:StatusCodeToBrushConverter x:Key="StatusCodeToBrush"/>
     </Window.Resources>
@@ -19,7 +22,7 @@
         </Grid.RowDefinitions>
 
         <!-- File Selection -->
-        <GroupBox Grid.Row="0" Header="Log File Selection" Padding="8" Margin="0,0,0,8">
+        <GroupBox Grid.Row="0" Header="Log File Selection (or drag-and-drop files here)" Padding="8" Margin="0,0,0,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -29,7 +32,7 @@
                 <TextBox x:Name="FilePathTextBox" Grid.Column="0"
                          VerticalContentAlignment="Center" Padding="4,2"
                          IsReadOnly="True"
-                         Text="Select a log file or directory..."/>
+                         Text="Select a log file or directory (or drag-and-drop)..."/>
                 <Button x:Name="BrowseFileButton" Grid.Column="1"
                         Content="Browse File…" Margin="8,0,0,0" Padding="12,4"
                         Click="BrowseFileButton_Click"/>
@@ -46,11 +49,15 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" Text="Top N results:" VerticalAlignment="Center" Margin="0,0,8,0"/>
             <TextBox x:Name="TopNTextBox" Grid.Column="1" Width="60" Text="10"
                      VerticalContentAlignment="Center" Padding="4,2"/>
-            <Button x:Name="AnalyzeButton" Grid.Column="3"
+            <Button x:Name="ThemeToggleButton" Grid.Column="3"
+                    Content="🌙 Dark" Padding="12,4" Margin="0,0,8,0"
+                    Click="ThemeToggleButton_Click"/>
+            <Button x:Name="AnalyzeButton" Grid.Column="4"
                     Content="Analyze" Padding="20,6" FontWeight="SemiBold"
                     Click="AnalyzeButton_Click" IsEnabled="False"/>
         </Grid>
@@ -135,12 +142,36 @@
                          TextWrapping="NoWrap"/>
             </TabItem>
             <TabItem Header="Charts" x:Name="ChartsTab">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,4,8,0">
+                        <Button x:Name="ExportChartPngButton" Content="Export Charts as PNG…"
+                                Padding="10,4" Margin="0,0,8,0"
+                                Click="ExportChartPng_Click" IsEnabled="False"/>
+                        <Button x:Name="ExportChartSvgButton" Content="Export Charts as SVG…"
+                                Padding="10,4"
+                                Click="ExportChartSvg_Click" IsEnabled="False"/>
+                    </StackPanel>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="ChartsPanel" Margin="8">
+                            <TextBlock Text="Run analysis to view charts." FontSize="14"
+                                       Foreground="Gray" HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" Margin="0,20,0,0"
+                                       x:Name="ChartsPlaceholder"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Heatmap" x:Name="HeatmapTab">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel x:Name="ChartsPanel" Margin="8">
-                        <TextBlock Text="Run analysis to view charts." FontSize="14"
+                    <StackPanel x:Name="HeatmapPanel" Margin="8">
+                        <TextBlock Text="Run analysis to view heatmap." FontSize="14"
                                    Foreground="Gray" HorizontalAlignment="Center"
                                    VerticalAlignment="Center" Margin="0,20,0,0"
-                                   x:Name="ChartsPlaceholder"/>
+                                   x:Name="HeatmapPlaceholder"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
