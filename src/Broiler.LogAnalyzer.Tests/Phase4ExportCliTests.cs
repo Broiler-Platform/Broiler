@@ -196,6 +196,7 @@ public class Phase4ExportCliTests
     [InlineData("<script>", "&lt;script&gt;")]
     [InlineData("a&b", "a&amp;b")]
     [InlineData("he said \"hi\"", "he said &quot;hi&quot;")]
+    [InlineData("it's", "it&#39;s")]
     public void HtmlEncode_EncodesCorrectly(string input, string expected)
     {
         Assert.Equal(expected, LogAnalyzerService.HtmlEncode(input));
@@ -333,7 +334,7 @@ public class Phase4ExportCliTests
             var content = File.ReadAllText(csvPath);
             var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
             // 1 header + 2 data rows matching /api (/api/users and /api/data)
-            Assert.Equal(3, lines.Length);
+            Assert.Equal(1 + 2, lines.Length);
         }
         finally
         {
@@ -384,8 +385,11 @@ public class Phase4ExportCliTests
             Assert.Equal(0, exitCode);
 
             var content = File.ReadAllText(csvPath);
-            var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            Assert.Equal(3, lines.Length); // 1 header + 2 data rows (matching /api)
+            // Verify both /api endpoints appear in the exported CSV
+            Assert.Contains("/api/users", content);
+            Assert.Contains("/api/data", content);
+            Assert.DoesNotContain("/index.html", content);
+            Assert.DoesNotContain("/admin", content);
         }
         finally
         {

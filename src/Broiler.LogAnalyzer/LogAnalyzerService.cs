@@ -677,7 +677,7 @@ public sealed class LogAnalyzerService
 
         // Hourly Distribution chart (embedded bar chart)
         var hourly = HourlyDistribution();
-        int maxHourly = hourly.Max(h => h.Count);
+        int maxHourly = hourly.Count > 0 ? hourly.Max(h => h.Count) : 0;
         if (maxHourly > 0)
         {
             sb.AppendLine("<h2>Hourly Request Distribution</h2>");
@@ -759,7 +759,8 @@ public sealed class LogAnalyzerService
             .Replace("&", "&amp;")
             .Replace("<", "&lt;")
             .Replace(">", "&gt;")
-            .Replace("\"", "&quot;");
+            .Replace("\"", "&quot;")
+            .Replace("'", "&#39;");
     }
 
     /// <summary>
