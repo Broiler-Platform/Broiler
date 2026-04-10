@@ -92,4 +92,37 @@ public static partial class LogParser
         }
         return (entries, totalLines);
     }
+
+    /// <summary>
+    /// Parses log lines from multiple files in parallel, returning a combined result.
+    /// Each file is parsed on a separate thread for improved throughput.
+    /// </summary>
+    public static (IReadOnlyList<LogEntry> Entries, int TotalLines) ParseFilesParallel(IReadOnlyList<string> filePaths)
+    {
+        var bag = new System.Collections.Concurrent.ConcurrentBag<(List<LogEntry> Entries, int Lines)>();
+
+        Parallel.ForEach(filePaths, filePath =>
+        {
+            var entries = new List<LogEntry>();
+            int lineCount = 0;
+            foreach (var line in File.ReadAllLines(filePath))
+            {
+                lineCount++;
+                var entry = ParseLine(line);
+                if (entry is not null)
+                    entries.Add(entry);
+            }
+            bag.Add((entries, lineCount));
+        });
+
+        var allEntries = new List<LogEntry>();
+        int totalLines = 0;
+        foreach (var (entries, lines) in bag)
+        {
+            allEntries.AddRange(entries);
+            totalLines += lines;
+        }
+
+        return (allEntries, totalLines);
+    }
 }

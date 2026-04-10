@@ -750,6 +750,267 @@ public sealed class LogAnalyzerService
         sb.AppendLine($"<div class=\"metric-card\"><div class=\"value\">{HtmlEncode(value)}</div><div class=\"label\">{HtmlEncode(label)}</div></div>");
     }
 
+    // ── Heatmap Data (Hour × Day-of-Week) ────────────────────────────
+
+    /// <summary>
+    /// Returns request counts bucketed by day-of-week (0=Sunday..6=Saturday) and hour-of-day (0–23).
+    /// Timestamps are evaluated in their original offset (as recorded in the log).
+    /// </summary>
+    public IReadOnlyList<(DayOfWeek Day, int Hour, int Count)> HourlyDayOfWeekDistribution()
+    {
+        var counts = new int[7, 24];
+        foreach (var e in _entries)
+        {
+            int day = (int)e.Timestamp.DayOfWeek;
+            int hour = e.Timestamp.Hour;
+            counts[day, hour]++;
+        }
+
+        var result = new List<(DayOfWeek Day, int Hour, int Count)>();
+        for (int d = 0; d < 7; d++)
+        {
+            for (int h = 0; h < 24; h++)
+            {
+                result.Add(((DayOfWeek)d, h, counts[d, h]));
+            }
+        }
+        return result;
+    }
+
+    // ── Geographic Distribution ────────────────────────────────────────
+
+    /// <summary>
+    /// Returns geographic distribution of requests using the provided GeoIP service.
+    /// Results are ordered by descending count. When <paramref name="top"/> is 0, all countries are returned.
+    /// </summary>
+    public IReadOnlyList<(string Country, int Count)> GeographicDistribution(GeoIpService geoIp, int top = 10)
+    {
+        var query = _entries
+            .GroupBy(e => geoIp.LookupCountry(e.RemoteHost))
+            .Select(g => (Country: g.Key, Count: g.Count()))
+            .OrderByDescending(x => x.Count);
+
+        return (top > 0 ? query.Take(top) : query).ToList();
+    }
+
+    // ── Comparison Mode ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Side-by-side comparison of two log analysis results.
+    /// </summary>
+    public sealed record ComparisonResult(
+        string LabelA,
+        string LabelB,
+        int TotalRequestsA,
+        int TotalRequestsB,
+        int UniqueIpsA,
+        int UniqueIpsB,
+        long TotalBytesA,
+        long TotalBytesB,
+        double AvgResponseSizeA,
+        double AvgResponseSizeB,
+        double RequestsPerSecondA,
+        double RequestsPerSecondB,
+        double ErrorRateA,
+        double ErrorRateB,
+        IReadOnlyList<(int StatusCode, int CountA, int CountB)> StatusCodeComparison,
+        IReadOnlyList<(string Endpoint, int CountA, int CountB)> TopEndpointComparison);
+
+    /// <summary>
+    /// Compares two <see cref="LogAnalyzerService"/> instances and produces a
+    /// side-by-side metric comparison including status codes and top endpoints.
+    /// </summary>
+    public static ComparisonResult Compare(
+        LogAnalyzerService a, string labelA,
+        LogAnalyzerService b, string labelB,
+        int top = 10)
+    {
+        // Error rates
+        double errorRateA = a.TotalRequests > 0
+            ? (double)a.Entries.Count(e => e.StatusCode >= 400) / a.TotalRequests
+            : 0;
+        double errorRateB = b.TotalRequests > 0
+            ? (double)b.Entries.Count(e => e.StatusCode >= 400) / b.TotalRequests
+            : 0;
+
+        // Status code comparison – merge codes from both sides
+        var codesA = a.StatusCodeDistribution().ToDictionary(x => x.StatusCode, x => x.Count);
+        var codesB = b.StatusCodeDistribution().ToDictionary(x => x.StatusCode, x => x.Count);
+        var allCodes = codesA.Keys.Union(codesB.Keys).OrderBy(c => c);
+        var statusComparison = allCodes
+            .Select(code => (
+                StatusCode: code,
+                CountA: codesA.GetValueOrDefault(code, 0),
+                CountB: codesB.GetValueOrDefault(code, 0)))
+            .ToList();
+
+        // Endpoint comparison – merge top endpoints from both sides
+        var endpointsA = a.TopEndpoints(top).ToDictionary(x => x.Endpoint, x => x.Count);
+        var endpointsB = b.TopEndpoints(top).ToDictionary(x => x.Endpoint, x => x.Count);
+        var allEndpoints = endpointsA.Keys.Union(endpointsB.Keys);
+        var endpointComparison = allEndpoints
+            .Select(ep => (
+                Endpoint: ep,
+                CountA: endpointsA.GetValueOrDefault(ep, 0),
+                CountB: endpointsB.GetValueOrDefault(ep, 0)))
+            .OrderByDescending(x => x.CountA + x.CountB)
+            .ToList();
+
+        return new ComparisonResult(
+            LabelA: labelA,
+            LabelB: labelB,
+            TotalRequestsA: a.TotalRequests,
+            TotalRequestsB: b.TotalRequests,
+            UniqueIpsA: a.UniqueIpCount,
+            UniqueIpsB: b.UniqueIpCount,
+            TotalBytesA: a.TotalBytesTransferred,
+            TotalBytesB: b.TotalBytesTransferred,
+            AvgResponseSizeA: a.AverageResponseSize,
+            AvgResponseSizeB: b.AverageResponseSize,
+            RequestsPerSecondA: a.RequestsPerSecond,
+            RequestsPerSecondB: b.RequestsPerSecond,
+            ErrorRateA: errorRateA,
+            ErrorRateB: errorRateB,
+            StatusCodeComparison: statusComparison,
+            TopEndpointComparison: endpointComparison);
+    }
+
+    /// <summary>
+    /// Formats a <see cref="ComparisonResult"/> as a human-readable plain-text report
+    /// with delta columns showing the difference between the two datasets.
+    /// </summary>
+    public static string FormatComparison(ComparisonResult result)
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine($"Comparison: {result.LabelA} vs {result.LabelB}");
+        sb.AppendLine(new string('=', 60));
+        sb.AppendLine();
+
+        sb.AppendLine(
+            string.Format("{0,-25} {1,12} {2,12} {3,12}", "Metric", result.LabelA, result.LabelB, "Delta"));
+        sb.AppendLine(new string('-', 61));
+        AppendMetricRow(sb, "Total Requests", result.TotalRequestsA, result.TotalRequestsB);
+        AppendMetricRow(sb, "Unique IPs", result.UniqueIpsA, result.UniqueIpsB);
+        AppendMetricRow(sb, "Total Bytes", result.TotalBytesA, result.TotalBytesB);
+        AppendMetricRowDouble(sb, "Avg Response Size", result.AvgResponseSizeA, result.AvgResponseSizeB);
+        AppendMetricRowDouble(sb, "Requests/sec", result.RequestsPerSecondA, result.RequestsPerSecondB);
+        AppendMetricRowPct(sb, "Error Rate", result.ErrorRateA, result.ErrorRateB);
+        sb.AppendLine();
+
+        sb.AppendLine("Status Code Comparison:");
+        sb.AppendLine(
+            string.Format("  {0,-8} {1,10} {2,10} {3,10}", "Code", result.LabelA, result.LabelB, "Delta"));
+        sb.AppendLine("  " + new string('-', 38));
+        foreach (var (code, countA, countB) in result.StatusCodeComparison)
+        {
+            int delta = countB - countA;
+            string sign = delta >= 0 ? "+" : "";
+            sb.AppendLine($"  {code,-8} {countA,10:N0} {countB,10:N0} {sign + delta,10}");
+        }
+        sb.AppendLine();
+
+        sb.AppendLine("Top Endpoint Comparison:");
+        sb.AppendLine(
+            string.Format("  {0,-30} {1,8} {2,8} {3,8}", "Endpoint", result.LabelA, result.LabelB, "Delta"));
+        sb.AppendLine("  " + new string('-', 54));
+        foreach (var (endpoint, countA, countB) in result.TopEndpointComparison)
+        {
+            int delta = countB - countA;
+            string sign = delta >= 0 ? "+" : "";
+            string ep = endpoint.Length > 30 ? endpoint[..27] + "..." : endpoint;
+            sb.AppendLine($"  {ep,-30} {countA,8:N0} {countB,8:N0} {sign + delta,8}");
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Formats a <see cref="ComparisonResult"/> as a Markdown report with tables
+    /// and delta columns showing the difference between the two datasets.
+    /// </summary>
+    public static string FormatComparisonMarkdown(ComparisonResult result)
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine($"# Comparison: {result.LabelA} vs {result.LabelB}");
+        sb.AppendLine();
+
+        sb.AppendLine("## Overview");
+        sb.AppendLine();
+        sb.AppendLine($"| Metric | {result.LabelA} | {result.LabelB} | Delta |");
+        sb.AppendLine("|--------|-------|-------|-------|");
+        AppendMdRow(sb, "Total Requests", $"{result.TotalRequestsA:N0}", $"{result.TotalRequestsB:N0}", result.TotalRequestsB - result.TotalRequestsA);
+        AppendMdRow(sb, "Unique IPs", $"{result.UniqueIpsA:N0}", $"{result.UniqueIpsB:N0}", result.UniqueIpsB - result.UniqueIpsA);
+        AppendMdRow(sb, "Total Bytes", $"{result.TotalBytesA:N0}", $"{result.TotalBytesB:N0}", result.TotalBytesB - result.TotalBytesA);
+        AppendMdRow(sb, "Avg Response Size", $"{result.AvgResponseSizeA:F0}", $"{result.AvgResponseSizeB:F0}", result.AvgResponseSizeB - result.AvgResponseSizeA);
+        AppendMdRow(sb, "Requests/sec", $"{result.RequestsPerSecondA:F2}", $"{result.RequestsPerSecondB:F2}", result.RequestsPerSecondB - result.RequestsPerSecondA);
+        AppendMdRowPct(sb, "Error Rate", result.ErrorRateA, result.ErrorRateB);
+        sb.AppendLine();
+
+        sb.AppendLine("## Status Code Comparison");
+        sb.AppendLine();
+        sb.AppendLine($"| Code | {result.LabelA} | {result.LabelB} | Delta |");
+        sb.AppendLine("|------|-------|-------|-------|");
+        foreach (var (code, countA, countB) in result.StatusCodeComparison)
+        {
+            long delta = (long)countB - countA;
+            string sign = delta >= 0 ? "+" : "";
+            sb.AppendLine($"| {code} | {countA:N0} | {countB:N0} | {sign}{delta} |");
+        }
+        sb.AppendLine();
+
+        sb.AppendLine("## Top Endpoint Comparison");
+        sb.AppendLine();
+        sb.AppendLine($"| Endpoint | {result.LabelA} | {result.LabelB} | Delta |");
+        sb.AppendLine("|----------|-------|-------|-------|");
+        foreach (var (endpoint, countA, countB) in result.TopEndpointComparison)
+        {
+            long delta = (long)countB - countA;
+            string sign = delta >= 0 ? "+" : "";
+            sb.AppendLine($"| {endpoint} | {countA:N0} | {countB:N0} | {sign}{delta} |");
+        }
+        sb.AppendLine();
+
+        return sb.ToString();
+    }
+
+    private static void AppendMetricRow(StringBuilder sb, string label, long valA, long valB)
+    {
+        long delta = valB - valA;
+        string sign = delta >= 0 ? "+" : "";
+        sb.AppendLine($"{label,-25} {valA,12:N0} {valB,12:N0} {sign + delta,12}");
+    }
+
+    private static void AppendMetricRowDouble(StringBuilder sb, string label, double valA, double valB)
+    {
+        double delta = valB - valA;
+        string sign = delta >= 0 ? "+" : "";
+        sb.AppendLine($"{label,-25} {valA,12:F2} {valB,12:F2} {sign}{delta,11:F2}");
+    }
+
+    private static void AppendMetricRowPct(StringBuilder sb, string label, double valA, double valB)
+    {
+        double delta = valB - valA;
+        string sign = delta >= 0 ? "+" : "";
+        sb.AppendLine($"{label,-25} {valA,11:P1} {valB,12:P1} {sign}{delta,10:P1}");
+    }
+
+    private static void AppendMdRow(StringBuilder sb, string label, string valA, string valB, double delta)
+    {
+        string sign = delta >= 0 ? "+" : "";
+        sb.AppendLine($"| {label} | {valA} | {valB} | {sign}{delta:N0} |");
+    }
+
+    private static void AppendMdRowPct(StringBuilder sb, string label, double valA, double valB)
+    {
+        double delta = valB - valA;
+        string sign = delta >= 0 ? "+" : "";
+        sb.AppendLine($"| {label} | {valA:P1} | {valB:P1} | {sign}{delta:P1} |");
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────
+
     /// <summary>
     /// Encodes a string for safe inclusion in HTML content.
     /// </summary>
