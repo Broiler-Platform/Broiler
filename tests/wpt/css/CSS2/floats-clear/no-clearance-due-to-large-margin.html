@@ -4,6 +4,10 @@
   <title>CSS2: No clearance due to large margin</title>
   <style>
     html, body { margin: 0; padding: 0; }
+    .wrapper {
+      /* Border prevents parent-child margin collapsing */
+      border-top: 1px solid transparent;
+    }
     .float {
       float: left;
       width: 100px;
@@ -12,7 +16,7 @@
     }
     .clear {
       clear: left;
-      margin-top: 200px;
+      margin-top: 100px;
       width: 200px;
       height: 50px;
       background: green;
@@ -23,9 +27,11 @@
   <!-- CSS2.1 §9.5.2: When the hypothetical position of the cleared
        element is already below all relevant floats due to a large
        margin-top, no clearance is needed and the margin is preserved.
-       The green box has margin-top:200px which already clears the
-       50px-tall float, so it should be at y=200. -->
-  <div class="float"></div>
-  <div class="clear"></div>
+       The wrapper border prevents parent-child margin collapsing.
+       The green box should be at y ≈ 101 (border + margin). -->
+  <div class="wrapper">
+    <div class="float"></div>
+    <div class="clear"></div>
+  </div>
 </body>
 </html>
