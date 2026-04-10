@@ -416,11 +416,21 @@ internal class CssBox : CssBoxProperties, IDisposable
             {
                 // CSS2.1 §9.6.1: The containing block for a fixed-position
                 // element is the viewport (initial containing block).
+                // CSS2.1 §10.1: For absolutely positioned elements, the
+                // containing block is the padding-box of the nearest
+                // positioned ancestor.
                 // Use the viewport width for percentage/auto resolution.
                 double width;
                 if (Position == CssConstants.Fixed && ContainerInt != null)
                 {
                     width = ContainerInt.ViewportSize.Width;
+                }
+                else if (Position == CssConstants.Absolute)
+                {
+                    var cb = FindPositionedContainingBlock();
+                    width = cb.Size.Width
+                            - cb.ActualPaddingLeft - cb.ActualPaddingRight
+                            - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
                 }
                 else
                 {
