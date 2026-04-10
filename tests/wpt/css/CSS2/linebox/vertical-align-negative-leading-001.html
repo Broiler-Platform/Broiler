@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSS2: vertical-align with leading</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .container {
+      line-height: 40px;
+      background: white;
+    }
+    .inner {
+      display: inline-block;
+      width: 100px;
+      height: 20px;
+      background: green;
+      vertical-align: top;
+    }
+  </style>
+</head>
+<body>
+  <!-- An inline-block element with vertical-align:top should be
+       aligned to the top of the line box.  The container's
+       line-height (40px) creates half-leading above and below.
+       Uses a colored box without text to avoid font-rendering diffs. -->
+  <div class="container">
+    <span class="inner"></span>
+  </div>
+</body>
+</html>

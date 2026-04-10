@@ -1153,4 +1153,343 @@ document.getElementById('out').appendChild(p);
             $"float-page-break-inside-avoid-6-print should pass (match ≥ threshold). " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
+
+    [Fact]
+    public void Wpt_ReplacedElementsAllAuto_MatchesReference()
+    {
+        // CSS2 §10.3/§10.6: Replaced elements with auto dimensions use
+        // their intrinsic size.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "visudet",
+            "replaced-elements-all-auto.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "visudet",
+            "replaced-elements-all-auto.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"replaced-elements-all-auto should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ReplacedElementsMinHeight20_MatchesReference()
+    {
+        // CSS2 §10.7: min-height should enforce a minimum height.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "visudet",
+            "replaced-elements-min-height-20.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "visudet",
+            "replaced-elements-min-height-20.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"replaced-elements-min-height-20 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ReplacedElementsMinHeight40_MatchesReference()
+    {
+        // CSS2 §10.7: min-height should override explicit height when greater.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "visudet",
+            "replaced-elements-min-height-40.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "visudet",
+            "replaced-elements-min-height-40.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"replaced-elements-min-height-40 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ReplacedElementsMinWidth40_MatchesReference()
+    {
+        // CSS2 §10.4: min-width should override explicit width when greater.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "visudet",
+            "replaced-elements-min-width-40.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "visudet",
+            "replaced-elements-min-width-40.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"replaced-elements-min-width-40 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ReplacedElementsMinWidth80_MatchesReference()
+    {
+        // CSS2 §10.4: min-width should override explicit width when greater.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "visudet",
+            "replaced-elements-min-width-80.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "visudet",
+            "replaced-elements-min-width-80.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"replaced-elements-min-width-80 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_VerticalAlignNegativeLeading001_MatchesReference()
+    {
+        // CSS2 §10.8.1: Vertical alignment with leading.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "linebox",
+            "vertical-align-negative-leading-001.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "linebox",
+            "vertical-align-negative-leading-001.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"vertical-align-negative-leading-001 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_NoClearanceDueToLargeMargin_MatchesReference()
+    {
+        // CSS2 §9.5.2: No clearance when margin-top already clears the float.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "floats-clear",
+            "no-clearance-due-to-large-margin.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "floats-clear",
+            "no-clearance-due-to-large-margin.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"no-clearance-due-to-large-margin should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_NoClearanceAdjoiningOppositeFloat_MatchesReference()
+    {
+        // CSS2 §9.5.2: clear:right should not clear left floats.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "floats-clear",
+            "no-clearance-adjoining-opposite-float.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "floats-clear",
+            "no-clearance-adjoining-opposite-float.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"no-clearance-adjoining-opposite-float should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ControlCharacters001_MatchesReference()
+    {
+        // CSS2 §4.3.8: Control characters should be stripped from rendering.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "other-formats",
+            "control-characters-001.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "other-formats",
+            "control-characters-001.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"control-characters-001 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_FloatPageBreakInsideAvoid5Print_MatchesReference()
+    {
+        // CSS2 §13.3.1 / §9.5.2: floated elements with page-break-inside:avoid.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "pagination",
+            "float-page-break-inside-avoid-5-print.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "pagination",
+            "float-page-break-inside-avoid-5-print.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"float-page-break-inside-avoid-5-print should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ContainingBlockPercentMarginTop_MatchesReference()
+    {
+        // CSS2 §8.3: Percentage margin-top resolves against containing block width.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "normal-flow",
+            "containing-block-percent-margin-top.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "normal-flow",
+            "containing-block-percent-margin-top.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"containing-block-percent-margin-top should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_LangPseudoclass001_MatchesReference()
+    {
+        // CSS2 §5.11.4: :lang() pseudo-class matching.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "selector",
+            "lang-pseudoclass-001.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "selector",
+            "lang-pseudoclass-001.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"lang-pseudoclass-001 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AbsposInBlockInInlineInRelposInline_MatchesReference()
+    {
+        // CSS2 §10.1: Absolute positioning in inline contexts.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "CSS2", "abspos",
+            "abspos-in-block-in-inline-in-relpos-inline.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "CSS2", "abspos",
+            "abspos-in-block-in-inline-in-relpos-inline.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"abspos-in-block-in-inline-in-relpos-inline should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
 }

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSS2: No clearance adjoining opposite float</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .float-left {
+      float: left;
+      width: 100px;
+      height: 100px;
+      background: blue;
+    }
+    .clear-right {
+      clear: right;
+      width: 200px;
+      height: 50px;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <!-- CSS2.1 §9.5.2: clear:right only clears right floats.  A left
+       float should not be cleared by clear:right, so the green box
+       should be at y=0 next to the float (or below if it doesn't fit). -->
+  <div class="float-left"></div>
+  <div class="clear-right"></div>
+</body>
+</html>

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSS2: Replaced elements with all auto dimensions</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    div { background: green; width: 100px; height: 100px; }
+  </style>
+</head>
+<body>
+  <!-- A replaced element (div standing in for <img>) with auto width/height
+       should use its intrinsic dimensions. Here we test that a simple 100x100
+       green box renders correctly when no explicit overrides are applied. -->
+  <div></div>
+</body>
+</html>

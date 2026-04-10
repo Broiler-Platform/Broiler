@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSS2: min-height on block element (20px)</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .box {
+      width: 100px;
+      min-height: 20px;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <!-- min-height: 20px should force the box to be at least 20px tall
+       even though it has no content. -->
+  <div class="box"></div>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSS2: Control characters should not render</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .box {
+      width: 200px;
+      height: 50px;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <!-- CSS2.1 §4.3.8: User agents should not render characters from
+       the Unicode "control characters" category (C0 U+0000-U+001F
+       except tab, newline, carriage return, and C1 U+007F-U+009F).
+       A simple green box verifies that control character stripping
+       does not break layout of adjacent elements. -->
+  <div class="box">&#x7;&#x1B;</div>
+</body>
+</html>
