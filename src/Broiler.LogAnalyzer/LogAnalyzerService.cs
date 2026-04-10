@@ -258,7 +258,7 @@ public sealed class LogAnalyzerService
     /// </summary>
     internal static string CsvEscape(string value)
     {
-        if (value.Contains('"') || value.Contains(',') || value.Contains('\n') || value.Contains('\r'))
+        if (value.IndexOfAny(['"', ',', '\n', '\r']) >= 0)
             return '"' + value.Replace("\"", "\"\"") + '"';
         return value;
     }

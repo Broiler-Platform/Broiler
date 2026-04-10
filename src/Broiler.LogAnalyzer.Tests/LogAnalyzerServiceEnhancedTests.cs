@@ -368,7 +368,9 @@ public class LogAnalyzerServiceEnhancedTests
         var service = new LogAnalyzerService([]);
         var json = service.ExportJson();
 
-        Assert.Equal("[]", json);
+        var doc = System.Text.Json.JsonDocument.Parse(json);
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, doc.RootElement.ValueKind);
+        Assert.Equal(0, doc.RootElement.GetArrayLength());
     }
 
     // ── Entries Property Test ──────────────────────────────────────
