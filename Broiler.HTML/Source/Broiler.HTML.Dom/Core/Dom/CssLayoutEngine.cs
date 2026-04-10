@@ -381,8 +381,15 @@ internal static class CssLayoutEngine
 
                 foreach (var word in b.Words)
                 {
-                    if (maxbottom - cury < box.ActualLineHeight)
-                        maxbottom += box.ActualLineHeight - (maxbottom - cury);
+                    // CSS2.1 §10.8: Every line box has a minimum height
+                    // from the block container's line-height (the "strut").
+                    // When line-height is 'normal' (ActualLineHeight == 0),
+                    // the minimum comes from the font metrics.
+                    double boxLineHeight = box.ActualLineHeight > 0
+                        ? box.ActualLineHeight
+                        : box.ActualFont.Height;
+                    if (maxbottom - cury < boxLineHeight)
+                        maxbottom += boxLineHeight - (maxbottom - cury);
 
                     // CSS2.1 §10.8: The "strut" — each line box has a minimum
                     // height from the block container's font and line-height.

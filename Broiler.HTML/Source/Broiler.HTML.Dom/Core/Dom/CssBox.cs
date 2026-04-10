@@ -589,7 +589,9 @@ internal class CssBox : CssBoxProperties, IDisposable
             {
                 var prevSibling = DomUtils.GetPreviousSibling(this);
 
-                if (Position != CssConstants.Fixed)
+                // Compute the static position for all elements (including
+                // position:fixed).  Fixed elements need the static position
+                // as fallback when offset properties are auto (CSS2.1 §10.6.4).
                 {
                     double left = ContainingBlock.Location.X + ContainingBlock.ActualPaddingLeft + ActualMarginLeft + ContainingBlock.ActualBorderLeftWidth;
 
@@ -849,19 +851,55 @@ internal class CssBox : CssBoxProperties, IDisposable
                         Location = new PointF(newX, newY);
                         ActualBottom = newY;
                     }
-                }
-                else
-                {
-                    // CSS2.1 §10.6.4: For fixed-position elements, 'top'/'left'
-                    // specify the offset of the top/left margin edge from the
-                    // viewport.  Location represents the border edge, so add
-                    // the final computed margins (which may have been updated by
-                    // later CSS rules such as the Acid2 'p + table + p' rule).
-                    var basePos = GetActualLocation(Left, Top);
-                    Location = new PointF(
-                        basePos.X + (float)ActualMarginLeft,
-                        basePos.Y + (float)ActualMarginTop);
-                    ActualBottom = Location.Y;
+
+                    // CSS2.1 §10.6.4 / §9.6.1: For fixed-position elements,
+                    // the containing block is the viewport.  When top/left/
+                    // bottom/right are explicitly set, use those offsets from
+                    // the viewport edge.  When they are auto, the static
+                    // position (computed above) is kept.
+                    if (Position == CssConstants.Fixed && ContainerInt != null)
+                    {
+                        bool hasLeft = Left != null && Left != CssConstants.Auto;
+                        bool hasRight = Right != null && Right != CssConstants.Auto;
+                        bool hasTop = Top != null && Top != CssConstants.Auto;
+                        bool hasBottom = Bottom != null && Bottom != CssConstants.Auto;
+
+                        if (hasLeft || hasRight || hasTop || hasBottom)
+                        {
+                            var vpSize = ContainerInt.ViewportSize;
+                            float newX = Location.X, newY = Location.Y;
+
+                            if (hasLeft)
+                            {
+                                double cssLeft = CssValueParser.ParseLength(Left, vpSize.Width, GetEmHeight());
+                                newX = (float)(cssLeft + ActualMarginLeft);
+                            }
+                            else if (hasRight)
+                            {
+                                double cssRight = CssValueParser.ParseLength(Right, vpSize.Width, GetEmHeight());
+                                newX = (float)(vpSize.Width - cssRight - ActualMarginRight - Size.Width);
+                            }
+
+                            if (hasTop)
+                            {
+                                double cssTop = CssValueParser.ParseLength(Top, vpSize.Height, GetEmHeight());
+                                newY = (float)(cssTop + ActualMarginTop);
+                            }
+                            else if (hasBottom)
+                            {
+                                double cssBottom = CssValueParser.ParseLength(Bottom, vpSize.Height, GetEmHeight());
+                                double boxHeight = ActualBottom - Location.Y;
+                                if (boxHeight <= 0) boxHeight = Size.Height;
+                                newY = (float)(vpSize.Height - cssBottom - ActualMarginBottom - boxHeight);
+                            }
+
+                            Location = new PointF(newX, newY);
+                            ActualBottom = newY;
+                        }
+                        // When all offsets are auto, keep the static position
+                        // (Location is already set from normal-flow
+                        // calculation above).
+                    }
                 }
             }
 
