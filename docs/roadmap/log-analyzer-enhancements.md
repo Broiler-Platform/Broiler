@@ -373,8 +373,8 @@ Items are ordered by estimated impact and implementation complexity.
 | 3  | Quick-filter toolbar                           | WPF       | High   | Medium | 3.2     | ✅ Done |
 | 4  | Bot/crawler detection                          | Lib       | High   | Medium | 4.1     | Planned |
 | 5  | Automated natural-language summary             | Lib       | High   | Medium | 4.2     | Planned |
-| 6  | Bar chart for status codes                     | WPF       | High   | Medium | 5.1     | Planned |
-| 7  | Line chart for hourly distribution             | WPF       | High   | Medium | 5.1     | Planned |
+| 6  | Bar chart for status codes                     | WPF       | High   | Medium | 5.1     | ✅ Done |
+| 7  | Line chart for hourly distribution             | WPF       | High   | Medium | 5.1     | ✅ Done |
 | 8  | HTML report export                             | Lib       | Medium | Medium | 7.1     | Planned |
 | 9  | `--format` flag for CLI                        | CLI       | Medium | Low    | 8.1     | Planned |
 | 10 | `--filter-endpoint` in CLI                     | CLI       | Medium | Low    | 8.2     | Planned |
@@ -382,7 +382,7 @@ Items are ordered by estimated impact and implementation complexity.
 | 12 | Top referers and user agents                   | Lib       | Medium | Low    | 6.1     | ✅ Done |
 | 13 | Average response size and requests/sec         | Lib       | Medium | Low    | 6.1     | ✅ Done |
 | 14 | Tabbed results view                            | WPF       | Medium | Medium | 3.4     | ✅ Done |
-| 15 | ASCII bar charts in CLI                        | CLI       | Medium | Low    | 5.2     | Planned |
+| 15 | ASCII bar charts in CLI                        | CLI       | Medium | Low    | 5.2     | ✅ Done |
 | 16 | Suspicious request detection                   | Lib       | Medium | Medium | 4.4     | Planned |
 | 17 | Drag-and-drop file support                     | WPF       | Medium | Low    | 10.1    | Planned |
 | 18 | Parallel file parsing                          | Lib       | Medium | Medium | 9.1     | Planned |
@@ -408,10 +408,17 @@ and a tabbed layout (Log Entries + Summary). Extended the Lib with
 `RequestsPerSecond`. CLI report now includes these new metrics. 20 new unit
 tests added in `LogAnalyzerServicePhase1Tests`.
 
-### Phase 2 — Visualization & Charting (TODOs 6–7, 14–15)
+### Phase 2 — Visualization & Charting (TODOs 6–7, 14–15) ✅ Complete
 
-Integrate a WPF charting library for bar and line charts. Add tabbed results
-view. Add optional ASCII charts in the CLI.
+Integrated ScottPlot (v5) WPF charting library with a bar chart for status code
+distribution and a line chart for hourly request distribution, displayed in a
+new "Charts" tab with lazy loading. Extended the tabbed results view to four
+tabs: Log Entries, Summary, Charts, and Per-Host Details (also lazily loaded).
+Added `AsciiChartService` to the core library providing horizontal bar charts
+and sparkline-style hourly distributions using Unicode block characters
+(▁▂▃▄▅▆▇█). CLI now supports a `--chart` flag that outputs ASCII charts for
+top endpoints, top IPs, and hourly distribution. 15 new unit tests added in
+`Phase2VisualizationTests`.
 
 ### Phase 3 — Deeper Analysis (TODOs 4–5, 16)
 
