@@ -99,6 +99,61 @@ public sealed class LogAnalyzerService
     /// </summary>
     public long TotalBytesTransferred => _entries.Sum(e => e.ResponseSize);
 
+    /// <summary>
+    /// Returns the average response size in bytes. Returns 0 when there are no entries.
+    /// </summary>
+    public double AverageResponseSize =>
+        _entries.Count > 0 ? (double)_entries.Sum(e => e.ResponseSize) / _entries.Count : 0;
+
+    /// <summary>
+    /// Returns the average requests per second across the time span of the log.
+    /// If all entries share the same timestamp or there is only one entry, returns the
+    /// total request count (the entire burst occurred in a single instant).
+    /// Returns 0 when there are no entries.
+    /// </summary>
+    public double RequestsPerSecond
+    {
+        get
+        {
+            if (_entries.Count == 0)
+                return 0;
+            var min = _entries.Min(e => e.Timestamp);
+            var max = _entries.Max(e => e.Timestamp);
+            var span = (max - min).TotalSeconds;
+            return span > 0 ? _entries.Count / span : _entries.Count;
+        }
+    }
+
+    /// <summary>
+    /// Returns the top N most-common Referer values (excluding null / empty / "-"),
+    /// ordered by descending count. When <paramref name="top"/> is 0, all are returned.
+    /// </summary>
+    public IReadOnlyList<(string Referer, int Count)> TopReferers(int top = 10)
+    {
+        var query = _entries
+            .Where(e => !string.IsNullOrEmpty(e.Referer) && e.Referer != "-")
+            .GroupBy(e => e.Referer!)
+            .Select(g => (Referer: g.Key, Count: g.Count()))
+            .OrderByDescending(x => x.Count);
+
+        return (top > 0 ? query.Take(top) : query).ToList();
+    }
+
+    /// <summary>
+    /// Returns the top N most-common User-Agent strings (excluding null / empty / "-"),
+    /// ordered by descending count. When <paramref name="top"/> is 0, all are returned.
+    /// </summary>
+    public IReadOnlyList<(string UserAgent, int Count)> TopUserAgents(int top = 10)
+    {
+        var query = _entries
+            .Where(e => !string.IsNullOrEmpty(e.UserAgent) && e.UserAgent != "-")
+            .GroupBy(e => e.UserAgent!)
+            .Select(g => (UserAgent: g.Key, Count: g.Count()))
+            .OrderByDescending(x => x.Count);
+
+        return (top > 0 ? query.Take(top) : query).ToList();
+    }
+
     // ── Filtering ──────────────────────────────────────────────────────
 
     /// <summary>
