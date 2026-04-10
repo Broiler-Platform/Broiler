@@ -29,6 +29,27 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     internal CssBox SplitPositionedAncestor { get; set; }
 
+    /// <summary>
+    /// When the block-inside-inline correction splits a positioned inline
+    /// element, the original box loses its children to anonymous "left" and
+    /// "right" copies.  This list tracks those copies so that
+    /// <see cref="GetInlineBoundingBox"/> can compute the bounding box
+    /// across <em>all</em> fragments, not just the (now-empty) original.
+    /// Only populated on the original box that serves as
+    /// <see cref="SplitPositionedAncestor"/> for hoisted descendants.
+    /// </summary>
+    internal List<CssBox> SplitFragments { get; private set; }
+
+    /// <summary>
+    /// Register a box as a fragment of this positioned inline that was
+    /// created during the block-inside-inline split.
+    /// </summary>
+    internal void AddSplitFragment(CssBox fragment)
+    {
+        SplitFragments ??= new List<CssBox>();
+        SplitFragments.Add(fragment);
+    }
+
     protected bool _wordsSizeMeasured;
     private CssBox _listItemBox;
     private IImageLoadHandler _imageLoadHandler;
@@ -251,22 +272,22 @@ internal class CssBox : CssBoxProperties, IDisposable
         float minX = float.MaxValue, minY = float.MaxValue;
         float maxX = float.MinValue, maxY = float.MinValue;
 
-        // First try the inline's own Rectangles (populated when the
-        // inline element has direct text words).
-        foreach (var rect in cb.Rectangles.Values)
+        // Accumulate extents from one box (the original or a fragment).
+        void AccumulateBox(CssBox box)
         {
-            if (rect.Left < minX) minX = rect.Left;
-            if (rect.Top < minY) minY = rect.Top;
-            if (rect.Right > maxX) maxX = rect.Right;
-            if (rect.Bottom > maxY) maxY = rect.Bottom;
-        }
+            // Try the inline's own Rectangles (populated when the
+            // inline element has direct text words).
+            foreach (var rect in box.Rectangles.Values)
+            {
+                if (rect.Left < minX) minX = rect.Left;
+                if (rect.Top < minY) minY = rect.Top;
+                if (rect.Right > maxX) maxX = rect.Right;
+                if (rect.Bottom > maxY) maxY = rect.Bottom;
+            }
 
-        // If the inline has no Rectangles (e.g. it only contains child
-        // boxes like inline-blocks), compute the bounding box from the
-        // child boxes' laid-out positions and sizes.
-        if (minX > maxX)
-        {
-            foreach (var child in cb.Boxes)
+            // Also scan child boxes (inline-blocks etc.) for their
+            // laid-out positions and sizes.
+            foreach (var child in box.Boxes)
             {
                 if (child.Size.Width <= 0 && child.Size.Height <= 0)
                     continue;
@@ -280,6 +301,24 @@ internal class CssBox : CssBoxProperties, IDisposable
                 if (top < minY) minY = top;
                 if (right > maxX) maxX = right;
                 if (bottom > maxY) maxY = bottom;
+            }
+        }
+
+        // Scan the original box.
+        AccumulateBox(cb);
+
+        // If the positioned inline was split by the block-inside-inline
+        // correction, also scan inline fragment copies that received its
+        // children so the bounding box covers the full inline extent.
+        // Only include fragments that are still inline — block-level
+        // anonymous wrappers created during the split are structural
+        // containers, not inline fragments.
+        if (cb.SplitFragments != null)
+        {
+            foreach (var frag in cb.SplitFragments)
+            {
+                if (frag.Display == CssConstants.Inline)
+                    AccumulateBox(frag);
             }
         }
 

@@ -1382,6 +1382,11 @@ internal sealed class DomParser
             badBox.Boxes[0].ParentBox = leftbox;
         }
 
+        // If badBox is the positioned ancestor being split, register the
+        // left-side copy as a fragment so GetInlineBoundingBox can find it.
+        if (leftbox != null && posAncestor == badBox)
+            posAncestor.AddSplitFragment(leftbox);
+
         var splitBox = badBox.Boxes[0];
         if (!ContainsInlinesOnlyDeep(splitBox))
         {
@@ -1417,6 +1422,12 @@ internal sealed class DomParser
             }
 
             rightBox.SetAllBoxes(badBox);
+
+            // Register the right-side copy as a fragment of the
+            // positioned ancestor so GetInlineBoundingBox includes it.
+            if (posAncestor == badBox)
+                posAncestor.AddSplitFragment(rightBox);
+
             // Also tag the right-side anonymous block.
             if (posAncestor != null)
                 SetSplitAncestorDeep(rightBox, posAncestor);
