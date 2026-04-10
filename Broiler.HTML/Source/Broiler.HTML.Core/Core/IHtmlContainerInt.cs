@@ -40,6 +40,14 @@ internal interface IHtmlContainerInt
     SizeF PageSize { get; }
 
     /// <summary>
+    /// The effective viewport dimensions.  This is the smaller of
+    /// <see cref="PageSize"/> and the layout max-size, matching the
+    /// initial containing block for <c>position:fixed</c> elements
+    /// and viewport-relative units (<c>vh</c>/<c>vw</c>).
+    /// </summary>
+    SizeF ViewportSize { get; }
+
+    /// <summary>
     /// Whether to avoid geometry anti-aliasing.
     /// </summary>
     bool AvoidGeometryAntialias { get; }

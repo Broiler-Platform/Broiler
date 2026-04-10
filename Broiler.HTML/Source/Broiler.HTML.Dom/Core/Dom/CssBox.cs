@@ -19,6 +19,37 @@ internal class CssBox : CssBoxProperties, IDisposable
 
     internal bool _tableFixed;
 
+    /// <summary>
+    /// When the block-inside-inline correction (CSS2.1 §9.2.1.1) splits a
+    /// positioned inline element into sibling anonymous blocks, the hoisted
+    /// blocks lose their parent–child relationship with the positioned
+    /// inline in the box tree.  This field links back to the original
+    /// positioned ancestor so that <see cref="FindPositionedContainingBlock"/>
+    /// can still find it.
+    /// </summary>
+    internal CssBox SplitPositionedAncestor { get; set; }
+
+    /// <summary>
+    /// When the block-inside-inline correction splits a positioned inline
+    /// element, the original box loses its children to anonymous "left" and
+    /// "right" copies.  This list tracks those copies so that
+    /// <see cref="GetInlineBoundingBox"/> can compute the bounding box
+    /// across <em>all</em> fragments, not just the (now-empty) original.
+    /// Only populated on the original box that serves as
+    /// <see cref="SplitPositionedAncestor"/> for hoisted descendants.
+    /// </summary>
+    internal List<CssBox> SplitFragments { get; private set; }
+
+    /// <summary>
+    /// Register a box as a fragment of this positioned inline that was
+    /// created during the block-inside-inline split.
+    /// </summary>
+    internal void AddSplitFragment(CssBox fragment)
+    {
+        SplitFragments ??= new List<CssBox>();
+        SplitFragments.Add(fragment);
+    }
+
     protected bool _wordsSizeMeasured;
     private CssBox _listItemBox;
     private IImageLoadHandler _imageLoadHandler;
@@ -203,6 +234,9 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// block is the padding-box of the nearest ancestor with a computed
     /// position of <c>absolute</c>, <c>relative</c>, or <c>fixed</c>.
     /// Falls back to <see cref="ContainingBlock"/> if none is found.
+    /// Also checks <see cref="SplitPositionedAncestor"/> which links back
+    /// to positioned inlines that were restructured by the block-inside-
+    /// inline correction (CSS2.1 §9.2.1.1).
     /// </summary>
     private CssBox FindPositionedContainingBlock()
     {
@@ -212,11 +246,95 @@ internal class CssBox : CssBoxProperties, IDisposable
             if (box.Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed || box.ParentBox == null)
                 return box;
 
+            // If the block-inside-inline correction split a positioned inline
+            // and hoisted this branch out, SplitPositionedAncestor links back
+            // to the original positioned inline ancestor.
+            if (box.SplitPositionedAncestor is { } spa
+                && spa.Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed)
+                return spa;
+
             box = box.ParentBox;
         }
 
         return ContainingBlock;
     }
+
+    /// <summary>
+    /// CSS2.1 §10.1: When the containing block for an absolutely positioned
+    /// element is formed by an inline-level element, the containing block is
+    /// the bounding box around the padding boxes of the first and last inline
+    /// boxes generated for that element.  Returns the bounding rectangle in
+    /// absolute coordinates, or <see cref="RectangleF.Empty"/> if the inline
+    /// has no line-box rectangles and no laid-out children.
+    /// </summary>
+    private static RectangleF GetInlineBoundingBox(CssBox cb)
+    {
+        float minX = float.MaxValue, minY = float.MaxValue;
+        float maxX = float.MinValue, maxY = float.MinValue;
+
+        // Accumulate extents from one box (the original or a fragment).
+        void AccumulateBox(CssBox box)
+        {
+            // Try the inline's own Rectangles (populated when the
+            // inline element has direct text words).
+            foreach (var rect in box.Rectangles.Values)
+            {
+                if (rect.Left < minX) minX = rect.Left;
+                if (rect.Top < minY) minY = rect.Top;
+                if (rect.Right > maxX) maxX = rect.Right;
+                if (rect.Bottom > maxY) maxY = rect.Bottom;
+            }
+
+            // Also scan child boxes (inline-blocks etc.) for their
+            // laid-out positions and sizes.
+            foreach (var child in box.Boxes)
+            {
+                if (child.Size.Width <= 0 && child.Size.Height <= 0)
+                    continue;
+                float left = child.Location.X;
+                float top = child.Location.Y;
+                float right = left + child.Size.Width;
+                float bottom = (float)child.ActualBottom;
+                if (bottom <= top) bottom = top + child.Size.Height;
+
+                if (left < minX) minX = left;
+                if (top < minY) minY = top;
+                if (right > maxX) maxX = right;
+                if (bottom > maxY) maxY = bottom;
+            }
+        }
+
+        // Scan the original box.
+        AccumulateBox(cb);
+
+        // If the positioned inline was split by the block-inside-inline
+        // correction, also scan inline fragment copies that received its
+        // children so the bounding box covers the full inline extent.
+        // Only include fragments that are still inline — block-level
+        // anonymous wrappers created during the split are structural
+        // containers, not inline fragments.
+        if (cb.SplitFragments != null)
+        {
+            foreach (var frag in cb.SplitFragments)
+            {
+                if (frag.Display == CssConstants.Inline)
+                    AccumulateBox(frag);
+            }
+        }
+
+        if (minX > maxX || minY > maxY)
+            return RectangleF.Empty;
+
+        return new RectangleF(minX, minY, maxX - minX, maxY - minY);
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when the given box is a pure inline element
+    /// (not inline-block/inline-table etc.) whose containing-block extent
+    /// must be computed from its line-box rectangles per CSS2.1 §10.1.
+    /// </summary>
+    private static bool IsInlineContainingBlock(CssBox cb) =>
+        cb.Display == CssConstants.Inline;
 
     /// <summary>
     /// Returns true when <see cref="Height"/> is a percentage that resolves
@@ -416,11 +534,32 @@ internal class CssBox : CssBoxProperties, IDisposable
             {
                 // CSS2.1 §9.6.1: The containing block for a fixed-position
                 // element is the viewport (initial containing block).
+                // CSS2.1 §10.1: For absolutely positioned elements, the
+                // containing block is the padding-box of the nearest
+                // positioned ancestor.
                 // Use the viewport width for percentage/auto resolution.
                 double width;
                 if (Position == CssConstants.Fixed && ContainerInt != null)
                 {
-                    width = ContainerInt.PageSize.Width;
+                    width = ContainerInt.ViewportSize.Width;
+                }
+                else if (Position == CssConstants.Absolute)
+                {
+                    var cb = FindPositionedContainingBlock();
+                    if (IsInlineContainingBlock(cb))
+                    {
+                        // CSS2.1 §10.1: The containing block is the bounding
+                        // box of the first and last inline boxes of the inline
+                        // ancestor.  The width is the bounding box width.
+                        var bbox = GetInlineBoundingBox(cb);
+                        width = bbox != RectangleF.Empty ? bbox.Width : cb.Size.Width;
+                    }
+                    else
+                    {
+                        width = cb.Size.Width
+                                - cb.ActualPaddingLeft - cb.ActualPaddingRight
+                                - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+                    }
                 }
                 else
                 {
@@ -589,7 +728,9 @@ internal class CssBox : CssBoxProperties, IDisposable
             {
                 var prevSibling = DomUtils.GetPreviousSibling(this);
 
-                if (Position != CssConstants.Fixed)
+                // Compute the static position for all elements (including
+                // position:fixed).  Fixed elements need the static position
+                // as fallback when offset properties are auto (CSS2.1 §10.6.4).
                 {
                     double left = ContainingBlock.Location.X + ContainingBlock.ActualPaddingLeft + ActualMarginLeft + ContainingBlock.ActualBorderLeftWidth;
 
@@ -806,11 +947,35 @@ internal class CssBox : CssBoxProperties, IDisposable
                         var cb = FindPositionedContainingBlock();
                         // CSS2.1 §10.1: The containing block for an absolutely
                         // positioned element is the padding-box of the nearest
-                        // positioned ancestor.
-                        double cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
-                        double cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
-                        double cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
-                        double cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+                        // positioned ancestor.  When the ancestor is an inline
+                        // element, the containing block is the bounding box of
+                        // the first and last inline boxes generated for it.
+                        double cbPadLeft, cbPadTop, cbPadWidth, cbPadHeight;
+                        if (IsInlineContainingBlock(cb))
+                        {
+                            var bbox = GetInlineBoundingBox(cb);
+                            if (bbox != RectangleF.Empty)
+                            {
+                                cbPadLeft = bbox.Left;
+                                cbPadTop = bbox.Top;
+                                cbPadWidth = bbox.Width;
+                                cbPadHeight = bbox.Height;
+                            }
+                            else
+                            {
+                                cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
+                                cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
+                                cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+                                cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+                            }
+                        }
+                        else
+                        {
+                            cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
+                            cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
+                            cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+                            cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+                        }
 
                         float newX = Location.X, newY = Location.Y;
 
@@ -849,19 +1014,55 @@ internal class CssBox : CssBoxProperties, IDisposable
                         Location = new PointF(newX, newY);
                         ActualBottom = newY;
                     }
-                }
-                else
-                {
-                    // CSS2.1 §10.6.4: For fixed-position elements, 'top'/'left'
-                    // specify the offset of the top/left margin edge from the
-                    // viewport.  Location represents the border edge, so add
-                    // the final computed margins (which may have been updated by
-                    // later CSS rules such as the Acid2 'p + table + p' rule).
-                    var basePos = GetActualLocation(Left, Top);
-                    Location = new PointF(
-                        basePos.X + (float)ActualMarginLeft,
-                        basePos.Y + (float)ActualMarginTop);
-                    ActualBottom = Location.Y;
+
+                    // CSS2.1 §10.6.4 / §9.6.1: For fixed-position elements,
+                    // the containing block is the viewport.  When top/left/
+                    // bottom/right are explicitly set, use those offsets from
+                    // the viewport edge.  When they are auto, the static
+                    // position (computed above) is kept.
+                    if (Position == CssConstants.Fixed && ContainerInt != null)
+                    {
+                        bool hasLeft = Left != null && Left != CssConstants.Auto;
+                        bool hasRight = Right != null && Right != CssConstants.Auto;
+                        bool hasTop = Top != null && Top != CssConstants.Auto;
+                        bool hasBottom = Bottom != null && Bottom != CssConstants.Auto;
+
+                        if (hasLeft || hasRight || hasTop || hasBottom)
+                        {
+                            var vpSize = ContainerInt.ViewportSize;
+                            float newX = Location.X, newY = Location.Y;
+
+                            if (hasLeft)
+                            {
+                                double cssLeft = CssValueParser.ParseLength(Left, vpSize.Width, GetEmHeight());
+                                newX = (float)(cssLeft + ActualMarginLeft);
+                            }
+                            else if (hasRight)
+                            {
+                                double cssRight = CssValueParser.ParseLength(Right, vpSize.Width, GetEmHeight());
+                                newX = (float)(vpSize.Width - cssRight - ActualMarginRight - Size.Width);
+                            }
+
+                            if (hasTop)
+                            {
+                                double cssTop = CssValueParser.ParseLength(Top, vpSize.Height, GetEmHeight());
+                                newY = (float)(cssTop + ActualMarginTop);
+                            }
+                            else if (hasBottom)
+                            {
+                                double cssBottom = CssValueParser.ParseLength(Bottom, vpSize.Height, GetEmHeight());
+                                double boxHeight = ActualBottom - Location.Y;
+                                if (boxHeight <= 0) boxHeight = Size.Height;
+                                newY = (float)(vpSize.Height - cssBottom - ActualMarginBottom - boxHeight);
+                            }
+
+                            Location = new PointF(newX, newY);
+                            ActualBottom = newY;
+                        }
+                        // When all offsets are auto, keep the static position
+                        // (Location is already set from normal-flow
+                        // calculation above).
+                    }
                 }
             }
 
@@ -994,7 +1195,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             // CSS2.1 §9.6.1: For fixed-position elements, percentage
             // heights resolve against the viewport, not the parent.
             double cbHeight = (Position == CssConstants.Fixed && ContainerInt != null)
-                ? ContainerInt.PageSize.Height
+                ? ContainerInt.ViewportSize.Height
                 : ContainingBlock.Size.Height;
 
             if (MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight))
@@ -1587,8 +1788,9 @@ internal class CssBox : CssBoxProperties, IDisposable
 
     protected override PointF GetActualLocation(string X, string Y)
     {
-        var left = CssValueParser.ParseLength(X, ContainerInt.PageSize.Width, GetEmHeight(), null);
-        var top = CssValueParser.ParseLength(Y, ContainerInt.PageSize.Height, GetEmHeight(), null);
+        var vpSize = ContainerInt.ViewportSize;
+        var left = CssValueParser.ParseLength(X, vpSize.Width, GetEmHeight(), null);
+        var top = CssValueParser.ParseLength(Y, vpSize.Height, GetEmHeight(), null);
 
         return new PointF((float)left, (float)top);
     }

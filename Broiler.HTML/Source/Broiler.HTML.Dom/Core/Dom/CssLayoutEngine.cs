@@ -19,6 +19,15 @@ internal static class CssLayoutEngine
     /// </summary>
     private const double TypicalAscentRatio = 0.8;
 
+    /// <summary>
+    /// Ratio to convert typographic points to CSS pixels (96 DPI / 72 DPI).
+    /// Layout coordinates are in CSS px, but font metrics from the layout
+    /// font are at pt-scale (SkiaSharp creates fonts in canvas units, and
+    /// the layout font is created at pt size).  This factor bridges the gap
+    /// for line-height calculations where font.Height is the fallback.
+    /// </summary>
+    private const double PtToCssPx = 96.0 / 72.0;
+
     public static void MeasureImageSize(CssRectImage imageWord)
     {
         ArgumentNullException.ThrowIfNull(imageWord);
@@ -44,18 +53,10 @@ internal static class CssLayoutEngine
         {
             imageWord.Width = imageWord.ImageRectangle == RectangleF.Empty ? imageWord.Image.Width : imageWord.ImageRectangle.Width;
 
-            // CSS2.1 §10.3.2: when both width and height are auto, clamp
-            // intrinsic width to the containing block width so the replaced
-            // element doesn't overflow its container unnecessarily.
-            if (!hasImageTagHeight && imageWord.OwnerBox.ContainingBlock != null)
-            {
-                double cbWidth = imageWord.OwnerBox.ContainingBlock.Size.Width;
-                if (cbWidth > 0 && imageWord.Width > cbWidth)
-                {
-                    imageWord.Width = cbWidth;
-                    scaleImageHeight = true;
-                }
-            }
+            // CSS2.1 §10.3.2: when width is auto the used value is the
+            // intrinsic width.  Do NOT clamp to the containing block —
+            // inline replaced elements are allowed to overflow their
+            // container.  Authors use max-width:100% to opt into clamping.
         }
         else
         {
@@ -389,8 +390,17 @@ internal static class CssLayoutEngine
 
                 foreach (var word in b.Words)
                 {
-                    if (maxbottom - cury < box.ActualLineHeight)
-                        maxbottom += box.ActualLineHeight - (maxbottom - cury);
+                    // CSS2.1 §10.8: Every line box has a minimum height
+                    // from the block container's line-height (the "strut").
+                    // When line-height is 'normal' (ActualLineHeight == 0),
+                    // the minimum comes from the font metrics, scaled to CSS
+                    // px (font.Height is at pt-scale because the layout font
+                    // is created at pt size in SkiaSharp canvas units).
+                    double boxLineHeight = box.ActualLineHeight > 0
+                        ? box.ActualLineHeight
+                        : box.ActualFont.Height * PtToCssPx;
+                    if (maxbottom - cury < boxLineHeight)
+                        maxbottom += boxLineHeight - (maxbottom - cury);
 
                     // CSS2.1 §10.8: The "strut" — each line box has a minimum
                     // height from the block container's font and line-height.
@@ -402,7 +412,7 @@ internal static class CssLayoutEngine
                     {
                         strutHeight = blockbox.ActualLineHeight;
                         if (strutHeight <= 0)
-                            strutHeight = blockbox.ActualFont.Height;
+                            strutHeight = blockbox.ActualFont.Height * PtToCssPx;
 
                         if (maxbottom - cury < strutHeight)
                             maxbottom += strutHeight - (maxbottom - cury);
@@ -437,7 +447,7 @@ internal static class CssLayoutEngine
                     // within the strut is at the font's ascent from the top.
                     if (word.IsImage && strutHeight > word.Height)
                     {
-                        double fontHeight = blockbox.ActualFont.Height;
+                        double fontHeight = blockbox.ActualFont.Height * PtToCssPx;
                         double baseline = fontHeight * TypicalAscentRatio;
                         word.Top = Math.Max(cury, cury + baseline - word.Height);
                     }
@@ -897,7 +907,7 @@ internal static class CssLayoutEngine
             lineTop = Math.Min(lineTop, rect.Top);
 
         // Start with the strut baseline (parent's font ascent from line top).
-        double parentFontHeight = lineBox.OwnerBox?.ActualFont.Height ?? 0;
+        double parentFontHeight = (lineBox.OwnerBox?.ActualFont.Height ?? 0) * PtToCssPx;
         double baseline = (lineTop < double.MaxValue)
             ? lineTop + parentFontHeight * TypicalAscentRatio
             : float.MinValue;
@@ -908,7 +918,7 @@ internal static class CssLayoutEngine
             if (box.Display != CssConstants.InlineBlock)
             {
                 double boxBaseline = lineBox.Rectangles[box].Top
-                    + box.ActualFont.Height * TypicalAscentRatio;
+                    + box.ActualFont.Height * PtToCssPx * TypicalAscentRatio;
                 baseline = Math.Max(baseline, boxBaseline);
             }
         }
@@ -934,7 +944,7 @@ internal static class CssLayoutEngine
             bool isInlineBlock = box.Display == CssConstants.InlineBlock;
             double boxAscent = isInlineBlock
                 ? lineBox.Rectangles[box].Height
-                : box.ActualFont.Height * TypicalAscentRatio;
+                : box.ActualFont.Height * PtToCssPx * TypicalAscentRatio;
 
             //Important notes on http://www.w3.org/TR/CSS21/tables.html#height-layout
             switch (box.VerticalAlign)
@@ -970,7 +980,7 @@ internal static class CssLayoutEngine
                     if (lineBox.Rectangles.ContainsKey(box) && baseline > float.MinValue)
                     {
                         double boxHeight = lineBox.Rectangles[box].Height;
-                        double parentFont = box.ParentBox?.ActualFont.Height ?? 0;
+                        double parentFont = (box.ParentBox?.ActualFont.Height ?? 0) * PtToCssPx;
                         double halfXHeight = parentFont * 0.25;
                         lineBox.SetBaseLine(g, box, baseline + halfXHeight - boxHeight / 2);
                     }
@@ -986,7 +996,7 @@ internal static class CssLayoutEngine
                     {
                         double lineHeight = box.ActualLineHeight > 0
                             ? box.ActualLineHeight
-                            : box.ActualFont.Height;
+                            : box.ActualFont.Height * PtToCssPx;
                         double offset = CssValueParser.ParseLength(
                             box.VerticalAlign, lineHeight, box.GetEmHeight());
                         if (!double.IsNaN(offset) && offset != 0)
