@@ -1,6 +1,6 @@
 # Roadmap: Broiler.LogAnalyzer Enhancements
 
-> **Status**: Active — created 2026-04-10 | Phase 1–3 complete  
+> **Status**: Active — created 2026-04-10 | Phase 1–4 complete  
 > **Tracking issue**: Create Roadmap Document for Broiler.LogAnalyzer Enhancements
 
 ---
@@ -375,9 +375,9 @@ Items are ordered by estimated impact and implementation complexity.
 | 5  | Automated natural-language summary             | Lib       | High   | Medium | 4.2     | ✅ Done |
 | 6  | Bar chart for status codes                     | WPF       | High   | Medium | 5.1     | ✅ Done |
 | 7  | Line chart for hourly distribution             | WPF       | High   | Medium | 5.1     | ✅ Done |
-| 8  | HTML report export                             | Lib       | Medium | Medium | 7.1     | Planned |
-| 9  | `--format` flag for CLI                        | CLI       | Medium | Low    | 8.1     | Planned |
-| 10 | `--filter-endpoint` in CLI                     | CLI       | Medium | Low    | 8.2     | Planned |
+| 8  | HTML report export                             | Lib       | Medium | Medium | 7.1     | ✅ Done |
+| 9  | `--format` flag for CLI                        | CLI       | Medium | Low    | 8.1     | ✅ Done |
+| 10 | `--filter-endpoint` in CLI                     | CLI       | Medium | Low    | 8.2     | ✅ Done |
 | 11 | Per-IP method and endpoint distribution        | Lib       | Medium | Medium | 6.2     | Planned |
 | 12 | Top referers and user agents                   | Lib       | Medium | Low    | 6.1     | ✅ Done |
 | 13 | Average response size and requests/sec         | Lib       | Medium | Low    | 6.1     | ✅ Done |
@@ -432,9 +432,17 @@ traffic, and suspicious requests. All three features surfaced in both CLI
 (`PrintReport`) and WPF (`FormatReport`). 33 new unit tests added in
 `LogAnalyzerServicePhase3Tests`.
 
-### Phase 4 — Export & CLI (TODOs 8–10)
+### Phase 4 — Export & CLI (TODOs 8–10) ✅ Complete
 
-Add HTML report export, `--format` flag, and `--filter-endpoint` in the CLI.
+Added HTML report export via `ExportHtml(top)` producing self-contained HTML with
+styled tables, metric cards, and an embedded hourly distribution bar chart.
+Added Markdown report export via `ExportMarkdown(top)` with structured tables for
+all metrics sections. CLI now supports `--format` flag accepting `text` (default),
+`json`, `csv`, `markdown`, and `html` to output the report in the chosen format.
+CLI now supports `--filter-endpoint <PATTERN>` for case-insensitive endpoint
+substring filtering (wiring the existing `Filter(endpointPattern:)` method).
+Updated help text with new options and examples. 33 new unit and integration tests
+added in `Phase4ExportCliTests`.
 
 ### Phase 5 — Advanced Features (TODOs 17–25)
 

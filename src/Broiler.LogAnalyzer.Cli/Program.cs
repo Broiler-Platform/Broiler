@@ -16,10 +16,12 @@ public class Program
         int top = 10;
         string? filterStatus = null;
         string? filterIp = null;
+        string? filterEndpoint = null;
         string? fromStr = null;
         string? toStr = null;
         string? exportCsv = null;
         string? exportJson = null;
+        string? format = null;
         bool showCharts = false;
 
         for (int i = 0; i < args.Length; i++)
@@ -42,6 +44,9 @@ public class Program
                 case "--filter-ip" when i + 1 < args.Length:
                     filterIp = args[++i];
                     break;
+                case "--filter-endpoint" when i + 1 < args.Length:
+                    filterEndpoint = args[++i];
+                    break;
                 case "--from" when i + 1 < args.Length:
                     fromStr = args[++i];
                     break;
@@ -54,6 +59,14 @@ public class Program
                 case "--export-json" when i + 1 < args.Length:
                     exportJson = args[++i];
                     break;
+                case "--format" when i + 1 < args.Length:
+                    format = args[++i].ToLowerInvariant();
+                    if (format is not ("text" or "json" or "csv" or "markdown" or "html"))
+                    {
+                        Console.Error.WriteLine("Error: '--format' must be one of: text, json, csv, markdown, html.");
+                        return 1;
+                    }
+                    break;
                 case "--chart":
                     showCharts = true;
                     break;
@@ -61,10 +74,12 @@ public class Program
                 case "--top":
                 case "--filter-status":
                 case "--filter-ip":
+                case "--filter-endpoint":
                 case "--from":
                 case "--to":
                 case "--export-csv":
                 case "--export-json":
+                case "--format":
                     Console.Error.WriteLine($"Error: '{args[i]}' requires a value.");
                     PrintUsage();
                     return 1;
@@ -176,13 +191,15 @@ public class Program
 
         // Apply filters if any were specified.
         bool hasFilters = minStatus is not null || maxStatus is not null ||
-                          filterIp is not null || from is not null || to is not null;
+                          filterIp is not null || filterEndpoint is not null ||
+                          from is not null || to is not null;
         if (hasFilters)
         {
             analyzer = analyzer.Filter(
                 minStatus: minStatus,
                 maxStatus: maxStatus,
                 ip: filterIp,
+                endpointPattern: filterEndpoint,
                 from: from,
                 to: to);
 
@@ -205,7 +222,25 @@ public class Program
             Console.WriteLine($"Exported {analyzer.TotalRequests:N0} entries to JSON: {exportJson}");
         }
 
-        PrintReport(analyzer, top, skipped, filesProcessed, showCharts);
+        // Output report in the requested format.
+        switch (format)
+        {
+            case "json":
+                Console.Write(analyzer.ExportJson());
+                break;
+            case "csv":
+                Console.Write(analyzer.ExportCsv());
+                break;
+            case "markdown":
+                Console.Write(analyzer.ExportMarkdown(top));
+                break;
+            case "html":
+                Console.Write(analyzer.ExportHtml(top));
+                break;
+            default: // "text" or null (default)
+                PrintReport(analyzer, top, skipped, filesProcessed, showCharts);
+                break;
+        }
         return 0;
     }
 
@@ -423,8 +458,10 @@ public class Program
         Console.WriteLine("  --top <N>              Number of top entries to display (default: 10, 0 = show all)");
         Console.WriteLine("  --filter-status <RANGE> Filter by HTTP status code or range (e.g. 404 or 400-499)");
         Console.WriteLine("  --filter-ip <IP>       Filter entries by remote host / IP");
+        Console.WriteLine("  --filter-endpoint <PATTERN> Filter entries by endpoint substring (case-insensitive)");
         Console.WriteLine("  --from <DATETIME>      Include entries from this date/time (ISO 8601)");
         Console.WriteLine("  --to <DATETIME>        Include entries up to this date/time (ISO 8601)");
+        Console.WriteLine("  --format <FORMAT>      Output format: text (default), json, csv, markdown, html");
         Console.WriteLine("  --export-csv <FILE>    Export entries to a CSV file");
         Console.WriteLine("  --export-json <FILE>   Export entries to a JSON file");
         Console.WriteLine("  --chart                Display ASCII charts for top endpoints, IPs, and hourly distribution");
@@ -436,7 +473,10 @@ public class Program
         Console.WriteLine("  Broiler.LogAnalyzer --file /var/log/apache2/ --top 20");
         Console.WriteLine("  Broiler.LogAnalyzer access.log --filter-status 500-599");
         Console.WriteLine("  Broiler.LogAnalyzer access.log --filter-ip 192.168.1.1");
+        Console.WriteLine("  Broiler.LogAnalyzer access.log --filter-endpoint /api");
         Console.WriteLine("  Broiler.LogAnalyzer access.log --from 2024-01-01 --to 2024-01-31");
+        Console.WriteLine("  Broiler.LogAnalyzer access.log --format json");
+        Console.WriteLine("  Broiler.LogAnalyzer access.log --format html > report.html");
         Console.WriteLine("  Broiler.LogAnalyzer access.log --export-csv report.csv --export-json report.json");
     }
 
