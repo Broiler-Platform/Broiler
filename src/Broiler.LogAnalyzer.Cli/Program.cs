@@ -1,4 +1,6 @@
-namespace Broiler.LogAnalyzer;
+using Broiler.LogAnalyzer;
+
+namespace Broiler.LogAnalyzer.Cli;
 
 /// <summary>
 /// Entry point for the Broiler Log Analyzer CLI tool.

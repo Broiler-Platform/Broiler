@@ -6,7 +6,7 @@ namespace Broiler.LogAnalyzer;
 /// <summary>
 /// Parses Apache access log lines in Common and Combined log formats.
 /// </summary>
-internal static partial class LogParser
+public static partial class LogParser
 {
     // Apache Combined Log Format:
     // %h %l %u %t "%r" %>s %b "%{Referer}i" "%{User-agent}i"
@@ -33,7 +33,7 @@ internal static partial class LogParser
     /// Attempts to parse a single log line into a <see cref="LogEntry"/>.
     /// Returns <c>null</c> if the line does not match the expected format.
     /// </summary>
-    internal static LogEntry? ParseLine(string line)
+    public static LogEntry? ParseLine(string line)
     {
         if (string.IsNullOrWhiteSpace(line))
             return null;
@@ -79,7 +79,7 @@ internal static partial class LogParser
     /// Parses all valid entries from the given lines, skipping malformed lines.
     /// Also returns the total number of lines processed.
     /// </summary>
-    internal static (IReadOnlyList<LogEntry> Entries, int TotalLines) ParseLines(IEnumerable<string> lines)
+    public static (IReadOnlyList<LogEntry> Entries, int TotalLines) ParseLines(IEnumerable<string> lines)
     {
         var entries = new List<LogEntry>();
         int totalLines = 0;

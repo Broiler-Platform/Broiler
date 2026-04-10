@@ -7,14 +7,14 @@ namespace Broiler.LogAnalyzer;
 /// files (access.log.1, access.log.2, …) and gzip-compressed variants
 /// (access.log.2.gz, access.log.3.gz, …).
 /// </summary>
-internal static class LogFileDiscovery
+public static class LogFileDiscovery
 {
     /// <summary>
     /// Given a path that is either a single file or a directory, returns all
     /// access log files found, sorted in natural log-rotation order
     /// (current log first, then .1, .2, … then .1.gz, .2.gz, …).
     /// </summary>
-    internal static IReadOnlyList<string> Resolve(string path)
+    public static IReadOnlyList<string> Resolve(string path)
     {
         if (File.Exists(path))
             return [path];
@@ -37,7 +37,7 @@ internal static class LogFileDiscovery
     /// Returns true if the filename looks like an Apache access log
     /// (access.log, access.log.N, access.log.N.gz, access_log variants).
     /// </summary>
-    internal static bool IsAccessLogFile(string filePath)
+    public static bool IsAccessLogFile(string filePath)
     {
         var name = Path.GetFileName(filePath);
         bool isGz = name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase);
@@ -67,13 +67,13 @@ internal static class LogFileDiscovery
     /// <summary>
     /// Returns true if the file is gzip-compressed (ends with .gz).
     /// </summary>
-    internal static bool IsGzipFile(string filePath) =>
+    public static bool IsGzipFile(string filePath) =>
         filePath.EndsWith(".gz", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Opens a stream reader for the file, decompressing gzip files automatically.
     /// </summary>
-    internal static StreamReader OpenReader(string filePath)
+    public static StreamReader OpenReader(string filePath)
     {
         var stream = File.OpenRead(filePath);
         if (IsGzipFile(filePath))
@@ -87,7 +87,7 @@ internal static class LogFileDiscovery
     /// <summary>
     /// Lazily reads lines from a file, decompressing gzip files automatically.
     /// </summary>
-    internal static IEnumerable<string> ReadLines(string filePath)
+    public static IEnumerable<string> ReadLines(string filePath)
     {
         using var reader = OpenReader(filePath);
         while (reader.ReadLine() is { } line)

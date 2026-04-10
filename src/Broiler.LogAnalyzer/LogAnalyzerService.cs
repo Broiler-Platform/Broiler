@@ -3,25 +3,25 @@ namespace Broiler.LogAnalyzer;
 /// <summary>
 /// Computes analytics metrics from parsed Apache access log entries.
 /// </summary>
-internal sealed class LogAnalyzerService
+public sealed class LogAnalyzerService
 {
     private readonly IReadOnlyList<LogEntry> _entries;
     private readonly int _uniqueIpCount;
 
-    internal LogAnalyzerService(IReadOnlyList<LogEntry> entries)
+    public LogAnalyzerService(IReadOnlyList<LogEntry> entries)
     {
         _entries = entries;
         _uniqueIpCount = _entries.Select(e => e.RemoteHost).Distinct().Count();
     }
 
-    internal int TotalRequests => _entries.Count;
+    public int TotalRequests => _entries.Count;
 
-    internal int UniqueIpCount => _uniqueIpCount;
+    public int UniqueIpCount => _uniqueIpCount;
 
     /// <summary>
     /// Returns status-code → count, ordered by status code.
     /// </summary>
-    internal IReadOnlyList<(int StatusCode, int Count)> StatusCodeDistribution()
+    public IReadOnlyList<(int StatusCode, int Count)> StatusCodeDistribution()
     {
         return _entries
             .GroupBy(e => e.StatusCode)
@@ -33,7 +33,7 @@ internal sealed class LogAnalyzerService
     /// <summary>
     /// Returns the top N most-requested endpoints, ordered by descending count.
     /// </summary>
-    internal IReadOnlyList<(string Endpoint, int Count)> TopEndpoints(int top = 10)
+    public IReadOnlyList<(string Endpoint, int Count)> TopEndpoints(int top = 10)
     {
         return _entries
             .GroupBy(e => e.Endpoint)
@@ -46,7 +46,7 @@ internal sealed class LogAnalyzerService
     /// <summary>
     /// Returns the top N IPs by request count, ordered by descending count.
     /// </summary>
-    internal IReadOnlyList<(string Ip, int Count)> TopIps(int top = 10)
+    public IReadOnlyList<(string Ip, int Count)> TopIps(int top = 10)
     {
         return _entries
             .GroupBy(e => e.RemoteHost)
@@ -59,7 +59,7 @@ internal sealed class LogAnalyzerService
     /// <summary>
     /// Returns the HTTP method distribution, ordered by descending count.
     /// </summary>
-    internal IReadOnlyList<(string Method, int Count)> MethodDistribution()
+    public IReadOnlyList<(string Method, int Count)> MethodDistribution()
     {
         return _entries
             .GroupBy(e => e.Method)
@@ -71,5 +71,5 @@ internal sealed class LogAnalyzerService
     /// <summary>
     /// Returns total bytes transferred across all entries.
     /// </summary>
-    internal long TotalBytesTransferred => _entries.Sum(e => e.ResponseSize);
+    public long TotalBytesTransferred => _entries.Sum(e => e.ResponseSize);
 }
