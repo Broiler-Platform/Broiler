@@ -603,25 +603,6 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                 Size = new SizeF((float)width, Size.Height);
 
-                // CSS2.1 §10.5: Pre-resolve percentage heights so that children
-                // can use ContainingBlock.Size.Height for their own percentage
-                // height resolution.  Without this, children of an element with
-                // height:100% would see Size.Height = 0 (not yet set).
-                if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height)
-                    && Height.Contains('%') && !HeightPercentageResolvesToAuto())
-                {
-                    double cbHeight;
-                    if (Position == CssConstants.Fixed && ContainerInt != null)
-                        cbHeight = ContainerInt.ViewportSize.Height;
-                    else if (ContainingBlock?.ParentBox == null && ContainerInt != null)
-                        cbHeight = ContainerInt.ViewportSize.Height;
-                    else
-                        cbHeight = ContainingBlock.Size.Height;
-                    double preHeight = CssValueParser.ParseLength(Height, cbHeight, GetEmHeight());
-                    preHeight += ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
-                    Size = new SizeF(Size.Width, (float)preHeight);
-                }
-
                 // CSS2.1 §10.3.3: For block-level, non-replaced elements in
                 // normal flow with an explicit width and auto margins, resolve
                 // the auto margins so the element is centered horizontally.
@@ -1094,6 +1075,26 @@ internal class CssBox : CssBoxProperties, IDisposable
                         // calculation above).
                     }
                 }
+            }
+
+            // CSS2.1 §10.5: Pre-resolve percentage heights so that children
+            // can use ContainingBlock.Size.Height for their own percentage
+            // height resolution.  This must run AFTER position assignment
+            // (which resets Size.Height to 0 via ActualBottom = top) but
+            // BEFORE child layout so descendants see the correct height.
+            if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height)
+                && Height.Contains('%') && !HeightPercentageResolvesToAuto())
+            {
+                double cbHeight;
+                if (Position == CssConstants.Fixed && ContainerInt != null)
+                    cbHeight = ContainerInt.ViewportSize.Height;
+                else if (ContainingBlock?.ParentBox == null && ContainerInt != null)
+                    cbHeight = ContainerInt.ViewportSize.Height;
+                else
+                    cbHeight = ContainingBlock.Size.Height;
+                double preHeight = CssValueParser.ParseLength(Height, cbHeight, GetEmHeight());
+                preHeight += ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+                Size = new SizeF(Size.Width, (float)preHeight);
             }
 
             //If we're talking about a table here..
