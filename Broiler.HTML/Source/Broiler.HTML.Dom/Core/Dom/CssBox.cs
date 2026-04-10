@@ -775,13 +775,22 @@ internal class CssBox : CssBoxProperties, IDisposable
                                 uncollapsedTop = hypotheticalTop;
                             }
 
-                            // clearance = max(amount to clear float, amount to
-                            // reach hypothetical position).  This can be negative.
-                            double clearance = Math.Max(
-                                maxFloatBottom - uncollapsedTop,
-                                hypotheticalTop - uncollapsedTop);
+                            // CSS2.2 §9.5.2: Only introduce clearance when the
+                            // hypothetical position (where the top border edge
+                            // would be if 'clear' were 'none') is NOT past the
+                            // relevant floats.  When the margin alone already
+                            // places the element past the float, no clearance is
+                            // needed and margin collapsing is preserved.
+                            if (hypotheticalTop < maxFloatBottom)
+                            {
+                                // clearance = max(amount to clear float, amount to
+                                // reach hypothetical position).  This can be negative.
+                                double clearance = Math.Max(
+                                    maxFloatBottom - uncollapsedTop,
+                                    hypotheticalTop - uncollapsedTop);
 
-                            top = uncollapsedTop + clearance;
+                                top = uncollapsedTop + clearance;
+                            }
                         }
                     }
 
@@ -1377,7 +1386,30 @@ internal class CssBox : CssBoxProperties, IDisposable
         }
         else if (_parentBox != null && ActualPaddingTop < 0.1 && ActualPaddingBottom < 0.1 && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1 && _parentBox.ActualBorderTopWidth < 0.1 && _parentBox.ActualBorderBottomWidth < 0.1)
         {
-            value = Math.Max(0, ActualMarginTop - Math.Max(_parentBox.ActualMarginTop, _parentBox.CollapsedMarginTop));
+            double parentEffective = Math.Max(_parentBox.ActualMarginTop, _parentBox.CollapsedMarginTop);
+
+            // CSS2.1 §8.3.1: First in-flow child's top margin collapses
+            // with the parent's top margin when the parent has no top
+            // border and no top padding.  When the child's margin
+            // exceeds the parent's, propagate the excess upward by
+            // shifting the parent's position down.  Only do this for
+            // non-root containers (not html/body) to avoid disturbing
+            // the root element's established position.
+            if (ActualMarginTop > parentEffective + 0.1
+                && _parentBox.ParentBox != null
+                && _parentBox.ParentBox.ParentBox != null)
+            {
+                double propagation = ActualMarginTop - parentEffective;
+                _parentBox.Location = new PointF(
+                    _parentBox.Location.X,
+                    _parentBox.Location.Y + (float)propagation);
+                _parentBox.CollapsedMarginTop = ActualMarginTop;
+                value = 0;
+            }
+            else
+            {
+                value = Math.Max(0, ActualMarginTop - parentEffective);
+            }
         }
         else
         {

@@ -251,10 +251,26 @@ internal static class CssBoxHelper
             return maxBottom;
 
         string clearDir = box.Clear;
-        foreach (var sibling in box.ParentBox.Boxes)
+
+        // Walk up the ancestor chain to find floats in the same block
+        // formatting context (BFC).  Floats from ancestor-level siblings
+        // are relevant for clearance even when the cleared element is
+        // nested deeper (CSS2.1 §9.5.2).
+        CssBox current = box;
+        while (current.ParentBox != null)
         {
-            if (sibling == box) break;
-            CollectMaxFloatBottom(sibling, clearDir, ref maxBottom, ref considered);
+            foreach (var sibling in current.ParentBox.Boxes)
+            {
+                if (sibling == current) break;
+                CollectMaxFloatBottom(sibling, clearDir, ref maxBottom, ref considered);
+            }
+
+            // Stop at BFC boundaries — floats in an outer BFC don't
+            // participate in clearance for elements in an inner BFC.
+            if (EstablishesBfc(current.ParentBox))
+                break;
+
+            current = current.ParentBox;
         }
 
         if (considered != null && considered.Count > 0)

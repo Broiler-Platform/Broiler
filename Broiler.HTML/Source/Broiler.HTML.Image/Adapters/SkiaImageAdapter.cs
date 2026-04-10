@@ -339,8 +339,9 @@ internal sealed class SkiaImageAdapter : RAdapter
     /// <summary>
     /// Rasterizes SVG data to an <see cref="SKBitmap"/> using Svg.Skia.
     /// Parses width/height/viewBox from the SVG root element to determine
-    /// output dimensions, falling back to 300×150 (the HTML default for
-    /// replaced elements with no intrinsic size).
+    /// output dimensions per the CSS2.1 replaced element sizing rules,
+    /// falling back to 300×150 (the HTML default for replaced elements
+    /// with no intrinsic size).
     /// </summary>
     private static RImage RasterizeSvg(byte[] data)
     {
@@ -352,22 +353,146 @@ internal sealed class SkiaImageAdapter : RAdapter
         if (svg.Picture == null)
             return null;
 
-        // Determine output dimensions from the SKPicture cull rect,
-        // which Svg.Skia derives from width/height/viewBox attributes.
-        var bounds = svg.Picture.CullRect;
-        int width = (int)Math.Ceiling(bounds.Width);
-        int height = (int)Math.Ceiling(bounds.Height);
+        // Parse the SVG root element's width, height and viewBox attributes
+        // to determine the correct intrinsic dimensions per CSS2.1.
+        var (svgWidth, svgHeight, vbRatio) = ParseSvgIntrinsicDimensions(svgContent);
 
-        // Fallback: HTML spec default for replaced elements with no intrinsic size.
-        if (width <= 0) width = 300;
-        if (height <= 0) height = 150;
+        int width, height;
+        if (svgWidth > 0 && svgHeight > 0)
+        {
+            // Both intrinsic width and height present.
+            width = (int)Math.Ceiling(svgWidth);
+            height = (int)Math.Ceiling(svgHeight);
+        }
+        else if (svgWidth > 0 && vbRatio > 0)
+        {
+            // Intrinsic width + aspect ratio → derive height.
+            width = (int)Math.Ceiling(svgWidth);
+            height = (int)Math.Ceiling(svgWidth / vbRatio);
+        }
+        else if (svgHeight > 0 && vbRatio > 0)
+        {
+            // Intrinsic height + aspect ratio → derive width.
+            height = (int)Math.Ceiling(svgHeight);
+            width = (int)Math.Ceiling(svgHeight * vbRatio);
+        }
+        else if (svgWidth > 0)
+        {
+            // Only intrinsic width, no ratio → default height.
+            width = (int)Math.Ceiling(svgWidth);
+            height = 150;
+        }
+        else if (svgHeight > 0)
+        {
+            // Only intrinsic height, no ratio → default width.
+            height = (int)Math.Ceiling(svgHeight);
+            width = 300;
+        }
+        else
+        {
+            // No intrinsic width/height.  Use 300×150 default,
+            // adjusted by viewBox aspect ratio if available.
+            if (vbRatio > 0)
+            {
+                width = 300;
+                height = Math.Max(1, (int)Math.Ceiling(300.0 / vbRatio));
+            }
+            else
+            {
+                var bounds = svg.Picture.CullRect;
+                width = (int)Math.Ceiling(bounds.Width);
+                height = (int)Math.Ceiling(bounds.Height);
+                if (width <= 0) width = 300;
+                if (height <= 0) height = 150;
+            }
+        }
 
         var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
         using var canvas = new SKCanvas(bitmap);
         canvas.Clear(SKColors.Transparent);
+
+        // Scale the SVG picture to fit the target bitmap dimensions.
+        var cullRect = svg.Picture.CullRect;
+        if (cullRect.Width > 0 && cullRect.Height > 0
+            && ((int)Math.Ceiling(cullRect.Width) != width
+                || (int)Math.Ceiling(cullRect.Height) != height))
+        {
+            float scaleX = width / cullRect.Width;
+            float scaleY = height / cullRect.Height;
+            canvas.Scale(scaleX, scaleY);
+        }
+
         canvas.DrawPicture(svg.Picture);
 
         return new ImageAdapter(bitmap);
+    }
+
+    /// <summary>
+    /// Parses the SVG root element to extract intrinsic width, height and
+    /// viewBox aspect ratio.  Returns (width, height, viewBoxRatio) where
+    /// values ≤ 0 indicate the attribute was absent or non-numeric.
+    /// </summary>
+    private static (double width, double height, double viewBoxRatio) ParseSvgIntrinsicDimensions(string svg)
+    {
+        double w = -1, h = -1, ratio = -1;
+
+        // Find the <svg ...> opening tag.
+        int svgIdx = svg.IndexOf("<svg", StringComparison.OrdinalIgnoreCase);
+        if (svgIdx < 0) return (w, h, ratio);
+        int tagEnd = svg.IndexOf('>', svgIdx);
+        if (tagEnd < 0) return (w, h, ratio);
+        var tag = svg.Substring(svgIdx, tagEnd - svgIdx + 1);
+
+        // Parse width attribute (only absolute units / plain numbers).
+        w = ParseSvgLengthAttribute(tag, "width");
+        h = ParseSvgLengthAttribute(tag, "height");
+
+        // Parse viewBox for aspect ratio.
+        var vbMatch = System.Text.RegularExpressions.Regex.Match(
+            tag, @"viewBox\s*=\s*[""']([^""']+)[""']",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (vbMatch.Success)
+        {
+            var parts = vbMatch.Groups[1].Value.Split(
+                new[] { ' ', ',', '\t', '\n', '\r' },
+                StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 4
+                && double.TryParse(parts[2], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out double vbW)
+                && double.TryParse(parts[3], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out double vbH)
+                && vbW > 0 && vbH > 0)
+            {
+                ratio = vbW / vbH;
+            }
+        }
+
+        return (w, h, ratio);
+    }
+
+    /// <summary>
+    /// Extracts a numeric length value from an SVG attribute.  Returns the
+    /// value in pixels for plain numbers and "px" units; returns -1 for
+    /// percentage values or absent attributes.
+    /// </summary>
+    private static double ParseSvgLengthAttribute(string tag, string name)
+    {
+        // Match name="value" but avoid matching longer attribute names
+        // (e.g. "width" should not match "stroke-width").
+        var m = System.Text.RegularExpressions.Regex.Match(
+            tag, @"(?<!\w)" + name + @"\s*=\s*[""']([^""']+)[""']",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!m.Success) return -1;
+
+        var val = m.Groups[1].Value.Trim();
+        // Ignore percentage values – they are not intrinsic dimensions.
+        if (val.EndsWith('%')) return -1;
+        // Strip "px" suffix.
+        if (val.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            val = val[..^2];
+
+        return double.TryParse(val, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out double v) && v > 0 ? v : -1;
     }
 
     /// <summary>

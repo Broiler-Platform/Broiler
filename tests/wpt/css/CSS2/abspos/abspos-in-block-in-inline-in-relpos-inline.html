@@ -1,32 +1,29 @@
 <!DOCTYPE html>
-<html>
-<head>
-  <title>CSS2: Absolute positioning in block in inline in relpos inline</title>
-  <style>
-    html, body { margin: 0; padding: 0; }
-    .container {
-      position: relative;
-      width: 300px;
-      height: 200px;
-      background: white;
-    }
-    .abspos {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      width: 100px;
-      height: 100px;
-      background: green;
-    }
-  </style>
-</head>
-<body>
-  <!-- CSS2.1 §10.1: An absolutely positioned element's containing block
-       is the nearest ancestor with position absolute, relative, or fixed.
-       The green box should be positioned at (10, 10) within the relative
-       container. -->
-  <div class="container">
-    <div class="abspos"></div>
-  </div>
-</body>
-</html>
+<link rel="author" title="Morten Stenshorne" href="mstensho@chromium.org">
+<link rel="help" href="https://www.w3.org/TR/CSS22/visudet.html#containing-block-details">
+<link rel="help" href="https://www.w3.org/TR/CSS22/visuren.html#anonymous-block-level">
+<style>
+  body { margin: 0px;}
+  .rel { position:relative; }
+  .inline-block { display:inline-block; width:100px; height:1px; }
+  .inline-block.large { width:200px; }
+  #target { position:absolute; width:100%; height:100px; background:green; }
+  #target-fixed { position:fixed; width:100%; height:100px; background:yellow; }
+</style>
+<p>There should be a green square, and a yellow rectangle below.</p>
+<div style="height:200px;">
+  <span class="rel" id="notContainingBlockOfTarget">
+    <div class="large inline-block"></div>
+    <br>
+    <span id="containingBlockOfTarget" class="rel">
+      <div class="inline-block"></div>
+      <span>
+        <div>
+          <div id="target-fixed"></div>
+          <div id="target"></div>
+        </div>
+      </span>
+      <div class="inline-block"></div></span><br>
+    <div class="large inline-block"></div>
+  </span>
+</div>
