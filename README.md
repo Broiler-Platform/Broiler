@@ -121,7 +121,7 @@ verifies the rendering pipeline remains functional on every change.
 
 ### Log Analyzer Tool
 
-A command-line tool for analysing Apache access log files. It supports single
+A command-line tool for analyzing Apache access log files. It supports single
 files, directories, rotated logs (`access.log.1`, `.2`, …), and
 gzip-compressed logs (`.gz`).
 
