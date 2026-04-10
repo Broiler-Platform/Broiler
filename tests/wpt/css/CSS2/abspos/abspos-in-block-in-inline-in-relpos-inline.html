@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSS2: Absolute positioning in block in inline in relpos inline</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .container {
+      position: relative;
+      width: 300px;
+      height: 200px;
+      background: white;
+    }
+    .abspos {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 100px;
+      height: 100px;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <!-- CSS2.1 §10.1: An absolutely positioned element's containing block
+       is the nearest ancestor with position absolute, relative, or fixed.
+       The green box should be positioned at (10, 10) within the relative
+       container. -->
+  <div class="container">
+    <div class="abspos"></div>
+  </div>
+</body>
+</html>

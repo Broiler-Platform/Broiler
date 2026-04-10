@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSS2: vertical-align with negative leading</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .container {
+      font-size: 20px;
+      line-height: 40px;
+      background: white;
+    }
+    .inner {
+      display: inline-block;
+      width: 100px;
+      height: 20px;
+      background: green;
+      vertical-align: baseline;
+    }
+  </style>
+</head>
+<body>
+  <!-- An inline-block element should be aligned to the baseline of
+       the parent.  The container's line-height (40px) is larger than
+       the font-size (20px) so half-leading is added above and below. -->
+  <div class="container">
+    <span class="inner"></span>
+  </div>
+</body>
+</html>

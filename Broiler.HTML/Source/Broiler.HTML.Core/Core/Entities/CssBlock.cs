@@ -144,6 +144,12 @@ public sealed class CssBlock
         if (other.Hover != Hover)
             return false;
 
+        // CSS2.1 §5.11: Blocks with different structural pseudo-classes
+        // (e.g. :lang(en) vs :lang(fr), or :first-child vs none) must
+        // not be merged; they have different matching conditions.
+        if (!string.Equals(other.PseudoClass, PseudoClass, StringComparison.OrdinalIgnoreCase))
+            return false;
+
         if (other.Selectors == null && Selectors != null)
             return false;
 

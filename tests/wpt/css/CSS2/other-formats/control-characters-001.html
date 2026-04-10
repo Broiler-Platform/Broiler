@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSS2: Control characters should not render</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    p {
+      font-size: 20px;
+      font-family: monospace;
+      background: white;
+    }
+  </style>
+</head>
+<body>
+  <!-- CSS2.1 §4.3.8: User agents should not render characters from
+       the Unicode "control characters" category (C0 U+0000-U+001F
+       except tab, newline, carriage return, and C1 U+007F-U+009F).
+       The text below includes a BEL (\x07) and ESC (\x1B) character
+       embedded between "Hello" and "World", which should be stripped. -->
+  <p>Hello&#x7;&#x1B;World</p>
+</body>
+</html>

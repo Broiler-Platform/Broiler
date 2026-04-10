@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>CSS2: :lang() pseudo-class</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    p { font-size: 20px; background: white; }
+    p:lang(en) {
+      background: green;
+    }
+    p:lang(fr) {
+      background: red;
+    }
+  </style>
+</head>
+<body>
+  <!-- CSS2.1 §5.11.4: :lang(en) should match because the html element
+       has lang="en".  The paragraph should have a green background.
+       :lang(fr) should NOT match. -->
+  <p>This text should have a green background.</p>
+</body>
+</html>

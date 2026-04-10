@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CSS2: Float with page-break-inside: avoid (test 5, print)</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .container {
+      page-break-inside: avoid;
+    }
+    .float-box {
+      float: left;
+      width: 150px;
+      height: 80px;
+      background: blue;
+      margin: 5px;
+    }
+    .clear { clear: both; }
+    .content {
+      height: 40px;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="float-box"></div>
+    <div class="float-box" style="background: red;"></div>
+    <div class="float-box" style="background: orange;"></div>
+    <div class="clear"></div>
+    <div class="content"></div>
+  </div>
+</body>
+</html>

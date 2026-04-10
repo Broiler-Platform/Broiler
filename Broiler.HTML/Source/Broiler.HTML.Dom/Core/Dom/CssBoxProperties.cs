@@ -625,7 +625,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
                 var actualMarginTop = CssValueParser.ParseLength(MarginTop, Size.Width, GetEmHeight());
 
-                if (MarginLeft.EndsWith("%"))
+                if (MarginTop.EndsWith("%"))
                     return actualMarginTop;
 
                 _actualMarginTop = actualMarginTop;
@@ -672,7 +672,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
                 var actualMarginBottom = CssValueParser.ParseLength(MarginBottom, Size.Width, GetEmHeight());
 
-                if (MarginLeft.EndsWith("%"))
+                if (MarginBottom.EndsWith("%"))
                     return actualMarginBottom;
 
                 _actualMarginBottom = actualMarginBottom;
@@ -693,7 +693,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
                 var actualMarginRight = CssValueParser.ParseLength(MarginRight, Size.Width, GetEmHeight());
                 
-                if (MarginLeft.EndsWith("%"))
+                if (MarginRight.EndsWith("%"))
                     return actualMarginRight;
                 
                 _actualMarginRight = actualMarginRight;
