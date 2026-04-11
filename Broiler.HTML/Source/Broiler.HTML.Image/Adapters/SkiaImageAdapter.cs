@@ -357,15 +357,40 @@ internal sealed class SkiaImageAdapter : RAdapter
             width = (int)Math.Ceiling(svgWidth);
             height = (int)Math.Ceiling(svgHeight);
         }
+        else if (svgWidth > 0 && vbRatio > 0)
+        {
+            // CSS Images Module Level 3 §5.2: Width is known and intrinsic
+            // ratio is available – derive height from width / ratio.
+            width = (int)Math.Ceiling(svgWidth);
+            height = (int)Math.Ceiling(svgWidth / vbRatio);
+        }
+        else if (svgHeight > 0 && vbRatio > 0)
+        {
+            // CSS Images Module Level 3 §5.2: Height is known and intrinsic
+            // ratio is available – derive width from height * ratio.
+            width = (int)Math.Ceiling(svgHeight * vbRatio);
+            height = (int)Math.Ceiling(svgHeight);
+        }
         else
         {
             // HTML spec §4.8.2: When the SVG lacks both explicit width and
-            // height the natural size is the default 300×150.  Browsers
-            // (Chromium, Firefox) do NOT derive the missing dimension from
-            // the viewBox ratio or partial attributes – they always fall
-            // back to 300×150.
-            width = 300;
-            height = 150;
+            // height (or one is present but no aspect ratio), the natural
+            // size defaults to 300×150.
+            if (svgWidth > 0)
+            {
+                width = (int)Math.Ceiling(svgWidth);
+                height = 150;
+            }
+            else if (svgHeight > 0)
+            {
+                width = 300;
+                height = (int)Math.Ceiling(svgHeight);
+            }
+            else
+            {
+                width = 300;
+                height = 150;
+            }
         }
 
         // SVGs that use percentage-based dimensions internally (e.g.
