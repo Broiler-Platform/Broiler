@@ -1757,6 +1757,8 @@ document.getElementById('out').appendChild(p);
         // Assert — output should mention the subset and only process 1 test.
         Assert.Contains("Subset", output);
         Assert.Contains("0 passed, 0 failed, 1 skipped", output);
+    }
+
     [Fact]
     public void Wpt_AlignContentBlock002_MatchesReference()
     {
