@@ -68,22 +68,10 @@ internal static class CssLayoutEngine
         {
             imageWord.Width = imageWord.ImageRectangle == RectangleF.Empty ? imageWord.Image.Width : imageWord.ImageRectangle.Width;
 
-            // CSS Images Level 3 §5.2: When the image has only an intrinsic
-            // ratio (no intrinsic width or height, e.g. an SVG with only a
-            // viewBox), constrain the width to the containing block width.
-            // Normal images with intrinsic dimensions overflow per CSS2.1
-            // §10.3.2 — authors use max-width:100% to opt into clamping.
-            if (imageWord.Image.HasIntrinsicRatio
-                && !imageWord.Image.HasIntrinsicWidth
-                && !imageWord.Image.HasIntrinsicHeight)
-            {
-                double cbWidth = imageWord.OwnerBox.ContainingBlock.Size.Width;
-                if (cbWidth > 0 && imageWord.Width > cbWidth)
-                {
-                    imageWord.Width = cbWidth;
-                    scaleImageHeight = true;
-                }
-            }
+            // CSS2.1 §10.3.2: when width is auto the used value is the
+            // intrinsic width.  Do NOT clamp to the containing block —
+            // inline replaced elements are allowed to overflow their
+            // container.  Authors use max-width:100% to opt into clamping.
         }
         else
         {
