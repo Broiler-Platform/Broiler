@@ -1312,7 +1312,28 @@ internal class CssBox : CssBoxProperties, IDisposable
         {
             if (!HeightPercentageResolvesToAuto())
             {
-                double borderBoxHeight = ActualHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+                // For percentage heights, resolve against the containing
+                // block's height directly.  ActualHeight resolves against
+                // Size.Height which may have been cached before the
+                // percentage height pre-resolution step set the correct
+                // Size.Height (CSS2.1 §10.5).
+                double contentHeight;
+                if (Height.Contains('%'))
+                {
+                    double cbHeight;
+                    if (Position == CssConstants.Fixed && ContainerInt != null)
+                        cbHeight = ContainerInt.ViewportSize.Height;
+                    else if (ContainingBlock?.ParentBox == null && ContainerInt != null)
+                        cbHeight = ContainerInt.ViewportSize.Height;
+                    else
+                        cbHeight = ContainingBlock.Size.Height;
+                    contentHeight = CssValueParser.ParseLength(Height, cbHeight, GetEmHeight());
+                }
+                else
+                {
+                    contentHeight = ActualHeight;
+                }
+                double borderBoxHeight = contentHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
                 ActualBottom = Location.Y + borderBoxHeight;
             }
         }
