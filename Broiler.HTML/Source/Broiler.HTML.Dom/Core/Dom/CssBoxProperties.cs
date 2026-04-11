@@ -436,6 +436,8 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string FlexDirection { get; set; } = "row";
     public string JustifyContent { get; set; } = "flex-start";
     public string AlignItems { get; set; } = "stretch";
+    public string AlignContent { get; set; } = "normal";
+    public string ColumnCount { get; set; } = "auto";
     public string FontFamily { get; set; }
 
     public string FontSize

@@ -100,6 +100,8 @@ internal static class CssUtils
             "list-style-type" => cssBox.ListStyleType,
             "overflow" => cssBox.Overflow,
             "transform" => cssBox.Transform,
+            "align-content" => cssBox.AlignContent,
+            "column-count" => cssBox.ColumnCount,
             _ => null,
         };
     }
@@ -191,6 +193,19 @@ internal static class CssUtils
                 break;
             case "align-items":
                 cssBox.AlignItems = value;
+                break;
+            case "align-content":
+                cssBox.AlignContent = value;
+                break;
+            case "column-count":
+                cssBox.ColumnCount = value;
+                break;
+            case "columns":
+                // CSS Multi-column §3: 'columns' is a shorthand for
+                // 'column-width' and 'column-count'.  A bare integer
+                // value sets column-count; we ignore column-width for now.
+                if (int.TryParse(value.Trim(), out _))
+                    cssBox.ColumnCount = value.Trim();
                 break;
             case "corner-nw-radius":
                 cssBox.CornerNwRadius = value;

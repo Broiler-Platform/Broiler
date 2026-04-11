@@ -1545,4 +1545,139 @@ document.getElementById('out').appendChild(p);
             $"inline-svg-100-percent-in-body should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
+
+    [Fact]
+    public void Wpt_AlignContentBlock002_MatchesReference()
+    {
+        // CSS Box Alignment Level 3 §5.4: align-content on block containers
+        // with various values (start, center, end, baseline, flex-start, etc.)
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "css-align", "blocks",
+            "align-content-block-002.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "css-align", "blocks",
+            "align-content-block-002.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"align-content-block-002 should pass (match ≥ threshold). " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AlignContentBlock004_MatchesReference()
+    {
+        // CSS Box Alignment Level 3 §5.4: align-content on large block
+        // container with floats
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "css-align", "blocks",
+            "align-content-block-004.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "css-align", "blocks",
+            "align-content-block-004.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"align-content-block-004 should pass (match ≥ threshold). " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AlignContentBlock006_MatchesReference()
+    {
+        // CSS Box Alignment Level 3 §5.4: align-content container change
+        // to large block container with floats
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "css-align", "blocks",
+            "align-content-block-006.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "css-align", "blocks",
+            "align-content-block-006.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"align-content-block-006 should pass (match ≥ threshold). " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AlignContentBlock008_MatchesReference()
+    {
+        // CSS Box Alignment Level 3 §5.4: align-content style change on
+        // large block container with floats
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "css-align", "blocks",
+            "align-content-block-008.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "css-align", "blocks",
+            "align-content-block-008.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"align-content-block-008 should pass (match ≥ threshold). " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AlignContentBlock010_MatchesReference()
+    {
+        // CSS Box Alignment Level 3 §5.4: align-content content change in
+        // large block container with floats
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "css-align", "blocks",
+            "align-content-block-010.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "css-align", "blocks",
+            "align-content-block-010.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"align-content-block-010 should pass (match ≥ threshold). " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
 }
