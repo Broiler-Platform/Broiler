@@ -763,7 +763,11 @@ internal class CssBox : CssBoxProperties, IDisposable
                     if (flowPrev is CssBox flowPrevBox && flowPrevBox.Position == CssConstants.Relative)
                         flowPrevBottom -= CssBoxHelper.GetRelativeOffsetY(flowPrevBox);
 
-                    double top = (flowPrev == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + MarginTopCollapse(flowPrev) + flowPrevBottom;
+                    // CSS2.1 §8.3.1: MarginTopCollapse may propagate margins
+                    // and update the parent's Location, so compute it before
+                    // reading ParentBox.ClientTop.
+                    double marginCollapse = MarginTopCollapse(flowPrev);
+                    double top = (flowPrev == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + marginCollapse + flowPrevBottom;
 
                     // --- Float positioning ---
                     if (Float != CssConstants.None)
