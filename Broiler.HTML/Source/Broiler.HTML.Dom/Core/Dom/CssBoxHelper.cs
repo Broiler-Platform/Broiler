@@ -495,9 +495,16 @@ internal static class CssBoxHelper
         if (Math.Abs(box.ActualBottom - box.Location.Y) > 0.5)
             return false;
 
-        // Must not contain any line boxes (inline content)
-        if (box.LineBoxes.Count > 0)
-            return false;
+        // Must not contain any line boxes with actual content.
+        // CreateLineBoxes always creates at least one CssLineBox for any
+        // element that enters the inline-formatting path, even if the
+        // element is empty.  An empty line box (no words) does not
+        // constitute "content" for margin-through-collapse purposes.
+        foreach (var lb in box.LineBoxes)
+        {
+            if (lb.Words.Count > 0)
+                return false;
+        }
 
         return true;
     }

@@ -1186,7 +1186,8 @@ internal class CssBox : CssBoxProperties, IDisposable
                         || Display is "flex" or "inline-flex" or "grid" or "inline-grid"
                         || (Overflow != null && Overflow != CssConstants.Visible)
                         || Position == CssConstants.Absolute
-                        || Position == CssConstants.Fixed;
+                        || Position == CssConstants.Fixed
+                        || (AlignContent != null && AlignContent != "normal");
                     if (isBfc)
                     {
                         ActualBottom = MarginBottomCollapse();
@@ -2027,7 +2028,10 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
             CollapsedMarginTop = value;
         }
-        else if (_parentBox != null && ActualPaddingTop < 0.1 && ActualPaddingBottom < 0.1 && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1 && _parentBox.ActualBorderTopWidth < 0.1 && _parentBox.ActualBorderBottomWidth < 0.1)
+        else if (_parentBox != null && ActualPaddingTop < 0.1 && ActualPaddingBottom < 0.1 && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1 && _parentBox.ActualBorderTopWidth < 0.1 && _parentBox.ActualBorderBottomWidth < 0.1
+            // CSS Box Alignment §5.4: align-content != normal establishes
+            // a BFC, which prevents parent–child margin collapsing.
+            && (_parentBox.AlignContent == null || _parentBox.AlignContent == "normal"))
         {
             double parentEffective = Math.Max(_parentBox.ActualMarginTop, _parentBox.CollapsedMarginTop);
 
@@ -2057,6 +2061,17 @@ internal class CssBox : CssBoxProperties, IDisposable
         else
         {
             value = ActualMarginTop;
+
+            // When the parent establishes a BFC (e.g. via align-content),
+            // the first child's margin is fully consumed for positioning.
+            // Record it so that an empty-collapsible sibling can subtract
+            // the already-consumed portion during its own collapse.
+            if (_parentBox != null
+                && _parentBox.AlignContent != null
+                && _parentBox.AlignContent != "normal")
+            {
+                CollapsedMarginTop = value;
+            }
         }
 
         // fix for hr tag
@@ -2123,7 +2138,8 @@ internal class CssBox : CssBoxProperties, IDisposable
             || Display == CssConstants.TableCell
             || (Overflow != null && Overflow != CssConstants.Visible)
             || Position == CssConstants.Absolute
-            || Position == CssConstants.Fixed;
+            || Position == CssConstants.Fixed
+            || (AlignContent != null && AlignContent != "normal");
 
         // Use the maximum ActualBottom across all children to handle
         // floated children that may not be the last in source order.

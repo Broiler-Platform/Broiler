@@ -127,25 +127,50 @@ internal sealed class CssParser
         {
             sb.Append(stylesheet, pos, nextAt - pos);
 
-            int braceStart = stylesheet.IndexOf('{', nextAt);
-            if (braceStart < 0)
+            // Determine which kind of at-rule this is.  @import and
+            // @charset are statement-style (terminated by ';'), while
+            // @media, @font-face, @keyframes, etc. are block-style
+            // (terminated by a balanced '{…}' pair).
+            int nameEnd = nextAt + 1;
+            while (nameEnd < stylesheet.Length && char.IsLetter(stylesheet[nameEnd]))
+                nameEnd++;
+            string atName = stylesheet.Substring(nextAt + 1, nameEnd - nextAt - 1).ToLowerInvariant();
+
+            if (atName == "import" || atName == "charset" || atName == "namespace")
             {
-                pos = nextAt;
-                break;
+                // Semicolon-terminated at-rule — skip to next ';'.
+                int semi = stylesheet.IndexOf(';', nextAt);
+                if (semi < 0)
+                {
+                    // Malformed — skip rest of stylesheet.
+                    pos = stylesheet.Length;
+                    break;
+                }
+                pos = semi + 1;
+            }
+            else
+            {
+                int braceStart = stylesheet.IndexOf('{', nextAt);
+                if (braceStart < 0)
+                {
+                    pos = nextAt;
+                    break;
+                }
+
+                int count = 1;
+                int endIdx = braceStart + 1;
+                while (count > 0 && endIdx < stylesheet.Length)
+                {
+                    if (stylesheet[endIdx] == '{')
+                        count++;
+                    else if (stylesheet[endIdx] == '}')
+                        count--;
+                    endIdx++;
+                }
+
+                pos = endIdx;
             }
 
-            int count = 1;
-            int endIdx = braceStart + 1;
-            while (count > 0 && endIdx < stylesheet.Length)
-            {
-                if (stylesheet[endIdx] == '{')
-                    count++;
-                else if (stylesheet[endIdx] == '}')
-                    count--;
-                endIdx++;
-            }
-
-            pos = endIdx;
             nextAt = pos < stylesheet.Length ? stylesheet.IndexOf('@', pos) : -1;
         }
 
