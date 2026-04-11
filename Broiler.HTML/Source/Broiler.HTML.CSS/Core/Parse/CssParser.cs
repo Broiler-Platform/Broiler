@@ -822,6 +822,17 @@ internal sealed class CssParser
             case "border-radius":
                 properties["corner-radius"] = propValue;
                 break;
+            case "columns":
+                // CSS Multi-column §3: 'columns' shorthand — a bare
+                // integer sets column-count; we ignore column-width.
+                {
+                    var trimmed = propValue.Trim();
+                    if (int.TryParse(trimmed, out _))
+                        properties["column-count"] = trimmed;
+                    else if (trimmed.Equals("auto", StringComparison.OrdinalIgnoreCase))
+                        properties["column-count"] = "auto";
+                }
+                break;
             default:
                 // CSS2.1 §4.1.8: Ignore declarations with illegal values.
                 // Validate enumerated CSS properties to reject unknown keywords
@@ -861,7 +872,7 @@ internal sealed class CssParser
     {
         "font" or "border" or "border-left" or "border-top" or "border-right" or
         "border-bottom" or "margin" or "border-style" or "border-width" or
-        "border-color" or "padding" or "background" => true,
+        "border-color" or "padding" or "background" or "columns" => true,
         _ => false
     };
 

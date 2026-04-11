@@ -1204,6 +1204,17 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
         }
 
+        // CSS Multi-column Layout §3: When column-count > 1, redistribute
+        // in-flow children into multiple columns.  This is a post-layout
+        // transformation that moves children horizontally and vertically
+        // to simulate multi-column flow.
+        if (ColumnCount != null && ColumnCount != "auto"
+            && int.TryParse(ColumnCount, out int colCount) && colCount > 1
+            && Boxes.Count > 0)
+        {
+            ApplyMultiColumnLayout(colCount);
+        }
+
         // CSS content-box model: 'height' specifies the content height only;
         // padding and border are additive (CSS2.1 §10.6.3).
         if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
@@ -1346,6 +1357,100 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
         }
 
+        // CSS Box Alignment Level 3 §5.4: align-content on block containers
+        // shifts the in-flow content vertically when the container has a
+        // definite height larger than the content.  Values:
+        //   normal/start/baseline/flex-start → no shift (top-aligned)
+        //   center                           → center vertically
+        //   end/flex-end/last baseline       → bottom-aligned
+        //   space-between/space-around/space-evenly → distribute space
+        // The "unsafe" and "safe" prefixes are stripped; safe alignment
+        // falls back to start when content overflows, but for blocks this
+        // is handled implicitly (shift is clamped to ≥ 0).
+        if (AlignContent != null && AlignContent != "normal"
+            && (IsBlock || Display == CssConstants.ListItem || Display == CssConstants.InlineBlock)
+            && Boxes.Count > 0
+            && Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
+        {
+            double borderBoxHeight = ActualBottom - Location.Y;
+            double containerContentHeight = borderBoxHeight
+                - ActualPaddingTop - ActualPaddingBottom
+                - ActualBorderTopWidth - ActualBorderBottomWidth;
+
+            // Compute height of in-flow children (excluding overflow:0 boxes,
+            // absolutely positioned elements, and fixed elements).
+            double contentTop = double.MaxValue;
+            double contentBottom = double.MinValue;
+            foreach (var child in Boxes)
+            {
+                if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                    continue;
+                if (child.Display == CssConstants.None)
+                    continue;
+                double childTop = child.Location.Y;
+                double childBottom = child.ActualBottom;
+                if (childTop < contentTop)
+                    contentTop = childTop;
+                if (childBottom > contentBottom)
+                    contentBottom = childBottom;
+            }
+
+            if (contentTop < double.MaxValue && contentBottom > double.MinValue)
+            {
+                double usedContentHeight = contentBottom - contentTop;
+                double freeSpace = containerContentHeight - usedContentHeight;
+
+                if (freeSpace > 0.5)
+                {
+                    // Normalise the align-content value: strip safe/unsafe prefix.
+                    string ac = AlignContent.Trim();
+                    if (ac.StartsWith("safe ", StringComparison.OrdinalIgnoreCase))
+                        ac = ac.Substring(5).Trim();
+                    else if (ac.StartsWith("unsafe ", StringComparison.OrdinalIgnoreCase))
+                        ac = ac.Substring(7).Trim();
+
+                    double shift = 0;
+                    switch (ac.ToLowerInvariant())
+                    {
+                        case "center":
+                            shift = freeSpace / 2;
+                            break;
+                        case "end":
+                        case "flex-end":
+                        case "last baseline":
+                            shift = freeSpace;
+                            break;
+                        case "space-between":
+                            // Single content group → same as start (no shift).
+                            break;
+                        case "space-around":
+                            shift = freeSpace / 2;
+                            break;
+                        case "space-evenly":
+                            shift = freeSpace / 2;
+                            break;
+                        // start, flex-start, baseline, normal → no shift.
+                    }
+
+                    // Safe alignment: clamp shift to 0 when content overflows.
+                    if (AlignContent.StartsWith("safe ", StringComparison.OrdinalIgnoreCase) && shift < 0)
+                        shift = 0;
+
+                    if (shift > 0.5)
+                    {
+                        foreach (var child in Boxes)
+                        {
+                            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                                continue;
+                            if (child.Display == CssConstants.None)
+                                continue;
+                            child.OffsetTop(shift);
+                        }
+                    }
+                }
+            }
+        }
+
         // Apply position:relative offset after layout (visual only, does not affect flow)
         // CSS2.1 §9.4.3: For relative positioning, 'left'/'right' and
         // 'top'/'bottom' form constraint pairs.  When 'top' is auto and
@@ -1383,6 +1488,127 @@ internal class CssBox : CssBoxProperties, IDisposable
             var actualWidth = Math.Max(GetMinimumWidth() + CssBoxHelper.GetWidthMarginDeep(this), Size.Width < 90999 ? ActualRight - ContainerInt.RootLocation.X : 0);
             ContainerInt.ActualSize = CommonUtils.Max(ContainerInt.ActualSize, new SizeF((float)actualWidth, (float)(ActualBottom - ContainerInt.RootLocation.Y)));
         }
+    }
+
+    /// <summary>
+    /// CSS Multi-column Layout §3: Redistributes in-flow child boxes into
+    /// multiple columns after single-column layout.  Children are moved
+    /// horizontally and vertically so that content flows top-to-bottom,
+    /// left-to-right across the specified number of columns.
+    /// </summary>
+    /// <param name="colCount">Number of columns (must be &gt; 1).</param>
+    private void ApplyMultiColumnLayout(int colCount)
+    {
+        // CSS Multi-column §3.4: The column gap defaults to 1em.
+        double columnGap = GetEmHeight();
+        double contentWidth = Size.Width - ActualPaddingLeft - ActualPaddingRight
+            - ActualBorderLeftWidth - ActualBorderRightWidth;
+        double columnWidth = (contentWidth - (colCount - 1) * columnGap) / colCount;
+        if (columnWidth <= 0) return;
+
+        // Determine the column height.  When max-height is set, use that
+        // as the column height constraint.  Otherwise compute from total
+        // content height divided by column count.
+        double containerTop = Location.Y + ActualPaddingTop + ActualBorderTopWidth;
+
+        // Collect in-flow children and measure total content height.
+        var inFlowChildren = new List<CssBox>();
+        foreach (var child in Boxes)
+        {
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.None)
+                continue;
+            inFlowChildren.Add(child);
+        }
+
+        if (inFlowChildren.Count == 0) return;
+
+        double firstChildTop = inFlowChildren[0].Location.Y;
+        double lastChildBottom = inFlowChildren[^1].ActualBottom;
+        double totalContentHeight = lastChildBottom - firstChildTop;
+
+        // Determine column height: use max-height if explicit, else
+        // use explicit height, else distribute evenly.
+        double columnHeight;
+        if (MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight))
+        {
+            double maxH = CssValueParser.ParseLength(MaxHeight, ContainingBlock?.Size.Height ?? Size.Height, GetEmHeight());
+            columnHeight = maxH - ActualPaddingTop - ActualPaddingBottom - ActualBorderTopWidth - ActualBorderBottomWidth;
+        }
+        else if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
+        {
+            double h = CssValueParser.ParseLength(Height, ContainingBlock?.Size.Height ?? Size.Height, GetEmHeight());
+            columnHeight = h;
+        }
+        else
+        {
+            // Auto height: balance columns evenly.
+            columnHeight = totalContentHeight / colCount;
+        }
+
+        if (columnHeight <= 0) return;
+
+        // Distribute children across columns.
+        int currentCol = 0;
+        double currentY = containerTop;
+        double columnLeft = Location.X + ActualPaddingLeft + ActualBorderLeftWidth;
+
+        foreach (var child in inFlowChildren)
+        {
+            double childHeight = child.ActualBottom - child.Location.Y;
+
+            // Check if the child fits in the current column.
+            // If not, move to the next column (respecting break-inside:avoid
+            // implicitly — block children are never split).
+            bool wouldOverflow = (currentY - containerTop) + childHeight > columnHeight;
+            if (wouldOverflow && currentCol < colCount - 1 && currentY > containerTop + 0.5)
+            {
+                currentCol++;
+                currentY = containerTop;
+            }
+
+            // Compute the target position for this child.
+            double targetX = columnLeft + currentCol * (columnWidth + columnGap);
+            double targetY = currentY;
+
+            // Calculate offset from current position to target position.
+            double dx = targetX - child.Location.X;
+            double dy = targetY - child.Location.Y;
+
+            if (Math.Abs(dx) > 0.1 || Math.Abs(dy) > 0.1)
+            {
+                child.OffsetLeft(dx);
+                child.OffsetTop(dy);
+            }
+
+            // Constrain child width to the column width.
+            if (child.Size.Width > columnWidth + 1)
+            {
+                child.Size = new SizeF((float)columnWidth, child.Size.Height);
+            }
+
+            currentY += childHeight;
+        }
+
+        // Update ActualBottom to reflect the tallest column.
+        double maxBottom = containerTop;
+        foreach (var child in inFlowChildren)
+        {
+            if (child.ActualBottom > maxBottom)
+                maxBottom = child.ActualBottom;
+        }
+
+        // The container's bottom is the tallest column plus padding/border.
+        double newBottom = maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
+        if (newBottom < ActualBottom)
+            ActualBottom = newBottom;
+
+        // Update ActualRight to reflect all columns.
+        double rightEdge = columnLeft + colCount * columnWidth + (colCount - 1) * columnGap
+            + ActualPaddingRight + ActualBorderRightWidth;
+        if (rightEdge > ActualRight)
+            ActualRight = rightEdge;
     }
 
     /// <summary>
