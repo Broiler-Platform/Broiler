@@ -1545,4 +1545,217 @@ document.getElementById('out').appendChild(p);
             $"inline-svg-100-percent-in-body should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
+
+    // ──────────── Subset pattern parsing ─────────────────────────────
+
+    [Fact]
+    public void ParseSubsetPatterns_Empty_String_Returns_Empty()
+    {
+        Assert.Empty(WptTestRunner.ParseSubsetPatterns(""));
+        Assert.Empty(WptTestRunner.ParseSubsetPatterns("   "));
+    }
+
+    [Fact]
+    public void ParseSubsetPatterns_Single_Value()
+    {
+        var patterns = WptTestRunner.ParseSubsetPatterns("css/CSS2");
+        Assert.Single(patterns);
+        Assert.Equal("css/CSS2", patterns[0]);
+    }
+
+    [Fact]
+    public void ParseSubsetPatterns_Multiple_Semicolon_Separated()
+    {
+        var patterns = WptTestRunner.ParseSubsetPatterns("css/CSS2;css/css-flexbox;html/semantics");
+        Assert.Equal(3, patterns.Length);
+        Assert.Equal("css/CSS2", patterns[0]);
+        Assert.Equal("css/css-flexbox", patterns[1]);
+        Assert.Equal("html/semantics", patterns[2]);
+    }
+
+    [Fact]
+    public void ParseSubsetPatterns_Trims_Whitespace_And_Ignores_Empty()
+    {
+        var patterns = WptTestRunner.ParseSubsetPatterns(" css/CSS2 ; ; css/css-* ");
+        Assert.Equal(2, patterns.Length);
+        Assert.Equal("css/CSS2", patterns[0]);
+        Assert.Equal("css/css-*", patterns[1]);
+    }
+
+    // ──────────── Wildcard / glob matching ───────────────────────────
+
+    [Fact]
+    public void MatchesPattern_Exact_Directory_Prefix()
+    {
+        Assert.True(WptTestRunner.MatchesPattern("css/CSS2/test.html", "css/CSS2"));
+        Assert.True(WptTestRunner.MatchesPattern("css/CSS2/sub/deep.html", "css/CSS2"));
+        Assert.False(WptTestRunner.MatchesPattern("css/CSS3/test.html", "css/CSS2"));
+    }
+
+    [Fact]
+    public void MatchesPattern_Wildcard_Star()
+    {
+        // css/css-* should match css/css-flexbox/..., css/css-grid/..., etc.
+        Assert.True(WptTestRunner.MatchesPattern("css/css-flexbox/test.html", "css/css-*"));
+        Assert.True(WptTestRunner.MatchesPattern("css/css-grid/layout.html", "css/css-*"));
+        Assert.False(WptTestRunner.MatchesPattern("css/CSS2/test.html", "css/css-*"));
+    }
+
+    [Fact]
+    public void MatchesPattern_Wildcard_Question()
+    {
+        Assert.True(WptTestRunner.MatchesPattern("css/ab/test.html", "css/a?"));
+        Assert.False(WptTestRunner.MatchesPattern("css/abc/test.html", "css/a?"));
+    }
+
+    [Fact]
+    public void MatchesPattern_Empty_Pattern_Matches_All()
+    {
+        Assert.True(WptTestRunner.MatchesPattern("anything/at/all.html", ""));
+    }
+
+    [Fact]
+    public void MatchesPattern_Case_Insensitive()
+    {
+        Assert.True(WptTestRunner.MatchesPattern("CSS/css2/test.html", "css/CSS2"));
+        Assert.True(WptTestRunner.MatchesPattern("css/CSS-Flexbox/test.html", "css/css-*"));
+    }
+
+    [Fact]
+    public void MatchesAnyPattern_Returns_True_When_Any_Matches()
+    {
+        var patterns = new[] { "css/CSS2", "html/semantics" };
+        Assert.True(WptTestRunner.MatchesAnyPattern("css/CSS2/test.html", patterns));
+        Assert.True(WptTestRunner.MatchesAnyPattern("html/semantics/page.html", patterns));
+        Assert.False(WptTestRunner.MatchesAnyPattern("svg/shapes/rect.html", patterns));
+    }
+
+    [Fact]
+    public void MatchesAnyPattern_Wildcards_In_Multiple_Patterns()
+    {
+        var patterns = new[] { "css/CSS2", "css/css-*" };
+        Assert.True(WptTestRunner.MatchesAnyPattern("css/CSS2/test.html", patterns));
+        Assert.True(WptTestRunner.MatchesAnyPattern("css/css-flexbox/test.html", patterns));
+        Assert.True(WptTestRunner.MatchesAnyPattern("css/css-grid/test.html", patterns));
+        Assert.False(WptTestRunner.MatchesAnyPattern("html/test.html", patterns));
+    }
+
+    // ──────────── DiscoverTests with subset patterns ─────────────────
+
+    [Fact]
+    public void DiscoverTests_With_Empty_Patterns_Returns_All()
+    {
+        // Arrange
+        var subDir = Path.Combine(_tempDir, "css", "CSS2");
+        Directory.CreateDirectory(subDir);
+        File.WriteAllText(Path.Combine(subDir, "test.html"), "<html></html>");
+
+        var subDir2 = Path.Combine(_tempDir, "html", "semantics");
+        Directory.CreateDirectory(subDir2);
+        File.WriteAllText(Path.Combine(subDir2, "test2.html"), "<html></html>");
+
+        // Act
+        var tests = WptTestRunner.DiscoverTests(_tempDir, Array.Empty<string>()).ToList();
+
+        // Assert — both files should be discovered.
+        Assert.Equal(2, tests.Count);
+    }
+
+    [Fact]
+    public void DiscoverTests_With_Exact_Pattern_Filters_Correctly()
+    {
+        // Arrange
+        var cssDir = Path.Combine(_tempDir, "css", "CSS2");
+        var htmlDir = Path.Combine(_tempDir, "html", "semantics");
+        Directory.CreateDirectory(cssDir);
+        Directory.CreateDirectory(htmlDir);
+        File.WriteAllText(Path.Combine(cssDir, "test.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(htmlDir, "test.html"), "<html></html>");
+
+        // Act
+        var tests = WptTestRunner.DiscoverTests(_tempDir, new[] { "css/CSS2" }).ToList();
+
+        // Assert — only the CSS2 test should be found.
+        Assert.Single(tests);
+        Assert.Contains("CSS2", tests[0]);
+    }
+
+    [Fact]
+    public void DiscoverTests_With_Wildcard_Pattern()
+    {
+        // Arrange
+        var flexDir = Path.Combine(_tempDir, "css", "css-flexbox");
+        var gridDir = Path.Combine(_tempDir, "css", "css-grid");
+        var css2Dir = Path.Combine(_tempDir, "css", "CSS2");
+        Directory.CreateDirectory(flexDir);
+        Directory.CreateDirectory(gridDir);
+        Directory.CreateDirectory(css2Dir);
+        File.WriteAllText(Path.Combine(flexDir, "test.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(gridDir, "test.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(css2Dir, "test.html"), "<html></html>");
+
+        // Act — wildcard should match css-flexbox and css-grid but not CSS2.
+        var tests = WptTestRunner.DiscoverTests(_tempDir, new[] { "css/css-*" }).ToList();
+
+        // Assert
+        Assert.Equal(2, tests.Count);
+        Assert.All(tests, t => Assert.Contains("css-", t));
+    }
+
+    [Fact]
+    public void DiscoverTests_With_Semicolon_Separated_Patterns()
+    {
+        // Arrange
+        var flexDir = Path.Combine(_tempDir, "css", "css-flexbox");
+        var css2Dir = Path.Combine(_tempDir, "css", "CSS2");
+        var htmlDir = Path.Combine(_tempDir, "html", "semantics");
+        Directory.CreateDirectory(flexDir);
+        Directory.CreateDirectory(css2Dir);
+        Directory.CreateDirectory(htmlDir);
+        File.WriteAllText(Path.Combine(flexDir, "test.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(css2Dir, "test.html"), "<html></html>");
+        File.WriteAllText(Path.Combine(htmlDir, "test.html"), "<html></html>");
+
+        // Act — pattern "css/CSS2;css/css-*" should match CSS2 and css-flexbox
+        var patterns = WptTestRunner.ParseSubsetPatterns("css/CSS2;css/css-*");
+        var tests = WptTestRunner.DiscoverTests(_tempDir, patterns).ToList();
+
+        // Assert
+        Assert.Equal(2, tests.Count);
+        Assert.Contains(tests, t => t.Contains("CSS2"));
+        Assert.Contains(tests, t => t.Contains("css-flexbox"));
+        Assert.DoesNotContain(tests, t => t.Contains("semantics"));
+    }
+
+    // ──────────── Program --subset integration ───────────────────────
+
+    [Fact]
+    public void Program_Subset_Filters_Tests()
+    {
+        // Arrange — create two directories with tests.
+        var cssDir = Path.Combine(_tempDir, "css", "CSS2");
+        var htmlDir = Path.Combine(_tempDir, "html", "semantics");
+        Directory.CreateDirectory(cssDir);
+        Directory.CreateDirectory(htmlDir);
+        File.WriteAllText(Path.Combine(cssDir, "test.html"), "<html><body>CSS2</body></html>");
+        File.WriteAllText(Path.Combine(htmlDir, "test.html"), "<html><body>HTML</body></html>");
+
+        // Act — only run CSS2 subset.
+        var sw = new StringWriter();
+        Console.SetOut(sw);
+        try
+        {
+            Program.Main(["--wpt-dir", _tempDir, "--subset", "css/CSS2"]);
+        }
+        finally
+        {
+            Console.SetOut(new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true });
+        }
+
+        var output = sw.ToString();
+
+        // Assert — output should mention the subset and only process 1 test.
+        Assert.Contains("Subset", output);
+        Assert.Contains("0 passed, 0 failed, 1 skipped", output);
+    }
 }
