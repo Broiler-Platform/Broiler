@@ -432,11 +432,6 @@ internal static class CssLayoutEngine
             double childSaveMaxRight = maxRight;
             double childSaveMaxBottom = maxbottom;
 
-#if DEBUG
-            if (isAbsposChild)
-                System.Diagnostics.Debug.WriteLine($"[FlowBox] abspos child: tag={b.HtmlTag?.Name} pos={b.Position} words={b.Words.Count} boxes={b.Boxes.Count} maxbottom_before={maxbottom:F1}");
-#endif
-
             double leftspacing = !isAbsposChild ? b.ActualMarginLeft + b.ActualBorderLeftWidth + b.ActualPaddingLeft : 0;
             double rightspacing = !isAbsposChild ? b.ActualMarginRight + b.ActualBorderRightWidth + b.ActualPaddingRight : 0;
 
@@ -614,9 +609,6 @@ internal static class CssLayoutEngine
             // content height.
             if (isAbsposChild)
             {
-#if DEBUG
-                System.Diagnostics.Debug.WriteLine($"[FlowBox] restoring: maxbottom {maxbottom:F1} -> {childSaveMaxBottom:F1}");
-#endif
                 curx = childSaveCurx;
                 maxRight = childSaveMaxRight;
                 maxbottom = childSaveMaxBottom;

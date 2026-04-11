@@ -2203,11 +2203,9 @@ internal class CssBox : CssBoxProperties, IDisposable
         // the parent has no bottom padding and no bottom border.
         bool collapseThrough = Boxes.Count > 0 && ParentBox != null && ParentBox.Boxes.IndexOf(this) == ParentBox.Boxes.Count - 1 && _parentBox.ActualMarginBottom < 0.1
             && ActualPaddingBottom < 0.1 && ActualBorderBottomWidth < 0.1;
-        if (collapseThrough)
-        {
-            var lastChildBottomMargin = Boxes[Boxes.Count - 1].ActualMarginBottom;
-            margin = Height == "auto" ? Math.Max(ActualMarginBottom, lastChildBottomMargin) : lastChildBottomMargin;
-        }
+        // NOTE: When collapseThrough is true, the collapsed margin is NOT
+        // included in this box's height — it is external spacing handled
+        // by the parent.  The `margin` variable stays 0.
 
         // CSS2.1 §10.6.3 / §10.6.7: Floated children contribute to the
         // height of their parent only when the parent establishes a new
@@ -2248,7 +2246,6 @@ internal class CssBox : CssBoxProperties, IDisposable
             double childBottom = child.ActualBottom;
             if (child.Position == CssConstants.Relative)
                 childBottom -= CssBoxHelper.GetRelativeOffsetY(child);
-
             maxChildBottom = Math.Max(maxChildBottom, childBottom);
             lastInFlowChild = child;
         }
@@ -2259,7 +2256,6 @@ internal class CssBox : CssBoxProperties, IDisposable
         // through (§8.3.1), so add it as internal content spacing.
         if (!collapseThrough && lastInFlowChild != null)
             maxChildBottom += lastInFlowChild.ActualMarginBottom;
-
         return Math.Max(ActualBottom, maxChildBottom + margin + ActualPaddingBottom + ActualBorderBottomWidth);
     }
 

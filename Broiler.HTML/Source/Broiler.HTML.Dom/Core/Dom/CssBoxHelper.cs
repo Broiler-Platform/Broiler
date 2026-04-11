@@ -502,10 +502,19 @@ internal static class CssBoxHelper
         // element that enters the inline-formatting path, even if the
         // element is empty.  An empty line box (no words) does not
         // constitute "content" for margin-through-collapse purposes.
-        foreach (var lb in box.LineBoxes)
+        //
+        // CSS2.1 §8.3.1: When height is explicitly 0, line boxes contain
+        // overflowing content that doesn't prevent margin collapse.  Only
+        // check for line-box content when height is auto.
+        bool hasExplicitZeroHeight = box.Height != CssConstants.Auto
+            && !string.IsNullOrEmpty(box.Height);
+        if (!hasExplicitZeroHeight)
         {
-            if (lb.Words.Count > 0)
-                return false;
+            foreach (var lb in box.LineBoxes)
+            {
+                if (lb.Words.Count > 0)
+                    return false;
+            }
         }
 
         return true;
