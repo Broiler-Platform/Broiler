@@ -114,7 +114,7 @@ internal static class CssLayoutEngine
             }
         }
 
-        // CSS2.1 §10.4/§10.7: Apply min-width / min-height constraints
+        // CSS2.1 §10.4/§10.7: Apply min/max width/height constraints
         // for replaced elements (images).  These are applied after intrinsic
         // sizing and aspect-ratio adjustments.
         var minWidth = new CssLength(imageWord.OwnerBox.MinWidth);
@@ -133,6 +133,25 @@ internal static class CssLayoutEngine
                     imageWord.Height *= ratio;
                 }
                 imageWord.Width = minWidthVal;
+            }
+        }
+
+        var maxHeight = new CssLength(imageWord.OwnerBox.MaxHeight);
+        if (maxHeight.Number > 0)
+        {
+            double maxHeightVal = maxHeight.Unit == CssUnit.Pixels
+                ? maxHeight.Number
+                : maxHeight.IsPercentage
+                    ? maxHeight.Number * imageWord.OwnerBox.ContainingBlock.Size.Height
+                    : -1;
+            if (maxHeightVal > 0 && imageWord.Height > maxHeightVal)
+            {
+                if (imageWord.Image != null && !hasImageTagWidth)
+                {
+                    double ratio = maxHeightVal / imageWord.Height;
+                    imageWord.Width *= ratio;
+                }
+                imageWord.Height = maxHeightVal;
             }
         }
 
@@ -896,6 +915,17 @@ internal static class CssLayoutEngine
         // typically ~80% of UPM). This matches common browser heuristics.
         const double TypicalAscentRatio = 0.8;
 
+        // CSS2.1 §10.8.1: Boxes with vertical-align:top or bottom do not
+        // contribute to the initial line box height calculation.  Collect
+        // them for a second positioning pass.
+        var topBottomBoxes = new HashSet<CssBox>();
+        foreach (var box in lineBox.Rectangles.Keys)
+        {
+            if (box.VerticalAlign == CssConstants.Top
+                || box.VerticalAlign == CssConstants.Bottom)
+                topBottomBoxes.Add(box);
+        }
+
         // CSS2.1 §10.8: The "strut" — an imaginary zero-width inline box
         // with the block container's font and line-height — establishes
         // the initial baseline of the line box.  This is critical when the
@@ -903,8 +933,11 @@ internal static class CssLayoutEngine
         // baseline is at the top of the content area and must not be
         // overridden by child inline-block font metrics.
         double lineTop = double.MaxValue;
-        foreach (var rect in lineBox.Rectangles.Values)
-            lineTop = Math.Min(lineTop, rect.Top);
+        foreach (var kvp in lineBox.Rectangles)
+        {
+            if (!topBottomBoxes.Contains(kvp.Key))
+                lineTop = Math.Min(lineTop, kvp.Value.Top);
+        }
 
         // Start with the strut baseline (parent's font ascent from line top).
         double parentFontHeight = (lineBox.OwnerBox?.ActualFont.Height ?? 0) * PtToCssPx;
@@ -915,7 +948,7 @@ internal static class CssLayoutEngine
         // Non-inline-block boxes also contribute to the baseline.
         foreach (var box in lineBox.Rectangles.Keys)
         {
-            if (box.Display != CssConstants.InlineBlock)
+            if (box.Display != CssConstants.InlineBlock && !topBottomBoxes.Contains(box))
             {
                 double boxBaseline = lineBox.Rectangles[box].Top
                     + box.ActualFont.Height * PtToCssPx * TypicalAscentRatio;
@@ -923,14 +956,14 @@ internal static class CssLayoutEngine
             }
         }
 
-        // Compute line box bottom for top/bottom/text-top/text-bottom alignment.
-        double lineBottom = double.MinValue;
-        foreach (var rect in lineBox.Rectangles.Values)
-            lineBottom = Math.Max(lineBottom, rect.Bottom);
+        // --- Phase 1: Position all non-top/bottom boxes ---
 
         var boxes = new List<CssBox>(lineBox.Rectangles.Keys);
         foreach (CssBox box in boxes)
         {
+            if (topBottomBoxes.Contains(box))
+                continue;
+
             // For inline text boxes, SetBaseLine receives the desired
             // word-top position, so baseline-relative values must be
             // converted from baseline Y to word-top Y by subtracting
@@ -956,20 +989,22 @@ internal static class CssLayoutEngine
                     lineBox.SetBaseLine(g, box, baseline - boxAscent - lineBox.Rectangles[box].Height * .2f);
                     break;
                 case CssConstants.TextTop:
-                case CssConstants.Top:
                     // CSS 2.1 §10.8.1: Align the top of the box with the
-                    // top of the line box (or parent font top for text-top).
-                    if (lineTop < double.MaxValue)
-                        lineBox.SetBaseLine(g, box, lineTop);
+                    // top of the parent element's content area (font top).
+                    if (baseline > float.MinValue)
+                    {
+                        double parentContentTop = baseline - parentFontHeight * TypicalAscentRatio;
+                        lineBox.SetBaseLine(g, box, parentContentTop);
+                    }
                     break;
                 case CssConstants.TextBottom:
-                case CssConstants.Bottom:
                     // CSS 2.1 §10.8.1: Align the bottom of the box with the
-                    // bottom of the line box (or parent font bottom for text-bottom).
-                    if (lineBottom > double.MinValue && lineBox.Rectangles.ContainsKey(box))
+                    // bottom of the parent element's content area (font bottom).
+                    if (baseline > float.MinValue && lineBox.Rectangles.ContainsKey(box))
                     {
                         double boxHeight = lineBox.Rectangles[box].Height;
-                        lineBox.SetBaseLine(g, box, lineBottom - boxHeight);
+                        double parentContentBottom = baseline + parentFontHeight * (1.0 - TypicalAscentRatio);
+                        lineBox.SetBaseLine(g, box, parentContentBottom - boxHeight);
                     }
                     break;
                 case CssConstants.Middle:
@@ -1009,6 +1044,53 @@ internal static class CssLayoutEngine
                     //case: baseline
                     lineBox.SetBaseLine(g, box, baseline - boxAscent);
                     break;
+            }
+        }
+
+        // --- Phase 2: Position top/bottom-aligned boxes ---
+        // CSS 2.1 §10.8.1: After all other boxes are positioned, compute
+        // the final line box extent and align top/bottom boxes within it.
+        if (topBottomBoxes.Count > 0)
+        {
+            double finalTop = double.MaxValue;
+            double finalBottom = double.MinValue;
+            foreach (var kvp in lineBox.Rectangles)
+            {
+                if (!topBottomBoxes.Contains(kvp.Key))
+                {
+                    finalTop = Math.Min(finalTop, kvp.Value.Top);
+                    finalBottom = Math.Max(finalBottom, kvp.Value.Bottom);
+                }
+            }
+
+            // Also consider word positions for the final line box bounds.
+            foreach (var word in lineBox.Words)
+            {
+                if (!topBottomBoxes.Contains(word.OwnerBox))
+                {
+                    finalTop = Math.Min(finalTop, word.Top);
+                    finalBottom = Math.Max(finalBottom, word.Bottom);
+                }
+            }
+
+            foreach (CssBox box in boxes)
+            {
+                if (!topBottomBoxes.Contains(box))
+                    continue;
+
+                if (box.VerticalAlign == CssConstants.Top)
+                {
+                    if (finalTop < double.MaxValue)
+                        lineBox.SetBaseLine(g, box, finalTop);
+                }
+                else // Bottom
+                {
+                    if (finalBottom > double.MinValue && lineBox.Rectangles.ContainsKey(box))
+                    {
+                        double boxHeight = lineBox.Rectangles[box].Height;
+                        lineBox.SetBaseLine(g, box, finalBottom - boxHeight);
+                    }
+                }
             }
         }
     }

@@ -328,7 +328,12 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
         CssValueParser.SetViewportSize(vpW, vpH);
 
         // if width is not restricted we set it to large value to get the actual later
-        Root.Size = new SizeF(MaxSize.Width > 0 ? MaxSize.Width : 99999, 0);
+        // CSS2.1 §10.5: Percentage heights on the root element resolve against
+        // the initial containing block, whose height is the viewport height.
+        // Set the root box's height to the viewport height so that
+        // html { height: 100% } resolves correctly.
+        float rootH = MaxSize.Height > 0 ? vpH : 0;
+        Root.Size = new SizeF(MaxSize.Width > 0 ? MaxSize.Width : 99999, rootH);
         Root.Location = Location;
         Root.PerformLayout(g);
 
