@@ -2121,8 +2121,9 @@ internal class CssBox : CssBoxProperties, IDisposable
 
         // CSS2.1 §8.3.1: Margins collapse through the parent only when
         // the parent has no bottom padding and no bottom border.
-        if (Boxes.Count > 0 && ParentBox != null && ParentBox.Boxes.IndexOf(this) == ParentBox.Boxes.Count - 1 && _parentBox.ActualMarginBottom < 0.1
-            && ActualPaddingBottom < 0.1 && ActualBorderBottomWidth < 0.1)
+        bool collapseThrough = Boxes.Count > 0 && ParentBox != null && ParentBox.Boxes.IndexOf(this) == ParentBox.Boxes.Count - 1 && _parentBox.ActualMarginBottom < 0.1
+            && ActualPaddingBottom < 0.1 && ActualBorderBottomWidth < 0.1;
+        if (collapseThrough)
         {
             var lastChildBottomMargin = Boxes[Boxes.Count - 1].ActualMarginBottom;
             margin = Height == "auto" ? Math.Max(ActualMarginBottom, lastChildBottomMargin) : lastChildBottomMargin;
@@ -2147,6 +2148,7 @@ internal class CssBox : CssBoxProperties, IDisposable
         // even when all children are floated (CSS2.1 §10.6.3: content
         // height is zero but padding is additive).
         double maxChildBottom = Location.Y + ActualBorderTopWidth + ActualPaddingTop;
+        CssBox lastInFlowChild = null;
         
         foreach (var child in Boxes)
         {
@@ -2168,7 +2170,15 @@ internal class CssBox : CssBoxProperties, IDisposable
                 childBottom -= CssBoxHelper.GetRelativeOffsetY(child);
 
             maxChildBottom = Math.Max(maxChildBottom, childBottom);
+            lastInFlowChild = child;
         }
+
+        // CSS2.1 §10.6.3: The auto height extends to the bottom margin-
+        // edge of the last in-flow child.  When the parent has bottom
+        // border or padding, the last child's margin does not collapse
+        // through (§8.3.1), so add it as internal content spacing.
+        if (!collapseThrough && lastInFlowChild != null)
+            maxChildBottom += lastInFlowChild.ActualMarginBottom;
 
         return Math.Max(ActualBottom, maxChildBottom + margin + ActualPaddingBottom + ActualBorderBottomWidth);
     }
