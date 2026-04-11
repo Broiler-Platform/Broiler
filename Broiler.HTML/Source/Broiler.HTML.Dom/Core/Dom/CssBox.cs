@@ -605,6 +605,25 @@ internal class CssBox : CssBoxProperties, IDisposable
                     width += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
                 }
 
+                // CSS2.1 §10.4: Apply max-width constraint even when
+                // Width is auto — the tentative used width must not exceed
+                // max-width.
+                if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
+                {
+                    double maxW = CssValueParser.ParseLength(MaxWidth, width, GetEmHeight());
+                    maxW += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
+                    if (width > maxW) width = maxW;
+                }
+
+                // CSS2.1 §10.4: Apply min-width constraint (min wins over
+                // max per §10.4) — also when Width is auto.
+                if (MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
+                {
+                    double minW = CssValueParser.ParseLength(MinWidth, width, GetEmHeight());
+                    minW += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
+                    if (width < minW) width = minW;
+                }
+
                 Size = new SizeF((float)width, Size.Height);
 
                 // CSS2.1 §10.3.3: For block-level, non-replaced elements in
@@ -1175,6 +1194,22 @@ internal class CssBox : CssBoxProperties, IDisposable
                 }
                 else if (Boxes.Count > 0)
                 {
+                    // CSS Multi-column: Pre-constrain width so children
+                    // lay out at column width instead of full container width.
+                    float savedWidth = Size.Width;
+                    int preColCount = 0;
+                    bool isMultiColumn = ColumnCount != null && ColumnCount != "auto"
+                        && int.TryParse(ColumnCount, out preColCount) && preColCount > 1;
+                    if (isMultiColumn)
+                    {
+                        double columnGap = GetEmHeight();
+                        double cw = Size.Width - ActualPaddingLeft - ActualPaddingRight
+                            - ActualBorderLeftWidth - ActualBorderRightWidth;
+                        double colWidth = (cw - (preColCount - 1) * columnGap) / preColCount;
+                        if (colWidth > 0)
+                            Size = new SizeF((float)colWidth, Size.Height);
+                    }
+
                     foreach (var childBox in Boxes)
                     {
                         childBox.PerformLayout(g);
@@ -1186,6 +1221,10 @@ internal class CssBox : CssBoxProperties, IDisposable
                             && PageBreakInside == CssConstants.Avoid)
                             childBox.BreakPage();
                     }
+
+                    // Restore original width after children are laid out.
+                    if (isMultiColumn)
+                        Size = new SizeF(savedWidth, Size.Height);
 
                     ActualRight = CalculateActualRight();
                     ActualBottom = MarginBottomCollapse();
@@ -1491,124 +1530,213 @@ internal class CssBox : CssBoxProperties, IDisposable
     }
 
     /// <summary>
-    /// CSS Multi-column Layout §3: Redistributes in-flow child boxes into
-    /// multiple columns after single-column layout.  Children are moved
-    /// horizontally and vertically so that content flows top-to-bottom,
-    /// left-to-right across the specified number of columns.
+    /// CSS Multi-column Layout: Redistributes in-flow child boxes into
+    /// multiple columns after single-column layout.  Walks down through
+    /// single-child containers (e.g. html to body) to find the actual
+    /// fragmentable children.
     /// </summary>
-    /// <param name="colCount">Number of columns (must be &gt; 1).</param>
     private void ApplyMultiColumnLayout(int colCount)
     {
-        // CSS Multi-column §3.4: The column gap defaults to 1em.
         double columnGap = GetEmHeight();
         double contentWidth = Size.Width - ActualPaddingLeft - ActualPaddingRight
             - ActualBorderLeftWidth - ActualBorderRightWidth;
         double columnWidth = (contentWidth - (colCount - 1) * columnGap) / colCount;
         if (columnWidth <= 0) return;
 
-        // Determine the column height.  When max-height is set, use that
-        // as the column height constraint.  Otherwise compute from total
-        // content height divided by column count.
         double containerTop = Location.Y + ActualPaddingTop + ActualBorderTopWidth;
+        double columnLeft = Location.X + ActualPaddingLeft + ActualBorderLeftWidth;
 
-        // Collect in-flow children and measure total content height.
-        var inFlowChildren = new List<CssBox>();
-        foreach (var child in Boxes)
+        // Walk down through single-child containers (html -> body) to find
+        // the level with multiple block children to distribute.
+        var fragmentParent = FindMultiColumnFragmentParent();
+        if (fragmentParent == null) return;
+
+        var fragments = new List<CssBox>();
+        foreach (var child in fragmentParent.Boxes)
         {
             if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
                 continue;
             if (child.Display == CssConstants.None)
                 continue;
-            inFlowChildren.Add(child);
+            fragments.Add(child);
         }
 
-        if (inFlowChildren.Count == 0) return;
+        if (fragments.Count == 0) return;
 
-        double firstChildTop = inFlowChildren[0].Location.Y;
-        double lastChildBottom = inFlowChildren[^1].ActualBottom;
-        double totalContentHeight = lastChildBottom - firstChildTop;
+        double firstTop = fragments[0].Location.Y;
+        double lastBottom = fragments[^1].ActualBottom;
+        double totalContentHeight = lastBottom - firstTop;
 
-        // Determine column height: use max-height if explicit, else
-        // use explicit height, else distribute evenly.
+        if (totalContentHeight <= 0) return;
+
+        // Determine column height: balanced columns for auto/max-height,
+        // or explicit height.
         double columnHeight;
-        if (MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight))
+        bool hasMaxHeight = MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight);
+        bool hasExplicitHeight = Height != CssConstants.Auto && !string.IsNullOrEmpty(Height);
+        double maxAllowedHeight = double.MaxValue;
+
+        if (hasMaxHeight)
         {
             double maxH = CssValueParser.ParseLength(MaxHeight, ContainingBlock?.Size.Height ?? Size.Height, GetEmHeight());
-            columnHeight = maxH - ActualPaddingTop - ActualPaddingBottom - ActualBorderTopWidth - ActualBorderBottomWidth;
+            maxAllowedHeight = maxH - ActualPaddingTop - ActualPaddingBottom - ActualBorderTopWidth - ActualBorderBottomWidth;
         }
-        else if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
+
+        if (hasExplicitHeight)
         {
             double h = CssValueParser.ParseLength(Height, ContainingBlock?.Size.Height ?? Size.Height, GetEmHeight());
             columnHeight = h;
         }
         else
         {
-            // Auto height: balance columns evenly.
-            columnHeight = totalContentHeight / colCount;
+            // Balanced column layout: find the minimum column height that
+            // distributes all fragments across colCount columns.  Use a
+            // binary search between (tallest fragment) and (total height).
+            double lo = 0;
+            foreach (var frag in fragments)
+            {
+                double fh = frag.ActualBottom - frag.Location.Y;
+                if (fh > lo) lo = fh;
+            }
+            double hi = totalContentHeight;
+
+            for (int iter = 0; iter < 20; iter++)
+            {
+                double mid = (lo + hi) / 2;
+                int cols = CountColumnsNeeded(fragments, mid);
+                if (cols <= colCount)
+                    hi = mid;
+                else
+                    lo = mid + 0.5;
+            }
+            columnHeight = Math.Ceiling(hi);
+
+            if (columnHeight > maxAllowedHeight)
+                columnHeight = maxAllowedHeight;
         }
 
         if (columnHeight <= 0) return;
 
-        // Distribute children across columns.
+        // Distribute fragments across columns.
         int currentCol = 0;
         double currentY = containerTop;
-        double columnLeft = Location.X + ActualPaddingLeft + ActualBorderLeftWidth;
 
-        foreach (var child in inFlowChildren)
+        foreach (var frag in fragments)
         {
-            double childHeight = child.ActualBottom - child.Location.Y;
+            double fragHeight = frag.ActualBottom - frag.Location.Y;
 
-            // Check if the child fits in the current column.
-            // If not, move to the next column (respecting break-inside:avoid
-            // implicitly — block children are never split).
-            bool wouldOverflow = (currentY - containerTop) + childHeight > columnHeight;
+            bool wouldOverflow = (currentY - containerTop) + fragHeight > columnHeight;
             if (wouldOverflow && currentCol < colCount - 1 && currentY > containerTop + 0.5)
             {
                 currentCol++;
                 currentY = containerTop;
             }
 
-            // Compute the target position for this child.
-            double targetX = columnLeft + currentCol * (columnWidth + columnGap);
+            double targetX = columnLeft + currentCol * (columnWidth + columnGap)
+                + (frag.Location.X - fragmentParent.Location.X);
             double targetY = currentY;
 
-            // Calculate offset from current position to target position.
-            double dx = targetX - child.Location.X;
-            double dy = targetY - child.Location.Y;
+            double dx = targetX - frag.Location.X;
+            double dy = targetY - frag.Location.Y;
 
             if (Math.Abs(dx) > 0.1 || Math.Abs(dy) > 0.1)
             {
-                child.OffsetLeft(dx);
-                child.OffsetTop(dy);
+                frag.OffsetLeft(dx);
+                frag.OffsetTop(dy);
             }
 
-            // Constrain child width to the column width.
-            if (child.Size.Width > columnWidth + 1)
+            if (frag.Size.Width > columnWidth + 1)
             {
-                child.Size = new SizeF((float)columnWidth, child.Size.Height);
+                frag.Size = new SizeF((float)columnWidth, frag.Size.Height);
             }
 
-            currentY += childHeight;
+            currentY += fragHeight;
         }
 
-        // Update ActualBottom to reflect the tallest column.
+        // Update container dimensions.
         double maxBottom = containerTop;
-        foreach (var child in inFlowChildren)
+        foreach (var frag in fragments)
         {
-            if (child.ActualBottom > maxBottom)
-                maxBottom = child.ActualBottom;
+            if (frag.ActualBottom > maxBottom)
+                maxBottom = frag.ActualBottom;
         }
 
-        // The container's bottom is the tallest column plus padding/border.
         double newBottom = maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
         if (newBottom < ActualBottom)
             ActualBottom = newBottom;
 
-        // Update ActualRight to reflect all columns.
+        if (fragmentParent != this)
+        {
+            double fpBottom = maxBottom + fragmentParent.ActualPaddingBottom + fragmentParent.ActualBorderBottomWidth;
+            if (fpBottom < fragmentParent.ActualBottom)
+                fragmentParent.ActualBottom = fpBottom;
+        }
+
         double rightEdge = columnLeft + colCount * columnWidth + (colCount - 1) * columnGap
             + ActualPaddingRight + ActualBorderRightWidth;
         if (rightEdge > ActualRight)
             ActualRight = rightEdge;
+    }
+
+    /// <summary>
+    /// Walks down through single-child containers to find the nearest
+    /// descendant with multiple in-flow block children for multi-column
+    /// fragmentation.
+    /// </summary>
+    private CssBox FindMultiColumnFragmentParent()
+    {
+        CssBox current = this;
+        for (int depth = 0; depth < 10; depth++)
+        {
+            int inFlowCount = 0;
+            CssBox onlyChild = null;
+            foreach (var child in current.Boxes)
+            {
+                if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                    continue;
+                if (child.Display == CssConstants.None)
+                    continue;
+                inFlowCount++;
+                onlyChild = child;
+            }
+
+            if (inFlowCount > 1)
+                return current;
+
+            if (inFlowCount == 1 && onlyChild != null && onlyChild.Boxes.Count > 0)
+            {
+                current = onlyChild;
+                continue;
+            }
+
+            break;
+        }
+
+        return current.Boxes.Count > 1 ? current : null;
+    }
+
+    /// <summary>
+    /// Counts the number of columns needed to fit all fragments within
+    /// the given column height (no splitting of individual fragments).
+    /// </summary>
+    private static int CountColumnsNeeded(List<CssBox> fragments, double columnHeight)
+    {
+        int cols = 1;
+        double currentH = 0;
+        foreach (var frag in fragments)
+        {
+            double fh = frag.ActualBottom - frag.Location.Y;
+            if (currentH + fh > columnHeight && currentH > 0.5)
+            {
+                cols++;
+                currentH = fh;
+            }
+            else
+            {
+                currentH += fh;
+            }
+        }
+        return cols;
     }
 
     /// <summary>
