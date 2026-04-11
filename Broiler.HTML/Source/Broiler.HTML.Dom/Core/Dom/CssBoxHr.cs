@@ -20,7 +20,8 @@ internal sealed class CssBoxHr : CssBox
 
         var prevSibling = DomUtils.GetPreviousSibling(this);
         double left = ContainingBlock.Location.X + ContainingBlock.ActualPaddingLeft + ActualMarginLeft + ContainingBlock.ActualBorderLeftWidth;
-        double top = (prevSibling == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + MarginTopCollapse(prevSibling) + (prevSibling != null ? prevSibling.ActualBottom + prevSibling.ActualBorderBottomWidth : 0);
+        double marginCollapse = MarginTopCollapse(prevSibling);
+        double top = (prevSibling == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + marginCollapse + (prevSibling != null ? prevSibling.ActualBottom + prevSibling.ActualBorderBottomWidth : 0);
         Location = new PointF((float)left, (float)top);
         ActualBottom = top;
 

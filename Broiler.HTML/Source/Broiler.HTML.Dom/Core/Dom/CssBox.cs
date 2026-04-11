@@ -423,6 +423,8 @@ internal class CssBox : CssBoxProperties, IDisposable
         // CSS2.1 §4.3.8: UAs should not render characters from the Unicode
         // "control characters" category (C0 U+0000–U+001F except tab/LF/CR,
         // and C1 U+007F–U+009F).  Strip them before word splitting.
+        // Per HTML spec §13.2.2, U+0000 (NULL) is replaced with U+FFFD
+        // (REPLACEMENT CHARACTER) so it remains visible.
         var textSpan = _text.Span;
         bool hasControl = false;
         for (int i = 0; i < textSpan.Length; i++)
@@ -441,7 +443,9 @@ internal class CssBox : CssBoxProperties, IDisposable
             for (int i = 0; i < textSpan.Length; i++)
             {
                 char c = textSpan[i];
-                if (c == '\t' || c == '\n' || c == '\r'
+                if (c == '\0')
+                    sb.Append('\uFFFD'); // HTML spec: NULL → REPLACEMENT CHARACTER
+                else if (c == '\t' || c == '\n' || c == '\r'
                     || (!char.IsControl(c) && (c < '\u007F' || c > '\u009F')))
                     sb.Append(c);
             }
@@ -763,7 +767,11 @@ internal class CssBox : CssBoxProperties, IDisposable
                     if (flowPrev is CssBox flowPrevBox && flowPrevBox.Position == CssConstants.Relative)
                         flowPrevBottom -= CssBoxHelper.GetRelativeOffsetY(flowPrevBox);
 
-                    double top = (flowPrev == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + MarginTopCollapse(flowPrev) + flowPrevBottom;
+                    // CSS2.1 §8.3.1: MarginTopCollapse may propagate margins
+                    // and update the parent's Location, so compute it before
+                    // reading ParentBox.ClientTop.
+                    double marginCollapse = MarginTopCollapse(flowPrev);
+                    double top = (flowPrev == null && ParentBox != null ? ParentBox.ClientTop : ParentBox == null ? Location.Y : 0) + marginCollapse + flowPrevBottom;
 
                     // --- Float positioning ---
                     if (Float != CssConstants.None)

@@ -1262,20 +1262,20 @@ internal static class PaintWalker
     private static double ParseFontSize(string fontSize)
     {
         if (string.IsNullOrEmpty(fontSize))
-            return 11; // default: matches CssConstants.FontSize (11pt)
+            return 12; // default: matches CssConstants.FontSize (12pt)
 
         // CSS 2.1 §15.7 named absolute sizes mapped to pt values
-        // (relative to CssConstants.FontSize = 11)
+        // (relative to CssConstants.FontSize = 12)
         return fontSize switch
         {
-            "medium" => 11,
-            "xx-small" => 7,
-            "x-small" => 8,
-            "small" => 9,
-            "large" => 13,
-            "x-large" => 14,
-            "xx-large" => 15,
-            _ => TryParseNumeric(fontSize, 11),
+            "medium" => 12,
+            "xx-small" => 8,
+            "x-small" => 9,
+            "small" => 10,
+            "large" => 14,
+            "x-large" => 15,
+            "xx-large" => 16,
+            _ => TryParseNumeric(fontSize, 12),
         };
     }
 
