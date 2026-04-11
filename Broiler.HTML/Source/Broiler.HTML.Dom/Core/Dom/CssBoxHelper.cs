@@ -437,16 +437,18 @@ internal static class CssBoxHelper
 
     /// <summary>
     /// Returns <c>true</c> if <paramref name="box"/> establishes a new
-    /// block formatting context (CSS2.1 §9.4.1).
+    /// block formatting context (CSS2.1 §9.4.1, CSS Box Alignment §5.4).
     /// </summary>
     private static bool EstablishesBfc(CssBox box)
     {
         return box.Float != CssConstants.None
             || box.Display == CssConstants.InlineBlock
             || box.Display == CssConstants.TableCell
+            || box.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
             || box.Position == CssConstants.Absolute
             || box.Position == CssConstants.Fixed
-            || (box.Overflow != null && box.Overflow != CssConstants.Visible);
+            || (box.Overflow != null && box.Overflow != CssConstants.Visible)
+            || (box.AlignContent != null && box.AlignContent != "normal");
     }
 
     private static void CollectFloatsInSubtree(CssBox root, List<CssBox> result)

@@ -1244,15 +1244,32 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
         }
 
-        // CSS Multi-column Layout §3: When column-count > 1, redistribute
-        // in-flow children into multiple columns.  This is a post-layout
-        // transformation that moves children horizontally and vertically
-        // to simulate multi-column flow.
-        if (ColumnCount != null && ColumnCount != "auto"
-            && int.TryParse(ColumnCount, out int colCount) && colCount > 1
-            && Boxes.Count > 0)
+        // CSS Multi-column Layout §3: When column-count > 1 or column-width
+        // is specified, redistribute in-flow children into multiple columns.
+        // This is a post-layout transformation that moves children
+        // horizontally and vertically to simulate multi-column flow.
         {
-            ApplyMultiColumnLayout(colCount);
+            int colCount = 0;
+            bool hasExplicitCount = ColumnCount != null && ColumnCount != "auto"
+                && int.TryParse(ColumnCount, out colCount) && colCount > 1;
+            bool hasColumnWidth = ColumnWidth != null && ColumnWidth != "auto"
+                && !string.IsNullOrEmpty(ColumnWidth);
+
+            if (!hasExplicitCount && hasColumnWidth)
+            {
+                // Auto column-count from column-width: CSS Multi-column §3.4
+                double cw = CssValueParser.ParseLength(ColumnWidth, Size.Width, GetEmHeight());
+                double gap = GetEmHeight();
+                double available = Size.Width - ActualPaddingLeft - ActualPaddingRight
+                    - ActualBorderLeftWidth - ActualBorderRightWidth;
+                if (cw > 0 && available > 0)
+                    colCount = Math.Max(1, (int)Math.Floor((available + gap) / (cw + gap)));
+            }
+
+            if (colCount > 1 && Boxes.Count > 0)
+            {
+                ApplyMultiColumnLayout(colCount);
+            }
         }
 
         // CSS content-box model: 'height' specifies the content height only;
@@ -1491,6 +1508,64 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
         }
 
+        // CSS Box Alignment Level 3 §6.1: justify-self on block-level boxes.
+        // When a non-replaced block has an explicit width narrower than its
+        // containing block, 'justify-self' shifts the box horizontally within
+        // the containing block's content area.  Values:
+        //   auto/normal/stretch → default behaviour (no shift)
+        //   start/flex-start/self-start/left → left-aligned (no shift in LTR)
+        //   end/flex-end/self-end/right → right-aligned
+        //   center → centered
+        // Floated and absolutely/fixed positioned boxes are unaffected.
+        if (JustifySelf != null && JustifySelf != "auto" && JustifySelf != "normal"
+            && JustifySelf != "stretch"
+            && Float == CssConstants.None
+            && Position != CssConstants.Absolute && Position != CssConstants.Fixed
+            && (IsBlock || Display == CssConstants.ListItem)
+            && ParentBox != null)
+        {
+            double boxWidth = ActualRight - Location.X;
+            double containerWidth = ParentBox.ClientRectangle.Width;
+            double freeSpace = containerWidth - boxWidth;
+
+            if (freeSpace > 0.5)
+            {
+                string js = JustifySelf.Trim().ToLowerInvariant();
+                bool isRtl = Direction == "rtl";
+
+                double dx = 0;
+                switch (js)
+                {
+                    case "center":
+                        dx = freeSpace / 2;
+                        break;
+                    case "end":
+                    case "flex-end":
+                        dx = isRtl ? 0 : freeSpace;
+                        break;
+                    case "self-end":
+                        dx = freeSpace;
+                        break;
+                    case "right":
+                        dx = freeSpace;
+                        break;
+                    case "start":
+                    case "flex-start":
+                        dx = isRtl ? freeSpace : 0;
+                        break;
+                    case "self-start":
+                        dx = 0;
+                        break;
+                    case "left":
+                        dx = 0;
+                        break;
+                }
+
+                if (dx > 0.5)
+                    OffsetLeft(dx);
+            }
+        }
+
         // Apply position:relative offset after layout (visual only, does not affect flow)
         // CSS2.1 §9.4.3: For relative positioning, 'left'/'right' and
         // 'top'/'bottom' form constraint pairs.  When 'top' is auto and
@@ -1587,6 +1662,11 @@ internal class CssBox : CssBoxProperties, IDisposable
         {
             double h = CssValueParser.ParseLength(Height, ContainingBlock?.Size.Height ?? Size.Height, GetEmHeight());
             columnHeight = h;
+        }
+        else if (ColumnFill == "auto" && hasMaxHeight)
+        {
+            // column-fill: auto — fill columns sequentially up to max-height.
+            columnHeight = maxAllowedHeight;
         }
         else
         {

@@ -1,4 +1,5 @@
-﻿using Broiler.HTML.Adapters.Adapters;
+﻿using System;
+using Broiler.HTML.Adapters.Adapters;
 using Broiler.HTML.CSS.Core.Parse;
 using Broiler.HTML.Dom.Core.Dom;
 using Broiler.HTML.Utils.Core.Utils;
@@ -101,7 +102,11 @@ internal static class CssUtils
             "overflow" => cssBox.Overflow,
             "transform" => cssBox.Transform,
             "align-content" => cssBox.AlignContent,
+            "justify-self" => cssBox.JustifySelf,
             "column-count" => cssBox.ColumnCount,
+            "column-width" => cssBox.ColumnWidth,
+            "column-fill" => cssBox.ColumnFill,
+            "break-inside" => cssBox.BreakInside,
             _ => null,
         };
     }
@@ -197,15 +202,35 @@ internal static class CssUtils
             case "align-content":
                 cssBox.AlignContent = value;
                 break;
+            case "justify-self":
+                cssBox.JustifySelf = value;
+                break;
             case "column-count":
                 cssBox.ColumnCount = value;
+                break;
+            case "column-width":
+                cssBox.ColumnWidth = value;
+                break;
+            case "column-fill":
+                cssBox.ColumnFill = value;
+                break;
+            case "break-inside":
+                cssBox.BreakInside = value;
                 break;
             case "columns":
                 // CSS Multi-column §3: 'columns' is a shorthand for
                 // 'column-width' and 'column-count'.  A bare integer
-                // value sets column-count; we ignore column-width for now.
-                if (int.TryParse(value.Trim(), out _))
-                    cssBox.ColumnCount = value.Trim();
+                // value sets column-count; a length sets column-width.
+                var colParts = value.Trim().Split([' '], StringSplitOptions.RemoveEmptyEntries);
+                foreach (var part in colParts)
+                {
+                    if (part == "auto")
+                        continue;
+                    if (int.TryParse(part, out _))
+                        cssBox.ColumnCount = part;
+                    else
+                        cssBox.ColumnWidth = part;
+                }
                 break;
             case "corner-nw-radius":
                 cssBox.CornerNwRadius = value;

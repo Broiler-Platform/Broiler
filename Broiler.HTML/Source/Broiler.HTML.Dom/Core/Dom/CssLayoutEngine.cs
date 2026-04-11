@@ -13,6 +13,21 @@ namespace Broiler.HTML.Dom.Core.Dom;
 internal static class CssLayoutEngine
 {
     /// <summary>
+    /// Returns true when <paramref name="box"/> or any of its ancestors
+    /// (up to but not including <paramref name="stop"/>) has
+    /// <c>position:absolute</c> or <c>position:fixed</c>.
+    /// </summary>
+    private static bool IsInAbsposSubtree(CssBox box, CssBox stop)
+    {
+        for (var b = box; b != null && b != stop; b = b.ParentBox)
+        {
+            if (b.Position == CssConstants.Absolute || b.Position == CssConstants.Fixed)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Approximate ratio of font ascent to total font height for typical
     /// Latin fonts.  Used to compute baseline position when full font
     /// metrics are not directly available (CSS2.1 §10.8 strut).
@@ -237,13 +252,21 @@ internal static class CssLayoutEngine
         double minTop = starty;
         foreach (var linebox in blockBox.LineBoxes)
         {
-            foreach (var rect in linebox.Rectangles.Values)
+            foreach (var rect in linebox.Rectangles)
             {
-                maxBottom = Math.Max(maxBottom, rect.Bottom);
-                minTop = Math.Min(minTop, rect.Top);
+                // CSS2.1 §9.6.1: Absolutely/fixed positioned elements are
+                // out of normal flow and must not affect the line box height.
+                if (IsInAbsposSubtree(rect.Key, blockBox))
+                    continue;
+
+                maxBottom = Math.Max(maxBottom, rect.Value.Bottom);
+                minTop = Math.Min(minTop, rect.Value.Top);
             }
             foreach (var word in linebox.Words)
             {
+                if (IsInAbsposSubtree(word.OwnerBox, blockBox))
+                    continue;
+
                 maxBottom = Math.Max(maxBottom, word.Bottom);
                 minTop = Math.Min(minTop, word.Top);
             }
@@ -311,11 +334,26 @@ internal static class CssLayoutEngine
         bool hasInlineContent = false;
         foreach (var lb in blockBox.LineBoxes)
         {
-            if (lb.Words.Count > 0 || lb.Rectangles.Count > 0)
+            // CSS2.1 §9.6.1: Words and rectangles from absolutely/fixed
+            // positioned elements are not in-flow inline content.
+            foreach (var w in lb.Words)
             {
-                hasInlineContent = true;
-                break;
+                if (!IsInAbsposSubtree(w.OwnerBox, blockBox))
+                {
+                    hasInlineContent = true;
+                    break;
+                }
             }
+            if (hasInlineContent) break;
+            foreach (var r in lb.Rectangles)
+            {
+                if (!IsInAbsposSubtree(r.Key, blockBox))
+                {
+                    hasInlineContent = true;
+                    break;
+                }
+            }
+            if (hasInlineContent) break;
         }
         if (blockBox.ActualLineHeight > 0 && !hasExplicitHeight && hasInlineContent)
             maxBottom = Math.Max(maxBottom, starty + blockBox.ActualLineHeight);
@@ -383,8 +421,24 @@ internal static class CssLayoutEngine
             if (b.Float != CssConstants.None)
                 continue;
 
-            double leftspacing = (b.Position != CssConstants.Absolute && b.Position != CssConstants.Fixed) ? b.ActualMarginLeft + b.ActualBorderLeftWidth + b.ActualPaddingLeft : 0;
-            double rightspacing = (b.Position != CssConstants.Absolute && b.Position != CssConstants.Fixed) ? b.ActualMarginRight + b.ActualBorderRightWidth + b.ActualPaddingRight : 0;
+            // CSS2.1 §9.6.1: Absolutely and fixed positioned elements are
+            // out of normal flow.  Save the current flow state so we can
+            // restore it after laying out the child — its words must not
+            // shift subsequent siblings or inflate the parent's content
+            // height.
+            bool isAbsposChild = b.Position == CssConstants.Absolute
+                || b.Position == CssConstants.Fixed;
+            double childSaveCurx = curx;
+            double childSaveMaxRight = maxRight;
+            double childSaveMaxBottom = maxbottom;
+
+#if DEBUG
+            if (isAbsposChild)
+                System.Diagnostics.Debug.WriteLine($"[FlowBox] abspos child: tag={b.HtmlTag?.Name} pos={b.Position} words={b.Words.Count} boxes={b.Boxes.Count} maxbottom_before={maxbottom:F1}");
+#endif
+
+            double leftspacing = !isAbsposChild ? b.ActualMarginLeft + b.ActualBorderLeftWidth + b.ActualPaddingLeft : 0;
+            double rightspacing = !isAbsposChild ? b.ActualMarginRight + b.ActualBorderRightWidth + b.ActualPaddingRight : 0;
 
             b.RectanglesReset();
             b.MeasureWordsSize(g);
@@ -554,6 +608,19 @@ internal static class CssLayoutEngine
             }
 
             curx += rightspacing;
+
+            // CSS2.1 §9.6.1: Restore flow state after an absolutely/fixed
+            // positioned child so it does not affect siblings or parent
+            // content height.
+            if (isAbsposChild)
+            {
+#if DEBUG
+                System.Diagnostics.Debug.WriteLine($"[FlowBox] restoring: maxbottom {maxbottom:F1} -> {childSaveMaxBottom:F1}");
+#endif
+                curx = childSaveCurx;
+                maxRight = childSaveMaxRight;
+                maxbottom = childSaveMaxBottom;
+            }
         }
 
         // handle height setting
