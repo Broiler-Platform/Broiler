@@ -423,7 +423,16 @@ internal sealed class SkiaImageAdapter : RAdapter
 
         canvas.DrawPicture(svg.Picture);
 
-        return new ImageAdapter(bitmap);
+        // An SVG has an intrinsic aspect ratio when it has a viewBox
+        // (which defines a ratio) or has both explicit width and height.
+        // SVGs with only one dimension and no viewBox do NOT have an
+        // intrinsic ratio, which affects how CSS min/max constraints
+        // scale the image (CSS Images Module Level 3 §5.2).
+        bool hasIntrinsicRatio = vbRatio > 0 || (svgWidth > 0 && svgHeight > 0);
+        bool hasIntrinsicWidth = svgWidth > 0;
+        bool hasIntrinsicHeight = svgHeight > 0;
+
+        return new ImageAdapter(bitmap, hasIntrinsicRatio, hasIntrinsicWidth, hasIntrinsicHeight);
     }
 
     /// <summary>

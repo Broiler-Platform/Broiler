@@ -68,10 +68,22 @@ internal static class CssLayoutEngine
         {
             imageWord.Width = imageWord.ImageRectangle == RectangleF.Empty ? imageWord.Image.Width : imageWord.ImageRectangle.Width;
 
-            // CSS2.1 §10.3.2: when width is auto the used value is the
-            // intrinsic width.  Do NOT clamp to the containing block —
-            // inline replaced elements are allowed to overflow their
-            // container.  Authors use max-width:100% to opt into clamping.
+            // CSS Images Level 3 §5.2: When the image has only an intrinsic
+            // ratio (no intrinsic width or height, e.g. an SVG with only a
+            // viewBox), constrain the width to the containing block width.
+            // Normal images with intrinsic dimensions overflow per CSS2.1
+            // §10.3.2 — authors use max-width:100% to opt into clamping.
+            if (imageWord.Image.HasIntrinsicRatio
+                && !imageWord.Image.HasIntrinsicWidth
+                && !imageWord.Image.HasIntrinsicHeight)
+            {
+                double cbWidth = imageWord.OwnerBox.ContainingBlock.Size.Width;
+                if (cbWidth > 0 && imageWord.Width > cbWidth)
+                {
+                    imageWord.Width = cbWidth;
+                    scaleImageHeight = true;
+                }
+            }
         }
         else
         {
@@ -114,14 +126,14 @@ internal static class CssLayoutEngine
         if (imageWord.Image != null)
         {
             // If only the width was set in the html tag, ratio the height.
-            if ((hasImageTagWidth && !hasImageTagHeight) || scaleImageHeight)
+            if (((hasImageTagWidth && !hasImageTagHeight) || scaleImageHeight) && imageWord.Image.HasIntrinsicRatio)
             {
                 // Divide the given tag width with the actual image width, to get the ratio.
                 double ratio = imageWord.Width / imageWord.Image.Width;
                 imageWord.Height = imageWord.Image.Height * ratio;
             }
             // If only the height was set in the html tag, ratio the width.
-            else if (hasImageTagHeight && !hasImageTagWidth)
+            else if (hasImageTagHeight && !hasImageTagWidth && imageWord.Image.HasIntrinsicRatio)
             {
                 // Divide the given tag height with the actual image height, to get the ratio.
                 double ratio = imageWord.Height / imageWord.Image.Height;
@@ -142,7 +154,7 @@ internal static class CssLayoutEngine
                     : -1;
             if (minWidthVal > 0 && imageWord.Width < minWidthVal)
             {
-                if (imageWord.Image != null && !hasImageTagHeight)
+                if (imageWord.Image != null && !hasImageTagHeight && imageWord.Image.HasIntrinsicRatio)
                 {
                     double ratio = minWidthVal / imageWord.Width;
                     imageWord.Height *= ratio;
@@ -161,7 +173,7 @@ internal static class CssLayoutEngine
                     : -1;
             if (maxHeightVal > 0 && imageWord.Height > maxHeightVal)
             {
-                if (imageWord.Image != null && !hasImageTagWidth)
+                if (imageWord.Image != null && !hasImageTagWidth && imageWord.Image.HasIntrinsicRatio)
                 {
                     double ratio = maxHeightVal / imageWord.Height;
                     imageWord.Width *= ratio;
@@ -180,7 +192,7 @@ internal static class CssLayoutEngine
                     : -1;
             if (minHeightVal > 0 && imageWord.Height < minHeightVal)
             {
-                if (imageWord.Image != null && !hasImageTagWidth)
+                if (imageWord.Image != null && !hasImageTagWidth && imageWord.Image.HasIntrinsicRatio)
                 {
                     double ratio = minHeightVal / imageWord.Height;
                     imageWord.Width *= ratio;
