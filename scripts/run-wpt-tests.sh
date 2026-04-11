@@ -140,7 +140,8 @@ if command -v npx &>/dev/null; then
     if [[ -n "$SUBSET" ]]; then
         IFS=';' read -ra PATTERNS <<< "$SUBSET"
         for PATTERN in "${PATTERNS[@]}"; do
-            PATTERN="$(echo "$PATTERN" | xargs)"   # trim whitespace
+            PATTERN="${PATTERN#"${PATTERN%%[![:space:]]*}"}"   # trim leading
+            PATTERN="${PATTERN%"${PATTERN##*[![:space:]]}"}"   # trim trailing
             [[ -z "$PATTERN" ]] && continue
             MATCHED=false
             # Use bash glob expansion; nullglob prevents literal fallback.
