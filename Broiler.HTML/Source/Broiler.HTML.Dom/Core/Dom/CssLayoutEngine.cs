@@ -111,17 +111,18 @@ internal static class CssLayoutEngine
             imageWord.Height = imageWord.Width > 0 ? imageWord.Width * 1.14f : 22.8f;
         }
 
-        if (imageWord.Image != null)
+        if (imageWord.Image != null && imageWord.Image.HasIntrinsicRatio)
         {
+            bool widthDriven = (hasImageTagWidth && !hasImageTagHeight) || scaleImageHeight;
             // If only the width was set in the html tag, ratio the height.
-            if (((hasImageTagWidth && !hasImageTagHeight) || scaleImageHeight) && imageWord.Image.HasIntrinsicRatio)
+            if (widthDriven)
             {
                 // Divide the given tag width with the actual image width, to get the ratio.
                 double ratio = imageWord.Width / imageWord.Image.Width;
                 imageWord.Height = imageWord.Image.Height * ratio;
             }
             // If only the height was set in the html tag, ratio the width.
-            else if (hasImageTagHeight && !hasImageTagWidth && imageWord.Image.HasIntrinsicRatio)
+            else if (hasImageTagHeight && !hasImageTagWidth)
             {
                 // Divide the given tag height with the actual image height, to get the ratio.
                 double ratio = imageWord.Height / imageWord.Image.Height;
