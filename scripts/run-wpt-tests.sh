@@ -152,7 +152,7 @@ if command -v npx &>/dev/null; then
                     echo "  Generating refs for: ${MATCH_DIR#"$WPT_DIR/"}"
                     if ! NODE_PATH="$REPO_ROOT/tests/wpt/node_modules" \
                         node "$SCRIPT_DIR/generate-wpt-references.js" \
-                        "$MATCH_DIR" "$REFERENCE_DIR" --concurrency 8 2>&1; then
+                        "$MATCH_DIR" "$REFERENCE_DIR" --concurrency 8 --base-dir "$WPT_DIR" 2>&1; then
                         echo "  ✗ Reference generation failed for $MATCH_DIR" >&2
                         REF_GEN_OK=false
                     fi

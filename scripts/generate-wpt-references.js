@@ -3,7 +3,7 @@
 // web-platform-tests using Playwright.
 //
 // Usage:
-//     node scripts/generate-wpt-references.js <test-dir> <output-dir> [--concurrency N]
+//     node scripts/generate-wpt-references.js <test-dir> <output-dir> [--concurrency N] [--base-dir <dir>]
 //
 // For each .html / .htm / .xhtml file under <test-dir>, headless Chromium
 // takes a 1024×768 viewport screenshot and writes the PNG to <output-dir>
@@ -54,11 +54,14 @@ function ensureDir(filePath) {
     const args = process.argv.slice(2);
     let testDir = null;
     let outputDir = null;
+    let baseDir = null;
     let concurrency = DEFAULT_CONCURRENCY;
 
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--concurrency' && i + 1 < args.length) {
             concurrency = parseInt(args[++i], 10) || DEFAULT_CONCURRENCY;
+        } else if (args[i] === '--base-dir' && i + 1 < args.length) {
+            baseDir = args[++i];
         } else if (!testDir) {
             testDir = args[i];
         } else if (!outputDir) {
@@ -67,12 +70,17 @@ function ensureDir(filePath) {
     }
 
     if (!testDir || !outputDir) {
-        console.error('Usage: node generate-wpt-references.js <test-dir> <output-dir> [--concurrency N]');
+        console.error('Usage: node generate-wpt-references.js <test-dir> <output-dir> [--concurrency N] [--base-dir <dir>]');
         process.exit(1);
     }
 
     testDir = path.resolve(testDir);
     outputDir = path.resolve(outputDir);
+    // When --base-dir is provided, compute output paths relative to it
+    // instead of testDir.  This ensures that when generating references for
+    // a subset directory, the output mirrors the full directory hierarchy
+    // expected by the C# WptTestRunner.
+    baseDir = baseDir ? path.resolve(baseDir) : testDir;
 
     if (!fs.existsSync(testDir)) {
         console.error(`Error: test directory not found: ${testDir}`);
@@ -104,7 +112,7 @@ function ensureDir(filePath) {
 
         while (queue.length > 0) {
             const testFile = queue.pop();
-            const relative = path.relative(testDir, testFile);
+            const relative = path.relative(baseDir, testFile);
             const outPath = path.join(
                 outputDir,
                 relative.replace(/\.[^.]+$/, '.png'),
