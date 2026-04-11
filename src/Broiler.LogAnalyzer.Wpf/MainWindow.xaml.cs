@@ -426,7 +426,7 @@ public partial class MainWindow : Window
             return;
 
         // Build a combined chart with status code bars and hourly line chart
-        var plot = new ScottPlot.Plot(1200, 800);
+        var plot = new ScottPlot.Plot();
 
         var statusData = _analyzer.StatusCodeDistribution();
         if (statusData.Count > 0)
@@ -532,7 +532,7 @@ public partial class MainWindow : Window
 
             for (int h = 0; h < 24; h++)
             {
-                int count = lookup.GetValueOrDefault(((DayOfWeek)d, h), 0);
+                int count = lookup.GetValueOrDefault((d, h), 0);
                 double intensity = (double)count / maxCount;
 
                 var cell = new Border
