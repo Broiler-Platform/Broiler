@@ -437,16 +437,18 @@ internal static class CssBoxHelper
 
     /// <summary>
     /// Returns <c>true</c> if <paramref name="box"/> establishes a new
-    /// block formatting context (CSS2.1 §9.4.1).
+    /// block formatting context (CSS2.1 §9.4.1, CSS Box Alignment §5.4).
     /// </summary>
     private static bool EstablishesBfc(CssBox box)
     {
         return box.Float != CssConstants.None
             || box.Display == CssConstants.InlineBlock
             || box.Display == CssConstants.TableCell
+            || box.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
             || box.Position == CssConstants.Absolute
             || box.Position == CssConstants.Fixed
-            || (box.Overflow != null && box.Overflow != CssConstants.Visible);
+            || (box.Overflow != null && box.Overflow != CssConstants.Visible)
+            || (box.AlignContent != null && box.AlignContent != "normal");
     }
 
     private static void CollectFloatsInSubtree(CssBox root, List<CssBox> result)
@@ -500,10 +502,19 @@ internal static class CssBoxHelper
         // element that enters the inline-formatting path, even if the
         // element is empty.  An empty line box (no words) does not
         // constitute "content" for margin-through-collapse purposes.
-        foreach (var lb in box.LineBoxes)
+        //
+        // CSS2.1 §8.3.1: When height is explicitly 0, line boxes contain
+        // overflowing content that doesn't prevent margin collapse.  Only
+        // check for line-box content when height is auto.
+        bool hasExplicitZeroHeight = box.Height != CssConstants.Auto
+            && !string.IsNullOrEmpty(box.Height);
+        if (!hasExplicitZeroHeight)
         {
-            if (lb.Words.Count > 0)
-                return false;
+            foreach (var lb in box.LineBoxes)
+            {
+                if (lb.Words.Count > 0)
+                    return false;
+            }
         }
 
         return true;

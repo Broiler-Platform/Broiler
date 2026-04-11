@@ -99,7 +99,12 @@ function ensureDir(filePath) {
     fs.mkdirSync(outputDir, { recursive: true });
 
     console.log(`Launching Chromium (concurrency=${concurrency}) …`);
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch({
+        headless: true,
+        // Allow file:// pages to load other file:// resources (e.g. SVG images
+        // referenced via <img src="support/...">) which Chrome blocks by default.
+        args: ['--allow-file-access-from-files'],
+    });
 
     let completed = 0;
     let errors = 0;

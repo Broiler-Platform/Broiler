@@ -351,19 +351,19 @@ internal sealed class SkiaImageAdapter : RAdapter
         var (svgWidth, svgHeight, vbRatio) = ParseSvgIntrinsicDimensions(svgContent);
 
         int width, height;
-        if (svgWidth > 0 && svgHeight > 0)
+        // Chrome's SVG sizing for <img> elements: only when BOTH explicit
+        // width and height attributes are present does the SVG have true
+        // intrinsic dimensions and an intrinsic aspect ratio.  When either
+        // dimension is missing Chrome falls back to the 300×150 default
+        // object size, regardless of viewBox or partial attributes.
+        bool hasBothDimensions = svgWidth > 0 && svgHeight > 0;
+        if (hasBothDimensions)
         {
-            // Both intrinsic width and height present – use them directly.
             width = (int)Math.Ceiling(svgWidth);
             height = (int)Math.Ceiling(svgHeight);
         }
         else
         {
-            // HTML spec §4.8.2: When the SVG lacks both explicit width and
-            // height the natural size is the default 300×150.  Browsers
-            // (Chromium, Firefox) do NOT derive the missing dimension from
-            // the viewBox ratio or partial attributes – they always fall
-            // back to 300×150.
             width = 300;
             height = 150;
         }
@@ -398,7 +398,13 @@ internal sealed class SkiaImageAdapter : RAdapter
 
         canvas.DrawPicture(svg.Picture);
 
-        return new ImageAdapter(bitmap);
+        // Only SVGs with both explicit width and height have intrinsic
+        // dimensions and an intrinsic ratio (matching Chrome's behavior).
+        // All other SVGs use the 300×150 default and have no ratio.
+        return new ImageAdapter(bitmap,
+            hasIntrinsicRatio: hasBothDimensions,
+            hasIntrinsicWidth: hasBothDimensions,
+            hasIntrinsicHeight: hasBothDimensions);
     }
 
     /// <summary>
