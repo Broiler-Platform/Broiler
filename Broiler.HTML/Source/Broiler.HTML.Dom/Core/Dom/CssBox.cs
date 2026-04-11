@@ -605,6 +605,25 @@ internal class CssBox : CssBoxProperties, IDisposable
                     width += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
                 }
 
+                // CSS2.1 §10.4: Apply max-width constraint even when
+                // Width is auto — the tentative used width must not exceed
+                // max-width.
+                if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
+                {
+                    double maxW = CssValueParser.ParseLength(MaxWidth, width, GetEmHeight());
+                    maxW += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
+                    if (width > maxW) width = maxW;
+                }
+
+                // CSS2.1 §10.4: Apply min-width constraint (min wins over
+                // max per §10.4) — also when Width is auto.
+                if (MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
+                {
+                    double minW = CssValueParser.ParseLength(MinWidth, width, GetEmHeight());
+                    minW += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
+                    if (width < minW) width = minW;
+                }
+
                 Size = new SizeF((float)width, Size.Height);
 
                 // CSS2.1 §10.3.3: For block-level, non-replaced elements in
@@ -1167,7 +1186,8 @@ internal class CssBox : CssBoxProperties, IDisposable
                         || Display is "flex" or "inline-flex" or "grid" or "inline-grid"
                         || (Overflow != null && Overflow != CssConstants.Visible)
                         || Position == CssConstants.Absolute
-                        || Position == CssConstants.Fixed;
+                        || Position == CssConstants.Fixed
+                        || (AlignContent != null && AlignContent != "normal");
                     if (isBfc)
                     {
                         ActualBottom = MarginBottomCollapse();
@@ -1175,6 +1195,22 @@ internal class CssBox : CssBoxProperties, IDisposable
                 }
                 else if (Boxes.Count > 0)
                 {
+                    // CSS Multi-column: Pre-constrain width so children
+                    // lay out at column width instead of full container width.
+                    float savedWidth = Size.Width;
+                    int preColCount = 0;
+                    bool isMultiColumn = ColumnCount != null && ColumnCount != "auto"
+                        && int.TryParse(ColumnCount, out preColCount) && preColCount > 1;
+                    if (isMultiColumn)
+                    {
+                        double columnGap = GetEmHeight();
+                        double cw = Size.Width - ActualPaddingLeft - ActualPaddingRight
+                            - ActualBorderLeftWidth - ActualBorderRightWidth;
+                        double colWidth = (cw - (preColCount - 1) * columnGap) / preColCount;
+                        if (colWidth > 0)
+                            Size = new SizeF((float)colWidth, Size.Height);
+                    }
+
                     foreach (var childBox in Boxes)
                     {
                         childBox.PerformLayout(g);
@@ -1186,6 +1222,10 @@ internal class CssBox : CssBoxProperties, IDisposable
                             && PageBreakInside == CssConstants.Avoid)
                             childBox.BreakPage();
                     }
+
+                    // Restore original width after children are laid out.
+                    if (isMultiColumn)
+                        Size = new SizeF(savedWidth, Size.Height);
 
                     ActualRight = CalculateActualRight();
                     ActualBottom = MarginBottomCollapse();
@@ -1202,6 +1242,17 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                 ActualBottom = prevSibling.ActualBottom;
             }
+        }
+
+        // CSS Multi-column Layout §3: When column-count > 1, redistribute
+        // in-flow children into multiple columns.  This is a post-layout
+        // transformation that moves children horizontally and vertically
+        // to simulate multi-column flow.
+        if (ColumnCount != null && ColumnCount != "auto"
+            && int.TryParse(ColumnCount, out int colCount) && colCount > 1
+            && Boxes.Count > 0)
+        {
+            ApplyMultiColumnLayout(colCount);
         }
 
         // CSS content-box model: 'height' specifies the content height only;
@@ -1346,6 +1397,100 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
         }
 
+        // CSS Box Alignment Level 3 §5.4: align-content on block containers
+        // shifts the in-flow content vertically when the container has a
+        // definite height larger than the content.  Values:
+        //   normal/start/baseline/flex-start → no shift (top-aligned)
+        //   center                           → center vertically
+        //   end/flex-end/last baseline       → bottom-aligned
+        //   space-between/space-around/space-evenly → distribute space
+        // The "unsafe" and "safe" prefixes are stripped; safe alignment
+        // falls back to start when content overflows, but for blocks this
+        // is handled implicitly (shift is clamped to ≥ 0).
+        if (AlignContent != null && AlignContent != "normal"
+            && (IsBlock || Display == CssConstants.ListItem || Display == CssConstants.InlineBlock)
+            && Boxes.Count > 0
+            && Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
+        {
+            double borderBoxHeight = ActualBottom - Location.Y;
+            double containerContentHeight = borderBoxHeight
+                - ActualPaddingTop - ActualPaddingBottom
+                - ActualBorderTopWidth - ActualBorderBottomWidth;
+
+            // Compute height of in-flow children (excluding overflow:0 boxes,
+            // absolutely positioned elements, and fixed elements).
+            double contentTop = double.MaxValue;
+            double contentBottom = double.MinValue;
+            foreach (var child in Boxes)
+            {
+                if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                    continue;
+                if (child.Display == CssConstants.None)
+                    continue;
+                double childTop = child.Location.Y;
+                double childBottom = child.ActualBottom;
+                if (childTop < contentTop)
+                    contentTop = childTop;
+                if (childBottom > contentBottom)
+                    contentBottom = childBottom;
+            }
+
+            if (contentTop < double.MaxValue && contentBottom > double.MinValue)
+            {
+                double usedContentHeight = contentBottom - contentTop;
+                double freeSpace = containerContentHeight - usedContentHeight;
+
+                if (freeSpace > 0.5)
+                {
+                    // Normalise the align-content value: strip safe/unsafe prefix.
+                    string ac = AlignContent.Trim();
+                    if (ac.StartsWith("safe ", StringComparison.OrdinalIgnoreCase))
+                        ac = ac.Substring(5).Trim();
+                    else if (ac.StartsWith("unsafe ", StringComparison.OrdinalIgnoreCase))
+                        ac = ac.Substring(7).Trim();
+
+                    double shift = 0;
+                    switch (ac.ToLowerInvariant())
+                    {
+                        case "center":
+                            shift = freeSpace / 2;
+                            break;
+                        case "end":
+                        case "flex-end":
+                        case "last baseline":
+                            shift = freeSpace;
+                            break;
+                        case "space-between":
+                            // Single content group → same as start (no shift).
+                            break;
+                        case "space-around":
+                            shift = freeSpace / 2;
+                            break;
+                        case "space-evenly":
+                            shift = freeSpace / 2;
+                            break;
+                        // start, flex-start, baseline, normal → no shift.
+                    }
+
+                    // Safe alignment: clamp shift to 0 when content overflows.
+                    if (AlignContent.StartsWith("safe ", StringComparison.OrdinalIgnoreCase) && shift < 0)
+                        shift = 0;
+
+                    if (shift > 0.5)
+                    {
+                        foreach (var child in Boxes)
+                        {
+                            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                                continue;
+                            if (child.Display == CssConstants.None)
+                                continue;
+                            child.OffsetTop(shift);
+                        }
+                    }
+                }
+            }
+        }
+
         // Apply position:relative offset after layout (visual only, does not affect flow)
         // CSS2.1 §9.4.3: For relative positioning, 'left'/'right' and
         // 'top'/'bottom' form constraint pairs.  When 'top' is auto and
@@ -1383,6 +1528,216 @@ internal class CssBox : CssBoxProperties, IDisposable
             var actualWidth = Math.Max(GetMinimumWidth() + CssBoxHelper.GetWidthMarginDeep(this), Size.Width < 90999 ? ActualRight - ContainerInt.RootLocation.X : 0);
             ContainerInt.ActualSize = CommonUtils.Max(ContainerInt.ActualSize, new SizeF((float)actualWidth, (float)(ActualBottom - ContainerInt.RootLocation.Y)));
         }
+    }
+
+    /// <summary>
+    /// CSS Multi-column Layout: Redistributes in-flow child boxes into
+    /// multiple columns after single-column layout.  Walks down through
+    /// single-child containers (e.g. html to body) to find the actual
+    /// fragmentable children.
+    /// </summary>
+    private void ApplyMultiColumnLayout(int colCount)
+    {
+        double columnGap = GetEmHeight();
+        double contentWidth = Size.Width - ActualPaddingLeft - ActualPaddingRight
+            - ActualBorderLeftWidth - ActualBorderRightWidth;
+        double columnWidth = (contentWidth - (colCount - 1) * columnGap) / colCount;
+        if (columnWidth <= 0) return;
+
+        double containerTop = Location.Y + ActualPaddingTop + ActualBorderTopWidth;
+        double columnLeft = Location.X + ActualPaddingLeft + ActualBorderLeftWidth;
+
+        // Walk down through single-child containers (html -> body) to find
+        // the level with multiple block children to distribute.
+        var fragmentParent = FindMultiColumnFragmentParent();
+        if (fragmentParent == null) return;
+
+        var fragments = new List<CssBox>();
+        foreach (var child in fragmentParent.Boxes)
+        {
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.None)
+                continue;
+            fragments.Add(child);
+        }
+
+        if (fragments.Count == 0) return;
+
+        double firstTop = fragments[0].Location.Y;
+        double lastBottom = fragments[^1].ActualBottom;
+        double totalContentHeight = lastBottom - firstTop;
+
+        if (totalContentHeight <= 0) return;
+
+        // Determine column height: balanced columns for auto/max-height,
+        // or explicit height.
+        double columnHeight;
+        bool hasMaxHeight = MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight);
+        bool hasExplicitHeight = Height != CssConstants.Auto && !string.IsNullOrEmpty(Height);
+        double maxAllowedHeight = double.MaxValue;
+
+        if (hasMaxHeight)
+        {
+            double maxH = CssValueParser.ParseLength(MaxHeight, ContainingBlock?.Size.Height ?? Size.Height, GetEmHeight());
+            maxAllowedHeight = maxH - ActualPaddingTop - ActualPaddingBottom - ActualBorderTopWidth - ActualBorderBottomWidth;
+        }
+
+        if (hasExplicitHeight)
+        {
+            double h = CssValueParser.ParseLength(Height, ContainingBlock?.Size.Height ?? Size.Height, GetEmHeight());
+            columnHeight = h;
+        }
+        else
+        {
+            // Balanced column layout: find the minimum column height that
+            // distributes all fragments across colCount columns.  Use a
+            // binary search between (tallest fragment) and (total height).
+            double lo = 0;
+            foreach (var frag in fragments)
+            {
+                double fh = frag.ActualBottom - frag.Location.Y;
+                if (fh > lo) lo = fh;
+            }
+            double hi = totalContentHeight;
+
+            for (int iter = 0; iter < 20; iter++)
+            {
+                double mid = (lo + hi) / 2;
+                int cols = CountColumnsNeeded(fragments, mid);
+                if (cols <= colCount)
+                    hi = mid;
+                else
+                    lo = mid + 0.5;
+            }
+            columnHeight = Math.Ceiling(hi);
+
+            if (columnHeight > maxAllowedHeight)
+                columnHeight = maxAllowedHeight;
+        }
+
+        if (columnHeight <= 0) return;
+
+        // Distribute fragments across columns.
+        int currentCol = 0;
+        double currentY = containerTop;
+
+        foreach (var frag in fragments)
+        {
+            double fragHeight = frag.ActualBottom - frag.Location.Y;
+
+            bool wouldOverflow = (currentY - containerTop) + fragHeight > columnHeight;
+            if (wouldOverflow && currentCol < colCount - 1 && currentY > containerTop + 0.5)
+            {
+                currentCol++;
+                currentY = containerTop;
+            }
+
+            double targetX = columnLeft + currentCol * (columnWidth + columnGap)
+                + (frag.Location.X - fragmentParent.Location.X);
+            double targetY = currentY;
+
+            double dx = targetX - frag.Location.X;
+            double dy = targetY - frag.Location.Y;
+
+            if (Math.Abs(dx) > 0.1 || Math.Abs(dy) > 0.1)
+            {
+                frag.OffsetLeft(dx);
+                frag.OffsetTop(dy);
+            }
+
+            if (frag.Size.Width > columnWidth + 1)
+            {
+                frag.Size = new SizeF((float)columnWidth, frag.Size.Height);
+            }
+
+            currentY += fragHeight;
+        }
+
+        // Update container dimensions.
+        double maxBottom = containerTop;
+        foreach (var frag in fragments)
+        {
+            if (frag.ActualBottom > maxBottom)
+                maxBottom = frag.ActualBottom;
+        }
+
+        double newBottom = maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
+        if (newBottom < ActualBottom)
+            ActualBottom = newBottom;
+
+        if (fragmentParent != this)
+        {
+            double fpBottom = maxBottom + fragmentParent.ActualPaddingBottom + fragmentParent.ActualBorderBottomWidth;
+            if (fpBottom < fragmentParent.ActualBottom)
+                fragmentParent.ActualBottom = fpBottom;
+        }
+
+        double rightEdge = columnLeft + colCount * columnWidth + (colCount - 1) * columnGap
+            + ActualPaddingRight + ActualBorderRightWidth;
+        if (rightEdge > ActualRight)
+            ActualRight = rightEdge;
+    }
+
+    /// <summary>
+    /// Walks down through single-child containers to find the nearest
+    /// descendant with multiple in-flow block children for multi-column
+    /// fragmentation.
+    /// </summary>
+    private CssBox FindMultiColumnFragmentParent()
+    {
+        CssBox current = this;
+        for (int depth = 0; depth < 10; depth++)
+        {
+            int inFlowCount = 0;
+            CssBox onlyChild = null;
+            foreach (var child in current.Boxes)
+            {
+                if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                    continue;
+                if (child.Display == CssConstants.None)
+                    continue;
+                inFlowCount++;
+                onlyChild = child;
+            }
+
+            if (inFlowCount > 1)
+                return current;
+
+            if (inFlowCount == 1 && onlyChild != null && onlyChild.Boxes.Count > 0)
+            {
+                current = onlyChild;
+                continue;
+            }
+
+            break;
+        }
+
+        return current.Boxes.Count > 1 ? current : null;
+    }
+
+    /// <summary>
+    /// Counts the number of columns needed to fit all fragments within
+    /// the given column height (no splitting of individual fragments).
+    /// </summary>
+    private static int CountColumnsNeeded(List<CssBox> fragments, double columnHeight)
+    {
+        int cols = 1;
+        double currentH = 0;
+        foreach (var frag in fragments)
+        {
+            double fh = frag.ActualBottom - frag.Location.Y;
+            if (currentH + fh > columnHeight && currentH > 0.5)
+            {
+                cols++;
+                currentH = fh;
+            }
+            else
+            {
+                currentH += fh;
+            }
+        }
+        return cols;
     }
 
     /// <summary>
@@ -1673,7 +2028,10 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
             CollapsedMarginTop = value;
         }
-        else if (_parentBox != null && ActualPaddingTop < 0.1 && ActualPaddingBottom < 0.1 && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1 && _parentBox.ActualBorderTopWidth < 0.1 && _parentBox.ActualBorderBottomWidth < 0.1)
+        else if (_parentBox != null && ActualPaddingTop < 0.1 && ActualPaddingBottom < 0.1 && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1 && _parentBox.ActualBorderTopWidth < 0.1 && _parentBox.ActualBorderBottomWidth < 0.1
+            // CSS Box Alignment §5.4: align-content != normal establishes
+            // a BFC, which prevents parent–child margin collapsing.
+            && (_parentBox.AlignContent == null || _parentBox.AlignContent == "normal"))
         {
             double parentEffective = Math.Max(_parentBox.ActualMarginTop, _parentBox.CollapsedMarginTop);
 
@@ -1703,6 +2061,17 @@ internal class CssBox : CssBoxProperties, IDisposable
         else
         {
             value = ActualMarginTop;
+
+            // When the parent establishes a BFC (e.g. via align-content),
+            // the first child's margin is fully consumed for positioning.
+            // Record it so that an empty-collapsible sibling can subtract
+            // the already-consumed portion during its own collapse.
+            if (_parentBox != null
+                && _parentBox.AlignContent != null
+                && _parentBox.AlignContent != "normal")
+            {
+                CollapsedMarginTop = value;
+            }
         }
 
         // fix for hr tag
@@ -1752,8 +2121,9 @@ internal class CssBox : CssBoxProperties, IDisposable
 
         // CSS2.1 §8.3.1: Margins collapse through the parent only when
         // the parent has no bottom padding and no bottom border.
-        if (Boxes.Count > 0 && ParentBox != null && ParentBox.Boxes.IndexOf(this) == ParentBox.Boxes.Count - 1 && _parentBox.ActualMarginBottom < 0.1
-            && ActualPaddingBottom < 0.1 && ActualBorderBottomWidth < 0.1)
+        bool collapseThrough = Boxes.Count > 0 && ParentBox != null && ParentBox.Boxes.IndexOf(this) == ParentBox.Boxes.Count - 1 && _parentBox.ActualMarginBottom < 0.1
+            && ActualPaddingBottom < 0.1 && ActualBorderBottomWidth < 0.1;
+        if (collapseThrough)
         {
             var lastChildBottomMargin = Boxes[Boxes.Count - 1].ActualMarginBottom;
             margin = Height == "auto" ? Math.Max(ActualMarginBottom, lastChildBottomMargin) : lastChildBottomMargin;
@@ -1769,7 +2139,8 @@ internal class CssBox : CssBoxProperties, IDisposable
             || Display == CssConstants.TableCell
             || (Overflow != null && Overflow != CssConstants.Visible)
             || Position == CssConstants.Absolute
-            || Position == CssConstants.Fixed;
+            || Position == CssConstants.Fixed
+            || (AlignContent != null && AlignContent != "normal");
 
         // Use the maximum ActualBottom across all children to handle
         // floated children that may not be the last in source order.
@@ -1777,6 +2148,7 @@ internal class CssBox : CssBoxProperties, IDisposable
         // even when all children are floated (CSS2.1 §10.6.3: content
         // height is zero but padding is additive).
         double maxChildBottom = Location.Y + ActualBorderTopWidth + ActualPaddingTop;
+        CssBox lastInFlowChild = null;
         
         foreach (var child in Boxes)
         {
@@ -1798,7 +2170,15 @@ internal class CssBox : CssBoxProperties, IDisposable
                 childBottom -= CssBoxHelper.GetRelativeOffsetY(child);
 
             maxChildBottom = Math.Max(maxChildBottom, childBottom);
+            lastInFlowChild = child;
         }
+
+        // CSS2.1 §10.6.3: The auto height extends to the bottom margin-
+        // edge of the last in-flow child.  When the parent has bottom
+        // border or padding, the last child's margin does not collapse
+        // through (§8.3.1), so add it as internal content spacing.
+        if (!collapseThrough && lastInFlowChild != null)
+            maxChildBottom += lastInFlowChild.ActualMarginBottom;
 
         return Math.Max(ActualBottom, maxChildBottom + margin + ActualPaddingBottom + ActualBorderBottomWidth);
     }
