@@ -3,7 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       subset:
-        description: 'WPT subset to test (e.g. "css/css-flexbox", leave empty for all)'
+        description: >
+          Semicolon-separated WPT subset patterns with optional wildcards.
+          Examples: "css/css-flexbox", "css/CSS2;css/css-*", leave empty for all.
         required: false
         default: ''
 permissions:

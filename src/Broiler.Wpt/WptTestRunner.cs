@@ -175,6 +175,123 @@ internal sealed class WptTestRunner
     }
 
     /// <summary>
+    /// Discovers test files under <paramref name="wptRoot"/> that match
+    /// the given <paramref name="subsetPatterns"/>.  Patterns may contain
+    /// <c>*</c> and <c>?</c> wildcards (glob-style) and are matched
+    /// against each file's path relative to <paramref name="wptRoot"/>
+    /// using forward-slash separators.  Multiple patterns can be supplied;
+    /// a file is included when it matches <em>any</em> of the patterns.
+    /// </summary>
+    internal static IEnumerable<string> DiscoverTests(string wptRoot, IReadOnlyList<string> subsetPatterns)
+    {
+        if (subsetPatterns.Count == 0)
+            return DiscoverTests(wptRoot);
+
+        return DiscoverTests(wptRoot)
+            .Where(f =>
+            {
+                var rel = Path.GetRelativePath(wptRoot, f).Replace('\\', '/');
+                return MatchesAnyPattern(rel, subsetPatterns);
+            });
+    }
+
+    /// <summary>
+    /// Parses a semicolon-separated subset string into individual patterns,
+    /// trimming whitespace and discarding empty entries.
+    /// </summary>
+    internal static string[] ParseSubsetPatterns(string subset)
+    {
+        if (string.IsNullOrWhiteSpace(subset))
+            return [];
+
+        return subset.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    /// <summary>
+    /// Returns <see langword="true"/> when <paramref name="relativePath"/>
+    /// matches any of the supplied glob patterns.  Each pattern is treated
+    /// as a prefix — a file matches when its relative path starts with the
+    /// pattern (after wildcard expansion).  A trailing <c>**</c> is
+    /// implicitly appended when the pattern does not end with a wildcard
+    /// character, so <c>css/CSS2</c> matches <c>css/CSS2/test.html</c>.
+    /// </summary>
+    internal static bool MatchesAnyPattern(string relativePath, IReadOnlyList<string> patterns)
+    {
+        foreach (var raw in patterns)
+        {
+            if (MatchesPattern(relativePath, raw))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Matches a single glob-like pattern against a relative path.
+    /// <list type="bullet">
+    ///   <item><c>*</c> matches zero or more characters except <c>/</c>.</item>
+    ///   <item><c>?</c> matches exactly one character except <c>/</c>.</item>
+    /// </list>
+    /// If the pattern contains no wildcard characters, or ends without a
+    /// wildcard, it is treated as a directory prefix (i.e. an implicit
+    /// <c>/**</c> is appended) so that <c>css/CSS2</c> matches all files
+    /// under that directory.
+    /// </summary>
+    internal static bool MatchesPattern(string relativePath, string pattern)
+    {
+        // Normalise separators in the pattern to forward slash.
+        var normalized = pattern.Replace('\\', '/').TrimEnd('/');
+
+        if (string.IsNullOrEmpty(normalized))
+            return true;
+
+        bool hasWildcard = normalized.Contains('*') || normalized.Contains('?');
+
+        if (!hasWildcard)
+        {
+            // Exact directory prefix: path must start with "pattern/" or equal the pattern.
+            return relativePath.StartsWith(normalized + "/", StringComparison.OrdinalIgnoreCase)
+                || relativePath.Equals(normalized, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Convert glob pattern to a regex that matches the full relative path
+        // as a prefix (or the entire path).
+        var regexPattern = GlobToRegex(normalized);
+        return Regex.IsMatch(relativePath, regexPattern, RegexOptions.IgnoreCase);
+    }
+
+    /// <summary>
+    /// Converts a glob-style pattern into a regular expression string.
+    /// The regex is anchored at the start and always appends an optional
+    /// <c>(/.*)?$</c> suffix so that files beneath the matched prefix
+    /// are included (e.g. <c>css/css-*</c> matches
+    /// <c>css/css-flexbox/test.html</c>).
+    /// </summary>
+    private static string GlobToRegex(string glob)
+    {
+        var sb = new System.Text.StringBuilder("^");
+
+        for (int i = 0; i < glob.Length; i++)
+        {
+            char c = glob[i];
+            switch (c)
+            {
+                case '*':
+                    sb.Append("[^/]*");
+                    break;
+                case '?':
+                    sb.Append("[^/]");
+                    break;
+                default:
+                    sb.Append(Regex.Escape(c.ToString()));
+                    break;
+            }
+        }
+
+        sb.Append("(/.*)?$");
+        return sb.ToString();
+    }
+
+    /// <summary>
     /// Determines whether the given file path is a WPT non-test file that
     /// should be excluded from test execution.  Non-test files include:
     /// <list type="bullet">
@@ -429,6 +546,19 @@ internal sealed class WptTestRunner
     internal IEnumerable<WptTestResult> RunAll(string wptRoot, string referenceDir)
     {
         foreach (var testPath in DiscoverTests(wptRoot))
+        {
+            yield return RunTest(testPath, referenceDir, wptRoot);
+        }
+    }
+
+    /// <summary>
+    /// Runs discovered tests that match <paramref name="subsetPatterns"/>
+    /// under <paramref name="wptRoot"/>, comparing each against reference
+    /// images in <paramref name="referenceDir"/>.
+    /// </summary>
+    internal IEnumerable<WptTestResult> RunAll(string wptRoot, string referenceDir, IReadOnlyList<string> subsetPatterns)
+    {
+        foreach (var testPath in DiscoverTests(wptRoot, subsetPatterns))
         {
             yield return RunTest(testPath, referenceDir, wptRoot);
         }

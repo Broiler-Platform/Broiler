@@ -17,6 +17,7 @@ public class Program
         string? wptPath = null;
         string? referenceDir = null;
         string? jsonOutputPath = null;
+        string? subset = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -31,9 +32,13 @@ public class Program
                 case "--json-output" when i + 1 < args.Length:
                     jsonOutputPath = args[++i];
                     break;
+                case "--subset" when i + 1 < args.Length:
+                    subset = args[++i];
+                    break;
                 case "--wpt-dir":
                 case "--reference-dir":
                 case "--json-output":
+                case "--subset":
                     Console.Error.WriteLine($"Error: '{args[i]}' requires a value.");
                     PrintUsage();
                     return 1;
@@ -74,15 +79,18 @@ public class Program
 
         Console.WriteLine($"WPT directory : {Path.GetFullPath(wptPath)}");
         Console.WriteLine($"Reference dir : {Path.GetFullPath(referenceDir)}");
+        if (!string.IsNullOrWhiteSpace(subset))
+            Console.WriteLine($"Subset        : {subset}");
         Console.WriteLine();
 
         var runner = new WptTestRunner();
+        var subsetPatterns = WptTestRunner.ParseSubsetPatterns(subset ?? "");
         int passed = 0, failed = 0, skipped = 0;
         var failures = new List<WptTestResult>();
 
         // Collect all results first so they can be sorted by percent match
         // before writing to the logfile.
-        var allResults = runner.RunAll(wptPath, referenceDir).ToList();
+        var allResults = runner.RunAll(wptPath, referenceDir, subsetPatterns).ToList();
 
         // Separate skipped results (no percent match) from compared results,
         // then sort compared results ascending by percent match so that the
@@ -232,7 +240,7 @@ public class Program
     private static void PrintUsage()
     {
         Console.WriteLine("Usage: Broiler.Wpt <wpt-directory> [OPTIONS]");
-        Console.WriteLine("       Broiler.Wpt --wpt-dir <PATH> [--reference-dir <PATH>]");
+        Console.WriteLine("       Broiler.Wpt --wpt-dir <PATH> [--reference-dir <PATH>] [--subset <PATTERNS>]");
         Console.WriteLine();
         Console.WriteLine("Arguments:");
         Console.WriteLine("  <wpt-directory>            Path to the web-platform-tests checkout");
@@ -241,6 +249,9 @@ public class Program
         Console.WriteLine("  --wpt-dir <PATH>           Path to the web-platform-tests checkout");
         Console.WriteLine("  --reference-dir <PATH>     Directory containing Chromium/Playwright reference PNGs");
         Console.WriteLine("                             (default: <wpt-directory>/references)");
+        Console.WriteLine("  --subset <PATTERNS>        Semicolon-separated list of sub-path patterns to test.");
+        Console.WriteLine("                             Supports * and ? wildcards (glob-style).");
+        Console.WriteLine("                             Example: \"css/CSS2;css/css-*\"");
         Console.WriteLine("  --json-output <PATH>       Write structured JSON report to the given path");
         Console.WriteLine("  --help                     Show this help message");
     }

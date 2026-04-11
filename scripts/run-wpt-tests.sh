@@ -9,8 +9,9 @@
 #     --output-dir <dir>   Directory for results (default: tests/wpt/results)
 #     --wpt-dir <dir>      Use an existing WPT checkout instead of cloning
 #     --shallow             Shallow-clone only (depth 1, much faster)
-#     --subset <path>       Run tests only under this sub-path of WPT
-#                           (e.g. "css/css-flexbox" or "html/semantics")
+#     --subset <patterns>   Semicolon-separated list of sub-path patterns with
+#                           optional wildcards (e.g. "css/CSS2;css/css-*").
+#                           A single pattern like "css/css-flexbox" also works.
 #     -h, --help           Show this help message
 #
 # Prerequisites:
@@ -53,8 +54,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --output-dir <dir>   Directory for results (default: tests/wpt/results)"
             echo "  --wpt-dir <dir>      Use an existing WPT checkout instead of cloning"
             echo "  --shallow            Shallow-clone only (depth 1, faster; default)"
-            echo "  --subset <path>      Run tests only under this sub-path of WPT"
-            echo "                       (e.g. \"css/css-flexbox\" or \"html/semantics\")"
+            echo "  --subset <patterns>  Semicolon-separated sub-path patterns with wildcards"
+            echo "                       (e.g. \"css/CSS2;css/css-*\" or \"css/css-flexbox\")"
             echo "  -h, --help           Show this help message"
             exit 0
             ;;
@@ -101,15 +102,13 @@ else
     fi
 fi
 
-# If a subset is requested, adjust the test directory.
+# If a subset is requested, expand patterns for reference generation but
+# always pass the raw patterns to the C# program via --subset.
 TEST_DIR="$WPT_DIR"
+SUBSET_ARGS=()
 if [[ -n "$SUBSET" ]]; then
-    TEST_DIR="$WPT_DIR/$SUBSET"
-    if [[ ! -d "$TEST_DIR" ]]; then
-        echo "  ✗ Subset directory not found: $TEST_DIR" >&2
-        exit 1
-    fi
-    echo "  Running subset: $SUBSET"
+    SUBSET_ARGS+=(--subset "$SUBSET")
+    echo "  Subset patterns: $SUBSET"
 fi
 echo ""
 
@@ -133,9 +132,46 @@ if command -v npx &>/dev/null; then
     # Set NODE_PATH so require('playwright') resolves from the local
     # node_modules installed above (Node.js resolves modules relative to
     # the requiring file's directory, not cwd).
-    if NODE_PATH="$REPO_ROOT/tests/wpt/node_modules" \
-        node "$SCRIPT_DIR/generate-wpt-references.js" \
-        "$TEST_DIR" "$REFERENCE_DIR" --concurrency 8 2>&1; then
+    #
+    # When a subset is specified, expand semicolon-separated patterns
+    # (which may contain wildcards) into individual directories and
+    # generate references for each.
+    REF_GEN_OK=true
+    if [[ -n "$SUBSET" ]]; then
+        IFS=';' read -ra PATTERNS <<< "$SUBSET"
+        for PATTERN in "${PATTERNS[@]}"; do
+            PATTERN="${PATTERN#"${PATTERN%%[![:space:]]*}"}"   # trim leading
+            PATTERN="${PATTERN%"${PATTERN##*[![:space:]]}"}"   # trim trailing
+            [[ -z "$PATTERN" ]] && continue
+            MATCHED=false
+            # Use bash glob expansion; nullglob prevents literal fallback.
+            shopt -s nullglob
+            for MATCH_DIR in $WPT_DIR/$PATTERN; do
+                if [[ -d "$MATCH_DIR" ]]; then
+                    MATCHED=true
+                    echo "  Generating refs for: ${MATCH_DIR#"$WPT_DIR/"}"
+                    if ! NODE_PATH="$REPO_ROOT/tests/wpt/node_modules" \
+                        node "$SCRIPT_DIR/generate-wpt-references.js" \
+                        "$MATCH_DIR" "$REFERENCE_DIR" --concurrency 8 2>&1; then
+                        echo "  ✗ Reference generation failed for $MATCH_DIR" >&2
+                        REF_GEN_OK=false
+                    fi
+                fi
+            done
+            shopt -u nullglob
+            if [[ "$MATCHED" == "false" ]]; then
+                echo "  ⚠ No directories matched pattern: $PATTERN"
+            fi
+        done
+    else
+        if ! NODE_PATH="$REPO_ROOT/tests/wpt/node_modules" \
+            node "$SCRIPT_DIR/generate-wpt-references.js" \
+            "$TEST_DIR" "$REFERENCE_DIR" --concurrency 8 2>&1; then
+            REF_GEN_OK=false
+        fi
+    fi
+
+    if [[ "$REF_GEN_OK" == "true" ]]; then
         echo "  ✓ Reference images generated"
     else
         echo "  ✗ Reference generation failed" >&2
@@ -177,7 +213,7 @@ REF_ARGS+=(--json-output "$JSON_REPORT")
 set +e
 dotnet run --project "$REPO_ROOT/src/Broiler.Wpt" \
     --configuration Release --no-build -- \
-    --wpt-dir "$TEST_DIR" "${REF_ARGS[@]}" 2>&1 | tee "$LOGFILE"
+    --wpt-dir "$TEST_DIR" "${REF_ARGS[@]}" "${SUBSET_ARGS[@]}" 2>&1 | tee "$LOGFILE"
 WPT_EXIT=$?
 set -e
 
