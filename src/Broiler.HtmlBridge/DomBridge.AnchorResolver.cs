@@ -47,10 +47,59 @@ public sealed partial class DomBridge
         //    from opposing inset values).
         ResolveFixedPositionSizing(viewportWidth, viewportHeight);
 
-        // 6. Strip CSS rules with unsupported properties (anchor(), inset,
+        // 6. Ensure elements that establish containing blocks via non-position
+        //    properties (contain:layout, transform) get position:relative so the
+        //    Broiler renderer treats them as containing blocks for abspos children.
+        EnsureContainingBlockPositioning(DocumentElement);
+
+        // 7. Strip CSS rules with unsupported properties (anchor(), inset,
         //    anchor-name) from the stylesheet so the renderer doesn't
         //    misinterpret them.
         NeutralizeStyleElementsForAnchorRules(DocumentElement);
+    }
+
+    // -----------------------------------------------------------------
+    // Containing block positioning
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// For elements that establish containing blocks via CSS properties that
+    /// Broiler's renderer does not understand (e.g. <c>contain:layout</c>,
+    /// <c>transform</c>), adds <c>position:relative</c> to their inline
+    /// styles so the renderer treats them as containing blocks for absolutely
+    /// positioned descendants.
+    /// </summary>
+    private void EnsureContainingBlockPositioning(DomElement root)
+    {
+        EnsureContainingBlockPositioningTree(root);
+    }
+
+    private void EnsureContainingBlockPositioningTree(DomElement el)
+    {
+        if (!el.IsTextNode && !string.Equals(el.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        {
+            var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (sel, _, decls) in CssRules)
+            {
+                if (MatchesSelector(el, sel))
+                    foreach (var kv in decls)
+                        props[kv.Key] = kv.Value;
+            }
+            foreach (var kv in el.Style)
+                props[kv.Key] = kv.Value;
+
+            // If the element already has explicit positioning, no change needed.
+            bool alreadyPositioned = props.TryGetValue("position", out var pos) &&
+                (pos == "relative" || pos == "absolute" || pos == "fixed" || pos == "sticky");
+
+            if (!alreadyPositioned && EstablishesContainingBlock(props))
+            {
+                el.Style["position"] = "relative";
+            }
+        }
+
+        foreach (var child in el.Children)
+            EnsureContainingBlockPositioningTree(child);
     }
 
     // -----------------------------------------------------------------
@@ -169,21 +218,145 @@ public sealed partial class DomBridge
         @"(?<selector>[^{}@]+)\{(?<body>[^}]*)\}",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Matches <c>@position-try</c> at-rules (with their full block).
+    /// </summary>
+    private static readonly Regex PositionTryAtRulePattern = new(
+        @"@position-try\s+[^{]+\{[^}]*\}",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Property names that are anchor-positioning-specific and should be
+    /// stripped from CSS rule bodies after the DomBridge has resolved them
+    /// into inline styles.  Properties whose values contain <c>anchor(</c>
+    /// or <c>anchor-size(</c> are also stripped (matched separately).
+    /// </summary>
+    private static readonly string[] UnsupportedPropertyNames =
+    {
+        "anchor-name",
+        "position-area",
+        "position-anchor",
+        "position-try-fallbacks",
+        "position-try",
+    };
+
     private static string RemoveUnsupportedCssRules(string css)
     {
-        return CssRuleBlockPattern.Replace(css, m =>
+        // 1. Remove @position-try at-rules entirely.
+        css = PositionTryAtRulePattern.Replace(css, string.Empty);
+
+        // 2. Within each rule block, strip only the unsupported individual
+        //    properties while keeping all other declarations intact.
+        css = CssRuleBlockPattern.Replace(css, m =>
         {
             var body = m.Groups["body"].Value;
-            if (body.Contains("anchor-name", StringComparison.OrdinalIgnoreCase) ||
-                body.Contains("anchor(", StringComparison.OrdinalIgnoreCase) ||
-                body.Contains("position-area", StringComparison.OrdinalIgnoreCase) ||
-                body.Contains("position-anchor", StringComparison.OrdinalIgnoreCase) ||
-                body.Contains("inset", StringComparison.OrdinalIgnoreCase))
+
+            // Quick check: if no unsupported properties exist, return as-is.
+            bool hasUnsupported = false;
+            foreach (var propName in UnsupportedPropertyNames)
             {
-                return string.Empty;
+                if (body.Contains(propName, StringComparison.OrdinalIgnoreCase))
+                { hasUnsupported = true; break; }
             }
-            return m.Value;
+            if (!hasUnsupported &&
+                !body.Contains("anchor(", StringComparison.OrdinalIgnoreCase) &&
+                !body.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
+            {
+                return m.Value;
+            }
+
+            // If the rule contained position-area or position-anchor, the
+            // DomBridge has resolved the element's position to explicit
+            // inline pixel values.  Strip layout/sizing properties from
+            // the CSS rule so they don't conflict with the inline values.
+            bool hasPositionResolution =
+                body.Contains("position-area", StringComparison.OrdinalIgnoreCase) ||
+                body.Contains("position-anchor", StringComparison.OrdinalIgnoreCase);
+
+            // Strip unsupported properties from the body.
+            var cleanedBody = StripUnsupportedProperties(body, hasPositionResolution);
+
+            // If the rule body is now empty, remove the entire rule.
+            if (string.IsNullOrWhiteSpace(cleanedBody))
+                return string.Empty;
+
+            return m.Groups["selector"].Value + "{" + cleanedBody + "}";
         });
+
+        return css;
+    }
+
+    /// <summary>
+    /// Layout properties that should also be stripped when the DomBridge has
+    /// resolved position-area or position-anchor to inline pixel values.
+    /// These would otherwise conflict with the DomBridge-computed values.
+    /// </summary>
+    private static readonly HashSet<string> PositionResolvedProperties = new(
+        StringComparer.OrdinalIgnoreCase)
+    {
+        "width", "height", "top", "left", "right", "bottom",
+        "inset", "inset-block", "inset-inline",
+        "inset-block-start", "inset-block-end",
+        "inset-inline-start", "inset-inline-end",
+        "align-self", "justify-self",
+    };
+
+    /// <summary>
+    /// Removes individual CSS declarations that use anchor-positioning
+    /// properties from a rule body string, keeping all other declarations.
+    /// When <paramref name="stripPositionProps"/> is true, also strips
+    /// layout properties that would conflict with DomBridge-resolved values.
+    /// </summary>
+    private static string StripUnsupportedProperties(string body, bool stripPositionProps)
+    {
+        var sb = new System.Text.StringBuilder();
+        // Split on ';' to get individual declarations.
+        var declarations = body.Split(';');
+        foreach (var decl in declarations)
+        {
+            var trimmed = decl.Trim();
+            if (string.IsNullOrEmpty(trimmed))
+                continue;
+
+            // Check if this declaration uses an unsupported property name.
+            var colonIdx = trimmed.IndexOf(':');
+            if (colonIdx < 0)
+            {
+                sb.Append(trimmed).Append(';');
+                continue;
+            }
+
+            var propName = trimmed[..colonIdx].Trim();
+            var propValue = trimmed[(colonIdx + 1)..].Trim();
+
+            bool isUnsupported = false;
+            foreach (var unsupported in UnsupportedPropertyNames)
+            {
+                if (propName.Equals(unsupported, StringComparison.OrdinalIgnoreCase))
+                { isUnsupported = true; break; }
+            }
+
+            // Also strip declarations whose values contain anchor() or
+            // anchor-size() function calls.
+            if (!isUnsupported &&
+                (propValue.Contains("anchor(", StringComparison.OrdinalIgnoreCase) ||
+                 propValue.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase)))
+            {
+                isUnsupported = true;
+            }
+
+            // Strip layout/sizing properties from position-area resolved rules.
+            if (!isUnsupported && stripPositionProps &&
+                PositionResolvedProperties.Contains(propName))
+            {
+                isUnsupported = true;
+            }
+
+            if (!isUnsupported)
+                sb.Append(' ').Append(trimmed).Append(';');
+        }
+
+        return sb.ToString();
     }
 
     // -----------------------------------------------------------------
@@ -486,8 +659,7 @@ public sealed partial class DomBridge
             foreach (var kv in parent.Style)
                 parentProps[kv.Key] = kv.Value;
 
-            if (parentProps.TryGetValue("position", out var pos) &&
-                (pos == "relative" || pos == "absolute" || pos == "fixed"))
+            if (EstablishesContainingBlock(parentProps))
             {
                 return TryParsePx(parentProps.GetValueOrDefault("width")) ?? _viewportWidth;
             }
@@ -515,14 +687,51 @@ public sealed partial class DomBridge
             foreach (var kv in parent.Style)
                 parentProps[kv.Key] = kv.Value;
 
-            if (parentProps.TryGetValue("position", out var pos) &&
-                (pos == "relative" || pos == "absolute" || pos == "fixed"))
+            if (EstablishesContainingBlock(parentProps))
             {
                 return TryParsePx(parentProps.GetValueOrDefault("height")) ?? _viewportHeight;
             }
             parent = parent.Parent;
         }
         return _viewportHeight;
+    }
+
+    /// <summary>
+    /// Determines whether an element with the given CSS properties
+    /// establishes a containing block for absolutely positioned descendants.
+    /// Per CSS spec, this includes:
+    /// <list type="bullet">
+    ///   <item>position: relative/absolute/fixed/sticky</item>
+    ///   <item>transform (any non-none value)</item>
+    ///   <item>contain: layout/paint/strict/content</item>
+    ///   <item>will-change: transform</item>
+    /// </list>
+    /// </summary>
+    private static bool EstablishesContainingBlock(Dictionary<string, string> props)
+    {
+        if (props.TryGetValue("position", out var pos) &&
+            (pos == "relative" || pos == "absolute" || pos == "fixed" || pos == "sticky"))
+            return true;
+
+        if (props.TryGetValue("transform", out var transform) &&
+            !string.Equals(transform, "none", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(transform))
+            return true;
+
+        if (props.TryGetValue("contain", out var contain) &&
+            !string.IsNullOrWhiteSpace(contain))
+        {
+            var containLower = contain.ToLowerInvariant();
+            if (containLower.Contains("layout") || containLower.Contains("paint") ||
+                containLower.Contains("strict") || containLower.Contains("content"))
+                return true;
+        }
+
+        if (props.TryGetValue("will-change", out var willChange) &&
+            willChange.Contains("transform", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
     }
 
     // -----------------------------------------------------------------
