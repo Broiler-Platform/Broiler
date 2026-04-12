@@ -33,11 +33,18 @@ public sealed partial class DomBridge
         // Also register anchors from inline styles (e.g. set via JS).
         BuildInlineAnchorRegistry(anchorRegistry);
 
+        // 1b. Parse @position-try at-rules from stylesheets.
+        var positionTryRules = ParsePositionTryRules();
+
         // 2. Resolve anchor() function values on elements.
         ResolveAnchorFunctions(DocumentElement, anchorRegistry);
 
         // 3. Resolve position-area values on anchored elements.
         ResolvePositionAreaValues(DocumentElement, anchorRegistry);
+
+        // 3b. Resolve position-try-fallbacks for elements whose base
+        //     style overflows the containing block.
+        ResolvePositionTryFallbacks(DocumentElement, anchorRegistry, positionTryRules);
 
         // 4. Insert backdrop elements for modal dialogs.
         InsertDialogBackdrops(DocumentElement, viewportWidth, viewportHeight);
@@ -47,10 +54,59 @@ public sealed partial class DomBridge
         //    from opposing inset values).
         ResolveFixedPositionSizing(viewportWidth, viewportHeight);
 
-        // 6. Strip CSS rules with unsupported properties (anchor(), inset,
+        // 6. Ensure elements that establish containing blocks via non-position
+        //    properties (contain:layout, transform) get position:relative so the
+        //    Broiler renderer treats them as containing blocks for abspos children.
+        EnsureContainingBlockPositioning(DocumentElement);
+
+        // 7. Strip CSS rules with unsupported properties (anchor(), inset,
         //    anchor-name) from the stylesheet so the renderer doesn't
         //    misinterpret them.
         NeutralizeStyleElementsForAnchorRules(DocumentElement);
+    }
+
+    // -----------------------------------------------------------------
+    // Containing block positioning
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// For elements that establish containing blocks via CSS properties that
+    /// Broiler's renderer does not understand (e.g. <c>contain:layout</c>,
+    /// <c>transform</c>), adds <c>position:relative</c> to their inline
+    /// styles so the renderer treats them as containing blocks for absolutely
+    /// positioned descendants.
+    /// </summary>
+    private void EnsureContainingBlockPositioning(DomElement root)
+    {
+        EnsureContainingBlockPositioningTree(root);
+    }
+
+    private void EnsureContainingBlockPositioningTree(DomElement el)
+    {
+        if (!el.IsTextNode && !string.Equals(el.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        {
+            var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (sel, _, decls) in CssRules)
+            {
+                if (MatchesSelector(el, sel))
+                    foreach (var kv in decls)
+                        props[kv.Key] = kv.Value;
+            }
+            foreach (var kv in el.Style)
+                props[kv.Key] = kv.Value;
+
+            // If the element already has explicit positioning, no change needed.
+            bool alreadyPositioned = props.TryGetValue("position", out var pos) &&
+                (pos == "relative" || pos == "absolute" || pos == "fixed" || pos == "sticky");
+
+            if (!alreadyPositioned && EstablishesContainingBlock(props))
+            {
+                el.Style["position"] = "relative";
+            }
+        }
+
+        foreach (var child in el.Children)
+            EnsureContainingBlockPositioningTree(child);
     }
 
     // -----------------------------------------------------------------
@@ -169,21 +225,145 @@ public sealed partial class DomBridge
         @"(?<selector>[^{}@]+)\{(?<body>[^}]*)\}",
         RegexOptions.Compiled);
 
+    /// <summary>
+    /// Matches <c>@position-try</c> at-rules (with their full block).
+    /// </summary>
+    private static readonly Regex PositionTryAtRulePattern = new(
+        @"@position-try\s+[^{]+\{[^}]*\}",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Property names that are anchor-positioning-specific and should be
+    /// stripped from CSS rule bodies after the DomBridge has resolved them
+    /// into inline styles.  Properties whose values contain <c>anchor(</c>
+    /// or <c>anchor-size(</c> are also stripped (matched separately).
+    /// </summary>
+    private static readonly string[] UnsupportedPropertyNames =
+    {
+        "anchor-name",
+        "position-area",
+        "position-anchor",
+        "position-try-fallbacks",
+        "position-try",
+    };
+
     private static string RemoveUnsupportedCssRules(string css)
     {
-        return CssRuleBlockPattern.Replace(css, m =>
+        // 1. Remove @position-try at-rules entirely.
+        css = PositionTryAtRulePattern.Replace(css, string.Empty);
+
+        // 2. Within each rule block, strip only the unsupported individual
+        //    properties while keeping all other declarations intact.
+        css = CssRuleBlockPattern.Replace(css, m =>
         {
             var body = m.Groups["body"].Value;
-            if (body.Contains("anchor-name", StringComparison.OrdinalIgnoreCase) ||
-                body.Contains("anchor(", StringComparison.OrdinalIgnoreCase) ||
-                body.Contains("position-area", StringComparison.OrdinalIgnoreCase) ||
-                body.Contains("position-anchor", StringComparison.OrdinalIgnoreCase) ||
-                body.Contains("inset", StringComparison.OrdinalIgnoreCase))
+
+            // Quick check: if no unsupported properties exist, return as-is.
+            bool hasUnsupported = false;
+            foreach (var propName in UnsupportedPropertyNames)
             {
-                return string.Empty;
+                if (body.Contains(propName, StringComparison.OrdinalIgnoreCase))
+                { hasUnsupported = true; break; }
             }
-            return m.Value;
+            if (!hasUnsupported &&
+                !body.Contains("anchor(", StringComparison.OrdinalIgnoreCase) &&
+                !body.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
+            {
+                return m.Value;
+            }
+
+            // If the rule contained position-area or position-anchor, the
+            // DomBridge has resolved the element's position to explicit
+            // inline pixel values.  Strip layout/sizing properties from
+            // the CSS rule so they don't conflict with the inline values.
+            bool hasPositionResolution =
+                body.Contains("position-area", StringComparison.OrdinalIgnoreCase) ||
+                body.Contains("position-anchor", StringComparison.OrdinalIgnoreCase);
+
+            // Strip unsupported properties from the body.
+            var cleanedBody = StripUnsupportedProperties(body, hasPositionResolution);
+
+            // If the rule body is now empty, remove the entire rule.
+            if (string.IsNullOrWhiteSpace(cleanedBody))
+                return string.Empty;
+
+            return m.Groups["selector"].Value + "{" + cleanedBody + "}";
         });
+
+        return css;
+    }
+
+    /// <summary>
+    /// Layout properties that should also be stripped when the DomBridge has
+    /// resolved position-area or position-anchor to inline pixel values.
+    /// These would otherwise conflict with the DomBridge-computed values.
+    /// </summary>
+    private static readonly HashSet<string> PositionResolvedProperties = new(
+        StringComparer.OrdinalIgnoreCase)
+    {
+        "width", "height", "top", "left", "right", "bottom",
+        "inset", "inset-block", "inset-inline",
+        "inset-block-start", "inset-block-end",
+        "inset-inline-start", "inset-inline-end",
+        "align-self", "justify-self",
+    };
+
+    /// <summary>
+    /// Removes individual CSS declarations that use anchor-positioning
+    /// properties from a rule body string, keeping all other declarations.
+    /// When <paramref name="stripPositionProps"/> is true, also strips
+    /// layout properties that would conflict with DomBridge-resolved values.
+    /// </summary>
+    private static string StripUnsupportedProperties(string body, bool stripPositionProps)
+    {
+        var sb = new System.Text.StringBuilder();
+        // Split on ';' to get individual declarations.
+        var declarations = body.Split(';');
+        foreach (var decl in declarations)
+        {
+            var trimmed = decl.Trim();
+            if (string.IsNullOrEmpty(trimmed))
+                continue;
+
+            // Check if this declaration uses an unsupported property name.
+            var colonIdx = trimmed.IndexOf(':');
+            if (colonIdx < 0)
+            {
+                sb.Append(trimmed).Append(';');
+                continue;
+            }
+
+            var propName = trimmed[..colonIdx].Trim();
+            var propValue = trimmed[(colonIdx + 1)..].Trim();
+
+            bool isUnsupported = false;
+            foreach (var unsupported in UnsupportedPropertyNames)
+            {
+                if (propName.Equals(unsupported, StringComparison.OrdinalIgnoreCase))
+                { isUnsupported = true; break; }
+            }
+
+            // Also strip declarations whose values contain anchor() or
+            // anchor-size() function calls.
+            if (!isUnsupported &&
+                (propValue.Contains("anchor(", StringComparison.OrdinalIgnoreCase) ||
+                 propValue.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase)))
+            {
+                isUnsupported = true;
+            }
+
+            // Strip layout/sizing properties from position-area resolved rules.
+            if (!isUnsupported && stripPositionProps &&
+                PositionResolvedProperties.Contains(propName))
+            {
+                isUnsupported = true;
+            }
+
+            if (!isUnsupported)
+                sb.Append(' ').Append(trimmed).Append(';');
+        }
+
+        return sb.ToString();
     }
 
     // -----------------------------------------------------------------
@@ -218,6 +398,131 @@ public sealed partial class DomBridge
 
     private AnchorInfo? ComputeElementBox(DomElement element)
     {
+        var props = GetComputedProps(element);
+
+        double width = TryParsePx(props.GetValueOrDefault("width")) ?? 0;
+        double height = TryParsePx(props.GetValueOrDefault("height")) ?? 0;
+
+        string? position = props.GetValueOrDefault("position");
+        bool isPositioned = position == "absolute" || position == "fixed";
+
+        // For absolutely positioned elements, use their explicit insets.
+        if (isPositioned)
+        {
+            double top = TryParsePx(props.GetValueOrDefault("top")) ?? 0;
+            double left = TryParsePx(props.GetValueOrDefault("left")) ?? 0;
+            return new AnchorInfo(top, left, width, height);
+        }
+
+        // For normal-flow elements, accumulate offsets from margins, padding,
+        // borders, and preceding sibling heights up the ancestor chain.
+        double marginLeft = TryParsePx(props.GetValueOrDefault("margin-left")) ?? 0;
+        double marginTop = TryParsePx(props.GetValueOrDefault("margin-top")) ?? 0;
+        double marginRight = TryParsePx(props.GetValueOrDefault("margin-right")) ?? 0;
+        ParseMarginShorthand(props, ref marginLeft, ref marginTop, ref marginRight);
+
+        double accLeft = marginLeft;
+        double accTop = marginTop;
+
+        // Add height of preceding siblings (vertical stacking in normal flow).
+        accTop += ComputePrecedingSiblingHeights(element);
+
+        // Walk up ancestors to accumulate margins, padding, and borders.
+        var ancestor = element.Parent;
+        while (ancestor != null)
+        {
+            var ancProps = GetComputedProps(ancestor);
+
+            // Check if ancestor establishes a CB — if so, stop here.
+            if (EstablishesContainingBlock(ancProps))
+            {
+                accLeft += TryParsePx(ancProps.GetValueOrDefault("padding-left")) ?? 0;
+                accTop += TryParsePx(ancProps.GetValueOrDefault("padding-top")) ?? 0;
+                accLeft += TryParsePx(ancProps.GetValueOrDefault("border-left-width")) ?? 0;
+                accTop += TryParsePx(ancProps.GetValueOrDefault("border-top-width")) ?? 0;
+                break;
+            }
+
+            // Accumulate ancestor margin + padding + border.
+            double ancML = TryParsePx(ancProps.GetValueOrDefault("margin-left")) ?? 0;
+            double ancMT = TryParsePx(ancProps.GetValueOrDefault("margin-top")) ?? 0;
+            double ancMR = 0;
+            ParseMarginShorthand(ancProps, ref ancML, ref ancMT, ref ancMR);
+
+            // Apply UA default body margin (8px) if body has no explicit margin.
+            if (string.Equals(ancestor.TagName, "body", StringComparison.OrdinalIgnoreCase) &&
+                ancML == 0 && ancMT == 0 &&
+                !ancProps.ContainsKey("margin") &&
+                !ancProps.ContainsKey("margin-left") &&
+                !ancProps.ContainsKey("margin-top"))
+            {
+                ancML = 8;
+                ancMT = 8;
+                ancMR = 8;
+            }
+
+            accLeft += ancML;
+            accTop += ancMT;
+            accLeft += TryParsePx(ancProps.GetValueOrDefault("padding-left")) ?? 0;
+            accTop += TryParsePx(ancProps.GetValueOrDefault("padding-top")) ?? 0;
+            accLeft += TryParsePx(ancProps.GetValueOrDefault("border-left-width")) ?? 0;
+            accTop += TryParsePx(ancProps.GetValueOrDefault("border-top-width")) ?? 0;
+            accTop += ComputePrecedingSiblingHeights(ancestor);
+
+            ancestor = ancestor.Parent;
+        }
+
+        // For block-level elements without explicit width, compute width
+        // from the containing block content width minus horizontal margins.
+        if (width == 0)
+        {
+            string? display = props.GetValueOrDefault("display");
+            bool isInline = display != null &&
+                (display.Contains("inline", StringComparison.OrdinalIgnoreCase) &&
+                 !display.Contains("inline-block", StringComparison.OrdinalIgnoreCase));
+
+            if (!isInline)
+            {
+                double cbWidth = FindContainingBlockWidth(element);
+                width = cbWidth - marginLeft - marginRight;
+                if (width < 0) width = 0;
+            }
+        }
+
+        return new AnchorInfo(accTop, accLeft, width, height);
+    }
+
+    /// <summary>
+    /// Parses the 'margin' shorthand into individual margin values,
+    /// only overwriting values that are still at their defaults (0).
+    /// </summary>
+    private static void ParseMarginShorthand(
+        Dictionary<string, string> props,
+        ref double marginLeft, ref double marginTop, ref double marginRight)
+    {
+        if (marginLeft == 0 && marginTop == 0 && marginRight == 0 &&
+            props.TryGetValue("margin", out var marginShorthand))
+        {
+            var parts = marginShorthand.Trim().Split(null as char[], StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 1)
+                marginTop = TryParsePx(parts[0]) ?? 0;
+            if (parts.Length >= 2)
+            {
+                marginRight = TryParsePx(parts[1]) ?? 0;
+                marginLeft = TryParsePx(parts[1]) ?? 0;
+            }
+            else if (parts.Length == 1)
+                marginLeft = marginRight = marginTop;
+            if (parts.Length >= 4)
+                marginLeft = TryParsePx(parts[3]) ?? 0;
+        }
+    }
+
+    /// <summary>
+    /// Gets computed CSS properties for an element (CSS rules + inline styles).
+    /// </summary>
+    private Dictionary<string, string> GetComputedProps(DomElement element)
+    {
         var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (sel, _, decls) in CssRules)
         {
@@ -227,13 +532,35 @@ public sealed partial class DomBridge
         }
         foreach (var kv in element.Style)
             props[kv.Key] = kv.Value;
+        return props;
+    }
 
-        double top = TryParsePx(props.GetValueOrDefault("top")) ?? 0;
-        double left = TryParsePx(props.GetValueOrDefault("left")) ?? 0;
-        double width = TryParsePx(props.GetValueOrDefault("width")) ?? 0;
-        double height = TryParsePx(props.GetValueOrDefault("height")) ?? 0;
+    /// <summary>
+    /// Computes the total height of preceding siblings in normal flow.
+    /// </summary>
+    private double ComputePrecedingSiblingHeights(DomElement element)
+    {
+        if (element.Parent == null) return 0;
 
-        return new AnchorInfo(top, left, width, height);
+        double totalHeight = 0;
+        foreach (var sibling in element.Parent.Children)
+        {
+            if (sibling == element) break;
+            if (sibling.IsTextNode) continue;
+
+            var sibProps = GetComputedProps(sibling);
+            string? sibPos = sibProps.GetValueOrDefault("position");
+            if (sibPos == "absolute" || sibPos == "fixed") continue;
+
+            double sibHeight = TryParsePx(sibProps.GetValueOrDefault("height")) ?? 0;
+            double sibMT = TryParsePx(sibProps.GetValueOrDefault("margin-top")) ?? 0;
+            double sibMB = TryParsePx(sibProps.GetValueOrDefault("margin-bottom")) ?? 0;
+            double sibMR = 0;
+            ParseMarginShorthand(sibProps, ref sibMT, ref sibMT, ref sibMR);
+
+            totalHeight += sibHeight + sibMT + sibMB;
+        }
+        return totalHeight;
     }
 
     // -----------------------------------------------------------------
@@ -241,7 +568,11 @@ public sealed partial class DomBridge
     // -----------------------------------------------------------------
 
     private static readonly Regex AnchorFunctionPattern = new(
-        @"anchor\(\s*(?<name>--[a-zA-Z0-9_-]+)\s+(?<edge>top|right|bottom|left|start|end|center)\s*\)",
+        @"anchor\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<edge>top|right|bottom|left|start|end|center)\s*\)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex AnchorSizeFunctionPattern = new(
+        @"anchor-size\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<dim>width|height|block|inline|self-block|self-inline)\s*\)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private void ResolveAnchorFunctions(
@@ -257,28 +588,46 @@ public sealed partial class DomBridge
         }
 
         bool hasAnchorRef = false;
+        bool hasAnchorSizeRef = false;
         foreach (var kv in cssProps)
         {
             if (kv.Value.Contains("anchor(", StringComparison.OrdinalIgnoreCase))
-            {
                 hasAnchorRef = true;
-                break;
-            }
+            if (kv.Value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
+                hasAnchorSizeRef = true;
+        }
+        // Also check inline styles for anchor-size()
+        foreach (var kv in element.Style)
+        {
+            if (kv.Value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
+                hasAnchorSizeRef = true;
         }
 
         if (hasAnchorRef)
         {
+            // Need CB dimensions for resolving anchor positions in right/bottom contexts.
+            double cbW = FindContainingBlockWidth(element);
+            double cbH = FindContainingBlockHeight(element);
+
+            // Get the implicit anchor name from position-anchor.
+            string? implicitAnchor = cssProps.GetValueOrDefault("position-anchor") ??
+                                     element.Style.GetValueOrDefault("position-anchor");
+
             foreach (var kv in cssProps)
             {
+                var propName = kv.Key.ToLowerInvariant();
                 var resolved = AnchorFunctionPattern.Replace(kv.Value, m =>
                 {
                     var anchorName = m.Groups["name"].Value;
+                    if (string.IsNullOrEmpty(anchorName))
+                        anchorName = implicitAnchor ?? string.Empty;
                     var edge = m.Groups["edge"].Value.ToLowerInvariant();
 
                     if (!anchorRegistry.TryGetValue(anchorName, out var anchor))
                         return "0px";
 
-                    double value = edge switch
+                    // Compute the raw edge position (from CB origin).
+                    double rawValue = edge switch
                     {
                         "top" => anchor.Top,
                         "right" => anchor.Right,
@@ -286,6 +635,15 @@ public sealed partial class DomBridge
                         "left" => anchor.Left,
                         "center" => (anchor.Top + anchor.Bottom) / 2,
                         _ => 0,
+                    };
+
+                    // For right/bottom inset properties, anchor() returns
+                    // the distance from the CB's opposite edge.
+                    double value = propName switch
+                    {
+                        "right" => cbW - rawValue,
+                        "bottom" => cbH - rawValue,
+                        _ => rawValue,
                     };
 
                     return $"{value.ToString(CultureInfo.InvariantCulture)}px";
@@ -299,6 +657,7 @@ public sealed partial class DomBridge
             foreach (var kv in cssProps)
             {
                 if (!kv.Value.Contains("anchor(", StringComparison.OrdinalIgnoreCase) &&
+                    !kv.Value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase) &&
                     !element.Style.ContainsKey(kv.Key) &&
                     IsLayoutProperty(kv.Key))
                 {
@@ -308,6 +667,12 @@ public sealed partial class DomBridge
 
             // Remove 'inset' shorthand.
             element.Style.Remove("inset");
+        }
+
+        // Resolve anchor-size() function calls in both CSS and inline styles.
+        if (hasAnchorSizeRef)
+        {
+            ResolveAnchorSizeFunctions(element, cssProps, anchorRegistry);
         }
 
         foreach (var child in element.Children)
@@ -322,6 +687,382 @@ public sealed partial class DomBridge
             or "width" or "height" => true,
         _ => false,
     };
+
+    /// <summary>
+    /// Resolves <c>anchor-size()</c> function calls in CSS properties and inline
+    /// styles, replacing them with computed pixel values from the anchor element's
+    /// dimensions.
+    /// </summary>
+    private static void ResolveAnchorSizeFunctions(
+        DomElement element,
+        Dictionary<string, string> cssProps,
+        Dictionary<string, AnchorInfo> anchorRegistry)
+    {
+        // Get implicit anchor name from position-anchor.
+        string? implicitAnchor = cssProps.GetValueOrDefault("position-anchor") ??
+                                 element.Style.GetValueOrDefault("position-anchor");
+
+        string ResolveValue(string value)
+        {
+            return AnchorSizeFunctionPattern.Replace(value, m =>
+            {
+                var anchorName = m.Groups["name"].Value;
+                if (string.IsNullOrEmpty(anchorName))
+                    anchorName = implicitAnchor ?? string.Empty;
+                var dim = m.Groups["dim"].Value.ToLowerInvariant();
+
+                if (!anchorRegistry.TryGetValue(anchorName, out var anchor))
+                    return "0px";
+
+                double result = dim switch
+                {
+                    "width" or "inline" or "self-inline" => anchor.Width,
+                    "height" or "block" or "self-block" => anchor.Height,
+                    _ => 0,
+                };
+
+                return $"{result.ToString(CultureInfo.InvariantCulture)}px";
+            });
+        }
+
+        // Resolve in CSS properties and apply as inline styles.
+        foreach (var kv in cssProps)
+        {
+            if (kv.Value.Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
+            {
+                element.Style[kv.Key] = ResolveValue(kv.Value);
+            }
+        }
+
+        // Resolve in existing inline styles.
+        var inlineKeys = new List<string>(element.Style.Keys);
+        foreach (var key in inlineKeys)
+        {
+            if (element.Style[key].Contains("anchor-size(", StringComparison.OrdinalIgnoreCase))
+            {
+                element.Style[key] = ResolveValue(element.Style[key]);
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // @position-try parsing and fallback resolution
+    // -----------------------------------------------------------------
+
+    private static readonly Regex PositionTryParsePattern = new(
+        @"@position-try\s+(?<name>--[a-zA-Z0-9_-]+)\s*\{(?<body>[^}]*)\}",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Parses all <c>@position-try</c> at-rules from <c>&lt;style&gt;</c>
+    /// elements, returning a dictionary mapping rule name to its property
+    /// declarations.
+    /// </summary>
+    private Dictionary<string, Dictionary<string, string>> ParsePositionTryRules()
+    {
+        var result = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        CollectPositionTryRulesFromTree(DocumentElement, result);
+        return result;
+    }
+
+    private void CollectPositionTryRulesFromTree(
+        DomElement el,
+        Dictionary<string, Dictionary<string, string>> result)
+    {
+        if (string.Equals(el.TagName, "style", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var child in el.Children)
+            {
+                if (child.IsTextNode && !string.IsNullOrEmpty(child.TextContent))
+                {
+                    foreach (Match m in PositionTryParsePattern.Matches(child.TextContent))
+                    {
+                        var name = m.Groups["name"].Value;
+                        var body = m.Groups["body"].Value;
+                        var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var decl in body.Split(';'))
+                        {
+                            var trimmed = decl.Trim();
+                            if (string.IsNullOrEmpty(trimmed)) continue;
+                            var colonIdx = trimmed.IndexOf(':');
+                            if (colonIdx < 0) continue;
+                            var propName = trimmed[..colonIdx].Trim();
+                            var propValue = trimmed[(colonIdx + 1)..].Trim();
+                            props[propName] = propValue;
+                        }
+                        result[name] = props;
+                    }
+                }
+            }
+        }
+
+        foreach (var child in el.Children)
+            CollectPositionTryRulesFromTree(child, result);
+    }
+
+    /// <summary>
+    /// For elements with <c>position-try-fallbacks</c>, checks whether
+    /// the base style overflows the containing block and applies the first
+    /// non-overflowing fallback from the <c>@position-try</c> rules.
+    /// </summary>
+    private void ResolvePositionTryFallbacks(
+        DomElement root,
+        Dictionary<string, AnchorInfo> anchorRegistry,
+        Dictionary<string, Dictionary<string, string>> positionTryRules)
+    {
+        ResolvePositionTryFallbacksTree(root, anchorRegistry, positionTryRules);
+    }
+
+    private void ResolvePositionTryFallbacksTree(
+        DomElement element,
+        Dictionary<string, AnchorInfo> anchorRegistry,
+        Dictionary<string, Dictionary<string, string>> positionTryRules)
+    {
+        if (!element.IsTextNode &&
+            !string.Equals(element.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+        {
+            // Collect all CSS + inline properties to find position-try-fallbacks.
+            var cssProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (selector, _, declarations) in CssRules)
+            {
+                if (MatchesSelector(element, selector))
+                    foreach (var kv in declarations)
+                        cssProps[kv.Key] = kv.Value;
+            }
+            foreach (var kv in element.Style)
+                cssProps[kv.Key] = kv.Value;
+
+            string? fallbacks = cssProps.GetValueOrDefault("position-try-fallbacks") ??
+                                cssProps.GetValueOrDefault("position-try");
+
+            if (!string.IsNullOrWhiteSpace(fallbacks) && positionTryRules.Count > 0)
+            {
+                TryApplyFallback(element, cssProps, anchorRegistry, positionTryRules, fallbacks!);
+            }
+        }
+
+        foreach (var child in element.Children)
+            ResolvePositionTryFallbacksTree(child, anchorRegistry, positionTryRules);
+    }
+
+    private void TryApplyFallback(
+        DomElement element,
+        Dictionary<string, string> baseProps,
+        Dictionary<string, AnchorInfo> anchorRegistry,
+        Dictionary<string, Dictionary<string, string>> positionTryRules,
+        string fallbackList)
+    {
+        // Get the containing block dimensions.
+        double cbWidth = FindContainingBlockWidth(element);
+        double cbHeight = FindContainingBlockHeight(element);
+
+        // Check if the base style overflows the IMCB.
+        double baseLeft = TryParsePx(element.Style.GetValueOrDefault("left")) ?? 0;
+        double baseTop = TryParsePx(element.Style.GetValueOrDefault("top")) ?? 0;
+        double baseRight = TryParsePx(element.Style.GetValueOrDefault("right")) ??
+                           TryParsePx(baseProps.GetValueOrDefault("right")) ?? 0;
+        double baseBottom = TryParsePx(element.Style.GetValueOrDefault("bottom")) ??
+                            TryParsePx(baseProps.GetValueOrDefault("bottom")) ?? 0;
+        double baseWidth = TryParsePx(element.Style.GetValueOrDefault("width")) ??
+                           TryParsePx(baseProps.GetValueOrDefault("width")) ?? 0;
+        double baseHeight = TryParsePx(element.Style.GetValueOrDefault("height")) ??
+                            TryParsePx(baseProps.GetValueOrDefault("height")) ?? 0;
+
+        // Compute IMCB (inset-modified containing block) dimensions.
+        double imcbWidth = cbWidth - baseLeft - baseRight;
+        double imcbHeight = cbHeight - baseTop - baseBottom;
+
+        // Estimate content width for min-content/max-content.
+        string? widthVal = baseProps.GetValueOrDefault("width");
+        bool hasAutoWidth = widthVal == "min-content" || widthVal == "max-content" ||
+                            widthVal == "auto" || widthVal == "fit-content";
+        if (hasAutoWidth && baseWidth == 0)
+        {
+            // Estimate from child element widths.
+            baseWidth = EstimateMinContentWidth(element);
+        }
+
+        bool baseOverflows = baseLeft < 0 || baseTop < 0 ||
+                             baseLeft + baseWidth > cbWidth ||
+                             baseTop + baseHeight > cbHeight ||
+                             (imcbWidth < baseWidth && imcbWidth >= 0) ||
+                             (imcbHeight < baseHeight && imcbHeight >= 0);
+
+        if (!baseOverflows)
+            return; // Base style fits; no fallback needed.
+
+        // Parse the fallback list (comma-separated @position-try names).
+        var names = fallbackList.Split(',').Select(n => n.Trim()).ToArray();
+
+        // Get implicit anchor name from position-anchor.
+        string? implicitAnchor = baseProps.GetValueOrDefault("position-anchor");
+
+        foreach (var name in names)
+        {
+            if (!positionTryRules.TryGetValue(name, out var tryProps))
+                continue;
+
+            // Compute the element position/size with this fallback applied.
+            // Start with the base properties, then overlay the try properties.
+            var merged = new Dictionary<string, string>(baseProps, StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in tryProps)
+                merged[kv.Key] = kv.Value;
+
+            // Resolve any anchor() references in the try properties.
+            double tryLeft = 0, tryTop = 0, tryWidth = baseWidth, tryHeight = baseHeight;
+
+            if (merged.TryGetValue("left", out var lv) && lv != "auto")
+            {
+                var resolvedL = AnchorFunctionPattern.Replace(lv, m =>
+                    ResolveAnchorEdge(m, anchorRegistry, "left", cbWidth, cbHeight, implicitAnchor));
+                tryLeft = TryParsePx(resolvedL) ?? 0;
+            }
+
+            if (merged.TryGetValue("right", out var rv) && rv != "auto")
+            {
+                var resolvedR = AnchorFunctionPattern.Replace(rv, m =>
+                    ResolveAnchorEdge(m, anchorRegistry, "right", cbWidth, cbHeight, implicitAnchor));
+                var rightPx = TryParsePx(resolvedR);
+                if (rightPx.HasValue)
+                {
+                    if (!merged.TryGetValue("left", out var leftV) ||
+                        leftV == "auto" || string.IsNullOrEmpty(leftV))
+                    {
+                        // No left specified; compute left from right + width.
+                        tryLeft = cbWidth - rightPx.Value - tryWidth;
+                    }
+                    else
+                    {
+                        // Both left and right specified; compute width.
+                        tryWidth = cbWidth - tryLeft - rightPx.Value;
+                    }
+                }
+            }
+
+            if (merged.TryGetValue("top", out var tv) && tv != "auto")
+            {
+                var resolvedT = AnchorFunctionPattern.Replace(tv, m =>
+                    ResolveAnchorEdge(m, anchorRegistry, "top", cbWidth, cbHeight, implicitAnchor));
+                tryTop = TryParsePx(resolvedT) ?? 0;
+            }
+
+            if (merged.TryGetValue("bottom", out var bv) && bv != "auto")
+            {
+                var resolvedB = AnchorFunctionPattern.Replace(bv, m =>
+                    ResolveAnchorEdge(m, anchorRegistry, "bottom", cbWidth, cbHeight, implicitAnchor));
+                var bottomPx = TryParsePx(resolvedB);
+                if (bottomPx.HasValue)
+                {
+                    if (!merged.TryGetValue("top", out var topV) ||
+                        topV == "auto" || string.IsNullOrEmpty(topV))
+                    {
+                        tryTop = cbHeight - bottomPx.Value - tryHeight;
+                    }
+                    else
+                    {
+                        tryHeight = cbHeight - tryTop - bottomPx.Value;
+                    }
+                }
+            }
+
+            if (merged.TryGetValue("width", out var wv))
+            {
+                var w = TryParsePx(wv);
+                if (w.HasValue) tryWidth = w.Value;
+            }
+            if (merged.TryGetValue("height", out var hv))
+            {
+                var h = TryParsePx(hv);
+                if (h.HasValue) tryHeight = h.Value;
+            }
+
+            // Handle "inset: auto" which resets all inset properties.
+            if (merged.TryGetValue("inset", out var insetVal) &&
+                insetVal.Trim() == "auto")
+            {
+                // The try rule explicitly resets insets; recalculate.
+            }
+
+            bool fits = tryLeft >= 0 && tryTop >= 0 &&
+                        tryLeft + tryWidth <= cbWidth &&
+                        tryTop + tryHeight <= cbHeight;
+
+            if (fits)
+            {
+                // Apply the fallback: set resolved values as inline styles.
+                element.Style["left"] = $"{tryLeft.ToString(CultureInfo.InvariantCulture)}px";
+                element.Style["top"] = $"{tryTop.ToString(CultureInfo.InvariantCulture)}px";
+                element.Style["width"] = $"{tryWidth.ToString(CultureInfo.InvariantCulture)}px";
+                element.Style["height"] = $"{tryHeight.ToString(CultureInfo.InvariantCulture)}px";
+                element.Style.Remove("right");
+                element.Style.Remove("bottom");
+                element.Style.Remove("inset");
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Estimates the min-content width of an element by examining its
+    /// children's explicit widths. This is a heuristic for elements
+    /// with <c>width: min-content</c>.
+    /// </summary>
+    private double EstimateMinContentWidth(DomElement element)
+    {
+        double maxWidth = 0;
+        foreach (var child in element.Children)
+        {
+            if (child.IsTextNode) continue;
+            var childProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (sel, _, decls) in CssRules)
+            {
+                if (MatchesSelector(child, sel))
+                    foreach (var kv in decls)
+                        childProps[kv.Key] = kv.Value;
+            }
+            foreach (var kv in child.Style)
+                childProps[kv.Key] = kv.Value;
+
+            double childWidth = TryParsePx(childProps.GetValueOrDefault("width")) ?? 0;
+            if (childWidth > maxWidth)
+                maxWidth = childWidth;
+        }
+        return maxWidth;
+    }
+
+    private static string ResolveAnchorEdge(
+        Match m, Dictionary<string, AnchorInfo> registry,
+        string contextProp, double cbWidth, double cbHeight,
+        string? implicitAnchor = null)
+    {
+        var anchorName = m.Groups["name"].Value;
+        if (string.IsNullOrEmpty(anchorName))
+            anchorName = implicitAnchor ?? string.Empty;
+        var edge = m.Groups["edge"].Value.ToLowerInvariant();
+
+        if (!registry.TryGetValue(anchorName, out var anchor))
+            return "0px";
+
+        double rawValue = edge switch
+        {
+            "top" => anchor.Top,
+            "right" => anchor.Right,
+            "bottom" => anchor.Bottom,
+            "left" => anchor.Left,
+            "center" => (anchor.Top + anchor.Bottom) / 2,
+            _ => 0,
+        };
+
+        // For right/bottom properties, return distance from the opposite CB edge.
+        double value = contextProp switch
+        {
+            "right" => cbWidth - rawValue,
+            "bottom" => cbHeight - rawValue,
+            _ => rawValue,
+        };
+
+        return $"{value.ToString(CultureInfo.InvariantCulture)}px";
+    }
 
     // -----------------------------------------------------------------
     // Dialog backdrop insertion
@@ -432,39 +1173,10 @@ public sealed partial class DomBridge
     /// </summary>
     private AnchorInfo? ComputeElementBoxWithContainer(DomElement element)
     {
-        var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (sel, _, decls) in CssRules)
-        {
-            if (MatchesSelector(element, sel))
-                foreach (var kv in decls)
-                    props[kv.Key] = kv.Value;
-        }
-        foreach (var kv in element.Style)
-            props[kv.Key] = kv.Value;
-
-        double width = TryParsePx(props.GetValueOrDefault("width")) ?? 0;
-        double height = TryParsePx(props.GetValueOrDefault("height")) ?? 0;
-        double top = TryParsePx(props.GetValueOrDefault("top")) ?? 0;
-        double left;
-
-        // Resolve left from 'right' if no explicit 'left'.
-        if (props.TryGetValue("left", out var leftVal) && TryParsePx(leftVal).HasValue)
-        {
-            left = TryParsePx(leftVal)!.Value;
-        }
-        else if (props.TryGetValue("right", out var rightVal) && TryParsePx(rightVal).HasValue)
-        {
-            double rightPx = TryParsePx(rightVal)!.Value;
-            // Find containing block width.
-            double containerWidth = FindContainingBlockWidth(element);
-            left = containerWidth - width - rightPx;
-        }
-        else
-        {
-            left = 0;
-        }
-
-        return new AnchorInfo(top, left, width, height);
+        // Delegate to the main ComputeElementBox which already handles
+        // both positioned and normal-flow elements with ancestor offset
+        // accumulation and block-width computation.
+        return ComputeElementBox(element);
     }
 
     /// <summary>
@@ -476,24 +1188,21 @@ public sealed partial class DomBridge
         var parent = element.Parent;
         while (parent != null)
         {
-            var parentProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (sel, _, decls) in CssRules)
-            {
-                if (MatchesSelector(parent, sel))
-                    foreach (var kv in decls)
-                        parentProps[kv.Key] = kv.Value;
-            }
-            foreach (var kv in parent.Style)
-                parentProps[kv.Key] = kv.Value;
+            var parentProps = GetComputedProps(parent);
 
-            if (parentProps.TryGetValue("position", out var pos) &&
-                (pos == "relative" || pos == "absolute" || pos == "fixed"))
+            if (EstablishesContainingBlock(parentProps))
             {
-                return TryParsePx(parentProps.GetValueOrDefault("width")) ?? _viewportWidth;
+                double w = TryParsePx(parentProps.GetValueOrDefault("width")) ?? _viewportWidth;
+                // Subtract padding from the CB width to get content width.
+                w -= TryParsePx(parentProps.GetValueOrDefault("padding-left")) ?? 0;
+                w -= TryParsePx(parentProps.GetValueOrDefault("padding-right")) ?? 0;
+                return w;
             }
             parent = parent.Parent;
         }
-        return _viewportWidth;
+        // No positioned ancestor found; use viewport width minus default body
+        // margin (8px each side) as the effective content width for block layout.
+        return _viewportWidth - 16;
     }
 
     /// <summary>
@@ -505,24 +1214,56 @@ public sealed partial class DomBridge
         var parent = element.Parent;
         while (parent != null)
         {
-            var parentProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (sel, _, decls) in CssRules)
-            {
-                if (MatchesSelector(parent, sel))
-                    foreach (var kv in decls)
-                        parentProps[kv.Key] = kv.Value;
-            }
-            foreach (var kv in parent.Style)
-                parentProps[kv.Key] = kv.Value;
+            var parentProps = GetComputedProps(parent);
 
-            if (parentProps.TryGetValue("position", out var pos) &&
-                (pos == "relative" || pos == "absolute" || pos == "fixed"))
+            if (EstablishesContainingBlock(parentProps))
             {
-                return TryParsePx(parentProps.GetValueOrDefault("height")) ?? _viewportHeight;
+                double h = TryParsePx(parentProps.GetValueOrDefault("height")) ?? _viewportHeight;
+                h -= TryParsePx(parentProps.GetValueOrDefault("padding-top")) ?? 0;
+                h -= TryParsePx(parentProps.GetValueOrDefault("padding-bottom")) ?? 0;
+                return h;
             }
             parent = parent.Parent;
         }
         return _viewportHeight;
+    }
+
+    /// <summary>
+    /// Determines whether an element with the given CSS properties
+    /// establishes a containing block for absolutely positioned descendants.
+    /// Per CSS spec, this includes:
+    /// <list type="bullet">
+    ///   <item>position: relative/absolute/fixed/sticky</item>
+    ///   <item>transform (any non-none value)</item>
+    ///   <item>contain: layout/paint/strict/content</item>
+    ///   <item>will-change: transform</item>
+    /// </list>
+    /// </summary>
+    private static bool EstablishesContainingBlock(Dictionary<string, string> props)
+    {
+        if (props.TryGetValue("position", out var pos) &&
+            (pos == "relative" || pos == "absolute" || pos == "fixed" || pos == "sticky"))
+            return true;
+
+        if (props.TryGetValue("transform", out var transform) &&
+            !string.Equals(transform, "none", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(transform))
+            return true;
+
+        if (props.TryGetValue("contain", out var contain) &&
+            !string.IsNullOrWhiteSpace(contain))
+        {
+            var containLower = contain.ToLowerInvariant();
+            if (containLower.Contains("layout") || containLower.Contains("paint") ||
+                containLower.Contains("strict") || containLower.Contains("content"))
+                return true;
+        }
+
+        if (props.TryGetValue("will-change", out var willChange) &&
+            willChange.Contains("transform", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
     }
 
     // -----------------------------------------------------------------

@@ -340,6 +340,19 @@ public sealed partial class DomBridge
             child.Parent = DocumentElement;
             DocumentElement.Children.Add(child);
         }
+
+        // Copy attributes from the parsed <html> element to DocumentElement
+        // so that attributes like lang="en", dir="rtl", etc. are preserved
+        // during serialization.
+        if (!string.IsNullOrEmpty(docElement.Id))
+            DocumentElement.Id = docElement.Id;
+        if (!string.IsNullOrEmpty(docElement.ClassName))
+            DocumentElement.ClassName = docElement.ClassName;
+        foreach (var kv in docElement.Attributes)
+            DocumentElement.Attributes[kv.Key] = kv.Value;
+        foreach (var kv in docElement.Style)
+            DocumentElement.Style[kv.Key] = kv.Value;
+
         _elements.AddRange(allElements);
 
         // Connect DocumentElement to _documentNode so that document.firstChild works

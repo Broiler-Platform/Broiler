@@ -85,11 +85,12 @@ public sealed partial class DomBridge
         if (!string.IsNullOrEmpty(element.ClassName))
             sb.Append(" class=\"").Append(HtmlSerializer.HtmlEncode(element.ClassName)).Append('"');
 
-        // Emit remaining attributes (skip id/class since already emitted)
+        // Emit remaining attributes (skip id/class/style since already emitted separately)
         foreach (var kvp in element.Attributes)
         {
             if (string.Equals(kvp.Key, "id", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(kvp.Key, "class", StringComparison.OrdinalIgnoreCase))
+                string.Equals(kvp.Key, "class", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(kvp.Key, "style", StringComparison.OrdinalIgnoreCase))
                 continue;
             sb.Append(' ').Append(kvp.Key).Append("=\"").Append(HtmlSerializer.HtmlEncode(kvp.Value)).Append('"');
         }
