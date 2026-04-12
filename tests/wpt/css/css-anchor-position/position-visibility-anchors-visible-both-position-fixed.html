@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>CSS Anchor Positioning Test: position-visibility: anchors-visible with both fixed</title>
+<link rel="help" href="https://drafts.csswg.org/css-anchor-position-1/#position-visibility">
+<link rel="match" href="reference/position-visibility-anchors-visible-both-position-fixed-ref.html">
+<style>
+  #anchor {
+    anchor-name: --a1;
+    position: fixed;
+    top: -100px;
+    left: 0;
+    width: 100px;
+    height: 100px;
+    background: orange;
+  }
+
+  #target {
+    position-anchor: --a1;
+    position-visibility: anchors-visible;
+    position-area: bottom right;
+    width: 100px;
+    height: 100px;
+    background: green;
+    position: fixed;
+    top: 0;
+    left: 0;
+  }
+
+  #spacer {
+    height: 200vh;
+  }
+</style>
+
+<div id="anchor">anchor</div>
+<div id="target">target</div>
+<div id="spacer"></div>
