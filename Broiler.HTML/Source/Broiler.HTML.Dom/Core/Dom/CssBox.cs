@@ -973,6 +973,75 @@ internal class CssBox : CssBoxProperties, IDisposable
                         }
                     }
 
+                    // CSS2.1 §9.5: The border box of an element in normal
+                    // flow that establishes a new BFC must not overlap the
+                    // margin box of any floats in the same BFC.  Shift the
+                    // block right past left floats and narrow it to avoid
+                    // right floats.  If it cannot fit beside the floats,
+                    // clear below them.
+                    if (Float == CssConstants.None
+                        && Position != CssConstants.Absolute && Position != CssConstants.Fixed)
+                    {
+                        bool isBfcRoot = Display == CssConstants.InlineBlock
+                            || Display == CssConstants.TableCell
+                            || Display is "flex" or "inline-flex" or "grid" or "inline-grid"
+                            || (Overflow != null && Overflow != CssConstants.Visible)
+                            || (AlignContent != null && AlignContent != "normal");
+
+                        if (isBfcRoot)
+                        {
+                            var precedingFloats = CssBoxHelper.CollectPrecedingFloatsInBfc(this);
+                            if (precedingFloats.Count > 0)
+                            {
+                                double containerLeft = ContainingBlock.Location.X + ContainingBlock.ActualPaddingLeft + ContainingBlock.ActualBorderLeftWidth;
+                                double containerRight = ContainingBlock.ClientLeft + ContainingBlock.AvailableWidth;
+                                double boxHeight = Math.Max(Size.Height, GetEmHeight());
+
+                                // Try to fit beside floats; if not possible, clear
+                                // below them.  100 iterations is a safe upper bound
+                                // since each iteration advances past at least one
+                                // float's bottom edge.
+                                for (int bfcIter = 0; bfcIter < 100; bfcIter++)
+                                {
+                                    double leftEdge = containerLeft + ActualMarginLeft;
+                                    double rightEdge = containerRight - ActualMarginRight;
+
+                                    foreach (var fb in precedingFloats)
+                                    {
+                                        double fbBottom = fb.ActualBottom + fb.ActualMarginBottom;
+                                        if (top < fbBottom && top + boxHeight > fb.Location.Y - fb.ActualMarginTop)
+                                        {
+                                            if (fb.Float == CssConstants.Left)
+                                                leftEdge = Math.Max(leftEdge, fb.Location.X + fb.Size.Width + fb.ActualMarginRight + ActualMarginLeft);
+                                            else if (fb.Float == CssConstants.Right)
+                                                rightEdge = Math.Min(rightEdge, fb.Location.X - fb.ActualMarginLeft - ActualMarginRight);
+                                        }
+                                    }
+
+                                    double availableWidth = rightEdge - leftEdge;
+                                    if (availableWidth >= Size.Width || availableWidth >= 0)
+                                    {
+                                        left = leftEdge;
+                                        if (availableWidth < Size.Width && (Width == CssConstants.Auto || string.IsNullOrEmpty(Width)))
+                                            Size = new SizeF((float)availableWidth, Size.Height);
+                                        break;
+                                    }
+
+                                    // Cannot fit beside floats — clear below them.
+                                    double maxFb = top;
+                                    foreach (var fb in precedingFloats)
+                                    {
+                                        double fbBottom = fb.ActualBottom + fb.ActualMarginBottom;
+                                        if (top < fbBottom && top + boxHeight > fb.Location.Y - fb.ActualMarginTop)
+                                            maxFb = Math.Max(maxFb, fbBottom);
+                                    }
+                                    if (maxFb <= top) break;
+                                    top = maxFb;
+                                }
+                            }
+                        }
+                    }
+
                     Location = new PointF((float)left, (float)top);
                     ActualBottom = top;
 
@@ -1199,9 +1268,26 @@ internal class CssBox : CssBoxProperties, IDisposable
                     // lay out at column width instead of full container width.
                     float savedWidth = Size.Width;
                     int preColCount = 0;
-                    bool isMultiColumn = ColumnCount != null && ColumnCount != "auto"
+                    bool hasExplicitColCount = ColumnCount != null && ColumnCount != "auto"
                         && int.TryParse(ColumnCount, out preColCount) && preColCount > 1;
-                    if (isMultiColumn)
+                    bool hasColWidth = ColumnWidth != null && ColumnWidth != "auto"
+                        && !string.IsNullOrEmpty(ColumnWidth);
+
+                    bool isMultiColumn = hasExplicitColCount || hasColWidth;
+                    if (isMultiColumn && !hasExplicitColCount && hasColWidth)
+                    {
+                        // Auto column-count from column-width: compute the
+                        // number of columns so we can pre-constrain width.
+                        double cwVal = CssValueParser.ParseLength(ColumnWidth, Size.Width, GetEmHeight());
+                        double gap = GetEmHeight();
+                        double available = Size.Width - ActualPaddingLeft - ActualPaddingRight
+                            - ActualBorderLeftWidth - ActualBorderRightWidth;
+                        if (cwVal > 0 && available > 0)
+                            preColCount = Math.Max(1, (int)Math.Floor((available + gap) / (cwVal + gap)));
+                        isMultiColumn = preColCount > 1;
+                    }
+
+                    if (isMultiColumn && preColCount > 1)
                     {
                         double columnGap = GetEmHeight();
                         double cw = Size.Width - ActualPaddingLeft - ActualPaddingRight
@@ -1229,6 +1315,58 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                     ActualRight = CalculateActualRight();
                     ActualBottom = MarginBottomCollapse();
+
+                    // CSS Grid Level 1 §8.5: When all grid items share
+                    // the same grid-row and grid-column (e.g.
+                    // grid-row: 1; grid-column: 1), they overlap in the
+                    // same grid cell.  Position them at the container's
+                    // content-area top-left so they stack visually.
+                    if (Display is "grid" or "inline-grid")
+                    {
+                        bool allSameCell = true;
+                        string firstRow = null, firstCol = null;
+                        foreach (var child in Boxes)
+                        {
+                            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                                continue;
+                            if (child.Display == CssConstants.None)
+                                continue;
+                            var cr = child.GridRow;
+                            var cc = child.GridColumn;
+                            // Skip items without explicit grid placement (default "auto").
+                            if (string.IsNullOrEmpty(cr) || cr == "auto"
+                                || string.IsNullOrEmpty(cc) || cc == "auto")
+                            { allSameCell = false; break; }
+                            if (firstRow == null)
+                            { firstRow = cr; firstCol = cc; }
+                            else if (cr != firstRow || cc != firstCol)
+                            { allSameCell = false; break; }
+                        }
+
+                        if (allSameCell && firstRow != null)
+                        {
+                            double cellLeft = Location.X + ActualPaddingLeft + ActualBorderLeftWidth;
+                            double cellTop = Location.Y + ActualPaddingTop + ActualBorderTopWidth;
+                            double maxBottom = cellTop;
+                            foreach (var child in Boxes)
+                            {
+                                if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                                    continue;
+                                if (child.Display == CssConstants.None)
+                                    continue;
+                                double dx = cellLeft + child.ActualMarginLeft - child.Location.X;
+                                double dy = cellTop + child.ActualMarginTop - child.Location.Y;
+                                if (Math.Abs(dx) > 0.1)
+                                    child.OffsetLeft(dx);
+                                if (Math.Abs(dy) > 0.1)
+                                    child.OffsetTop(dy);
+                                double childBottom = child.ActualBottom + child.ActualMarginBottom;
+                                if (childBottom > maxBottom)
+                                    maxBottom = childBottom;
+                            }
+                            ActualBottom = maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
+                        }
+                    }
                 }
             }
         }
@@ -1531,7 +1669,11 @@ internal class CssBox : CssBoxProperties, IDisposable
             if (freeSpace > 0.5)
             {
                 string js = JustifySelf.Trim().ToLowerInvariant();
-                bool isRtl = Direction == "rtl";
+                // CSS Box Alignment §6.1: 'start'/'end' use the containing
+                // block's writing direction; 'self-start'/'self-end' use the
+                // element's own writing direction.
+                bool isElementRtl = Direction == "rtl";
+                bool isContainerRtl = ParentBox?.Direction == "rtl";
 
                 double dx = 0;
                 switch (js)
@@ -1541,20 +1683,20 @@ internal class CssBox : CssBoxProperties, IDisposable
                         break;
                     case "end":
                     case "flex-end":
-                        dx = isRtl ? 0 : freeSpace;
+                        dx = isContainerRtl ? 0 : freeSpace;
                         break;
                     case "self-end":
-                        dx = freeSpace;
+                        dx = isElementRtl ? 0 : freeSpace;
                         break;
                     case "right":
                         dx = freeSpace;
                         break;
                     case "start":
                     case "flex-start":
-                        dx = isRtl ? freeSpace : 0;
+                        dx = isContainerRtl ? freeSpace : 0;
                         break;
                     case "self-start":
-                        dx = 0;
+                        dx = isElementRtl ? freeSpace : 0;
                         break;
                     case "left":
                         dx = 0;

@@ -442,6 +442,8 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string ColumnWidth { get; set; } = "auto";
     public string ColumnFill { get; set; } = "balance";
     public string BreakInside { get; set; } = "auto";
+    public string GridRow { get; set; } = "auto";
+    public string GridColumn { get; set; } = "auto";
     public string FontFamily { get; set; }
 
     public string FontSize

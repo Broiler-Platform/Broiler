@@ -389,6 +389,7 @@ internal sealed class CssValueParser
         int r = -1;
         int g = -1;
         int b = -1;
+        int a = 255;
 
         if (length == 7)
         {
@@ -405,10 +406,30 @@ internal sealed class CssValueParser
             b = ParseHexInt(str, idx + 3, 1);
             b = b * 16 + b;
         }
+        else if (length == 9)
+        {
+            // #RRGGBBAA — 8-digit hex with alpha (CSS Color Level 4)
+            r = ParseHexInt(str, idx + 1, 2);
+            g = ParseHexInt(str, idx + 3, 2);
+            b = ParseHexInt(str, idx + 5, 2);
+            a = ParseHexInt(str, idx + 7, 2);
+        }
+        else if (length == 5)
+        {
+            // #RGBA — 4-digit hex with alpha (CSS Color Level 4)
+            r = ParseHexInt(str, idx + 1, 1);
+            r = r * 16 + r;
+            g = ParseHexInt(str, idx + 2, 1);
+            g = g * 16 + g;
+            b = ParseHexInt(str, idx + 3, 1);
+            b = b * 16 + b;
+            a = ParseHexInt(str, idx + 4, 1);
+            a = a * 16 + a;
+        }
 
         if (r > -1 && g > -1 && b > -1)
         {
-            color = Color.FromArgb(r, g, b);
+            color = Color.FromArgb(a, r, g, b);
             return true;
         }
 
