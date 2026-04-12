@@ -340,6 +340,11 @@ public sealed partial class DomBridge
                     ["left"] = "0",
                     ["width"] = $"{vpW}px",
                     ["height"] = $"{vpH}px",
+                    // Pre-composited ::backdrop color: the CSS spec default for
+                    // dialog::backdrop is rgba(0,0,0,0.1).  Alpha-blending
+                    // 10% black over white: 255*(1-0.1) + 0*0.1 = 229.5 ≈ 229.
+                    // We use the pre-composited value because the Broiler
+                    // renderer's alpha compositing produces incorrect results.
                     ["background-color"] = "rgb(229, 229, 229)",
                 });
             backdrop.Parent = parent;

@@ -281,10 +281,14 @@ public sealed partial class DomBridge
         return result;
     }
 
+    private static readonly Regex StepsPattern = new(
+        @"steps\(\s*(\d+)\s*(?:,\s*(start|end|jump-start|jump-end|jump-none|jump-both))?\s*\)",
+        RegexOptions.Compiled);
+
     private static double ApplyTimingFunction(double progress, string timingFunction)
     {
         // Handle steps() timing functions.
-        var stepsMatch = Regex.Match(timingFunction, @"steps\(\s*(\d+)\s*(?:,\s*(start|end|jump-start|jump-end|jump-none|jump-both))?\s*\)");
+        var stepsMatch = StepsPattern.Match(timingFunction);
         if (stepsMatch.Success)
         {
             int steps = int.Parse(stepsMatch.Groups[1].Value, CultureInfo.InvariantCulture);
