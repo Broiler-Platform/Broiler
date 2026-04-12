@@ -1264,9 +1264,26 @@ internal class CssBox : CssBoxProperties, IDisposable
                     // lay out at column width instead of full container width.
                     float savedWidth = Size.Width;
                     int preColCount = 0;
-                    bool isMultiColumn = ColumnCount != null && ColumnCount != "auto"
+                    bool hasExplicitColCount = ColumnCount != null && ColumnCount != "auto"
                         && int.TryParse(ColumnCount, out preColCount) && preColCount > 1;
-                    if (isMultiColumn)
+                    bool hasColWidth = ColumnWidth != null && ColumnWidth != "auto"
+                        && !string.IsNullOrEmpty(ColumnWidth);
+
+                    bool isMultiColumn = hasExplicitColCount || hasColWidth;
+                    if (isMultiColumn && !hasExplicitColCount && hasColWidth)
+                    {
+                        // Auto column-count from column-width: compute the
+                        // number of columns so we can pre-constrain width.
+                        double cwVal = CssValueParser.ParseLength(ColumnWidth, Size.Width, GetEmHeight());
+                        double gap = GetEmHeight();
+                        double available = Size.Width - ActualPaddingLeft - ActualPaddingRight
+                            - ActualBorderLeftWidth - ActualBorderRightWidth;
+                        if (cwVal > 0 && available > 0)
+                            preColCount = Math.Max(1, (int)Math.Floor((available + gap) / (cwVal + gap)));
+                        isMultiColumn = preColCount > 1;
+                    }
+
+                    if (isMultiColumn && preColCount > 1)
                     {
                         double columnGap = GetEmHeight();
                         double cw = Size.Width - ActualPaddingLeft - ActualPaddingRight
@@ -1294,6 +1311,56 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                     ActualRight = CalculateActualRight();
                     ActualBottom = MarginBottomCollapse();
+
+                    // CSS Grid Level 1 §8.5: When all grid items share
+                    // the same grid-row and grid-column (e.g.
+                    // grid-row: 1; grid-column: 1), they overlap in the
+                    // same grid cell.  Position them at the container's
+                    // content-area top-left so they stack visually.
+                    if (Display is "grid" or "inline-grid")
+                    {
+                        bool allSameCell = true;
+                        string firstRow = null, firstCol = null;
+                        foreach (var child in Boxes)
+                        {
+                            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                                continue;
+                            if (child.Display == CssConstants.None)
+                                continue;
+                            var cr = child.GridRow;
+                            var cc = child.GridColumn;
+                            if (string.IsNullOrEmpty(cr) || string.IsNullOrEmpty(cc))
+                            { allSameCell = false; break; }
+                            if (firstRow == null)
+                            { firstRow = cr; firstCol = cc; }
+                            else if (cr != firstRow || cc != firstCol)
+                            { allSameCell = false; break; }
+                        }
+
+                        if (allSameCell && firstRow != null)
+                        {
+                            double cellLeft = Location.X + ActualPaddingLeft + ActualBorderLeftWidth;
+                            double cellTop = Location.Y + ActualPaddingTop + ActualBorderTopWidth;
+                            double maxBottom = cellTop;
+                            foreach (var child in Boxes)
+                            {
+                                if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                                    continue;
+                                if (child.Display == CssConstants.None)
+                                    continue;
+                                double dx = cellLeft + child.ActualMarginLeft - child.Location.X;
+                                double dy = cellTop + child.ActualMarginTop - child.Location.Y;
+                                if (Math.Abs(dx) > 0.1)
+                                    child.OffsetLeft(dx);
+                                if (Math.Abs(dy) > 0.1)
+                                    child.OffsetTop(dy);
+                                double childBottom = child.ActualBottom + child.ActualMarginBottom;
+                                if (childBottom > maxBottom)
+                                    maxBottom = childBottom;
+                            }
+                            ActualBottom = maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
+                        }
+                    }
                 }
             }
         }

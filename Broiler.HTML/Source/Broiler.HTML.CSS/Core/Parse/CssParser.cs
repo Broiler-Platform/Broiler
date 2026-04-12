@@ -817,6 +817,14 @@ internal sealed class CssParser
             case "border-bottom":
                 ParseBorderProperty(propValue, "-bottom", properties);
                 break;
+            case "border-inline":
+                ParseBorderProperty(propValue, "-left", properties);
+                ParseBorderProperty(propValue, "-right", properties);
+                break;
+            case "border-block":
+                ParseBorderProperty(propValue, "-top", properties);
+                ParseBorderProperty(propValue, "-bottom", properties);
+                break;
             case "margin":
                 ParseMarginProperty(propValue, properties);
                 break;
@@ -896,7 +904,8 @@ internal sealed class CssParser
     private static bool IsShorthandProperty(string propName) => propName switch
     {
         "font" or "border" or "border-left" or "border-top" or "border-right" or
-        "border-bottom" or "margin" or "border-style" or "border-width" or
+        "border-bottom" or "border-inline" or "border-block" or
+        "margin" or "border-style" or "border-width" or
         "border-color" or "padding" or "background" or "columns" => true,
         _ => false
     };

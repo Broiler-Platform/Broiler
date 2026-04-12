@@ -598,6 +598,70 @@ public sealed partial class DomBridge
         if (computed.TryGetValue("border", out var borderVal))
             ExpandBorderShorthand(computed, borderVal);
 
+        // Expand border-inline shorthand → border-left and border-right
+        // CSS Logical Properties §5.1: border-inline applies to both
+        // inline-start and inline-end (left and right in LTR).
+        if (computed.TryGetValue("border-inline", out var biVal))
+        {
+            if (!computed.ContainsKey("border-left")) computed["border-left"] = biVal;
+            if (!computed.ContainsKey("border-right")) computed["border-right"] = biVal;
+            ExpandBorderSideShorthand(computed, biVal, "left");
+            ExpandBorderSideShorthand(computed, biVal, "right");
+        }
+
+        // Expand border-block shorthand → border-top and border-bottom
+        if (computed.TryGetValue("border-block", out var bbVal))
+        {
+            if (!computed.ContainsKey("border-top")) computed["border-top"] = bbVal;
+            if (!computed.ContainsKey("border-bottom")) computed["border-bottom"] = bbVal;
+            ExpandBorderSideShorthand(computed, bbVal, "top");
+            ExpandBorderSideShorthand(computed, bbVal, "bottom");
+        }
+
+        // Expand margin-block shorthand → margin-top and margin-bottom
+        if (computed.TryGetValue("margin-block", out var mbVal))
+        {
+            var parts = SplitCssValues(mbVal);
+            if (parts.Length >= 1)
+            {
+                if (!computed.ContainsKey("margin-top")) computed["margin-top"] = parts[0];
+                if (!computed.ContainsKey("margin-bottom")) computed["margin-bottom"] = parts.Length > 1 ? parts[1] : parts[0];
+            }
+        }
+
+        // Expand margin-inline shorthand → margin-left and margin-right
+        if (computed.TryGetValue("margin-inline", out var miVal))
+        {
+            var parts = SplitCssValues(miVal);
+            if (parts.Length >= 1)
+            {
+                if (!computed.ContainsKey("margin-left")) computed["margin-left"] = parts[0];
+                if (!computed.ContainsKey("margin-right")) computed["margin-right"] = parts.Length > 1 ? parts[1] : parts[0];
+            }
+        }
+
+        // Expand padding-block shorthand → padding-top and padding-bottom
+        if (computed.TryGetValue("padding-block", out var pbVal))
+        {
+            var parts = SplitCssValues(pbVal);
+            if (parts.Length >= 1)
+            {
+                if (!computed.ContainsKey("padding-top")) computed["padding-top"] = parts[0];
+                if (!computed.ContainsKey("padding-bottom")) computed["padding-bottom"] = parts.Length > 1 ? parts[1] : parts[0];
+            }
+        }
+
+        // Expand padding-inline shorthand → padding-left and padding-right
+        if (computed.TryGetValue("padding-inline", out var piVal))
+        {
+            var parts = SplitCssValues(piVal);
+            if (parts.Length >= 1)
+            {
+                if (!computed.ContainsKey("padding-left")) computed["padding-left"] = parts[0];
+                if (!computed.ContainsKey("padding-right")) computed["padding-right"] = parts.Length > 1 ? parts[1] : parts[0];
+            }
+        }
+
         // Expand background shorthand → background-color, background-image, background-repeat,
         // background-attachment, background-position (CSS2.1 §14.2.1)
         if (computed.TryGetValue("background", out var bgVal))
@@ -682,6 +746,35 @@ public sealed partial class DomBridge
             ExpandBoxShorthand(computed, style, "border-top-style", "border-right-style", "border-bottom-style", "border-left-style");
         if (color != null)
             ExpandBoxShorthand(computed, color, "border-top-color", "border-right-color", "border-bottom-color", "border-left-color");
+    }
+
+    /// <summary>
+    /// Expands a border shorthand value (e.g. "solid black 1em") into
+    /// individual longhands for a specific side (top, right, bottom, left).
+    /// </summary>
+    private static void ExpandBorderSideShorthand(
+        Dictionary<string, string> computed, string value, string side)
+    {
+        var parts = SplitCssValues(value);
+        string? width = null, style = null, color = null;
+        foreach (var part in parts)
+        {
+            var lower = part.ToLowerInvariant();
+            if (lower is "none" or "hidden" or "dotted" or "dashed" or "solid"
+                or "double" or "groove" or "ridge" or "inset" or "outset")
+                style ??= part;
+            else if (lower is "thin" or "medium" or "thick" || IsLengthOrPercentage(lower))
+                width ??= part;
+            else
+                color ??= part;
+        }
+
+        if (width != null && !computed.ContainsKey($"border-{side}-width"))
+            computed[$"border-{side}-width"] = width;
+        if (style != null && !computed.ContainsKey($"border-{side}-style"))
+            computed[$"border-{side}-style"] = style;
+        if (color != null && !computed.ContainsKey($"border-{side}-color"))
+            computed[$"border-{side}-color"] = color;
     }
 
     /// <summary>
