@@ -460,6 +460,12 @@ internal static class CssBoxHelper
             return;
         }
 
+        // CSS2.1 §9.5: Don't recurse into elements that establish a new
+        // block formatting context — their inner floats don't participate
+        // in the parent BFC's float list.
+        if (EstablishesBfc(root))
+            return;
+
         foreach (var child in root.Boxes)
             CollectFloatsInSubtree(child, result);
     }

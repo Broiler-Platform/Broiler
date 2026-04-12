@@ -2392,6 +2392,17 @@ internal class CssBox : CssBoxProperties, IDisposable
             lastInFlowChild = child;
         }
 
+        // CSS2.1 §10.6.7: When a BFC root auto-sizes its height it must
+        // extend to contain all descendant floats — not only direct-child
+        // floats.  Walk the subtree (stopping at nested BFC boundaries)
+        // to find the maximum float bottom.
+        if (isBfc)
+        {
+            double maxFloatDesc = maxChildBottom;
+            FindMaxDescendantFloatBottom(this, ref maxFloatDesc);
+            maxChildBottom = Math.Max(maxChildBottom, maxFloatDesc);
+        }
+
         // CSS2.1 §10.6.3: The auto height extends to the bottom margin-
         // edge of the last in-flow child.  When the parent has bottom
         // border or padding, the last child's margin does not collapse
@@ -2399,6 +2410,36 @@ internal class CssBox : CssBoxProperties, IDisposable
         if (!collapseThrough && lastInFlowChild != null)
             maxChildBottom += lastInFlowChild.ActualMarginBottom;
         return Math.Max(ActualBottom, maxChildBottom + margin + ActualPaddingBottom + ActualBorderBottomWidth);
+    }
+
+    /// <summary>
+    /// Recursively finds the maximum bottom edge of any float in the
+    /// subtree, stopping at nested BFC boundaries.  Used by the BFC
+    /// root height calculation so that grandchild (and deeper) floats
+    /// are properly contained.
+    /// </summary>
+    private static void FindMaxDescendantFloatBottom(CssBox box, ref double maxBottom)
+    {
+        foreach (var child in box.Boxes)
+        {
+            if (child.Float != CssConstants.None && child.Display != CssConstants.None)
+            {
+                maxBottom = Math.Max(maxBottom, child.ActualBottom + child.ActualMarginBottom);
+            }
+
+            // Don't recurse into nested BFC roots — their floats are
+            // contained by them, not by the outer BFC.
+            bool childIsBfc = child.Float != CssConstants.None
+                || child.Display == CssConstants.InlineBlock
+                || child.Display == CssConstants.TableCell
+                || child.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
+                || child.Position == CssConstants.Absolute
+                || child.Position == CssConstants.Fixed
+                || (child.Overflow != null && child.Overflow != CssConstants.Visible)
+                || (child.AlignContent != null && child.AlignContent != "normal");
+            if (!childIsBfc)
+                FindMaxDescendantFloatBottom(child, ref maxBottom);
+        }
     }
 
     internal void OffsetTop(double amount)
