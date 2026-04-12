@@ -1775,6 +1775,74 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
+        // HTMLDialogElement interface
+        if (tag == "dialog")
+        {
+            // showModal() — sets the 'open' attribute so the dialog is visible.
+            obj.FastAddValue(
+                (KeyString)"showModal",
+                new JSFunction((in Arguments _) =>
+                {
+                    element.Attributes["open"] = "";
+                    element.DomProperties["_modal"] = true;
+                    return JSUndefined.Value;
+                }, "showModal", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // show() — opens non-modally.
+            obj.FastAddValue(
+                (KeyString)"show",
+                new JSFunction((in Arguments _) =>
+                {
+                    element.Attributes["open"] = "";
+                    return JSUndefined.Value;
+                }, "show", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // close(returnValue) — removes the 'open' attribute.
+            obj.FastAddValue(
+                (KeyString)"close",
+                new JSFunction((in Arguments a) =>
+                {
+                    element.Attributes.Remove("open");
+                    element.DomProperties.Remove("_modal");
+                    if (a.Length > 0)
+                        element.DomProperties["_returnValue"] = a[0].ToString();
+                    return JSUndefined.Value;
+                }, "close", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            // open (getter/setter)
+            obj.FastAddProperty(
+                (KeyString)"open",
+                new JSFunction((in Arguments _) =>
+                    element.Attributes.ContainsKey("open") ? JSBoolean.True : JSBoolean.False,
+                    "get open"),
+                new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length > 0 && a[0].BooleanValue)
+                        element.Attributes["open"] = "";
+                    else
+                        element.Attributes.Remove("open");
+                    return JSUndefined.Value;
+                }, "set open"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // returnValue (getter/setter)
+            obj.FastAddProperty(
+                (KeyString)"returnValue",
+                new JSFunction((in Arguments _) =>
+                    element.DomProperties.TryGetValue("_returnValue", out var rv) && rv is string s
+                        ? new JSString(s) : new JSString(string.Empty),
+                    "get returnValue"),
+                new JSFunction((in Arguments a) =>
+                {
+                    element.DomProperties["_returnValue"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    return JSUndefined.Value;
+                }, "set returnValue"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
         // HTMLSelectElement interface
         if (tag == "select")
         {

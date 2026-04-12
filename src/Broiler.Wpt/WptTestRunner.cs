@@ -642,6 +642,11 @@ internal sealed class WptTestRunner
         bridge.FireWindowLoadEvent();
         bridge.FlushTimers();
 
+        // Resolve CSS animation snapshots: for elements with animation + negative
+        // delay, compute the animated property values at t=0 and write them as
+        // inline styles so the static renderer can produce the correct output.
+        bridge.ResolveAnimationSnapshots();
+
         return bridge.SerializeToHtml();
     }
 }

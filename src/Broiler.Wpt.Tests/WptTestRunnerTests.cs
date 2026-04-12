@@ -1893,4 +1893,57 @@ document.getElementById('out').appendChild(p);
             $"align-content-block-010 should pass (match ≥ threshold). " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
+
+    [Fact]
+    public void Wpt_AnimationDelay008_MatchesReference()
+    {
+        // CSS Animations §animation-delay – liveness: a negative delay on a
+        // running animation should fast-forward the visual output.
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "css-animations",
+            "animation-delay-008.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "css-animations",
+            "animation-delay-008.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"animation-delay-008 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AnchorPositionTopLayer007_MatchesReference()
+    {
+        // CSS Anchor Positioning: dialog in top layer positioned via anchor()
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
+            "anchor-position-top-layer-007.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
+            "anchor-position-top-layer-007.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"anchor-position-top-layer-007 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
 }

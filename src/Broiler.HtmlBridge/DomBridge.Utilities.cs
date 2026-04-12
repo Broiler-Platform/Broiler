@@ -574,9 +574,71 @@ public sealed partial class DomBridge
     /// against the element, and returns computed values.
     /// </summary>
 
+    /// <summary>
+    /// A JSObject subclass that intercepts property get/set to sync
+    /// JavaScript camelCase style property assignments (e.g.
+    /// <c>style.animationDelay = '-100s'</c>) with the DOM element's
+    /// <see cref="DomElement.Style"/> dictionary in CSS kebab-case
+    /// (<c>animation-delay: -100s</c>).
+    /// </summary>
+    private sealed class CssStyleDeclaration : JSObject
+    {
+        private readonly DomElement _element;
+
+        // Names that are JS methods / special properties, not CSS properties.
+        private static readonly HashSet<string> NonCssNames = new(StringComparer.Ordinal)
+        {
+            "setProperty", "getPropertyValue", "removeProperty",
+            "cssText", "cssFloat", "length", "parentRule",
+            "item", "getPropertyPriority",
+        };
+
+        public CssStyleDeclaration(DomElement element) => _element = element;
+
+        protected override bool SetValue(
+            KeyString name, JSValue value, JSValue receiver, bool throwError = true)
+        {
+            var nameStr = name.ToString();
+            if (!NonCssNames.Contains(nameStr))
+            {
+                var kebab = ToKebabCase(nameStr);
+                var val = value?.ToString() ?? string.Empty;
+                if (string.IsNullOrEmpty(val))
+                    _element.Style.Remove(kebab);
+                else
+                    _element.Style[kebab] = val;
+            }
+
+            return base.SetValue(name, value, receiver, throwError);
+        }
+
+        protected override JSValue GetValue(
+            KeyString key, JSValue receiver, bool throwError = true)
+        {
+            // Try normal lookup first (methods, explicit properties, etc.)
+            var result = base.GetValue(key, receiver, false);
+            if (result != null && !result.IsUndefined)
+                return result;
+
+            // Fall back to element.Style lookup (kebab-case)
+            var nameStr = key.ToString();
+            if (!NonCssNames.Contains(nameStr))
+            {
+                var kebab = ToKebabCase(nameStr);
+                if (_element.Style.TryGetValue(kebab, out var val))
+                    return new JSString(val);
+                // Also try the name as-is (already kebab-case)
+                if (nameStr != kebab && _element.Style.TryGetValue(nameStr, out val))
+                    return new JSString(val);
+            }
+
+            return new JSString(string.Empty);
+        }
+    }
+
     private static JSObject BuildStyleObject(DomElement element)
     {
-        var style = new JSObject();
+        var style = new CssStyleDeclaration(element);
 
         // style.cssText (getter / setter)
         style.FastAddProperty(
