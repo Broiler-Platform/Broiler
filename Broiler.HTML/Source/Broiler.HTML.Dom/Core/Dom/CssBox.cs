@@ -1919,8 +1919,9 @@ internal class CssBox : CssBoxProperties, IDisposable
         double maxBottom = containerTop;
         foreach (var frag in fragments)
         {
-            if (frag.ActualBottom > maxBottom)
-                maxBottom = frag.ActualBottom;
+            double vb = GetVisualBottom(frag);
+            if (vb > maxBottom)
+                maxBottom = vb;
         }
 
         double newBottom = maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
@@ -1977,29 +1978,6 @@ internal class CssBox : CssBoxProperties, IDisposable
         return current.Boxes.Count > 1 ? current : null;
     }
 
-    /// <summary>
-    /// Counts the number of columns needed to fit all fragments within
-    /// the given column height (no splitting of individual fragments).
-    /// </summary>
-    private static int CountColumnsNeeded(List<CssBox> fragments, double columnHeight)
-    {
-        int cols = 1;
-        double currentH = 0;
-        foreach (var frag in fragments)
-        {
-            double fh = frag.ActualBottom - frag.Location.Y;
-            if (currentH + fh > columnHeight && currentH > 0.5)
-            {
-                cols++;
-                currentH = fh;
-            }
-            else
-            {
-                currentH += fh;
-            }
-        }
-        return cols;
-    }
 
     /// <summary>
     /// Counts columns needed using visual (overflow-aware) heights.
@@ -2043,19 +2021,6 @@ internal class CssBox : CssBoxProperties, IDisposable
         return bottom;
     }
 
-    /// <summary>
-    /// CSS Fragmentation §3: Recursively collects leaf-level fragmentable
-    /// blocks from a box hierarchy.  Walks into children of boxes that are
-    /// taller than <paramref name="columnHeight"/> (unless they have
-    /// <c>break-inside: avoid</c>), collecting the deepest blocks that
-    /// either fit within a column or cannot be further fragmented.
-    /// </summary>
-    private static List<CssBox> CollectFragmentableBlocks(CssBox parent, double columnHeight)
-    {
-        var result = new List<CssBox>();
-        CollectFragmentableBlocksCore(parent, columnHeight, result, 0);
-        return result;
-    }
 
     private static void CollectFragmentableBlocksCore(CssBox parent, double columnHeight,
         List<CssBox> result, int depth)
