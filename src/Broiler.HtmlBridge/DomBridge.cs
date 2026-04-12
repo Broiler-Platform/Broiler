@@ -520,7 +520,14 @@ public sealed partial class DomBridge
             case "overflow":
             case "overflow-x":
             case "overflow-y":
-                return v is "visible" or "hidden" or "scroll" or "auto" or "clip";
+                // CSS Overflow Level 3: overflow can be one or two keywords
+                // (e.g. "hidden scroll" sets overflow-x:hidden and overflow-y:scroll).
+                foreach (var part in v.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (part is not ("visible" or "hidden" or "scroll" or "auto" or "clip"))
+                        return false;
+                }
+                return true;
 
             case "text-align":
                 return v is "left" or "right" or "center" or "justify"
