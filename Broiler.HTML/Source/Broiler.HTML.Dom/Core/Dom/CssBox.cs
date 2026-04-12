@@ -1271,7 +1271,8 @@ internal class CssBox : CssBoxProperties, IDisposable
                     // the inline layout path for shrink-to-fit sizing.)
                     if (Display is "grid" or "inline-grid")
                     {
-                        ApplyGridStacking();
+                        if (!ApplyGridStacking())
+                            ApplyGridAutoPlacement();
                     }
                 }
                 else if (Boxes.Count > 0)
@@ -1330,7 +1331,8 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                     if (Display is "grid" or "inline-grid")
                     {
-                        ApplyGridStacking();
+                        if (!ApplyGridStacking())
+                            ApplyGridAutoPlacement();
                     }
                 }
             }
@@ -2414,7 +2416,9 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// container's content-area top-left so they stack visually with
     /// later items painted on top.
     /// </summary>
-    private void ApplyGridStacking()
+    /// <returns><c>true</c> if stacking was applied; <c>false</c>
+    /// if items are not all in the same cell.</returns>
+    private bool ApplyGridStacking()
     {
         bool allSameCell = true;
         string firstRow = null, firstCol = null;
@@ -2437,7 +2441,7 @@ internal class CssBox : CssBoxProperties, IDisposable
         }
 
         if (!allSameCell || firstRow == null)
-            return;
+            return false;
 
         double cellLeft = Location.X + ActualPaddingLeft + ActualBorderLeftWidth;
         double cellTop = Location.Y + ActualPaddingTop + ActualBorderTopWidth;
@@ -2459,6 +2463,112 @@ internal class CssBox : CssBoxProperties, IDisposable
                 maxBottom = childBottom;
         }
         ActualBottom = maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
+        return true;
+    }
+
+    /// <summary>
+    /// Called from <see cref="CssLayoutEngine.FlowInlineBlock"/> after
+    /// CreateLineBoxes to apply grid stacking or auto-placement for grid
+    /// containers that are laid out via the inline-block path.
+    /// </summary>
+    internal void ApplyGridLayoutAfterInline()
+    {
+        if (!ApplyGridStacking())
+            ApplyGridAutoPlacement();
+    }
+
+    /// <summary>
+    /// CSS Grid Level 1: Auto-placement for grid items that are not all
+    /// in the same cell.  The inline layout path (CreateLineBoxes) places
+    /// grid items as inline-blocks on a single line.  This method
+    /// repositions them into proper grid rows (one item per row for a
+    /// single-column grid) and applies justify-self within the column.
+    /// </summary>
+    private void ApplyGridAutoPlacement()
+    {
+        double cellLeft = Location.X + ActualPaddingLeft + ActualBorderLeftWidth;
+        double cellTop = Location.Y + ActualPaddingTop + ActualBorderTopWidth;
+        double columnWidth = Size.Width - ActualPaddingLeft - ActualPaddingRight
+            - ActualBorderLeftWidth - ActualBorderRightWidth;
+        if (columnWidth <= 0) return;
+
+
+        double currentY = cellTop;
+        foreach (var child in Boxes)
+        {
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.None)
+                continue;
+
+            // CSS Grid Level 1 §6.1: Grid items with auto/normal/stretch
+            // justify-self and auto width should stretch to fill the column.
+            bool isAutoWidth = child.Width == CssConstants.Auto
+                || string.IsNullOrEmpty(child.Width);
+            string js = child.JustifySelf?.Trim().ToLowerInvariant();
+            bool isStretch = js == null || js == "auto" || js == "normal"
+                || js == "stretch";
+
+            if (isStretch && isAutoWidth)
+            {
+                double targetWidth = columnWidth
+                    - child.ActualMarginLeft - child.ActualMarginRight;
+                if (targetWidth > 0 && Math.Abs(child.Size.Width - targetWidth) > 0.5)
+                    child.Size = new SizeF((float)targetWidth, child.Size.Height);
+            }
+
+            // Move child to the start of the current row.
+            double dx = cellLeft + child.ActualMarginLeft - child.Location.X;
+            double dy = currentY + child.ActualMarginTop - child.Location.Y;
+            if (Math.Abs(dx) > 0.1)
+                child.OffsetLeft(dx);
+            if (Math.Abs(dy) > 0.1)
+                child.OffsetTop(dy);
+
+            // CSS Grid Level 1 §6.1: Apply justify-self to position the
+            // item within its grid cell (column width).
+            double boxWidth = child.ActualRight - child.Location.X;
+            double freeSpace = columnWidth - boxWidth;
+            if (freeSpace > 0.5 && !isStretch)
+            {
+                bool isElementRtl = child.Direction == "rtl";
+                bool isContainerRtl = Direction == "rtl";
+
+                double justifyDx = 0;
+                switch (js)
+                {
+                    case "center":
+                        justifyDx = freeSpace / 2;
+                        break;
+                    case "end":
+                    case "flex-end":
+                        justifyDx = isContainerRtl ? 0 : freeSpace;
+                        break;
+                    case "self-end":
+                        justifyDx = isElementRtl ? 0 : freeSpace;
+                        break;
+                    case "right":
+                        justifyDx = freeSpace;
+                        break;
+                    case "start":
+                    case "flex-start":
+                        justifyDx = isContainerRtl ? freeSpace : 0;
+                        break;
+                    case "self-start":
+                        justifyDx = isElementRtl ? freeSpace : 0;
+                        break;
+                    case "left":
+                        justifyDx = 0;
+                        break;
+                }
+
+                if (Math.Abs(justifyDx) > 0.5)
+                    child.OffsetLeft(justifyDx);
+            }
+
+            currentY = child.ActualBottom + child.ActualMarginBottom;
+        }
+        ActualBottom = currentY + ActualPaddingBottom + ActualBorderBottomWidth;
     }
 
     internal void OffsetTop(double amount)
