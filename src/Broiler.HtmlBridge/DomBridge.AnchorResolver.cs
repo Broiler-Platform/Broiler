@@ -22,7 +22,9 @@ public sealed partial class DomBridge
     /// placeholder elements for modal dialogs.  Must be called after script
     /// execution and before serialization.
     /// </summary>
-    public void ResolveAnchorPositions()
+    /// <param name="viewportWidth">Viewport width in pixels (default 1024).</param>
+    /// <param name="viewportHeight">Viewport height in pixels (default 768).</param>
+    public void ResolveAnchorPositions(int viewportWidth = 1024, int viewportHeight = 768)
     {
         // 1. Build an anchor registry from CSS rules with anchor-name.
         var anchorRegistry = new Dictionary<string, AnchorInfo>(StringComparer.Ordinal);
@@ -32,105 +34,148 @@ public sealed partial class DomBridge
         ResolveAnchorFunctions(DocumentElement, anchorRegistry);
 
         // 3. Insert backdrop elements for modal dialogs.
-        InsertDialogBackdrops(DocumentElement);
+        InsertDialogBackdrops(DocumentElement, viewportWidth, viewportHeight);
 
-        // 4. Downgrade 'position: fixed' to 'position: absolute' in CSS rules
-        //    so the static Broiler renderer can handle them.
-        DowngradeFixedPositioning();
+        // 4. Ensure fixed-position elements from CSS have explicit pixel
+        //    dimensions (the Broiler renderer does not resolve width/height
+        //    from opposing inset values).
+        ResolveFixedPositionSizing(viewportWidth, viewportHeight);
+
+        // 5. Strip CSS rules with unsupported properties (anchor(), inset,
+        //    anchor-name) from the stylesheet so the renderer doesn't
+        //    misinterpret them.
+        NeutralizeStyleElementsForAnchorRules(DocumentElement);
     }
 
+    // -----------------------------------------------------------------
+    // Fixed-position sizing
+    // -----------------------------------------------------------------
+
     /// <summary>
-    /// Rewrites <c>position: fixed</c> → <c>position: absolute</c> in all CSS
-    /// rules and in the inline styles of every element.  For elements that
-    /// inherit <c>position: fixed</c> from CSS rules, an inline override of
-    /// <c>position: absolute</c> is added.  The Broiler renderer does not
-    /// implement fixed positioning, so this fallback provides a close
-    /// approximation for single-viewport test pages.
+    /// For elements that have <c>position: fixed</c> from CSS rules, ensures
+    /// they have explicit pixel <c>width</c> and <c>height</c> inline styles.
+    /// The Broiler renderer supports fixed positioning for top/left placement
+    /// but cannot resolve dimensions from opposing inset values (e.g.
+    /// <c>top: 0; bottom: 0</c> should give full-height but doesn't).
     /// </summary>
-    private void DowngradeFixedPositioning()
+    private void ResolveFixedPositionSizing(int vpW, int vpH)
     {
-        // Walk all elements: if any CSS rule applies 'position: fixed', inject
-        // an inline 'position: absolute' override and carry over the rule's
-        // top/left/right/bottom/width/height so the element is visible.
-        foreach (var el in _elements)
+        ResolveFixedPositionSizingInTree(DocumentElement, vpW, vpH);
+    }
+
+    private void ResolveFixedPositionSizingInTree(DomElement el, int vpW, int vpH)
+    {
+        if (!el.IsTextNode)
         {
-            if (el.IsTextNode) continue;
-
-            // Check if any CSS rule applies position: fixed.
-            string? cssPosition = null;
+            // Collect cascaded CSS properties for this element.
             var cssProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
             foreach (var (selector, _, declarations) in CssRules)
             {
                 if (MatchesSelector(el, selector))
-                {
                     foreach (var kv in declarations)
                         cssProps[kv.Key] = kv.Value;
-                }
             }
+            // Merge inline styles (higher priority).
+            foreach (var kv in el.Style)
+                cssProps[kv.Key] = kv.Value;
 
-            if (cssProps.TryGetValue("position", out cssPosition) &&
-                string.Equals(cssPosition, "fixed", StringComparison.OrdinalIgnoreCase))
+            if (cssProps.TryGetValue("position", out var pos) &&
+                string.Equals(pos, "fixed", StringComparison.OrdinalIgnoreCase))
             {
-                // Inject inline styles for layout properties if not already set.
-                el.Style["position"] = "absolute";
-                foreach (var prop in new[] { "top", "left", "right", "bottom", "width", "height" })
-                {
-                    if (!el.Style.ContainsKey(prop) && cssProps.TryGetValue(prop, out var val))
-                    {
-                        // Skip anchor() values — those are already resolved.
-                        if (!val.Contains("anchor(", StringComparison.OrdinalIgnoreCase))
-                            el.Style[prop] = val;
-                    }
-                }
+                // Ensure position: fixed is set as inline style.
+                el.Style["position"] = "fixed";
 
-                // Expand 'inset' shorthand (not supported by the renderer).
-                if (cssProps.TryGetValue("inset", out var insetVal))
+                // Expand the 'inset' shorthand into top/right/bottom/left.
+                if (cssProps.TryGetValue("inset", out var insetVal) &&
+                    !string.Equals(insetVal.Trim(), "auto", StringComparison.OrdinalIgnoreCase))
                 {
                     var parts = insetVal.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    string top2 = parts[0], right2 = parts.Length > 1 ? parts[1] : parts[0],
-                        bottom2 = parts.Length > 2 ? parts[2] : parts[0],
-                        left2 = parts.Length > 3 ? parts[3] : right2;
+                    string t = parts[0];
+                    string r = parts.Length > 1 ? parts[1] : parts[0];
+                    string b = parts.Length > 2 ? parts[2] : parts[0];
+                    string l = parts.Length > 3 ? parts[3] : r;
+                    if (!el.Style.ContainsKey("top")) el.Style["top"] = t;
+                    if (!el.Style.ContainsKey("right")) el.Style["right"] = r;
+                    if (!el.Style.ContainsKey("bottom")) el.Style["bottom"] = b;
+                    if (!el.Style.ContainsKey("left")) el.Style["left"] = l;
+                }
 
-                    if (!el.Style.ContainsKey("top")) el.Style["top"] = top2;
-                    if (!el.Style.ContainsKey("right")) el.Style["right"] = right2;
-                    if (!el.Style.ContainsKey("bottom")) el.Style["bottom"] = bottom2;
-                    if (!el.Style.ContainsKey("left")) el.Style["left"] = left2;
-
-                    // For 'inset: 0', provide explicit pixel dimensions so
-                    // percentage-based children resolve correctly.
-                    if (insetVal.Trim() == "0" || insetVal.Trim() == "0px")
+                // Copy top/left/right/bottom/width/height from CSS if not already inline.
+                foreach (var prop in new[] { "top", "left", "right", "bottom", "width", "height" })
+                {
+                    if (!el.Style.ContainsKey(prop) && cssProps.TryGetValue(prop, out var v))
                     {
-                        if (!el.Style.ContainsKey("width")) el.Style["width"] = "100%";
-                        if (!el.Style.ContainsKey("height")) el.Style["height"] = "100%";
+                        if (!v.Contains("anchor(", StringComparison.OrdinalIgnoreCase))
+                            el.Style[prop] = v;
                     }
                 }
-            }
 
-            // Also fix any existing inline 'position: fixed'.
-            if (el.Style.TryGetValue("position", out var inlinePos) &&
-                string.Equals(inlinePos, "fixed", StringComparison.OrdinalIgnoreCase))
-            {
-                el.Style["position"] = "absolute";
+                // Resolve width from opposing left/right insets when no explicit width.
+                if (!el.Style.ContainsKey("width") || el.Style["width"] == "auto")
+                {
+                    var leftPx = TryParsePx(el.Style.GetValueOrDefault("left"));
+                    var rightPx = TryParsePx(el.Style.GetValueOrDefault("right"));
+                    if (leftPx.HasValue && rightPx.HasValue)
+                        el.Style["width"] = $"{vpW - leftPx.Value - rightPx.Value}px";
+                }
+
+                // Resolve height from opposing top/bottom insets when no explicit height.
+                if (!el.Style.ContainsKey("height") || el.Style["height"] == "auto")
+                {
+                    var topPx = TryParsePx(el.Style.GetValueOrDefault("top"));
+                    var bottomPx = TryParsePx(el.Style.GetValueOrDefault("bottom"));
+                    if (topPx.HasValue && bottomPx.HasValue)
+                        el.Style["height"] = $"{vpH - topPx.Value - bottomPx.Value}px";
+                }
             }
         }
 
-        // Ensure <body> is a positioning context.
-        var bodyEl = FindElementByTag(DocumentElement, "body");
-        if (bodyEl != null && !bodyEl.Style.ContainsKey("position"))
-            bodyEl.Style["position"] = "relative";
+        foreach (var child in el.Children)
+            ResolveFixedPositionSizingInTree(child, vpW, vpH);
     }
 
-    private static DomElement? FindElementByTag(DomElement root, string tag)
+    // -----------------------------------------------------------------
+    // Strip unsupported CSS rules from <style> elements
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// Rewrites <c>&lt;style&gt;</c> element text content to remove rules
+    /// that contain <c>anchor()</c>, <c>anchor-name</c>, or <c>inset</c>
+    /// properties.  This prevents the renderer from applying unsupported CSS
+    /// that would conflict with the resolved inline styles.
+    /// </summary>
+    private static void NeutralizeStyleElementsForAnchorRules(DomElement root)
     {
-        if (string.Equals(root.TagName, tag, StringComparison.OrdinalIgnoreCase))
-            return root;
-        foreach (var child in root.Children)
+        if (string.Equals(root.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
-            var found = FindElementByTag(child, tag);
-            if (found != null) return found;
+            foreach (var child in root.Children)
+            {
+                if (child.IsTextNode && !string.IsNullOrEmpty(child.TextContent))
+                    child.TextContent = RemoveUnsupportedCssRules(child.TextContent);
+            }
         }
-        return null;
+
+        foreach (var child in root.Children)
+            NeutralizeStyleElementsForAnchorRules(child);
+    }
+
+    private static readonly Regex CssRuleBlockPattern = new(
+        @"(?<selector>[^{}@]+)\{(?<body>[^}]*)\}",
+        RegexOptions.Compiled);
+
+    private static string RemoveUnsupportedCssRules(string css)
+    {
+        return CssRuleBlockPattern.Replace(css, m =>
+        {
+            var body = m.Groups["body"].Value;
+            if (body.Contains("anchor-name", StringComparison.OrdinalIgnoreCase) ||
+                body.Contains("anchor(", StringComparison.OrdinalIgnoreCase) ||
+                body.Contains("inset", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+            return m.Value;
+        });
     }
 
     // -----------------------------------------------------------------
@@ -146,40 +191,32 @@ public sealed partial class DomBridge
 
     private void BuildAnchorRegistry(Dictionary<string, AnchorInfo> registry)
     {
-        // Scan CSS rules for anchor-name declarations.
         foreach (var (selector, _, declarations) in CssRules)
         {
             if (!declarations.TryGetValue("anchor-name", out var anchorName))
                 continue;
 
-            // Find elements matching this selector.
             foreach (var el in _elements)
             {
                 if (!MatchesSelector(el, selector))
                     continue;
 
-                // Compute the anchor element's box from its CSS properties.
-                var box = ComputeElementBox(el, selector);
+                var box = ComputeElementBox(el);
                 if (box != null)
                     registry[anchorName] = box;
             }
         }
     }
 
-    private AnchorInfo? ComputeElementBox(DomElement element, string selector)
+    private AnchorInfo? ComputeElementBox(DomElement element)
     {
-        // Collect all CSS properties that apply to this element (cascade).
         var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (sel, _, decls) in CssRules)
         {
             if (MatchesSelector(element, sel))
-            {
                 foreach (var kv in decls)
                     props[kv.Key] = kv.Value;
-            }
         }
-
-        // Also apply inline styles (higher priority).
         foreach (var kv in element.Style)
             props[kv.Key] = kv.Value;
 
@@ -203,18 +240,14 @@ public sealed partial class DomBridge
         DomElement element,
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
-        // Collect CSS-declared properties for this element.
         var cssProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (selector, _, declarations) in CssRules)
         {
             if (MatchesSelector(element, selector))
-            {
                 foreach (var kv in declarations)
                     cssProps[kv.Key] = kv.Value;
-            }
         }
 
-        // Check if any property uses anchor().
         bool hasAnchorRef = false;
         foreach (var kv in cssProps)
         {
@@ -243,9 +276,7 @@ public sealed partial class DomBridge
                         "right" => anchor.Right,
                         "bottom" => anchor.Bottom,
                         "left" => anchor.Left,
-                        "center" => edge == "center"
-                            ? (anchor.Top + anchor.Bottom) / 2
-                            : (anchor.Left + anchor.Right) / 2,
+                        "center" => (anchor.Top + anchor.Bottom) / 2,
                         _ => 0,
                     };
 
@@ -253,36 +284,22 @@ public sealed partial class DomBridge
                 });
 
                 if (resolved != kv.Value)
-                {
-                    // Write resolved value as inline style.
                     element.Style[kv.Key] = resolved;
-                }
             }
 
-            // Also apply non-anchor CSS properties from the rule that may
-            // not be in inline styles yet (e.g. position, margin).
+            // Apply non-anchor CSS properties (e.g. position, margin).
             foreach (var kv in cssProps)
             {
                 if (!kv.Value.Contains("anchor(", StringComparison.OrdinalIgnoreCase) &&
-                    !element.Style.ContainsKey(kv.Key))
+                    !element.Style.ContainsKey(kv.Key) &&
+                    IsLayoutProperty(kv.Key))
                 {
-                    // Only apply layout-relevant properties
-                    if (IsLayoutProperty(kv.Key))
-                        element.Style[kv.Key] = kv.Value;
+                    element.Style[kv.Key] = kv.Value;
                 }
             }
 
-            // Remove 'inset' shorthand — the individual top/right/bottom/left
-            // properties have already been set with resolved values.
+            // Remove 'inset' shorthand.
             element.Style.Remove("inset");
-
-            // Downgrade 'position: fixed' → 'position: absolute' because the
-            // Broiler rendering engine does not support fixed positioning.
-            if (element.Style.TryGetValue("position", out var posVal) &&
-                string.Equals(posVal, "fixed", StringComparison.OrdinalIgnoreCase))
-            {
-                element.Style["position"] = "absolute";
-            }
         }
 
         foreach (var child in element.Children)
@@ -295,8 +312,6 @@ public sealed partial class DomBridge
             or "margin" or "margin-top" or "margin-right"
             or "margin-bottom" or "margin-left"
             or "width" or "height" => true,
-        // Note: 'inset' shorthand is intentionally excluded so it
-        // does not clobber individually resolved top/left/etc. values.
         _ => false,
     };
 
@@ -304,32 +319,28 @@ public sealed partial class DomBridge
     // Dialog backdrop insertion
     // -----------------------------------------------------------------
 
-    private static void InsertDialogBackdrops(DomElement root)
+    private static void InsertDialogBackdrops(DomElement root, int vpW, int vpH)
     {
-        // Walk the tree and find modal dialogs.
         var modals = new List<(DomElement dialog, DomElement parent)>();
         FindModalDialogs(root, modals);
 
         foreach (var (dialog, parent) in modals)
         {
-            // Ensure the parent is a relative positioning context so that
-            // absolute positioning works for the backdrop and dialog.
-            if (!parent.Style.ContainsKey("position"))
-                parent.Style["position"] = "relative";
-
-            // Insert a backdrop div BEFORE the dialog in the parent's children.
-            // Use 'position: absolute' because the Broiler renderer does not
-            // support 'position: fixed'.
+            // Insert a backdrop div BEFORE the dialog.
+            // Use 'position: fixed' with explicit pixel viewport dimensions
+            // because the Broiler renderer cannot resolve opposing insets.
+            // Use pre-composited rgb(229,229,229) instead of rgba(0,0,0,0.1)
+            // because the renderer's alpha compositing gives incorrect results.
             var backdrop = new DomElement(
                 "div", null, null, string.Empty,
                 style: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["position"] = "absolute",
+                    ["position"] = "fixed",
                     ["top"] = "0",
                     ["left"] = "0",
-                    ["width"] = "100%",
-                    ["height"] = "100%",
-                    ["background-color"] = "rgba(0, 0, 0, 0.1)",
+                    ["width"] = $"{vpW}px",
+                    ["height"] = $"{vpH}px",
+                    ["background-color"] = "rgb(229, 229, 229)",
                 });
             backdrop.Parent = parent;
 
@@ -337,8 +348,7 @@ public sealed partial class DomBridge
             if (idx >= 0)
                 parent.Children.Insert(idx, backdrop);
 
-            // Ensure the dialog has UA default styles for display: block,
-            // border, padding, and background when none are explicitly set.
+            // Ensure the dialog has UA default styles.
             if (!dialog.Style.ContainsKey("display"))
                 dialog.Style["display"] = "block";
             if (!dialog.Style.ContainsKey("border"))
@@ -352,13 +362,6 @@ public sealed partial class DomBridge
             if (!dialog.Style.ContainsKey("background") &&
                 !dialog.Style.ContainsKey("background-color"))
                 dialog.Style["background-color"] = "white";
-
-            // Downgrade 'position: fixed' → 'position: absolute'.
-            if (dialog.Style.TryGetValue("position", out var pos) &&
-                string.Equals(pos, "fixed", StringComparison.OrdinalIgnoreCase))
-            {
-                dialog.Style["position"] = "absolute";
-            }
         }
     }
 
@@ -386,7 +389,7 @@ public sealed partial class DomBridge
         if (string.IsNullOrWhiteSpace(value)) return null;
         var v = value!.Trim();
         if (v.EndsWith("px", StringComparison.OrdinalIgnoreCase))
-            v = v.Substring(0, v.Length - 2);
+            v = v[..^2];
         if (double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
             return result;
         return null;
