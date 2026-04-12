@@ -607,6 +607,16 @@ public sealed partial class DomBridge
                     _element.Style.Remove(kebab);
                 else
                     _element.Style[kebab] = val;
+
+                // Invalidate cached position-area resolution when relevant
+                // properties change so offset queries recompute.
+                if (kebab is "position-area" or "position-anchor")
+                {
+                    _element.DomProperties.Remove("_resolvedLeft");
+                    _element.DomProperties.Remove("_resolvedTop");
+                    _element.DomProperties.Remove("_resolvedWidth");
+                    _element.DomProperties.Remove("_resolvedHeight");
+                }
             }
 
             return base.SetValue(name, value, receiver, throwError);

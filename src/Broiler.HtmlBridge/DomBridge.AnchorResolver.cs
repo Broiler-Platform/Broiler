@@ -30,18 +30,24 @@ public sealed partial class DomBridge
         var anchorRegistry = new Dictionary<string, AnchorInfo>(StringComparer.Ordinal);
         BuildAnchorRegistry(anchorRegistry);
 
+        // Also register anchors from inline styles (e.g. set via JS).
+        BuildInlineAnchorRegistry(anchorRegistry);
+
         // 2. Resolve anchor() function values on elements.
         ResolveAnchorFunctions(DocumentElement, anchorRegistry);
 
-        // 3. Insert backdrop elements for modal dialogs.
+        // 3. Resolve position-area values on anchored elements.
+        ResolvePositionAreaValues(DocumentElement, anchorRegistry);
+
+        // 4. Insert backdrop elements for modal dialogs.
         InsertDialogBackdrops(DocumentElement, viewportWidth, viewportHeight);
 
-        // 4. Ensure fixed-position elements from CSS have explicit pixel
+        // 5. Ensure fixed-position elements from CSS have explicit pixel
         //    dimensions (the Broiler renderer does not resolve width/height
         //    from opposing inset values).
         ResolveFixedPositionSizing(viewportWidth, viewportHeight);
 
-        // 5. Strip CSS rules with unsupported properties (anchor(), inset,
+        // 6. Strip CSS rules with unsupported properties (anchor(), inset,
         //    anchor-name) from the stylesheet so the renderer doesn't
         //    misinterpret them.
         NeutralizeStyleElementsForAnchorRules(DocumentElement);
@@ -170,6 +176,8 @@ public sealed partial class DomBridge
             var body = m.Groups["body"].Value;
             if (body.Contains("anchor-name", StringComparison.OrdinalIgnoreCase) ||
                 body.Contains("anchor(", StringComparison.OrdinalIgnoreCase) ||
+                body.Contains("position-area", StringComparison.OrdinalIgnoreCase) ||
+                body.Contains("position-anchor", StringComparison.OrdinalIgnoreCase) ||
                 body.Contains("inset", StringComparison.OrdinalIgnoreCase))
             {
                 return string.Empty;
@@ -398,5 +406,386 @@ public sealed partial class DomBridge
         if (double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
             return result;
         return null;
+    }
+
+    // -----------------------------------------------------------------
+    // Inline anchor registry (anchors set via JS style manipulation)
+    // -----------------------------------------------------------------
+
+    private void BuildInlineAnchorRegistry(Dictionary<string, AnchorInfo> registry)
+    {
+        foreach (var el in _elements)
+        {
+            if (el.Style.TryGetValue("anchor-name", out var anchorName) &&
+                !string.IsNullOrWhiteSpace(anchorName))
+            {
+                var box = ComputeElementBoxWithContainer(el);
+                if (box != null && !registry.ContainsKey(anchorName))
+                    registry[anchorName] = box;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Computes an element's box position relative to its positioned
+    /// containing block, resolving <c>right</c> to <c>left</c> when needed.
+    /// </summary>
+    private AnchorInfo? ComputeElementBoxWithContainer(DomElement element)
+    {
+        var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (sel, _, decls) in CssRules)
+        {
+            if (MatchesSelector(element, sel))
+                foreach (var kv in decls)
+                    props[kv.Key] = kv.Value;
+        }
+        foreach (var kv in element.Style)
+            props[kv.Key] = kv.Value;
+
+        double width = TryParsePx(props.GetValueOrDefault("width")) ?? 0;
+        double height = TryParsePx(props.GetValueOrDefault("height")) ?? 0;
+        double top = TryParsePx(props.GetValueOrDefault("top")) ?? 0;
+        double left;
+
+        // Resolve left from 'right' if no explicit 'left'.
+        if (props.TryGetValue("left", out var leftVal) && TryParsePx(leftVal).HasValue)
+        {
+            left = TryParsePx(leftVal)!.Value;
+        }
+        else if (props.TryGetValue("right", out var rightVal) && TryParsePx(rightVal).HasValue)
+        {
+            double rightPx = TryParsePx(rightVal)!.Value;
+            // Find containing block width.
+            double containerWidth = FindContainingBlockWidth(element);
+            left = containerWidth - width - rightPx;
+        }
+        else
+        {
+            left = 0;
+        }
+
+        return new AnchorInfo(top, left, width, height);
+    }
+
+    /// <summary>
+    /// Finds the width of the nearest positioned ancestor (containing block)
+    /// for an absolutely positioned element.
+    /// </summary>
+    private double FindContainingBlockWidth(DomElement element)
+    {
+        var parent = element.Parent;
+        while (parent != null)
+        {
+            var parentProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (sel, _, decls) in CssRules)
+            {
+                if (MatchesSelector(parent, sel))
+                    foreach (var kv in decls)
+                        parentProps[kv.Key] = kv.Value;
+            }
+            foreach (var kv in parent.Style)
+                parentProps[kv.Key] = kv.Value;
+
+            if (parentProps.TryGetValue("position", out var pos) &&
+                (pos == "relative" || pos == "absolute" || pos == "fixed"))
+            {
+                return TryParsePx(parentProps.GetValueOrDefault("width")) ?? _viewportWidth;
+            }
+            parent = parent.Parent;
+        }
+        return _viewportWidth;
+    }
+
+    /// <summary>
+    /// Finds the height of the nearest positioned ancestor (containing block)
+    /// for an absolutely positioned element.
+    /// </summary>
+    private double FindContainingBlockHeight(DomElement element)
+    {
+        var parent = element.Parent;
+        while (parent != null)
+        {
+            var parentProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (sel, _, decls) in CssRules)
+            {
+                if (MatchesSelector(parent, sel))
+                    foreach (var kv in decls)
+                        parentProps[kv.Key] = kv.Value;
+            }
+            foreach (var kv in parent.Style)
+                parentProps[kv.Key] = kv.Value;
+
+            if (parentProps.TryGetValue("position", out var pos) &&
+                (pos == "relative" || pos == "absolute" || pos == "fixed"))
+            {
+                return TryParsePx(parentProps.GetValueOrDefault("height")) ?? _viewportHeight;
+            }
+            parent = parent.Parent;
+        }
+        return _viewportHeight;
+    }
+
+    // -----------------------------------------------------------------
+    // position-area resolution
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// Resolves <c>position-area</c> values on elements that have
+    /// <c>position-anchor</c>.  Computes the 3×3 grid from the anchor
+    /// element's position and the containing block, then selects the
+    /// region specified by position-area and sets explicit inline styles.
+    /// </summary>
+    private void ResolvePositionAreaValues(
+        DomElement element,
+        Dictionary<string, AnchorInfo> anchorRegistry)
+    {
+        if (!element.IsTextNode)
+        {
+            var cssProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (selector, _, declarations) in CssRules)
+            {
+                if (MatchesSelector(element, selector))
+                    foreach (var kv in declarations)
+                        cssProps[kv.Key] = kv.Value;
+            }
+            foreach (var kv in element.Style)
+                cssProps[kv.Key] = kv.Value;
+
+            string? positionArea = cssProps.GetValueOrDefault("position-area");
+            string? positionAnchor = cssProps.GetValueOrDefault("position-anchor");
+
+            if (!string.IsNullOrWhiteSpace(positionArea) &&
+                positionArea != "none" &&
+                !string.IsNullOrWhiteSpace(positionAnchor) &&
+                anchorRegistry.TryGetValue(positionAnchor, out var anchor))
+            {
+                var rect = ComputePositionAreaRect(element, anchor, positionArea);
+                if (rect != null)
+                {
+                    element.Style["position"] = "absolute";
+                    element.Style["left"] = $"{rect.Value.Left.ToString(CultureInfo.InvariantCulture)}px";
+                    element.Style["top"] = $"{rect.Value.Top.ToString(CultureInfo.InvariantCulture)}px";
+                    element.Style["width"] = $"{rect.Value.Width.ToString(CultureInfo.InvariantCulture)}px";
+                    element.Style["height"] = $"{rect.Value.Height.ToString(CultureInfo.InvariantCulture)}px";
+
+                    // Store resolved offsets for JS offset property queries.
+                    element.DomProperties["_resolvedLeft"] = rect.Value.Left;
+                    element.DomProperties["_resolvedTop"] = rect.Value.Top;
+                    element.DomProperties["_resolvedWidth"] = rect.Value.Width;
+                    element.DomProperties["_resolvedHeight"] = rect.Value.Height;
+                }
+            }
+        }
+
+        foreach (var child in element.Children)
+            ResolvePositionAreaValues(child, anchorRegistry);
+    }
+
+    private readonly record struct PositionAreaRect(
+        double Left, double Top, double Width, double Height);
+
+    /// <summary>
+    /// Computes the rectangle for a given <c>position-area</c> value using
+    /// the 3×3 grid defined by the anchor element and containing block.
+    /// </summary>
+    private PositionAreaRect? ComputePositionAreaRect(
+        DomElement element, AnchorInfo anchor, string positionArea)
+    {
+        double cbWidth = FindContainingBlockWidth(element);
+        double cbHeight = FindContainingBlockHeight(element);
+
+        // Grid boundaries.
+        double anchorLeft = anchor.Left;
+        double anchorRight = anchor.Right;
+        double anchorTop = anchor.Top;
+        double anchorBottom = anchor.Bottom;
+
+        // Grid column edges: CB-left, anchor-left, anchor-right, max(CB-right, anchor-right)
+        double gridLeft = 0; // CB left (in CB coordinates)
+        double gridRight = Math.Max(cbWidth, anchorRight);
+
+        // Grid row edges: min(CB-top, anchor-top), anchor-top, anchor-bottom, CB-bottom
+        double gridTop = Math.Min(0, anchorTop);
+        double gridBottom = Math.Max(cbHeight, anchorBottom);
+
+        // Parse the position-area value into block and inline axis selections.
+        ParsePositionArea(positionArea, out var blockSel, out var inlineSel);
+
+        // Compute column range.
+        double colStart, colEnd;
+        switch (inlineSel)
+        {
+            case AxisSelection.Start:
+                colStart = gridLeft; colEnd = anchorLeft; break;
+            case AxisSelection.Center:
+                colStart = anchorLeft; colEnd = anchorRight; break;
+            case AxisSelection.End:
+                colStart = anchorRight; colEnd = gridRight; break;
+            case AxisSelection.SpanStart:
+                colStart = gridLeft; colEnd = anchorRight; break;
+            case AxisSelection.SpanEnd:
+                colStart = anchorLeft; colEnd = gridRight; break;
+            case AxisSelection.SpanAll:
+                colStart = gridLeft; colEnd = gridRight; break;
+            default:
+                colStart = gridLeft; colEnd = gridRight; break;
+        }
+
+        // Compute row range.
+        double rowStart, rowEnd;
+        switch (blockSel)
+        {
+            case AxisSelection.Start:
+                rowStart = gridTop; rowEnd = anchorTop; break;
+            case AxisSelection.Center:
+                rowStart = anchorTop; rowEnd = anchorBottom; break;
+            case AxisSelection.End:
+                rowStart = anchorBottom; rowEnd = gridBottom; break;
+            case AxisSelection.SpanStart:
+                rowStart = gridTop; rowEnd = anchorBottom; break;
+            case AxisSelection.SpanEnd:
+                rowStart = anchorTop; rowEnd = gridBottom; break;
+            case AxisSelection.SpanAll:
+                rowStart = gridTop; rowEnd = gridBottom; break;
+            default:
+                rowStart = gridTop; rowEnd = gridBottom; break;
+        }
+
+        double width = Math.Max(0, colEnd - colStart);
+        double height = Math.Max(0, rowEnd - rowStart);
+
+        return new PositionAreaRect(colStart, rowStart, width, height);
+    }
+
+    private enum AxisSelection { Start, Center, End, SpanStart, SpanEnd, SpanAll }
+
+    /// <summary>
+    /// Parses a position-area value into block and inline axis selections.
+    /// Block keywords: top, bottom, span-top, span-bottom.
+    /// Inline keywords: left, right, span-left, span-right.
+    /// Ambiguous: center, span-all (assigned to whichever axis needs it).
+    /// </summary>
+    private static void ParsePositionArea(
+        string value, out AxisSelection blockSel, out AxisSelection inlineSel)
+    {
+        blockSel = AxisSelection.SpanAll;
+        inlineSel = AxisSelection.SpanAll;
+
+        var parts = value.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return;
+
+        if (parts.Length == 1)
+        {
+            var sel = MapKeyword(parts[0]);
+            var axis = ClassifyKeyword(parts[0]);
+            if (axis == KeywordAxis.Block)
+                blockSel = sel;
+            else if (axis == KeywordAxis.Inline)
+                inlineSel = sel;
+            else // ambiguous single keyword
+            {
+                blockSel = sel;
+                inlineSel = sel;
+            }
+            return;
+        }
+
+        // Two keywords: disambiguate axes.
+        var sel1 = MapKeyword(parts[0]);
+        var sel2 = MapKeyword(parts[1]);
+        var axis1 = ClassifyKeyword(parts[0]);
+        var axis2 = ClassifyKeyword(parts[1]);
+
+        if (axis1 == KeywordAxis.Block && axis2 == KeywordAxis.Inline)
+        { blockSel = sel1; inlineSel = sel2; }
+        else if (axis1 == KeywordAxis.Inline && axis2 == KeywordAxis.Block)
+        { inlineSel = sel1; blockSel = sel2; }
+        else if (axis1 == KeywordAxis.Block && axis2 != KeywordAxis.Block)
+        { blockSel = sel1; inlineSel = sel2; }
+        else if (axis1 == KeywordAxis.Inline && axis2 != KeywordAxis.Inline)
+        { inlineSel = sel1; blockSel = sel2; }
+        else if (axis2 == KeywordAxis.Block)
+        { inlineSel = sel1; blockSel = sel2; }
+        else if (axis2 == KeywordAxis.Inline)
+        { blockSel = sel1; inlineSel = sel2; }
+        else
+        { blockSel = sel1; inlineSel = sel2; } // both ambiguous → first=block, second=inline
+    }
+
+    private enum KeywordAxis { Block, Inline, Ambiguous }
+
+    private static KeywordAxis ClassifyKeyword(string kw) => kw.Trim().ToLowerInvariant() switch
+    {
+        "top" or "bottom" or "span-top" or "span-bottom" or "block-start" or "block-end" => KeywordAxis.Block,
+        "left" or "right" or "span-left" or "span-right" or "inline-start" or "inline-end" => KeywordAxis.Inline,
+        _ => KeywordAxis.Ambiguous,
+    };
+
+    private static AxisSelection MapKeyword(string kw) => kw.Trim().ToLowerInvariant() switch
+    {
+        "top" or "left" or "start" or "block-start" or "inline-start" => AxisSelection.Start,
+        "center" => AxisSelection.Center,
+        "bottom" or "right" or "end" or "block-end" or "inline-end" => AxisSelection.End,
+        "span-top" or "span-left" or "span-start" => AxisSelection.SpanStart,
+        "span-bottom" or "span-right" or "span-end" => AxisSelection.SpanEnd,
+        "span-all" or "all" => AxisSelection.SpanAll,
+        _ => AxisSelection.SpanAll,
+    };
+
+    // -----------------------------------------------------------------
+    // position-area resolution for JS offset queries
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// Resolves position-area for a specific element during JS execution,
+    /// returning the computed rect as (left, top, width, height).
+    /// Called lazily when offsetLeft/offsetTop/etc. are queried.
+    /// </summary>
+    internal (double left, double top, double width, double height)?
+        ResolvePositionAreaForElement(DomElement element)
+    {
+        // Check for pre-resolved values first.
+        if (element.DomProperties.TryGetValue("_resolvedLeft", out var rl) && rl is double resolvedLeft &&
+            element.DomProperties.TryGetValue("_resolvedTop", out var rt) && rt is double resolvedTop &&
+            element.DomProperties.TryGetValue("_resolvedWidth", out var rw) && rw is double resolvedWidth &&
+            element.DomProperties.TryGetValue("_resolvedHeight", out var rh) && rh is double resolvedHeight)
+            return (resolvedLeft, resolvedTop, resolvedWidth, resolvedHeight);
+
+        // Resolve on-the-fly from CSS properties and inline styles.
+        var cssProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (selector, _, declarations) in CssRules)
+        {
+            if (MatchesSelector(element, selector))
+                foreach (var kv in declarations)
+                    cssProps[kv.Key] = kv.Value;
+        }
+        foreach (var kv in element.Style)
+            cssProps[kv.Key] = kv.Value;
+
+        string? positionArea = cssProps.GetValueOrDefault("position-area");
+        string? positionAnchor = cssProps.GetValueOrDefault("position-anchor");
+
+        if (string.IsNullOrWhiteSpace(positionArea) || positionArea == "none" ||
+            string.IsNullOrWhiteSpace(positionAnchor))
+            return null;
+
+        // Build anchor registry on-the-fly.
+        var anchorRegistry = new Dictionary<string, AnchorInfo>(StringComparer.Ordinal);
+        BuildAnchorRegistry(anchorRegistry);
+        BuildInlineAnchorRegistry(anchorRegistry);
+
+        if (!anchorRegistry.TryGetValue(positionAnchor, out var anchor))
+            return null;
+
+        var rect = ComputePositionAreaRect(element, anchor, positionArea);
+        if (rect == null) return null;
+
+        // Cache the resolved values.
+        element.DomProperties["_resolvedLeft"] = rect.Value.Left;
+        element.DomProperties["_resolvedTop"] = rect.Value.Top;
+        element.DomProperties["_resolvedWidth"] = rect.Value.Width;
+        element.DomProperties["_resolvedHeight"] = rect.Value.Height;
+
+        return (rect.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height);
     }
 }

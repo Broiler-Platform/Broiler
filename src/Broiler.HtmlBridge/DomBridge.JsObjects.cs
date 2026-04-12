@@ -2143,6 +2143,8 @@ public sealed partial class DomBridge
             var isRoot = tag == "html" || tag == "body";
             var vpW = _viewportWidth;
             var vpH = _viewportHeight;
+            var bridgeForOffset = this;
+            var elForOffset = element;
 
             obj.FastAddProperty(
                 (KeyString)"clientWidth",
@@ -2156,12 +2158,34 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
                 (KeyString)"offsetWidth",
-                new JSFunction((in Arguments _) => new JSNumber(isRoot ? vpW : 0), "get offsetWidth"),
+                new JSFunction((in Arguments _) =>
+                {
+                    if (!isRoot)
+                    {
+                        var resolved = bridgeForOffset.ResolvePositionAreaForElement(elForOffset);
+                        if (resolved != null)
+                            return new JSNumber(resolved.Value.width);
+                        var w = TryParsePx(elForOffset.Style.GetValueOrDefault("width"));
+                        if (w.HasValue) return new JSNumber(w.Value);
+                    }
+                    return new JSNumber(isRoot ? vpW : 0);
+                }, "get offsetWidth"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
                 (KeyString)"offsetHeight",
-                new JSFunction((in Arguments _) => new JSNumber(isRoot ? vpH : 0), "get offsetHeight"),
+                new JSFunction((in Arguments _) =>
+                {
+                    if (!isRoot)
+                    {
+                        var resolved = bridgeForOffset.ResolvePositionAreaForElement(elForOffset);
+                        if (resolved != null)
+                            return new JSNumber(resolved.Value.height);
+                        var h = TryParsePx(elForOffset.Style.GetValueOrDefault("height"));
+                        if (h.HasValue) return new JSNumber(h.Value);
+                    }
+                    return new JSNumber(isRoot ? vpH : 0);
+                }, "get offsetHeight"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
@@ -2186,12 +2210,24 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
                 (KeyString)"offsetTop",
-                new JSFunction((in Arguments _) => new JSNumber(0), "get offsetTop"),
+                new JSFunction((in Arguments _) =>
+                {
+                    var resolved = bridgeForOffset.ResolvePositionAreaForElement(elForOffset);
+                    if (resolved != null)
+                        return new JSNumber(resolved.Value.top);
+                    return new JSNumber(0);
+                }, "get offsetTop"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
                 (KeyString)"offsetLeft",
-                new JSFunction((in Arguments _) => new JSNumber(0), "get offsetLeft"),
+                new JSFunction((in Arguments _) =>
+                {
+                    var resolved = bridgeForOffset.ResolvePositionAreaForElement(elForOffset);
+                    if (resolved != null)
+                        return new JSNumber(resolved.Value.left);
+                    return new JSNumber(0);
+                }, "get offsetLeft"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(

@@ -973,6 +973,71 @@ internal class CssBox : CssBoxProperties, IDisposable
                         }
                     }
 
+                    // CSS2.1 §9.5: The border box of an element in normal
+                    // flow that establishes a new BFC must not overlap the
+                    // margin box of any floats in the same BFC.  Shift the
+                    // block right past left floats and narrow it to avoid
+                    // right floats.  If it cannot fit beside the floats,
+                    // clear below them.
+                    if (Float == CssConstants.None
+                        && Position != CssConstants.Absolute && Position != CssConstants.Fixed)
+                    {
+                        bool isBfcRoot = Display == CssConstants.InlineBlock
+                            || Display == CssConstants.TableCell
+                            || Display is "flex" or "inline-flex" or "grid" or "inline-grid"
+                            || (Overflow != null && Overflow != CssConstants.Visible)
+                            || (AlignContent != null && AlignContent != "normal");
+
+                        if (isBfcRoot)
+                        {
+                            var precedingFloats = CssBoxHelper.CollectPrecedingFloatsInBfc(this);
+                            if (precedingFloats.Count > 0)
+                            {
+                                double containerLeft = ContainingBlock.Location.X + ContainingBlock.ActualPaddingLeft + ContainingBlock.ActualBorderLeftWidth;
+                                double containerRight = ContainingBlock.ClientLeft + ContainingBlock.AvailableWidth;
+                                double boxHeight = Math.Max(Size.Height, GetEmHeight());
+
+                                for (int bfcIter = 0; bfcIter < 100; bfcIter++)
+                                {
+                                    double leftEdge = containerLeft + ActualMarginLeft;
+                                    double rightEdge = containerRight - ActualMarginRight;
+
+                                    foreach (var fb in precedingFloats)
+                                    {
+                                        double fbBottom = fb.ActualBottom + fb.ActualMarginBottom;
+                                        if (top < fbBottom && top + boxHeight > fb.Location.Y - fb.ActualMarginTop)
+                                        {
+                                            if (fb.Float == CssConstants.Left)
+                                                leftEdge = Math.Max(leftEdge, fb.Location.X + fb.Size.Width + fb.ActualMarginRight + ActualMarginLeft);
+                                            else if (fb.Float == CssConstants.Right)
+                                                rightEdge = Math.Min(rightEdge, fb.Location.X - fb.ActualMarginLeft - ActualMarginRight);
+                                        }
+                                    }
+
+                                    double availableWidth = rightEdge - leftEdge;
+                                    if (availableWidth >= Size.Width || availableWidth >= 0)
+                                    {
+                                        left = leftEdge;
+                                        if (availableWidth < Size.Width && (Width == CssConstants.Auto || string.IsNullOrEmpty(Width)))
+                                            Size = new SizeF((float)availableWidth, Size.Height);
+                                        break;
+                                    }
+
+                                    // Cannot fit beside floats — clear below them.
+                                    double maxFb = top;
+                                    foreach (var fb in precedingFloats)
+                                    {
+                                        double fbBottom = fb.ActualBottom + fb.ActualMarginBottom;
+                                        if (top < fbBottom && top + boxHeight > fb.Location.Y - fb.ActualMarginTop)
+                                            maxFb = Math.Max(maxFb, fbBottom);
+                                    }
+                                    if (maxFb <= top) break;
+                                    top = maxFb;
+                                }
+                            }
+                        }
+                    }
+
                     Location = new PointF((float)left, (float)top);
                     ActualBottom = top;
 
@@ -1531,7 +1596,11 @@ internal class CssBox : CssBoxProperties, IDisposable
             if (freeSpace > 0.5)
             {
                 string js = JustifySelf.Trim().ToLowerInvariant();
-                bool isRtl = Direction == "rtl";
+                // CSS Box Alignment §6.1: 'start'/'end' use the containing
+                // block's writing direction; 'self-start'/'self-end' use the
+                // element's own writing direction.
+                bool isElementRtl = Direction == "rtl";
+                bool isContainerRtl = ParentBox?.Direction == "rtl";
 
                 double dx = 0;
                 switch (js)
@@ -1541,20 +1610,20 @@ internal class CssBox : CssBoxProperties, IDisposable
                         break;
                     case "end":
                     case "flex-end":
-                        dx = isRtl ? 0 : freeSpace;
+                        dx = isContainerRtl ? 0 : freeSpace;
                         break;
                     case "self-end":
-                        dx = freeSpace;
+                        dx = isElementRtl ? 0 : freeSpace;
                         break;
                     case "right":
                         dx = freeSpace;
                         break;
                     case "start":
                     case "flex-start":
-                        dx = isRtl ? freeSpace : 0;
+                        dx = isContainerRtl ? freeSpace : 0;
                         break;
                     case "self-start":
-                        dx = 0;
+                        dx = isElementRtl ? freeSpace : 0;
                         break;
                     case "left":
                         dx = 0;
