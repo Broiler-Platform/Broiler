@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Broiler.HtmlBridge;
+using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.Image;
 using Broiler.JavaScript.Engine;
 using SkiaSharp;
@@ -444,15 +445,44 @@ internal sealed class WptTestRunner
         // Post-process HTML (strip scripts, clean up for rendering).
         html = HtmlPostProcessor.Process(html);
 
+        // Pre-load WPT fonts when wptRoot is known.  WPT test files reference
+        // fonts via root-relative URLs (e.g. @import "/fonts/ahem.css") that
+        // resolve to {wptRoot}/fonts/ on disk.  Registering known WPT fonts
+        // directly with the adapter guarantees CSS font-family references work
+        // even when the @font-face stylesheet import path resolution fails.
+        if (wptRoot != null)
+            EnsureWptFontsLoaded(wptRoot);
+
         // Derive the base URL from the test file so that relative sub-resource
         // paths (background images, stylesheets, etc.) resolve correctly.
         var testBaseUrl = new Uri(Path.GetFullPath(testPath)).AbsoluteUri;
+
+        // Build a stylesheet load handler that resolves root-relative WPT
+        // paths (e.g. "/fonts/ahem.css") against the WPT root directory so
+        // that @import rules that use WPT-server-relative paths are honoured.
+        EventHandler<HtmlStylesheetLoadEventArgs> stylesheetHandler = null;
+        if (wptRoot != null)
+        {
+            var capturedWptRoot = wptRoot;
+            stylesheetHandler = (_, args) =>
+            {
+                var src = args.Src;
+                if (src != null && src.StartsWith("/", StringComparison.Ordinal))
+                {
+                    var rel = src.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+                    var local = Path.Combine(capturedWptRoot, rel);
+                    if (File.Exists(local))
+                        args.SetSrc = local;
+                }
+            };
+        }
 
         // Render via Broiler HTML stack.
         SKBitmap rendered;
         try
         {
-            rendered = HtmlRender.RenderToImage(html, _width, _height, SKColors.White, baseUrl: testBaseUrl);
+            rendered = HtmlRender.RenderToImage(html, _width, _height, SKColors.White,
+                stylesheetLoad: stylesheetHandler, baseUrl: testBaseUrl);
         }
         catch (Exception ex)
         {
@@ -562,6 +592,20 @@ internal sealed class WptTestRunner
         {
             yield return RunTest(testPath, referenceDir, wptRoot);
         }
+    }
+
+    /// <summary>
+    /// Pre-loads well-known WPT fonts from <paramref name="wptRoot"/>
+    /// into the rendering adapter so that <c>font-family</c> CSS references
+    /// work correctly without relying on the @font-face stylesheet import
+    /// mechanism (which uses root-relative URLs that cannot be resolved for
+    /// <c>file://</c> base URLs).
+    /// </summary>
+    private static void EnsureWptFontsLoaded(string wptRoot)
+    {
+        var ahemPath = Path.Combine(wptRoot, "fonts", "Ahem.ttf");
+        if (File.Exists(ahemPath))
+            HtmlRender.LoadFontFromFile(ahemPath, "Ahem");
     }
 
     /// <summary>
