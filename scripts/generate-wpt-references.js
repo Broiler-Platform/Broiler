@@ -8,6 +8,13 @@
 // For each .html / .htm / .xhtml file under <test-dir>, headless Chromium
 // takes a 1024×768 viewport screenshot and writes the PNG to <output-dir>
 // mirroring the relative directory structure.
+//
+// WPT tests frequently reference fonts via root-relative URLs such as
+//     @import "/fonts/ahem.css";
+// These map to {wptRoot}/fonts/ on disk.  When a fonts/ directory exists
+// alongside the test root (baseDir), this script intercepts those requests
+// and serves the local files so that custom test fonts (e.g. Ahem) render
+// correctly in Chromium, matching real WPT behaviour.
 
 'use strict';
 
@@ -22,10 +29,6 @@ const TEST_EXTENSIONS = new Set(['.html', '.htm', '.xhtml']);
 const VIEWPORT = { width: 1024, height: 768 };
 const PAGE_LOAD_TIMEOUT = 10_000;   // ms — max time to wait for page load
 const DEFAULT_CONCURRENCY = 8;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 /** Recursively discover test files. */
 function discoverTests(dir) {
@@ -106,6 +109,17 @@ function ensureDir(filePath) {
         args: ['--allow-file-access-from-files'],
     });
 
+    // Determine if there is a local fonts/ directory to serve.
+    // WPT tests import fonts via root-relative URLs such as /fonts/ahem.css.
+    // When loaded from file://, these become file:///fonts/... which do not
+    // exist on the filesystem.  We intercept those requests and serve them
+    // from {baseDir}/fonts/ so Chromium uses the correct test fonts.
+    const localFontsDir = path.join(baseDir, 'fonts');
+    const hasFontsDir = fs.existsSync(localFontsDir);
+    if (hasFontsDir) {
+        console.log(`Serving WPT fonts from: ${localFontsDir}`);
+    }
+
     let completed = 0;
     let errors = 0;
     const total = testFiles.length;
@@ -113,6 +127,36 @@ function ensureDir(filePath) {
     // Worker function — processes one file at a time from the queue.
     async function worker(queue) {
         const context = await browser.newContext({ viewport: VIEWPORT });
+
+        // Intercept root-relative /fonts/ requests and serve them from the
+        // local fonts directory.  WPT tests use paths like /fonts/ahem.css
+        // which a real WPT server resolves relative to the WPT root.  When
+        // loading via file://, Chrome resolves them as file:///fonts/... which
+        // does not exist on disk.  Playwright can intercept these requests via
+        // context.route() for both http:// and file:// origin requests.
+        if (hasFontsDir) {
+            await context.route(/file:\/\/\/fonts\//i, async (route) => {
+                const url = route.request().url();
+                // Strip the file:///fonts/ prefix to get the filename/subpath.
+                const subpath = decodeURIComponent(url.replace(/^file:\/\/\/fonts\//i, ''));
+                const localPath = path.join(localFontsDir, subpath);
+                if (fs.existsSync(localPath)) {
+                    const body = fs.readFileSync(localPath);
+                    const ext = path.extname(localPath).toLowerCase();
+                    const contentType =
+                        ext === '.css'  ? 'text/css; charset=utf-8' :
+                        ext === '.ttf'  ? 'font/truetype' :
+                        ext === '.otf'  ? 'font/opentype' :
+                        ext === '.woff' ? 'font/woff' :
+                        ext === '.woff2'? 'font/woff2' :
+                        'application/octet-stream';
+                    await route.fulfill({ status: 200, contentType, body });
+                } else {
+                    await route.abort('failed');
+                }
+            });
+        }
+
         const page = await context.newPage();
 
         while (queue.length > 0) {

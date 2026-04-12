@@ -1261,6 +1261,19 @@ internal class CssBox : CssBoxProperties, IDisposable
                     {
                         ActualBottom = MarginBottomCollapse();
                     }
+
+                    // CSS Grid Level 1 §8.5: When all grid items share
+                    // the same grid-row and grid-column, reposition them
+                    // to the container's content-area origin so they
+                    // overlap visually.  (This duplicates the same logic
+                    // in the block path below; it is needed here because
+                    // ContainsInlinesOnly() forces grid containers into
+                    // the inline layout path for shrink-to-fit sizing.)
+                    if (Display is "grid" or "inline-grid")
+                    {
+                        if (!ApplyGridStacking())
+                            ApplyGridAutoPlacement();
+                    }
                 }
                 else if (Boxes.Count > 0)
                 {
@@ -1316,56 +1329,10 @@ internal class CssBox : CssBoxProperties, IDisposable
                     ActualRight = CalculateActualRight();
                     ActualBottom = MarginBottomCollapse();
 
-                    // CSS Grid Level 1 §8.5: When all grid items share
-                    // the same grid-row and grid-column (e.g.
-                    // grid-row: 1; grid-column: 1), they overlap in the
-                    // same grid cell.  Position them at the container's
-                    // content-area top-left so they stack visually.
                     if (Display is "grid" or "inline-grid")
                     {
-                        bool allSameCell = true;
-                        string firstRow = null, firstCol = null;
-                        foreach (var child in Boxes)
-                        {
-                            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
-                                continue;
-                            if (child.Display == CssConstants.None)
-                                continue;
-                            var cr = child.GridRow;
-                            var cc = child.GridColumn;
-                            // Skip items without explicit grid placement (default "auto").
-                            if (string.IsNullOrEmpty(cr) || cr == "auto"
-                                || string.IsNullOrEmpty(cc) || cc == "auto")
-                            { allSameCell = false; break; }
-                            if (firstRow == null)
-                            { firstRow = cr; firstCol = cc; }
-                            else if (cr != firstRow || cc != firstCol)
-                            { allSameCell = false; break; }
-                        }
-
-                        if (allSameCell && firstRow != null)
-                        {
-                            double cellLeft = Location.X + ActualPaddingLeft + ActualBorderLeftWidth;
-                            double cellTop = Location.Y + ActualPaddingTop + ActualBorderTopWidth;
-                            double maxBottom = cellTop;
-                            foreach (var child in Boxes)
-                            {
-                                if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
-                                    continue;
-                                if (child.Display == CssConstants.None)
-                                    continue;
-                                double dx = cellLeft + child.ActualMarginLeft - child.Location.X;
-                                double dy = cellTop + child.ActualMarginTop - child.Location.Y;
-                                if (Math.Abs(dx) > 0.1)
-                                    child.OffsetLeft(dx);
-                                if (Math.Abs(dy) > 0.1)
-                                    child.OffsetTop(dy);
-                                double childBottom = child.ActualBottom + child.ActualMarginBottom;
-                                if (childBottom > maxBottom)
-                                    maxBottom = childBottom;
-                            }
-                            ActualBottom = maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
-                        }
+                        if (!ApplyGridStacking())
+                            ApplyGridAutoPlacement();
                     }
                 }
             }
@@ -1782,14 +1749,18 @@ internal class CssBox : CssBoxProperties, IDisposable
         if (fragments.Count == 0) return;
 
         double firstTop = fragments[0].Location.Y;
-        double lastBottom = fragments[^1].ActualBottom;
+        double lastBottom = GetVisualBottom(fragments[^1]);
+        foreach (var frag in fragments)
+        {
+            double vb = GetVisualBottom(frag);
+            if (vb > lastBottom) lastBottom = vb;
+        }
         double totalContentHeight = lastBottom - firstTop;
 
         if (totalContentHeight <= 0) return;
 
         // Determine column height: balanced columns for auto/max-height,
         // or explicit height.
-        double columnHeight;
         bool hasMaxHeight = MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight);
         bool hasExplicitHeight = Height != CssConstants.Auto && !string.IsNullOrEmpty(Height);
         double maxAllowedHeight = double.MaxValue;
@@ -1800,6 +1771,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             maxAllowedHeight = maxH - ActualPaddingTop - ActualPaddingBottom - ActualBorderTopWidth - ActualBorderBottomWidth;
         }
 
+        double columnHeight;
         if (hasExplicitHeight)
         {
             double h = CssValueParser.ParseLength(Height, ContainingBlock?.Size.Height ?? Size.Height, GetEmHeight());
@@ -1818,7 +1790,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             double lo = 0;
             foreach (var frag in fragments)
             {
-                double fh = frag.ActualBottom - frag.Location.Y;
+                double fh = GetVisualBottom(frag) - frag.Location.Y;
                 if (fh > lo) lo = fh;
             }
             double hi = totalContentHeight;
@@ -1826,7 +1798,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             for (int iter = 0; iter < 20; iter++)
             {
                 double mid = (lo + hi) / 2;
-                int cols = CountColumnsNeeded(fragments, mid);
+                int cols = CountColumnsNeededVisual(fragments, mid);
                 if (cols <= colCount)
                     hi = mid;
                 else
@@ -1840,13 +1812,80 @@ internal class CssBox : CssBoxProperties, IDisposable
 
         if (columnHeight <= 0) return;
 
+        // CSS Fragmentation §3: When fragments contain boxes with visible
+        // overflow that exceeds the column height (e.g. height: 0 parents
+        // with overflowing children), flatten the hierarchy by collecting
+        // the deepest fragmentable blocks from inside those containers.
+        bool needsDeepFragment = false;
+        foreach (var frag in fragments)
+        {
+            double visualH = GetVisualBottom(frag) - frag.Location.Y;
+            if (visualH > columnHeight + 0.5 && frag.Boxes.Count > 0)
+            {
+                needsDeepFragment = true;
+                break;
+            }
+        }
+
+        if (needsDeepFragment)
+        {
+            var deepFragments = new List<CssBox>();
+            foreach (var frag in fragments)
+            {
+                double visualH = GetVisualBottom(frag) - frag.Location.Y;
+                if (visualH > columnHeight + 0.5 && frag.Boxes.Count > 0)
+                {
+                    CollectFragmentableBlocksCore(frag, columnHeight, deepFragments, 0);
+                }
+                else
+                {
+                    deepFragments.Add(frag);
+                }
+            }
+
+            if (deepFragments.Count > fragments.Count)
+            {
+                fragments = deepFragments;
+                firstTop = fragments[0].Location.Y;
+                lastBottom = firstTop;
+                foreach (var frag in fragments)
+                {
+                    double vb = GetVisualBottom(frag);
+                    if (vb > lastBottom) lastBottom = vb;
+                }
+                totalContentHeight = lastBottom - firstTop;
+
+                // Re-compute balanced column height for the new fragment set.
+                if (!hasExplicitHeight && !(ColumnFill == "auto" && hasMaxHeight))
+                {
+                    double lo = 0;
+                    foreach (var frag in fragments)
+                    {
+                        double fh = GetVisualBottom(frag) - frag.Location.Y;
+                        if (fh > lo) lo = fh;
+                    }
+                    double hi = totalContentHeight;
+                    for (int iter = 0; iter < 20; iter++)
+                    {
+                        double mid = (lo + hi) / 2;
+                        int cols = CountColumnsNeededVisual(fragments, mid);
+                        if (cols <= colCount) hi = mid;
+                        else lo = mid + 0.5;
+                    }
+                    columnHeight = Math.Ceiling(hi);
+                    if (columnHeight > maxAllowedHeight)
+                        columnHeight = maxAllowedHeight;
+                }
+            }
+        }
+
         // Distribute fragments across columns.
         int currentCol = 0;
         double currentY = containerTop;
 
         foreach (var frag in fragments)
         {
-            double fragHeight = frag.ActualBottom - frag.Location.Y;
+            double fragHeight = GetVisualBottom(frag) - frag.Location.Y;
 
             bool wouldOverflow = (currentY - containerTop) + fragHeight > columnHeight;
             if (wouldOverflow && currentCol < colCount - 1 && currentY > containerTop + 0.5)
@@ -1880,8 +1919,9 @@ internal class CssBox : CssBoxProperties, IDisposable
         double maxBottom = containerTop;
         foreach (var frag in fragments)
         {
-            if (frag.ActualBottom > maxBottom)
-                maxBottom = frag.ActualBottom;
+            double vb = GetVisualBottom(frag);
+            if (vb > maxBottom)
+                maxBottom = vb;
         }
 
         double newBottom = maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
@@ -1938,17 +1978,17 @@ internal class CssBox : CssBoxProperties, IDisposable
         return current.Boxes.Count > 1 ? current : null;
     }
 
+
     /// <summary>
-    /// Counts the number of columns needed to fit all fragments within
-    /// the given column height (no splitting of individual fragments).
+    /// Counts columns needed using visual (overflow-aware) heights.
     /// </summary>
-    private static int CountColumnsNeeded(List<CssBox> fragments, double columnHeight)
+    private static int CountColumnsNeededVisual(List<CssBox> fragments, double columnHeight)
     {
         int cols = 1;
         double currentH = 0;
         foreach (var frag in fragments)
         {
-            double fh = frag.ActualBottom - frag.Location.Y;
+            double fh = GetVisualBottom(frag) - frag.Location.Y;
             if (currentH + fh > columnHeight && currentH > 0.5)
             {
                 cols++;
@@ -1960,6 +2000,67 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
         }
         return cols;
+    }
+
+    /// <summary>
+    /// Returns the visual bottom of a box, accounting for children that
+    /// overflow a constrained height (e.g. height: 0 with visible overflow).
+    /// </summary>
+    private static double GetVisualBottom(CssBox box)
+    {
+        double bottom = box.ActualBottom;
+        foreach (var child in box.Boxes)
+        {
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.None)
+                continue;
+            double cb = GetVisualBottom(child);
+            if (cb > bottom) bottom = cb;
+        }
+        return bottom;
+    }
+
+
+    private static void CollectFragmentableBlocksCore(CssBox parent, double columnHeight,
+        List<CssBox> result, int depth)
+    {
+        if (depth > 15) return; // safety limit
+
+        foreach (var child in parent.Boxes)
+        {
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.None)
+                continue;
+
+            double childHeight = GetVisualBottom(child) - child.Location.Y;
+
+            // If child fits in a column, or has break-inside: avoid, or
+            // has no block children to further fragment, keep it as-is.
+            bool avoidBreak = child.BreakInside == "avoid" ||
+                child.BreakInside == "avoid-column";
+            bool hasBlockChildren = false;
+            foreach (var gc in child.Boxes)
+            {
+                if (gc.Position != CssConstants.Absolute && gc.Position != CssConstants.Fixed
+                    && gc.Display != CssConstants.None)
+                {
+                    hasBlockChildren = true;
+                    break;
+                }
+            }
+
+            if (childHeight <= columnHeight + 0.5 || avoidBreak || !hasBlockChildren)
+            {
+                result.Add(child);
+            }
+            else
+            {
+                // Recurse: this child is too tall and can be fragmented.
+                CollectFragmentableBlocksCore(child, columnHeight, result, depth + 1);
+            }
+        }
     }
 
     /// <summary>
@@ -2392,6 +2493,17 @@ internal class CssBox : CssBoxProperties, IDisposable
             lastInFlowChild = child;
         }
 
+        // CSS2.1 §10.6.7: When a BFC root auto-sizes its height it must
+        // extend to contain all descendant floats — not only direct-child
+        // floats.  Walk the subtree (stopping at nested BFC boundaries)
+        // to find the maximum float bottom.
+        if (isBfc)
+        {
+            double maxFloatDesc = maxChildBottom;
+            FindMaxDescendantFloatBottom(this, ref maxFloatDesc);
+            maxChildBottom = Math.Max(maxChildBottom, maxFloatDesc);
+        }
+
         // CSS2.1 §10.6.3: The auto height extends to the bottom margin-
         // edge of the last in-flow child.  When the parent has bottom
         // border or padding, the last child's margin does not collapse
@@ -2399,6 +2511,197 @@ internal class CssBox : CssBoxProperties, IDisposable
         if (!collapseThrough && lastInFlowChild != null)
             maxChildBottom += lastInFlowChild.ActualMarginBottom;
         return Math.Max(ActualBottom, maxChildBottom + margin + ActualPaddingBottom + ActualBorderBottomWidth);
+    }
+
+    /// <summary>
+    /// Recursively finds the maximum bottom edge of any float in the
+    /// subtree, stopping at nested BFC boundaries.  Used by the BFC
+    /// root height calculation so that grandchild (and deeper) floats
+    /// are properly contained.
+    /// </summary>
+    private static void FindMaxDescendantFloatBottom(CssBox box, ref double maxBottom)
+    {
+        foreach (var child in box.Boxes)
+        {
+            if (child.Float != CssConstants.None && child.Display != CssConstants.None)
+            {
+                maxBottom = Math.Max(maxBottom, child.ActualBottom + child.ActualMarginBottom);
+            }
+
+            // Don't recurse into nested BFC roots — their floats are
+            // contained by them, not by the outer BFC.
+            bool childIsBfc = child.Float != CssConstants.None
+                || child.Display == CssConstants.InlineBlock
+                || child.Display == CssConstants.TableCell
+                || child.Display is "flex" or "inline-flex" or "grid" or "inline-grid"
+                || child.Position == CssConstants.Absolute
+                || child.Position == CssConstants.Fixed
+                || (child.Overflow != null && child.Overflow != CssConstants.Visible)
+                || (child.AlignContent != null && child.AlignContent != "normal");
+            if (!childIsBfc)
+                FindMaxDescendantFloatBottom(child, ref maxBottom);
+        }
+    }
+
+    /// <summary>
+    /// CSS Grid Level 1 §8.5: When all grid items share the same
+    /// grid-row and grid-column (e.g. grid-row: 1; grid-column: 1),
+    /// they overlap in the same grid cell.  Reposition them to the
+    /// container's content-area top-left so they stack visually with
+    /// later items painted on top.
+    /// </summary>
+    /// <returns><c>true</c> if stacking was applied; <c>false</c>
+    /// if items are not all in the same cell.</returns>
+    private bool ApplyGridStacking()
+    {
+        bool allSameCell = true;
+        string firstRow = null, firstCol = null;
+        foreach (var child in Boxes)
+        {
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.None)
+                continue;
+            var cr = child.GridRow;
+            var cc = child.GridColumn;
+            // Items without explicit grid placement use auto.
+            if (string.IsNullOrEmpty(cr) || cr == "auto"
+                || string.IsNullOrEmpty(cc) || cc == "auto")
+            { allSameCell = false; break; }
+            if (firstRow == null)
+            { firstRow = cr; firstCol = cc; }
+            else if (cr != firstRow || cc != firstCol)
+            { allSameCell = false; break; }
+        }
+
+        if (!allSameCell || firstRow == null)
+            return false;
+
+        double cellLeft = Location.X + ActualPaddingLeft + ActualBorderLeftWidth;
+        double cellTop = Location.Y + ActualPaddingTop + ActualBorderTopWidth;
+        double maxBottom = cellTop;
+        foreach (var child in Boxes)
+        {
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.None)
+                continue;
+            double dx = cellLeft + child.ActualMarginLeft - child.Location.X;
+            double dy = cellTop + child.ActualMarginTop - child.Location.Y;
+            if (Math.Abs(dx) > 0.1)
+                child.OffsetLeft(dx);
+            if (Math.Abs(dy) > 0.1)
+                child.OffsetTop(dy);
+            double childBottom = child.ActualBottom + child.ActualMarginBottom;
+            if (childBottom > maxBottom)
+                maxBottom = childBottom;
+        }
+        ActualBottom = maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
+        return true;
+    }
+
+    /// <summary>
+    /// Called from <see cref="CssLayoutEngine.FlowInlineBlock"/> after
+    /// CreateLineBoxes to apply grid stacking or auto-placement for grid
+    /// containers that are laid out via the inline-block path.
+    /// </summary>
+    internal void ApplyGridLayoutAfterInline()
+    {
+        if (!ApplyGridStacking())
+            ApplyGridAutoPlacement();
+    }
+
+    /// <summary>
+    /// CSS Grid Level 1: Auto-placement for grid items that are not all
+    /// in the same cell.  The inline layout path (CreateLineBoxes) places
+    /// grid items as inline-blocks on a single line.  This method
+    /// repositions them into proper grid rows (one item per row for a
+    /// single-column grid) and applies justify-self within the column.
+    /// </summary>
+    private void ApplyGridAutoPlacement()
+    {
+        double cellLeft = Location.X + ActualPaddingLeft + ActualBorderLeftWidth;
+        double cellTop = Location.Y + ActualPaddingTop + ActualBorderTopWidth;
+        double columnWidth = Size.Width - ActualPaddingLeft - ActualPaddingRight
+            - ActualBorderLeftWidth - ActualBorderRightWidth;
+        if (columnWidth <= 0) return;
+
+        double currentY = cellTop;
+        foreach (var child in Boxes)
+        {
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.None)
+                continue;
+
+            // CSS Grid Level 1 §6.1: Grid items with auto/normal/stretch
+            // justify-self and auto width should stretch to fill the column.
+            bool isAutoWidth = child.Width == CssConstants.Auto
+                || string.IsNullOrEmpty(child.Width);
+            string js = child.JustifySelf?.Trim().ToLowerInvariant();
+            bool isStretch = js == null || js == "auto" || js == "normal"
+                || js == "stretch";
+
+            if (isStretch && isAutoWidth)
+            {
+                double targetWidth = columnWidth
+                    - child.ActualMarginLeft - child.ActualMarginRight;
+                if (targetWidth > 0 && Math.Abs(child.Size.Width - targetWidth) > 0.5)
+                    child.Size = new SizeF((float)targetWidth, child.Size.Height);
+            }
+
+            // Move child to the start of the current row.
+            double dx = cellLeft + child.ActualMarginLeft - child.Location.X;
+            double dy = currentY + child.ActualMarginTop - child.Location.Y;
+            if (Math.Abs(dx) > 0.1)
+                child.OffsetLeft(dx);
+            if (Math.Abs(dy) > 0.1)
+                child.OffsetTop(dy);
+
+            // CSS Grid Level 1 §6.1: Apply justify-self to position the
+            // item within its grid cell (column width).
+            double boxWidth = child.ActualRight - child.Location.X;
+            double freeSpace = columnWidth - boxWidth;
+            if (freeSpace > 0.5 && !isStretch)
+            {
+                bool isElementRtl = child.Direction == "rtl";
+                bool isContainerRtl = Direction == "rtl";
+
+                double justifyDx = 0;
+                switch (js)
+                {
+                    case "center":
+                        justifyDx = freeSpace / 2;
+                        break;
+                    case "end":
+                    case "flex-end":
+                        justifyDx = isContainerRtl ? 0 : freeSpace;
+                        break;
+                    case "self-end":
+                        justifyDx = isElementRtl ? 0 : freeSpace;
+                        break;
+                    case "right":
+                        justifyDx = freeSpace;
+                        break;
+                    case "start":
+                    case "flex-start":
+                        justifyDx = isContainerRtl ? freeSpace : 0;
+                        break;
+                    case "self-start":
+                        justifyDx = isElementRtl ? freeSpace : 0;
+                        break;
+                    case "left":
+                        justifyDx = 0;
+                        break;
+                }
+
+                if (Math.Abs(justifyDx) > 0.5)
+                    child.OffsetLeft(justifyDx);
+            }
+
+            currentY = child.ActualBottom + child.ActualMarginBottom;
+        }
+        ActualBottom = currentY + ActualPaddingBottom + ActualBorderBottomWidth;
     }
 
     internal void OffsetTop(double amount)

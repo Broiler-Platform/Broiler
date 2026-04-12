@@ -10,6 +10,16 @@ namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class SkiaImageAdapter : RAdapter
 {
+    /// <summary>
+    /// Typefaces loaded from font files via <see cref="LoadFontFromFile"/>,
+    /// keyed by CSS family name (case-insensitive).  SkiaSharp's system
+    /// <see cref="SKFontManager"/> does not expose fonts loaded with
+    /// <see cref="SKTypeface.FromFile"/>; this dictionary allows
+    /// <see cref="CreateFontInt"/> to resolve them by name.
+    /// </summary>
+    private readonly Dictionary<string, SKTypeface> _loadedTypefaces
+        = new(StringComparer.OrdinalIgnoreCase);
+
     private SkiaImageAdapter()
     {
         // Register system fonts first so we can probe availability below.
@@ -76,8 +86,19 @@ internal sealed class SkiaImageAdapter : RAdapter
         var familyName = typeface.FamilyName;
         AddFontFamily(new FontFamilyAdapter(familyName));
 
+        // Cache the typeface so CreateFontInt can use it directly.
+        // SKFontManager.Default cannot find typefaces loaded from files,
+        // so we maintain our own lookup dictionary.
+        _loadedTypefaces[familyName] = typeface;
+
         if (!string.IsNullOrEmpty(mapFromName))
+        {
             AddFontFamilyMapping(mapFromName!, familyName);
+            // Also register under the alias name so that CSS font-family
+            // lookups with the alias (e.g. "Ahem") resolve to this typeface
+            // even before the mapping is applied.
+            _loadedTypefaces[mapFromName!] = typeface;
+        }
 
         // Do not dispose the typeface — SkiaSharp's font manager retains
         // a reference so that subsequent SKTypeface.FromFamilyName lookups
@@ -545,6 +566,12 @@ internal sealed class SkiaImageAdapter : RAdapter
     protected override RFont CreateFontInt(string family, double size, FontStyle style)
     {
         var skStyle = ConvertFontStyle(style);
+        // Prefer typefaces loaded from files over the system font manager,
+        // because SKFontManager.Default cannot resolve fonts that were
+        // loaded with SKTypeface.FromFile (they are not registered with
+        // the native OS font manager).
+        if (_loadedTypefaces.TryGetValue(family, out var loaded))
+            return new FontAdapter(loaded, size, style);
         var typeface = SKTypeface.FromFamilyName(family, skStyle) ?? SKTypeface.Default;
         return new FontAdapter(typeface, size, style);
     }

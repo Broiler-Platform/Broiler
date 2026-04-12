@@ -135,6 +135,23 @@ public static class HtmlRender
         data.SaveTo(stream);
     }
 
+    /// <summary>
+    /// Loads a TrueType/OpenType font from a file and registers it with
+    /// the rendering adapter so that CSS <c>font-family</c> references
+    /// using <paramref name="cssName"/> resolve to it.
+    /// </summary>
+    /// <param name="path">Absolute path to a .ttf or .otf font file.</param>
+    /// <param name="cssName">
+    /// Optional CSS family name alias.  When provided, the font will be
+    /// accessible under this name in addition to its own family name
+    /// (e.g. pass <c>"Ahem"</c> for the WPT Ahem test font).
+    /// </param>
+    /// <returns>
+    /// The font's own family name, or <c>null</c> if loading failed.
+    /// </returns>
+    public static string LoadFontFromFile(string path, string cssName = null)
+        => SkiaImageAdapter.Instance.LoadFontFromFile(path, cssName);
+
     private static SizeF MeasureHtml(HtmlContainer container, SizeF minSize, SizeF maxSize)
     {
         // Create a small temporary surface for measurement

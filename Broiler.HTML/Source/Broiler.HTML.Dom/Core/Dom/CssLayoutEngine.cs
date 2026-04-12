@@ -746,7 +746,23 @@ internal static class CssLayoutEngine
         b.ActualBottom = cury;
 
         // --- Lay out children inside the inline-block ---
-        if (DomUtils.ContainsInlinesOnly(b))
+        if (b.Display is "grid" or "inline-grid")
+        {
+            // CSS Grid Level 1: Grid items should be laid out as blocks
+            // (not inline-blocks) so that width:auto stretches to the
+            // column width.  Use the block layout path, then apply grid
+            // stacking or auto-placement to fix positioning.
+            foreach (var child in b.Boxes)
+                child.PerformLayout(g);
+
+            double childMaxBottom = b.Location.Y;
+            foreach (var child in b.Boxes)
+                childMaxBottom = Math.Max(childMaxBottom, child.ActualBottom);
+            b.ActualBottom = childMaxBottom;
+
+            b.ApplyGridLayoutAfterInline();
+        }
+        else if (DomUtils.ContainsInlinesOnly(b))
         {
             CreateLineBoxes(g, b);
         }

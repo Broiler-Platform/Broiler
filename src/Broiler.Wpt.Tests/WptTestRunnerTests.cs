@@ -1946,4 +1946,84 @@ document.getElementById('out').appendChild(p);
             $"anchor-position-top-layer-007 should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
+
+    [Fact]
+    public void Wpt_AlignContentBlock001_MatchesReference()
+    {
+        // CSS Box Alignment Level 3 §5.4: non-normal align-content
+        // establishes a BFC on blocks (float avoidance, margin containment)
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "css-align", "blocks",
+            "align-content-block-001.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "css-align", "blocks",
+            "align-content-block-001.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"align-content-block-001 should pass (match ≥ threshold). " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BlockJustifySelf_MatchesReference()
+    {
+        // CSS Box Alignment Level 3 §6.1: justify-self on block-level boxes
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "css-align", "self-alignment",
+            "block-justify-self.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "css-align", "self-alignment",
+            "block-justify-self.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"block-justify-self should pass (match ≥ threshold). " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AlignContentBlockBreakOverflow010_MatchesReference()
+    {
+        // CSS Box Alignment Level 3 §5.4: align-content fragmentation
+        // with overflow in multi-column layout
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "css-align", "blocks",
+            "align-content-block-break-overflow-010.html");
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refImage = Path.Combine(refDir, "css", "css-align", "blocks",
+            "align-content-block-break-overflow-010.png");
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"align-content-block-break-overflow-010 should pass (match ≥ threshold). " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
 }
