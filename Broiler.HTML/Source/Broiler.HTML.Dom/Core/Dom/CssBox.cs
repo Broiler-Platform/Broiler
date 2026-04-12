@@ -1261,6 +1261,18 @@ internal class CssBox : CssBoxProperties, IDisposable
                     {
                         ActualBottom = MarginBottomCollapse();
                     }
+
+                    // CSS Grid Level 1 §8.5: When all grid items share
+                    // the same grid-row and grid-column, reposition them
+                    // to the container's content-area origin so they
+                    // overlap visually.  (This duplicates the same logic
+                    // in the block path below; it is needed here because
+                    // ContainsInlinesOnly() forces grid containers into
+                    // the inline layout path for shrink-to-fit sizing.)
+                    if (Display is "grid" or "inline-grid")
+                    {
+                        ApplyGridStacking();
+                    }
                 }
                 else if (Boxes.Count > 0)
                 {
@@ -1316,56 +1328,9 @@ internal class CssBox : CssBoxProperties, IDisposable
                     ActualRight = CalculateActualRight();
                     ActualBottom = MarginBottomCollapse();
 
-                    // CSS Grid Level 1 §8.5: When all grid items share
-                    // the same grid-row and grid-column (e.g.
-                    // grid-row: 1; grid-column: 1), they overlap in the
-                    // same grid cell.  Position them at the container's
-                    // content-area top-left so they stack visually.
                     if (Display is "grid" or "inline-grid")
                     {
-                        bool allSameCell = true;
-                        string firstRow = null, firstCol = null;
-                        foreach (var child in Boxes)
-                        {
-                            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
-                                continue;
-                            if (child.Display == CssConstants.None)
-                                continue;
-                            var cr = child.GridRow;
-                            var cc = child.GridColumn;
-                            // Skip items without explicit grid placement (default "auto").
-                            if (string.IsNullOrEmpty(cr) || cr == "auto"
-                                || string.IsNullOrEmpty(cc) || cc == "auto")
-                            { allSameCell = false; break; }
-                            if (firstRow == null)
-                            { firstRow = cr; firstCol = cc; }
-                            else if (cr != firstRow || cc != firstCol)
-                            { allSameCell = false; break; }
-                        }
-
-                        if (allSameCell && firstRow != null)
-                        {
-                            double cellLeft = Location.X + ActualPaddingLeft + ActualBorderLeftWidth;
-                            double cellTop = Location.Y + ActualPaddingTop + ActualBorderTopWidth;
-                            double maxBottom = cellTop;
-                            foreach (var child in Boxes)
-                            {
-                                if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
-                                    continue;
-                                if (child.Display == CssConstants.None)
-                                    continue;
-                                double dx = cellLeft + child.ActualMarginLeft - child.Location.X;
-                                double dy = cellTop + child.ActualMarginTop - child.Location.Y;
-                                if (Math.Abs(dx) > 0.1)
-                                    child.OffsetLeft(dx);
-                                if (Math.Abs(dy) > 0.1)
-                                    child.OffsetTop(dy);
-                                double childBottom = child.ActualBottom + child.ActualMarginBottom;
-                                if (childBottom > maxBottom)
-                                    maxBottom = childBottom;
-                            }
-                            ActualBottom = maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
-                        }
+                        ApplyGridStacking();
                     }
                 }
             }
@@ -2440,6 +2405,60 @@ internal class CssBox : CssBoxProperties, IDisposable
             if (!childIsBfc)
                 FindMaxDescendantFloatBottom(child, ref maxBottom);
         }
+    }
+
+    /// <summary>
+    /// CSS Grid Level 1 §8.5: When all grid items share the same
+    /// grid-row and grid-column (e.g. grid-row: 1; grid-column: 1),
+    /// they overlap in the same grid cell.  Reposition them to the
+    /// container's content-area top-left so they stack visually with
+    /// later items painted on top.
+    /// </summary>
+    private void ApplyGridStacking()
+    {
+        bool allSameCell = true;
+        string firstRow = null, firstCol = null;
+        foreach (var child in Boxes)
+        {
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.None)
+                continue;
+            var cr = child.GridRow;
+            var cc = child.GridColumn;
+            // Items without explicit grid placement use auto.
+            if (string.IsNullOrEmpty(cr) || cr == "auto"
+                || string.IsNullOrEmpty(cc) || cc == "auto")
+            { allSameCell = false; break; }
+            if (firstRow == null)
+            { firstRow = cr; firstCol = cc; }
+            else if (cr != firstRow || cc != firstCol)
+            { allSameCell = false; break; }
+        }
+
+        if (!allSameCell || firstRow == null)
+            return;
+
+        double cellLeft = Location.X + ActualPaddingLeft + ActualBorderLeftWidth;
+        double cellTop = Location.Y + ActualPaddingTop + ActualBorderTopWidth;
+        double maxBottom = cellTop;
+        foreach (var child in Boxes)
+        {
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.None)
+                continue;
+            double dx = cellLeft + child.ActualMarginLeft - child.Location.X;
+            double dy = cellTop + child.ActualMarginTop - child.Location.Y;
+            if (Math.Abs(dx) > 0.1)
+                child.OffsetLeft(dx);
+            if (Math.Abs(dy) > 0.1)
+                child.OffsetTop(dy);
+            double childBottom = child.ActualBottom + child.ActualMarginBottom;
+            if (childBottom > maxBottom)
+                maxBottom = childBottom;
+        }
+        ActualBottom = maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
     }
 
     internal void OffsetTop(double amount)
