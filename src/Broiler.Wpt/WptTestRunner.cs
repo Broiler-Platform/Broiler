@@ -651,7 +651,18 @@ internal sealed class WptTestRunner
         }
 
         if (scripts.Count == 0 && deferredScripts.Count == 0)
-            return html;
+        {
+            // Even with no inline scripts, we still need to process anchor
+            // positioning, animation snapshots, etc. via the DomBridge.
+            using var context2 = new JSContext();
+            var bridge2 = new DomBridge();
+            bridge2.Attach(context2, html, url);
+            bridge2.FireWindowLoadEvent();
+            bridge2.FlushTimers();
+            bridge2.ResolveAnimationSnapshots();
+            bridge2.ResolveAnchorPositions();
+            return bridge2.SerializeToHtml();
+        }
 
         using var context = new JSContext();
         var bridge = new DomBridge();
