@@ -87,3 +87,6 @@ docs/google-compliance/google-reference.png
 docs/google-compliance/google-diff.png
 docs/google-compliance/google-report.txt
 docs/google-compliance/google-js-errors.log
+node_modules/
+package.json
+package-lock.json

@@ -642,6 +642,17 @@ internal sealed class WptTestRunner
         bridge.FireWindowLoadEvent();
         bridge.FlushTimers();
 
+        // Resolve CSS animation snapshots: for elements with animation + negative
+        // delay, compute the animated property values at t=0 and write them as
+        // inline styles so the static renderer can produce the correct output.
+        bridge.ResolveAnimationSnapshots();
+
+        // Resolve CSS anchor positioning: for elements that use anchor()
+        // functions, compute the anchored position from the target anchor
+        // element's known CSS position and dimensions.  Also inserts
+        // backdrop elements for modal <dialog> elements.
+        bridge.ResolveAnchorPositions();
+
         return bridge.SerializeToHtml();
     }
 }

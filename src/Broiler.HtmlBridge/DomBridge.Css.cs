@@ -220,11 +220,71 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Strips block-style at-rules (e.g. <c>@keyframes</c>, <c>@font-face</c>,
+    /// <c>@supports</c>) from CSS text so that their inner content is not parsed
+    /// as regular CSS rules.  Balanced <c>{…}</c> pairs are tracked so that
+    /// nested rules inside at-rule blocks are completely removed.
+    /// </summary>
+    private static readonly Regex BlockAtRulePattern = new(
+        @"@(?:keyframes|font-face|supports|layer|counter-style|property|container)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static string StripBlockAtRules(string css)
+    {
+        var match = BlockAtRulePattern.Match(css);
+        if (!match.Success)
+            return css;
+
+        var sb = new StringBuilder(css.Length);
+        int pos = 0;
+
+        while (match.Success)
+        {
+            sb.Append(css, pos, match.Index - pos);
+
+            // Find the opening brace.
+            int braceStart = css.IndexOf('{', match.Index);
+            if (braceStart < 0)
+            {
+                pos = css.Length;
+                break;
+            }
+
+            // Scan for the balanced closing brace.
+            int count = 1;
+            int endIdx = braceStart + 1;
+            while (count > 0 && endIdx < css.Length)
+            {
+                if (css[endIdx] == '{') count++;
+                else if (css[endIdx] == '}') count--;
+                endIdx++;
+            }
+
+            pos = endIdx;
+            match = match.NextMatch();
+            // Skip matches that fall inside the range we just consumed.
+            while (match.Success && match.Index < pos)
+                match = match.NextMatch();
+        }
+
+        if (pos < css.Length)
+            sb.Append(css, pos, css.Length - pos);
+
+        return sb.ToString();
+    }
+
+    /// <summary>
     /// Parses raw CSS text into rules, handling <c>@media</c> queries.
     /// Rules inside <c>@media screen</c> are included; <c>@media print</c> rules are skipped.
+    /// Block-style at-rules (<c>@keyframes</c>, etc.) are stripped before rule extraction.
     /// </summary>
     private void ParseCssText(string cssText)
     {
+        // Strip block-style at-rules (@keyframes, @font-face, etc.) before
+        // processing so that their internal selectors (e.g. "from", "50%", "to")
+        // are not mistakenly added to _cssRules.
+        cssText = StripBlockAtRules(cssText);
+
         var remaining = MediaQueryPattern.Replace(cssText, m =>
         {
             var query = m.Groups["query"].Value.Trim();
