@@ -2077,360 +2077,165 @@ document.getElementById('out').appendChild(p);
             $"Expected target display:none but styles = [{string.Join(", ", targetEl.Style.Select(kv => $"{kv.Key}:{kv.Value}"))}]");
     }
 
-    [Fact]
-    public void Wpt_PositionVisibilityAnchorsVisible_MatchesReference()
+    private WptTestResult RunAnchorMatchTest(string testFileName)
     {
         var root = FindRepoRoot();
         var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-anchors-visible.html");
+        var testDir = Path.Combine(wptRoot, "css", "css-anchor-position");
+        var testFile = Path.Combine(testDir, testFileName);
         if (!File.Exists(testFile))
             throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-anchors-visible.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        // Parse the reference HTML path from <link rel="match" href="...">
+        var html = File.ReadAllText(testFile);
+        var matchLink = System.Text.RegularExpressions.Regex.Match(html,
+            @"<link\s+rel=""match""\s+href=""([^""]+)""",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!matchLink.Success)
+            throw new InvalidOperationException($"No <link rel=\"match\"> found in {testFileName}");
+
+        var refHref = matchLink.Groups[1].Value;
+        var refHtmlPath = Path.GetFullPath(Path.Combine(testDir, refHref));
+        if (!File.Exists(refHtmlPath))
+            throw new FileNotFoundException($"Reference HTML not found: {refHtmlPath}");
+
         var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        return runner.RunMatchTest(testFile, refHtmlPath, wptRoot);
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityAnchorsVisible_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible.html");
         Assert.True(result.Passed,
-            $"position-visibility-anchors-visible should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionVisibilityInitial_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-initial.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-initial.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-visibility-initial.html");
         Assert.True(result.Passed,
-            $"position-visibility-initial should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionVisibilityAnchorsValidTentative_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-anchors-valid.tentative.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-anchors-valid.tentative.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-visibility-anchors-valid.tentative.html");
         Assert.True(result.Passed,
-            $"position-visibility-anchors-valid.tentative should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionVisibilityAnchorsVisibleCssVisibility_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-css-visibility.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-css-visibility.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-css-visibility.html");
         Assert.True(result.Passed,
-            $"position-visibility-anchors-visible-css-visibility should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionVisibilityRemoveAnchorsVisible_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-remove-anchors-visible.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-remove-anchors-visible.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-visibility-remove-anchors-visible.html");
         Assert.True(result.Passed,
-            $"position-visibility-remove-anchors-visible should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionVisibilityAnchorsVisibleChained001_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-chained-001.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-chained-001.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-chained-001.html");
         Assert.True(result.Passed,
-            $"position-visibility-anchors-visible-chained-001 should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionVisibilityAnchorsVisibleChained002_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-chained-002.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-chained-002.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-chained-002.html");
         Assert.True(result.Passed,
-            $"position-visibility-anchors-visible-chained-002 should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionVisibilityAnchorsVisibleChained003_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-chained-003.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-chained-003.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-chained-003.html");
         Assert.True(result.Passed,
-            $"position-visibility-anchors-visible-chained-003 should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionVisibilityAnchorsVisiblePositionFixed_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-position-fixed.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-position-fixed.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-position-fixed.html");
         Assert.True(result.Passed,
-            $"position-visibility-anchors-visible-position-fixed should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionVisibilityAnchorsVisibleBothPositionFixed_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-both-position-fixed.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-both-position-fixed.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-both-position-fixed.html");
         Assert.True(result.Passed,
-            $"position-visibility-anchors-visible-both-position-fixed should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionVisibilityAnchorsVisibleStackedChild_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-stacked-child.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-stacked-child.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-stacked-child.html");
         Assert.True(result.Passed,
-            $"position-visibility-anchors-visible-stacked-child should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionVisibilityAnchorsVisibleStackedChildTentative_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-stacked-child.tentative.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-stacked-child.tentative.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-stacked-child.tentative.html");
         Assert.True(result.Passed,
-            $"position-visibility-anchors-visible-stacked-child.tentative should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionVisibilityAnchorsVisibleWithPosition_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-with-position.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-with-position.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-with-position.html");
         Assert.True(result.Passed,
-            $"position-visibility-anchors-visible-with-position should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionVisibilityAnchorsVisibleAfterScrollOut_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-after-scroll-out.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-visibility-anchors-visible-after-scroll-out.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-after-scroll-out.html");
         Assert.True(result.Passed,
-            $"position-visibility-anchors-visible-after-scroll-out should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_Transform005_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "transform-005.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "transform-005.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("transform-005.html");
         Assert.True(result.Passed,
-            $"transform-005 should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionAreaInlineContainer_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-area-inline-container.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-area-inline-container.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-area-inline-container.html");
         Assert.True(result.Passed,
-            $"position-area-inline-container should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
     public void Wpt_PositionAreaAbsInlineContainer_MatchesReference()
     {
-        var root = FindRepoRoot();
-        var wptRoot = Path.Combine(root, "tests", "wpt");
-        var refDir = Path.Combine(wptRoot, "references");
-        var testFile = Path.Combine(wptRoot, "css", "css-anchor-position",
-            "position-area-abs-inline-container.html");
-        if (!File.Exists(testFile))
-            throw new FileNotFoundException($"WPT test file not found: {testFile}");
-        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
-            "position-area-abs-inline-container.png");
-        if (!File.Exists(refImage))
-            throw new FileNotFoundException($"Reference image not found: {refImage}");
-        var runner = new WptTestRunner(1024, 768);
-        var result = runner.RunTest(testFile, refDir, wptRoot);
+        var result = RunAnchorMatchTest("position-area-abs-inline-container.html");
         Assert.True(result.Passed,
-            $"position-area-abs-inline-container should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 

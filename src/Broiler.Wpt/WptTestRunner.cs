@@ -569,6 +569,118 @@ internal sealed class WptTestRunner
     }
 
     /// <summary>
+    /// Runs a WPT <c>rel="match"</c> test by rendering both the test HTML and
+    /// its reference HTML with the Broiler stack, then comparing the two bitmaps.
+    /// This avoids font-rendering / scrollbar differences between Chromium and
+    /// Broiler that make cross-engine comparison imprecise.
+    /// </summary>
+    /// <param name="testPath">Path to the test HTML file.</param>
+    /// <param name="refHtmlPath">Path to the WPT reference HTML file.</param>
+    /// <param name="wptRoot">Optional WPT root directory for font loading.</param>
+    internal WptTestResult RunMatchTest(string testPath, string refHtmlPath, string? wptRoot = null)
+    {
+        if (!File.Exists(testPath))
+            return new WptTestResult { TestPath = testPath, Passed = false,
+                Message = "Test file not found.", Category = FailureCategory.FileIO };
+        if (!File.Exists(refHtmlPath))
+            return new WptTestResult { TestPath = testPath, Passed = false,
+                Message = $"Reference HTML not found: {refHtmlPath}", Category = FailureCategory.FileIO };
+
+        if (wptRoot != null)
+            EnsureWptFontsLoaded(wptRoot);
+
+        SKBitmap? rendered = null;
+        SKBitmap? reference = null;
+        try
+        {
+            rendered = RenderHtmlFile(testPath, wptRoot);
+            reference = RenderHtmlFile(refHtmlPath, wptRoot);
+
+            using var diff = PixelDiffRunner.Compare(rendered, reference);
+            double matchPct = (1.0 - diff.DiffRatio) * 100;
+
+            if (diff.IsMatch)
+            {
+                return new WptTestResult
+                {
+                    TestPath = testPath,
+                    Passed = true,
+                    MatchPercent = matchPct,
+                };
+            }
+
+            var diagnostics = MismatchClassifier.Classify(
+                diff,
+                rendered.Width, rendered.Height,
+                reference.Width, reference.Height);
+
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = false,
+                MatchPercent = matchPct,
+                Message = $"Pixel mismatch: {matchPct:F1}% match ({diff.DiffPixelCount}/{diff.TotalPixelCount} pixels differ) — {diagnostics.Summary}",
+                Category = FailureCategory.PixelMismatch,
+                MismatchDiagnostics = diagnostics,
+            };
+        }
+        catch (Exception ex)
+        {
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = false,
+                Message = $"Match test failed: {ex.Message}",
+                Category = FailureCategory.RenderingError,
+                StackTrace = ex.StackTrace,
+            };
+        }
+        finally
+        {
+            rendered?.Dispose();
+            reference?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Renders an HTML file through the full Broiler pipeline (script execution,
+    /// anchor resolution, rendering) and returns the resulting bitmap.
+    /// </summary>
+    private SKBitmap RenderHtmlFile(string htmlPath, string? wptRoot)
+    {
+        var html = File.ReadAllText(htmlPath);
+
+        if (IsMediaPlaybackTest(html))
+            throw new InvalidOperationException("Test requires media playback.");
+
+        var testBaseUrl = new Uri(Path.GetFullPath(htmlPath)).AbsoluteUri;
+
+        // Set local base path for sub-resource resolution.
+        html = ExecuteScriptsWithDom(html, testBaseUrl);
+        html = HtmlPostProcessor.Process(html);
+
+        EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetHandler = null;
+        if (wptRoot != null)
+        {
+            var capturedWptRoot = wptRoot;
+            stylesheetHandler = (_, args) =>
+            {
+                var src = args.Src;
+                if (src != null && src.StartsWith("/", StringComparison.Ordinal))
+                {
+                    var rel = src.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+                    var local = Path.Combine(capturedWptRoot, rel);
+                    if (File.Exists(local))
+                        args.SetSrc = local;
+                }
+            };
+        }
+
+        return HtmlRender.RenderToImage(html, _width, _height, SKColors.White,
+            stylesheetLoad: stylesheetHandler, baseUrl: testBaseUrl);
+    }
+
+    /// <summary>
     /// Runs all discovered tests under <paramref name="wptRoot"/>, comparing
     /// each against reference images in <paramref name="referenceDir"/>.
     /// Yields results as they complete.
