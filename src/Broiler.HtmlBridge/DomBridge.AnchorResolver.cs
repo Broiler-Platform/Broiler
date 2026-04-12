@@ -604,7 +604,8 @@ public sealed partial class DomBridge
         double gridLeft = 0; // CB left (in CB coordinates)
         double gridRight = Math.Max(cbWidth, anchorRight);
 
-        // Grid row edges: min(CB-top, anchor-top), anchor-top, anchor-bottom, CB-bottom
+        // Grid row edges: when the anchor extends above the CB (anchorTop < 0),
+        // the grid top is clamped to the anchor top, not the CB top (which is 0).
         double gridTop = Math.Min(0, anchorTop);
         double gridBottom = Math.Max(cbHeight, anchorBottom);
 

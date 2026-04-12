@@ -997,6 +997,10 @@ internal class CssBox : CssBoxProperties, IDisposable
                                 double containerRight = ContainingBlock.ClientLeft + ContainingBlock.AvailableWidth;
                                 double boxHeight = Math.Max(Size.Height, GetEmHeight());
 
+                                // Try to fit beside floats; if not possible, clear
+                                // below them.  100 iterations is a safe upper bound
+                                // since each iteration advances past at least one
+                                // float's bottom edge.
                                 for (int bfcIter = 0; bfcIter < 100; bfcIter++)
                                 {
                                     double leftEdge = containerLeft + ActualMarginLeft;
@@ -1329,7 +1333,9 @@ internal class CssBox : CssBoxProperties, IDisposable
                                 continue;
                             var cr = child.GridRow;
                             var cc = child.GridColumn;
-                            if (string.IsNullOrEmpty(cr) || string.IsNullOrEmpty(cc))
+                            // Skip items without explicit grid placement (default "auto").
+                            if (string.IsNullOrEmpty(cr) || cr == "auto"
+                                || string.IsNullOrEmpty(cc) || cc == "auto")
                             { allSameCell = false; break; }
                             if (firstRow == null)
                             { firstRow = cr; firstCol = cc; }
