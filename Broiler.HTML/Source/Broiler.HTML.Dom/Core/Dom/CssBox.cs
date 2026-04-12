@@ -1749,14 +1749,18 @@ internal class CssBox : CssBoxProperties, IDisposable
         if (fragments.Count == 0) return;
 
         double firstTop = fragments[0].Location.Y;
-        double lastBottom = fragments[^1].ActualBottom;
+        double lastBottom = GetVisualBottom(fragments[^1]);
+        foreach (var frag in fragments)
+        {
+            double vb = GetVisualBottom(frag);
+            if (vb > lastBottom) lastBottom = vb;
+        }
         double totalContentHeight = lastBottom - firstTop;
 
         if (totalContentHeight <= 0) return;
 
         // Determine column height: balanced columns for auto/max-height,
         // or explicit height.
-        double columnHeight;
         bool hasMaxHeight = MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight);
         bool hasExplicitHeight = Height != CssConstants.Auto && !string.IsNullOrEmpty(Height);
         double maxAllowedHeight = double.MaxValue;
@@ -1767,6 +1771,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             maxAllowedHeight = maxH - ActualPaddingTop - ActualPaddingBottom - ActualBorderTopWidth - ActualBorderBottomWidth;
         }
 
+        double columnHeight;
         if (hasExplicitHeight)
         {
             double h = CssValueParser.ParseLength(Height, ContainingBlock?.Size.Height ?? Size.Height, GetEmHeight());
@@ -1785,7 +1790,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             double lo = 0;
             foreach (var frag in fragments)
             {
-                double fh = frag.ActualBottom - frag.Location.Y;
+                double fh = GetVisualBottom(frag) - frag.Location.Y;
                 if (fh > lo) lo = fh;
             }
             double hi = totalContentHeight;
@@ -1793,7 +1798,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             for (int iter = 0; iter < 20; iter++)
             {
                 double mid = (lo + hi) / 2;
-                int cols = CountColumnsNeeded(fragments, mid);
+                int cols = CountColumnsNeededVisual(fragments, mid);
                 if (cols <= colCount)
                     hi = mid;
                 else
@@ -1807,13 +1812,80 @@ internal class CssBox : CssBoxProperties, IDisposable
 
         if (columnHeight <= 0) return;
 
+        // CSS Fragmentation §3: When fragments contain boxes with visible
+        // overflow that exceeds the column height (e.g. height: 0 parents
+        // with overflowing children), flatten the hierarchy by collecting
+        // the deepest fragmentable blocks from inside those containers.
+        bool needsDeepFragment = false;
+        foreach (var frag in fragments)
+        {
+            double visualH = GetVisualBottom(frag) - frag.Location.Y;
+            if (visualH > columnHeight + 0.5 && frag.Boxes.Count > 0)
+            {
+                needsDeepFragment = true;
+                break;
+            }
+        }
+
+        if (needsDeepFragment)
+        {
+            var deepFragments = new List<CssBox>();
+            foreach (var frag in fragments)
+            {
+                double visualH = GetVisualBottom(frag) - frag.Location.Y;
+                if (visualH > columnHeight + 0.5 && frag.Boxes.Count > 0)
+                {
+                    CollectFragmentableBlocksCore(frag, columnHeight, deepFragments, 0);
+                }
+                else
+                {
+                    deepFragments.Add(frag);
+                }
+            }
+
+            if (deepFragments.Count > fragments.Count)
+            {
+                fragments = deepFragments;
+                firstTop = fragments[0].Location.Y;
+                lastBottom = firstTop;
+                foreach (var frag in fragments)
+                {
+                    double vb = GetVisualBottom(frag);
+                    if (vb > lastBottom) lastBottom = vb;
+                }
+                totalContentHeight = lastBottom - firstTop;
+
+                // Re-compute balanced column height for the new fragment set.
+                if (!hasExplicitHeight && !(ColumnFill == "auto" && hasMaxHeight))
+                {
+                    double lo = 0;
+                    foreach (var frag in fragments)
+                    {
+                        double fh = GetVisualBottom(frag) - frag.Location.Y;
+                        if (fh > lo) lo = fh;
+                    }
+                    double hi = totalContentHeight;
+                    for (int iter = 0; iter < 20; iter++)
+                    {
+                        double mid = (lo + hi) / 2;
+                        int cols = CountColumnsNeededVisual(fragments, mid);
+                        if (cols <= colCount) hi = mid;
+                        else lo = mid + 0.5;
+                    }
+                    columnHeight = Math.Ceiling(hi);
+                    if (columnHeight > maxAllowedHeight)
+                        columnHeight = maxAllowedHeight;
+                }
+            }
+        }
+
         // Distribute fragments across columns.
         int currentCol = 0;
         double currentY = containerTop;
 
         foreach (var frag in fragments)
         {
-            double fragHeight = frag.ActualBottom - frag.Location.Y;
+            double fragHeight = GetVisualBottom(frag) - frag.Location.Y;
 
             bool wouldOverflow = (currentY - containerTop) + fragHeight > columnHeight;
             if (wouldOverflow && currentCol < colCount - 1 && currentY > containerTop + 0.5)
@@ -1927,6 +1999,103 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
         }
         return cols;
+    }
+
+    /// <summary>
+    /// Counts columns needed using visual (overflow-aware) heights.
+    /// </summary>
+    private static int CountColumnsNeededVisual(List<CssBox> fragments, double columnHeight)
+    {
+        int cols = 1;
+        double currentH = 0;
+        foreach (var frag in fragments)
+        {
+            double fh = GetVisualBottom(frag) - frag.Location.Y;
+            if (currentH + fh > columnHeight && currentH > 0.5)
+            {
+                cols++;
+                currentH = fh;
+            }
+            else
+            {
+                currentH += fh;
+            }
+        }
+        return cols;
+    }
+
+    /// <summary>
+    /// Returns the visual bottom of a box, accounting for children that
+    /// overflow a constrained height (e.g. height: 0 with visible overflow).
+    /// </summary>
+    private static double GetVisualBottom(CssBox box)
+    {
+        double bottom = box.ActualBottom;
+        foreach (var child in box.Boxes)
+        {
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.None)
+                continue;
+            double cb = GetVisualBottom(child);
+            if (cb > bottom) bottom = cb;
+        }
+        return bottom;
+    }
+
+    /// <summary>
+    /// CSS Fragmentation §3: Recursively collects leaf-level fragmentable
+    /// blocks from a box hierarchy.  Walks into children of boxes that are
+    /// taller than <paramref name="columnHeight"/> (unless they have
+    /// <c>break-inside: avoid</c>), collecting the deepest blocks that
+    /// either fit within a column or cannot be further fragmented.
+    /// </summary>
+    private static List<CssBox> CollectFragmentableBlocks(CssBox parent, double columnHeight)
+    {
+        var result = new List<CssBox>();
+        CollectFragmentableBlocksCore(parent, columnHeight, result, 0);
+        return result;
+    }
+
+    private static void CollectFragmentableBlocksCore(CssBox parent, double columnHeight,
+        List<CssBox> result, int depth)
+    {
+        if (depth > 15) return; // safety limit
+
+        foreach (var child in parent.Boxes)
+        {
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+                continue;
+            if (child.Display == CssConstants.None)
+                continue;
+
+            double childHeight = GetVisualBottom(child) - child.Location.Y;
+
+            // If child fits in a column, or has break-inside: avoid, or
+            // has no block children to further fragment, keep it as-is.
+            bool avoidBreak = child.BreakInside == "avoid" ||
+                child.BreakInside == "avoid-column";
+            bool hasBlockChildren = false;
+            foreach (var gc in child.Boxes)
+            {
+                if (gc.Position != CssConstants.Absolute && gc.Position != CssConstants.Fixed
+                    && gc.Display != CssConstants.None)
+                {
+                    hasBlockChildren = true;
+                    break;
+                }
+            }
+
+            if (childHeight <= columnHeight + 0.5 || avoidBreak || !hasBlockChildren)
+            {
+                result.Add(child);
+            }
+            else
+            {
+                // Recurse: this child is too tall and can be fragmented.
+                CollectFragmentableBlocksCore(child, columnHeight, result, depth + 1);
+            }
+        }
     }
 
     /// <summary>
