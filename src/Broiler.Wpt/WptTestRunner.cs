@@ -647,6 +647,12 @@ internal sealed class WptTestRunner
         // inline styles so the static renderer can produce the correct output.
         bridge.ResolveAnimationSnapshots();
 
+        // Resolve CSS anchor positioning: for elements that use anchor()
+        // functions, compute the anchored position from the target anchor
+        // element's known CSS position and dimensions.  Also inserts
+        // backdrop elements for modal <dialog> elements.
+        bridge.ResolveAnchorPositions();
+
         return bridge.SerializeToHtml();
     }
 }

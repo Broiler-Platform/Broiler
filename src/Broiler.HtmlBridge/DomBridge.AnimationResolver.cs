@@ -51,7 +51,14 @@ public sealed partial class DomBridge
     {
         if (string.Equals(root.TagName, "style", StringComparison.OrdinalIgnoreCase))
         {
-            var css = root.TextContent ?? string.Empty;
+            var css = root.TextContent;
+            // Fall back to concatenating child text nodes when TextContent is not set.
+            if (string.IsNullOrEmpty(css))
+            {
+                css = string.Concat(root.Children
+                    .Where(c => c.IsTextNode)
+                    .Select(c => c.TextContent ?? string.Empty));
+            }
             foreach (Match m in KeyframesRulePattern.Matches(css))
             {
                 var name = m.Groups["name"].Value.Trim().Trim('"', '\'');
@@ -192,11 +199,9 @@ public sealed partial class DomBridge
         // Clamp progress to [0, 1] for a single iteration.
         rawProgress = Math.Min(rawProgress, 1.0);
 
-        // Apply timing function to get the effective progress.
-        double progress = ApplyTimingFunction(rawProgress, timingFunction);
-
         // Find the two surrounding keyframes and interpolate.
-        var resolvedProps = ResolveKeyframeProperties(keyframes, (float)progress, timingFunction);
+        // NOTE: The timing function is applied per-interval, not globally.
+        var resolvedProps = ResolveKeyframeProperties(keyframes, (float)rawProgress, timingFunction);
 
         // Apply resolved values as inline styles and remove animation properties.
         foreach (var kv in resolvedProps)
