@@ -2026,4 +2026,131 @@ document.getElementById('out').appendChild(p);
             $"align-content-block-break-overflow-010 should pass (match ≥ threshold). " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
+
+    [Fact]
+    public void ScrollTop_Is_Stored_After_Script_Execution()
+    {
+        var html = @"<!DOCTYPE html>
+<style>
+  #sc { overflow: hidden scroll; width: 300px; height: 100px; }
+  #anchor { anchor-name: --a1; width: 100px; height: 100px; background: orange; }
+  #spacer { height: 100px; }
+  #target { position-anchor: --a1; position-visibility: anchors-visible;
+    position-area: bottom right; width: 100px; height: 100px; background: red;
+    position: absolute; top: 0; left: 0; }
+</style>
+<div id=""sc"">
+  <div id=""anchor"">anchor</div>
+  <div id=""spacer""></div>
+  <div id=""target"">target</div>
+</div>
+<script>
+  document.getElementById('sc').scrollTop = 100;
+</script>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        ctx.Eval("document.getElementById('sc').scrollTop = 100;");
+
+        // 1. Verify scrollTop is stored
+        Broiler.HtmlBridge.DomElement? sc = null;
+        FindDomElement(bridge.DocumentElement, "sc", ref sc);
+        Assert.NotNull(sc);
+        Assert.True(
+            sc!.DomProperties.TryGetValue("_scrollTop", out var st) && st is double stv && stv == 100,
+            $"scrollTop not stored");
+
+        // 2. Check that GetComputedProps works for the target
+        Broiler.HtmlBridge.DomElement? targetEl = null;
+        FindDomElement(bridge.DocumentElement, "target", ref targetEl);
+        Assert.NotNull(targetEl);
+
+        // Use reflection to call GetComputedProps
+        var getPropsMethod = typeof(Broiler.HtmlBridge.DomBridge).GetMethod("GetComputedProps",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(getPropsMethod);
+        var targetProps = (Dictionary<string, string>)getPropsMethod!.Invoke(bridge, new object[] { targetEl })!;
+        
+        // Check position-visibility value exactly
+        var pvValue = targetProps.GetValueOrDefault("position-visibility");
+        Assert.True(!string.IsNullOrEmpty(pvValue), 
+            $"position-visibility not in computed props. Keys: [{string.Join(", ", targetProps.Keys)}]");
+        Assert.Equal("anchors-visible", pvValue!.Trim());
+
+        // Check position-anchor value 
+        var paValue = targetProps.GetValueOrDefault("position-anchor");
+        Assert.True(!string.IsNullOrEmpty(paValue),
+            $"position-anchor not in computed props.");
+        Assert.Equal("--a1", paValue!.Trim());
+
+        // 3. Check FindElementByAnchorName
+        var findMethod = typeof(Broiler.HtmlBridge.DomBridge).GetMethod("FindElementByAnchorName",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(findMethod);
+        var anchorEl = (Broiler.HtmlBridge.DomElement?)findMethod!.Invoke(bridge, new object[] { "--a1" });
+        Assert.NotNull(anchorEl);
+        Assert.Equal("anchor", anchorEl!.Id);
+
+        // 4. Check IsAnchorVisibleForTarget sub-conditions
+        // 4a. HasInheritedVisibilityHidden
+        var hasHidden = typeof(Broiler.HtmlBridge.DomBridge).GetMethod("HasInheritedVisibilityHidden",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(hasHidden);
+        var isHidden = (bool)hasHidden!.Invoke(bridge, new object[] { anchorEl })!;
+        Assert.False(isHidden, "Anchor should not have visibility:hidden");
+
+        // 4b. FindContainingBlockElement for target
+        var findCB = typeof(Broiler.HtmlBridge.DomBridge).GetMethod("FindContainingBlockElement",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(findCB);
+        var targetCB = (Broiler.HtmlBridge.DomElement?)findCB!.Invoke(bridge, new object[] { targetEl })!;
+        
+        // 4c. HasOverflowClipping for the scroll container
+        var scProps = (Dictionary<string, string>)getPropsMethod!.Invoke(bridge, new object[] { sc })!;
+        var hasOvClip = typeof(Broiler.HtmlBridge.DomBridge).GetMethod("HasOverflowClipping",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(hasOvClip);
+        var isClipping = (bool)hasOvClip!.Invoke(null, new object[] { scProps })!;
+        Assert.True(isClipping, $"Scroll container should clip overflow. overflow={scProps.GetValueOrDefault("overflow")}");
+
+        // 4d. Check containment: sc == targetCB?
+        var scIsCB = (object?)sc == (object?)targetCB;
+        // If scIsCB is true, that's the bug!
+        Assert.False(scIsCB, "Scroll container should NOT be the containing block for target");
+
+        // 4e. ComputeNaturalOffsetInContainer
+        var computeOffset = typeof(Broiler.HtmlBridge.DomBridge).GetMethod("ComputeNaturalOffsetInContainer",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(computeOffset);
+        var anchorOffset = (double)computeOffset!.Invoke(bridge, new object[] { anchorEl, sc })!;
+        Assert.True(anchorOffset >= 0, $"Anchor offset should be >= 0: {anchorOffset}");
+
+        // Full check  
+        var isVisMethod = typeof(Broiler.HtmlBridge.DomBridge).GetMethod("IsAnchorVisibleForTarget",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(isVisMethod);
+        var isVisible = (bool)isVisMethod!.Invoke(bridge, new object[] { anchorEl, targetEl })!;
+        Assert.False(isVisible, 
+            $"Anchor should not be visible. anchorOffset={anchorOffset}, containerH=100, scrollTop=100" +
+            $"\ntargetCB={(targetCB?.TagName ?? "null")} id={(targetCB?.Id ?? "null")}" +
+            $"\nscIsCB={scIsCB}, overflow={scProps.GetValueOrDefault("overflow")}" +
+            $"\nscProps: [{string.Join(", ", scProps.Select(kv => $"{kv.Key}={kv.Value}"))}]");
+
+        // 5. Resolve anchor positions
+        bridge.ResolveAnchorPositions();
+
+        // 6. Target should be hidden because anchor is scrolled out
+        Assert.True(
+            targetEl!.Style.TryGetValue("display", out var d) && d == "none",
+            $"Expected target display:none but styles = [{string.Join(", ", targetEl.Style.Select(kv => $"{kv.Key}:{kv.Value}"))}]");
+    }
+
+    private static void FindDomElement(Broiler.HtmlBridge.DomElement el, string id, ref Broiler.HtmlBridge.DomElement? found)
+    {
+        if (found != null) return;
+        if (el.Id == id) { found = el; return; }
+        foreach (var c in el.Children)
+            FindDomElement(c, id, ref found);
+    }
 }

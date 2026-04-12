@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Broiler.Wpt\Broiler.Wpt.csproj" />
+    <ProjectReference Include="..\Broiler.HtmlBridge\Broiler.HtmlBridge.csproj" />
+    <ProjectReference Include="..\..\Broiler.JavaScript\Broiler.JavaScript.Engine\Broiler.JavaScript.Engine.csproj" />
   </ItemGroup>
 
   <ItemGroup>
