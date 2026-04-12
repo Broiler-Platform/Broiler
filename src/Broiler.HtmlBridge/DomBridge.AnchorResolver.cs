@@ -398,6 +398,131 @@ public sealed partial class DomBridge
 
     private AnchorInfo? ComputeElementBox(DomElement element)
     {
+        var props = GetComputedProps(element);
+
+        double width = TryParsePx(props.GetValueOrDefault("width")) ?? 0;
+        double height = TryParsePx(props.GetValueOrDefault("height")) ?? 0;
+
+        string? position = props.GetValueOrDefault("position");
+        bool isPositioned = position == "absolute" || position == "fixed";
+
+        // For absolutely positioned elements, use their explicit insets.
+        if (isPositioned)
+        {
+            double top = TryParsePx(props.GetValueOrDefault("top")) ?? 0;
+            double left = TryParsePx(props.GetValueOrDefault("left")) ?? 0;
+            return new AnchorInfo(top, left, width, height);
+        }
+
+        // For normal-flow elements, accumulate offsets from margins, padding,
+        // borders, and preceding sibling heights up the ancestor chain.
+        double marginLeft = TryParsePx(props.GetValueOrDefault("margin-left")) ?? 0;
+        double marginTop = TryParsePx(props.GetValueOrDefault("margin-top")) ?? 0;
+        double marginRight = TryParsePx(props.GetValueOrDefault("margin-right")) ?? 0;
+        ParseMarginShorthand(props, ref marginLeft, ref marginTop, ref marginRight);
+
+        double accLeft = marginLeft;
+        double accTop = marginTop;
+
+        // Add height of preceding siblings (vertical stacking in normal flow).
+        accTop += ComputePrecedingSiblingHeights(element);
+
+        // Walk up ancestors to accumulate margins, padding, and borders.
+        var ancestor = element.Parent;
+        while (ancestor != null)
+        {
+            var ancProps = GetComputedProps(ancestor);
+
+            // Check if ancestor establishes a CB — if so, stop here.
+            if (EstablishesContainingBlock(ancProps))
+            {
+                accLeft += TryParsePx(ancProps.GetValueOrDefault("padding-left")) ?? 0;
+                accTop += TryParsePx(ancProps.GetValueOrDefault("padding-top")) ?? 0;
+                accLeft += TryParsePx(ancProps.GetValueOrDefault("border-left-width")) ?? 0;
+                accTop += TryParsePx(ancProps.GetValueOrDefault("border-top-width")) ?? 0;
+                break;
+            }
+
+            // Accumulate ancestor margin + padding + border.
+            double ancML = TryParsePx(ancProps.GetValueOrDefault("margin-left")) ?? 0;
+            double ancMT = TryParsePx(ancProps.GetValueOrDefault("margin-top")) ?? 0;
+            double ancMR = 0;
+            ParseMarginShorthand(ancProps, ref ancML, ref ancMT, ref ancMR);
+
+            // Apply UA default body margin (8px) if body has no explicit margin.
+            if (string.Equals(ancestor.TagName, "body", StringComparison.OrdinalIgnoreCase) &&
+                ancML == 0 && ancMT == 0 &&
+                !ancProps.ContainsKey("margin") &&
+                !ancProps.ContainsKey("margin-left") &&
+                !ancProps.ContainsKey("margin-top"))
+            {
+                ancML = 8;
+                ancMT = 8;
+                ancMR = 8;
+            }
+
+            accLeft += ancML;
+            accTop += ancMT;
+            accLeft += TryParsePx(ancProps.GetValueOrDefault("padding-left")) ?? 0;
+            accTop += TryParsePx(ancProps.GetValueOrDefault("padding-top")) ?? 0;
+            accLeft += TryParsePx(ancProps.GetValueOrDefault("border-left-width")) ?? 0;
+            accTop += TryParsePx(ancProps.GetValueOrDefault("border-top-width")) ?? 0;
+            accTop += ComputePrecedingSiblingHeights(ancestor);
+
+            ancestor = ancestor.Parent;
+        }
+
+        // For block-level elements without explicit width, compute width
+        // from the containing block content width minus horizontal margins.
+        if (width == 0)
+        {
+            string? display = props.GetValueOrDefault("display");
+            bool isInline = display != null &&
+                (display.Contains("inline", StringComparison.OrdinalIgnoreCase) &&
+                 !display.Contains("inline-block", StringComparison.OrdinalIgnoreCase));
+
+            if (!isInline)
+            {
+                double cbWidth = FindContainingBlockWidth(element);
+                width = cbWidth - marginLeft - marginRight;
+                if (width < 0) width = 0;
+            }
+        }
+
+        return new AnchorInfo(accTop, accLeft, width, height);
+    }
+
+    /// <summary>
+    /// Parses the 'margin' shorthand into individual margin values,
+    /// only overwriting values that are still at their defaults (0).
+    /// </summary>
+    private static void ParseMarginShorthand(
+        Dictionary<string, string> props,
+        ref double marginLeft, ref double marginTop, ref double marginRight)
+    {
+        if (marginLeft == 0 && marginTop == 0 && marginRight == 0 &&
+            props.TryGetValue("margin", out var marginShorthand))
+        {
+            var parts = marginShorthand.Trim().Split(null as char[], StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 1)
+                marginTop = TryParsePx(parts[0]) ?? 0;
+            if (parts.Length >= 2)
+            {
+                marginRight = TryParsePx(parts[1]) ?? 0;
+                marginLeft = TryParsePx(parts[1]) ?? 0;
+            }
+            else if (parts.Length == 1)
+                marginLeft = marginRight = marginTop;
+            if (parts.Length >= 4)
+                marginLeft = TryParsePx(parts[3]) ?? 0;
+        }
+    }
+
+    /// <summary>
+    /// Gets computed CSS properties for an element (CSS rules + inline styles).
+    /// </summary>
+    private Dictionary<string, string> GetComputedProps(DomElement element)
+    {
         var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (sel, _, decls) in CssRules)
         {
@@ -407,42 +532,35 @@ public sealed partial class DomBridge
         }
         foreach (var kv in element.Style)
             props[kv.Key] = kv.Value;
+        return props;
+    }
 
-        double top = TryParsePx(props.GetValueOrDefault("top")) ?? 0;
-        double left = TryParsePx(props.GetValueOrDefault("left")) ?? 0;
-        double width = TryParsePx(props.GetValueOrDefault("width")) ?? 0;
-        double height = TryParsePx(props.GetValueOrDefault("height")) ?? 0;
+    /// <summary>
+    /// Computes the total height of preceding siblings in normal flow.
+    /// </summary>
+    private double ComputePrecedingSiblingHeights(DomElement element)
+    {
+        if (element.Parent == null) return 0;
 
-        // For elements in normal flow (not positioned), include margins
-        // in the position calculation since margins offset the element from
-        // its normal flow position.
-        string? position = props.GetValueOrDefault("position");
-        bool isPositioned = position == "absolute" || position == "fixed";
-        if (!isPositioned)
+        double totalHeight = 0;
+        foreach (var sibling in element.Parent.Children)
         {
-            double marginLeft = TryParsePx(props.GetValueOrDefault("margin-left")) ?? 0;
-            double marginTop = TryParsePx(props.GetValueOrDefault("margin-top")) ?? 0;
+            if (sibling == element) break;
+            if (sibling.IsTextNode) continue;
 
-            // Also check for 'margin' shorthand (single value or multi-value).
-            if (marginLeft == 0 && marginTop == 0 &&
-                props.TryGetValue("margin", out var marginShorthand))
-            {
-                var parts = marginShorthand.Trim().Split(null as char[], StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length >= 1)
-                    marginTop = TryParsePx(parts[0]) ?? 0;
-                if (parts.Length >= 2)
-                    marginLeft = TryParsePx(parts[1]) ?? 0;
-                else if (parts.Length == 1)
-                    marginLeft = marginTop;
-                if (parts.Length >= 4)
-                    marginLeft = TryParsePx(parts[3]) ?? 0;
-            }
+            var sibProps = GetComputedProps(sibling);
+            string? sibPos = sibProps.GetValueOrDefault("position");
+            if (sibPos == "absolute" || sibPos == "fixed") continue;
 
-            left += marginLeft;
-            top += marginTop;
+            double sibHeight = TryParsePx(sibProps.GetValueOrDefault("height")) ?? 0;
+            double sibMT = TryParsePx(sibProps.GetValueOrDefault("margin-top")) ?? 0;
+            double sibMB = TryParsePx(sibProps.GetValueOrDefault("margin-bottom")) ?? 0;
+            double sibMR = 0;
+            ParseMarginShorthand(sibProps, ref sibMT, ref sibMT, ref sibMR);
+
+            totalHeight += sibHeight + sibMT + sibMB;
         }
-
-        return new AnchorInfo(top, left, width, height);
+        return totalHeight;
     }
 
     // -----------------------------------------------------------------
@@ -450,11 +568,11 @@ public sealed partial class DomBridge
     // -----------------------------------------------------------------
 
     private static readonly Regex AnchorFunctionPattern = new(
-        @"anchor\(\s*(?<name>--[a-zA-Z0-9_-]+)\s+(?<edge>top|right|bottom|left|start|end|center)\s*\)",
+        @"anchor\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<edge>top|right|bottom|left|start|end|center)\s*\)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Regex AnchorSizeFunctionPattern = new(
-        @"anchor-size\(\s*(?<name>--[a-zA-Z0-9_-]+)\s+(?<dim>width|height|block|inline|self-block|self-inline)\s*\)",
+        @"anchor-size\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<dim>width|height|block|inline|self-block|self-inline)\s*\)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private void ResolveAnchorFunctions(
@@ -491,12 +609,18 @@ public sealed partial class DomBridge
             double cbW = FindContainingBlockWidth(element);
             double cbH = FindContainingBlockHeight(element);
 
+            // Get the implicit anchor name from position-anchor.
+            string? implicitAnchor = cssProps.GetValueOrDefault("position-anchor") ??
+                                     element.Style.GetValueOrDefault("position-anchor");
+
             foreach (var kv in cssProps)
             {
                 var propName = kv.Key.ToLowerInvariant();
                 var resolved = AnchorFunctionPattern.Replace(kv.Value, m =>
                 {
                     var anchorName = m.Groups["name"].Value;
+                    if (string.IsNullOrEmpty(anchorName))
+                        anchorName = implicitAnchor ?? string.Empty;
                     var edge = m.Groups["edge"].Value.ToLowerInvariant();
 
                     if (!anchorRegistry.TryGetValue(anchorName, out var anchor))
@@ -574,11 +698,17 @@ public sealed partial class DomBridge
         Dictionary<string, string> cssProps,
         Dictionary<string, AnchorInfo> anchorRegistry)
     {
+        // Get implicit anchor name from position-anchor.
+        string? implicitAnchor = cssProps.GetValueOrDefault("position-anchor") ??
+                                 element.Style.GetValueOrDefault("position-anchor");
+
         string ResolveValue(string value)
         {
             return AnchorSizeFunctionPattern.Replace(value, m =>
             {
                 var anchorName = m.Groups["name"].Value;
+                if (string.IsNullOrEmpty(anchorName))
+                    anchorName = implicitAnchor ?? string.Empty;
                 var dim = m.Groups["dim"].Value.ToLowerInvariant();
 
                 if (!anchorRegistry.TryGetValue(anchorName, out var anchor))
@@ -764,6 +894,9 @@ public sealed partial class DomBridge
         // Parse the fallback list (comma-separated @position-try names).
         var names = fallbackList.Split(',').Select(n => n.Trim()).ToArray();
 
+        // Get implicit anchor name from position-anchor.
+        string? implicitAnchor = baseProps.GetValueOrDefault("position-anchor");
+
         foreach (var name in names)
         {
             if (!positionTryRules.TryGetValue(name, out var tryProps))
@@ -781,14 +914,14 @@ public sealed partial class DomBridge
             if (merged.TryGetValue("left", out var lv) && lv != "auto")
             {
                 var resolvedL = AnchorFunctionPattern.Replace(lv, m =>
-                    ResolveAnchorEdge(m, anchorRegistry, "left", cbWidth, cbHeight));
+                    ResolveAnchorEdge(m, anchorRegistry, "left", cbWidth, cbHeight, implicitAnchor));
                 tryLeft = TryParsePx(resolvedL) ?? 0;
             }
 
             if (merged.TryGetValue("right", out var rv) && rv != "auto")
             {
                 var resolvedR = AnchorFunctionPattern.Replace(rv, m =>
-                    ResolveAnchorEdge(m, anchorRegistry, "right", cbWidth, cbHeight));
+                    ResolveAnchorEdge(m, anchorRegistry, "right", cbWidth, cbHeight, implicitAnchor));
                 var rightPx = TryParsePx(resolvedR);
                 if (rightPx.HasValue)
                 {
@@ -809,14 +942,14 @@ public sealed partial class DomBridge
             if (merged.TryGetValue("top", out var tv) && tv != "auto")
             {
                 var resolvedT = AnchorFunctionPattern.Replace(tv, m =>
-                    ResolveAnchorEdge(m, anchorRegistry, "top", cbWidth, cbHeight));
+                    ResolveAnchorEdge(m, anchorRegistry, "top", cbWidth, cbHeight, implicitAnchor));
                 tryTop = TryParsePx(resolvedT) ?? 0;
             }
 
             if (merged.TryGetValue("bottom", out var bv) && bv != "auto")
             {
                 var resolvedB = AnchorFunctionPattern.Replace(bv, m =>
-                    ResolveAnchorEdge(m, anchorRegistry, "bottom", cbWidth, cbHeight));
+                    ResolveAnchorEdge(m, anchorRegistry, "bottom", cbWidth, cbHeight, implicitAnchor));
                 var bottomPx = TryParsePx(resolvedB);
                 if (bottomPx.HasValue)
                 {
@@ -899,9 +1032,12 @@ public sealed partial class DomBridge
 
     private static string ResolveAnchorEdge(
         Match m, Dictionary<string, AnchorInfo> registry,
-        string contextProp, double cbWidth, double cbHeight)
+        string contextProp, double cbWidth, double cbHeight,
+        string? implicitAnchor = null)
     {
         var anchorName = m.Groups["name"].Value;
+        if (string.IsNullOrEmpty(anchorName))
+            anchorName = implicitAnchor ?? string.Empty;
         var edge = m.Groups["edge"].Value.ToLowerInvariant();
 
         if (!registry.TryGetValue(anchorName, out var anchor))
@@ -1037,65 +1173,10 @@ public sealed partial class DomBridge
     /// </summary>
     private AnchorInfo? ComputeElementBoxWithContainer(DomElement element)
     {
-        var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (sel, _, decls) in CssRules)
-        {
-            if (MatchesSelector(element, sel))
-                foreach (var kv in decls)
-                    props[kv.Key] = kv.Value;
-        }
-        foreach (var kv in element.Style)
-            props[kv.Key] = kv.Value;
-
-        double width = TryParsePx(props.GetValueOrDefault("width")) ?? 0;
-        double height = TryParsePx(props.GetValueOrDefault("height")) ?? 0;
-        double top = TryParsePx(props.GetValueOrDefault("top")) ?? 0;
-        double left;
-
-        // Resolve left from 'right' if no explicit 'left'.
-        if (props.TryGetValue("left", out var leftVal) && TryParsePx(leftVal).HasValue)
-        {
-            left = TryParsePx(leftVal)!.Value;
-        }
-        else if (props.TryGetValue("right", out var rightVal) && TryParsePx(rightVal).HasValue)
-        {
-            double rightPx = TryParsePx(rightVal)!.Value;
-            // Find containing block width.
-            double containerWidth = FindContainingBlockWidth(element);
-            left = containerWidth - width - rightPx;
-        }
-        else
-        {
-            left = 0;
-        }
-
-        // For elements in normal flow (not positioned), include margins.
-        string? position = props.GetValueOrDefault("position");
-        bool isPositioned = position == "absolute" || position == "fixed";
-        if (!isPositioned)
-        {
-            double marginLeft = TryParsePx(props.GetValueOrDefault("margin-left")) ?? 0;
-            double marginTop = TryParsePx(props.GetValueOrDefault("margin-top")) ?? 0;
-
-            if (marginLeft == 0 && marginTop == 0 &&
-                props.TryGetValue("margin", out var marginShorthand))
-            {
-                var parts = marginShorthand.Trim().Split(null as char[], StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length >= 1)
-                    marginTop = TryParsePx(parts[0]) ?? 0;
-                if (parts.Length >= 2)
-                    marginLeft = TryParsePx(parts[1]) ?? 0;
-                else if (parts.Length == 1)
-                    marginLeft = marginTop;
-                if (parts.Length >= 4)
-                    marginLeft = TryParsePx(parts[3]) ?? 0;
-            }
-
-            left += marginLeft;
-            top += marginTop;
-        }
-
-        return new AnchorInfo(top, left, width, height);
+        // Delegate to the main ComputeElementBox which already handles
+        // both positioned and normal-flow elements with ancestor offset
+        // accumulation and block-width computation.
+        return ComputeElementBox(element);
     }
 
     /// <summary>
@@ -1107,23 +1188,21 @@ public sealed partial class DomBridge
         var parent = element.Parent;
         while (parent != null)
         {
-            var parentProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (sel, _, decls) in CssRules)
-            {
-                if (MatchesSelector(parent, sel))
-                    foreach (var kv in decls)
-                        parentProps[kv.Key] = kv.Value;
-            }
-            foreach (var kv in parent.Style)
-                parentProps[kv.Key] = kv.Value;
+            var parentProps = GetComputedProps(parent);
 
             if (EstablishesContainingBlock(parentProps))
             {
-                return TryParsePx(parentProps.GetValueOrDefault("width")) ?? _viewportWidth;
+                double w = TryParsePx(parentProps.GetValueOrDefault("width")) ?? _viewportWidth;
+                // Subtract padding from the CB width to get content width.
+                w -= TryParsePx(parentProps.GetValueOrDefault("padding-left")) ?? 0;
+                w -= TryParsePx(parentProps.GetValueOrDefault("padding-right")) ?? 0;
+                return w;
             }
             parent = parent.Parent;
         }
-        return _viewportWidth;
+        // No positioned ancestor found; use viewport width minus default body
+        // margin (8px each side) as the effective content width for block layout.
+        return _viewportWidth - 16;
     }
 
     /// <summary>
@@ -1135,19 +1214,14 @@ public sealed partial class DomBridge
         var parent = element.Parent;
         while (parent != null)
         {
-            var parentProps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (sel, _, decls) in CssRules)
-            {
-                if (MatchesSelector(parent, sel))
-                    foreach (var kv in decls)
-                        parentProps[kv.Key] = kv.Value;
-            }
-            foreach (var kv in parent.Style)
-                parentProps[kv.Key] = kv.Value;
+            var parentProps = GetComputedProps(parent);
 
             if (EstablishesContainingBlock(parentProps))
             {
-                return TryParsePx(parentProps.GetValueOrDefault("height")) ?? _viewportHeight;
+                double h = TryParsePx(parentProps.GetValueOrDefault("height")) ?? _viewportHeight;
+                h -= TryParsePx(parentProps.GetValueOrDefault("padding-top")) ?? 0;
+                h -= TryParsePx(parentProps.GetValueOrDefault("padding-bottom")) ?? 0;
+                return h;
             }
             parent = parent.Parent;
         }
