@@ -46,6 +46,10 @@ public sealed partial class DomBridge
         //     style overflows the containing block.
         ResolvePositionTryFallbacks(DocumentElement, anchorRegistry, positionTryRules);
 
+        // 3c. Resolve position-visibility: hide anchor-positioned elements
+        //     whose anchor is not visible or does not exist.
+        ResolvePositionVisibility(DocumentElement, anchorRegistry);
+
         // 4. Insert backdrop elements for modal dialogs.
         InsertDialogBackdrops(DocumentElement, viewportWidth, viewportHeight);
 
@@ -63,6 +67,10 @@ public sealed partial class DomBridge
         //    anchor-name) from the stylesheet so the renderer doesn't
         //    misinterpret them.
         NeutralizeStyleElementsForAnchorRules(DocumentElement);
+
+        // 8. Apply scroll simulation: shift content in scroll containers
+        //    where JavaScript set scrollTop/scrollLeft to match Chromium output.
+        ApplyScrollSimulation(DocumentElement);
     }
 
     // -----------------------------------------------------------------
@@ -197,6 +205,314 @@ public sealed partial class DomBridge
     }
 
     // -----------------------------------------------------------------
+    // Scroll simulation
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// Simulates scroll positions set via JavaScript (<c>element.scrollTop</c>,
+    /// <c>element.scrollLeft</c>) by shifting children of scroll containers
+    /// with negative margins.  Combined with <c>overflow: hidden</c>, this
+    /// produces the same visual output as a real browser scroll.
+    /// </summary>
+    private void ApplyScrollSimulation(DomElement root)
+    {
+        ApplyScrollSimulationTree(root);
+    }
+
+    private void ApplyScrollSimulationTree(DomElement el)
+    {
+        if (!el.IsTextNode)
+        {
+            double scrollTop = 0;
+            double scrollLeft = 0;
+            if (el.DomProperties.TryGetValue("_scrollTop", out var st) && st is double stv)
+                scrollTop = stv;
+            if (el.DomProperties.TryGetValue("_scrollLeft", out var sl) && sl is double slv)
+                scrollLeft = slv;
+
+            if (scrollTop != 0 || scrollLeft != 0)
+            {
+                // Only apply to elements that clip overflow.
+                var props = GetComputedProps(el);
+                bool clips = HasOverflowClipping(props);
+
+                if (clips && el.Children.Count > 0)
+                {
+                    // Shift content by inserting a negative-margin spacer as the
+                    // first child.  This moves all normal-flow content upward /
+                    // leftward, and overflow:hidden clips what scrolled out.
+                    var spacer = new DomElement("div", null, null, "")
+                    {
+                        Parent = el,
+                    };
+                    if (scrollTop != 0)
+                        spacer.Style["margin-bottom"] =
+                            $"{(-scrollTop).ToString(CultureInfo.InvariantCulture)}px";
+                    if (scrollLeft != 0)
+                        spacer.Style["margin-right"] =
+                            $"{(-scrollLeft).ToString(CultureInfo.InvariantCulture)}px";
+                    spacer.Style["height"] = "0";
+                    spacer.Style["width"] = "0";
+                    spacer.Style["line-height"] = "0";
+                    spacer.Style["font-size"] = "0";
+                    el.Children.Insert(0, spacer);
+                }
+            }
+        }
+
+        // Use index-based loop because the list may grow during iteration
+        // (spacer insertion above).
+        for (int i = 0; i < el.Children.Count; i++)
+            ApplyScrollSimulationTree(el.Children[i]);
+    }
+
+    private static bool HasOverflowClipping(Dictionary<string, string> props)
+    {
+        if (props.TryGetValue("overflow", out var ov))
+        {
+            var val = ov.Trim().ToLowerInvariant();
+            if (val.Contains("hidden") || val.Contains("scroll") || val.Contains("auto") || val.Contains("clip"))
+                return true;
+        }
+        if (props.TryGetValue("overflow-x", out var ovx))
+        {
+            var val = ovx.Trim().ToLowerInvariant();
+            if (val.Contains("hidden") || val.Contains("scroll") || val.Contains("auto") || val.Contains("clip"))
+                return true;
+        }
+        if (props.TryGetValue("overflow-y", out var ovy))
+        {
+            var val = ovy.Trim().ToLowerInvariant();
+            if (val.Contains("hidden") || val.Contains("scroll") || val.Contains("auto") || val.Contains("clip"))
+                return true;
+        }
+        return false;
+    }
+
+    // -----------------------------------------------------------------
+    // position-visibility resolution
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// Implements the <c>position-visibility</c> CSS property for anchor-positioned
+    /// elements.  Hides elements when their anchor is not visible (scrolled out,
+    /// CSS <c>visibility: hidden</c>) or does not exist.
+    /// </summary>
+    private void ResolvePositionVisibility(
+        DomElement root,
+        Dictionary<string, AnchorInfo> anchorRegistry)
+    {
+        ResolvePositionVisibilityTree(root, anchorRegistry);
+    }
+
+    private void ResolvePositionVisibilityTree(
+        DomElement el,
+        Dictionary<string, AnchorInfo> anchorRegistry)
+    {
+        if (!el.IsTextNode)
+        {
+            var props = GetComputedProps(el);
+            string? posVis = props.GetValueOrDefault("position-visibility");
+            string? posAnchor = props.GetValueOrDefault("position-anchor");
+
+            if (!string.IsNullOrWhiteSpace(posVis) &&
+                !posVis.Equals("always", StringComparison.OrdinalIgnoreCase))
+            {
+                if (posVis.Equals("anchors-visible", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!string.IsNullOrWhiteSpace(posAnchor))
+                    {
+                        var anchorEl = FindElementByAnchorName(posAnchor);
+                        if (anchorEl != null && !IsAnchorVisibleForTarget(anchorEl, el))
+                        {
+                            el.Style["display"] = "none";
+                        }
+                    }
+                }
+                else if (posVis.Equals("anchors-valid", StringComparison.OrdinalIgnoreCase))
+                {
+                    bool hasValidAnchor = false;
+
+                    // Check explicit position-anchor reference.
+                    if (!string.IsNullOrWhiteSpace(posAnchor) &&
+                        anchorRegistry.ContainsKey(posAnchor))
+                        hasValidAnchor = true;
+
+                    // Check anchor() function references in CSS values.
+                    if (!hasValidAnchor)
+                    {
+                        foreach (var kv in props)
+                        {
+                            if (kv.Value.Contains("anchor(", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var m = AnchorFunctionPattern.Match(kv.Value);
+                                if (m.Success)
+                                {
+                                    string name = m.Groups["name"].Value;
+                                    if (anchorRegistry.ContainsKey(name))
+                                    { hasValidAnchor = true; break; }
+                                }
+                            }
+                        }
+                    }
+
+                    if (!hasValidAnchor)
+                        el.Style["display"] = "none";
+                }
+            }
+        }
+
+        foreach (var child in el.Children)
+            ResolvePositionVisibilityTree(child, anchorRegistry);
+    }
+
+    /// <summary>
+    /// Finds the <see cref="DomElement"/> that has the given
+    /// <c>anchor-name</c> (from CSS rules or inline styles).
+    /// </summary>
+    private DomElement? FindElementByAnchorName(string anchorName)
+    {
+        foreach (var el in _elements)
+        {
+            if (el.IsTextNode) continue;
+            // Check inline styles first.
+            if (el.Style.TryGetValue("anchor-name", out var n) &&
+                string.Equals(n.Trim(), anchorName, StringComparison.Ordinal))
+                return el;
+        }
+
+        // Fall back to CSS rules.
+        foreach (var el in _elements)
+        {
+            if (el.IsTextNode) continue;
+            foreach (var (sel, _, decls) in CssRules)
+            {
+                if (MatchesSelector(el, sel) &&
+                    decls.TryGetValue("anchor-name", out var name) &&
+                    string.Equals(name.Trim(), anchorName, StringComparison.Ordinal))
+                    return el;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Checks whether the anchor element is "visible" for the purposes of
+    /// <c>position-visibility: anchors-visible</c>.  An anchor is not visible
+    /// if it has <c>visibility: hidden</c> (or inherits it), or if it has been
+    /// scrolled out of view in an ancestor scroll container.  However, when
+    /// the scroll container is the containing block for the target element,
+    /// the anchor is considered visible (per spec § position-visibility).
+    /// </summary>
+    private bool IsAnchorVisibleForTarget(DomElement anchor, DomElement target)
+    {
+        // Check CSS visibility on the anchor and its ancestors.
+        if (HasInheritedVisibilityHidden(anchor))
+            return false;
+
+        // Find the containing block element for the target.
+        var targetCB = FindContainingBlockElement(target);
+
+        // Walk from the anchor upward looking for scroll containers.
+        var el = anchor.Parent;
+        while (el != null)
+        {
+            var props = GetComputedProps(el);
+            bool isScrollContainer = HasOverflowClipping(props);
+
+            if (isScrollContainer)
+            {
+                // When the scroll container IS the containing block for the
+                // target, there are no intervening clips → anchor is visible.
+                if (el == targetCB)
+                    return true;
+
+                // Check if the anchor is scrolled out of this container.
+                if (el.DomProperties.TryGetValue("_scrollTop", out var st) &&
+                    st is double scrollTop && scrollTop > 0)
+                {
+                    double containerH =
+                        TryParsePx(props.GetValueOrDefault("height")) ?? 0;
+                    double anchorOffset =
+                        ComputeNaturalOffsetInContainer(anchor, el);
+                    double anchorH =
+                        TryParsePx(GetComputedProps(anchor)
+                            .GetValueOrDefault("height")) ?? 0;
+
+                    // Anchor is NOT visible if entirely above or below the
+                    // visible region.
+                    if (anchorOffset + anchorH <= scrollTop ||
+                        anchorOffset >= scrollTop + containerH)
+                        return false;
+                }
+            }
+
+            el = el.Parent;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Checks whether the element or any ancestor has <c>visibility: hidden</c>.
+    /// </summary>
+    private bool HasInheritedVisibilityHidden(DomElement el)
+    {
+        var current = el;
+        while (current != null)
+        {
+            var props = GetComputedProps(current);
+            if (props.TryGetValue("visibility", out var v) &&
+                v.Equals("hidden", StringComparison.OrdinalIgnoreCase))
+                return true;
+            current = current.Parent;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Computes the vertical offset of <paramref name="el"/> relative to the
+    /// <paramref name="container"/> by summing heights of preceding siblings
+    /// and ancestor margins/padding up to the container.
+    /// </summary>
+    private double ComputeNaturalOffsetInContainer(DomElement el, DomElement container)
+    {
+        double offset = 0;
+        var current = el;
+        while (current != null && current != container)
+        {
+            offset += ComputePrecedingSiblingHeights(current);
+            var props = GetComputedProps(current);
+            offset += TryParsePx(props.GetValueOrDefault("margin-top")) ?? 0;
+            current = current.Parent;
+            if (current != null && current != container)
+            {
+                var cProps = GetComputedProps(current);
+                offset += TryParsePx(cProps.GetValueOrDefault("padding-top")) ?? 0;
+                offset += TryParsePx(cProps.GetValueOrDefault("border-top-width")) ?? 0;
+            }
+        }
+        return offset;
+    }
+
+    /// <summary>
+    /// Finds the nearest positioned ancestor that serves as the containing
+    /// block for an absolutely positioned element.
+    /// </summary>
+    private DomElement? FindContainingBlockElement(DomElement el)
+    {
+        var parent = el.Parent;
+        while (parent != null)
+        {
+            var pProps = GetComputedProps(parent);
+            if (EstablishesContainingBlock(pProps))
+                return parent;
+            parent = parent.Parent;
+        }
+        return null;
+    }
+
+    // -----------------------------------------------------------------
     // Strip unsupported CSS rules from <style> elements
     // -----------------------------------------------------------------
 
@@ -245,6 +561,7 @@ public sealed partial class DomBridge
         "position-anchor",
         "position-try-fallbacks",
         "position-try",
+        "position-visibility",
     };
 
     private static string RemoveUnsupportedCssRules(string css)

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>CSS Anchor Positioning Test: position-visibility: anchors-visible chained 003</title>
+<link rel="help" href="https://drafts.csswg.org/css-anchor-position-1/#position-visibility">
+<link rel="match" href="reference/position-visibility-anchors-visible-after-scroll-out-ref.html">
+<style>
+  #scroll-container {
+    overflow: hidden scroll;
+    width: 300px;
+    height: 100px;
+  }
+
+  #anchor1 {
+    anchor-name: --a1;
+    width: 100px;
+    height: 100px;
+    background: orange;
+  }
+
+  .spacer {
+    height: 100px;
+  }
+
+  #anchor2 {
+    anchor-name: --a2;
+    position-anchor: --a1;
+  }
+
+  #anchor3 {
+    anchor-name: --a3;
+    position-anchor: --a2;
+  }
+
+  #anchor4 {
+    anchor-name: --a4;
+    position-anchor: --a3;
+  }
+
+  .anchored {
+    position-visibility: anchors-visible;
+    position-area: bottom;
+    width: 100px;
+    height: 50px;
+    background: red;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  #target {
+    position-anchor: --a4;
+  }
+</style>
+
+<div id="scroll-container">
+  <div id="anchor1">anchor1</div>
+  <div class="spacer"></div>
+  <div id="anchor2" class="anchored">anchor2</div>
+  <div id="anchor3" class="anchored">anchor3</div>
+  <div id="anchor4" class="anchored">anchor4</div>
+  <div id="target" class="anchored">target</div>
+</div>
+
+<script>
+  document.getElementById('scroll-container').scrollTop = 100;
+</script>

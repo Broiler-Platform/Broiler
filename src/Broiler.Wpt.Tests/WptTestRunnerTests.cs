@@ -2026,4 +2026,224 @@ document.getElementById('out').appendChild(p);
             $"align-content-block-break-overflow-010 should pass (match ≥ threshold). " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
+
+    [Fact]
+    public void PositionVisibility_HidesTarget_WhenAnchorScrolledOut()
+    {
+        // Validates the full position-visibility pipeline: scrollTop storage,
+        // CSS overflow two-value shorthand parsing, anchor visibility check,
+        // and target element hiding via display:none.
+        var html = @"<!DOCTYPE html>
+<style>
+  #sc { overflow: hidden scroll; width: 300px; height: 100px; }
+  #anchor { anchor-name: --a1; width: 100px; height: 100px; background: orange; }
+  #spacer { height: 100px; }
+  #target { position-anchor: --a1; position-visibility: anchors-visible;
+    position-area: bottom right; width: 100px; height: 100px; background: red;
+    position: absolute; top: 0; left: 0; }
+</style>
+<div id=""sc"">
+  <div id=""anchor"">anchor</div>
+  <div id=""spacer""></div>
+  <div id=""target"">target</div>
+</div>
+<script>
+  document.getElementById('sc').scrollTop = 100;
+</script>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        ctx.Eval("document.getElementById('sc').scrollTop = 100;");
+
+        // Verify scrollTop is stored
+        Broiler.HtmlBridge.DomElement? sc = null;
+        FindDomElement(bridge.DocumentElement, "sc", ref sc);
+        Assert.NotNull(sc);
+        Assert.True(
+            sc!.DomProperties.TryGetValue("_scrollTop", out var st) && st is double stv && stv == 100,
+            "scrollTop not stored");
+
+        // Resolve anchor positions (includes position-visibility)
+        bridge.ResolveAnchorPositions();
+
+        Broiler.HtmlBridge.DomElement? targetEl = null;
+        FindDomElement(bridge.DocumentElement, "target", ref targetEl);
+        Assert.NotNull(targetEl);
+
+        // Target should be hidden because anchor is scrolled out
+        Assert.True(
+            targetEl!.Style.TryGetValue("display", out var d) && d == "none",
+            $"Expected target display:none but styles = [{string.Join(", ", targetEl.Style.Select(kv => $"{kv.Key}:{kv.Value}"))}]");
+    }
+
+    private WptTestResult RunAnchorMatchTest(string testFileName)
+    {
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var testDir = Path.Combine(wptRoot, "css", "css-anchor-position");
+        var testFile = Path.Combine(testDir, testFileName);
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        // Parse the reference HTML path from <link rel="match" href="...">
+        var html = File.ReadAllText(testFile);
+        var matchLink = System.Text.RegularExpressions.Regex.Match(html,
+            @"<link\s+rel=""match""\s+href=""([^""]+)""",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!matchLink.Success)
+            throw new InvalidOperationException($"No <link rel=\"match\"> found in {testFileName}");
+
+        var refHref = matchLink.Groups[1].Value;
+        var refHtmlPath = Path.GetFullPath(Path.Combine(testDir, refHref));
+        if (!File.Exists(refHtmlPath))
+            throw new FileNotFoundException($"Reference HTML not found: {refHtmlPath}");
+
+        var runner = new WptTestRunner(1024, 768);
+        return runner.RunMatchTest(testFile, refHtmlPath, wptRoot);
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityAnchorsVisible_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityInitial_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-initial.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityAnchorsValidTentative_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-anchors-valid.tentative.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityAnchorsVisibleCssVisibility_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-css-visibility.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityRemoveAnchorsVisible_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-remove-anchors-visible.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityAnchorsVisibleChained001_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-chained-001.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityAnchorsVisibleChained002_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-chained-002.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityAnchorsVisibleChained003_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-chained-003.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityAnchorsVisiblePositionFixed_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-position-fixed.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityAnchorsVisibleBothPositionFixed_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-both-position-fixed.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityAnchorsVisibleStackedChild_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-stacked-child.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityAnchorsVisibleStackedChildTentative_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-stacked-child.tentative.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityAnchorsVisibleWithPosition_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-with-position.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionVisibilityAnchorsVisibleAfterScrollOut_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-visibility-anchors-visible-after-scroll-out.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Transform005_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("transform-005.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionAreaInlineContainer_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-area-inline-container.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionAreaAbsInlineContainer_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-area-abs-inline-container.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    private static void FindDomElement(Broiler.HtmlBridge.DomElement el, string id, ref Broiler.HtmlBridge.DomElement? found)
+    {
+        if (found != null) return;
+        if (el.Id == id) { found = el; return; }
+        foreach (var c in el.Children)
+            FindDomElement(c, id, ref found);
+    }
 }

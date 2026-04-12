@@ -2200,13 +2200,33 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
                 (KeyString)"scrollTop",
-                new JSFunction((in Arguments _) => new JSNumber(0), "get scrollTop"),
-                new JSFunction((in Arguments _) => JSUndefined.Value, "set scrollTop"),
+                new JSFunction((in Arguments _) =>
+                {
+                    if (element.DomProperties.TryGetValue("_scrollTop", out var st) && st is double sv)
+                        return new JSNumber(sv);
+                    return new JSNumber(0);
+                }, "get scrollTop"),
+                new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length > 0)
+                        element.DomProperties["_scrollTop"] = a[0].DoubleValue;
+                    return JSUndefined.Value;
+                }, "set scrollTop"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
                 (KeyString)"scrollLeft",
-                new JSFunction((in Arguments _) => new JSNumber(0), "get scrollLeft"),
-                new JSFunction((in Arguments _) => JSUndefined.Value, "set scrollLeft"),
+                new JSFunction((in Arguments _) =>
+                {
+                    if (element.DomProperties.TryGetValue("_scrollLeft", out var sl) && sl is double sv)
+                        return new JSNumber(sv);
+                    return new JSNumber(0);
+                }, "get scrollLeft"),
+                new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length > 0)
+                        element.DomProperties["_scrollLeft"] = a[0].DoubleValue;
+                    return JSUndefined.Value;
+                }, "set scrollLeft"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
                 (KeyString)"offsetTop",
