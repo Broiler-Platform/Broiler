@@ -2626,7 +2626,6 @@ internal class CssBox : CssBoxProperties, IDisposable
             - ActualBorderLeftWidth - ActualBorderRightWidth;
         if (columnWidth <= 0) return;
 
-
         double currentY = cellTop;
         foreach (var child in Boxes)
         {
