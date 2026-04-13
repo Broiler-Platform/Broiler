@@ -1519,6 +1519,99 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
         }
 
+        // CSS Box Alignment Level 3 §6.1: Post-layout self-alignment for
+        // absolutely positioned elements.  After children are laid out,
+        // shrink the box to fit-content size and align within the IMCB.
+        // This must run after child layout so content dimensions are known.
+        if (Position == CssConstants.Absolute)
+        {
+            string jsPost = JustifySelf?.Trim().ToLowerInvariant() ?? "auto";
+            bool jsPostNonDefault = jsPost != "auto" && jsPost != "normal" && jsPost != "stretch";
+            string asPost = AlignSelf?.Trim().ToLowerInvariant() ?? "auto";
+            bool asPostNonDefault = asPost != "auto" && asPost != "normal" && asPost != "stretch";
+
+            if (jsPostNonDefault || asPostNonDefault)
+            {
+                var cb = FindPositionedContainingBlock();
+                double cbPadLeft, cbPadTop, cbPadWidth, cbPadHeight;
+                if (IsInlineContainingBlock(cb))
+                {
+                    var bbox = GetInlineBoundingBox(cb);
+                    if (bbox != RectangleF.Empty)
+                    {
+                        cbPadLeft = bbox.Left;
+                        cbPadTop = bbox.Top;
+                        cbPadWidth = bbox.Width;
+                        cbPadHeight = bbox.Height;
+                    }
+                    else
+                    {
+                        cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
+                        cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
+                        cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+                        cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+                    }
+                }
+                else
+                {
+                    cbPadLeft = cb.Location.X + cb.ActualBorderLeftWidth;
+                    cbPadTop = cb.Location.Y + cb.ActualBorderTopWidth;
+                    cbPadWidth = cb.Size.Width - cb.ActualBorderLeftWidth - cb.ActualBorderRightWidth;
+                    cbPadHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+                }
+
+                bool hasL = Left != null && Left != CssConstants.Auto;
+                bool hasR = Right != null && Right != CssConstants.Auto;
+                bool hasT = Top != null && Top != CssConstants.Auto;
+                bool hasB = Bottom != null && Bottom != CssConstants.Auto;
+
+                float newX = Location.X, newY = Location.Y;
+
+                if (hasL && hasR && jsPostNonDefault)
+                {
+                    double cssLeft = CssValueParser.ParseLength(Left, cbPadWidth, GetEmHeight());
+                    double cssRight = CssValueParser.ParseLength(Right, cbPadWidth, GetEmHeight());
+                    double imcbLeft = cbPadLeft + cssLeft;
+                    double imcbWidth = cbPadWidth - cssLeft - cssRight;
+
+                    double boxWidth = GetShrinkToFitWidth();
+                    Size = new SizeF((float)boxWidth, Size.Height);
+
+                    bool isRtl = Direction == "rtl";
+                    double dx = ResolveAbsposSelfAlignment(
+                        jsPost, imcbWidth, boxWidth, isRtl);
+                    newX = (float)(imcbLeft + dx + ActualMarginLeft);
+                }
+
+                if (hasT && hasB && asPostNonDefault)
+                {
+                    double cssTop = CssValueParser.ParseLength(Top, cbPadHeight, GetEmHeight());
+                    double cssBottom = CssValueParser.ParseLength(Bottom, cbPadHeight, GetEmHeight());
+                    double imcbTop = cbPadTop + cssTop;
+                    double imcbHeight = cbPadHeight - cssTop - cssBottom;
+
+                    double boxHeight = GetShrinkToFitHeight();
+
+                    double dy = ResolveAbsposSelfAlignment(
+                        asPost, imcbHeight, boxHeight, false);
+                    newY = (float)(imcbTop + dy + ActualMarginTop);
+                }
+
+                if (newX != Location.X || newY != Location.Y)
+                {
+                    float deltaX = newX - Location.X;
+                    float deltaY = newY - Location.Y;
+                    Location = new PointF(newX, newY);
+                    ActualBottom += deltaY;
+
+                    foreach (var child in Boxes)
+                    {
+                        OffsetBoxRecursive(child, deltaX, deltaY);
+                    }
+                }
+            }
+        }
+
         // CSS Box Alignment Level 3 §5.4: align-content on block containers
         // shifts the in-flow content vertically when the container has a
         // definite height larger than the content.  Values:
@@ -2511,6 +2604,157 @@ internal class CssBox : CssBoxProperties, IDisposable
         if (!collapseThrough && lastInFlowChild != null)
             maxChildBottom += lastInFlowChild.ActualMarginBottom;
         return Math.Max(ActualBottom, maxChildBottom + margin + ActualPaddingBottom + ActualBorderBottomWidth);
+    }
+
+    /// <summary>
+    /// CSS Box Alignment Level 3 §6.1: Resolves justify-self / align-self
+    /// alignment for an absolutely-positioned box within its inset-modified
+    /// containing block (IMCB).  Returns the offset from the IMCB start
+    /// edge.  Default overflow behaviour for abspos is 'safe': when the
+    /// content would overflow the strong CB edge, it is shifted to align
+    /// with the start of the writing direction.
+    /// </summary>
+    private static double ResolveAbsposSelfAlignment(
+        string alignment, double containerSize, double boxSize, bool isRtl)
+    {
+        double freeSpace = containerSize - boxSize;
+
+        // Strip safe/unsafe prefix.
+        string a = alignment;
+        bool isSafe = true; // default for abspos is safe
+        if (a.StartsWith("safe ", StringComparison.OrdinalIgnoreCase))
+        {
+            a = a.Substring(5).Trim();
+            isSafe = true;
+        }
+        else if (a.StartsWith("unsafe ", StringComparison.OrdinalIgnoreCase))
+        {
+            a = a.Substring(7).Trim();
+            isSafe = false;
+        }
+
+        double dx;
+        switch (a)
+        {
+            case "center":
+                dx = freeSpace / 2;
+                break;
+            case "end":
+            case "flex-end":
+                dx = isRtl ? 0 : freeSpace;
+                break;
+            case "self-end":
+                dx = isRtl ? 0 : freeSpace;
+                break;
+            case "right":
+                dx = freeSpace;
+                break;
+            case "start":
+            case "flex-start":
+                dx = isRtl ? freeSpace : 0;
+                break;
+            case "self-start":
+                dx = isRtl ? freeSpace : 0;
+                break;
+            case "left":
+                dx = 0;
+                break;
+            default:
+                dx = 0; // fallback: start-aligned
+                break;
+        }
+
+        // Safe overflow: clamp so the element does not overflow the
+        // strong edge (start edge in the writing direction).
+        if (isSafe)
+        {
+            if (isRtl)
+            {
+                // Strong edge is right (end of CB) — clamp dx ≤ freeSpace
+                dx = Math.Min(dx, Math.Max(freeSpace, 0));
+            }
+            else
+            {
+                // Strong edge is left (start of CB) — clamp dx ≥ 0
+                dx = Math.Max(dx, 0);
+            }
+        }
+
+        return dx;
+    }
+
+    /// <summary>
+    /// Computes the shrink-to-fit content width of this box: the maximum
+    /// right edge of all child boxes (relative to this box) plus padding
+    /// and border.  Used for abspos self-alignment where the box size is
+    /// content-driven rather than stretched.
+    /// </summary>
+    private double GetShrinkToFitWidth()
+    {
+        // If there's an explicit CSS width, use it (plus border/padding).
+        if (Width != CssConstants.Auto && !string.IsNullOrEmpty(Width))
+            return Size.Width;
+
+        double maxRight = 0;
+        foreach (var child in Boxes)
+        {
+            if (child.Display == CssConstants.None) continue;
+            double childRight = (child.Location.X - Location.X)
+                                + child.Size.Width
+                                + child.ActualMarginRight;
+            maxRight = Math.Max(maxRight, childRight);
+        }
+
+        if (maxRight <= 0) return Size.Width;
+
+        return maxRight + ActualPaddingRight + ActualBorderRightWidth;
+    }
+
+    /// <summary>
+    /// Computes the shrink-to-fit content height of this box: the maximum
+    /// bottom edge of all child boxes (relative to this box) plus padding
+    /// and border.  Used for abspos self-alignment where the box size is
+    /// content-driven rather than stretched.
+    /// </summary>
+    private double GetShrinkToFitHeight()
+    {
+        // If there's an explicit CSS height, use it (plus border/padding).
+        if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
+        {
+            double h = ActualBottom - Location.Y;
+            return h > 0 ? h : Size.Height;
+        }
+
+        double maxBottom = 0;
+        foreach (var child in Boxes)
+        {
+            if (child.Display == CssConstants.None) continue;
+            double childBottom = (child.Location.Y - Location.Y)
+                                 + (child.ActualBottom - child.Location.Y)
+                                 + child.ActualMarginBottom;
+            maxBottom = Math.Max(maxBottom, childBottom);
+        }
+
+        if (maxBottom <= 0)
+        {
+            double h = ActualBottom - Location.Y;
+            return h > 0 ? h : Size.Height;
+        }
+
+        return maxBottom + ActualPaddingBottom + ActualBorderBottomWidth;
+    }
+
+    /// <summary>
+    /// Recursively offsets a box and all its descendants by the given
+    /// delta.  Used when post-layout self-alignment moves an abspos box
+    /// to a new position.
+    /// </summary>
+    private static void OffsetBoxRecursive(CssBox box, float dx, float dy)
+    {
+        box.Location = new PointF(box.Location.X + dx, box.Location.Y + dy);
+        box.ActualBottom += dy;
+        foreach (var child in box.Boxes)
+            OffsetBoxRecursive(child, dx, dy);
     }
 
     /// <summary>

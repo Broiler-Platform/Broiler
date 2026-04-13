@@ -438,6 +438,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string AlignItems { get; set; } = "stretch";
     public string AlignContent { get; set; } = "normal";
     public string JustifySelf { get; set; } = "auto";
+    public string AlignSelf { get; set; } = "auto";
     public string ColumnCount { get; set; } = "auto";
     public string ColumnWidth { get; set; } = "auto";
     public string ColumnFill { get; set; } = "balance";
