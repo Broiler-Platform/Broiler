@@ -2239,6 +2239,34 @@ document.getElementById('out').appendChild(p);
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
+    [Fact]
+    public void Debug_SaveInlineContainerImages()
+    {
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var testDir = Path.Combine(wptRoot, "css", "css-anchor-position");
+        var testFile = Path.Combine(testDir, "position-area-inline-container.html");
+        var refFile = Path.Combine(testDir, "reference", "position-area-inline-container-ref.html");
+        var runner = new WptTestRunner(1024, 768);
+
+        // Use the existing RunMatchTest method which does fonts + rendering
+        var result = runner.RunMatchTest(testFile, refFile, wptRoot);
+
+        // Also get the serialized HTML from DomBridge for debugging
+        var html = File.ReadAllText(testFile);
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.ResolveAnchorPositions();
+        var output = bridge.SerializeToHtml();
+        File.WriteAllText("/tmp/debug-inline-container-resolved.html", output);
+
+        // Report the detailed results
+        Assert.Fail($"Match={result.MatchPercent:F1}%\nSerialized HTML saved to /tmp/debug-inline-container-resolved.html\n\nResolved HTML (anchor elements):\n" +
+            string.Join("\n", output.Split('\n').Where(l =>
+                l.Contains("anchored") || l.Contains("inline-container") || l.Contains("id=\"anchor\"") || l.Contains("position: absolute"))));
+    }
+
     private static void FindDomElement(Broiler.HtmlBridge.DomElement el, string id, ref Broiler.HtmlBridge.DomElement? found)
     {
         if (found != null) return;
