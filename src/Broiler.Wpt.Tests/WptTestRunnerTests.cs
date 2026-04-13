@@ -2535,4 +2535,35 @@ document.getElementById('out').appendChild(p);
         foreach (var c in el.Children)
             FindDomElement(c, id, ref found);
     }
+
+    [Fact]
+    public void DEBUG_DumpProcessedHtml()
+    {
+        string[] tests = { "position-try-cascade.html", "position-area-percents-001.html", "anchor-size-css-zoom.html" };
+        foreach (var t in tests)
+        {
+            var bridge = RunAnchorResolution(t);
+            var html = bridge.SerializeToHtml();
+            File.WriteAllText($"/tmp/debug-{t}", html);
+        }
+
+        // Also dump for match test to see reference HTML
+        var root = FindRepoRoot();
+        var testDir = Path.Combine(root, "tests", "wpt", "css", "css-anchor-position");
+        foreach (var refFile in new[] { "position-area-percents-001-ref.html", "reference/anchor-size-css-zoom-ref.html" })
+        {
+            var refPath = Path.Combine(testDir, refFile);
+            if (File.Exists(refPath))
+            {
+                var html = File.ReadAllText(refPath);
+                var ctx = new Broiler.JavaScript.Engine.JSContext();
+                var bridge = new Broiler.HtmlBridge.DomBridge();
+                bridge.Attach(ctx, html, "file:///test.html");
+                bridge.ResolveAnchorPositions();
+                var processedHtml = bridge.SerializeToHtml();
+                File.WriteAllText($"/tmp/debug-ref-{Path.GetFileName(refFile)}", processedHtml);
+            }
+        }
+        Assert.True(true);
+    }
 }
