@@ -306,26 +306,27 @@ public sealed partial class DomBridge
                     var originalChildren = el.Children.ToList();
                     el.Children.Clear();
                     el.Children.Add(wrapper);
-
-                    // Fixed-positioned children are viewport-relative and
-                    // must NOT be wrapped in the scroll offset container,
-                    // otherwise the Broiler renderer would incorrectly
-                    // shift them by the scroll amount.
                     foreach (var child in originalChildren)
                     {
-                        var cp = GetComputedProps(child);
-                        var childPos = cp.GetValueOrDefault("position");
-                        if (childPos == "fixed")
+                        child.Parent = wrapper;
+                        wrapper.Children.Add(child);
+                    }
+
+                    // For the document scrolling element, extract ALL
+                    // fixed-positioned descendants from the wrapper and
+                    // re-parent them as direct children of <html>.  This
+                    // prevents the Broiler renderer from incorrectly
+                    // shifting viewport-relative elements by the scroll
+                    // offset applied to the wrapper.
+                    if (isDocScrollingElement)
+                    {
+                        var fixedDescendants = new List<DomElement>();
+                        CollectFixedDescendants(wrapper, fixedDescendants);
+                        foreach (var fixedEl in fixedDescendants)
                         {
-                            // Keep fixed children as direct children of
-                            // the scrolling element (outside the wrapper).
-                            child.Parent = el;
-                            el.Children.Add(child);
-                        }
-                        else
-                        {
-                            child.Parent = wrapper;
-                            wrapper.Children.Add(child);
+                            fixedEl.Parent?.Children.Remove(fixedEl);
+                            fixedEl.Parent = el;
+                            el.Children.Add(fixedEl);
                         }
                     }
 
@@ -334,7 +335,10 @@ public sealed partial class DomBridge
                     // leaking above the container's top edge (Broiler's
                     // renderer clips overflow at the bottom but may not
                     // fully clip at the top for position:relative offsets).
-                    if (scrollTop > 0)
+                    // Skip this for the document scrolling element (<html>)
+                    // because its children are structural (<head>, <body>)
+                    // and must not be hidden — the viewport clips naturally.
+                    if (scrollTop > 0 && !isDocScrollingElement)
                     {
                         double childOffset = 0;
                         foreach (var child in wrapper.Children)
@@ -368,6 +372,29 @@ public sealed partial class DomBridge
         // (wrapper insertion above).
         for (int i = 0; i < el.Children.Count; i++)
             ApplyScrollSimulationTree(el.Children[i]);
+    }
+
+    /// <summary>
+    /// Recursively collects all descendants with <c>position: fixed</c>
+    /// (including generated backdrop divs) from the given subtree.
+    /// </summary>
+    private void CollectFixedDescendants(DomElement parent, List<DomElement> results)
+    {
+        foreach (var child in parent.Children)
+        {
+            if (child.IsTextNode) continue;
+            var cp = GetComputedProps(child);
+            var pos = cp.GetValueOrDefault("position");
+            if (pos == "fixed")
+            {
+                results.Add(child);
+            }
+            else
+            {
+                // Recurse into non-fixed elements to find fixed descendants.
+                CollectFixedDescendants(child, results);
+            }
+        }
     }
 
     private static bool HasOverflowClipping(Dictionary<string, string> props)
@@ -1115,9 +1142,11 @@ public sealed partial class DomBridge
                     // Compute the raw edge position (from CB origin).
                     // When the target is fixed and the anchor is not fixed,
                     // adjust for document scroll to get viewport position.
+                    // Use only the CSS computed position to determine if the
+                    // anchor is fixed — modal dialogs with position:absolute
+                    // are still shifted by scroll simulation and need adjustment.
                     bool anchorIsFixed = anchor.SourceElement != null &&
-                        ((GetComputedProps(anchor.SourceElement).GetValueOrDefault("position") == "fixed") ||
-                         (anchor.SourceElement.DomProperties.TryGetValue("_modal", out var aMod) && aMod is true));
+                        GetComputedProps(anchor.SourceElement).GetValueOrDefault("position") == "fixed";
                     double adjY = anchorIsFixed ? 0 : scrollAdjY;
                     double adjX = anchorIsFixed ? 0 : scrollAdjX;
 
@@ -1593,13 +1622,16 @@ public sealed partial class DomBridge
             if (!(el.DomProperties.TryGetValue("_modal", out var m) && m is true))
                 continue;
 
-            // Check if position is already set (inline or CSS)
+            // Check if position is already set (inline or CSS).
+            // position:absolute dialogs keep their author position so that
+            // scroll simulation can shift them, matching Chromium behaviour.
             var props = GetComputedProps(el);
             if (props.TryGetValue("position", out var pos) &&
                 (pos == "fixed" || pos == "absolute"))
                 continue;
 
-            // Set position:fixed as UA default for modal dialogs
+            // Set position:fixed as UA default for modal dialogs that have
+            // no explicit position, matching Chromium's top-layer behaviour.
             el.Style["position"] = "fixed";
         }
     }
