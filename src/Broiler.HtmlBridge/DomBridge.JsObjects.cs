@@ -21,6 +21,8 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
     private readonly Dictionary<DomElement, JSObject> _jsObjectCache = [];
+    /// <summary>Counter for tracking top-layer insertion order via showModal().</summary>
+    private int _topLayerCounter;
 
     internal JSObject ToJSObject(DomElement element)
     {
@@ -1785,6 +1787,7 @@ public sealed partial class DomBridge
                 {
                     element.Attributes["open"] = "";
                     element.DomProperties["_modal"] = true;
+                    element.DomProperties["_topLayerOrder"] = ++bridge._topLayerCounter;
                     return JSUndefined.Value;
                 }, "showModal", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);

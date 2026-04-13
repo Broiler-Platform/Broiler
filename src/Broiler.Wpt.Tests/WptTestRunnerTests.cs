@@ -2147,6 +2147,62 @@ document.getElementById('out').appendChild(p);
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
+    [Fact]
+    public void Wpt_AnchorPositionTopLayer001_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("anchor-position-top-layer-001.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AnchorPositionTopLayer002_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("anchor-position-top-layer-002.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AnchorPositionTopLayer003_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("anchor-position-top-layer-003.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AnchorPositionTopLayer004_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("anchor-position-top-layer-004.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AnchorPositionTopLayer005_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("anchor-position-top-layer-005.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AnchorPositionTopLayer006_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("anchor-position-top-layer-006.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionAreaPercents001_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("position-area-percents-001.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
     private WptTestResult RunAnchorMatchTest(string testFileName)
     {
         var root = FindRepoRoot();

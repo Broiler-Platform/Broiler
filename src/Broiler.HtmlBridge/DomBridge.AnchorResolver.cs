@@ -26,6 +26,10 @@ public sealed partial class DomBridge
     /// <param name="viewportHeight">Viewport height in pixels (default 768).</param>
     public void ResolveAnchorPositions(int viewportWidth = 1024, int viewportHeight = 768)
     {
+        // 0. Apply UA default position:fixed to modal dialogs before anchor
+        //    resolution, since browsers treat top-layer elements as fixed.
+        ApplyDialogUAPositioning(DocumentElement);
+
         // 1. Build an anchor registry from CSS rules with anchor-name.
         var anchorRegistry = new Dictionary<string, AnchorInfo>(StringComparer.Ordinal);
         BuildAnchorRegistry(anchorRegistry);
@@ -271,11 +275,15 @@ public sealed partial class DomBridge
 
             if (scrollTop != 0 || scrollLeft != 0)
             {
-                // Only apply to elements that clip overflow.
+                // Only apply to elements that clip overflow, or to the
+                // document scrolling element (<html>) which is implicitly
+                // clipped by the viewport.
                 var props = GetComputedProps(el);
                 bool clips = HasOverflowClipping(props);
+                bool isDocScrollingElement =
+                    string.Equals(el.TagName, "html", StringComparison.OrdinalIgnoreCase);
 
-                if (clips && el.Children.Count > 0)
+                if ((clips || isDocScrollingElement) && el.Children.Count > 0)
                 {
                     // Wrap all children in a positioned div that shifts content
                     // upward / leftward.  Using position:relative + top/left
@@ -304,12 +312,33 @@ public sealed partial class DomBridge
                         wrapper.Children.Add(child);
                     }
 
+                    // For the document scrolling element, extract ALL
+                    // fixed-positioned descendants from the wrapper and
+                    // re-parent them as direct children of <html>.  This
+                    // prevents the Broiler renderer from incorrectly
+                    // shifting viewport-relative elements by the scroll
+                    // offset applied to the wrapper.
+                    if (isDocScrollingElement)
+                    {
+                        var fixedDescendants = new List<DomElement>();
+                        CollectFixedDescendants(wrapper, fixedDescendants);
+                        foreach (var fixedEl in fixedDescendants)
+                        {
+                            fixedEl.Parent?.Children.Remove(fixedEl);
+                            fixedEl.Parent = el;
+                            el.Children.Add(fixedEl);
+                        }
+                    }
+
                     // Hide normal-flow children that are entirely above the
                     // scroll position.  This prevents coloured content from
                     // leaking above the container's top edge (Broiler's
                     // renderer clips overflow at the bottom but may not
                     // fully clip at the top for position:relative offsets).
-                    if (scrollTop > 0)
+                    // Skip this for the document scrolling element (<html>)
+                    // because its children are structural (<head>, <body>)
+                    // and must not be hidden — the viewport clips naturally.
+                    if (scrollTop > 0 && !isDocScrollingElement)
                     {
                         double childOffset = 0;
                         foreach (var child in wrapper.Children)
@@ -343,6 +372,29 @@ public sealed partial class DomBridge
         // (wrapper insertion above).
         for (int i = 0; i < el.Children.Count; i++)
             ApplyScrollSimulationTree(el.Children[i]);
+    }
+
+    /// <summary>
+    /// Recursively collects all descendants with <c>position: fixed</c>
+    /// (including generated backdrop divs) from the given subtree.
+    /// </summary>
+    private void CollectFixedDescendants(DomElement parent, List<DomElement> results)
+    {
+        foreach (var child in parent.Children)
+        {
+            if (child.IsTextNode) continue;
+            var cp = GetComputedProps(child);
+            var pos = cp.GetValueOrDefault("position");
+            if (pos == "fixed")
+            {
+                results.Add(child);
+            }
+            else
+            {
+                // Recurse into non-fixed elements to find fixed descendants.
+                CollectFixedDescendants(child, results);
+            }
+        }
     }
 
     private static bool HasOverflowClipping(Dictionary<string, string> props)
@@ -788,7 +840,8 @@ public sealed partial class DomBridge
     // -----------------------------------------------------------------
 
     private sealed record AnchorInfo(
-        double Top, double Left, double Width, double Height)
+        double Top, double Left, double Width, double Height,
+        DomElement? SourceElement = null)
     {
         public double Right => Left + Width;
         public double Bottom => Top + Height;
@@ -808,7 +861,7 @@ public sealed partial class DomBridge
 
                 var box = ComputeElementBox(el);
                 if (box != null)
-                    registry[anchorName] = box;
+                    registry[anchorName] = box with { SourceElement = el };
             }
         }
     }
@@ -1004,7 +1057,7 @@ public sealed partial class DomBridge
     // -----------------------------------------------------------------
 
     private static readonly Regex AnchorFunctionPattern = new(
-        @"anchor\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<edge>top|right|bottom|left|start|end|center)\s*\)",
+        @"anchor\(\s*(?:(?<name>--[a-zA-Z0-9_-]+)\s+)?(?<edge>top|right|bottom|left|start|end|center)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Regex AnchorSizeFunctionPattern = new(
@@ -1049,6 +1102,23 @@ public sealed partial class DomBridge
             string? implicitAnchor = cssProps.GetValueOrDefault("position-anchor") ??
                                      element.Style.GetValueOrDefault("position-anchor");
 
+            // When the target element is fixed-positioned (e.g. top-layer dialog)
+            // and the anchor is NOT fixed-positioned, anchor positions must be
+            // adjusted by the document scroll offset so the anchor's viewport
+            // position is used instead of its document position.
+            bool targetIsFixed =
+                (cssProps.GetValueOrDefault("position") ?? element.Style.GetValueOrDefault("position")) == "fixed" ||
+                (element.DomProperties.TryGetValue("_modal", out var tModal) && tModal is true);
+            double scrollAdjY = 0, scrollAdjX = 0;
+            if (targetIsFixed)
+            {
+                var docEl = DocumentElement;
+                if (docEl.DomProperties.TryGetValue("_scrollTop", out var stv) && stv is double scrollTop)
+                    scrollAdjY = scrollTop;
+                if (docEl.DomProperties.TryGetValue("_scrollLeft", out var slv) && slv is double scrollLeft)
+                    scrollAdjX = scrollLeft;
+            }
+
             foreach (var kv in cssProps)
             {
                 var propName = kv.Key.ToLowerInvariant();
@@ -1058,18 +1128,35 @@ public sealed partial class DomBridge
                     if (string.IsNullOrEmpty(anchorName))
                         anchorName = implicitAnchor ?? string.Empty;
                     var edge = m.Groups["edge"].Value.ToLowerInvariant();
+                    var fallback = m.Groups["fallback"].Success
+                        ? m.Groups["fallback"].Value.Trim()
+                        : null;
 
-                    if (!anchorRegistry.TryGetValue(anchorName, out var anchor))
-                        return "0px";
+                    if (!anchorRegistry.TryGetValue(anchorName, out var anchor) ||
+                        !IsAnchorAccessible(anchor.SourceElement, element))
+                    {
+                        // Anchor not found or not accessible — use fallback or 0px.
+                        return fallback ?? "0px";
+                    }
 
                     // Compute the raw edge position (from CB origin).
+                    // When the target is fixed and the anchor is not fixed,
+                    // adjust for document scroll to get viewport position.
+                    // Use only the CSS computed position to determine if the
+                    // anchor is fixed — modal dialogs with position:absolute
+                    // are still shifted by scroll simulation and need adjustment.
+                    bool anchorIsFixed = anchor.SourceElement != null &&
+                        GetComputedProps(anchor.SourceElement).GetValueOrDefault("position") == "fixed";
+                    double adjY = anchorIsFixed ? 0 : scrollAdjY;
+                    double adjX = anchorIsFixed ? 0 : scrollAdjX;
+
                     double rawValue = edge switch
                     {
-                        "top" => anchor.Top,
-                        "right" => anchor.Right,
-                        "bottom" => anchor.Bottom,
-                        "left" => anchor.Left,
-                        "center" => (anchor.Top + anchor.Bottom) / 2,
+                        "top" => anchor.Top - adjY,
+                        "right" => anchor.Right - adjX,
+                        "bottom" => anchor.Bottom - adjY,
+                        "left" => anchor.Left - adjX,
+                        "center" => (anchor.Top + anchor.Bottom) / 2 - adjY,
                         _ => 0,
                     };
 
@@ -1514,37 +1601,73 @@ public sealed partial class DomBridge
     }
 
     // -----------------------------------------------------------------
+    // Dialog UA default positioning
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// Applies the UA default <c>position: fixed</c> to modal dialog elements
+    /// that don't already have an explicit position, matching browser behaviour
+    /// where top-layer elements are always treated as fixed-positioned.
+    /// Must be called <em>before</em> anchor resolution so that anchor()
+    /// function values are resolved with the correct positioning context.
+    /// </summary>
+    private void ApplyDialogUAPositioning(DomElement root)
+    {
+        foreach (var el in _elements)
+        {
+            if (!string.Equals(el.TagName, "dialog", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (!el.Attributes.ContainsKey("open"))
+                continue;
+            if (!(el.DomProperties.TryGetValue("_modal", out var m) && m is true))
+                continue;
+
+            // Check if position is already set (inline or CSS).
+            // position:absolute dialogs keep their author position so that
+            // scroll simulation can shift them, matching Chromium behaviour.
+            var props = GetComputedProps(el);
+            if (props.TryGetValue("position", out var pos) &&
+                (pos == "fixed" || pos == "absolute"))
+                continue;
+
+            // Set position:fixed as UA default for modal dialogs that have
+            // no explicit position, matching Chromium's top-layer behaviour.
+            el.Style["position"] = "fixed";
+        }
+    }
+
+    // -----------------------------------------------------------------
     // Dialog backdrop insertion
     // -----------------------------------------------------------------
 
-    private static void InsertDialogBackdrops(DomElement root, int vpW, int vpH)
+    private void InsertDialogBackdrops(DomElement root, int vpW, int vpH)
     {
         var modals = new List<(DomElement dialog, DomElement parent)>();
         FindModalDialogs(root, modals);
 
         foreach (var (dialog, parent) in modals)
         {
+            // Collect ::backdrop CSS properties for this dialog element.
+            // Look for selectors ending with "::backdrop" that would match
+            // the dialog (e.g. "dialog::backdrop", "#target::backdrop").
+            var backdropBg = GetBackdropBackground(dialog);
+
             // Insert a backdrop div BEFORE the dialog.
             // Use 'position: fixed' with explicit pixel viewport dimensions
             // because the Broiler renderer cannot resolve opposing insets.
-            // Use pre-composited rgb(229,229,229) instead of rgba(0,0,0,0.1)
-            // because the renderer's alpha compositing gives incorrect results.
+            var backdropStyle = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["position"] = "fixed",
+                ["top"] = "0",
+                ["left"] = "0",
+                ["width"] = $"{vpW}px",
+                ["height"] = $"{vpH}px",
+                ["background-color"] = backdropBg,
+            };
+
             var backdrop = new DomElement(
                 "div", null, null, string.Empty,
-                style: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["position"] = "fixed",
-                    ["top"] = "0",
-                    ["left"] = "0",
-                    ["width"] = $"{vpW}px",
-                    ["height"] = $"{vpH}px",
-                    // Pre-composited ::backdrop color: the CSS spec default for
-                    // dialog::backdrop is rgba(0,0,0,0.1).  Alpha-blending
-                    // 10% black over white: 255*(1-0.1) + 0*0.1 = 229.5 ≈ 229.
-                    // We use the pre-composited value because the Broiler
-                    // renderer's alpha compositing produces incorrect results.
-                    ["background-color"] = "rgb(229, 229, 229)",
-                });
+                style: backdropStyle);
             backdrop.Parent = parent;
 
             int idx = parent.Children.IndexOf(dialog);
@@ -1552,20 +1675,120 @@ public sealed partial class DomBridge
                 parent.Children.Insert(idx, backdrop);
 
             // Ensure the dialog has UA default styles.
+            // Check both inline styles and CSS rules before applying defaults.
+            var dialogProps = GetComputedProps(dialog);
             if (!dialog.Style.ContainsKey("display"))
                 dialog.Style["display"] = "block";
-            if (!dialog.Style.ContainsKey("border"))
+            if (!dialog.Style.ContainsKey("border") &&
+                !dialogProps.ContainsKey("border") &&
+                !dialogProps.ContainsKey("border-width"))
             {
                 dialog.Style["border-width"] = "1px";
                 dialog.Style["border-style"] = "solid";
                 dialog.Style["border-color"] = "black";
             }
-            if (!dialog.Style.ContainsKey("padding"))
+            if (!dialog.Style.ContainsKey("padding") &&
+                !dialogProps.ContainsKey("padding"))
                 dialog.Style["padding"] = "1em";
             if (!dialog.Style.ContainsKey("background") &&
-                !dialog.Style.ContainsKey("background-color"))
+                !dialog.Style.ContainsKey("background-color") &&
+                !dialogProps.ContainsKey("background") &&
+                !dialogProps.ContainsKey("background-color"))
                 dialog.Style["background-color"] = "white";
         }
+    }
+
+    /// <summary>
+    /// Determines the background color for a dialog's <c>::backdrop</c>
+    /// pseudo-element by checking CSS rules for <c>::backdrop</c> selectors
+    /// that match the given dialog element.
+    /// </summary>
+    private string GetBackdropBackground(DomElement dialog)
+    {
+        // Default backdrop color: pre-composited rgba(0,0,0,0.1) over white.
+        // Alpha-blending: 255*(1-0.1) + 0*0.1 = 229.5 ≈ 229.
+        const string defaultBg = "rgb(229, 229, 229)";
+
+        foreach (var (selector, _, declarations) in CssRules)
+        {
+            // Check for selectors ending in ::backdrop
+            if (!selector.Contains("::backdrop", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            // Extract the base selector before ::backdrop
+            var parts = selector.Split("::backdrop", StringSplitOptions.None);
+            if (parts.Length < 2) continue;
+
+            string baseSelector = parts[0].Trim();
+
+            // Check if the base selector matches this dialog
+            bool matches = false;
+            if (string.IsNullOrEmpty(baseSelector) ||
+                string.Equals(baseSelector, "dialog", StringComparison.OrdinalIgnoreCase))
+            {
+                // Bare "::backdrop" or "dialog::backdrop" matches all dialogs
+                matches = string.Equals(dialog.TagName, "dialog", StringComparison.OrdinalIgnoreCase);
+            }
+            else
+            {
+                // Try matching specific selectors like "#target::backdrop"
+                matches = MatchesSelector(dialog, baseSelector);
+            }
+
+            if (matches)
+            {
+                // Check for background or background-color in the declarations
+                if (declarations.TryGetValue("background", out var bg))
+                {
+                    if (string.Equals(bg.Trim(), "transparent", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(bg.Trim(), "none", StringComparison.OrdinalIgnoreCase))
+                        return "transparent";
+                    return bg;
+                }
+                if (declarations.TryGetValue("background-color", out var bgColor))
+                {
+                    if (string.Equals(bgColor.Trim(), "transparent", StringComparison.OrdinalIgnoreCase))
+                        return "transparent";
+                    return bgColor;
+                }
+            }
+        }
+
+        return defaultBg;
+    }
+
+    /// <summary>
+    /// Checks whether an anchor element is accessible from a target element,
+    /// according to CSS Anchor Positioning top-layer visibility rules.
+    /// </summary>
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item>Non-top-layer elements cannot anchor to top-layer elements.</item>
+    /// <item>A top-layer element can only anchor to top-layer elements that
+    /// were added to the top layer <em>before</em> it (lower order).</item>
+    /// <item>Non-top-layer anchors are always accessible.</item>
+    /// </list>
+    /// </remarks>
+    private static bool IsAnchorAccessible(DomElement? anchorElement, DomElement targetElement)
+    {
+        if (anchorElement == null) return true;
+
+        bool anchorIsTopLayer =
+            anchorElement.DomProperties.TryGetValue("_modal", out var am) && am is true;
+        bool targetIsTopLayer =
+            targetElement.DomProperties.TryGetValue("_modal", out var tm) && tm is true;
+
+        if (!anchorIsTopLayer)
+            return true; // Non-top-layer anchors are accessible from anywhere.
+
+        if (!targetIsTopLayer)
+            return false; // Non-top-layer target cannot see top-layer anchor.
+
+        // Both are in top layer — anchor must have been added BEFORE the target.
+        int anchorOrder = anchorElement.DomProperties.TryGetValue("_topLayerOrder", out var ao) && ao is int aoi ? aoi : 0;
+        int targetOrder = targetElement.DomProperties.TryGetValue("_topLayerOrder", out var to) && to is int toi ? toi : 0;
+
+        return anchorOrder < targetOrder;
     }
 
     private static void FindModalDialogs(DomElement element, List<(DomElement, DomElement)> results)
@@ -1725,7 +1948,7 @@ public sealed partial class DomBridge
             {
                 var box = ComputeElementBoxWithContainer(el);
                 if (box != null && !registry.ContainsKey(anchorName))
-                    registry[anchorName] = box;
+                    registry[anchorName] = box with { SourceElement = el };
             }
         }
     }
