@@ -2077,6 +2077,76 @@ document.getElementById('out').appendChild(p);
             $"Expected target display:none but styles = [{string.Join(", ", targetEl.Style.Select(kv => $"{kv.Key}:{kv.Value}"))}]");
     }
 
+    /// <summary>
+    /// Runs a css-anchor-position test against a Chromium reference PNG.
+    /// </summary>
+    private WptTestResult RunAnchorPixelTest(string testFileName)
+    {
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var testDir = Path.Combine(wptRoot, "css", "css-anchor-position");
+        var testFile = Path.Combine(testDir, testFileName);
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var refDir = Path.Combine(wptRoot, "references");
+        var refImage = Path.Combine(refDir, "css", "css-anchor-position",
+            Path.ChangeExtension(testFileName, ".png"));
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        return runner.RunTest(testFile, refDir, wptRoot);
+    }
+
+    [Fact]
+    public void Wpt_PositionAreaScrolling002_MatchesReference()
+    {
+        var result = RunAnchorPixelTest("position-area-scrolling-002.tentative.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionAreaAnchorPartiallyOutside_MatchesReference()
+    {
+        var result = RunAnchorPixelTest("position-area-anchor-partially-outside.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionAreaScrolling003_MatchesReference()
+    {
+        var result = RunAnchorPixelTest("position-area-scrolling-003.tentative.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionTryGrid001_MatchesReference()
+    {
+        var result = RunAnchorPixelTest("position-try-grid-001.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AnchorCenterScroll001_MatchesReference()
+    {
+        var result = RunAnchorPixelTest("anchor-center-scroll-001.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionTryCascade_MatchesReference()
+    {
+        var result = RunAnchorPixelTest("position-try-cascade.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
     private WptTestResult RunAnchorMatchTest(string testFileName)
     {
         var root = FindRepoRoot();

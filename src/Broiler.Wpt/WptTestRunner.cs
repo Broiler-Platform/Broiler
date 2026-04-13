@@ -139,6 +139,65 @@ internal sealed class WptTestRunner
         @"<script(?<attrs>[^>]*)>(?<content>[\s\S]*?)</script>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    /// <summary>
+    /// Regex to extract the <c>src</c> attribute from a script element.
+    /// </summary>
+    private static readonly Regex ScriptSrcPattern = new(
+        @"src\s*=\s*[""']([^""']+)[""']",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Minimal stubs for WPT testharness.js and check-layout-th.js so that
+    /// inline test scripts can execute without errors.  Only the functions
+    /// that cause script failures are stubbed; the stubs execute callbacks
+    /// synchronously so that DOM-mutating side-effects (e.g. setting
+    /// <c>element.style.positionArea</c>) are visible after JS execution.
+    /// </summary>
+    private const string TestharnessStubs = @"
+(function() {
+  if (typeof test === 'undefined') {
+    window.test = function(func, name) { try { func(); } catch(e) {} };
+  }
+  if (typeof async_test === 'undefined') {
+    window.async_test = function(func, name) {
+      var t = { step: function(f){try{f();}catch(e){}}, done: function(){}, step_func: function(f){return f;}, step_func_done: function(f){return f;}, step_timeout: function(f,d){try{f();}catch(e){}} };
+      if (func) { try { func(t); } catch(e) {} }
+      return t;
+    };
+  }
+  if (typeof promise_test === 'undefined') {
+    window.promise_test = function(func, name) { try { func(); } catch(e) {} };
+  }
+  if (typeof assert_equals === 'undefined') {
+    window.assert_equals = function(a, b, msg) {};
+  }
+  if (typeof assert_true === 'undefined') {
+    window.assert_true = function(v, msg) {};
+  }
+  if (typeof assert_false === 'undefined') {
+    window.assert_false = function(v, msg) {};
+  }
+  if (typeof assert_unreached === 'undefined') {
+    window.assert_unreached = function(msg) {};
+  }
+  if (typeof assert_approx_equals === 'undefined') {
+    window.assert_approx_equals = function(a, b, eps, msg) {};
+  }
+  if (typeof setup === 'undefined') {
+    window.setup = function(obj) {};
+  }
+  if (typeof done === 'undefined') {
+    window.done = function() {};
+  }
+  if (typeof checkLayout === 'undefined') {
+    window.checkLayout = function(selector, callDone) {};
+  }
+  if (typeof requestAnimationFrame === 'undefined') {
+    window.requestAnimationFrame = function(cb) { cb(0); return 0; };
+  }
+})();
+";
+
     private readonly int _width;
     private readonly int _height;
 
@@ -729,6 +788,16 @@ internal sealed class WptTestRunner
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
 
+        // Determine the base directory for resolving relative script paths.
+        string? testDir = null;
+        if (url.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
+        {
+            var localPath = new Uri(url).LocalPath;
+            testDir = Path.GetDirectoryName(localPath);
+        }
+
+        bool needsStubs = false;
+
         foreach (Match match in ScriptTagPattern.Matches(html))
         {
             var attrs = match.Groups["attrs"].Value;
@@ -752,6 +821,39 @@ internal sealed class WptTestRunner
 
             bool isDefer = attrs.Contains("defer", StringComparison.OrdinalIgnoreCase);
 
+            // Check for external script src attribute.
+            var srcMatch = ScriptSrcPattern.Match(attrs);
+            if (srcMatch.Success)
+            {
+                var src = srcMatch.Groups[1].Value;
+
+                // Testharness / check-layout scripts → inject stubs.
+                if (src.Contains("testharness", StringComparison.OrdinalIgnoreCase) ||
+                    src.Contains("check-layout", StringComparison.OrdinalIgnoreCase))
+                {
+                    needsStubs = true;
+                    continue;
+                }
+
+                // Try to load relative-path scripts from the test directory.
+                if (testDir != null &&
+                    !src.StartsWith("/", StringComparison.Ordinal) &&
+                    !src.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                {
+                    var localScript = Path.Combine(testDir, src.Replace('/', Path.DirectorySeparatorChar));
+                    if (File.Exists(localScript))
+                    {
+                        var scriptContent = File.ReadAllText(localScript);
+                        if (isDefer)
+                            deferredScripts.Add(scriptContent);
+                        else
+                            scripts.Add(scriptContent);
+                    }
+                }
+
+                continue;
+            }
+
             // Inline script
             var content = match.Groups["content"].Value.Trim();
             if (string.IsNullOrEmpty(content)) continue;
@@ -761,6 +863,10 @@ internal sealed class WptTestRunner
             else
                 scripts.Add(content);
         }
+
+        // Insert testharness stubs at the beginning if needed.
+        if (needsStubs)
+            scripts.Insert(0, TestharnessStubs);
 
         if (scripts.Count == 0 && deferredScripts.Count == 0)
         {
@@ -779,6 +885,9 @@ internal sealed class WptTestRunner
         using var context = new JSContext();
         var bridge = new DomBridge();
         bridge.Attach(context, html, url);
+
+        // Register DOM elements with IDs as globals (HTML5 named access).
+        bridge.RegisterNamedElementGlobals(context);
 
         foreach (var script in scripts)
         {
