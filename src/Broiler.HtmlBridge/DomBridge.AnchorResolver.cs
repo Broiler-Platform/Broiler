@@ -49,6 +49,10 @@ public sealed partial class DomBridge
             DocumentElement, anchorRegistry, scrollContainersNeedingRelative,
             deferredDomMoves);
 
+        // 3a2. Resolve align-self/justify-self: anchor-center on elements
+        //      that have position-anchor but no position-area.
+        ResolveAnchorCenter(DocumentElement, anchorRegistry);
+
         // 3b. Resolve position-try-fallbacks for elements whose base
         //     style overflows the containing block.
         ResolvePositionTryFallbacks(DocumentElement, anchorRegistry, positionTryRules);
@@ -716,6 +720,9 @@ public sealed partial class DomBridge
         "inset-block-start", "inset-block-end",
         "inset-inline-start", "inset-inline-end",
         "align-self", "justify-self",
+        "grid-column", "grid-row", "grid-area",
+        "grid-column-start", "grid-column-end",
+        "grid-row-start", "grid-row-end",
     };
 
     /// <summary>
@@ -1337,8 +1344,39 @@ public sealed partial class DomBridge
             foreach (var kv in tryProps)
                 merged[kv.Key] = kv.Value;
 
+            // Handle "inset: auto" — reset all inset properties so the
+            // base style's insets don't leak through to the fallback.
+            if (merged.TryGetValue("inset", out var insetVal) &&
+                insetVal.Trim() == "auto")
+            {
+                if (!tryProps.ContainsKey("left"))
+                    merged["left"] = "auto";
+                if (!tryProps.ContainsKey("right"))
+                    merged["right"] = "auto";
+                if (!tryProps.ContainsKey("top"))
+                    merged["top"] = "auto";
+                if (!tryProps.ContainsKey("bottom"))
+                    merged["bottom"] = "auto";
+            }
+
+            // Resolve explicit width/height first so that subsequent
+            // left-from-right and top-from-bottom calculations use
+            // the correct element dimensions.
+            double tryWidth = baseWidth, tryHeight = baseHeight;
+
+            if (merged.TryGetValue("width", out var wv))
+            {
+                var w = TryParsePx(wv);
+                if (w.HasValue) tryWidth = w.Value;
+            }
+            if (merged.TryGetValue("height", out var hv))
+            {
+                var h = TryParsePx(hv);
+                if (h.HasValue) tryHeight = h.Value;
+            }
+
             // Resolve any anchor() references in the try properties.
-            double tryLeft = 0, tryTop = 0, tryWidth = baseWidth, tryHeight = baseHeight;
+            double tryLeft = 0, tryTop = 0;
 
             if (merged.TryGetValue("left", out var lv) && lv != "auto")
             {
@@ -1392,24 +1430,6 @@ public sealed partial class DomBridge
                         tryHeight = cbHeight - tryTop - bottomPx.Value;
                     }
                 }
-            }
-
-            if (merged.TryGetValue("width", out var wv))
-            {
-                var w = TryParsePx(wv);
-                if (w.HasValue) tryWidth = w.Value;
-            }
-            if (merged.TryGetValue("height", out var hv))
-            {
-                var h = TryParsePx(hv);
-                if (h.HasValue) tryHeight = h.Value;
-            }
-
-            // Handle "inset: auto" which resets all inset properties.
-            if (merged.TryGetValue("inset", out var insetVal) &&
-                insetVal.Trim() == "auto")
-            {
-                // The try rule explicitly resets insets; recalculate.
             }
 
             bool fits = tryLeft >= 0 && tryTop >= 0 &&
@@ -1593,6 +1613,70 @@ public sealed partial class DomBridge
         if (double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
             return result;
         return null;
+    }
+
+    /// <summary>
+    /// Resolves <c>align-self: anchor-center</c> and
+    /// <c>justify-self: anchor-center</c> on elements that have
+    /// <c>position-anchor</c> but no <c>position-area</c>.
+    /// Centers the element on the anchor in the appropriate axis.
+    /// </summary>
+    private void ResolveAnchorCenter(
+        DomElement element,
+        Dictionary<string, AnchorInfo> anchorRegistry)
+    {
+        if (!element.IsTextNode)
+        {
+            var cssProps = GetComputedProps(element);
+
+            string? positionAnchor = cssProps.GetValueOrDefault("position-anchor");
+            string? positionArea = cssProps.GetValueOrDefault("position-area");
+            string? alignSelf = cssProps.GetValueOrDefault("align-self");
+            string? justifySelf = cssProps.GetValueOrDefault("justify-self");
+
+            bool hasAnchorCenter =
+                (alignSelf != null && alignSelf.Equals("anchor-center", StringComparison.OrdinalIgnoreCase)) ||
+                (justifySelf != null && justifySelf.Equals("anchor-center", StringComparison.OrdinalIgnoreCase));
+
+            if (hasAnchorCenter &&
+                !string.IsNullOrWhiteSpace(positionAnchor) &&
+                (string.IsNullOrWhiteSpace(positionArea) || positionArea == "none") &&
+                anchorRegistry.TryGetValue(positionAnchor, out var anchor))
+            {
+                double elWidth = TryParsePx(cssProps.GetValueOrDefault("width")) ??
+                                 TryParsePx(element.Style.GetValueOrDefault("width")) ?? 0;
+                double elHeight = TryParsePx(cssProps.GetValueOrDefault("height")) ??
+                                  TryParsePx(element.Style.GetValueOrDefault("height")) ?? 0;
+
+                // align-self: anchor-center → center vertically on anchor
+                if (alignSelf != null &&
+                    alignSelf.Equals("anchor-center", StringComparison.OrdinalIgnoreCase))
+                {
+                    double anchorCenterY = anchor.Top + anchor.Height / 2.0;
+                    double top = anchorCenterY - elHeight / 2.0;
+                    element.Style["top"] = $"{top.ToString(CultureInfo.InvariantCulture)}px";
+                }
+
+                // justify-self: anchor-center → center horizontally on anchor
+                if (justifySelf != null &&
+                    justifySelf.Equals("anchor-center", StringComparison.OrdinalIgnoreCase))
+                {
+                    double anchorCenterX = anchor.Left + anchor.Width / 2.0;
+                    double left = anchorCenterX - elWidth / 2.0;
+                    element.Style["left"] = $"{left.ToString(CultureInfo.InvariantCulture)}px";
+                }
+
+                // Ensure the element has position:absolute.
+                if (!cssProps.TryGetValue("position", out var pos) ||
+                    pos == "static")
+                {
+                    element.Style["position"] = "absolute";
+                }
+            }
+        }
+
+        foreach (var child in element.Children)
+            ResolveAnchorCenter(child, anchorRegistry);
     }
 
     /// <summary>
@@ -2459,8 +2543,8 @@ public sealed partial class DomBridge
             }
         }
 
-        // Grid column edges: CB-left, anchor-left, anchor-right, max(CB-right, anchor-right)
-        double gridLeft = cbOffsetX;
+        // Grid column edges: extend to include both the CB and the anchor.
+        double gridLeft = Math.Min(cbOffsetX, anchorLeft);
         double gridRight = Math.Max(cbOffsetX + cbWidth, anchorRight);
 
         // Grid row edges.

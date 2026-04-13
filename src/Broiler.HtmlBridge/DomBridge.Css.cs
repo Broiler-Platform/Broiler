@@ -930,6 +930,10 @@ public sealed partial class DomBridge
     /// </summary>
     internal static string[] SplitCssDeclarations(string declarations)
     {
+        // Strip CSS comments (/* ... */) before splitting so that comments
+        // between declarations don't pollute property names or values.
+        declarations = StripCssComments(declarations);
+
         var parts = new List<string>();
         var sb = new StringBuilder();
         int depth = 0;

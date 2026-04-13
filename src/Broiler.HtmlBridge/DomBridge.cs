@@ -116,6 +116,37 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Registers all DOM elements with an <c>id</c> attribute as globals
+    /// on the JS context, matching the HTML5 "named access on the Window
+    /// object" behaviour (e.g. <c>window.myId</c> → element with id="myId").
+    /// </summary>
+    public void RegisterNamedElementGlobals(JSContext context)
+    {
+        foreach (var el in _elements)
+        {
+            if (el.IsTextNode || string.IsNullOrEmpty(el.Id))
+                continue;
+            // Only register if the global doesn't already exist
+            // (user-defined globals take precedence).
+            try
+            {
+                var existing = context.Eval(
+                    $"typeof {el.Id} !== 'undefined'");
+                if (existing?.ToString() == "True")
+                    continue;
+            }
+            catch
+            {
+                // If the id isn't a valid JS identifier, skip it.
+                continue;
+            }
+
+            var jsObj = ToJSObject(el);
+            context[el.Id] = jsObj;
+        }
+    }
+
+    /// <summary>
     /// Sets the viewport dimensions used by <c>window.innerWidth</c>,
     /// <c>window.innerHeight</c>, and element box-model properties
     /// (<c>clientWidth</c>, <c>clientHeight</c>, etc.) on <c>&lt;html&gt;</c>
