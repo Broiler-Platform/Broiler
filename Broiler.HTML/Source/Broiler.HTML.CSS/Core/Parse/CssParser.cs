@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Broiler.HTML.Core.Core.Entities;
@@ -1154,11 +1155,27 @@ internal sealed class CssParser
         // store the solid color as background-gradient so the paint walker
         // can render it within the element's box (the canvas propagation
         // path only looks at background-color).
+        // For two-color linear gradients (e.g. linear-gradient(to bottom, green 50%, red 50%)),
+        // store as background-color + background-gradient + background-gradient-angle
+        // so the existing two-color gradient rendering pipeline can handle them.
         if (gradientFunc != null)
         {
             string? uniformColor = TryExtractUniformGradientColor(gradientFunc);
             if (uniformColor != null)
+            {
                 properties["background-gradient"] = uniformColor;
+            }
+            else
+            {
+                // Try to extract a two-color linear gradient.
+                var twoColor = TryExtractTwoColorLinearGradient(gradientFunc);
+                if (twoColor != null)
+                {
+                    properties["background-color"] = twoColor.Value.color1;
+                    properties["background-gradient"] = twoColor.Value.color2;
+                    properties["background-gradient-angle"] = twoColor.Value.angle.ToString("F0");
+                }
+            }
         }
     }
 
@@ -1295,8 +1312,74 @@ internal sealed class CssParser
     }
 
     /// <summary>
-    /// Splits a string on commas that are not inside parentheses.
+    /// Extracts a two-color linear gradient into its component colors and
+    /// angle.  Returns <c>null</c> for non-linear, single-color, or
+    /// gradients with more than two distinct color stops.
+    /// <para>
+    /// Example: <c>linear-gradient(to bottom, green 50%, red 50%)</c>
+    /// → (color1: "green", color2: "red", angle: 180).
+    /// </para>
     /// </summary>
+    private (string color1, string color2, double angle)? TryExtractTwoColorLinearGradient(string gradientFunc)
+    {
+        if (!gradientFunc.StartsWith("linear-gradient(", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        int openParen = gradientFunc.IndexOf('(');
+        if (openParen < 0) return null;
+
+        string inner = gradientFunc.Substring(openParen + 1).TrimEnd(')').Trim();
+        if (string.IsNullOrEmpty(inner)) return null;
+
+        var tokens = SplitOnTopLevelCommas(inner);
+        if (tokens.Count < 2) return null;
+
+        double angle = 180; // default: to bottom
+        int colorStartIdx = 0;
+
+        // First token may be a direction or angle.
+        string first = tokens[0].Trim().ToLowerInvariant();
+        if (first.StartsWith("to "))
+        {
+            colorStartIdx = 1;
+            angle = first switch
+            {
+                "to top" => 0,
+                "to right" => 90,
+                "to bottom" => 180,
+                "to left" => 270,
+                "to top right" or "to right top" => 45,
+                "to bottom right" or "to right bottom" => 135,
+                "to bottom left" or "to left bottom" => 225,
+                "to top left" or "to left top" => 315,
+                _ => 180
+            };
+        }
+        else if (first.EndsWith("deg"))
+        {
+            if (double.TryParse(first.AsSpan(0, first.Length - 3),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out double deg))
+            {
+                angle = deg;
+                colorStartIdx = 1;
+            }
+        }
+
+        // Need exactly two color stops after the direction.
+        var colorTokens = tokens.Skip(colorStartIdx).ToList();
+        if (colorTokens.Count != 2) return null;
+
+        string c1 = StripPositionHint(colorTokens[0].Trim());
+        string c2 = StripPositionHint(colorTokens[1].Trim());
+
+        if (!_valueParser.IsColorValid(c1) || !_valueParser.IsColorValid(c2))
+            return null;
+
+        return (c1, c2, angle);
+    }
+
+    /// <summary>
     private static List<string> SplitOnTopLevelCommas(string value)
     {
         var parts = new List<string>();
