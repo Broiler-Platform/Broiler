@@ -1556,9 +1556,59 @@ public sealed partial class DomBridge
         var v = value!.Trim();
         if (v.EndsWith("px", StringComparison.OrdinalIgnoreCase))
             v = v[..^2];
+        // Don't parse pure numbers without px suffix if they contain '%'
+        if (v.Contains('%')) return null;
         if (double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
             return result;
         return null;
+    }
+
+    /// <summary>
+    /// Tries to parse a CSS percentage value (e.g. "50%") and returns
+    /// the numeric value (e.g. 50.0).
+    /// </summary>
+    private static double? TryParsePercent(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var v = value!.Trim();
+        if (!v.EndsWith('%')) return null;
+        v = v[..^1];
+        if (double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
+            return result;
+        return null;
+    }
+
+    /// <summary>
+    /// Computes the offset within a position-area cell based on alignment.
+    /// For "start" cells (top/left), the element is aligned to the end
+    /// (nearest to the anchor). For "end" cells (bottom/right), aligned
+    /// to the start. For "center" cells, centered.
+    /// </summary>
+    private static double ComputeAlignmentOffset(
+        AxisSelection sel, double cellSize, double elementSize, bool isInlineAxis)
+    {
+        double slack = cellSize - elementSize;
+        if (slack <= 0) return 0;
+
+        switch (sel)
+        {
+            case AxisSelection.Start:
+                // "top" or "left" cell: align towards the anchor (end of cell).
+                return slack;
+            case AxisSelection.End:
+                // "bottom" or "right" cell: align towards the anchor (start of cell).
+                return 0;
+            case AxisSelection.Center:
+                // "center" cell: center the element.
+                return slack / 2;
+            case AxisSelection.SpanStart:
+            case AxisSelection.SpanEnd:
+            case AxisSelection.SpanAll:
+                // Spanning cells: align to start by default.
+                return 0;
+            default:
+                return 0;
+        }
     }
 
     // -----------------------------------------------------------------
@@ -1898,23 +1948,47 @@ public sealed partial class DomBridge
                         element.Style["position"] = "fixed";
                     }
 
-                    element.Style["left"] = $"{rect.Value.Left.ToString(CultureInfo.InvariantCulture)}px";
-                    element.Style["top"] = $"{rect.Value.Top.ToString(CultureInfo.InvariantCulture)}px";
+                    double cellW = rect.Value.Width;
+                    double cellH = rect.Value.Height;
 
-                    // Preserve the element's own explicit dimensions when set.
-                    // The position-area cell defines the maximum available area,
-                    // not the element's intrinsic size.
-                    double resolvedW = rect.Value.Width;
-                    double resolvedH = rect.Value.Height;
+                    // Resolve element dimensions.  Percentage values are
+                    // resolved against the position-area cell dimensions.
+                    // Explicit pixel values are used directly.
+                    double resolvedW = cellW;
+                    double resolvedH = cellH;
 
-                    double? explicitW = TryParsePx(cssProps.GetValueOrDefault("width"));
-                    double? explicitH = TryParsePx(cssProps.GetValueOrDefault("height"));
+                    string? rawW = cssProps.GetValueOrDefault("width");
+                    string? rawH = cssProps.GetValueOrDefault("height");
 
-                    if (explicitW.HasValue && explicitW.Value > 0)
-                        resolvedW = Math.Min(explicitW.Value, rect.Value.Width);
-                    if (explicitH.HasValue && explicitH.Value > 0)
-                        resolvedH = Math.Min(explicitH.Value, rect.Value.Height);
+                    double? explicitW = TryParsePx(rawW);
+                    double? explicitH = TryParsePx(rawH);
+                    double? pctW = TryParsePercent(rawW);
+                    double? pctH = TryParsePercent(rawH);
 
+                    if (pctW.HasValue)
+                        resolvedW = cellW * pctW.Value / 100.0;
+                    else if (explicitW.HasValue && explicitW.Value > 0)
+                        resolvedW = Math.Min(explicitW.Value, cellW);
+
+                    if (pctH.HasValue)
+                        resolvedH = cellH * pctH.Value / 100.0;
+                    else if (explicitH.HasValue && explicitH.Value > 0)
+                        resolvedH = Math.Min(explicitH.Value, cellH);
+
+                    // Compute alignment-based offset within the cell.
+                    // Parse the position-area to determine alignment.
+                    ParsePositionArea(positionArea, out var blockAlign, out var inlineAlign);
+
+                    double offsetX = ComputeAlignmentOffset(
+                        inlineAlign, cellW, resolvedW, isInlineAxis: true);
+                    double offsetY = ComputeAlignmentOffset(
+                        blockAlign, cellH, resolvedH, isInlineAxis: false);
+
+                    double finalLeft = rect.Value.Left + offsetX;
+                    double finalTop = rect.Value.Top + offsetY;
+
+                    element.Style["left"] = $"{finalLeft.ToString(CultureInfo.InvariantCulture)}px";
+                    element.Style["top"] = $"{finalTop.ToString(CultureInfo.InvariantCulture)}px";
                     element.Style["width"] = $"{resolvedW.ToString(CultureInfo.InvariantCulture)}px";
                     element.Style["height"] = $"{resolvedH.ToString(CultureInfo.InvariantCulture)}px";
 
@@ -1923,8 +1997,8 @@ public sealed partial class DomBridge
                         scrollContainersNeedingRelative.Add(scrollContainer);
 
                     // Store resolved offsets for JS offset property queries.
-                    element.DomProperties["_resolvedLeft"] = rect.Value.Left;
-                    element.DomProperties["_resolvedTop"] = rect.Value.Top;
+                    element.DomProperties["_resolvedLeft"] = finalLeft;
+                    element.DomProperties["_resolvedTop"] = finalTop;
                     element.DomProperties["_resolvedWidth"] = resolvedW;
                     element.DomProperties["_resolvedHeight"] = resolvedH;
                 }
@@ -1960,12 +2034,22 @@ public sealed partial class DomBridge
             cbWidth = TryParsePx(scProps.GetValueOrDefault("width")) ?? _viewportWidth;
             cbHeight = TryParsePx(scProps.GetValueOrDefault("height")) ?? _viewportHeight;
 
+            // For the position-area grid, use the scroll content dimensions
+            // (the actual scrollable area) rather than the scroll port dimensions.
+            // The grid extends to cover the full scrollable content.
+            double scrollContentWidth = FindScrollContentWidth(scrollContainer, cbWidth);
+            double scrollContentHeight = FindScrollContentHeight(scrollContainer, cbHeight);
+
             // Compute anchor position relative to the scroll container.
             var anchorRelPos = ComputeAnchorRelativeToContainer(anchor, scrollContainer);
             anchorLeft = anchorRelPos.Left;
             anchorRight = anchorRelPos.Left + anchor.Width;
             anchorTop = anchorRelPos.Top;
             anchorBottom = anchorRelPos.Top + anchor.Height;
+
+            // Use scroll content dimensions for the grid edges.
+            cbWidth = scrollContentWidth;
+            cbHeight = scrollContentHeight;
         }
         else
         {
@@ -2068,13 +2152,72 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Computes the anchor's position relative to the specified container by
-    /// subtracting the container's document-coordinate position from the
-    /// anchor's document-coordinate position.
+    /// Computes the total width of the scrollable content inside a scroll
+    /// container by examining its children's widths and margins.
+    /// Falls back to the container's own width if no explicit child widths
+    /// are found.
+    /// </summary>
+    private double FindScrollContentWidth(DomElement scrollContainer, double containerWidth)
+    {
+        double maxWidth = containerWidth;
+        foreach (var child in scrollContainer.Children)
+        {
+            if (child.IsTextNode) continue;
+            var childProps = GetComputedProps(child);
+            double? childW = TryParsePx(childProps.GetValueOrDefault("width"));
+            if (childW.HasValue)
+            {
+                double ml = TryParsePx(childProps.GetValueOrDefault("margin-left")) ?? 0;
+                double mr = TryParsePx(childProps.GetValueOrDefault("margin-right")) ?? 0;
+                double totalW = childW.Value + ml + mr;
+                if (totalW > maxWidth) maxWidth = totalW;
+            }
+        }
+        return maxWidth;
+    }
+
+    /// <summary>
+    /// Computes the total height of the scrollable content inside a scroll
+    /// container by examining its children's heights and margins.
+    /// Falls back to the container's own height if no explicit child heights
+    /// are found.
+    /// </summary>
+    private double FindScrollContentHeight(DomElement scrollContainer, double containerHeight)
+    {
+        double maxHeight = containerHeight;
+        foreach (var child in scrollContainer.Children)
+        {
+            if (child.IsTextNode) continue;
+            var childProps = GetComputedProps(child);
+            double? childH = TryParsePx(childProps.GetValueOrDefault("height"));
+            if (childH.HasValue)
+            {
+                double mt = TryParsePx(childProps.GetValueOrDefault("margin-top")) ?? 0;
+                double mb = TryParsePx(childProps.GetValueOrDefault("margin-bottom")) ?? 0;
+                double totalH = childH.Value + mt + mb;
+                if (totalH > maxHeight) maxHeight = totalH;
+            }
+        }
+        return maxHeight;
+    }
+
+    /// <summary>
+    /// Computes the anchor's position relative to the specified container.
+    /// When the anchor's containing block IS the container (e.g. the
+    /// scroll container itself has position:relative), the anchor's
+    /// coordinates from ComputeElementBox are already container-relative.
+    /// Otherwise, both are in document coordinates and we subtract.
     /// </summary>
     private (double Left, double Top) ComputeAnchorRelativeToContainer(
         AnchorInfo anchor, DomElement container)
     {
+        // Check if the container establishes a CB. If it does, the anchor's
+        // ComputeElementBox walk will have stopped at the container, and
+        // the returned coordinates are already container-relative.
+        var containerProps = GetComputedProps(container);
+        if (EstablishesContainingBlock(containerProps))
+            return (anchor.Left, anchor.Top);
+
         var containerBox = ComputeElementBox(container);
         if (containerBox == null)
             return (anchor.Left, anchor.Top);
