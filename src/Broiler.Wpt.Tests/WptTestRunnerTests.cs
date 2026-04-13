@@ -2365,6 +2365,46 @@ document.getElementById('out').appendChild(p);
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
+    [Fact]
+    public void Wpt_AnchorSizeCssZoom_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("anchor-size-css-zoom.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_GridPositionAreaBasic_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("grid-position-area-basic.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Transform014_MatchesReference()
+    {
+        var result = RunAnchorPixelTest("transform-014.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AnchorCenterOverflow005_MatchesReference()
+    {
+        var result = RunAnchorMatchTest("anchor-center-overflow-005.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_PositionTry003_MatchesReference()
+    {
+        var result = RunAnchorPixelTest("position-try-003.html");
+        Assert.True(result.Passed,
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
     // -----------------------------------------------------------------
     // Anchor-positioned resolution tests (script-based WPT tests)
     // -----------------------------------------------------------------

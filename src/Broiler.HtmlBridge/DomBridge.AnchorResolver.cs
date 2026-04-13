@@ -706,6 +706,7 @@ public sealed partial class DomBridge
     private static readonly string[] UnsupportedPropertyNames =
     {
         "anchor-name",
+        "anchor-scope",
         "position-area",
         "position-anchor",
         "position-try-fallbacks",
@@ -850,6 +851,14 @@ public sealed partial class DomBridge
         public double Bottom => Top + Height;
     }
 
+    /// <summary>
+    /// A single anchor registration with its source element for scope resolution.
+    /// </summary>
+    private sealed record AnchorRegistration(string Name, AnchorInfo Info);
+
+    /// <summary>All registered anchors (multiple entries possible for same name).</summary>
+    private readonly List<AnchorRegistration> _allAnchors = new();
+
     private void BuildAnchorRegistry(Dictionary<string, AnchorInfo> registry)
     {
         foreach (var (selector, _, declarations) in CssRules)
@@ -864,7 +873,11 @@ public sealed partial class DomBridge
 
                 var box = ComputeElementBox(el);
                 if (box != null)
-                    registry[anchorName] = box with { SourceElement = el };
+                {
+                    var info = box with { SourceElement = el };
+                    registry[anchorName] = info;
+                    _allAnchors.Add(new AnchorRegistration(anchorName, info));
+                }
             }
         }
     }
@@ -1138,8 +1151,11 @@ public sealed partial class DomBridge
                     if (!anchorRegistry.TryGetValue(anchorName, out var anchor) ||
                         !IsAnchorAccessible(anchor.SourceElement, element))
                     {
-                        // Anchor not found or not accessible — use fallback or 0px.
-                        return fallback ?? "0px";
+                        // Try scoped lookup before giving up.
+                        var scoped = FindScopedAnchor(anchorName, element, anchorRegistry);
+                        if (scoped == null || !IsAnchorAccessible(scoped.SourceElement, element))
+                            return fallback ?? "0px";
+                        anchor = scoped;
                     }
 
                     // Compute the raw edge position (from CB origin).
@@ -1219,7 +1235,7 @@ public sealed partial class DomBridge
     /// styles, replacing them with computed pixel values from the anchor element's
     /// dimensions.
     /// </summary>
-    private static void ResolveAnchorSizeFunctions(
+    private void ResolveAnchorSizeFunctions(
         DomElement element,
         Dictionary<string, string> cssProps,
         Dictionary<string, AnchorInfo> anchorRegistry)
@@ -1238,7 +1254,13 @@ public sealed partial class DomBridge
                 var dim = m.Groups["dim"].Value.ToLowerInvariant();
 
                 if (!anchorRegistry.TryGetValue(anchorName, out var anchor))
-                    return "0px";
+                {
+                    // Try scoped anchor lookup.
+                    var scoped = FindScopedAnchor(anchorName, element, anchorRegistry);
+                    if (scoped == null)
+                        return "0px";
+                    anchor = scoped;
+                }
 
                 double result = dim switch
                 {
@@ -1885,9 +1907,12 @@ public sealed partial class DomBridge
 
             if (hasAnchorCenter &&
                 !string.IsNullOrWhiteSpace(positionAnchor) &&
-                (string.IsNullOrWhiteSpace(positionArea) || positionArea == "none") &&
-                anchorRegistry.TryGetValue(positionAnchor, out var anchor))
+                (string.IsNullOrWhiteSpace(positionArea) || positionArea == "none"))
             {
+                // Use scoped anchor lookup.
+                var anchor = FindScopedAnchor(positionAnchor, element, anchorRegistry);
+                if (anchor != null)
+                {
                 double elWidth = TryParsePx(cssProps.GetValueOrDefault("width")) ??
                                  TryParsePx(element.Style.GetValueOrDefault("width")) ?? 0;
                 double elHeight = TryParsePx(cssProps.GetValueOrDefault("height")) ??
@@ -1958,6 +1983,7 @@ public sealed partial class DomBridge
                 {
                     element.Style["position"] = "absolute";
                 }
+                } // end if (anchor != null)
             }
         }
 
@@ -2011,7 +2037,11 @@ public sealed partial class DomBridge
             {
                 var box = ComputeElementBoxWithContainer(el);
                 if (box != null && !registry.ContainsKey(anchorName))
-                    registry[anchorName] = box with { SourceElement = el };
+                {
+                    var info = box with { SourceElement = el };
+                    registry[anchorName] = info;
+                    _allAnchors.Add(new AnchorRegistration(anchorName, info));
+                }
             }
         }
     }
@@ -2026,6 +2056,81 @@ public sealed partial class DomBridge
         // both positioned and normal-flow elements with ancestor offset
         // accumulation and block-width computation.
         return ComputeElementBox(element);
+    }
+
+    /// <summary>
+    /// Looks up an anchor by name, respecting <c>anchor-scope</c>.
+    /// When the target element has an ancestor with <c>anchor-scope</c>
+    /// matching the anchor name, only anchors that are also descendants of
+    /// that scope ancestor are considered.
+    /// Falls back to the global registry when no scope is found.
+    /// </summary>
+    private AnchorInfo? FindScopedAnchor(
+        string anchorName, DomElement targetElement,
+        Dictionary<string, AnchorInfo> globalRegistry)
+    {
+        // Walk up from the target to find the nearest ancestor with
+        // anchor-scope matching the anchor name.
+        var scopeAncestor = FindAnchorScopeAncestor(targetElement, anchorName);
+        if (scopeAncestor == null)
+        {
+            // No scope → use global registry.
+            return globalRegistry.GetValueOrDefault(anchorName);
+        }
+
+        // Find anchors with this name that are descendants of the scope ancestor.
+        foreach (var reg in _allAnchors)
+        {
+            if (!string.Equals(reg.Name, anchorName, StringComparison.Ordinal))
+                continue;
+            if (reg.Info.SourceElement != null && IsDescendantOf(reg.Info.SourceElement, scopeAncestor))
+                return reg.Info;
+        }
+
+        // No scoped anchor found.
+        return null;
+    }
+
+    /// <summary>
+    /// Finds the nearest ancestor of <paramref name="element"/> that has
+    /// <c>anchor-scope</c> matching <paramref name="anchorName"/> (or
+    /// <c>anchor-scope: all</c>).
+    /// </summary>
+    private DomElement? FindAnchorScopeAncestor(DomElement element, string anchorName)
+    {
+        var parent = element.Parent;
+        while (parent != null)
+        {
+            var props = GetComputedProps(parent);
+            if (props.TryGetValue("anchor-scope", out var scope) &&
+                !string.IsNullOrWhiteSpace(scope) &&
+                !scope.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                // "all" matches any anchor name.
+                if (scope.Equals("all", StringComparison.OrdinalIgnoreCase))
+                    return parent;
+                // Check if the scope contains the specific anchor name.
+                if (scope.Contains(anchorName, StringComparison.Ordinal))
+                    return parent;
+            }
+            parent = parent.Parent;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns true if <paramref name="element"/> is a descendant of
+    /// <paramref name="ancestor"/>.
+    /// </summary>
+    private static bool IsDescendantOf(DomElement element, DomElement ancestor)
+    {
+        var parent = element.Parent;
+        while (parent != null)
+        {
+            if (parent == ancestor) return true;
+            parent = parent.Parent;
+        }
+        return false;
     }
 
     /// <summary>
@@ -2620,9 +2725,12 @@ public sealed partial class DomBridge
 
             if (!string.IsNullOrWhiteSpace(positionArea) &&
                 positionArea != "none" &&
-                !string.IsNullOrWhiteSpace(positionAnchor) &&
-                anchorRegistry.TryGetValue(positionAnchor, out var anchor))
+                !string.IsNullOrWhiteSpace(positionAnchor))
             {
+                // Use scoped anchor lookup when anchor-scope is present.
+                var anchor = FindScopedAnchor(positionAnchor, element, anchorRegistry);
+                if (anchor == null) goto skipPositionArea;
+
                 // Find the anchor element to determine its scroll container.
                 var anchorEl = FindElementByAnchorName(positionAnchor);
                 var scrollContainer = anchorEl != null
@@ -2761,6 +2869,18 @@ public sealed partial class DomBridge
                     element.Style["width"] = $"{resolvedW.ToString(CultureInfo.InvariantCulture)}px";
                     element.Style["height"] = $"{resolvedH.ToString(CultureInfo.InvariantCulture)}px";
 
+                    // When the position-area cell dimensions include border and
+                    // padding (stretch fills the border box), set box-sizing
+                    // so the renderer doesn't add border/padding on top.
+                    string? placeSelf = cssProps.GetValueOrDefault("place-self");
+                    bool isStretched = string.IsNullOrWhiteSpace(placeSelf) ||
+                        placeSelf.Contains("stretch", StringComparison.OrdinalIgnoreCase);
+                    if (isStretched && !explicitW.HasValue && !explicitH.HasValue &&
+                        !pctW.HasValue && !pctH.HasValue)
+                    {
+                        element.Style["box-sizing"] = "border-box";
+                    }
+
                     // Write resolved pixel margins to prevent the renderer
                     // from re-resolving percentages against the parent CB.
                     if (marginTop != 0 || marginRight != 0 ||
@@ -2784,6 +2904,7 @@ public sealed partial class DomBridge
                     element.DomProperties["_resolvedHeight"] = resolvedH;
                 }
             }
+            skipPositionArea:;
         }
 
         foreach (var child in element.Children)
