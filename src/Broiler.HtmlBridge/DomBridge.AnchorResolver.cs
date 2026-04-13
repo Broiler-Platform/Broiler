@@ -44,8 +44,10 @@ public sealed partial class DomBridge
         //    defers adding it until after position-visibility resolution,
         //    so IsAnchorVisibleForTarget is not affected by the new CB.
         var scrollContainersNeedingRelative = new HashSet<DomElement>();
+        var deferredDomMoves = new List<(DomElement element, DomElement oldParent, DomElement newParent)>();
         ResolvePositionAreaValues(
-            DocumentElement, anchorRegistry, scrollContainersNeedingRelative);
+            DocumentElement, anchorRegistry, scrollContainersNeedingRelative,
+            deferredDomMoves);
 
         // 3b. Resolve position-try-fallbacks for elements whose base
         //     style overflows the containing block.
@@ -55,7 +57,22 @@ public sealed partial class DomBridge
         //     whose anchor is not visible or does not exist.
         ResolvePositionVisibility(DocumentElement, anchorRegistry);
 
-        // 3d. Now apply deferred position:relative to scroll containers
+        // 3d. Apply deferred DOM moves (inline CB → block ancestor promotion).
+        //     Must be done after all position-area resolution is complete
+        //     to avoid collection modification during traversal.
+        foreach (var (el, oldParent, newParent) in deferredDomMoves)
+        {
+            oldParent.Children.Remove(el);
+            newParent.Children.Add(el);
+        }
+
+        // 3d2. Promote any remaining absolutely positioned children of
+        //      inline CBs to the block-level ancestor.  This handles
+        //      non-position-area elements (like anchor elements) that
+        //      the Broiler renderer can't place inside inline boxes.
+        PromoteAbsPosFromInlineCBs(DocumentElement);
+
+        // 3e. Now apply deferred position:relative to scroll containers
         //     used as containing blocks by position-area.
         foreach (var sc in scrollContainersNeedingRelative)
         {
@@ -570,6 +587,24 @@ public sealed partial class DomBridge
         return null;
     }
 
+    /// <summary>
+    /// Finds the containing block for the anchor referenced by the target element.
+    /// The anchor's CB is typically the same as the target's CB when both are
+    /// inside the same positioned ancestor.
+    /// </summary>
+    private DomElement? FindAnchorContainingBlock(DomElement target, DomElement targetCB)
+    {
+        // Find the anchor element by looking at the target's position-anchor.
+        var cssProps = GetComputedProps(target);
+        string? posAnchor = cssProps.GetValueOrDefault("position-anchor");
+        if (string.IsNullOrWhiteSpace(posAnchor)) return null;
+
+        var anchorEl = FindElementByAnchorName(posAnchor);
+        if (anchorEl == null) return null;
+
+        return FindContainingBlockElement(anchorEl);
+    }
+
     // -----------------------------------------------------------------
     // Strip unsupported CSS rules from <style> elements
     // -----------------------------------------------------------------
@@ -784,8 +819,27 @@ public sealed partial class DomBridge
         // For absolutely positioned elements, use their explicit insets.
         if (isPositioned)
         {
-            double top = TryParsePx(props.GetValueOrDefault("top")) ?? 0;
-            double left = TryParsePx(props.GetValueOrDefault("left")) ?? 0;
+            double? topPx = TryParsePx(props.GetValueOrDefault("top"));
+            double? leftPx = TryParsePx(props.GetValueOrDefault("left"));
+            double? rightPx = TryParsePx(props.GetValueOrDefault("right"));
+            double? bottomPx = TryParsePx(props.GetValueOrDefault("bottom"));
+
+            double top = topPx ?? 0;
+            double left = leftPx ?? 0;
+
+            // When only right/bottom are specified, compute left/top from
+            // the containing block dimensions.
+            if (leftPx == null && rightPx.HasValue)
+            {
+                double cbW = FindContainingBlockWidth(element);
+                left = cbW - rightPx.Value - width;
+            }
+            if (topPx == null && bottomPx.HasValue)
+            {
+                double cbH = FindContainingBlockHeight(element);
+                top = cbH - bottomPx.Value - height;
+            }
+
             return new AnchorInfo(top, left, width, height);
         }
 
@@ -931,7 +985,7 @@ public sealed partial class DomBridge
             double sibMT = TryParsePx(sibProps.GetValueOrDefault("margin-top")) ?? 0;
             double sibMB = TryParsePx(sibProps.GetValueOrDefault("margin-bottom")) ?? 0;
             double sibMR = 0;
-            ParseMarginShorthand(sibProps, ref sibMT, ref sibMT, ref sibMR);
+            ParseMarginShorthand(sibProps, ref sibMT, ref sibMB, ref sibMR);
 
             totalHeight += sibHeight + sibMT + sibMB;
         }
@@ -1519,9 +1573,59 @@ public sealed partial class DomBridge
         var v = value!.Trim();
         if (v.EndsWith("px", StringComparison.OrdinalIgnoreCase))
             v = v[..^2];
+        // Don't parse pure numbers without px suffix if they contain '%'
+        if (v.Contains('%')) return null;
         if (double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
             return result;
         return null;
+    }
+
+    /// <summary>
+    /// Tries to parse a CSS percentage value (e.g. "50%") and returns
+    /// the numeric value (e.g. 50.0).
+    /// </summary>
+    private static double? TryParsePercent(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var v = value!.Trim();
+        if (!v.EndsWith('%')) return null;
+        v = v[..^1];
+        if (double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
+            return result;
+        return null;
+    }
+
+    /// <summary>
+    /// Computes the offset within a position-area cell based on alignment.
+    /// For "start" cells (top/left), the element is aligned to the end
+    /// (nearest to the anchor). For "end" cells (bottom/right), aligned
+    /// to the start. For "center" cells, centered.
+    /// </summary>
+    private static double ComputeAlignmentOffset(
+        AxisSelection sel, double cellSize, double elementSize, bool isInlineAxis)
+    {
+        double slack = cellSize - elementSize;
+        if (slack <= 0) return 0;
+
+        switch (sel)
+        {
+            case AxisSelection.Start:
+                // "top" or "left" cell: align towards the anchor (end of cell).
+                return slack;
+            case AxisSelection.End:
+                // "bottom" or "right" cell: align towards the anchor (start of cell).
+                return 0;
+            case AxisSelection.Center:
+                // "center" cell: center the element.
+                return slack / 2;
+            case AxisSelection.SpanStart:
+            case AxisSelection.SpanEnd:
+            case AxisSelection.SpanAll:
+                // Spanning cells: align to start by default.
+                return 0;
+            default:
+                return 0;
+        }
     }
 
     // -----------------------------------------------------------------
@@ -1567,7 +1671,14 @@ public sealed partial class DomBridge
 
             if (EstablishesContainingBlock(parentProps))
             {
-                double w = TryParsePx(parentProps.GetValueOrDefault("width")) ?? _viewportWidth;
+                double? explicitW = TryParsePx(parentProps.GetValueOrDefault("width"));
+                if (explicitW == null)
+                {
+                    // Inline elements (e.g. <span>) with position:relative
+                    // may not have explicit width. Estimate from content.
+                    explicitW = EstimateInlineContentWidth(parent);
+                }
+                double w = explicitW ?? _viewportWidth;
                 // Subtract padding from the CB width to get content width.
                 w -= TryParsePx(parentProps.GetValueOrDefault("padding-left")) ?? 0;
                 w -= TryParsePx(parentProps.GetValueOrDefault("padding-right")) ?? 0;
@@ -1593,7 +1704,13 @@ public sealed partial class DomBridge
 
             if (EstablishesContainingBlock(parentProps))
             {
-                double h = TryParsePx(parentProps.GetValueOrDefault("height")) ?? _viewportHeight;
+                double? explicitH = TryParsePx(parentProps.GetValueOrDefault("height"));
+                if (explicitH == null)
+                {
+                    // Inline elements may not have explicit height. Estimate from content.
+                    explicitH = EstimateInlineContentHeight(parent);
+                }
+                double h = explicitH ?? _viewportHeight;
                 h -= TryParsePx(parentProps.GetValueOrDefault("padding-top")) ?? 0;
                 h -= TryParsePx(parentProps.GetValueOrDefault("padding-bottom")) ?? 0;
                 return h;
@@ -1642,6 +1759,424 @@ public sealed partial class DomBridge
                 return el;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Estimates the content width of an inline element (e.g. a positioned
+    /// <c>&lt;span&gt;</c>) by examining its text content and child element widths.
+    /// Returns <c>null</c> if the element is not an inline element.
+    /// </summary>
+    private double? EstimateInlineContentWidth(DomElement element)
+    {
+        string? display = GetComputedProps(element).GetValueOrDefault("display");
+        bool isInline = IsInlineElement(element.TagName, display);
+        if (!isInline) return null;
+
+        double totalWidth = 0;
+        var elProps = GetComputedProps(element);
+        double fontSize = TryParsePx(elProps.GetValueOrDefault("font-size")) ?? 16;
+
+        // Check parent font-size as well (inline elements inherit).
+        if (element.Parent != null)
+        {
+            var parentProps = GetComputedProps(element.Parent);
+            double parentFs = TryParsePx(parentProps.GetValueOrDefault("font-size")) ?? 16;
+            if (parentFs > 0) fontSize = parentFs;
+        }
+
+        foreach (var child in element.Children)
+        {
+            if (child.IsTextNode)
+            {
+                // Estimate text width from font-size (Ahem font: 1ch = font-size).
+                int charCount = (child.TextContent ?? "").Length;
+                totalWidth += charCount * fontSize;
+            }
+            else
+            {
+                var childProps = GetComputedProps(child);
+                // Skip absolutely positioned children (they don't contribute to flow width).
+                string? childPos = childProps.GetValueOrDefault("position");
+                if (childPos == "absolute" || childPos == "fixed") continue;
+
+                double childW = TryParsePx(childProps.GetValueOrDefault("width")) ?? 0;
+                totalWidth += childW;
+            }
+        }
+        return totalWidth > 0 ? totalWidth : null;
+    }
+
+    /// <summary>
+    /// Estimates the content height of an inline element by using its
+    /// line-height or font-size.
+    /// Returns <c>null</c> if the element is not an inline element.
+    /// </summary>
+    private double? EstimateInlineContentHeight(DomElement element)
+    {
+        string? display = GetComputedProps(element).GetValueOrDefault("display");
+        bool isInline = IsInlineElement(element.TagName, display);
+        if (!isInline) return null;
+
+        var props = GetComputedProps(element);
+        double fontSize = TryParsePx(props.GetValueOrDefault("font-size")) ?? 16;
+
+        // Check parent for font-size and line-height (inline elements inherit).
+        if (element.Parent != null)
+        {
+            var parentProps = GetComputedProps(element.Parent);
+            double parentFs = TryParsePx(parentProps.GetValueOrDefault("font-size")) ?? 16;
+            if (parentFs > 0) fontSize = parentFs;
+
+            string? lhVal = parentProps.GetValueOrDefault("line-height");
+            if (lhVal != null)
+            {
+                var lhTrimmed = lhVal.Trim();
+                // Check for explicit px value first (e.g. "100px").
+                if (lhTrimmed.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+                {
+                    double? lhPx = TryParsePx(lhTrimmed);
+                    if (lhPx.HasValue) return lhPx.Value;
+                }
+                // Unitless values are line-height multipliers (e.g. "1", "1.5").
+                if (double.TryParse(lhTrimmed,
+                        NumberStyles.Float, CultureInfo.InvariantCulture, out var lhMul))
+                    return parentFs * lhMul;
+            }
+        }
+
+        return fontSize;
+    }
+
+    /// <summary>
+    /// Determines if an element is an inline element based on its tag name
+    /// and display property.
+    /// </summary>
+    private static bool IsInlineElement(string tagName, string? display)
+    {
+        if (display != null)
+        {
+            var d = display.Trim().ToLowerInvariant();
+            if (d == "inline" || d == "inline-block") return true;
+            if (d == "block" || d == "flex" || d == "grid" || d == "table" ||
+                d == "list-item" || d == "flow-root")
+                return false;
+        }
+        // Default inline elements.
+        var tag = tagName.ToLowerInvariant();
+        return tag is "span" or "a" or "strong" or "em" or "b" or "i" or
+               "code" or "small" or "big" or "sub" or "sup" or "abbr" or
+               "cite" or "q" or "mark" or "label" or "time";
+    }
+
+    /// <summary>
+    /// Checks whether the given element is an inline-level element that
+    /// establishes a containing block (e.g. <c>&lt;span&gt;</c> with
+    /// <c>position: relative</c>).  Broiler's renderer cannot correctly
+    /// place absolutely positioned children inside such elements.
+    /// </summary>
+    private bool IsInlineContainingBlock(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        string? display = props.GetValueOrDefault("display");
+        if (!IsInlineElement(element.TagName, display))
+            return false;
+        return EstablishesContainingBlock(props);
+    }
+
+    /// <summary>
+    /// Promotes absolutely positioned children out of inline containing
+    /// blocks to the nearest block-level ancestor.  Adjusts their
+    /// coordinates to be relative to the block ancestor instead of the
+    /// inline element.  This is needed because Broiler's renderer does
+    /// not support positioning absolutely positioned elements inside
+    /// inline boxes (like <c>&lt;span&gt;</c>).
+    /// </summary>
+    private void PromoteAbsPosFromInlineCBs(DomElement root)
+    {
+        // Collect all promotions first (to avoid mutating during traversal).
+        var promotions = new List<(DomElement child, DomElement inlineCB, DomElement blockAncestor,
+            double offX, double offY)>();
+        CollectInlineCBPromotions(root, promotions);
+
+        foreach (var (child, inlineCB, blockAncestor, offX, offY) in promotions)
+        {
+            // Adjust the child's left/top styles.
+            // Read from computed CSS (rules + inline) to get the correct
+            // current values, then write to inline style (which overrides).
+            var childCss = GetComputedProps(child);
+            double curLeft = TryParsePx(childCss.GetValueOrDefault("left")) ?? 0;
+            double curTop = TryParsePx(childCss.GetValueOrDefault("top")) ?? 0;
+            double curWidth = TryParsePx(childCss.GetValueOrDefault("width")) ?? 0;
+            double curHeight = TryParsePx(childCss.GetValueOrDefault("height")) ?? 0;
+            child.Style["position"] = childCss.GetValueOrDefault("position") ?? "absolute";
+            // Ensure inline elements (like <span>) are treated as block-level
+            // after absolute positioning, so the renderer paints backgrounds.
+            string? childDisplay = childCss.GetValueOrDefault("display");
+            if (IsInlineElement(child.TagName, childDisplay))
+                child.Style["display"] = "block";
+            child.Style["left"] = $"{(curLeft + offX).ToString(CultureInfo.InvariantCulture)}px";
+            child.Style["top"] = $"{(curTop + offY).ToString(CultureInfo.InvariantCulture)}px";
+            // Ensure width and height are preserved as inline styles.
+            if (curWidth > 0)
+                child.Style["width"] = $"{curWidth.ToString(CultureInfo.InvariantCulture)}px";
+            if (curHeight > 0)
+                child.Style["height"] = $"{curHeight.ToString(CultureInfo.InvariantCulture)}px";
+            // Preserve background-color if specified in CSS rules.
+            string? bg = childCss.GetValueOrDefault("background-color")
+                      ?? childCss.GetValueOrDefault("background");
+            if (!string.IsNullOrWhiteSpace(bg) && bg != "transparent" && bg != "initial")
+                child.Style["background-color"] = bg;
+
+            // Move from inline CB to block ancestor.
+            inlineCB.Children.Remove(child);
+            blockAncestor.Children.Add(child);
+
+            // Ensure the block ancestor has position:relative.
+            var blockProps = GetComputedProps(blockAncestor);
+            string? blockPos = blockProps.GetValueOrDefault("position");
+            if (blockPos == null || blockPos == "static")
+                blockAncestor.Style["position"] = "relative";
+        }
+    }
+
+    private void CollectInlineCBPromotions(
+        DomElement element,
+        List<(DomElement child, DomElement inlineCB, DomElement blockAncestor,
+            double offX, double offY)> promotions)
+    {
+        if (!element.IsTextNode && IsInlineContainingBlock(element))
+        {
+            var (offX, offY, blockAncestor) = ComputeInlineCBOffset(element);
+            if (blockAncestor != null)
+            {
+                // Collect absolutely positioned children.
+                foreach (var child in element.Children.ToList())
+                {
+                    if (child.IsTextNode) continue;
+                    var childProps = GetComputedProps(child);
+                    string? childPos = childProps.GetValueOrDefault("position");
+                    if (childPos == "absolute" || childPos == "fixed")
+                    {
+                        promotions.Add((child, element, blockAncestor, offX, offY));
+                    }
+                }
+            }
+        }
+
+        foreach (var child in element.Children.ToList())
+            CollectInlineCBPromotions(child, promotions);
+    }
+
+    /// <summary>
+    /// Computes the offset from an inline containing block to the nearest
+    /// block-level ancestor.  This offset is used to adjust absolute
+    /// coordinates when promoting position-area elements out of an inline CB.
+    /// Returns (offsetX, offsetY, blockAncestor).
+    /// </summary>
+    private (double offsetX, double offsetY, DomElement? blockAncestor)
+        ComputeInlineCBOffset(DomElement inlineCB)
+    {
+        // Walk up from the inline CB to find the nearest block-level ancestor.
+        // The inline CB's position within its parent block is determined by:
+        // - Preceding text content (widths of chars)
+        // - Preceding inline siblings
+        // - Line breaks
+        // We estimate this from the layout context.
+        var parent = inlineCB.Parent;
+        DomElement? blockAncestor = null;
+
+        // Find nearest block-level ancestor.
+        while (parent != null)
+        {
+            if (!parent.IsTextNode)
+            {
+                var parentProps = GetComputedProps(parent);
+                string? parentDisplay = parentProps.GetValueOrDefault("display");
+                if (!IsInlineElement(parent.TagName, parentDisplay))
+                {
+                    blockAncestor = parent;
+                    break;
+                }
+            }
+            parent = parent.Parent;
+        }
+
+        if (blockAncestor == null) return (0, 0, null);
+
+        // Compute the inline CB's position within the block ancestor.
+        // This accounts for preceding siblings (line breaks, text) and
+        // the text/inline content before the inline CB in the same line.
+        double offsetX = 0, offsetY = 0;
+
+        // Walk from the block ancestor down to the inline CB, accumulating
+        // offset from preceding siblings' dimensions and the inline CB's
+        // own position within its parent.
+        offsetX += EstimateInlineOffsetX(inlineCB, blockAncestor);
+        offsetY += EstimateInlineOffsetY(inlineCB, blockAncestor);
+
+        return (offsetX, offsetY, blockAncestor);
+    }
+
+    /// <summary>
+    /// Estimates the horizontal position of an inline element within
+    /// its nearest block ancestor, accounting for preceding text and
+    /// inline content.
+    /// </summary>
+    private double EstimateInlineOffsetX(DomElement inlineEl, DomElement blockAncestor)
+    {
+        double offset = 0;
+        var parent = inlineEl.Parent;
+        while (parent != null && parent != blockAncestor)
+        {
+            // Accumulate horizontal position from parent's preceding content
+            offset += EstimatePrecedingInlineWidth(inlineEl, parent);
+            inlineEl = parent;
+            parent = parent.Parent;
+        }
+        // Final level: position within the block ancestor
+        if (parent == blockAncestor)
+            offset += EstimatePrecedingInlineWidth(inlineEl, blockAncestor);
+        return offset;
+    }
+
+    /// <summary>
+    /// Estimates the vertical position of an inline element within
+    /// its nearest block ancestor, accounting for preceding block
+    /// siblings, line breaks (<c>&lt;br&gt;</c>), and text nodes that
+    /// contain only line breaks.
+    /// </summary>
+    private double EstimateInlineOffsetY(DomElement inlineEl, DomElement blockAncestor)
+    {
+        double offset = 0;
+        var parent = inlineEl.Parent;
+        while (parent != null && parent != blockAncestor)
+        {
+            offset += EstimatePrecedingBlockHeight(inlineEl, parent);
+            inlineEl = parent;
+            parent = parent.Parent;
+        }
+        if (parent == blockAncestor)
+            offset += EstimatePrecedingBlockHeight(inlineEl, blockAncestor);
+        return offset;
+    }
+
+    /// <summary>
+    /// Estimates the total height of preceding siblings in block/inline context,
+    /// handling <c>&lt;br&gt;</c> elements (which contribute the parent's
+    /// line-height) and text nodes with line breaks.
+    /// </summary>
+    private double EstimatePrecedingBlockHeight(DomElement element, DomElement parent)
+    {
+        double totalHeight = 0;
+        var parentProps = GetComputedProps(parent);
+        double fontSize = TryParsePx(parentProps.GetValueOrDefault("font-size")) ?? 16;
+        double lineHeight = ResolveLineHeight(parentProps, fontSize);
+
+        foreach (var sibling in parent.Children)
+        {
+            if (sibling == element) break;
+            if (sibling.IsTextNode)
+            {
+                // Count line breaks in text content.
+                var text = sibling.TextContent ?? "";
+                int lineBreaks = text.Count(c => c == '\n');
+                // Don't count text node line breaks as they're usually
+                // just whitespace in the HTML source.
+                continue;
+            }
+
+            var sibProps = GetComputedProps(sibling);
+            string? sibPos = sibProps.GetValueOrDefault("position");
+            if (sibPos == "absolute" || sibPos == "fixed") continue;
+
+            if (sibling.TagName.Equals("br", StringComparison.OrdinalIgnoreCase))
+            {
+                // <br> creates a line break with the parent's line-height.
+                totalHeight += lineHeight;
+                continue;
+            }
+
+            double sibHeight = TryParsePx(sibProps.GetValueOrDefault("height")) ?? 0;
+            double sibMT = TryParsePx(sibProps.GetValueOrDefault("margin-top")) ?? 0;
+            double sibMB = TryParsePx(sibProps.GetValueOrDefault("margin-bottom")) ?? 0;
+            double sibMR = 0;
+            ParseMarginShorthand(sibProps, ref sibMT, ref sibMB, ref sibMR);
+
+            totalHeight += sibHeight + sibMT + sibMB;
+        }
+        return totalHeight;
+    }
+
+    /// <summary>
+    /// Resolves the computed line-height from CSS properties.
+    /// Handles unitless values (multipliers of font-size), pixel values,
+    /// and the "normal" keyword (defaults to 1.2 × font-size).
+    /// </summary>
+    private static double ResolveLineHeight(Dictionary<string, string> props, double fontSize)
+    {
+        string? lh = props.GetValueOrDefault("line-height");
+        if (string.IsNullOrWhiteSpace(lh) || lh == "normal")
+            return fontSize * 1.2;
+
+        var v = lh!.Trim();
+
+        // Explicit pixel value.
+        if (v.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+        {
+            double? px = TryParsePx(v);
+            if (px.HasValue) return px.Value;
+        }
+
+        // Unitless: a multiplier of font-size.
+        if (double.TryParse(v, NumberStyles.Float,
+            CultureInfo.InvariantCulture, out var multiplier))
+            return fontSize * multiplier;
+
+        return fontSize * 1.2;
+    }
+
+    /// <summary>
+    /// Estimates the total width of inline content preceding <paramref name="element"/>
+    /// within <paramref name="parent"/>.  This includes text nodes and inline elements.
+    /// </summary>
+    private double EstimatePrecedingInlineWidth(DomElement element, DomElement parent)
+    {
+        double width = 0;
+        var props = GetComputedProps(parent);
+        double fontSize = TryParsePx(props.GetValueOrDefault("font-size")) ?? 16;
+
+        foreach (var sibling in parent.Children)
+        {
+            if (sibling == element) break;
+
+            if (sibling.IsTextNode)
+            {
+                // Decode HTML entities (e.g. &nbsp; → \u00A0) before counting.
+                var text = System.Net.WebUtility.HtmlDecode(sibling.TextContent ?? "");
+                int charCount = 0;
+                foreach (char c in text)
+                {
+                    if (c == '\n' || c == '\r') continue;
+                    if (c == '\u00A0' || !char.IsWhiteSpace(c)) // &nbsp; or visible
+                        charCount++;
+                }
+                width += charCount * fontSize;
+            }
+            else
+            {
+                var sibProps = GetComputedProps(sibling);
+                string? sibPos = sibProps.GetValueOrDefault("position");
+                if (sibPos == "absolute" || sibPos == "fixed") continue;
+
+                // Check for explicit width
+                double? sibW = TryParsePx(sibProps.GetValueOrDefault("width"));
+                if (sibW.HasValue)
+                    width += sibW.Value;
+                else if (sibling.TagName.Equals("br", StringComparison.OrdinalIgnoreCase))
+                    width = 0; // Line break resets horizontal position
+            }
+        }
+        return width;
     }
 
     /// <summary>
@@ -1695,7 +2230,8 @@ public sealed partial class DomBridge
     private void ResolvePositionAreaValues(
         DomElement element,
         Dictionary<string, AnchorInfo> anchorRegistry,
-        HashSet<DomElement> scrollContainersNeedingRelative)
+        HashSet<DomElement> scrollContainersNeedingRelative,
+        List<(DomElement element, DomElement oldParent, DomElement newParent)> deferredDomMoves)
     {
         if (!element.IsTextNode)
         {
@@ -1741,23 +2277,82 @@ public sealed partial class DomBridge
                         element.Style["position"] = "fixed";
                     }
 
-                    element.Style["left"] = $"{rect.Value.Left.ToString(CultureInfo.InvariantCulture)}px";
-                    element.Style["top"] = $"{rect.Value.Top.ToString(CultureInfo.InvariantCulture)}px";
+                    double cellW = rect.Value.Width;
+                    double cellH = rect.Value.Height;
 
-                    // Preserve the element's own explicit dimensions when set.
-                    // The position-area cell defines the maximum available area,
-                    // not the element's intrinsic size.
-                    double resolvedW = rect.Value.Width;
-                    double resolvedH = rect.Value.Height;
+                    // Resolve element dimensions.  Percentage values are
+                    // resolved against the position-area cell dimensions.
+                    // Explicit pixel values are used directly.
+                    double resolvedW = cellW;
+                    double resolvedH = cellH;
 
-                    double? explicitW = TryParsePx(cssProps.GetValueOrDefault("width"));
-                    double? explicitH = TryParsePx(cssProps.GetValueOrDefault("height"));
+                    string? rawW = cssProps.GetValueOrDefault("width");
+                    string? rawH = cssProps.GetValueOrDefault("height");
 
-                    if (explicitW.HasValue && explicitW.Value > 0)
-                        resolvedW = Math.Min(explicitW.Value, rect.Value.Width);
-                    if (explicitH.HasValue && explicitH.Value > 0)
-                        resolvedH = Math.Min(explicitH.Value, rect.Value.Height);
+                    double? explicitW = TryParsePx(rawW);
+                    double? explicitH = TryParsePx(rawH);
+                    double? pctW = TryParsePercent(rawW);
+                    double? pctH = TryParsePercent(rawH);
 
+                    if (pctW.HasValue)
+                        resolvedW = cellW * pctW.Value / 100.0;
+                    else if (explicitW.HasValue && explicitW.Value > 0)
+                        resolvedW = Math.Min(explicitW.Value, cellW);
+
+                    if (pctH.HasValue)
+                        resolvedH = cellH * pctH.Value / 100.0;
+                    else if (explicitH.HasValue && explicitH.Value > 0)
+                        resolvedH = Math.Min(explicitH.Value, cellH);
+
+                    // Compute alignment-based offset within the cell.
+                    // Parse the position-area to determine alignment.
+                    ParsePositionArea(positionArea, out var blockAlign, out var inlineAlign);
+
+                    double offsetX = ComputeAlignmentOffset(
+                        inlineAlign, cellW, resolvedW, isInlineAxis: true);
+                    double offsetY = ComputeAlignmentOffset(
+                        blockAlign, cellH, resolvedH, isInlineAxis: false);
+
+                    double finalLeft = rect.Value.Left + offsetX;
+                    double finalTop = rect.Value.Top + offsetY;
+
+                    // Broiler's renderer cannot place absolutely positioned
+                    // children inside inline elements (e.g. <span> with
+                    // position:relative).  When the containing block is an
+                    // inline element, promote the coordinates to the nearest
+                    // block-level ancestor and ensure it has position:relative.
+                    if (scrollContainer == null)
+                    {
+                        var inlineCB = FindContainingBlockElement(element);
+                        if (inlineCB != null && IsInlineContainingBlock(inlineCB))
+                        {
+                            var (inlineOffX, inlineOffY, blockAncestor) =
+                                ComputeInlineCBOffset(inlineCB);
+                            finalLeft += inlineOffX;
+                            finalTop += inlineOffY;
+
+                            // Ensure the block ancestor has position:relative
+                            // so the renderer can place the abs-pos element.
+                            if (blockAncestor != null)
+                            {
+                                var blockProps = GetComputedProps(blockAncestor);
+                                string? blockPos = blockProps.GetValueOrDefault("position");
+                                if (blockPos == null || blockPos == "static")
+                                    blockAncestor.Style["position"] = "relative";
+                            }
+
+                            // Defer the move to avoid collection modification
+                            // during tree traversal.
+                            if (blockAncestor != null && element.Parent != blockAncestor
+                                && element.Parent != null)
+                            {
+                                deferredDomMoves.Add((element, element.Parent, blockAncestor));
+                            }
+                        }
+                    }
+
+                    element.Style["left"] = $"{finalLeft.ToString(CultureInfo.InvariantCulture)}px";
+                    element.Style["top"] = $"{finalTop.ToString(CultureInfo.InvariantCulture)}px";
                     element.Style["width"] = $"{resolvedW.ToString(CultureInfo.InvariantCulture)}px";
                     element.Style["height"] = $"{resolvedH.ToString(CultureInfo.InvariantCulture)}px";
 
@@ -1766,8 +2361,8 @@ public sealed partial class DomBridge
                         scrollContainersNeedingRelative.Add(scrollContainer);
 
                     // Store resolved offsets for JS offset property queries.
-                    element.DomProperties["_resolvedLeft"] = rect.Value.Left;
-                    element.DomProperties["_resolvedTop"] = rect.Value.Top;
+                    element.DomProperties["_resolvedLeft"] = finalLeft;
+                    element.DomProperties["_resolvedTop"] = finalTop;
                     element.DomProperties["_resolvedWidth"] = resolvedW;
                     element.DomProperties["_resolvedHeight"] = resolvedH;
                 }
@@ -1775,7 +2370,8 @@ public sealed partial class DomBridge
         }
 
         foreach (var child in element.Children)
-            ResolvePositionAreaValues(child, anchorRegistry, scrollContainersNeedingRelative);
+            ResolvePositionAreaValues(child, anchorRegistry, scrollContainersNeedingRelative,
+                deferredDomMoves);
     }
 
     private readonly record struct PositionAreaRect(
@@ -1803,12 +2399,22 @@ public sealed partial class DomBridge
             cbWidth = TryParsePx(scProps.GetValueOrDefault("width")) ?? _viewportWidth;
             cbHeight = TryParsePx(scProps.GetValueOrDefault("height")) ?? _viewportHeight;
 
+            // For the position-area grid, use the scroll content dimensions
+            // (the actual scrollable area) rather than the scroll port dimensions.
+            // The grid extends to cover the full scrollable content.
+            double scrollContentWidth = FindScrollContentWidth(scrollContainer, cbWidth);
+            double scrollContentHeight = FindScrollContentHeight(scrollContainer, cbHeight);
+
             // Compute anchor position relative to the scroll container.
             var anchorRelPos = ComputeAnchorRelativeToContainer(anchor, scrollContainer);
             anchorLeft = anchorRelPos.Left;
             anchorRight = anchorRelPos.Left + anchor.Width;
             anchorTop = anchorRelPos.Top;
             anchorBottom = anchorRelPos.Top + anchor.Height;
+
+            // Use scroll content dimensions for the grid edges.
+            cbWidth = scrollContentWidth;
+            cbHeight = scrollContentHeight;
         }
         else
         {
@@ -1819,21 +2425,37 @@ public sealed partial class DomBridge
             anchorTop = anchor.Top;
             anchorBottom = anchor.Bottom;
 
-            // When the initial CB is the body's content area, the grid
-            // origin must be at the body margin offset so that grid-cell
-            // coordinates match the anchor's page coordinates.
+            // Determine the containing block for coordinate system.
             var cbEl = FindContainingBlockElement(element);
             if (cbEl == null)
             {
                 // No positioned ancestor → initial CB = body content area.
+                // Anchor coordinates from ComputeElementBox are document-absolute,
+                // and the grid origin must account for body margin.
                 cbOffsetX = FindBodyMarginLeft();
                 cbOffsetY = FindBodyMarginTop();
             }
             else
             {
-                var box = ComputeElementBox(cbEl);
-                cbOffsetX = box?.Left ?? 0;
-                cbOffsetY = box?.Top ?? 0;
+                // A positioned ancestor was found. The anchor's CSS top/left
+                // values from ComputeElementBox are relative to the anchor's
+                // own CB. If the anchor's CB is the same as the target's CB,
+                // coordinates are already in the right frame — grid origin is 0.
+                // Otherwise, we need to map the anchor coordinates.
+                var anchorCBEl = FindAnchorContainingBlock(element, cbEl);
+                if (anchorCBEl == cbEl)
+                {
+                    // Same CB → anchor coords are CB-relative → grid at origin.
+                    cbOffsetX = 0;
+                    cbOffsetY = 0;
+                }
+                else
+                {
+                    // Different CBs → use document coordinates.
+                    var box = ComputeElementBox(cbEl);
+                    cbOffsetX = box?.Left ?? 0;
+                    cbOffsetY = box?.Top ?? 0;
+                }
             }
         }
 
@@ -1895,13 +2517,72 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Computes the anchor's position relative to the specified container by
-    /// subtracting the container's document-coordinate position from the
-    /// anchor's document-coordinate position.
+    /// Computes the total width of the scrollable content inside a scroll
+    /// container by examining its children's widths and margins.
+    /// Falls back to the container's own width if no explicit child widths
+    /// are found.
+    /// </summary>
+    private double FindScrollContentWidth(DomElement scrollContainer, double containerWidth)
+    {
+        double maxWidth = containerWidth;
+        foreach (var child in scrollContainer.Children)
+        {
+            if (child.IsTextNode) continue;
+            var childProps = GetComputedProps(child);
+            double? childW = TryParsePx(childProps.GetValueOrDefault("width"));
+            if (childW.HasValue)
+            {
+                double ml = TryParsePx(childProps.GetValueOrDefault("margin-left")) ?? 0;
+                double mr = TryParsePx(childProps.GetValueOrDefault("margin-right")) ?? 0;
+                double totalW = childW.Value + ml + mr;
+                if (totalW > maxWidth) maxWidth = totalW;
+            }
+        }
+        return maxWidth;
+    }
+
+    /// <summary>
+    /// Computes the total height of the scrollable content inside a scroll
+    /// container by examining its children's heights and margins.
+    /// Falls back to the container's own height if no explicit child heights
+    /// are found.
+    /// </summary>
+    private double FindScrollContentHeight(DomElement scrollContainer, double containerHeight)
+    {
+        double maxHeight = containerHeight;
+        foreach (var child in scrollContainer.Children)
+        {
+            if (child.IsTextNode) continue;
+            var childProps = GetComputedProps(child);
+            double? childH = TryParsePx(childProps.GetValueOrDefault("height"));
+            if (childH.HasValue)
+            {
+                double mt = TryParsePx(childProps.GetValueOrDefault("margin-top")) ?? 0;
+                double mb = TryParsePx(childProps.GetValueOrDefault("margin-bottom")) ?? 0;
+                double totalH = childH.Value + mt + mb;
+                if (totalH > maxHeight) maxHeight = totalH;
+            }
+        }
+        return maxHeight;
+    }
+
+    /// <summary>
+    /// Computes the anchor's position relative to the specified container.
+    /// When the anchor's containing block IS the container (e.g. the
+    /// scroll container itself has position:relative), the anchor's
+    /// coordinates from ComputeElementBox are already container-relative.
+    /// Otherwise, both are in document coordinates and we subtract.
     /// </summary>
     private (double Left, double Top) ComputeAnchorRelativeToContainer(
         AnchorInfo anchor, DomElement container)
     {
+        // Check if the container establishes a CB. If it does, the anchor's
+        // ComputeElementBox walk will have stopped at the container, and
+        // the returned coordinates are already container-relative.
+        var containerProps = GetComputedProps(container);
+        if (EstablishesContainingBlock(containerProps))
+            return (anchor.Left, anchor.Top);
+
         var containerBox = ComputeElementBox(container);
         if (containerBox == null)
             return (anchor.Left, anchor.Top);
