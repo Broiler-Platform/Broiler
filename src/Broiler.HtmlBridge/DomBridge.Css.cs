@@ -662,6 +662,28 @@ public sealed partial class DomBridge
             }
         }
 
+        // Expand inset shorthand → top, right, bottom, left (CSS Logical Properties)
+        if (computed.TryGetValue("inset", out var insetVal))
+        {
+            // inset is a shorthand that maps to top, right, bottom, left using
+            // the same 1-4 value pattern as margin/padding.  Only set longhands
+            // that are not already explicitly specified to avoid clobbering
+            // author-provided overrides.
+            var insetParts = SplitCssValues(insetVal);
+            if (insetParts.Length > 0)
+            {
+                string iTop = insetParts[0];
+                string iRight = insetParts.Length > 1 ? insetParts[1] : iTop;
+                string iBottom = insetParts.Length > 2 ? insetParts[2] : iTop;
+                string iLeft = insetParts.Length > 3 ? insetParts[3] : iRight;
+
+                if (!computed.ContainsKey("top")) computed["top"] = iTop;
+                if (!computed.ContainsKey("right")) computed["right"] = iRight;
+                if (!computed.ContainsKey("bottom")) computed["bottom"] = iBottom;
+                if (!computed.ContainsKey("left")) computed["left"] = iLeft;
+            }
+        }
+
         // Expand background shorthand → background-color, background-image, background-repeat,
         // background-attachment, background-position (CSS2.1 §14.2.1)
         if (computed.TryGetValue("background", out var bgVal))
