@@ -1604,6 +1604,47 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Returns the computed left margin of the <c>&lt;body&gt;</c> element
+    /// (defaults to 8px per CSS 2 § UA stylesheet).
+    /// </summary>
+    private double FindBodyMarginLeft()
+    {
+        var body = FindBodyElement();
+        if (body != null)
+        {
+            var props = GetComputedProps(body);
+            return TryParsePx(props.GetValueOrDefault("margin-left")) ?? 8;
+        }
+        return 8;
+    }
+
+    /// <summary>
+    /// Returns the computed top margin of the <c>&lt;body&gt;</c> element
+    /// (defaults to 8px per CSS 2 § UA stylesheet).
+    /// </summary>
+    private double FindBodyMarginTop()
+    {
+        var body = FindBodyElement();
+        if (body != null)
+        {
+            var props = GetComputedProps(body);
+            return TryParsePx(props.GetValueOrDefault("margin-top")) ?? 8;
+        }
+        return 8;
+    }
+
+    private DomElement? FindBodyElement()
+    {
+        foreach (var el in _elements)
+        {
+            if (!el.IsTextNode &&
+                string.Equals(el.TagName, "body", StringComparison.OrdinalIgnoreCase))
+                return el;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Determines whether an element with the given CSS properties
     /// establishes a containing block for absolutely positioned descendants.
     /// Per CSS spec, this includes:
@@ -1753,6 +1794,7 @@ public sealed partial class DomBridge
     {
         double cbWidth, cbHeight;
         double anchorLeft, anchorRight, anchorTop, anchorBottom;
+        double cbOffsetX = 0, cbOffsetY = 0;
 
         if (scrollContainer != null)
         {
@@ -1776,16 +1818,32 @@ public sealed partial class DomBridge
             anchorRight = anchor.Right;
             anchorTop = anchor.Top;
             anchorBottom = anchor.Bottom;
+
+            // When the initial CB is the body's content area, the grid
+            // origin must be at the body margin offset so that grid-cell
+            // coordinates match the anchor's page coordinates.
+            var cbEl = FindContainingBlockElement(element);
+            if (cbEl == null)
+            {
+                // No positioned ancestor → initial CB = body content area.
+                cbOffsetX = FindBodyMarginLeft();
+                cbOffsetY = FindBodyMarginTop();
+            }
+            else
+            {
+                var box = ComputeElementBox(cbEl);
+                cbOffsetX = box?.Left ?? 0;
+                cbOffsetY = box?.Top ?? 0;
+            }
         }
 
         // Grid column edges: CB-left, anchor-left, anchor-right, max(CB-right, anchor-right)
-        double gridLeft = 0; // CB left (in CB coordinates)
-        double gridRight = Math.Max(cbWidth, anchorRight);
+        double gridLeft = cbOffsetX;
+        double gridRight = Math.Max(cbOffsetX + cbWidth, anchorRight);
 
-        // Grid row edges: when the anchor extends above the CB (anchorTop < 0),
-        // the grid top is clamped to the anchor top, not the CB top (which is 0).
-        double gridTop = Math.Min(0, anchorTop);
-        double gridBottom = Math.Max(cbHeight, anchorBottom);
+        // Grid row edges.
+        double gridTop = Math.Min(cbOffsetY, anchorTop);
+        double gridBottom = Math.Max(cbOffsetY + cbHeight, anchorBottom);
 
         // Parse the position-area value into block and inline axis selections.
         ParsePositionArea(positionArea, out var blockSel, out var inlineSel);
