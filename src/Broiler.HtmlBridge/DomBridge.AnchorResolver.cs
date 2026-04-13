@@ -887,6 +887,24 @@ public sealed partial class DomBridge
             double top = topPx ?? 0;
             double left = leftPx ?? 0;
 
+            // When both left and right are specified without explicit width,
+            // derive width from the containing block dimensions.
+            if (width == 0 && leftPx.HasValue && rightPx.HasValue)
+            {
+                double cbW = FindContainingBlockWidth(element);
+                width = cbW - leftPx.Value - rightPx.Value;
+                if (width < 0) width = 0;
+            }
+
+            // When both top and bottom are specified without explicit height,
+            // derive height from the containing block dimensions.
+            if (height == 0 && topPx.HasValue && bottomPx.HasValue)
+            {
+                double cbH = FindContainingBlockHeight(element);
+                height = cbH - topPx.Value - bottomPx.Value;
+                if (height < 0) height = 0;
+            }
+
             // When only right/bottom are specified, compute left/top from
             // the containing block dimensions.
             if (leftPx == null && rightPx.HasValue)
@@ -1021,6 +1039,28 @@ public sealed partial class DomBridge
         }
         foreach (var kv in element.Style)
             props[kv.Key] = kv.Value;
+
+        // Expand the inset shorthand → top, right, bottom, left so that
+        // downstream code (ComputeElementBox, TryApplyFallback, etc.) can
+        // read the individual inset properties directly.
+        if (props.TryGetValue("inset", out var insetVal2))
+        {
+            var parts = insetVal2.Split(new[] { ' ', '\t' },
+                StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 0)
+            {
+                string iTop = parts[0];
+                string iRight = parts.Length > 1 ? parts[1] : iTop;
+                string iBottom = parts.Length > 2 ? parts[2] : iTop;
+                string iLeft = parts.Length > 3 ? parts[3] : iRight;
+
+                if (!props.ContainsKey("top")) props["top"] = iTop;
+                if (!props.ContainsKey("right")) props["right"] = iRight;
+                if (!props.ContainsKey("bottom")) props["bottom"] = iBottom;
+                if (!props.ContainsKey("left")) props["left"] = iLeft;
+            }
+        }
+
         return props;
     }
 
@@ -1839,6 +1879,27 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Resolves a CSS value that may be a percentage or a pixel length.
+    /// Percentages are resolved against <paramref name="reference"/>.
+    /// Returns 0 for values that cannot be parsed.
+    /// </summary>
+    private static double ResolvePctOrPx(string value, double reference)
+    {
+        var pct = TryParsePercent(value);
+        if (pct.HasValue)
+            return reference * pct.Value / 100.0;
+        return TryParsePx(value) ?? 0;
+    }
+
+    /// <summary>
+    /// Returns true if the value contains a CSS percentage token.
+    /// </summary>
+    private static bool HasPercent(string? value)
+    {
+        return value != null && value.Contains('%');
+    }
+
+    /// <summary>
     /// Resolves <c>align-self: anchor-center</c> and
     /// <c>justify-self: anchor-center</c> on elements that have
     /// <c>position-anchor</c> but no <c>position-area</c>.
@@ -2163,9 +2224,13 @@ public sealed partial class DomBridge
         if (display != null)
         {
             var d = display.Trim().ToLowerInvariant();
-            if (d == "inline" || d == "inline-block") return true;
+            // inline-block establishes a containing block for abspos children
+            // and is treated as block-level for layout purposes, so it is
+            // NOT considered inline here.
+            if (d == "inline") return true;
             if (d == "block" || d == "flex" || d == "grid" || d == "table" ||
-                d == "list-item" || d == "flow-root")
+                d == "list-item" || d == "flow-root" || d == "inline-block" ||
+                d == "inline-flex" || d == "inline-grid")
                 return false;
         }
         // Default inline elements.
@@ -2587,11 +2652,121 @@ public sealed partial class DomBridge
                     double cellW = rect.Value.Width;
                     double cellH = rect.Value.Height;
 
+                    // Resolve any percentage insets within the cell.
+                    // CSS spec: top/bottom % resolve against CB height,
+                    // left/right % resolve against CB width.  For position-area
+                    // the CB is the position-area cell.
+                    double insetTop = 0, insetRight = 0, insetBottom = 0, insetLeft = 0;
+                    string? rawInset = cssProps.GetValueOrDefault("inset");
+                    if (rawInset != null)
+                    {
+                        var insetParts = rawInset.Split(new[] { ' ', '\t' },
+                            StringSplitOptions.RemoveEmptyEntries);
+                        if (insetParts.Length > 0)
+                        {
+                            insetTop = ResolvePctOrPx(insetParts[0], cellH);
+                            insetRight = ResolvePctOrPx(
+                                insetParts.Length > 1 ? insetParts[1] : insetParts[0], cellW);
+                            insetBottom = ResolvePctOrPx(
+                                insetParts.Length > 2 ? insetParts[2] : insetParts[0], cellH);
+                            insetLeft = ResolvePctOrPx(
+                                insetParts.Length > 3 ? insetParts[3]
+                                    : (insetParts.Length > 1 ? insetParts[1] : insetParts[0]), cellW);
+                        }
+                    }
+                    else
+                    {
+                        // Check individual inset properties from CSS
+                        string? rawTop2 = cssProps.GetValueOrDefault("top");
+                        string? rawRight2 = cssProps.GetValueOrDefault("right");
+                        string? rawBottom2 = cssProps.GetValueOrDefault("bottom");
+                        string? rawLeft2 = cssProps.GetValueOrDefault("left");
+                        if (rawTop2 != null && rawTop2 != "auto")
+                            insetTop = ResolvePctOrPx(rawTop2, cellH);
+                        if (rawRight2 != null && rawRight2 != "auto")
+                            insetRight = ResolvePctOrPx(rawRight2, cellW);
+                        if (rawBottom2 != null && rawBottom2 != "auto")
+                            insetBottom = ResolvePctOrPx(rawBottom2, cellH);
+                        if (rawLeft2 != null && rawLeft2 != "auto")
+                            insetLeft = ResolvePctOrPx(rawLeft2, cellW);
+                    }
+
+                    // The IMCB (Inset-Modified Containing Block) is the cell
+                    // after applying insets.
+                    double imcbLeft = rect.Value.Left + insetLeft;
+                    double imcbTop = rect.Value.Top + insetTop;
+                    double imcbW = cellW - insetLeft - insetRight;
+                    double imcbH = cellH - insetTop - insetBottom;
+                    if (imcbW < 0) imcbW = 0;
+                    if (imcbH < 0) imcbH = 0;
+
+                    // Resolve percentage margins against the cell width
+                    // (CSS spec: margin % always resolves against inline dimension).
+                    double marginTop2 = ResolvePctOrPx(
+                        cssProps.GetValueOrDefault("margin-top") ?? "0", cellW);
+                    double marginRight2 = ResolvePctOrPx(
+                        cssProps.GetValueOrDefault("margin-right") ?? "0", cellW);
+                    double marginBottom2 = ResolvePctOrPx(
+                        cssProps.GetValueOrDefault("margin-bottom") ?? "0", cellW);
+                    double marginLeft2 = ResolvePctOrPx(
+                        cssProps.GetValueOrDefault("margin-left") ?? "0", cellW);
+
+                    // Resolve percentage margins from the 'margin' shorthand
+                    string? marginShorthand = cssProps.GetValueOrDefault("margin");
+                    if (marginShorthand != null)
+                    {
+                        var mp = marginShorthand.Split(new[] { ' ', '\t' },
+                            StringSplitOptions.RemoveEmptyEntries);
+                        if (mp.Length > 0)
+                        {
+                            if (!cssProps.ContainsKey("margin-top"))
+                                marginTop2 = ResolvePctOrPx(mp[0], cellW);
+                            if (!cssProps.ContainsKey("margin-right"))
+                                marginRight2 = ResolvePctOrPx(
+                                    mp.Length > 1 ? mp[1] : mp[0], cellW);
+                            if (!cssProps.ContainsKey("margin-bottom"))
+                                marginBottom2 = ResolvePctOrPx(
+                                    mp.Length > 2 ? mp[2] : mp[0], cellW);
+                            if (!cssProps.ContainsKey("margin-left"))
+                                marginLeft2 = ResolvePctOrPx(
+                                    mp.Length > 3 ? mp[3]
+                                        : (mp.Length > 1 ? mp[1] : mp[0]), cellW);
+                        }
+                    }
+
+                    // Resolve percentage padding against the cell width.
+                    double padTop = 0, padRight = 0, padBottom = 0, padLeft = 0;
+                    string? padShorthand = cssProps.GetValueOrDefault("padding");
+                    if (padShorthand != null)
+                    {
+                        var pp = padShorthand.Split(new[] { ' ', '\t' },
+                            StringSplitOptions.RemoveEmptyEntries);
+                        if (pp.Length > 0)
+                        {
+                            padTop = ResolvePctOrPx(pp[0], cellW);
+                            padRight = ResolvePctOrPx(
+                                pp.Length > 1 ? pp[1] : pp[0], cellW);
+                            padBottom = ResolvePctOrPx(
+                                pp.Length > 2 ? pp[2] : pp[0], cellW);
+                            padLeft = ResolvePctOrPx(
+                                pp.Length > 3 ? pp[3]
+                                    : (pp.Length > 1 ? pp[1] : pp[0]), cellW);
+                        }
+                    }
+                    if (cssProps.TryGetValue("padding-top", out var pt))
+                        padTop = ResolvePctOrPx(pt, cellW);
+                    if (cssProps.TryGetValue("padding-right", out var pr))
+                        padRight = ResolvePctOrPx(pr, cellW);
+                    if (cssProps.TryGetValue("padding-bottom", out var pb))
+                        padBottom = ResolvePctOrPx(pb, cellW);
+                    if (cssProps.TryGetValue("padding-left", out var pl))
+                        padLeft = ResolvePctOrPx(pl, cellW);
+
                     // Resolve element dimensions.  Percentage values are
                     // resolved against the position-area cell dimensions.
                     // Explicit pixel values are used directly.
-                    double resolvedW = cellW;
-                    double resolvedH = cellH;
+                    double resolvedW = imcbW;
+                    double resolvedH = imcbH;
 
                     string? rawW = cssProps.GetValueOrDefault("width");
                     string? rawH = cssProps.GetValueOrDefault("height");
@@ -2656,6 +2831,87 @@ public sealed partial class DomBridge
                                 deferredDomMoves.Add((element, element.Parent, blockAncestor));
                             }
                         }
+                    }
+
+                    // Determine whether to use cell-boundary positioning
+                    // (left/top/right/bottom to define the IMCB) so the
+                    // renderer's box model naturally handles margins, borders,
+                    // and padding.  Use this when the element stretches to
+                    // fill the cell (place-self: stretch, the default for
+                    // position-area) and has percentage-based box properties.
+                    bool hasPercentBoxProps =
+                        HasPercent(cssProps.GetValueOrDefault("margin")) ||
+                        HasPercent(cssProps.GetValueOrDefault("margin-top")) ||
+                        HasPercent(cssProps.GetValueOrDefault("margin-right")) ||
+                        HasPercent(cssProps.GetValueOrDefault("margin-bottom")) ||
+                        HasPercent(cssProps.GetValueOrDefault("margin-left")) ||
+                        HasPercent(cssProps.GetValueOrDefault("padding")) ||
+                        HasPercent(cssProps.GetValueOrDefault("padding-top")) ||
+                        HasPercent(cssProps.GetValueOrDefault("padding-right")) ||
+                        HasPercent(cssProps.GetValueOrDefault("padding-bottom")) ||
+                        HasPercent(cssProps.GetValueOrDefault("padding-left")) ||
+                        HasPercent(rawInset) ||
+                        HasPercent(cssProps.GetValueOrDefault("top")) ||
+                        HasPercent(cssProps.GetValueOrDefault("left")) ||
+                        HasPercent(cssProps.GetValueOrDefault("right")) ||
+                        HasPercent(cssProps.GetValueOrDefault("bottom"));
+
+                    if (hasPercentBoxProps)
+                    {
+                        // Resolve all percentages explicitly and use
+                        // left/top + computed content width/height.
+                        // Content width = IMCB width - margins - borders - padding
+                        double borderW = TryParsePx(cssProps.GetValueOrDefault("border-left-width")) ?? 0;
+                        double borderE = TryParsePx(cssProps.GetValueOrDefault("border-right-width")) ?? 0;
+                        double borderN = TryParsePx(cssProps.GetValueOrDefault("border-top-width")) ?? 0;
+                        double borderS = TryParsePx(cssProps.GetValueOrDefault("border-bottom-width")) ?? 0;
+
+                        // Parse border shorthand if individual widths not set
+                        string? borderShort = cssProps.GetValueOrDefault("border");
+                        if (borderShort != null)
+                        {
+                            var borderParts = borderShort.Split(new[] { ' ', '\t' },
+                                StringSplitOptions.RemoveEmptyEntries);
+                            foreach (var bp in borderParts)
+                            {
+                                var bw = TryParsePx(bp);
+                                if (bw.HasValue)
+                                {
+                                    if (borderW == 0) borderW = bw.Value;
+                                    if (borderE == 0) borderE = bw.Value;
+                                    if (borderN == 0) borderN = bw.Value;
+                                    if (borderS == 0) borderS = bw.Value;
+                                    break;
+                                }
+                            }
+                        }
+
+                        double contentW = imcbW - marginLeft2 - marginRight2
+                            - borderW - borderE - padLeft - padRight;
+                        double contentH = imcbH - marginTop2 - marginBottom2
+                            - borderN - borderS - padTop - padBottom;
+                        if (contentW < 0) contentW = 0;
+                        if (contentH < 0) contentH = 0;
+
+                        finalLeft = imcbLeft;
+                        finalTop = imcbTop;
+
+                        // Set resolved pixel values for margins and padding
+                        // to override the percentage values from CSS.
+                        element.Style["margin-top"] = $"{marginTop2.ToString(CultureInfo.InvariantCulture)}px";
+                        element.Style["margin-right"] = $"{marginRight2.ToString(CultureInfo.InvariantCulture)}px";
+                        element.Style["margin-bottom"] = $"{marginBottom2.ToString(CultureInfo.InvariantCulture)}px";
+                        element.Style["margin-left"] = $"{marginLeft2.ToString(CultureInfo.InvariantCulture)}px";
+                        element.Style["padding-top"] = $"{padTop.ToString(CultureInfo.InvariantCulture)}px";
+                        element.Style["padding-right"] = $"{padRight.ToString(CultureInfo.InvariantCulture)}px";
+                        element.Style["padding-bottom"] = $"{padBottom.ToString(CultureInfo.InvariantCulture)}px";
+                        element.Style["padding-left"] = $"{padLeft.ToString(CultureInfo.InvariantCulture)}px";
+                        element.Style.Remove("margin");
+                        element.Style.Remove("padding");
+                        element.Style.Remove("inset");
+
+                        resolvedW = contentW;
+                        resolvedH = contentH;
                     }
 
                     element.Style["left"] = $"{finalLeft.ToString(CultureInfo.InvariantCulture)}px";
