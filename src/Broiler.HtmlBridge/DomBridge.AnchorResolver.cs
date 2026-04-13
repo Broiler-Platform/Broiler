@@ -2100,7 +2100,7 @@ public sealed partial class DomBridge
             double sibMT = TryParsePx(sibProps.GetValueOrDefault("margin-top")) ?? 0;
             double sibMB = TryParsePx(sibProps.GetValueOrDefault("margin-bottom")) ?? 0;
             double sibMR = 0;
-            ParseMarginShorthand(sibProps, ref sibMT, ref sibMT, ref sibMR);
+            ParseMarginShorthand(sibProps, ref sibMT, ref sibMB, ref sibMR);
 
             totalHeight += sibHeight + sibMT + sibMB;
         }
