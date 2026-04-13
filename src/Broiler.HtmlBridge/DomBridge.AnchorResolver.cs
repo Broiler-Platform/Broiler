@@ -282,6 +282,38 @@ public sealed partial class DomBridge
                         child.Parent = wrapper;
                         wrapper.Children.Add(child);
                     }
+
+                    // Hide normal-flow children that are entirely above the
+                    // scroll position.  This prevents coloured content from
+                    // leaking above the container's top edge (Broiler's
+                    // renderer clips overflow at the bottom but may not
+                    // fully clip at the top for position:relative offsets).
+                    if (scrollTop > 0)
+                    {
+                        double childOffset = 0;
+                        foreach (var child in wrapper.Children)
+                        {
+                            if (child.IsTextNode) continue;
+                            var cp = GetComputedProps(child);
+                            var childPos = cp.GetValueOrDefault("position");
+                            if (childPos == "absolute" || childPos == "fixed")
+                                continue;
+                            double childH =
+                                TryParsePx(cp.GetValueOrDefault("height")) ?? 0;
+                            double childMT =
+                                TryParsePx(cp.GetValueOrDefault("margin-top")) ?? 0;
+                            childOffset += childMT;
+                            if (childOffset + childH <= scrollTop)
+                            {
+                                child.Style["visibility"] = "hidden";
+                                childOffset += childH;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
