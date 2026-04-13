@@ -48,6 +48,15 @@ public sealed partial class DomBridge
             ToJSObject(DocumentElement),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // document.scrollingElement (getter — returns document.documentElement
+        // in standards mode, or document.body in quirks mode; we always use
+        // standards mode so it's always the <html> element).
+        document.FastAddProperty(
+            (KeyString)"scrollingElement",
+            new JSFunction((in Arguments _) => ToJSObject(DocumentElement), "get scrollingElement"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // document.body (getter — first <body> child of documentElement)
         document.FastAddProperty(
             (KeyString)"body",
