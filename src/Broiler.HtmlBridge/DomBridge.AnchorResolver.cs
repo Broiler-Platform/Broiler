@@ -40,7 +40,12 @@ public sealed partial class DomBridge
         ResolveAnchorFunctions(DocumentElement, anchorRegistry);
 
         // 3. Resolve position-area values on anchored elements.
-        ResolvePositionAreaValues(DocumentElement, anchorRegistry);
+        //    Collects scroll containers that need position:relative but
+        //    defers adding it until after position-visibility resolution,
+        //    so IsAnchorVisibleForTarget is not affected by the new CB.
+        var scrollContainersNeedingRelative = new HashSet<DomElement>();
+        ResolvePositionAreaValues(
+            DocumentElement, anchorRegistry, scrollContainersNeedingRelative);
 
         // 3b. Resolve position-try-fallbacks for elements whose base
         //     style overflows the containing block.
@@ -49,6 +54,19 @@ public sealed partial class DomBridge
         // 3c. Resolve position-visibility: hide anchor-positioned elements
         //     whose anchor is not visible or does not exist.
         ResolvePositionVisibility(DocumentElement, anchorRegistry);
+
+        // 3d. Now apply deferred position:relative to scroll containers
+        //     used as containing blocks by position-area.
+        foreach (var sc in scrollContainersNeedingRelative)
+        {
+            var scProps = GetComputedProps(sc);
+            bool alreadyPositioned =
+                scProps.TryGetValue("position", out var scPos) &&
+                (scPos == "relative" || scPos == "absolute" ||
+                 scPos == "fixed" || scPos == "sticky");
+            if (!alreadyPositioned)
+                sc.Style["position"] = "relative";
+        }
 
         // 4. Insert backdrop elements for modal dialogs.
         InsertDialogBackdrops(DocumentElement, viewportWidth, viewportHeight);
@@ -238,30 +256,70 @@ public sealed partial class DomBridge
 
                 if (clips && el.Children.Count > 0)
                 {
-                    // Shift content by inserting a negative-margin spacer as the
-                    // first child.  This moves all normal-flow content upward /
-                    // leftward, and overflow:hidden clips what scrolled out.
-                    var spacer = new DomElement("div", null, null, "")
+                    // Wrap all children in a positioned div that shifts content
+                    // upward / leftward.  Using position:relative + top/left
+                    // ensures the shifted content is clipped correctly by the
+                    // container's overflow:hidden at all edges (including top),
+                    // avoiding the rendering artefact where negative-margin
+                    // spacers can leak above the container's top edge.
+                    var wrapper = new DomElement("div", null, null, "")
                     {
                         Parent = el,
                     };
+                    wrapper.Style["position"] = "relative";
                     if (scrollTop != 0)
-                        spacer.Style["margin-bottom"] =
+                        wrapper.Style["top"] =
                             $"{(-scrollTop).ToString(CultureInfo.InvariantCulture)}px";
                     if (scrollLeft != 0)
-                        spacer.Style["margin-right"] =
+                        wrapper.Style["left"] =
                             $"{(-scrollLeft).ToString(CultureInfo.InvariantCulture)}px";
-                    spacer.Style["height"] = "0";
-                    spacer.Style["width"] = "0";
-                    spacer.Style["line-height"] = "0";
-                    spacer.Style["font-size"] = "0";
-                    el.Children.Insert(0, spacer);
+
+                    var originalChildren = el.Children.ToList();
+                    el.Children.Clear();
+                    el.Children.Add(wrapper);
+                    foreach (var child in originalChildren)
+                    {
+                        child.Parent = wrapper;
+                        wrapper.Children.Add(child);
+                    }
+
+                    // Hide normal-flow children that are entirely above the
+                    // scroll position.  This prevents coloured content from
+                    // leaking above the container's top edge (Broiler's
+                    // renderer clips overflow at the bottom but may not
+                    // fully clip at the top for position:relative offsets).
+                    if (scrollTop > 0)
+                    {
+                        double childOffset = 0;
+                        foreach (var child in wrapper.Children)
+                        {
+                            if (child.IsTextNode) continue;
+                            var cp = GetComputedProps(child);
+                            var childPos = cp.GetValueOrDefault("position");
+                            if (childPos == "absolute" || childPos == "fixed")
+                                continue;
+                            double childH =
+                                TryParsePx(cp.GetValueOrDefault("height")) ?? 0;
+                            double childMT =
+                                TryParsePx(cp.GetValueOrDefault("margin-top")) ?? 0;
+                            childOffset += childMT;
+                            if (childOffset + childH <= scrollTop)
+                            {
+                                child.Style["visibility"] = "hidden";
+                                childOffset += childH;
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
 
         // Use index-based loop because the list may grow during iteration
-        // (spacer insertion above).
+        // (wrapper insertion above).
         for (int i = 0; i < el.Children.Count; i++)
             ApplyScrollSimulationTree(el.Children[i]);
     }
@@ -618,7 +676,7 @@ public sealed partial class DomBridge
     private static readonly HashSet<string> PositionResolvedProperties = new(
         StringComparer.OrdinalIgnoreCase)
     {
-        "width", "height", "top", "left", "right", "bottom",
+        "position", "width", "height", "top", "left", "right", "bottom",
         "inset", "inset-block", "inset-inline",
         "inset-block-start", "inset-block-end",
         "inset-inline-start", "inset-inline-end",
@@ -1546,6 +1604,47 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Returns the computed left margin of the <c>&lt;body&gt;</c> element
+    /// (defaults to 8px per CSS 2 § UA stylesheet).
+    /// </summary>
+    private double FindBodyMarginLeft()
+    {
+        var body = FindBodyElement();
+        if (body != null)
+        {
+            var props = GetComputedProps(body);
+            return TryParsePx(props.GetValueOrDefault("margin-left")) ?? 8;
+        }
+        return 8;
+    }
+
+    /// <summary>
+    /// Returns the computed top margin of the <c>&lt;body&gt;</c> element
+    /// (defaults to 8px per CSS 2 § UA stylesheet).
+    /// </summary>
+    private double FindBodyMarginTop()
+    {
+        var body = FindBodyElement();
+        if (body != null)
+        {
+            var props = GetComputedProps(body);
+            return TryParsePx(props.GetValueOrDefault("margin-top")) ?? 8;
+        }
+        return 8;
+    }
+
+    private DomElement? FindBodyElement()
+    {
+        foreach (var el in _elements)
+        {
+            if (!el.IsTextNode &&
+                string.Equals(el.TagName, "body", StringComparison.OrdinalIgnoreCase))
+                return el;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Determines whether an element with the given CSS properties
     /// establishes a containing block for absolutely positioned descendants.
     /// Per CSS spec, this includes:
@@ -1595,7 +1694,8 @@ public sealed partial class DomBridge
     /// </summary>
     private void ResolvePositionAreaValues(
         DomElement element,
-        Dictionary<string, AnchorInfo> anchorRegistry)
+        Dictionary<string, AnchorInfo> anchorRegistry,
+        HashSet<DomElement> scrollContainersNeedingRelative)
     {
         if (!element.IsTextNode)
         {
@@ -1617,26 +1717,65 @@ public sealed partial class DomBridge
                 !string.IsNullOrWhiteSpace(positionAnchor) &&
                 anchorRegistry.TryGetValue(positionAnchor, out var anchor))
             {
-                var rect = ComputePositionAreaRect(element, anchor, positionArea);
+                // Find the anchor element to determine its scroll container.
+                var anchorEl = FindElementByAnchorName(positionAnchor);
+                var scrollContainer = anchorEl != null
+                    ? FindNearestScrollContainer(anchorEl)
+                    : null;
+
+                // Compute the grid cell using the anchor's scroll container
+                // (or the viewport) as the containing block.
+                var rect = ComputePositionAreaRect(
+                    element, anchor, positionArea, scrollContainer);
                 if (rect != null)
                 {
-                    element.Style["position"] = "absolute";
+                    // Preserve position:fixed when the element already has it;
+                    // otherwise default to position:absolute.
+                    if (!cssProps.TryGetValue("position", out var origPos) ||
+                        !origPos.Equals("fixed", StringComparison.OrdinalIgnoreCase))
+                    {
+                        element.Style["position"] = "absolute";
+                    }
+                    else
+                    {
+                        element.Style["position"] = "fixed";
+                    }
+
                     element.Style["left"] = $"{rect.Value.Left.ToString(CultureInfo.InvariantCulture)}px";
                     element.Style["top"] = $"{rect.Value.Top.ToString(CultureInfo.InvariantCulture)}px";
-                    element.Style["width"] = $"{rect.Value.Width.ToString(CultureInfo.InvariantCulture)}px";
-                    element.Style["height"] = $"{rect.Value.Height.ToString(CultureInfo.InvariantCulture)}px";
+
+                    // Preserve the element's own explicit dimensions when set.
+                    // The position-area cell defines the maximum available area,
+                    // not the element's intrinsic size.
+                    double resolvedW = rect.Value.Width;
+                    double resolvedH = rect.Value.Height;
+
+                    double? explicitW = TryParsePx(cssProps.GetValueOrDefault("width"));
+                    double? explicitH = TryParsePx(cssProps.GetValueOrDefault("height"));
+
+                    if (explicitW.HasValue && explicitW.Value > 0)
+                        resolvedW = Math.Min(explicitW.Value, rect.Value.Width);
+                    if (explicitH.HasValue && explicitH.Value > 0)
+                        resolvedH = Math.Min(explicitH.Value, rect.Value.Height);
+
+                    element.Style["width"] = $"{resolvedW.ToString(CultureInfo.InvariantCulture)}px";
+                    element.Style["height"] = $"{resolvedH.ToString(CultureInfo.InvariantCulture)}px";
+
+                    // Record the scroll container for deferred position:relative.
+                    if (scrollContainer != null)
+                        scrollContainersNeedingRelative.Add(scrollContainer);
 
                     // Store resolved offsets for JS offset property queries.
                     element.DomProperties["_resolvedLeft"] = rect.Value.Left;
                     element.DomProperties["_resolvedTop"] = rect.Value.Top;
-                    element.DomProperties["_resolvedWidth"] = rect.Value.Width;
-                    element.DomProperties["_resolvedHeight"] = rect.Value.Height;
+                    element.DomProperties["_resolvedWidth"] = resolvedW;
+                    element.DomProperties["_resolvedHeight"] = resolvedH;
                 }
             }
         }
 
         foreach (var child in element.Children)
-            ResolvePositionAreaValues(child, anchorRegistry);
+            ResolvePositionAreaValues(child, anchorRegistry, scrollContainersNeedingRelative);
     }
 
     private readonly record struct PositionAreaRect(
@@ -1645,27 +1784,66 @@ public sealed partial class DomBridge
     /// <summary>
     /// Computes the rectangle for a given <c>position-area</c> value using
     /// the 3×3 grid defined by the anchor element and containing block.
+    /// When <paramref name="scrollContainer"/> is provided, the grid is
+    /// computed relative to that container (the anchor's scroll container)
+    /// rather than the target element's normal containing block.
     /// </summary>
     private PositionAreaRect? ComputePositionAreaRect(
-        DomElement element, AnchorInfo anchor, string positionArea)
+        DomElement element, AnchorInfo anchor, string positionArea,
+        DomElement? scrollContainer = null)
     {
-        double cbWidth = FindContainingBlockWidth(element);
-        double cbHeight = FindContainingBlockHeight(element);
+        double cbWidth, cbHeight;
+        double anchorLeft, anchorRight, anchorTop, anchorBottom;
+        double cbOffsetX = 0, cbOffsetY = 0;
 
-        // Grid boundaries.
-        double anchorLeft = anchor.Left;
-        double anchorRight = anchor.Right;
-        double anchorTop = anchor.Top;
-        double anchorBottom = anchor.Bottom;
+        if (scrollContainer != null)
+        {
+            // Use the scroll container's own dimensions as the CB.
+            var scProps = GetComputedProps(scrollContainer);
+            cbWidth = TryParsePx(scProps.GetValueOrDefault("width")) ?? _viewportWidth;
+            cbHeight = TryParsePx(scProps.GetValueOrDefault("height")) ?? _viewportHeight;
+
+            // Compute anchor position relative to the scroll container.
+            var anchorRelPos = ComputeAnchorRelativeToContainer(anchor, scrollContainer);
+            anchorLeft = anchorRelPos.Left;
+            anchorRight = anchorRelPos.Left + anchor.Width;
+            anchorTop = anchorRelPos.Top;
+            anchorBottom = anchorRelPos.Top + anchor.Height;
+        }
+        else
+        {
+            cbWidth = FindContainingBlockWidth(element);
+            cbHeight = FindContainingBlockHeight(element);
+            anchorLeft = anchor.Left;
+            anchorRight = anchor.Right;
+            anchorTop = anchor.Top;
+            anchorBottom = anchor.Bottom;
+
+            // When the initial CB is the body's content area, the grid
+            // origin must be at the body margin offset so that grid-cell
+            // coordinates match the anchor's page coordinates.
+            var cbEl = FindContainingBlockElement(element);
+            if (cbEl == null)
+            {
+                // No positioned ancestor → initial CB = body content area.
+                cbOffsetX = FindBodyMarginLeft();
+                cbOffsetY = FindBodyMarginTop();
+            }
+            else
+            {
+                var box = ComputeElementBox(cbEl);
+                cbOffsetX = box?.Left ?? 0;
+                cbOffsetY = box?.Top ?? 0;
+            }
+        }
 
         // Grid column edges: CB-left, anchor-left, anchor-right, max(CB-right, anchor-right)
-        double gridLeft = 0; // CB left (in CB coordinates)
-        double gridRight = Math.Max(cbWidth, anchorRight);
+        double gridLeft = cbOffsetX;
+        double gridRight = Math.Max(cbOffsetX + cbWidth, anchorRight);
 
-        // Grid row edges: when the anchor extends above the CB (anchorTop < 0),
-        // the grid top is clamped to the anchor top, not the CB top (which is 0).
-        double gridTop = Math.Min(0, anchorTop);
-        double gridBottom = Math.Max(cbHeight, anchorBottom);
+        // Grid row edges.
+        double gridTop = Math.Min(cbOffsetY, anchorTop);
+        double gridBottom = Math.Max(cbOffsetY + cbHeight, anchorBottom);
 
         // Parse the position-area value into block and inline axis selections.
         ParsePositionArea(positionArea, out var blockSel, out var inlineSel);
@@ -1714,6 +1892,40 @@ public sealed partial class DomBridge
         double height = Math.Max(0, rowEnd - rowStart);
 
         return new PositionAreaRect(colStart, rowStart, width, height);
+    }
+
+    /// <summary>
+    /// Computes the anchor's position relative to the specified container by
+    /// subtracting the container's document-coordinate position from the
+    /// anchor's document-coordinate position.
+    /// </summary>
+    private (double Left, double Top) ComputeAnchorRelativeToContainer(
+        AnchorInfo anchor, DomElement container)
+    {
+        var containerBox = ComputeElementBox(container);
+        if (containerBox == null)
+            return (anchor.Left, anchor.Top);
+        return (anchor.Left - containerBox.Left, anchor.Top - containerBox.Top);
+    }
+
+    /// <summary>
+    /// Finds the nearest ancestor of <paramref name="el"/> that is a scroll
+    /// container (has <c>overflow: hidden/scroll/auto/clip</c>).
+    /// </summary>
+    private DomElement? FindNearestScrollContainer(DomElement el)
+    {
+        var parent = el.Parent;
+        while (parent != null)
+        {
+            if (!parent.IsTextNode)
+            {
+                var props = GetComputedProps(parent);
+                if (HasOverflowClipping(props))
+                    return parent;
+            }
+            parent = parent.Parent;
+        }
+        return null;
     }
 
     private enum AxisSelection { Start, Center, End, SpanStart, SpanEnd, SpanAll }
