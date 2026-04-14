@@ -2108,6 +2108,41 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_PositionAreaScrolling002_ResolvesPositionArea()
+    {
+        var bridge = RunAnchorResolution("position-area-scrolling-002.tentative.html");
+
+        // Check that position-area was resolved for all 9 elements
+        var expected = new (string id, double x, double y, double w, double h)[]
+        {
+            ("e1", 100, 100, 100, 100),
+            ("e2", 225, 100, 50, 100),
+            ("e3", 300, 100, 100, 100),
+            ("e4", 100, 225, 100, 50),
+            ("e5", 225, 225, 50, 50),
+            ("e6", 300, 225, 100, 50),
+            ("e7", 100, 300, 100, 100),
+            ("e8", 225, 300, 50, 100),
+            ("e9", 300, 300, 100, 100),
+        };
+
+        var errors = new List<string>();
+        foreach (var (id, ex, ey, ew, eh) in expected)
+        {
+            var pos = GetResolvedPosition(bridge, id);
+            if (pos == null) { errors.Add($"{id}: not found"); continue; }
+            var (ax, ay, aw, ah) = pos.Value;
+            if (Math.Abs(ax - ex) > 1) errors.Add($"{id} x: expected={ex} actual={ax}");
+            if (Math.Abs(ay - ey) > 1) errors.Add($"{id} y: expected={ey} actual={ay}");
+            if (Math.Abs(aw - ew) > 1) errors.Add($"{id} w: expected={ew} actual={aw}");
+            if (Math.Abs(ah - eh) > 1) errors.Add($"{id} h: expected={eh} actual={ah}");
+        }
+
+        Assert.True(errors.Count == 0,
+            $"Position area scrolling-002 mismatches:\n{string.Join("\n", errors)}");
+    }
+
+    [Fact]
     public void Wpt_PositionAreaAnchorPartiallyOutside_MatchesReference()
     {
         var result = RunAnchorPixelTest("position-area-anchor-partially-outside.html");

@@ -166,7 +166,10 @@ internal sealed class WptTestRunner
     };
   }
   if (typeof promise_test === 'undefined') {
-    window.promise_test = function(func, name) { try { func(); } catch(e) {} };
+    // Real testharness.js defers promise_test execution until after
+    // page load. Reference screenshots capture the pre-test DOM, so
+    // we must NOT invoke the callback synchronously here.
+    window.promise_test = function(func, name) {};
   }
   if (typeof assert_equals === 'undefined') {
     window.assert_equals = function(a, b, msg) {};

@@ -1900,6 +1900,73 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Resolves a CSS border-width value from cascaded properties.
+    /// Checks the individual property (e.g. "border-left-width") first,
+    /// then falls back to the "border" shorthand.  The CSS keywords
+    /// "thin", "medium", and "thick" are mapped to 1, 3, and 4 px
+    /// respectively to match <see cref="CssValueParser.GetActualBorderWidth"/>.
+    /// </summary>
+    private static double ResolveBorderWidth(
+        Dictionary<string, string> cssProps,
+        string sideProperty,
+        string shorthandProperty)
+    {
+        if (cssProps.TryGetValue(sideProperty, out var sideVal) && sideVal != null)
+            return ResolveBorderKeywordOrPx(sideVal);
+
+        // Try the border-width shorthand
+        if (cssProps.TryGetValue("border-width", out var bwVal) && bwVal != null)
+            return ResolveBorderKeywordOrPx(bwVal.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0]);
+
+        // Fall back to the border shorthand (e.g. "solid")
+        if (cssProps.TryGetValue(shorthandProperty, out var shortVal) && shortVal != null)
+        {
+            // If the shorthand contains an explicit width, use it; otherwise
+            // the shorthand implies "medium" (3px).
+            foreach (var part in shortVal.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var px = TryParsePx(part);
+                if (px.HasValue)
+                    return px.Value;
+                if (part.Equals("thin", StringComparison.OrdinalIgnoreCase))
+                    return 1;
+                if (part.Equals("thick", StringComparison.OrdinalIgnoreCase))
+                    return 4;
+            }
+            // "border: solid" (style only, no width) → medium = 3px
+            bool hasStyle = false;
+            foreach (var part in shortVal.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (part.Equals("solid", StringComparison.OrdinalIgnoreCase) ||
+                    part.Equals("dotted", StringComparison.OrdinalIgnoreCase) ||
+                    part.Equals("dashed", StringComparison.OrdinalIgnoreCase) ||
+                    part.Equals("double", StringComparison.OrdinalIgnoreCase) ||
+                    part.Equals("groove", StringComparison.OrdinalIgnoreCase) ||
+                    part.Equals("ridge", StringComparison.OrdinalIgnoreCase) ||
+                    part.Equals("inset", StringComparison.OrdinalIgnoreCase) ||
+                    part.Equals("outset", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasStyle = true;
+                    break;
+                }
+            }
+            if (hasStyle)
+                return 3; // medium
+        }
+
+        return 0;
+    }
+
+    /// <summary>Converts a CSS border-width keyword or pixel value to a number.</summary>
+    private static double ResolveBorderKeywordOrPx(string value)
+    {
+        if (value.Equals("thin", StringComparison.OrdinalIgnoreCase)) return 1;
+        if (value.Equals("medium", StringComparison.OrdinalIgnoreCase)) return 3;
+        if (value.Equals("thick", StringComparison.OrdinalIgnoreCase)) return 4;
+        return TryParsePx(value) ?? 0;
+    }
+
+    /// <summary>
     /// Resolves <c>align-self: anchor-center</c> and
     /// <c>justify-self: anchor-center</c> on elements that have
     /// <c>position-anchor</c> but no <c>position-area</c>.
@@ -2627,12 +2694,22 @@ public sealed partial class DomBridge
             {
                 // Find the anchor element to determine its scroll container.
                 var anchorEl = FindElementByAnchorName(positionAnchor);
-                var scrollContainer = anchorEl != null
+                var rawScrollContainer = anchorEl != null
                     ? FindNearestScrollContainer(anchorEl)
                     : null;
 
+                // Only use the scroll container as the CB when the
+                // positioned element is actually inside that scroll
+                // container.  When the element is outside (e.g. the
+                // anchor is in a scrollable sibling), the grid must
+                // be computed against the element's own CB.
+                var scrollContainer = rawScrollContainer != null &&
+                    IsDescendantOfElement(element, rawScrollContainer)
+                        ? rawScrollContainer
+                        : null;
+
                 // Compute the grid cell using the anchor's scroll container
-                // (or the viewport) as the containing block.
+                // (or the element's own CB) as the containing block.
                 var rect = ComputePositionAreaRect(
                     element, anchor, positionArea, scrollContainer);
                 if (rect != null)
@@ -2914,6 +2991,40 @@ public sealed partial class DomBridge
                         resolvedH = contentH;
                     }
 
+                    // When box-sizing is border-box, the resolved width/height
+                    // represent the total (border-box) dimensions.  The renderer
+                    // treats the CSS 'width'/'height' properties as content-box
+                    // dimensions, so we need to subtract borders and padding to
+                    // get the correct content width/height.  We also set explicit
+                    // pixel border-width values in the inline style so the
+                    // renderer uses CSS-spec values (medium=3px) rather than its
+                    // own default (medium=2px).
+                    double borderBoxW = resolvedW;
+                    double borderBoxH = resolvedH;
+                    string? boxSizing = cssProps.GetValueOrDefault("box-sizing");
+                    if (boxSizing != null &&
+                        boxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase) &&
+                        !hasPercentBoxProps)
+                    {
+                        double bdrL = ResolveBorderWidth(cssProps, "border-left-width", "border");
+                        double bdrR = ResolveBorderWidth(cssProps, "border-right-width", "border");
+                        double bdrT = ResolveBorderWidth(cssProps, "border-top-width", "border");
+                        double bdrB = ResolveBorderWidth(cssProps, "border-bottom-width", "border");
+
+                        resolvedW -= bdrL + bdrR + padLeft + padRight;
+                        resolvedH -= bdrT + bdrB + padTop + padBottom;
+                        if (resolvedW < 0) resolvedW = 0;
+                        if (resolvedH < 0) resolvedH = 0;
+
+                        // Override border-width with explicit pixel values so
+                        // the renderer doesn't use its own keyword mapping
+                        // (which maps medium→2px instead of the spec's 3px).
+                        if (bdrT > 0) element.Style["border-top-width"] = $"{bdrT.ToString(CultureInfo.InvariantCulture)}px";
+                        if (bdrR > 0) element.Style["border-right-width"] = $"{bdrR.ToString(CultureInfo.InvariantCulture)}px";
+                        if (bdrB > 0) element.Style["border-bottom-width"] = $"{bdrB.ToString(CultureInfo.InvariantCulture)}px";
+                        if (bdrL > 0) element.Style["border-left-width"] = $"{bdrL.ToString(CultureInfo.InvariantCulture)}px";
+                    }
+
                     element.Style["left"] = $"{finalLeft.ToString(CultureInfo.InvariantCulture)}px";
                     element.Style["top"] = $"{finalTop.ToString(CultureInfo.InvariantCulture)}px";
                     element.Style["width"] = $"{resolvedW.ToString(CultureInfo.InvariantCulture)}px";
@@ -2924,10 +3035,11 @@ public sealed partial class DomBridge
                         scrollContainersNeedingRelative.Add(scrollContainer);
 
                     // Store resolved offsets for JS offset property queries.
+                    // Use border-box dimensions (matching offsetWidth/offsetHeight).
                     element.DomProperties["_resolvedLeft"] = finalLeft;
                     element.DomProperties["_resolvedTop"] = finalTop;
-                    element.DomProperties["_resolvedWidth"] = resolvedW;
-                    element.DomProperties["_resolvedHeight"] = resolvedH;
+                    element.DomProperties["_resolvedWidth"] = borderBoxW;
+                    element.DomProperties["_resolvedHeight"] = borderBoxH;
                 }
             }
         }
@@ -3170,6 +3282,21 @@ public sealed partial class DomBridge
             parent = parent.Parent;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when <paramref name="el"/> is a descendant of
+    /// <paramref name="potentialAncestor"/> in the DOM tree.
+    /// </summary>
+    private static bool IsDescendantOfElement(DomElement el, DomElement potentialAncestor)
+    {
+        var current = el.Parent;
+        while (current != null)
+        {
+            if (ReferenceEquals(current, potentialAncestor)) return true;
+            current = current.Parent;
+        }
+        return false;
     }
 
     private enum AxisSelection { Start, Center, End, SpanStart, SpanEnd, SpanAll }
