@@ -208,12 +208,16 @@ internal sealed class WptTestRunner
     /// </summary>
     private const string BrowserApiStubs = @"
 (function() {
-  if (typeof requestAnimationFrame === 'undefined') {
-    window.requestAnimationFrame = function(cb) { cb(0); return 0; };
-  }
-  if (typeof cancelAnimationFrame === 'undefined') {
-    window.cancelAnimationFrame = function(id) {};
-  }
+  // Always override requestAnimationFrame with a synchronous stub.
+  // DomBridge registers a native async rAF that queues callbacks into
+  // _rafCallbacks for later execution via FlushTimerStep().  However,
+  // style mutations (e.g. element.style.display = 'none') made inside
+  // those async callbacks do not persist correctly on the C# DomElement.
+  // By unconditionally replacing rAF with a synchronous implementation,
+  // callbacks execute immediately during Eval / FireWindowLoadEvent,
+  // which avoids the FlushTimerStep persistence bug.
+  window.requestAnimationFrame = function(cb) { cb(0); return 0; };
+  window.cancelAnimationFrame = function(id) {};
   if (typeof takeScreenshot === 'undefined') {
     window.takeScreenshot = function() {
       if (document.documentElement) {
