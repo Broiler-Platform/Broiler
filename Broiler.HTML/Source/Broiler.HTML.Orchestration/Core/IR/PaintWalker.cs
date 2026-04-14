@@ -159,33 +159,61 @@ internal static class PaintWalker
     /// Finds the canvas background color AND image source per CSS2.1 §14.2.
     /// The cascade is: root → html → body, but body is only considered when
     /// html has BOTH transparent background-color AND no background-image.
+    /// <para>
+    /// CSS Backgrounds §2.11.1 and CSS Containment §4.2: propagation is
+    /// suppressed when the source element has <c>display: none</c>,
+    /// <c>display: contents</c>, or <c>contain: paint</c>.
+    /// </para>
     /// Returns (color, colorSource, imageSource).
     /// </summary>
     private static (Color Color, Fragment? ColorSource, Fragment? ImageSource) FindCanvasBackgroundAndImage(Fragment root)
     {
         // Check root itself.
         if (root.Style.ActualBackgroundColor.A > 0 || root.BackgroundImageHandle != null)
+        {
+            // CSS Backgrounds §2.11.1: if the root element has display:none
+            // its background must not propagate to the canvas.
+            if (SuppressesPropagation(root))
+                return (Color.Empty, null, null);
+
             return (root.Style.ActualBackgroundColor, root,
                 root.BackgroundImageHandle != null ? root : null);
+        }
 
         // Step 1: html element.
         Fragment? html = FindFirstBlockChild(root) ?? FindFirstVisibleChild(root);
         if (html == null)
             return (Color.Empty, null, null);
 
+        // CSS Containment §4.2: contain:paint on the html element prevents
+        // propagation from body.
+        bool htmlSuppressed = SuppressesPropagation(html);
+
         bool htmlHasBg = html.Style.ActualBackgroundColor.A > 0;
         bool htmlHasImg = html.BackgroundImageHandle != null;
 
         if (htmlHasBg || htmlHasImg)
         {
+            if (htmlSuppressed)
+                return (Color.Empty, null, null);
+
             return (html.Style.ActualBackgroundColor,
                 htmlHasBg ? html : null,
                 htmlHasImg ? html : null);
         }
 
         // Step 2: html has no background at all → fall back to body.
+        // But if html has contain:paint, propagation from body is blocked.
+        if (htmlSuppressed)
+            return (Color.Empty, null, null);
+
         Fragment? body = FindFirstBlockChild(html) ?? FindFirstVisibleChild(html);
         if (body == null)
+            return (Color.Empty, null, null);
+
+        // CSS Containment §4.2 / CSS Backgrounds §2.11.1: body with
+        // contain:paint or display:contents/none does not propagate.
+        if (SuppressesPropagation(body))
             return (Color.Empty, null, null);
 
         bool bodyHasBg = body.Style.ActualBackgroundColor.A > 0;
@@ -199,6 +227,39 @@ internal static class PaintWalker
         }
 
         return (Color.Empty, null, null);
+    }
+
+    /// <summary>
+    /// Returns <see langword="true"/> when the given fragment's CSS properties
+    /// suppress background propagation to the canvas.  Per the CSS
+    /// Backgrounds and CSS Containment specifications, propagation is
+    /// suppressed when:
+    /// <list type="bullet">
+    ///   <item><c>display: none</c> — the element generates no box.</item>
+    ///   <item><c>display: contents</c> — the element generates no principal box.</item>
+    ///   <item><c>contain: paint</c> (or a shorthand that includes paint,
+    ///         e.g. <c>strict</c>, <c>content</c>) — paint containment
+    ///         prevents the background from propagating.</item>
+    /// </list>
+    /// </summary>
+    private static bool SuppressesPropagation(Fragment fragment)
+    {
+        var display = fragment.Style.Display;
+        if (display is "none" or "contents")
+            return true;
+
+        var contain = fragment.Style.Contain;
+        if (!string.IsNullOrEmpty(contain) && contain != "none")
+        {
+            // contain: strict = size layout style paint
+            // contain: content = layout style paint
+            if (contain.Contains("paint", StringComparison.OrdinalIgnoreCase)
+                || contain.Equals("strict", StringComparison.OrdinalIgnoreCase)
+                || contain.Equals("content", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>

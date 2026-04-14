@@ -111,6 +111,7 @@ internal static class CssUtils
             "break-inside" => cssBox.BreakInside,
             "grid-row" => cssBox.GridRow,
             "grid-column" => cssBox.GridColumn,
+            "contain" => cssBox.Contain,
             _ => null,
         };
     }
@@ -232,6 +233,9 @@ internal static class CssUtils
                 break;
             case "grid-column":
                 cssBox.GridColumn = value;
+                break;
+            case "contain":
+                cssBox.Contain = value;
                 break;
             case "columns":
                 // CSS Multi-column §3: 'columns' is a shorthand for

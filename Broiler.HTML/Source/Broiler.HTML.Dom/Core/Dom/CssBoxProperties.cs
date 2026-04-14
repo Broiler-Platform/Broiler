@@ -432,6 +432,17 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string Filter { get; set; } = "none";
     public string Isolation { get; set; } = "auto";
     public string BackgroundClip { get; set; } = "border-box";
+
+    /// <summary>
+    /// CSS Containment Module Level 2: the <c>contain</c> property.
+    /// Values include <c>none</c>, <c>strict</c>, <c>content</c>,
+    /// <c>size</c>, <c>layout</c>, <c>style</c>, <c>paint</c>,
+    /// or a space-separated combination of the last four keywords.
+    /// Used by background propagation (CSS Backgrounds §2.11.1):
+    /// <c>contain: paint</c> on html or body suppresses canvas
+    /// background propagation.
+    /// </summary>
+    public string Contain { get; set; } = "none";
     public string Transform { get; set; } = "none";
     public string FlexDirection { get; set; } = "row";
     public string JustifyContent { get; set; } = "flex-start";
