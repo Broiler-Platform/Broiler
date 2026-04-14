@@ -1914,9 +1914,20 @@ public sealed partial class DomBridge
         if (cssProps.TryGetValue(sideProperty, out var sideVal) && sideVal != null)
             return ResolveBorderKeywordOrPx(sideVal);
 
-        // Try the border-width shorthand
+        // Try the border-width shorthand (1-4 values: top [right [bottom [left]]])
         if (cssProps.TryGetValue("border-width", out var bwVal) && bwVal != null)
-            return ResolveBorderKeywordOrPx(bwVal.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0]);
+        {
+            var parts = bwVal.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            int idx = sideProperty switch
+            {
+                "border-top-width" => 0,
+                "border-right-width" => parts.Length > 1 ? 1 : 0,
+                "border-bottom-width" => parts.Length > 2 ? 2 : 0,
+                "border-left-width" => parts.Length > 3 ? 3 : (parts.Length > 1 ? 1 : 0),
+                _ => 0
+            };
+            return ResolveBorderKeywordOrPx(parts[idx]);
+        }
 
         // Fall back to the border shorthand (e.g. "solid")
         if (cssProps.TryGetValue(shorthandProperty, out var shortVal) && shortVal != null)
@@ -3019,10 +3030,12 @@ public sealed partial class DomBridge
                         // Override border-width with explicit pixel values so
                         // the renderer doesn't use its own keyword mapping
                         // (which maps medium→2px instead of the spec's 3px).
-                        if (bdrT > 0) element.Style["border-top-width"] = $"{bdrT.ToString(CultureInfo.InvariantCulture)}px";
-                        if (bdrR > 0) element.Style["border-right-width"] = $"{bdrR.ToString(CultureInfo.InvariantCulture)}px";
-                        if (bdrB > 0) element.Style["border-bottom-width"] = $"{bdrB.ToString(CultureInfo.InvariantCulture)}px";
-                        if (bdrL > 0) element.Style["border-left-width"] = $"{bdrL.ToString(CultureInfo.InvariantCulture)}px";
+                        // Always set the value (even 0px) to ensure the
+                        // renderer doesn't fall back to its keyword defaults.
+                        element.Style["border-top-width"] = $"{bdrT.ToString(CultureInfo.InvariantCulture)}px";
+                        element.Style["border-right-width"] = $"{bdrR.ToString(CultureInfo.InvariantCulture)}px";
+                        element.Style["border-bottom-width"] = $"{bdrB.ToString(CultureInfo.InvariantCulture)}px";
+                        element.Style["border-left-width"] = $"{bdrL.ToString(CultureInfo.InvariantCulture)}px";
                     }
 
                     element.Style["left"] = $"{finalLeft.ToString(CultureInfo.InvariantCulture)}px";
