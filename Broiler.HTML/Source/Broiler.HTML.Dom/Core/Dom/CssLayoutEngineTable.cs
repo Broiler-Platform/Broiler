@@ -650,6 +650,16 @@ internal sealed class CssLayoutEngineTable
         for (int i = 0; i < _allRows.Count; i++)
         {
             var row = _allRows[i];
+
+            // CSS2.1 §17.5.5: Rows with visibility:collapse are hidden and do
+            // not contribute height.  Column widths are still affected (handled
+            // during column width calculation).
+            if (row.Visibility == CssConstants.Collapse)
+            {
+                currentrow++;
+                continue;
+            }
+
             double curx = startx;
             int curCol = 0;
             bool breakPage = false;

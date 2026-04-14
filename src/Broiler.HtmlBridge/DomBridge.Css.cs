@@ -103,6 +103,7 @@ public sealed partial class DomBridge
         ["background-blend-mode"] = "normal",
         ["isolation"] = "auto",
         ["filter"] = "none",
+        ["writing-mode"] = "horizontal-tb",
     };
 
     private static readonly Regex StyleTagPattern = new(

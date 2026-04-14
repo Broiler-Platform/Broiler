@@ -393,6 +393,13 @@ internal static class CssLayoutEngine
             dist = (cellbot - bottom) / 2;
         }
 
+        // CSS Box Alignment §6.2: When align-content is 'normal' on a
+        // table cell, vertical-align maps to safe alignment.  If the
+        // content overflows the cell (dist < 0), safe alignment clamps
+        // to start (top), preventing negative shifts.
+        if (dist < 0 && (cell.AlignContent == null || cell.AlignContent == "normal"))
+            dist = 0;
+
         foreach (CssBox b in cell.Boxes)
         {
             b.OffsetTop(dist);

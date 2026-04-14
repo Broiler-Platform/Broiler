@@ -1565,36 +1565,81 @@ internal class CssBox : CssBoxProperties, IDisposable
                 bool hasT = Top != null && Top != CssConstants.Auto;
                 bool hasB = Bottom != null && Bottom != CssConstants.Auto;
 
+                // CSS Writing Modes Level 4: the containing block's writing mode
+                // determines which physical axis corresponds to justify-self (inline)
+                // and align-self (block).
+                bool cbVertical = cb.WritingMode == "vertical-rl" || cb.WritingMode == "vertical-lr";
+
                 float newX = Location.X, newY = Location.Y;
 
-                if (hasL && hasR && jsPostNonDefault)
+                // justify-self controls the inline axis:
+                //   horizontal-tb → horizontal (L/R insets)
+                //   vertical-rl/lr → vertical (T/B insets)
+                if (jsPostNonDefault)
                 {
-                    double cssLeft = CssValueParser.ParseLength(Left, cbPadWidth, GetEmHeight());
-                    double cssRight = CssValueParser.ParseLength(Right, cbPadWidth, GetEmHeight());
-                    double imcbLeft = cbPadLeft + cssLeft;
-                    double imcbWidth = cbPadWidth - cssLeft - cssRight;
+                    if (!cbVertical && hasL && hasR)
+                    {
+                        double cssLeft = CssValueParser.ParseLength(Left, cbPadWidth, GetEmHeight());
+                        double cssRight = CssValueParser.ParseLength(Right, cbPadWidth, GetEmHeight());
+                        double imcbLeft = cbPadLeft + cssLeft;
+                        double imcbWidth = cbPadWidth - cssLeft - cssRight;
 
-                    double boxWidth = GetShrinkToFitWidth();
-                    Size = new SizeF((float)boxWidth, Size.Height);
+                        double boxWidth = GetShrinkToFitWidth();
+                        Size = new SizeF((float)boxWidth, Size.Height);
 
-                    bool isRtl = Direction == "rtl";
-                    double dx = ResolveAbsposSelfAlignment(
-                        jsPost, imcbWidth, boxWidth, isRtl);
-                    newX = (float)(imcbLeft + dx + ActualMarginLeft);
+                        bool isRtl = Direction == "rtl";
+                        double dx = ResolveAbsposSelfAlignment(
+                            jsPost, imcbWidth, boxWidth, isRtl);
+                        newX = (float)(imcbLeft + dx + ActualMarginLeft);
+                    }
+                    else if (cbVertical && hasT && hasB)
+                    {
+                        double cssTop = CssValueParser.ParseLength(Top, cbPadHeight, GetEmHeight());
+                        double cssBottom = CssValueParser.ParseLength(Bottom, cbPadHeight, GetEmHeight());
+                        double imcbTop = cbPadTop + cssTop;
+                        double imcbHeight = cbPadHeight - cssTop - cssBottom;
+
+                        double boxHeight = GetShrinkToFitHeight();
+
+                        double dy = ResolveAbsposSelfAlignment(
+                            jsPost, imcbHeight, boxHeight, false);
+                        newY = (float)(imcbTop + dy + ActualMarginTop);
+                    }
                 }
 
-                if (hasT && hasB && asPostNonDefault)
+                // align-self controls the block axis:
+                //   horizontal-tb → vertical (T/B insets)
+                //   vertical-rl/lr → horizontal (L/R insets)
+                if (asPostNonDefault)
                 {
-                    double cssTop = CssValueParser.ParseLength(Top, cbPadHeight, GetEmHeight());
-                    double cssBottom = CssValueParser.ParseLength(Bottom, cbPadHeight, GetEmHeight());
-                    double imcbTop = cbPadTop + cssTop;
-                    double imcbHeight = cbPadHeight - cssTop - cssBottom;
+                    if (!cbVertical && hasT && hasB)
+                    {
+                        double cssTop = CssValueParser.ParseLength(Top, cbPadHeight, GetEmHeight());
+                        double cssBottom = CssValueParser.ParseLength(Bottom, cbPadHeight, GetEmHeight());
+                        double imcbTop = cbPadTop + cssTop;
+                        double imcbHeight = cbPadHeight - cssTop - cssBottom;
 
-                    double boxHeight = GetShrinkToFitHeight();
+                        double boxHeight = GetShrinkToFitHeight();
 
-                    double dy = ResolveAbsposSelfAlignment(
-                        asPost, imcbHeight, boxHeight, false);
-                    newY = (float)(imcbTop + dy + ActualMarginTop);
+                        double dy = ResolveAbsposSelfAlignment(
+                            asPost, imcbHeight, boxHeight, false);
+                        newY = (float)(imcbTop + dy + ActualMarginTop);
+                    }
+                    else if (cbVertical && hasL && hasR)
+                    {
+                        double cssLeft = CssValueParser.ParseLength(Left, cbPadWidth, GetEmHeight());
+                        double cssRight = CssValueParser.ParseLength(Right, cbPadWidth, GetEmHeight());
+                        double imcbLeft = cbPadLeft + cssLeft;
+                        double imcbWidth = cbPadWidth - cssLeft - cssRight;
+
+                        double boxWidth = GetShrinkToFitWidth();
+                        Size = new SizeF((float)boxWidth, Size.Height);
+
+                        bool isRtl = Direction == "rtl";
+                        double dx = ResolveAbsposSelfAlignment(
+                            asPost, imcbWidth, boxWidth, isRtl);
+                        newX = (float)(imcbLeft + dx + ActualMarginLeft);
+                    }
                 }
 
                 if (newX != Location.X || newY != Location.Y)
@@ -1623,9 +1668,11 @@ internal class CssBox : CssBoxProperties, IDisposable
         // falls back to start when content overflows, but for blocks this
         // is handled implicitly (shift is clamped to ≥ 0).
         if (AlignContent != null && AlignContent != "normal"
-            && (IsBlock || Display == CssConstants.ListItem || Display == CssConstants.InlineBlock)
+            && (IsBlock || Display == CssConstants.ListItem || Display == CssConstants.InlineBlock
+                || Display == CssConstants.TableCell)
             && Boxes.Count > 0
-            && Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
+            && (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height)
+                || Display == CssConstants.TableCell))
         {
             double borderBoxHeight = ActualBottom - Location.Y;
             double containerContentHeight = borderBoxHeight
@@ -1655,15 +1702,23 @@ internal class CssBox : CssBoxProperties, IDisposable
                 double usedContentHeight = contentBottom - contentTop;
                 double freeSpace = containerContentHeight - usedContentHeight;
 
-                if (freeSpace > 0.5)
-                {
-                    // Normalise the align-content value: strip safe/unsafe prefix.
-                    string ac = AlignContent.Trim();
-                    if (ac.StartsWith("safe ", StringComparison.OrdinalIgnoreCase))
-                        ac = ac.Substring(5).Trim();
-                    else if (ac.StartsWith("unsafe ", StringComparison.OrdinalIgnoreCase))
-                        ac = ac.Substring(7).Trim();
+                // Normalise the align-content value: strip safe/unsafe prefix.
+                string ac = AlignContent.Trim();
+                bool explicitUnsafe = ac.StartsWith("unsafe ", StringComparison.OrdinalIgnoreCase);
+                bool explicitSafe = ac.StartsWith("safe ", StringComparison.OrdinalIgnoreCase);
+                if (explicitSafe)
+                    ac = ac.Substring(5).Trim();
+                else if (explicitUnsafe)
+                    ac = ac.Substring(7).Trim();
 
+                // CSS Box Alignment §5.3: when no explicit safe/unsafe keyword
+                // is present, the default overflow alignment is "safe".
+                bool isSafe = !explicitUnsafe;
+
+                // Only compute shift when there's free space, or when unsafe
+                // mode allows shifting even into overflow.
+                if (freeSpace > 0.5 || (!isSafe && freeSpace < -0.5))
+                {
                     double shift = 0;
                     switch (ac.ToLowerInvariant())
                     {
@@ -1687,11 +1742,11 @@ internal class CssBox : CssBoxProperties, IDisposable
                         // start, flex-start, baseline, normal → no shift.
                     }
 
-                    // Safe alignment: clamp shift to 0 when content overflows.
-                    if (AlignContent.StartsWith("safe ", StringComparison.OrdinalIgnoreCase) && shift < 0)
+                    // Safe alignment: clamp shift to 0 to prevent overflow.
+                    if (isSafe && shift < 0)
                         shift = 0;
 
-                    if (shift > 0.5)
+                    if (Math.Abs(shift) > 0.5)
                     {
                         foreach (var child in Boxes)
                         {

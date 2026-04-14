@@ -439,6 +439,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string AlignContent { get; set; } = "normal";
     public string JustifySelf { get; set; } = "auto";
     public string AlignSelf { get; set; } = "auto";
+    public string WritingMode { get; set; } = "horizontal-tb";
     public string ColumnCount { get; set; } = "auto";
     public string ColumnWidth { get; set; } = "auto";
     public string ColumnFill { get; set; } = "balance";
@@ -1190,6 +1191,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         _lineHeight = p._lineHeight;
         WordBreak = p.WordBreak;
         Direction = p.Direction;
+        WritingMode = p.WritingMode;
         TextShadow = p.TextShadow;
 
         if (!everything)
