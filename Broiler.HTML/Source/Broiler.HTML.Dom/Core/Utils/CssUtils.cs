@@ -104,6 +104,7 @@ internal static class CssUtils
             "align-content" => cssBox.AlignContent,
             "justify-self" => cssBox.JustifySelf,
             "align-self" => cssBox.AlignSelf,
+            "writing-mode" => cssBox.WritingMode,
             "column-count" => cssBox.ColumnCount,
             "column-width" => cssBox.ColumnWidth,
             "column-fill" => cssBox.ColumnFill,
@@ -210,6 +211,9 @@ internal static class CssUtils
                 break;
             case "align-self":
                 cssBox.AlignSelf = value;
+                break;
+            case "writing-mode":
+                cssBox.WritingMode = value;
                 break;
             case "column-count":
                 cssBox.ColumnCount = value;
