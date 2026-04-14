@@ -11,6 +11,13 @@ public sealed class ComputedStyle
     /// <summary>Semantic role of the element, derived from tag name during style resolution.</summary>
     public BoxKind Kind { get; init; } = BoxKind.Anonymous;
 
+    /// <summary>
+    /// Original HTML tag name (e.g. "html", "body", "div"), or <c>null</c>
+    /// for anonymous boxes.  Used by canvas background propagation logic
+    /// (CSS 2.1 §14.2) to identify the root and body elements.
+    /// </summary>
+    public string? TagName { get; init; }
+
     // --- Box model (raw CSS strings, matching CssBoxProperties conventions) ---
 
     public string Display { get; init; } = "inline";

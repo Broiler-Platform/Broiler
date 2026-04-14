@@ -12,12 +12,15 @@ internal static class ComputedStyleBuilder
     /// <summary>
     /// Snapshots the computed style of a CssBox, capturing all resolved actual values.
     /// </summary>
-    public static ComputedStyle FromBox(CssBoxProperties box)
+    public static ComputedStyle FromBox(CssBoxProperties box, string? tagName = null)
     {
         return new ComputedStyle
         {
             // Phase 2: Element classification
             Kind = box.Kind,
+
+            // HTML tag name for canvas background propagation (CSS 2.1 §14.2)
+            TagName = tagName,
 
             // Box model
             Display = box.Display,
