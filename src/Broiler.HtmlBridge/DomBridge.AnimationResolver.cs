@@ -125,22 +125,137 @@ public sealed partial class DomBridge
         DomElement element,
         Dictionary<string, List<KeyframeEntry>> keyframesMap)
     {
-        // Check if this element has animation properties set.
+        // Check if this element has animation properties set (inline styles).
+        string? animValue = null, delayValue = null, nameValue = null;
+        bool hasAnimation = false, hasDelay = false, hasName = false;
+
         if (element.Style.Count > 0)
         {
-            var hasAnimation = element.Style.TryGetValue("animation", out var animValue);
-            var hasDelay = element.Style.TryGetValue("animation-delay", out var delayValue);
-            var hasName = element.Style.TryGetValue("animation-name", out var nameValue);
+            hasAnimation = element.Style.TryGetValue("animation", out animValue);
+            hasDelay = element.Style.TryGetValue("animation-delay", out delayValue);
+            hasName = element.Style.TryGetValue("animation-name", out nameValue);
+        }
 
-            if (hasAnimation || hasName)
+        // Also check stylesheet rules that may apply to this element.
+        if (!hasAnimation && !hasName)
+        {
+            var sheetProps = CollectStylesheetAnimationProperties(element);
+            if (sheetProps != null)
             {
-                TryResolveAnimation(element, keyframesMap,
-                    animValue, delayValue, nameValue);
+                if (!hasAnimation && sheetProps.TryGetValue("animation", out var sv))
+                    { hasAnimation = true; animValue = sv; }
+                if (!hasDelay && sheetProps.TryGetValue("animation-delay", out var dv))
+                    { hasDelay = true; delayValue = dv; }
+                if (!hasName && sheetProps.TryGetValue("animation-name", out var nv))
+                    { hasName = true; nameValue = nv; }
             }
+        }
+
+        if (hasAnimation || hasName)
+        {
+            TryResolveAnimation(element, keyframesMap,
+                animValue, delayValue, nameValue);
         }
 
         foreach (var child in element.Children)
             ResolveAnimationsOnTree(child, keyframesMap);
+    }
+
+    // -----------------------------------------------------------------
+    // Stylesheet animation property matching
+    // -----------------------------------------------------------------
+
+    private static readonly Regex AnimCssRulePattern = new(
+        @"(?<selector>[^{@]+)\{(?<declarations>[^}]*)\}",
+        RegexOptions.Compiled | RegexOptions.Singleline);
+
+    /// <summary>
+    /// Collects animation-related properties from <c>&lt;style&gt;</c> elements
+    /// whose selectors match the given element.  This is a simplified matcher
+    /// that handles tag selectors (e.g. <c>body</c>, <c>html</c>).
+    /// </summary>
+    private static Dictionary<string, string>? CollectStylesheetAnimationProperties(DomElement element)
+    {
+        // Walk up to find <style> elements.
+        var root = element;
+        while (root.Parent != null) root = root.Parent;
+
+        Dictionary<string, string>? result = null;
+        CollectAnimPropsFromStyleElements(root, element, ref result);
+        return result;
+    }
+
+    private static void CollectAnimPropsFromStyleElements(
+        DomElement node, DomElement target, ref Dictionary<string, string>? result)
+    {
+        if (string.Equals(node.TagName, "style", StringComparison.OrdinalIgnoreCase))
+        {
+            var css = node.TextContent;
+            if (string.IsNullOrEmpty(css))
+            {
+                css = string.Concat(node.Children
+                    .Where(c => c.IsTextNode)
+                    .Select(c => c.TextContent ?? string.Empty));
+            }
+
+            // Strip @keyframes rules first to avoid matching their inner blocks.
+            var stripped = KeyframesRulePattern.Replace(css, string.Empty);
+
+            foreach (Match m in AnimCssRulePattern.Matches(stripped))
+            {
+                var selector = m.Groups["selector"].Value.Trim();
+                if (!SimpleMatchesElement(selector, target))
+                    continue;
+
+                var declarations = ParseDeclarations(m.Groups["declarations"].Value);
+                foreach (var kv in declarations)
+                {
+                    if (kv.Key.StartsWith("animation", StringComparison.OrdinalIgnoreCase))
+                    {
+                        result ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        result[kv.Key] = kv.Value;
+                    }
+                }
+            }
+        }
+
+        foreach (var child in node.Children)
+            CollectAnimPropsFromStyleElements(child, target, ref result);
+    }
+
+    /// <summary>
+    /// Very simple CSS selector matcher — handles tag names, classes, IDs,
+    /// and <c>:root</c> pseudo-class.  Sufficient for WPT body/html selectors.
+    /// </summary>
+    private static bool SimpleMatchesElement(string selector, DomElement element)
+    {
+        var selTrimmed = selector.Trim().ToLowerInvariant();
+
+        // Tag name selector (e.g. "body", "html")
+        if (selTrimmed == element.TagName?.ToLowerInvariant())
+            return true;
+
+        // :root matches the html element
+        if (selTrimmed == ":root" &&
+            string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // ID selector (e.g. "#myid")
+        if (selTrimmed.StartsWith('#'))
+        {
+            var id = selTrimmed.Substring(1);
+            return string.Equals(element.Id, id, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Class selector (e.g. ".myclass")
+        if (selTrimmed.StartsWith('.'))
+        {
+            var cls = selTrimmed.Substring(1);
+            return element.ClassName?.Split(' ')
+                .Any(c => string.Equals(c, cls, StringComparison.OrdinalIgnoreCase)) == true;
+        }
+
+        return false;
     }
 
     private static void TryResolveAnimation(
@@ -267,13 +382,13 @@ public sealed partial class DomBridge
                     float intervalEnd = after.Position;
                     float localProgress = (progress - intervalStart) / (intervalEnd - intervalStart);
 
-                    // Apply per-interval timing function (steps, etc.).
+                    // Apply per-interval timing function (steps, cubic-bezier, etc.).
                     localProgress = (float)ApplyTimingFunction(localProgress, timingFunction);
 
-                    // For non-numeric values (colors, keywords), use discrete stepping.
-                    result[prop] = localProgress >= 1.0f
-                        ? after.Properties[prop]
-                        : before.Properties[prop];
+                    // Try color interpolation for background-color, color, etc.
+                    var interpolated = TryInterpolateValue(
+                        prop, before.Properties[prop], after.Properties[prop], localProgress);
+                    result[prop] = interpolated;
                 }
             }
         }
@@ -283,6 +398,10 @@ public sealed partial class DomBridge
 
     private static readonly Regex StepsPattern = new(
         @"steps\(\s*(\d+)\s*(?:,\s*(start|end|jump-start|jump-end|jump-none|jump-both))?\s*\)",
+        RegexOptions.Compiled);
+
+    private static readonly Regex CubicBezierPattern = new(
+        @"cubic-bezier\(\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*,\s*([0-9.eE+-]+)\s*\)",
         RegexOptions.Compiled);
 
     private static double ApplyTimingFunction(double progress, string timingFunction)
@@ -301,8 +420,66 @@ public sealed partial class DomBridge
         if (timingFunction == "step-end")
             return ApplySteps(progress, 1, "end");
 
-        // For linear/ease/etc., use the raw progress (close enough for static snapshots).
-        return progress;
+        // Handle cubic-bezier() timing functions.
+        var bezierMatch = CubicBezierPattern.Match(timingFunction);
+        if (bezierMatch.Success)
+        {
+            double x1 = double.Parse(bezierMatch.Groups[1].Value, CultureInfo.InvariantCulture);
+            double y1 = double.Parse(bezierMatch.Groups[2].Value, CultureInfo.InvariantCulture);
+            double x2 = double.Parse(bezierMatch.Groups[3].Value, CultureInfo.InvariantCulture);
+            double y2 = double.Parse(bezierMatch.Groups[4].Value, CultureInfo.InvariantCulture);
+            return SolveCubicBezier(progress, x1, y1, x2, y2);
+        }
+
+        // Named easing keywords.
+        return timingFunction switch
+        {
+            "ease" => SolveCubicBezier(progress, 0.25, 0.1, 0.25, 1.0),
+            "ease-in" => SolveCubicBezier(progress, 0.42, 0.0, 1.0, 1.0),
+            "ease-out" => SolveCubicBezier(progress, 0.0, 0.0, 0.58, 1.0),
+            "ease-in-out" => SolveCubicBezier(progress, 0.42, 0.0, 0.58, 1.0),
+            _ => progress, // linear
+        };
+    }
+
+    /// <summary>
+    /// Evaluates a cubic-bezier timing function: given an x-progress value
+    /// in [0,1], finds the corresponding y-output by Newton-Raphson iteration
+    /// on the x-coordinate polynomial.
+    /// </summary>
+    private static double SolveCubicBezier(double x, double x1, double y1, double x2, double y2)
+    {
+        if (x <= 0) return 0;
+        if (x >= 1) return 1;
+
+        // Solve for t where B_x(t) = x using Newton-Raphson.
+        double t = x; // initial guess
+        for (int i = 0; i < 20; i++)
+        {
+            double bx = BezierCoord(t, x1, x2);
+            double dx = bx - x;
+            if (Math.Abs(dx) < 1e-7) break;
+            double dbx = BezierDerivative(t, x1, x2);
+            if (Math.Abs(dbx) < 1e-12) break;
+            t -= dx / dbx;
+            t = Math.Clamp(t, 0, 1);
+        }
+
+        return BezierCoord(t, y1, y2);
+    }
+
+    // B(t) = 3(1-t)^2 * t * p1 + 3(1-t) * t^2 * p2 + t^3
+    private static double BezierCoord(double t, double p1, double p2)
+    {
+        double omt = 1 - t;
+        return 3 * omt * omt * t * p1 + 3 * omt * t * t * p2 + t * t * t;
+    }
+
+    // B'(t) = 3(1-t)^2 * p1 + 6(1-t)*t*(p2-p1) + 3t^2*(1-p2)
+    private static double BezierDerivative(double t, double p1, double p2)
+    {
+        double omt = 1 - t;
+        return 3 * omt * omt * p1 + 6 * omt * t * (p2 - p1) + 3 * t * t * (1 - p2);
     }
 
     private static double ApplySteps(double progress, int steps, string position)
@@ -378,4 +555,98 @@ public sealed partial class DomBridge
             or "running" or "paused" or "infinite" => true,
         _ => false,
     };
+
+    // -----------------------------------------------------------------
+    // Value interpolation
+    // -----------------------------------------------------------------
+
+    private static readonly Regex RgbPattern = new(
+        @"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex RgbaPattern = new(
+        @"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Attempts to interpolate between two CSS values at the given progress.
+    /// Supports color values (rgb, rgba, named colors) and numeric values.
+    /// Falls back to discrete stepping for unsupported value types.
+    /// </summary>
+    private static string TryInterpolateValue(string prop, string fromValue, string toValue, float progress)
+    {
+        // Try color interpolation for color-related properties.
+        if (IsColorProperty(prop))
+        {
+            if (TryParseRgbColor(fromValue, out int fr, out int fg, out int fb, out double fa) &&
+                TryParseRgbColor(toValue, out int tr, out int tg, out int tb, out double ta))
+            {
+                int r = (int)Math.Round(fr + (tr - fr) * progress);
+                int g = (int)Math.Round(fg + (tg - fg) * progress);
+                int b = (int)Math.Round(fb + (tb - fb) * progress);
+                r = Math.Clamp(r, 0, 255);
+                g = Math.Clamp(g, 0, 255);
+                b = Math.Clamp(b, 0, 255);
+
+                if (Math.Abs(fa - 1.0) < 0.001 && Math.Abs(ta - 1.0) < 0.001)
+                    return $"rgb({r}, {g}, {b})";
+
+                double a = fa + (ta - fa) * progress;
+                return $"rgba({r}, {g}, {b}, {a.ToString("F2", CultureInfo.InvariantCulture)})";
+            }
+        }
+
+        // Fallback: discrete stepping for non-interpolatable values.
+        return progress >= 1.0f ? toValue : fromValue;
+    }
+
+    private static bool IsColorProperty(string prop) => prop switch
+    {
+        "background-color" or "color" or "border-color"
+            or "border-top-color" or "border-right-color"
+            or "border-bottom-color" or "border-left-color"
+            or "outline-color" or "text-decoration-color"
+            or "fill" or "stroke" => true,
+        _ => false,
+    };
+
+    private static bool TryParseRgbColor(string value, out int r, out int g, out int b, out double a)
+    {
+        r = g = b = 0;
+        a = 1.0;
+
+        var m = RgbaPattern.Match(value);
+        if (m.Success)
+        {
+            r = int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
+            g = int.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
+            b = int.Parse(m.Groups[3].Value, CultureInfo.InvariantCulture);
+            if (m.Groups[4].Success)
+                a = double.Parse(m.Groups[4].Value, CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        // Try named colors
+        return TryParseNamedColor(value, out r, out g, out b);
+    }
+
+    private static bool TryParseNamedColor(string name, out int r, out int g, out int b)
+    {
+        r = g = b = 0;
+        switch (name.Trim().ToLowerInvariant())
+        {
+            case "red": r = 255; return true;
+            case "green": g = 128; return true;
+            case "blue": b = 255; return true;
+            case "white": r = g = b = 255; return true;
+            case "black": return true;
+            case "yellow": r = 255; g = 255; return true;
+            case "cyan" or "aqua": g = 255; b = 255; return true;
+            case "magenta" or "fuchsia": r = 255; b = 255; return true;
+            case "lime": g = 255; return true;
+            case "orange": r = 255; g = 165; return true;
+            case "transparent": return true;
+            default: return false;
+        }
+    }
 }

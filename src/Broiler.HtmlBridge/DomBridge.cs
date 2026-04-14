@@ -272,6 +272,27 @@ public sealed partial class DomBridge
     {
         if (_jsContext == null) return;
 
+        // 1. Fire window.onload if it was set by script.
+        //    In browsers, setting `window.onload = fn` registers a handler
+        //    that fires when the page finishes loading.  This is distinct
+        //    from the <body onload="…"> inline attribute handler.
+        try
+        {
+            _jsContext.Eval(@"
+(function() {
+  if (typeof window.onload === 'function') {
+    try { window.onload(); } catch(e) {}
+  }
+})();");
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireWindowLoadEvent",
+                $"Error firing window.onload: {ex.Message}", ex);
+        }
+
+        // 2. Fire <body onload="…"> attribute handler and any load event
+        //    listeners registered on the body element.
         // Find the <body> element by traversing the document tree.
         // The body is a child of <html> (documentElement), which is a
         // child of the document node. It may not appear in the flat

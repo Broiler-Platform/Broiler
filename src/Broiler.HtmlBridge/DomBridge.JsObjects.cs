@@ -135,11 +135,25 @@ public sealed partial class DomBridge
             }, "set textContent"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // style object — CSS property access and manipulation
-        obj.FastAddValue(
+        // style object — CSS property access and manipulation.
+        // In browsers, `element.style` is a read-only property: assigning a
+        // string sets `style.cssText` instead of replacing the object.
+        var styleObj = BuildStyleObject(element);
+        obj.FastAddProperty(
             (KeyString)"style",
-            BuildStyleObject(element),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+            new JSFunction((in Arguments a) => styleObj, "get style"),
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0 && a[0] is JSString s)
+                {
+                    // Setting element.style = "prop: val; ..." parses as cssText
+                    element.Style.Clear();
+                    foreach (var kv in ParseStyle(s.ToString()))
+                        element.Style[kv.Key] = kv.Value;
+                }
+                return JSUndefined.Value;
+            }, "set style"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // classList — class list manipulation
         obj.FastAddValue(
@@ -935,6 +949,27 @@ public sealed partial class DomBridge
                 element.Children[idx] = newEl;
                 return a[1]; // returns the old child
             }, "replaceChild", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // remove() — ChildNode.remove() per DOM Living Standard
+        obj.FastAddValue(
+            (KeyString)"remove",
+            new JSFunction((in Arguments a) =>
+            {
+                if (element.Parent != null)
+                {
+                    var idx = element.Parent.Children.IndexOf(element);
+                    if (idx >= 0)
+                    {
+                        NotifyNodeIteratorPreRemoval(element);
+                        element.Parent.Children.RemoveAt(idx);
+                        var parent = element.Parent;
+                        element.Parent = null;
+                        NotifyChildRemoved(parent, element, idx);
+                    }
+                }
+                return JSUndefined.Value;
+            }, "remove", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- DOM events --
