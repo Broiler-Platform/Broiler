@@ -2535,4 +2535,193 @@ document.getElementById('out').appendChild(p);
         foreach (var c in el.Children)
             FindDomElement(c, id, ref found);
     }
+
+    /// <summary>
+    /// Helper to run a css-align WPT test against a Chromium PNG reference.
+    /// </summary>
+    private void RunCssAlignTest(string subPath, string testLabel)
+    {
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "css-align", subPath);
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var pngName = Path.ChangeExtension(subPath, ".png");
+        var refImage = Path.Combine(refDir, "css", "css-align", pngName);
+        if (!File.Exists(refImage))
+            throw new FileNotFoundException($"Reference image not found: {refImage}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunTest(testFile, refDir, wptRoot);
+
+        Assert.True(result.Passed,
+            $"{testLabel} should pass (match ≥ threshold). " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    /// <summary>
+    /// Helper to run a css-align WPT reftest using RunMatchTest (both test
+    /// and reference rendered by Broiler, avoiding cross-engine differences).
+    /// </summary>
+    private void RunCssAlignMatchTest(string subPath, string refRelPath, string testLabel)
+    {
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var testFile = Path.Combine(wptRoot, "css", "css-align", subPath);
+        // Resolve the reference path relative to the test file's directory.
+        var testDir = Path.GetDirectoryName(testFile)!;
+        var refFile = Path.GetFullPath(Path.Combine(testDir, refRelPath));
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+        if (!File.Exists(refFile))
+            throw new FileNotFoundException($"WPT reference HTML not found: {refFile}");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunMatchTest(testFile, refFile, wptRoot);
+
+        Assert.True(result.Passed,
+            $"{testLabel} should pass (match ≥ threshold). " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_AlignContentTableCell002_MatchesReference()
+    {
+        RunCssAlignMatchTest("blocks/align-content-table-cell-002.html",
+            "../../reference/ref-filled-green-300px-square.html",
+            "align-content-table-cell-002");
+    }
+
+    [Fact]
+    public void Wpt_AlignContentTableCell003_MatchesReference()
+    {
+        RunCssAlignMatchTest("blocks/align-content-table-cell-003.html",
+            "../../reference/ref-filled-green-300px-square.html",
+            "align-content-table-cell-003");
+    }
+
+    [Fact]
+    public void Wpt_AlignContentTableCell004_MatchesReference()
+    {
+        RunCssAlignMatchTest("blocks/align-content-table-cell-004.html",
+            "../../reference/ref-filled-green-300px-square.html",
+            "align-content-table-cell-004");
+    }
+
+    [Fact]
+    public void Wpt_AlignContentTableCell005_MatchesReference()
+    {
+        RunCssAlignMatchTest("blocks/align-content-table-cell-005.html",
+            "../../reference/ref-filled-green-300px-square.html",
+            "align-content-table-cell-005");
+    }
+
+    [Fact]
+    public void Wpt_SafeJustifySelfVrl_MatchesReference()
+    {
+        RunCssAlignTest("blocks/safe-justify-self-vrl.html",
+            "safe-justify-self-vrl");
+    }
+
+    [Fact]
+    public void Wpt_AlignSelfDefaultOverflowVrlRtlHtb_MatchesReference()
+    {
+        RunCssAlignTest("abspos/align-self-default-overflow-vrl-rtl-htb.html",
+            "align-self-default-overflow-vrl-rtl-htb");
+    }
+
+    [Fact]
+    public void Wpt_AlignSelfDefaultOverflowVrlRtlVrl_MatchesReference()
+    {
+        RunCssAlignTest("abspos/align-self-default-overflow-vrl-rtl-vrl.html",
+            "align-self-default-overflow-vrl-rtl-vrl");
+    }
+
+    [Fact]
+    public void Wpt_AlignSelfDefaultOverflowVrlLtrHtb_MatchesReference()
+    {
+        RunCssAlignTest("abspos/align-self-default-overflow-vrl-ltr-htb.html",
+            "align-self-default-overflow-vrl-ltr-htb");
+    }
+
+    [Fact]
+    public void Wpt_AlignSelfDefaultOverflowVrlLtrVrl_MatchesReference()
+    {
+        RunCssAlignTest("abspos/align-self-default-overflow-vrl-ltr-vrl.html",
+            "align-self-default-overflow-vrl-ltr-vrl");
+    }
+
+    [Fact]
+    public void Wpt_AlignSelfDefaultOverflowHtbRtlHtb_MatchesReference()
+    {
+        RunCssAlignTest("abspos/align-self-default-overflow-htb-rtl-htb.html",
+            "align-self-default-overflow-htb-rtl-htb");
+    }
+
+    [Fact]
+    public void Wpt_AlignSelfDefaultOverflowHtbRtlVrl_MatchesReference()
+    {
+        RunCssAlignTest("abspos/align-self-default-overflow-htb-rtl-vrl.html",
+            "align-self-default-overflow-htb-rtl-vrl");
+    }
+
+    [Fact]
+    public void Wpt_JustifySelfDefaultOverflowVrlLtrHtb_MatchesReference()
+    {
+        RunCssAlignTest("abspos/justify-self-default-overflow-vrl-ltr-htb.html",
+            "justify-self-default-overflow-vrl-ltr-htb");
+    }
+
+    [Fact]
+    public void Wpt_JustifySelfDefaultOverflowVrlLtrVrl_MatchesReference()
+    {
+        RunCssAlignTest("abspos/justify-self-default-overflow-vrl-ltr-vrl.html",
+            "justify-self-default-overflow-vrl-ltr-vrl");
+    }
+
+    [Fact]
+    public void Wpt_JustifySelfDefaultOverflowVrlRtlHtb_MatchesReference()
+    {
+        RunCssAlignTest("abspos/justify-self-default-overflow-vrl-rtl-htb.html",
+            "justify-self-default-overflow-vrl-rtl-htb");
+    }
+
+    [Fact]
+    public void Wpt_JustifySelfDefaultOverflowVrlRtlVrl_MatchesReference()
+    {
+        RunCssAlignTest("abspos/justify-self-default-overflow-vrl-rtl-vrl.html",
+            "justify-self-default-overflow-vrl-rtl-vrl");
+    }
+
+    [Fact]
+    public void Wpt_JustifySelfDefaultOverflowHtbLtrHtb_MatchesReference()
+    {
+        RunCssAlignTest("abspos/justify-self-default-overflow-htb-ltr-htb.html",
+            "justify-self-default-overflow-htb-ltr-htb");
+    }
+
+    [Fact]
+    public void Wpt_JustifySelfDefaultOverflowHtbLtrVrl_MatchesReference()
+    {
+        RunCssAlignTest("abspos/justify-self-default-overflow-htb-ltr-vrl.html",
+            "justify-self-default-overflow-htb-ltr-vrl");
+    }
+
+    [Fact]
+    public void Wpt_JustifySelfDefaultOverflowHtbRtlHtb_MatchesReference()
+    {
+        RunCssAlignTest("abspos/justify-self-default-overflow-htb-rtl-htb.html",
+            "justify-self-default-overflow-htb-rtl-htb");
+    }
+
+    [Fact]
+    public void Wpt_JustifySelfDefaultOverflowHtbRtlVrl_MatchesReference()
+    {
+        RunCssAlignTest("abspos/justify-self-default-overflow-htb-rtl-vrl.html",
+            "justify-self-default-overflow-htb-rtl-vrl");
+    }
 }
