@@ -119,6 +119,14 @@ public sealed class HtmlTreeBuilder
                                     target.Id = kvp.Value;
                                 else if (string.Equals(kvp.Key, "class", StringComparison.OrdinalIgnoreCase))
                                     target.ClassName = kvp.Value;
+                                else if (string.Equals(kvp.Key, "style", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    // Parse inline style into the Style dictionary
+                                    // so that serialization emits it correctly.
+                                    target.Attributes[kvp.Key] = kvp.Value;
+                                    foreach (var skv in ParseStyle(kvp.Value))
+                                        target.Style[skv.Key] = skv.Value;
+                                }
                                 else
                                     target.Attributes[kvp.Key] = kvp.Value;
                             }

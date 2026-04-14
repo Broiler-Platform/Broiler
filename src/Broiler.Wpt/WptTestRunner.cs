@@ -771,6 +771,19 @@ internal sealed class WptTestRunner
     }
 
     /// <summary>
+    /// Public wrapper for <see cref="RenderHtmlFile"/> that allows test code
+    /// to render a single HTML file through the full WPT pipeline and inspect
+    /// the resulting bitmap directly (e.g. for visual-inspection tests that
+    /// lack a <c>rel="match"</c> reference).
+    /// </summary>
+    internal SKBitmap RenderHtmlFilePublic(string htmlPath, string? wptRoot)
+    {
+        if (wptRoot != null)
+            EnsureWptFontsLoaded(wptRoot);
+        return RenderHtmlFile(htmlPath, wptRoot);
+    }
+
+    /// <summary>
     /// Runs all discovered tests under <paramref name="wptRoot"/>, comparing
     /// each against reference images in <paramref name="referenceDir"/>.
     /// Yields results as they complete.
