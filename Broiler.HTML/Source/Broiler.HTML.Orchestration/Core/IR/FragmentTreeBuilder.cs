@@ -23,7 +23,7 @@ internal static class FragmentTreeBuilder
 
     private static Fragment BuildFragment(CssBox box)
     {
-        var style = ComputedStyleBuilder.FromBox(box);
+        var style = ComputedStyleBuilder.FromBox(box, box.HtmlTag?.Name);
 
         var children = new List<Fragment>(box.Boxes.Count);
         foreach (var child in box.Boxes)

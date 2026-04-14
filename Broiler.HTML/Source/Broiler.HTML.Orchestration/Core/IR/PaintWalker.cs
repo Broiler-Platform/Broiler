@@ -180,8 +180,10 @@ internal static class PaintWalker
                 root.BackgroundImageHandle != null ? root : null);
         }
 
-        // Step 1: html element.
-        Fragment? html = FindFirstBlockChild(root) ?? FindFirstVisibleChild(root);
+        // Step 1: html element — prefer TagName-based lookup, then
+        // fall back to structural heuristics for trees without tag info.
+        Fragment? html = FindFragmentByTag(root, "html")
+            ?? FindFirstBlockChild(root) ?? FindFirstVisibleChild(root);
         if (html == null)
             return (Color.Empty, null, null);
 
@@ -207,7 +209,12 @@ internal static class PaintWalker
         if (htmlSuppressed)
             return (Color.Empty, null, null);
 
-        Fragment? body = FindFirstBlockChild(html) ?? FindFirstVisibleChild(html);
+        // When body has display:inline, anonymous block wrappers may
+        // intervene between the html fragment and the body fragment.
+        // Use a recursive tag-based search (depth-limited) to locate
+        // the body regardless of box-tree restructuring.
+        Fragment? body = FindFragmentByTag(html, "body")
+            ?? FindFirstBlockChild(html) ?? FindFirstVisibleChild(html);
         if (body == null)
             return (Color.Empty, null, null);
 
@@ -227,6 +234,37 @@ internal static class PaintWalker
         }
 
         return (Color.Empty, null, null);
+    }
+
+    /// <summary>
+    /// Searches for a fragment with the given HTML tag name among direct
+    /// children and, if not found, recursively through anonymous wrapper
+    /// boxes (up to 3 levels deep).  This handles cases where CSS anonymous
+    /// block boxing wraps the target element (e.g. body with display:inline
+    /// containing block-level children).
+    /// </summary>
+    private static Fragment? FindFragmentByTag(Fragment parent, string tagName, int depth = 0)
+    {
+        if (depth > 3) return null;
+
+        foreach (var child in parent.Children)
+        {
+            if (string.Equals(child.Style.TagName, tagName, StringComparison.OrdinalIgnoreCase))
+                return child;
+        }
+
+        // Recurse into anonymous wrappers (no tag name) to find the target.
+        foreach (var child in parent.Children)
+        {
+            if (child.Style.TagName == null && child.Style.Display != "none")
+            {
+                var found = FindFragmentByTag(child, tagName, depth + 1);
+                if (found != null)
+                    return found;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

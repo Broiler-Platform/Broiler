@@ -167,6 +167,7 @@ public sealed class HtmlContainer : IDisposable
         // use the <body> element's background for the canvas.
         if (htmlBox != null)
         {
+            // First try direct children (most common case).
             foreach (var child in htmlBox.Boxes)
             {
                 if (string.Equals(child.HtmlTag?.Name, "body", StringComparison.OrdinalIgnoreCase))
@@ -183,9 +184,56 @@ public sealed class HtmlContainer : IDisposable
                     break;
                 }
             }
+
+            // When body has display:inline, the CSS box model may wrap it
+            // inside anonymous block boxes.  Search recursively for the
+            // body CssBox so that its background still propagates per
+            // CSS 2.1 §14.2.
+            if (bg.IsEmpty || bg.A == 0)
+            {
+                var bodyBox = FindBodyBoxRecursive(htmlBox);
+                if (bodyBox != null)
+                {
+                    if (SuppressesCanvasPropagation(bodyBox))
+                        return Color.Empty;
+
+                    bg = bodyBox.ActualBackgroundColor;
+                    if (!bg.IsEmpty && bg.A > 0)
+                        return bg;
+                }
+            }
         }
 
         return Color.Empty;
+    }
+
+    /// <summary>
+    /// Recursively searches for the <c>&lt;body&gt;</c> CssBox within the
+    /// given parent.  When <c>body</c> has <c>display:inline</c>, the CSS box
+    /// model wraps it inside anonymous block boxes, so a direct-child search
+    /// may fail.  This method walks up to 3 levels deep to find the body element.
+    /// </summary>
+    private static Broiler.HTML.Dom.Core.Dom.CssBox? FindBodyBoxRecursive(
+        Broiler.HTML.Dom.Core.Dom.CssBox parent, int depth = 0)
+    {
+        if (depth > 3) return null;
+
+        foreach (var child in parent.Boxes)
+        {
+            if (string.Equals(child.HtmlTag?.Name, "body", StringComparison.OrdinalIgnoreCase))
+                return child;
+
+            // Only recurse into anonymous boxes (no tag) that might wrap
+            // the body element.
+            if (child.HtmlTag == null)
+            {
+                var found = FindBodyBoxRecursive(child, depth + 1);
+                if (found != null)
+                    return found;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
