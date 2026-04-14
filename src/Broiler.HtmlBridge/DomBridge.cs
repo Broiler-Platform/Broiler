@@ -722,6 +722,12 @@ public sealed class DomElement(
     /// <summary>Text content for text nodes.</summary>
     public string? TextContent { get; set; }
 
+    /// <summary>Tracks CSS property names that were set via JavaScript
+    /// (<c>element.style.prop = value</c>, <c>setProperty</c>, or <c>cssText</c>).
+    /// These must be preserved by <see cref="DomBridge.InvalidateElementStyles"/>
+    /// when the cascade is recalculated after class changes.</summary>
+    public HashSet<string> JsSetStyleProps { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>IDL-level properties that are NOT reflected as content attributes
     /// (e.g. input.value, option.defaultSelected). Keyed by property name.</summary>
     public Dictionary<string, object?> DomProperties { get; } = new(StringComparer.OrdinalIgnoreCase);

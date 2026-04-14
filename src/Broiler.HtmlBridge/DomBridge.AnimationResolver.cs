@@ -102,8 +102,16 @@ public sealed partial class DomBridge
         return entries.OrderBy(e => e.Position).ToList();
     }
 
+    private static readonly Regex CssCommentPattern = new(
+        @"/\*.*?\*/",
+        RegexOptions.Compiled | RegexOptions.Singleline);
+
     private static Dictionary<string, string> ParseDeclarations(string text)
     {
+        // Strip CSS comments before parsing declarations so that comment
+        // text doesn't become part of property names or values.
+        text = CssCommentPattern.Replace(text, string.Empty);
+
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var decl in text.Split(';'))
         {

@@ -363,21 +363,21 @@ public sealed partial class DomBridge
                 inlineStyleProps.Add(kv.Key);
         }
 
-        // 2. Remove all CSS-derived properties (keep inline ones).
+        // 2. Remove all CSS-derived properties (keep inline ones AND JS-set ones).
         var keysToRemove = element.Style.Keys
-            .Where(k => !inlineStyleProps.Contains(k))
+            .Where(k => !inlineStyleProps.Contains(k) && !element.JsSetStyleProps.Contains(k))
             .ToList();
         foreach (var key in keysToRemove)
             element.Style.Remove(key);
 
-        // 3. Re-apply CSS rules that still match.
+        // 3. Re-apply CSS rules that still match (don't override inline or JS-set props).
         foreach (var (selector, _, declarations) in _cssRules)
         {
             if (MatchesSelector(element, selector))
             {
                 foreach (var kv in declarations)
                 {
-                    if (!inlineStyleProps.Contains(kv.Key))
+                    if (!inlineStyleProps.Contains(kv.Key) && !element.JsSetStyleProps.Contains(kv.Key))
                         element.Style[kv.Key] = kv.Value;
                 }
             }

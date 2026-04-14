@@ -148,8 +148,12 @@ public sealed partial class DomBridge
                 {
                     // Setting element.style = "prop: val; ..." parses as cssText
                     element.Style.Clear();
+                    element.JsSetStyleProps.Clear();
                     foreach (var kv in ParseStyle(s.ToString()))
+                    {
                         element.Style[kv.Key] = kv.Value;
+                        element.JsSetStyleProps.Add(kv.Key);
+                    }
                 }
                 return JSUndefined.Value;
             }, "set style"),

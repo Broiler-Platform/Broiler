@@ -604,9 +604,15 @@ public sealed partial class DomBridge
                 var kebab = ToKebabCase(nameStr);
                 var val = value?.ToString() ?? string.Empty;
                 if (string.IsNullOrEmpty(val))
+                {
                     _element.Style.Remove(kebab);
+                    _element.JsSetStyleProps.Remove(kebab);
+                }
                 else
+                {
                     _element.Style[kebab] = val;
+                    _element.JsSetStyleProps.Add(kebab);
+                }
 
                 // Invalidate cached position-area resolution when relevant
                 // properties change so offset queries recompute.
@@ -662,10 +668,14 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 element.Style.Clear();
+                element.JsSetStyleProps.Clear();
                 if (a.Length > 0)
                 {
                     foreach (var kv in ParseStyle(a[0].ToString()))
+                    {
                         element.Style[kv.Key] = kv.Value;
+                        element.JsSetStyleProps.Add(kv.Key);
+                    }
                 }
                 return JSUndefined.Value;
             }, "set cssText"),
@@ -677,7 +687,11 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 if (a.Length >= 2)
-                    element.Style[a[0].ToString()] = a[1].ToString();
+                {
+                    var prop = a[0].ToString();
+                    element.Style[prop] = a[1].ToString();
+                    element.JsSetStyleProps.Add(prop);
+                }
                 return JSUndefined.Value;
             }, "setProperty", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -724,6 +738,7 @@ public sealed partial class DomBridge
                     var prop = a[0].ToString();
                     var removed = element.Style.TryGetValue(prop, out var val) ? val : string.Empty;
                     element.Style.Remove(prop);
+                    element.JsSetStyleProps.Remove(prop);
                     return new JSString(removed);
                 }
                 return new JSString(string.Empty);
