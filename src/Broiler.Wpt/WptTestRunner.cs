@@ -195,8 +195,36 @@ internal sealed class WptTestRunner
   if (typeof checkLayout === 'undefined') {
     window.checkLayout = function(selector, callDone) {};
   }
+})();
+";
+
+    /// <summary>
+    /// Minimal stubs for browser APIs that the DomBridge JavaScript context
+    /// does not natively provide.  These are injected unconditionally before
+    /// any test scripts execute so that common Web APIs (such as
+    /// <c>requestAnimationFrame</c>) are available even when testharness.js
+    /// is not referenced.  WPT tests that use <c>requestAnimationFrame</c>
+    /// inside <c>window.onload</c> handlers depend on this.
+    /// </summary>
+    private const string BrowserApiStubs = @"
+(function() {
   if (typeof requestAnimationFrame === 'undefined') {
     window.requestAnimationFrame = function(cb) { cb(0); return 0; };
+  }
+  if (typeof cancelAnimationFrame === 'undefined') {
+    window.cancelAnimationFrame = function(id) {};
+  }
+  if (typeof takeScreenshot === 'undefined') {
+    window.takeScreenshot = function() {
+      if (document.documentElement) {
+        document.documentElement.classList.remove('reftest-wait');
+      }
+    };
+  }
+  if (typeof waitForAtLeastOneFrame === 'undefined') {
+    window.waitForAtLeastOneFrame = function() {
+      return Promise.resolve();
+    };
   }
 })();
 ";
@@ -871,6 +899,12 @@ internal sealed class WptTestRunner
         if (needsStubs)
             scripts.Insert(0, TestharnessStubs);
 
+        // Always inject browser API stubs (requestAnimationFrame, etc.)
+        // so that tests relying on common Web APIs work even without
+        // testharness.js.  Insert at position 0 so they are available
+        // before any test script code runs.
+        scripts.Insert(0, BrowserApiStubs);
+
         if (scripts.Count == 0 && deferredScripts.Count == 0)
         {
             // Even with no inline scripts, we still need to process anchor
@@ -878,6 +912,8 @@ internal sealed class WptTestRunner
             using var context2 = new JSContext();
             var bridge2 = new DomBridge();
             bridge2.Attach(context2, html, url);
+            // Inject browser API stubs so onload handlers etc. can reference them.
+            try { context2.Eval(BrowserApiStubs); } catch { /* best-effort */ }
             bridge2.FireWindowLoadEvent();
             bridge2.FlushTimers();
             bridge2.ResolveAnimationSnapshots();

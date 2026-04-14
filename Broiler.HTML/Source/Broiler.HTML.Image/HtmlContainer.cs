@@ -149,6 +149,13 @@ public sealed class HtmlContainer : IDisposable
             if (string.Equals(child.HtmlTag?.Name, "html", StringComparison.OrdinalIgnoreCase))
             {
                 htmlBox = child;
+
+                // CSS Backgrounds §2.11.1: display:none / display:contents
+                // and CSS Containment §4.2: contain:paint on the root
+                // element suppress propagation to the canvas.
+                if (SuppressesCanvasPropagation(child))
+                    return Color.Empty;
+
                 bg = child.ActualBackgroundColor;
                 if (!bg.IsEmpty && bg.A > 0)
                     return bg;
@@ -164,6 +171,12 @@ public sealed class HtmlContainer : IDisposable
             {
                 if (string.Equals(child.HtmlTag?.Name, "body", StringComparison.OrdinalIgnoreCase))
                 {
+                    // CSS Backgrounds §2.11.1 / Containment §4.2:
+                    // body with display:none/contents or contain:paint
+                    // does not propagate to the canvas.
+                    if (SuppressesCanvasPropagation(child))
+                        return Color.Empty;
+
                     bg = child.ActualBackgroundColor;
                     if (!bg.IsEmpty && bg.A > 0)
                         return bg;
@@ -173,6 +186,30 @@ public sealed class HtmlContainer : IDisposable
         }
 
         return Color.Empty;
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> if the given CssBox has properties that suppress
+    /// background propagation to the canvas (display:none, display:contents,
+    /// contain:paint/strict/content).
+    /// </summary>
+    private static bool SuppressesCanvasPropagation(Broiler.HTML.Dom.Core.Dom.CssBox box)
+    {
+        var display = box.Display;
+        if (string.Equals(display, "none", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (string.Equals(display, "contents", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var contain = box.Contain;
+        if (!string.IsNullOrEmpty(contain))
+        {
+            var lower = contain.ToLowerInvariant();
+            if (lower.Contains("paint") || lower.Contains("strict") || lower.Contains("content"))
+                return true;
+        }
+
+        return false;
     }
 
     public void Dispose() => HtmlContainerInt.Dispose();
