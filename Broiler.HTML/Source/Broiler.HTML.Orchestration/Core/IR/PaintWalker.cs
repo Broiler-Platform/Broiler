@@ -1908,7 +1908,23 @@ internal static class PaintWalker
         int openParen = gradFunc.IndexOf('(');
         if (openParen < 0) return null;
 
-        string inner = gradFunc.Substring(openParen + 1).TrimEnd(')').Trim();
+        // Find the matching closing paren for the outer linear-gradient().
+        // We cannot use TrimEnd(')') as it would strip closing parens of
+        // nested color functions like rgba().
+        int depth = 0;
+        int closeParen = -1;
+        for (int ci = openParen; ci < gradFunc.Length; ci++)
+        {
+            if (gradFunc[ci] == '(') depth++;
+            else if (gradFunc[ci] == ')')
+            {
+                depth--;
+                if (depth == 0) { closeParen = ci; break; }
+            }
+        }
+        if (closeParen < 0) closeParen = gradFunc.Length;
+
+        string inner = gradFunc.Substring(openParen + 1, closeParen - openParen - 1).Trim();
         if (string.IsNullOrEmpty(inner)) return null;
 
         var tokens = SplitOnTopLevelCommas(inner);
