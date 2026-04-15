@@ -604,6 +604,23 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                     width += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
                 }
+                else if ((Position == CssConstants.Absolute || Position == CssConstants.Fixed)
+                    && Left != null && Left != CssConstants.Auto
+                    && Right != null && Right != CssConstants.Auto)
+                {
+                    // CSS2.1 §10.3.7: For absolutely positioned, non-replaced
+                    // elements when width is auto and both left and right are
+                    // specified, compute width from the constraint equation:
+                    // left + margin-left + width + margin-right + right = CB width
+                    double cbContentWidth = width;
+                    if (Position == CssConstants.Fixed && ContainerInt != null)
+                        cbContentWidth = ContainerInt.ViewportSize.Width;
+                    double cssLeft = CssValueParser.ParseLength(Left, cbContentWidth, GetEmHeight());
+                    double cssRight = CssValueParser.ParseLength(Right, cbContentWidth, GetEmHeight());
+                    width = cbContentWidth - cssLeft - cssRight - ActualMarginLeft - ActualMarginRight;
+                    if (width < 0) width = 0;
+                    width += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
+                }
 
                 // CSS2.1 §10.4: Apply max-width constraint even when
                 // Width is auto — the tentative used width must not exceed
@@ -1418,6 +1435,36 @@ internal class CssBox : CssBoxProperties, IDisposable
                 // by CreateLineBoxes (e.g. from line-height).
                 ActualBottom = Location.Y + borderBoxHeight;
             }
+        }
+        else if ((Position == CssConstants.Absolute || Position == CssConstants.Fixed)
+            && Top != null && Top != CssConstants.Auto
+            && Bottom != null && Bottom != CssConstants.Auto
+            && (Height == CssConstants.Auto || string.IsNullOrEmpty(Height)))
+        {
+            // CSS2.1 §10.6.4: For absolutely positioned, non-replaced
+            // elements when height is auto and both top and bottom are
+            // specified, compute height from the constraint equation:
+            // top + margin-top + height + margin-bottom + bottom = CB height
+            double cbHeight;
+            if (Position == CssConstants.Fixed && ContainerInt != null)
+                cbHeight = ContainerInt.ViewportSize.Height;
+            else
+            {
+                var cb = FindPositionedContainingBlock();
+                cbHeight = (cb.ActualBottom - cb.Location.Y) - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth;
+                // When the containing block is the initial containing block
+                // (root element) and its height hasn't been finalized yet,
+                // fall back to the viewport height.
+                if (cbHeight <= 0 && ContainerInt != null && (cb.ParentBox == null || cb == ContainingBlock))
+                    cbHeight = ContainerInt.ViewportSize.Height;
+            }
+            double cssTop = CssValueParser.ParseLength(Top, cbHeight, GetEmHeight());
+            double cssBottom = CssValueParser.ParseLength(Bottom, cbHeight, GetEmHeight());
+            double resolvedHeight = cbHeight - cssTop - cssBottom - ActualMarginTop - ActualMarginBottom
+                - ActualPaddingTop - ActualPaddingBottom - ActualBorderTopWidth - ActualBorderBottomWidth;
+            if (resolvedHeight < 0) resolvedHeight = 0;
+            double borderBoxH = resolvedHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+            ActualBottom = Location.Y + borderBoxH;
         }
 
         // CSS2.1 §10.7: Apply min-height / max-height constraints.

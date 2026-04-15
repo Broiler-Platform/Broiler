@@ -181,6 +181,43 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
         canvas.Restore();
     }
 
+    /// <summary>
+    /// Creates an off-screen gradient bitmap tile for tiled gradient rendering.
+    /// </summary>
+    public override RImage? CreateLinearGradientTile(int width, int height, Color[] colors, float[] positions, float angle)
+    {
+        if (width <= 0 || height <= 0 || colors == null || colors.Length == 0)
+            return null;
+
+        var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var tileCanvas = new SKCanvas(bitmap);
+
+        // Convert angle (CSS: 0=to top, 90=to right, 180=to bottom) to
+        // SkiaSharp linear gradient start/end points.
+        var radians = angle * Math.PI / 180.0;
+        float cx = width / 2f;
+        float cy = height / 2f;
+        float halfDiag = (float)Math.Max(width, height) / 2f;
+
+        // CSS gradient angles: 0deg = bottom→top, 90deg = left→right, 180deg = top→bottom
+        // SkiaSharp: start and end points define the gradient line
+        float sin = (float)Math.Sin(radians);
+        float cos = (float)Math.Cos(radians);
+        var startPoint = new SKPoint(cx - sin * halfDiag, cy + cos * halfDiag);
+        var endPoint = new SKPoint(cx + sin * halfDiag, cy - cos * halfDiag);
+
+        var skColors = new SKColor[colors.Length];
+        for (int i = 0; i < colors.Length; i++)
+            skColors[i] = Utilities.Utils.Convert(colors[i]);
+
+        using var shader = SKShader.CreateLinearGradient(
+            startPoint, endPoint, skColors, positions, SKShaderTileMode.Clamp);
+        using var paint = new SKPaint { Shader = shader, IsAntialias = true };
+        tileCanvas.DrawRect(0, 0, width, height, paint);
+
+        return new ImageAdapter(bitmap);
+    }
+
     public override void Dispose()
     {
         if (dispose)
