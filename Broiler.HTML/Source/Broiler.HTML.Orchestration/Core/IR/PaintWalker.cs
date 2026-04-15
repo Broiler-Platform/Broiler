@@ -602,6 +602,13 @@ internal static class PaintWalker
             if (rect.Width <= 0 || rect.Height <= 0)
                 continue;
 
+            // CSS Backgrounds §2.11.4: background-clip determines the painting area.
+            // Default is border-box; padding-box clips to inside borders;
+            // content-box clips to inside padding.
+            var fillRect = GetBackgroundClipRect(rect, fragment, style.BackgroundClip);
+            if (fillRect.Width <= 0 || fillRect.Height <= 0)
+                continue;
+
             // Background gradient
             if (style.ActualBackgroundGradient.A > 0 &&
                 style.ActualBackgroundGradient != style.ActualBackgroundColor)
@@ -616,11 +623,11 @@ internal static class PaintWalker
                 var fillColor = style.ActualBackgroundColor.A > 0
                     ? style.ActualBackgroundColor
                     : style.ActualBackgroundGradient;
-                items.Add(new FillRectItem { Bounds = rect, Color = fillColor });
+                items.Add(new FillRectItem { Bounds = fillRect, Color = fillColor });
             }
             else if (style.ActualBackgroundColor.A > 0)
             {
-                items.Add(new FillRectItem { Bounds = rect, Color = style.ActualBackgroundColor });
+                items.Add(new FillRectItem { Bounds = fillRect, Color = style.ActualBackgroundColor });
             }
         }
     }
@@ -646,13 +653,10 @@ internal static class PaintWalker
             if (bounds.Width <= 0 || bounds.Height <= 0)
                 continue;
 
-            // Background image covers the padding box (inside borders)
-            var border = fragment.Border;
-            var imgRect = new RectangleF(
-                bounds.X + (float)border.Left,
-                bounds.Y + (float)border.Top,
-                bounds.Width - (float)(border.Left + border.Right),
-                bounds.Height - (float)(border.Top + border.Bottom));
+            // CSS Backgrounds §2.11.4: background-clip determines the painting area
+            // for background images. Default padding-box for background-origin,
+            // but clip area is controlled by background-clip.
+            var imgRect = GetBackgroundClipRect(bounds, fragment, fragment.Style.BackgroundClip);
 
             if (imgRect.Width <= 0 || imgRect.Height <= 0)
                 continue;
@@ -745,12 +749,7 @@ internal static class PaintWalker
             if (bounds.Width <= 0 || bounds.Height <= 0)
                 continue;
 
-            var border = fragment.Border;
-            var imgRect = new RectangleF(
-                bounds.X + (float)border.Left,
-                bounds.Y + (float)border.Top,
-                bounds.Width - (float)(border.Left + border.Right),
-                bounds.Height - (float)(border.Top + border.Bottom));
+            var imgRect = GetBackgroundClipRect(bounds, fragment, fragment.Style.BackgroundClip);
 
             if (imgRect.Width <= 0 || imgRect.Height <= 0)
                 continue;
@@ -1454,6 +1453,55 @@ internal static class PaintWalker
         if (fragment.InlineRects != null && fragment.InlineRects.Count > 0)
             return fragment.InlineRects;
         return [fragment.Bounds];
+    }
+
+    /// <summary>
+    /// Computes the background painting area from a border-box rectangle based on
+    /// the CSS <c>background-clip</c> property.
+    /// <list type="bullet">
+    ///   <item><c>border-box</c> (default): returns <paramref name="borderBoxRect"/> unchanged.</item>
+    ///   <item><c>padding-box</c>: shrinks by border widths.</item>
+    ///   <item><c>content-box</c>: shrinks by border + padding widths.</item>
+    /// </list>
+    /// </summary>
+    private static RectangleF GetBackgroundClipRect(RectangleF borderBoxRect, Fragment fragment, string backgroundClip)
+    {
+        if (string.IsNullOrEmpty(backgroundClip) ||
+            backgroundClip.Equals("border-box", StringComparison.OrdinalIgnoreCase))
+            return borderBoxRect;
+
+        var border = fragment.Border;
+        float bLeft = (float)border.Left;
+        float bTop = (float)border.Top;
+        float bRight = (float)border.Right;
+        float bBottom = (float)border.Bottom;
+
+        if (backgroundClip.Equals("padding-box", StringComparison.OrdinalIgnoreCase))
+        {
+            return new RectangleF(
+                borderBoxRect.X + bLeft,
+                borderBoxRect.Y + bTop,
+                borderBoxRect.Width - bLeft - bRight,
+                borderBoxRect.Height - bTop - bBottom);
+        }
+
+        if (backgroundClip.Equals("content-box", StringComparison.OrdinalIgnoreCase))
+        {
+            var padding = fragment.Padding;
+            float pLeft = (float)padding.Left;
+            float pTop = (float)padding.Top;
+            float pRight = (float)padding.Right;
+            float pBottom = (float)padding.Bottom;
+
+            return new RectangleF(
+                borderBoxRect.X + bLeft + pLeft,
+                borderBoxRect.Y + bTop + pTop,
+                borderBoxRect.Width - bLeft - bRight - pLeft - pRight,
+                borderBoxRect.Height - bTop - bBottom - pTop - pBottom);
+        }
+
+        // For unsupported values (e.g. "text", "border-area"), fall back to border-box.
+        return borderBoxRect;
     }
 
     /// <summary>
