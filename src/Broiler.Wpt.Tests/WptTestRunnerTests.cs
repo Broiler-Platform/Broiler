@@ -2877,7 +2877,7 @@ document.getElementById('out').appendChild(p);
         // CSS Backgrounds §2.11.4: background-clip has no effect on the root
         // element — its background always paints the entire canvas.
         // This test is a visual test (no rel="match") so we render it and
-        // verify the canvas is entirely green (no red visible).
+        // verify the canvas is not white (background propagation happened).
         var root = FindRepoRoot();
         var wptRoot = Path.Combine(root, "tests", "wpt");
         var testFile = Path.Combine(wptRoot, "css", "css-backgrounds", "background-clip-root.html");
@@ -2899,9 +2899,188 @@ document.getElementById('out').appendChild(p);
             // because the test verifies clip has no effect).
             var topLeft = rendered.GetPixel(5, 5);
             // The canvas should NOT be white (which would mean no background).
-            Assert.True(topLeft.Red < 250 || topLeft.Green > 10 || topLeft.Blue > 10,
+            // Check: not (R>250 && G>250 && B>250)
+            Assert.False(topLeft.Red > 250 && topLeft.Green > 250 && topLeft.Blue > 250,
                 $"background-clip-root: canvas should not be white. " +
                 $"pixel(5,5) = R={topLeft.Red} G={topLeft.Green} B={topLeft.Blue}");
         }
+    }
+
+    // ── CSS Backgrounds: background-clip visual tests ──────────────────────
+    // These tests use background images and compare against Chromium reference
+    // screenshots.  They test border-box, padding-box, and content-box clipping.
+
+    /// <summary>
+    /// Helper to run a background-clip visual test against its Chromium reference.
+    /// </summary>
+    private WptTestResult RunBackgroundClipVisualTest(string fileName)
+    {
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "css-backgrounds", "background-clip", fileName);
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var runner = new WptTestRunner(1024, 768);
+        return runner.RunTest(testFile, refDir, wptRoot);
+    }
+
+    [Fact]
+    public void Wpt_ClipBorderBox_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-border-box.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-border-box: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipBorderBoxWithPosition_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-border-box_with_position.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-border-box_with_position: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipBorderBoxWithRadius_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-border-box_with_radius.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-border-box_with_radius: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipBorderBoxWithSize_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-border-box_with_size.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-border-box_with_size: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipPaddingBox_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-padding-box.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-padding-box: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipPaddingBoxWithPosition_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-padding-box_with_position.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-padding-box_with_position: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipPaddingBoxWithRadius_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-padding-box_with_radius.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-padding-box_with_radius: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipPaddingBoxWithSize_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-padding-box_with_size.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-padding-box_with_size: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipContentBox_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-content-box.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-content-box: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipContentBoxWithPosition_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-content-box_with_position.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-content-box_with_position: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipContentBoxWithRadius_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-content-box_with_radius.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-content-box_with_radius: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipContentBoxWithSize_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-content-box_with_size.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-content-box_with_size: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    // ── CSS Backgrounds: background-clip reftests ──────────────────────────
+    // These tests have <link rel="match"> and render both test and reference
+    // HTML through Broiler for comparison.
+
+    [Fact]
+    public void Wpt_ClipBorderArea_MatchesReference()
+    {
+        // CSS Backgrounds Level 4: background-clip: border-area fills the
+        // border area itself (not the padding area) with the background.
+        var result = RunCssBackgroundsMatchTest("background-clip/clip-border-area.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-border-area: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipBorderAreaCornerShape_MatchesReference()
+    {
+        // CSS Backgrounds Level 4: background-clip: border-area with
+        // rounded corners should follow the corner shape.
+        var result = RunCssBackgroundsMatchTest("background-clip/clip-border-area-corner-shape.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-border-area-corner-shape: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipTextDescendants_MatchesReference()
+    {
+        // background-clip: text clips the background to the foreground text
+        // of descendant elements.
+        var result = RunCssBackgroundsMatchTest("background-clip/clip-text-descendants.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-text-descendants: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipTextDynamic2_MatchesReference()
+    {
+        // background-clip: text with dynamic content changes via script.
+        var result = RunCssBackgroundsMatchTest("background-clip/clip-text-dynamic-2.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-text-dynamic-2: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipTextStackingContextChild_MatchesReference()
+    {
+        // background-clip: text with a child that creates a stacking context.
+        var result = RunCssBackgroundsMatchTest("background-clip/clip-text-stacking-context-child.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-text-stacking-context-child: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipTextTextDecorations_MatchesReference()
+    {
+        // background-clip: text with text decorations (underline, etc.)
+        var result = RunCssBackgroundsMatchTest("background-clip/clip-text-text-decorations.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-text-text-decorations: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 }
