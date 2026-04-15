@@ -38,7 +38,6 @@ public sealed class DisplayList
 [JsonDerivedType(typeof(DrawSvgLineItem), "DrawSvgLine")]
 [JsonDerivedType(typeof(BlendModeItem), "BlendMode")]
 [JsonDerivedType(typeof(RestoreBlendModeItem), "RestoreBlendMode")]
-[JsonDerivedType(typeof(DrawTiledGradientItem), "DrawTiledGradient")]
 public abstract class DisplayItem
 {
     public RectangleF Bounds { get; init; }
@@ -148,38 +147,6 @@ public sealed class BlendModeItem : DisplayItem
 
 /// <summary>Restores from a blend mode layer pushed by <see cref="BlendModeItem"/>.</summary>
 public sealed class RestoreBlendModeItem : DisplayItem { }
-
-/// <summary>
-/// Draws a tiled CSS gradient (e.g. linear-gradient) at a specified tile size.
-/// The rendering backend creates a gradient bitmap on-the-fly and tiles it.
-/// </summary>
-public sealed class DrawTiledGradientItem : DisplayItem
-{
-    /// <summary>CSS gradient function string (e.g. "linear-gradient(rgba(0,255,0,0.5), rgba(0,0,255,0.5))").</summary>
-    public string GradientFunction { get; init; } = string.Empty;
-    /// <summary>Width of each gradient tile in pixels.</summary>
-    public float TileWidth { get; init; }
-    /// <summary>Height of each gradient tile in pixels.</summary>
-    public float TileHeight { get; init; }
-    /// <summary>Rectangle to fill with the tiled pattern.</summary>
-    public RectangleF FillRect { get; init; }
-    /// <summary>Tile origin (top-left of first tile).</summary>
-    public PointF TileOrigin { get; init; }
-    /// <summary>CSS background-repeat value.</summary>
-    public string Repeat { get; init; } = "repeat";
-    /// <summary>Pre-parsed gradient color stops (color, position 0..1 pairs).</summary>
-    public IReadOnlyList<GradientStop>? Stops { get; init; }
-    /// <summary>Gradient angle in degrees (0 = to top, 90 = to right, 180 = to bottom).</summary>
-    public float Angle { get; init; } = 180f;
-}
-
-/// <summary>A single color stop in a CSS gradient.</summary>
-public sealed class GradientStop
-{
-    public Color Color { get; init; }
-    /// <summary>Position along the gradient line (0.0 = start, 1.0 = end).</summary>
-    public float Position { get; init; }
-}
 
 /// <summary>Draws a line between two points (Phase 3).</summary>
 public sealed class DrawLineItem : DisplayItem
