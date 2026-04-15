@@ -58,10 +58,13 @@ internal static class PaintWalker
         // as a unit, per CSS2.1 §14.2).
         var (canvasBg, colorSource, imgSource) = FindCanvasBackgroundAndImage(root);
 
+        // Also check for CSS gradient layers in background-image.
+        var gradientSource = imgSource ?? colorSource ?? FindGradientSource(root);
+
         // Determine root opacity for canvas compositing.
         // CSS Compositing §2.11: the root element's opacity applies to
         // the canvas background (both color and image).
-        var htmlFragment = colorSource ?? imgSource ?? FindFirstBlockChild(root) ?? FindFirstVisibleChild(root);
+        var htmlFragment = colorSource ?? imgSource ?? gradientSource ?? FindFirstBlockChild(root) ?? FindFirstVisibleChild(root);
         float rootOpacity = 1f;
         if (htmlFragment != null
             && htmlFragment.Style.Opacity != null
@@ -81,6 +84,22 @@ internal static class PaintWalker
             finalBg = ApplyRootFilter(htmlFragment, finalBg);
 
             items.Add(new FillRectItem { Bounds = viewport, Color = finalBg });
+        }
+
+        // CSS3 Backgrounds: Handle multiple gradient background layers.
+        // These are stored as comma-separated gradient functions in background-image.
+        if (gradientSource != null && HasGradientBackgroundImage(gradientSource.Style.BackgroundImage))
+        {
+            bool needsOpacity = rootOpacity < 1f;
+            if (needsOpacity)
+                items.Add(new OpacityItem { Bounds = viewport, Opacity = rootOpacity });
+
+            EmitGradientLayers(gradientSource, viewport, viewport, items);
+
+            if (needsOpacity)
+                items.Add(new RestoreOpacityItem { Bounds = viewport });
+
+            return gradientSource;
         }
 
         // CSS2.1 §14.2: The root element's background-image is also
@@ -608,8 +627,15 @@ internal static class PaintWalker
 
     private static void EmitBackgroundImage(Fragment fragment, List<DisplayItem> items, RectangleF viewport = default)
     {
+        // CSS3: handle gradient background layers even without a url-based image.
         if (fragment.BackgroundImageHandle == null)
+        {
+            if (HasGradientBackgroundImage(fragment.Style.BackgroundImage))
+            {
+                EmitElementGradientLayers(fragment, items, viewport);
+            }
             return;
+        }
 
         // Use GetPaintRects to handle inline elements (which may have zero
         // Size but non-empty InlineRects from per-line-box layout).
@@ -705,6 +731,31 @@ internal static class PaintWalker
 
             if (hasBgBlend)
                 items.Add(new RestoreBlendModeItem { Bounds = imgRect });
+        }
+    }
+
+    /// <summary>
+    /// Emits gradient layer display items for a non-canvas element's background.
+    /// </summary>
+    private static void EmitElementGradientLayers(Fragment fragment, List<DisplayItem> items, RectangleF viewport)
+    {
+        var rects = GetPaintRects(fragment);
+        foreach (var bounds in rects)
+        {
+            if (bounds.Width <= 0 || bounds.Height <= 0)
+                continue;
+
+            var border = fragment.Border;
+            var imgRect = new RectangleF(
+                bounds.X + (float)border.Left,
+                bounds.Y + (float)border.Top,
+                bounds.Width - (float)(border.Left + border.Right),
+                bounds.Height - (float)(border.Top + border.Bottom));
+
+            if (imgRect.Width <= 0 || imgRect.Height <= 0)
+                continue;
+
+            EmitGradientLayers(fragment, imgRect, viewport.Width > 0 ? viewport : imgRect, items);
         }
     }
 
@@ -1475,6 +1526,18 @@ internal static class PaintWalker
                 TileOrigin = new PointF(ti.TileOrigin.X + dx, ti.TileOrigin.Y + dy),
                 Repeat = ti.Repeat,
             },
+            DrawTiledGradientItem tg => new DrawTiledGradientItem
+            {
+                Bounds = ob,
+                GradientFunction = tg.GradientFunction,
+                TileWidth = tg.TileWidth,
+                TileHeight = tg.TileHeight,
+                FillRect = OffsetRect(tg.FillRect, dx, dy),
+                TileOrigin = new PointF(tg.TileOrigin.X + dx, tg.TileOrigin.Y + dy),
+                Repeat = tg.Repeat,
+                Stops = tg.Stops,
+                Angle = tg.Angle,
+            },
             ClipItem c => new ClipItem { Bounds = ob, ClipRect = OffsetRect(c.ClipRect, dx, dy) },
             RestoreItem => new RestoreItem { Bounds = ob },
             OpacityItem o => new OpacityItem { Bounds = ob, Opacity = o.Opacity },
@@ -1586,5 +1649,464 @@ internal static class PaintWalker
         }
 
         return (offsetX, offsetY, color);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    //  CSS3 multiple background gradient support
+    // ────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns <c>true</c> if the background-image value contains one or more
+    /// CSS gradient function references (e.g. <c>linear-gradient(…)</c>).
+    /// </summary>
+    private static bool HasGradientBackgroundImage(string? bgImage)
+    {
+        if (string.IsNullOrEmpty(bgImage) || bgImage == "none")
+            return false;
+        return bgImage.Contains("gradient(", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Finds the first fragment in the canvas propagation chain (root → html → body)
+    /// that has gradient functions in its <c>background-image</c>.
+    /// </summary>
+    private static Fragment? FindGradientSource(Fragment root)
+    {
+        if (HasGradientBackgroundImage(root.Style.BackgroundImage))
+            return root;
+
+        Fragment? html = FindFragmentByTag(root, "html")
+            ?? FindFirstBlockChild(root) ?? FindFirstVisibleChild(root);
+        if (html == null) return null;
+
+        if (HasGradientBackgroundImage(html.Style.BackgroundImage))
+            return html;
+
+        // Only fall back to body if html has no background at all.
+        if (html.Style.ActualBackgroundColor.A > 0 || html.BackgroundImageHandle != null)
+            return null;
+
+        Fragment? body = FindFragmentByTag(html, "body")
+            ?? FindFirstBlockChild(html) ?? FindFirstVisibleChild(html);
+        if (body != null && HasGradientBackgroundImage(body.Style.BackgroundImage))
+            return body;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Emits <see cref="DrawTiledGradientItem"/> display items for each gradient
+    /// layer in the fragment's <c>background-image</c>.  Layers are painted
+    /// bottom-most first (last in the comma list) to top-most (first in the list).
+    /// </summary>
+    private static void EmitGradientLayers(Fragment fragment, RectangleF fillRect, RectangleF viewport, List<DisplayItem> items)
+    {
+        var style = fragment.Style;
+        var gradientFunctions = SplitGradientLayers(style.BackgroundImage);
+        if (gradientFunctions.Count == 0) return;
+
+        // Per-layer comma-separated properties.
+        var sizes = SplitOnTopLevelCommas(style.BackgroundSize ?? "auto");
+        var positions = SplitOnTopLevelCommas(style.BackgroundPosition ?? "0% 0%");
+        var repeats = SplitOnTopLevelCommas(style.BackgroundRepeat ?? "repeat");
+        var attachments = SplitOnTopLevelCommas(style.BackgroundAttachment ?? "scroll");
+
+        // CSS3: layers are painted bottom-up. The last listed layer is bottom-most.
+        for (int i = gradientFunctions.Count - 1; i >= 0; i--)
+        {
+            string gradFunc = gradientFunctions[i].Trim();
+            if (string.IsNullOrEmpty(gradFunc) || gradFunc == "none")
+                continue;
+
+            // Cycle per-layer properties (CSS3 Backgrounds §3: values repeat).
+            string sizeStr = sizes.Count > 0 ? sizes[i % sizes.Count].Trim() : "auto";
+            string posStr = positions.Count > 0 ? positions[i % positions.Count].Trim() : "0% 0%";
+            string repeatStr = repeats.Count > 0 ? repeats[i % repeats.Count].Trim() : "repeat";
+            string attachStr = attachments.Count > 0 ? attachments[i % attachments.Count].Trim() : "scroll";
+
+            // Parse the gradient function into color stops and angle.
+            var gradInfo = ParseGradientFunction(gradFunc);
+            if (gradInfo == null || gradInfo.Stops.Count == 0)
+                continue;
+
+            // Parse background-size for this layer.
+            float tileW = fillRect.Width;
+            float tileH = fillRect.Height;
+            ParseBackgroundSize(sizeStr, fillRect.Width, fillRect.Height, out tileW, out tileH);
+
+            // Determine tile origin based on attachment and position.
+            // For 'fixed' attachment: position relative to viewport.
+            // For 'scroll' attachment on root: position relative to root element's box
+            // (which may be offset by margin).
+            bool isFixed = attachStr.Equals("fixed", StringComparison.OrdinalIgnoreCase);
+            var tileOrigin = new PointF(fillRect.X, fillRect.Y);
+
+            if (isFixed)
+            {
+                tileOrigin = new PointF(viewport.X, viewport.Y);
+            }
+            else
+            {
+                // For scroll attachment on root element, position relative to
+                // the root element's box (accounting for margin).
+                float marginLeft = (float)fragment.Margin.Left;
+                float marginTop = (float)fragment.Margin.Top;
+                tileOrigin = new PointF(fillRect.X + marginLeft, fillRect.Y + marginTop);
+            }
+
+            // Apply background-position offset.
+            var posParts = posStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (posParts.Length >= 1)
+            {
+                string xVal = null, yVal = null;
+                foreach (var p in posParts)
+                {
+                    if (IsHorizontalKeyword(p))
+                        xVal = p;
+                    else if (IsVerticalKeyword(p))
+                        yVal = p;
+                    else if (p.Equals("center", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (xVal == null) xVal = p;
+                        else if (yVal == null) yVal = p;
+                    }
+                    else
+                    {
+                        if (xVal == null) xVal = p;
+                        else if (yVal == null) yVal = p;
+                    }
+                }
+                tileOrigin.X += ParsePositionValue(xVal, fillRect.Width, tileW);
+                tileOrigin.Y += ParsePositionValue(yVal, fillRect.Height, tileH);
+            }
+
+            items.Add(new DrawTiledGradientItem
+            {
+                Bounds = fillRect,
+                GradientFunction = gradFunc,
+                TileWidth = tileW,
+                TileHeight = tileH,
+                FillRect = fillRect,
+                TileOrigin = tileOrigin,
+                Repeat = repeatStr,
+                Stops = gradInfo.Stops,
+                Angle = gradInfo.Angle,
+            });
+        }
+    }
+
+    /// <summary>
+    /// Splits a comma-separated CSS background-image value into individual
+    /// gradient function strings, respecting nested parentheses.
+    /// </summary>
+    private static List<string> SplitGradientLayers(string? bgImage)
+    {
+        if (string.IsNullOrEmpty(bgImage) || bgImage == "none")
+            return new List<string>();
+        return SplitOnTopLevelCommas(bgImage);
+    }
+
+    /// <summary>
+    /// Splits a CSS value on top-level commas (outside parentheses).
+    /// </summary>
+    private static List<string> SplitOnTopLevelCommas(string value)
+    {
+        var parts = new List<string>();
+        var sb = new System.Text.StringBuilder();
+        int depth = 0;
+        foreach (char c in value)
+        {
+            if (c == '(') depth++;
+            else if (c == ')' && depth > 0) depth--;
+
+            if (c == ',' && depth == 0)
+            {
+                parts.Add(sb.ToString());
+                sb.Clear();
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
+        if (sb.Length > 0)
+            parts.Add(sb.ToString());
+        return parts;
+    }
+
+    /// <summary>
+    /// Parses a CSS background-size value for a single layer.
+    /// Supports: <c>auto</c>, <c>Wpx Hpx</c>, <c>Wpx</c>.
+    /// </summary>
+    private static void ParseBackgroundSize(string sizeStr, float containerW, float containerH, out float w, out float h)
+    {
+        w = containerW;
+        h = containerH;
+
+        if (string.IsNullOrEmpty(sizeStr) || sizeStr.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var parts = sizeStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 1)
+        {
+            string wp = parts[0].Trim();
+            if (!wp.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            {
+                if (wp.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+                    float.TryParse(wp.AsSpan(0, wp.Length - 2), NumberStyles.Float, CultureInfo.InvariantCulture, out w);
+                else if (wp.EndsWith("%"))
+                {
+                    if (float.TryParse(wp.AsSpan(0, wp.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out float pct))
+                        w = containerW * pct / 100f;
+                }
+                else
+                    float.TryParse(wp, NumberStyles.Float, CultureInfo.InvariantCulture, out w);
+            }
+        }
+        if (parts.Length >= 2)
+        {
+            string hp = parts[1].Trim();
+            if (!hp.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            {
+                if (hp.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+                    float.TryParse(hp.AsSpan(0, hp.Length - 2), NumberStyles.Float, CultureInfo.InvariantCulture, out h);
+                else if (hp.EndsWith("%"))
+                {
+                    if (float.TryParse(hp.AsSpan(0, hp.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out float pct))
+                        h = containerH * pct / 100f;
+                }
+                else
+                    float.TryParse(hp, NumberStyles.Float, CultureInfo.InvariantCulture, out h);
+            }
+        }
+        else if (parts.Length == 1)
+        {
+            // Single value: width is set, height is auto (maintain aspect ratio).
+            // For gradients there's no intrinsic ratio, so use same value for both.
+            h = w;
+        }
+    }
+
+    /// <summary>
+    /// Parsed gradient info: angle and color stops.
+    /// </summary>
+    private sealed class GradientInfo
+    {
+        public float Angle { get; set; } = 180f; // default: to bottom
+        public List<GradientStop> Stops { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Parses a CSS gradient function string into angle and color stops.
+    /// Supports <c>linear-gradient([angle|direction,] color [pos], color [pos], …)</c>.
+    /// </summary>
+    private static GradientInfo? ParseGradientFunction(string gradFunc)
+    {
+        if (!gradFunc.StartsWith("linear-gradient(", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        int openParen = gradFunc.IndexOf('(');
+        if (openParen < 0) return null;
+
+        // Find the matching closing paren for the outer linear-gradient().
+        // We cannot use TrimEnd(')') as it would strip closing parens of
+        // nested color functions like rgba().
+        int depth = 0;
+        int closeParen = -1;
+        for (int ci = openParen; ci < gradFunc.Length; ci++)
+        {
+            if (gradFunc[ci] == '(') depth++;
+            else if (gradFunc[ci] == ')')
+            {
+                depth--;
+                if (depth == 0) { closeParen = ci; break; }
+            }
+        }
+        if (closeParen < 0) closeParen = gradFunc.Length;
+
+        string inner = gradFunc.Substring(openParen + 1, closeParen - openParen - 1).Trim();
+        if (string.IsNullOrEmpty(inner)) return null;
+
+        var tokens = SplitOnTopLevelCommas(inner);
+        if (tokens.Count < 2) return null;
+
+        var info = new GradientInfo();
+        int colorStartIdx = 0;
+
+        // Check if first token is a direction/angle.
+        string first = tokens[0].Trim();
+        if (first.StartsWith("to ", StringComparison.OrdinalIgnoreCase))
+        {
+            info.Angle = ParseCssDirection(first);
+            colorStartIdx = 1;
+        }
+        else if (first.EndsWith("deg", StringComparison.OrdinalIgnoreCase))
+        {
+            if (float.TryParse(first.AsSpan(0, first.Length - 3), NumberStyles.Float, CultureInfo.InvariantCulture, out float deg))
+                info.Angle = deg;
+            colorStartIdx = 1;
+        }
+        else if (first.EndsWith("turn", StringComparison.OrdinalIgnoreCase))
+        {
+            if (float.TryParse(first.AsSpan(0, first.Length - 4), NumberStyles.Float, CultureInfo.InvariantCulture, out float turn))
+                info.Angle = turn * 360f;
+            colorStartIdx = 1;
+        }
+        else if (first.EndsWith("rad", StringComparison.OrdinalIgnoreCase))
+        {
+            if (float.TryParse(first.AsSpan(0, first.Length - 3), NumberStyles.Float, CultureInfo.InvariantCulture, out float rad))
+                info.Angle = (float)(rad * 180.0 / Math.PI);
+            colorStartIdx = 1;
+        }
+
+        // Parse color stops.
+        int stopCount = tokens.Count - colorStartIdx;
+        for (int i = colorStartIdx; i < tokens.Count; i++)
+        {
+            string stopStr = tokens[i].Trim();
+            var stop = ParseGradientStop(stopStr, i - colorStartIdx, stopCount);
+            if (stop != null)
+                info.Stops.Add(stop);
+        }
+
+        return info;
+    }
+
+    /// <summary>
+    /// Parses a CSS gradient direction keyword (e.g. "to bottom", "to top right")
+    /// into degrees (CSS convention: 0=top, 90=right, 180=bottom, 270=left).
+    /// </summary>
+    private static float ParseCssDirection(string direction)
+    {
+        string dir = direction.Trim().ToLowerInvariant();
+        return dir switch
+        {
+            "to top" => 0f,
+            "to top right" or "to right top" => 45f,
+            "to right" => 90f,
+            "to bottom right" or "to right bottom" => 135f,
+            "to bottom" => 180f,
+            "to bottom left" or "to left bottom" => 225f,
+            "to left" => 270f,
+            "to top left" or "to left top" => 315f,
+            _ => 180f,
+        };
+    }
+
+    /// <summary>
+    /// Parses a single CSS gradient color stop (e.g. "rgba(0,255,0,0.5)" or "red 50%").
+    /// </summary>
+    private static GradientStop? ParseGradientStop(string stopStr, int index, int total)
+    {
+        // Default position: evenly distributed.
+        float position = total > 1 ? (float)index / (total - 1) : 0f;
+
+        // Split color from position hint. The position is the last token
+        // if it's a length/percentage, but we need to be careful with
+        // parenthesised color functions like rgba(0,0,0,1).
+        string colorStr = stopStr;
+        string posHint = null;
+
+        // Find the last space at depth 0 to separate color from position.
+        int depth = 0;
+        int lastSpaceAtDepth0 = -1;
+        for (int i = 0; i < stopStr.Length; i++)
+        {
+            if (stopStr[i] == '(') depth++;
+            else if (stopStr[i] == ')' && depth > 0) depth--;
+            else if (stopStr[i] == ' ' && depth == 0)
+                lastSpaceAtDepth0 = i;
+        }
+
+        if (lastSpaceAtDepth0 > 0)
+        {
+            string possiblePos = stopStr.Substring(lastSpaceAtDepth0 + 1).Trim();
+            if (possiblePos.EndsWith("%") || possiblePos.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            {
+                posHint = possiblePos;
+                colorStr = stopStr.Substring(0, lastSpaceAtDepth0).Trim();
+            }
+        }
+
+        // Parse the position.
+        if (posHint != null)
+        {
+            if (posHint.EndsWith("%"))
+            {
+                if (float.TryParse(posHint.AsSpan(0, posHint.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out float pct))
+                    position = pct / 100f;
+            }
+            else if (posHint.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            {
+                // For px-based positions, treat as fraction of a 100px default tile.
+                // The actual tile size will be applied when rendering.
+                if (float.TryParse(posHint.AsSpan(0, posHint.Length - 2), NumberStyles.Float, CultureInfo.InvariantCulture, out float px))
+                    position = px / 100f; // Rough approximation; tile size is applied later.
+            }
+        }
+
+        // Parse the color.
+        Color color = ParseCssColor(colorStr);
+        if (color.IsEmpty)
+            return null;
+
+        return new GradientStop { Color = color, Position = Math.Clamp(position, 0f, 1f) };
+    }
+
+    /// <summary>
+    /// Parses a CSS color value (rgba, rgb, hex, named) into a <see cref="Color"/>.
+    /// </summary>
+    private static Color ParseCssColor(string colorStr)
+    {
+        colorStr = colorStr.Trim();
+        if (string.IsNullOrEmpty(colorStr))
+            return Color.Empty;
+
+        // rgba(r, g, b, a)
+        if (colorStr.StartsWith("rgba(", StringComparison.OrdinalIgnoreCase) && colorStr.EndsWith(")"))
+        {
+            string inner = colorStr.Substring(5, colorStr.Length - 6);
+            var parts = inner.Split(',');
+            if (parts.Length == 4
+                && int.TryParse(parts[0].Trim(), out int r)
+                && int.TryParse(parts[1].Trim(), out int g)
+                && int.TryParse(parts[2].Trim(), out int b)
+                && float.TryParse(parts[3].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float a))
+            {
+                return Color.FromArgb((int)(Math.Clamp(a, 0f, 1f) * 255), r, g, b);
+            }
+        }
+
+        // rgb(r, g, b)
+        if (colorStr.StartsWith("rgb(", StringComparison.OrdinalIgnoreCase) && colorStr.EndsWith(")"))
+        {
+            string inner = colorStr.Substring(4, colorStr.Length - 5);
+            var parts = inner.Split(',');
+            if (parts.Length == 3
+                && int.TryParse(parts[0].Trim(), out int r)
+                && int.TryParse(parts[1].Trim(), out int g)
+                && int.TryParse(parts[2].Trim(), out int b))
+            {
+                return Color.FromArgb(255, r, g, b);
+            }
+        }
+
+        // Hex colors
+        if (colorStr.StartsWith('#'))
+        {
+            try { return ColorTranslator.FromHtml(colorStr); }
+            catch { return Color.Empty; }
+        }
+
+        // Named colors
+        try
+        {
+            var c = Color.FromName(colorStr);
+            if (c.A > 0 || colorStr.Equals("transparent", StringComparison.OrdinalIgnoreCase))
+                return c;
+        }
+        catch { }
+
+        return Color.Empty;
     }
 }

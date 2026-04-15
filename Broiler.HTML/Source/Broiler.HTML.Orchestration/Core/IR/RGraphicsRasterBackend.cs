@@ -39,6 +39,9 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                 case DrawTiledImageItem tiled:
                     RenderDrawTiledImage(g, tiled);
                     break;
+                case DrawTiledGradientItem tiledGrad:
+                    RenderDrawTiledGradient(g, tiledGrad);
+                    break;
                 case DrawLineItem line:
                     RenderDrawLine(g, line);
                     break;
@@ -315,6 +318,78 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                     g.DrawRectangle(brush, fill.X, fill.Y, fill.Width, fill.Height);
                     break;
                 }
+        }
+
+        g.PopClip();
+    }
+
+    private static void RenderDrawTiledGradient(RGraphics g, DrawTiledGradientItem item)
+    {
+        int tileW = (int)Math.Max(1, item.TileWidth);
+        int tileH = (int)Math.Max(1, item.TileHeight);
+        var fill = item.FillRect;
+        var origin = item.TileOrigin;
+
+        // Build color/position arrays from the pre-parsed stops.
+        Color[] colors;
+        float[] positions;
+        if (item.Stops != null && item.Stops.Count > 0)
+        {
+            colors = new Color[item.Stops.Count];
+            positions = new float[item.Stops.Count];
+            for (int i = 0; i < item.Stops.Count; i++)
+            {
+                colors[i] = item.Stops[i].Color;
+                positions[i] = item.Stops[i].Position;
+            }
+        }
+        else
+        {
+            return; // No stops to render.
+        }
+
+        using var tileImage = g.CreateLinearGradientTile(tileW, tileH, colors, positions, item.Angle);
+        if (tileImage == null)
+            return;
+
+        var srcRect = new RectangleF(0, 0, tileW, tileH);
+
+        // Clip to the element's fill area.
+        var clip = fill;
+        clip.Intersect(g.GetClip());
+        g.PushClip(clip);
+
+        switch (item.Repeat)
+        {
+            case "no-repeat":
+                g.DrawImage(tileImage, new RectangleF(origin.X, origin.Y, tileW, tileH), srcRect);
+                break;
+            case "repeat-x":
+            {
+                float ox = origin.X;
+                while (ox > fill.X) ox -= tileW;
+                using var brush = g.GetTextureBrush(tileImage, srcRect, new PointF(ox, origin.Y));
+                g.DrawRectangle(brush, fill.X, origin.Y, fill.Width, tileH);
+                break;
+            }
+            case "repeat-y":
+            {
+                float oy = origin.Y;
+                while (oy > fill.Y) oy -= tileH;
+                using var brush = g.GetTextureBrush(tileImage, srcRect, new PointF(origin.X, oy));
+                g.DrawRectangle(brush, origin.X, fill.Y, tileW, fill.Height);
+                break;
+            }
+            default: // "repeat"
+            {
+                float ox = origin.X;
+                while (ox > fill.X) ox -= tileW;
+                float oy = origin.Y;
+                while (oy > fill.Y) oy -= tileH;
+                using var brush = g.GetTextureBrush(tileImage, srcRect, new PointF(ox, oy));
+                g.DrawRectangle(brush, fill.X, fill.Y, fill.Width, fill.Height);
+                break;
+            }
         }
 
         g.PopClip();
