@@ -653,12 +653,20 @@ internal static class PaintWalker
             if (bounds.Width <= 0 || bounds.Height <= 0)
                 continue;
 
-            // CSS Backgrounds §2.11.4: background-clip determines the painting area
-            // for background images. Default padding-box for background-origin,
-            // but clip area is controlled by background-clip.
-            var imgRect = GetBackgroundClipRect(bounds, fragment, fragment.Style.BackgroundClip);
+            // CSS Backgrounds Level 3:
+            // - background-origin (default: padding-box) determines the positioning area
+            //   where tiling starts and background-position is resolved.
+            // - background-clip (default: border-box) determines the painting/visibility area.
+            var border = fragment.Border;
+            var originRect = new RectangleF(
+                bounds.X + (float)border.Left,
+                bounds.Y + (float)border.Top,
+                bounds.Width - (float)(border.Left + border.Right),
+                bounds.Height - (float)(border.Top + border.Bottom));
 
-            if (imgRect.Width <= 0 || imgRect.Height <= 0)
+            var clipRect = GetBackgroundClipRect(bounds, fragment, fragment.Style.BackgroundClip);
+
+            if (clipRect.Width <= 0 || clipRect.Height <= 0)
                 continue;
 
             var repeat = fragment.Style.BackgroundRepeat;
@@ -667,10 +675,10 @@ internal static class PaintWalker
             // CSS2.1 §14.2.1: For fixed attachment, the tiling origin is
             // the viewport origin; the image is visible only within the
             // element's padding area.  For scroll attachment, the origin
-            // is the padding-box origin.
+            // is the padding-box origin (background-origin default).
             var tileOrigin = isFixed
                 ? new PointF(viewport.X, viewport.Y)
-                : new PointF(imgRect.X, imgRect.Y);
+                : new PointF(originRect.X, originRect.Y);
 
             // Apply background-position offset to tile origin.
             // CSS2.1 §14.2.1: position keywords may appear in any order
@@ -712,8 +720,8 @@ internal static class PaintWalker
                     }
                 }
 
-                tileOrigin.X += ParsePositionValue(xVal, imgRect.Width, imgW);
-                tileOrigin.Y += ParsePositionValue(yVal, imgRect.Height, imgH);
+                tileOrigin.X += ParsePositionValue(xVal, originRect.Width, imgW);
+                tileOrigin.Y += ParsePositionValue(yVal, originRect.Height, imgH);
             }
 
             // CSS Compositing §8: background-blend-mode specifies how the
@@ -721,20 +729,20 @@ internal static class PaintWalker
             bool hasBgBlend = !string.IsNullOrEmpty(fragment.Style.BackgroundBlendMode)
                 && !fragment.Style.BackgroundBlendMode.Equals("normal", StringComparison.OrdinalIgnoreCase);
             if (hasBgBlend)
-                items.Add(new BlendModeItem { Bounds = imgRect, Mode = fragment.Style.BackgroundBlendMode });
+                items.Add(new BlendModeItem { Bounds = clipRect, Mode = fragment.Style.BackgroundBlendMode });
 
             items.Add(new DrawTiledImageItem
             {
-                Bounds = imgRect,
+                Bounds = clipRect,
                 ImageHandle = fragment.BackgroundImageHandle,
                 SourceRect = RectangleF.Empty,
-                FillRect = imgRect,
+                FillRect = clipRect,
                 TileOrigin = tileOrigin,
                 Repeat = repeat,
             });
 
             if (hasBgBlend)
-                items.Add(new RestoreBlendModeItem { Bounds = imgRect });
+                items.Add(new RestoreBlendModeItem { Bounds = clipRect });
         }
     }
 
