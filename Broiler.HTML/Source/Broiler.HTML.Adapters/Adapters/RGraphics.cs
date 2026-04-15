@@ -68,5 +68,17 @@ public abstract class RGraphics : IDisposable
     /// </summary>
     public virtual void RestoreBlendLayer() { }
 
+    /// <summary>
+    /// Creates an off-screen gradient image tile.  The returned <see cref="RImage"/>
+    /// can be used with <see cref="GetTextureBrush"/> for tiled gradient rendering.
+    /// Default implementation returns <c>null</c> (platform may not support off-screen rendering).
+    /// </summary>
+    /// <param name="width">Tile width in pixels.</param>
+    /// <param name="height">Tile height in pixels.</param>
+    /// <param name="colors">Gradient color stops.</param>
+    /// <param name="positions">Relative positions (0.0–1.0) for each color stop.</param>
+    /// <param name="angle">Gradient angle in degrees (0 = top, 90 = right, 180 = bottom).</param>
+    public virtual RImage? CreateLinearGradientTile(int width, int height, Color[] colors, float[] positions, float angle) => null;
+
     public abstract void Dispose();
 }
