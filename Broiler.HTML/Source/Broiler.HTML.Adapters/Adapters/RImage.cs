@@ -9,6 +9,16 @@ public abstract class RImage : IDisposable
     public abstract double Height { get; }
 
     /// <summary>
+    /// The intrinsic width when available. Defaults to the decoded image width.
+    /// </summary>
+    public virtual double IntrinsicWidth => Width;
+
+    /// <summary>
+    /// The intrinsic height when available. Defaults to the decoded image height.
+    /// </summary>
+    public virtual double IntrinsicHeight => Height;
+
+    /// <summary>
     /// The intrinsic aspect ratio (width ÷ height) when available.
     /// Defaults to the decoded bitmap ratio.
     /// </summary>

@@ -9,12 +9,16 @@ internal sealed class ImageAdapter(
     bool hasIntrinsicRatio = true,
     bool hasIntrinsicWidth = true,
     bool hasIntrinsicHeight = true,
-    double? intrinsicAspectRatio = null) : RImage
+    double? intrinsicAspectRatio = null,
+    double? intrinsicWidth = null,
+    double? intrinsicHeight = null) : RImage
 {
     public SKBitmap Bitmap { get; } = bitmap;
 
     public override double Width => Bitmap.Width;
     public override double Height => Bitmap.Height;
+    public override double IntrinsicWidth { get; } = intrinsicWidth ?? bitmap.Width;
+    public override double IntrinsicHeight { get; } = intrinsicHeight ?? bitmap.Height;
     public override bool HasIntrinsicRatio { get; } = hasIntrinsicRatio;
     public override bool HasIntrinsicWidth { get; } = hasIntrinsicWidth;
     public override bool HasIntrinsicHeight { get; } = hasIntrinsicHeight;

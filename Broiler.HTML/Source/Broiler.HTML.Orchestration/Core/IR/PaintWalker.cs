@@ -773,8 +773,8 @@ internal static class PaintWalker
                     sizeStr,
                     originRect.Width,
                     originRect.Height,
-                    (float)sizeImg.Width,
-                    (float)sizeImg.Height,
+                    (float)sizeImg.IntrinsicWidth,
+                    (float)sizeImg.IntrinsicHeight,
                     sizeImg.HasIntrinsicRatio,
                     (float)sizeImg.IntrinsicAspectRatio,
                     sizeImg.HasIntrinsicWidth,
@@ -2138,8 +2138,8 @@ internal static class PaintWalker
         string sizeStr,
         float containerW,
         float containerH,
-        float imgW,
-        float imgH,
+        float intrinsicW,
+        float intrinsicH,
         bool hasIntrinsicRatio,
         float intrinsicRatio,
         bool hasIntrinsicWidth,
@@ -2147,7 +2147,11 @@ internal static class PaintWalker
         out float w,
         out float h)
     {
-        float ratio = hasIntrinsicRatio && intrinsicRatio > 0 ? intrinsicRatio : 0;
+        float ratio = hasIntrinsicRatio && intrinsicRatio > 0
+            ? intrinsicRatio
+            : (hasIntrinsicWidth && hasIntrinsicHeight && intrinsicW > 0 && intrinsicH > 0
+                ? intrinsicW / intrinsicH
+                : 0);
 
         bool autoAutoRequested = string.IsNullOrEmpty(sizeStr)
             || sizeStr.Equals("auto", StringComparison.OrdinalIgnoreCase)
@@ -2155,35 +2159,38 @@ internal static class PaintWalker
 
         if (autoAutoRequested)
         {
-            // CSS Images / Backgrounds sizing for auto auto:
-            // - no intrinsic dimensions & no ratio => fill positioning area
-            // - no intrinsic dimensions & ratio => contain in positioning area
-            // - otherwise use intrinsic size (tileW/H = 0 => source bitmap size)
-            if (!hasIntrinsicWidth && !hasIntrinsicHeight)
+            if (hasIntrinsicWidth && hasIntrinsicHeight && intrinsicW > 0 && intrinsicH > 0)
             {
-                if (ratio > 0)
+                w = intrinsicW;
+                h = intrinsicH;
+            }
+            else if (hasIntrinsicWidth && intrinsicW > 0)
+            {
+                w = intrinsicW;
+                h = ratio > 0 ? intrinsicW / ratio : containerH;
+            }
+            else if (hasIntrinsicHeight && intrinsicH > 0)
+            {
+                h = intrinsicH;
+                w = ratio > 0 ? intrinsicH * ratio : containerW;
+            }
+            else if (ratio > 0)
+            {
+                if (containerW / ratio <= containerH)
                 {
-                    if (containerW / ratio <= containerH)
-                    {
-                        w = containerW;
-                        h = containerW / ratio;
-                    }
-                    else
-                    {
-                        h = containerH;
-                        w = containerH * ratio;
-                    }
+                    w = containerW;
+                    h = containerW / ratio;
                 }
                 else
                 {
-                    w = containerW;
                     h = containerH;
+                    w = containerH * ratio;
                 }
             }
             else
             {
-                w = 0;
-                h = 0;
+                w = containerW;
+                h = containerH;
             }
             return;
         }
@@ -2194,32 +2201,32 @@ internal static class PaintWalker
         if (sizeStr.Equals("contain", StringComparison.OrdinalIgnoreCase))
         {
             if (ratio <= 0) return;
-            if (imgW <= 0 || imgH <= 0)
+            if (!(hasIntrinsicWidth && hasIntrinsicHeight && intrinsicW > 0 && intrinsicH > 0))
             {
-                imgW = ratio;
-                imgH = 1;
+                intrinsicW = ratio;
+                intrinsicH = 1;
             }
-            float scaleX = containerW / imgW;
-            float scaleY = containerH / imgH;
+            float scaleX = containerW / intrinsicW;
+            float scaleY = containerH / intrinsicH;
             float scale = Math.Min(scaleX, scaleY);
-            w = imgW * scale;
-            h = imgH * scale;
+            w = intrinsicW * scale;
+            h = intrinsicH * scale;
             return;
         }
 
         if (sizeStr.Equals("cover", StringComparison.OrdinalIgnoreCase))
         {
             if (ratio <= 0) return;
-            if (imgW <= 0 || imgH <= 0)
+            if (!(hasIntrinsicWidth && hasIntrinsicHeight && intrinsicW > 0 && intrinsicH > 0))
             {
-                imgW = ratio;
-                imgH = 1;
+                intrinsicW = ratio;
+                intrinsicH = 1;
             }
-            float scaleX = containerW / imgW;
-            float scaleY = containerH / imgH;
+            float scaleX = containerW / intrinsicW;
+            float scaleY = containerH / intrinsicH;
             float scale = Math.Max(scaleX, scaleY);
-            w = imgW * scale;
-            h = imgH * scale;
+            w = intrinsicW * scale;
+            h = intrinsicH * scale;
             return;
         }
 
@@ -2258,35 +2265,46 @@ internal static class PaintWalker
         // Maintain aspect ratio when one dimension is auto
         if (wIsAuto && !hIsAuto && h > 0 && ratio > 0)
             w = h * ratio;
+        else if (wIsAuto && !hIsAuto && hasIntrinsicWidth && intrinsicW > 0)
+            w = intrinsicW;
         else if (!wIsAuto && hIsAuto && w > 0 && ratio > 0)
             h = w / ratio;
+        else if (!wIsAuto && hIsAuto && hasIntrinsicHeight && intrinsicH > 0)
+            h = intrinsicH;
         else if (wIsAuto && hIsAuto)
         {
-            if (!hasIntrinsicWidth && !hasIntrinsicHeight)
+            if (hasIntrinsicWidth && hasIntrinsicHeight && intrinsicW > 0 && intrinsicH > 0)
             {
-                if (ratio > 0)
+                w = intrinsicW;
+                h = intrinsicH;
+            }
+            else if (hasIntrinsicWidth && intrinsicW > 0)
+            {
+                w = intrinsicW;
+                h = ratio > 0 ? intrinsicW / ratio : containerH;
+            }
+            else if (hasIntrinsicHeight && intrinsicH > 0)
+            {
+                h = intrinsicH;
+                w = ratio > 0 ? intrinsicH * ratio : containerW;
+            }
+            else if (ratio > 0)
+            {
+                if (containerW / ratio <= containerH)
                 {
-                    if (containerW / ratio <= containerH)
-                    {
-                        w = containerW;
-                        h = containerW / ratio;
-                    }
-                    else
-                    {
-                        h = containerH;
-                        w = containerH * ratio;
-                    }
+                    w = containerW;
+                    h = containerW / ratio;
                 }
                 else
                 {
-                    w = containerW;
                     h = containerH;
+                    w = containerH * ratio;
                 }
             }
             else
             {
-                w = 0;
-                h = 0;
+                w = containerW;
+                h = containerH;
             }
         }
     }
