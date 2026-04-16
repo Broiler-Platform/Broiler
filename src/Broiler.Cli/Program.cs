@@ -16,6 +16,7 @@ public class Program
         string? url = null;
         string? captureImageUrl = null;
         string? output = null;
+        bool preservePdfLayout = false;
         bool fullPage = false;
         bool testEngines = false;
         bool fuzzLayout = false;
@@ -41,6 +42,9 @@ public class Program
                     break;
                 case "--output" when i + 1 < args.Length:
                     output = args[++i];
+                    break;
+                case "--preserve-layout":
+                    preservePdfLayout = true;
                     break;
                 case "--timeout" when i + 1 < args.Length:
                     if (!int.TryParse(args[++i], out timeoutSeconds) || timeoutSeconds <= 0)
@@ -134,13 +138,13 @@ public class Program
         if (pdfInputPath is not null)
         {
             try
-            {
-                var converter = new PdfConverterProcessRunner();
-                exitCode = await converter.RunAsync(pdfInputPath, output);
-            }
-            catch (FileNotFoundException ex)
-            {
-                Console.Error.WriteLine($"PDF conversion failed: {ex.Message}");
+                {
+                    var converter = new PdfConverterProcessRunner();
+                    exitCode = await converter.RunAsync(pdfInputPath, output, preservePdfLayout);
+                }
+                catch (FileNotFoundException ex)
+                {
+                    Console.Error.WriteLine($"PDF conversion failed: {ex.Message}");
                 exitCode = 1;
             }
             catch (IOException ex)
@@ -291,7 +295,7 @@ public class Program
 
     private static void PrintUsage()
     {
-        Console.WriteLine("Usage: Broiler.Cli --convert-pdf <PDF> [--output <FILE|DIR>]");
+        Console.WriteLine("Usage: Broiler.Cli --convert-pdf <PDF> [--output <FILE|DIR>] [--preserve-layout]");
         Console.WriteLine("Usage: Broiler.Cli --url <URL> --output <FILE> [OPTIONS]");
         Console.WriteLine("       Broiler.Cli --capture-image <URL> --output <FILE> [OPTIONS]");
         Console.WriteLine("       Broiler.Cli --test-engines");
@@ -302,6 +306,7 @@ public class Program
         Console.WriteLine("  --url <URL>            The URL of the website to capture");
         Console.WriteLine("  --capture-image <URL>  Capture the website as an image (PNG or JPEG)");
         Console.WriteLine("  --output <FILE|DIR>    Output file path, or output directory for PDF conversion");
+        Console.WriteLine("  --preserve-layout      Preserve PDF page layout and styling during PDF conversion");
         Console.WriteLine("  --width <PIXELS>       Image width in pixels (default: 1024, used with --capture-image)");
         Console.WriteLine("  --height <PIXELS>      Image height in pixels (default: 768, used with --capture-image)");
         Console.WriteLine("  --full-page            Capture the full page content");
@@ -386,12 +391,12 @@ internal sealed class PdfConverterProcessRunner
     private const string PdfAppEnvironmentVariable = "BROILER_PDF_APP";
     private const string PdfAppName = "Broiler.Pdf";
 
-    public async Task<int> RunAsync(string inputPdfPath, string? outputPath)
+    public async Task<int> RunAsync(string inputPdfPath, string? outputPath, bool preserveLayout = false)
     {
         var command = ResolveCommand();
         using var process = new Process
         {
-            StartInfo = CreateStartInfo(command, inputPdfPath, outputPath),
+            StartInfo = CreateStartInfo(command, inputPdfPath, outputPath, preserveLayout),
         };
 
         try
@@ -444,7 +449,7 @@ internal sealed class PdfConverterProcessRunner
             "3) run 'dotnet run --project src/Broiler.Pdf -- --input <PDF> [--output <FILE|DIR>]'.");
     }
 
-    private static ProcessStartInfo CreateStartInfo(PdfProcessCommand command, string inputPdfPath, string? outputPath)
+    private static ProcessStartInfo CreateStartInfo(PdfProcessCommand command, string inputPdfPath, string? outputPath, bool preserveLayout)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -465,6 +470,9 @@ internal sealed class PdfConverterProcessRunner
             startInfo.ArgumentList.Add("--output");
             startInfo.ArgumentList.Add(outputPath);
         }
+
+        if (preserveLayout)
+            startInfo.ArgumentList.Add("--preserve-layout");
 
         return startInfo;
     }
