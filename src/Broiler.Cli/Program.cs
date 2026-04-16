@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Broiler.HtmlBridge;
 
@@ -134,10 +135,8 @@ public class Program
         {
             try
             {
-                var converter = new PdfToWordConverter();
-                var outputPath = converter.Convert(pdfInputPath, output);
-                Console.WriteLine($"Word document saved to {outputPath}");
-                exitCode = 0;
+                var converter = new PdfConverterProcessRunner();
+                exitCode = await converter.RunAsync(pdfInputPath, output);
             }
             catch (FileNotFoundException ex)
             {
@@ -299,7 +298,7 @@ public class Program
         Console.WriteLine("       Broiler.Cli --fuzz-layout [--count <N>] [--output <DIR>]");
         Console.WriteLine();
         Console.WriteLine("Options:");
-        Console.WriteLine("  --convert-pdf <PDF>    Convert a PDF file to a Word document (.docx)");
+        Console.WriteLine("  --convert-pdf <PDF>    Convert a PDF file via the external Broiler.Pdf app");
         Console.WriteLine("  --url <URL>            The URL of the website to capture");
         Console.WriteLine("  --capture-image <URL>  Capture the website as an image (PNG or JPEG)");
         Console.WriteLine("  --output <FILE|DIR>    Output file path, or output directory for PDF conversion");
@@ -313,6 +312,9 @@ public class Program
         Console.WriteLine("  --count <N>            Number of fuzz cases to generate (default: 1000)");
         Console.WriteLine("  --diagnostics          Emit structured JSON log output on stdout after the operation");
         Console.WriteLine("  --help                 Show this help message");
+        Console.WriteLine();
+        Console.WriteLine("PDF conversion requires the standalone Broiler.Pdf app.");
+        Console.WriteLine("Set BROILER_PDF_APP or place Broiler.Pdf beside Broiler.Cli.");
     }
 
     /// <summary>
@@ -378,3 +380,151 @@ public class Program
         Console.WriteLine(json);
     }
 }
+
+internal sealed class PdfConverterProcessRunner
+{
+    private const string PdfAppEnvironmentVariable = "BROILER_PDF_APP";
+    private const string PdfAppName = "Broiler.Pdf";
+
+    public async Task<int> RunAsync(string inputPdfPath, string? outputPath)
+    {
+        var command = ResolveCommand();
+        using var process = new Process
+        {
+            StartInfo = CreateStartInfo(command, inputPdfPath, outputPath),
+        };
+
+        try
+        {
+            process.Start();
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Could not start the external PDF converter '{command.FileName}': {ex.Message}",
+                ex);
+        }
+
+        var standardOutputTask = process.StandardOutput.ReadToEndAsync();
+        var standardErrorTask = process.StandardError.ReadToEndAsync();
+
+        await process.WaitForExitAsync();
+
+        var standardOutput = await standardOutputTask;
+        var standardError = await standardErrorTask;
+
+        if (!string.IsNullOrEmpty(standardOutput))
+            Console.Out.Write(standardOutput);
+
+        if (!string.IsNullOrEmpty(standardError))
+            Console.Error.Write(standardError);
+
+        return process.ExitCode;
+    }
+
+    internal static PdfProcessCommand ResolveCommand()
+    {
+        var configuredCommand = TryResolveConfiguredCommand();
+        if (configuredCommand is not null)
+            return configuredCommand;
+
+        var adjacentCommand = TryResolveAdjacentCommand();
+        if (adjacentCommand is not null)
+            return adjacentCommand;
+
+        var sourceProjectCommand = TryResolveSourceProjectCommand();
+        if (sourceProjectCommand is not null)
+            return sourceProjectCommand;
+
+        throw new InvalidOperationException(
+            "Broiler PDF conversion now lives in the standalone Broiler.Pdf app. " +
+            "To continue, use one of these options: " +
+            "1) place Broiler.Pdf beside Broiler.Cli, " +
+            "2) set BROILER_PDF_APP to the Broiler.Pdf executable or .dll path, or " +
+            "3) run 'dotnet run --project src/Broiler.Pdf -- --input <PDF> [--output <FILE|DIR>]'.");
+    }
+
+    private static ProcessStartInfo CreateStartInfo(PdfProcessCommand command, string inputPdfPath, string? outputPath)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = command.FileName,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+
+        foreach (var argument in command.BaseArguments)
+            startInfo.ArgumentList.Add(argument);
+
+        startInfo.ArgumentList.Add("--input");
+        startInfo.ArgumentList.Add(inputPdfPath);
+
+        if (!string.IsNullOrWhiteSpace(outputPath))
+        {
+            startInfo.ArgumentList.Add("--output");
+            startInfo.ArgumentList.Add(outputPath);
+        }
+
+        return startInfo;
+    }
+
+    private static PdfProcessCommand? TryResolveConfiguredCommand()
+    {
+        var configuredPath = Environment.GetEnvironmentVariable(PdfAppEnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(configuredPath))
+            return null;
+
+        var fullPath = Path.GetFullPath(configuredPath);
+        return CreateCommandForPath(fullPath)
+            ?? throw new InvalidOperationException(
+                $"{PdfAppEnvironmentVariable} points to '{fullPath}', but that file does not exist.");
+    }
+
+    private static PdfProcessCommand? TryResolveAdjacentCommand()
+    {
+        var baseDirectory = AppContext.BaseDirectory;
+        foreach (var candidate in new[]
+        {
+            Path.Combine(baseDirectory, PdfAppName),
+            Path.Combine(baseDirectory, PdfAppName + ".exe"),
+            Path.Combine(baseDirectory, PdfAppName + ".dll"),
+        })
+        {
+            var command = CreateCommandForPath(candidate);
+            if (command is not null)
+                return command;
+        }
+
+        return null;
+    }
+
+    private static PdfProcessCommand? TryResolveSourceProjectCommand()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            var projectPath = Path.Combine(directory.FullName, "src", PdfAppName, PdfAppName + ".csproj");
+            if (File.Exists(projectPath))
+            {
+                return new PdfProcessCommand(
+                    "dotnet",
+                    ["run", "--project", projectPath, "--"]);
+            }
+        }
+
+        return null;
+    }
+
+    private static PdfProcessCommand? CreateCommandForPath(string candidatePath)
+    {
+        if (!File.Exists(candidatePath))
+            return null;
+
+        if (string.Equals(Path.GetExtension(candidatePath), ".dll", StringComparison.OrdinalIgnoreCase))
+            return new PdfProcessCommand("dotnet", [candidatePath]);
+
+        return new PdfProcessCommand(candidatePath, []);
+    }
+}
+
+internal sealed record PdfProcessCommand(string FileName, IReadOnlyList<string> BaseArguments);
