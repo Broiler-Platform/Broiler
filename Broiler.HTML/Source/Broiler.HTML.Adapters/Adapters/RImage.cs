@@ -56,5 +56,12 @@ public abstract class RImage : IDisposable
         return false;
     }
 
+    /// <summary>
+    /// Attempts to sample a representative color from a source rectangle within
+    /// the image. Defaults to the uniform-color fast path when available.
+    /// </summary>
+    public virtual bool TryGetSampledColor(RectangleF sourceRect, out Color color)
+        => TryGetUniformColor(out color);
+
     public abstract void Dispose();
 }

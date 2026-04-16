@@ -386,6 +386,14 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
             visibleDest.Width * scaleX,
             visibleDest.Height * scaleY);
 
+        if ((visibleSrc.Width < 0.5f || visibleSrc.Height < 0.5f)
+            && image.TryGetSampledColor(visibleSrc, out var sampledColor))
+        {
+            using var brush = g.GetSolidBrush(sampledColor);
+            g.DrawRectangle(brush, visibleDest.X, visibleDest.Y, visibleDest.Width, visibleDest.Height);
+            return;
+        }
+
         g.DrawImage(image, visibleDest, visibleSrc);
     }
 
