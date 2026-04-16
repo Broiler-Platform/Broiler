@@ -11,5 +11,11 @@ internal sealed class ImageAdapter(BitmapImage image) : RImage
 
     public override double Height => Image.PixelHeight;
 
+    public override bool TryGetSampledColor(System.Drawing.RectangleF sourceRect, out System.Drawing.Color color)
+    {
+        color = System.Drawing.Color.Empty;
+        return false;
+    }
+
     public override void Dispose() => Image.StreamSource?.Dispose();
 }

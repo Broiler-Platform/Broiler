@@ -1,6 +1,7 @@
 using Broiler.HTML.Adapters.Adapters;
 using SkiaSharp;
 using System.Drawing;
+using System;
 
 namespace Broiler.HTML.Image.Adapters;
 
@@ -9,12 +10,16 @@ internal sealed class ImageAdapter(
     bool hasIntrinsicRatio = true,
     bool hasIntrinsicWidth = true,
     bool hasIntrinsicHeight = true,
-    double? intrinsicAspectRatio = null) : RImage
+    double? intrinsicAspectRatio = null,
+    double? intrinsicWidth = null,
+    double? intrinsicHeight = null) : RImage
 {
     public SKBitmap Bitmap { get; } = bitmap;
 
     public override double Width => Bitmap.Width;
     public override double Height => Bitmap.Height;
+    public override double IntrinsicWidth { get; } = intrinsicWidth ?? bitmap.Width;
+    public override double IntrinsicHeight { get; } = intrinsicHeight ?? bitmap.Height;
     public override bool HasIntrinsicRatio { get; } = hasIntrinsicRatio;
     public override bool HasIntrinsicWidth { get; } = hasIntrinsicWidth;
     public override bool HasIntrinsicHeight { get; } = hasIntrinsicHeight;
@@ -45,6 +50,23 @@ internal sealed class ImageAdapter(
         }
 
         color = Color.FromArgb(first.Alpha, first.Red, first.Green, first.Blue);
+        return true;
+    }
+
+    public override bool TryGetSampledColor(RectangleF sourceRect, out Color color)
+    {
+        if (Bitmap.Width <= 0 || Bitmap.Height <= 0)
+        {
+            color = Color.Empty;
+            return false;
+        }
+
+        float sampleX = sourceRect.X + (sourceRect.Width / 2f);
+        float sampleY = sourceRect.Y + (sourceRect.Height / 2f);
+        int x = Math.Clamp((int)Math.Floor(sampleX), 0, Bitmap.Width - 1);
+        int y = Math.Clamp((int)Math.Floor(sampleY), 0, Bitmap.Height - 1);
+        var pixel = Bitmap.GetPixel(x, y);
+        color = Color.FromArgb(pixel.Alpha, pixel.Red, pixel.Green, pixel.Blue);
         return true;
     }
 

@@ -371,13 +371,15 @@ internal sealed class SkiaImageAdapter : RAdapter
         // Parse the SVG root element's width, height and viewBox attributes.
         var (svgWidth, svgHeight, vbRatio) = ParseSvgIntrinsicDimensions(svgContent);
 
+        bool hasIntrinsicWidth = svgWidth > 0;
+        bool hasIntrinsicHeight = svgHeight > 0;
         int width, height;
         // Chrome's SVG sizing for <img> elements: only when BOTH explicit
         // width and height attributes are present does the SVG have true
         // intrinsic dimensions and an intrinsic aspect ratio.  When either
         // dimension is missing Chrome falls back to the 300×150 default
         // object size, regardless of viewBox or partial attributes.
-        bool hasBothDimensions = svgWidth > 0 && svgHeight > 0;
+        bool hasBothDimensions = hasIntrinsicWidth && hasIntrinsicHeight;
         if (hasBothDimensions)
         {
             width = (int)Math.Ceiling(svgWidth);
@@ -419,6 +421,9 @@ internal sealed class SkiaImageAdapter : RAdapter
 
         canvas.DrawPicture(svg.Picture);
 
+        if (TryParseSolidViewportFill(svgContent, out var solidFill))
+            bitmap.Erase(solidFill);
+
         // Only SVGs with both explicit width and height have intrinsic
         // dimensions.  SVGs with a viewBox expose an intrinsic ratio even
         // when width/height are omitted or non-intrinsic (e.g. percentages).
@@ -428,9 +433,11 @@ internal sealed class SkiaImageAdapter : RAdapter
             : vbRatio;
         return new ImageAdapter(bitmap,
             hasIntrinsicRatio: hasIntrinsicRatio,
-            hasIntrinsicWidth: hasBothDimensions,
-            hasIntrinsicHeight: hasBothDimensions,
-            intrinsicAspectRatio: intrinsicRatio > 0 ? intrinsicRatio : null);
+            hasIntrinsicWidth: hasIntrinsicWidth,
+            hasIntrinsicHeight: hasIntrinsicHeight,
+            intrinsicAspectRatio: intrinsicRatio > 0 ? intrinsicRatio : null,
+            intrinsicWidth: hasIntrinsicWidth ? svgWidth : 0,
+            intrinsicHeight: hasIntrinsicHeight ? svgHeight : 0);
     }
 
     /// <summary>
@@ -574,6 +581,57 @@ internal sealed class SkiaImageAdapter : RAdapter
 
         return double.TryParse(val, System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out double v) && v > 0 ? v : -1;
+    }
+
+    private static bool IsBitmapFullyTransparent(SKBitmap bitmap)
+    {
+        for (int y = 0; y < bitmap.Height; y++)
+        {
+            for (int x = 0; x < bitmap.Width; x++)
+            {
+                if (bitmap.GetPixel(x, y).Alpha != 0)
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryParseSolidViewportFill(string svgContent, out SKColor color)
+    {
+        color = SKColors.Transparent;
+
+        var rectMatches = System.Text.RegularExpressions.Regex.Matches(
+            svgContent,
+            @"<rect\b[^>]*>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (rectMatches.Count != 1)
+            return false;
+
+        var rectTag = rectMatches[0].Value;
+        bool fillsViewport =
+            System.Text.RegularExpressions.Regex.IsMatch(rectTag, @"\bwidth\s*=\s*[""']100%[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+            && System.Text.RegularExpressions.Regex.IsMatch(rectTag, @"\bheight\s*=\s*[""']100%[""']", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!fillsViewport)
+            return false;
+
+        var fillMatch = System.Text.RegularExpressions.Regex.Match(
+            rectTag,
+            @"\bfill\s*=\s*[""']([^""']+)[""']",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!fillMatch.Success)
+            return false;
+
+        var fillValue = fillMatch.Groups[1].Value.Trim();
+        try
+        {
+            color = SKColor.Parse(fillValue);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>

@@ -9,6 +9,16 @@ public abstract class RImage : IDisposable
     public abstract double Height { get; }
 
     /// <summary>
+    /// The intrinsic width when available. Defaults to the decoded image width.
+    /// </summary>
+    public virtual double IntrinsicWidth => Width;
+
+    /// <summary>
+    /// The intrinsic height when available. Defaults to the decoded image height.
+    /// </summary>
+    public virtual double IntrinsicHeight => Height;
+
+    /// <summary>
     /// The intrinsic aspect ratio (width ÷ height) when available.
     /// Defaults to the decoded bitmap ratio.
     /// </summary>
@@ -45,6 +55,13 @@ public abstract class RImage : IDisposable
         color = Color.Empty;
         return false;
     }
+
+    /// <summary>
+    /// Attempts to sample a representative color from a source rectangle within
+    /// the image. Defaults to the uniform-color fast path when available.
+    /// </summary>
+    public virtual bool TryGetSampledColor(RectangleF sourceRect, out Color color)
+        => TryGetUniformColor(out color);
 
     public abstract void Dispose();
 }

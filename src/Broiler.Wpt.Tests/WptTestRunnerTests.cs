@@ -2891,6 +2891,23 @@ document.getElementById('out').appendChild(p);
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
+    [Theory]
+    [InlineData("background-size/vector/wide--contain--height.html")]
+    [InlineData("background-size/vector/wide--contain--width.html")]
+    [InlineData("background-size/vector/wide--cover--height.html")]
+    [InlineData("background-size/vector/wide--cover--width.html")]
+    [InlineData("background-size/vector/wide--auto--omitted-width-nonpercent-height-viewbox.html")]
+    [InlineData("background-size/vector/wide--auto--percent-width-nonpercent-height-viewbox.html")]
+    [InlineData("background-size/vector/wide--auto--nonpercent-width-omitted-height.html")]
+    [InlineData("background-size/vector/wide--auto--nonpercent-width-percent-height.html")]
+    public void Wpt_BackgroundSizeVector_AdditionalVectorCases_MatchReference(string subPath)
+    {
+        var result = RunCssBackgroundsMatchTest(subPath);
+        Assert.True(result.Passed,
+            $"{Path.GetFileNameWithoutExtension(subPath)} should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
     [Fact]
     public void Wpt_BackgroundClipRoot_MatchesReference()
     {

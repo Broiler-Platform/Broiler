@@ -301,7 +301,7 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         switch (item.Repeat)
         {
             case "no-repeat":
-                g.DrawImage(image, new RectangleF(origin.X, origin.Y, tileW, tileH), srcRect);
+                DrawClippedImage(g, image, new RectangleF(origin.X, origin.Y, tileW, tileH), srcRect, clip);
                 break;
             case "repeat-x":
                 {
@@ -359,6 +359,42 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         }
 
         g.PopClip();
+    }
+
+    private static void DrawClippedImage(
+        RGraphics g,
+        RImage image,
+        RectangleF destRect,
+        RectangleF srcRect,
+        RectangleF clipRect)
+    {
+        var visibleDest = RectangleF.Intersect(destRect, clipRect);
+        if (visibleDest.Width <= 0 || visibleDest.Height <= 0)
+            return;
+
+        if (visibleDest == destRect)
+        {
+            g.DrawImage(image, destRect, srcRect);
+            return;
+        }
+
+        float scaleX = srcRect.Width / destRect.Width;
+        float scaleY = srcRect.Height / destRect.Height;
+        var visibleSrc = new RectangleF(
+            srcRect.X + ((visibleDest.X - destRect.X) * scaleX),
+            srcRect.Y + ((visibleDest.Y - destRect.Y) * scaleY),
+            visibleDest.Width * scaleX,
+            visibleDest.Height * scaleY);
+
+        if ((visibleSrc.Width < 0.5f || visibleSrc.Height < 0.5f)
+            && image.TryGetSampledColor(visibleSrc, out var sampledColor))
+        {
+            using var brush = g.GetSolidBrush(sampledColor);
+            g.DrawRectangle(brush, visibleDest.X, visibleDest.Y, visibleDest.Width, visibleDest.Height);
+            return;
+        }
+
+        g.DrawImage(image, visibleDest, visibleSrc);
     }
 
     private static void RenderDrawTiledGradient(RGraphics g, DrawTiledGradientItem item)
