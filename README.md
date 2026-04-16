@@ -132,6 +132,9 @@ BROILER_PDF_APP=./src/Broiler.Pdf/bin/Debug/net8.0/Broiler.Pdf.dll \
 dotnet run --project src/Broiler.Cli -- --help
 ```
 
+For the planned in-house parser design, see the
+[Broiler.Pdf Native PDF Parser Roadmap](docs/roadmap/broiler-pdf-native-parser.md).
+
 #### CI Website Capture
 
 The CI workflow (`.github/workflows/build.yml`) automatically captures a
