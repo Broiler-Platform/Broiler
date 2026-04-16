@@ -1,8 +1,6 @@
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
-using UglyToad.PdfPig;
-using UglyToad.PdfPig.Content;
 
 namespace Broiler.Pdf;
 
@@ -111,6 +109,12 @@ public sealed class PdfConversionOptions
 internal sealed class PdfToWordConverter
 {
     private const double PointsToTwipsRatio = 20d;
+    private readonly IPdfDocumentParser documentParser;
+
+    public PdfToWordConverter(IPdfDocumentParser? documentParser = null)
+    {
+        this.documentParser = documentParser ?? new PdfPigDocumentParser();
+    }
 
     public string Convert(string inputPdfPath, string? outputPath = null, PdfConversionOptions? options = null)
     {
@@ -133,14 +137,14 @@ internal sealed class PdfToWordConverter
 
         try
         {
-            using var pdfDocument = PdfDocument.Open(fullInputPath);
+            using var pdfDocument = documentParser.Open(fullInputPath);
             using var wordDocument = WordprocessingDocument.Create(resolvedOutputPath, WordprocessingDocumentType.Document);
 
             var mainPart = wordDocument.AddMainDocumentPart();
             mainPart.Document = new Document(new Body());
 
             var body = mainPart.Document.Body!;
-            var pages = pdfDocument.GetPages().ToList();
+            var pages = pdfDocument.Pages;
             for (int i = 0; i < pages.Count; i++)
             {
                 if (options.PreserveLayout)
@@ -224,7 +228,7 @@ internal sealed class PdfToWordConverter
         }
     }
 
-    private static void AppendPagePreservingLayout(MainDocumentPart mainPart, Body body, Page page, int pageIndex)
+    private static void AppendPagePreservingLayout(MainDocumentPart mainPart, Body body, IPdfPage page, int pageIndex)
     {
         var chunkId = $"AltChunkId{pageIndex + 1}";
         var alternativePart = mainPart.AddAlternativeFormatImportPart(AlternativeFormatImportPartType.Html, chunkId);
@@ -232,19 +236,19 @@ internal sealed class PdfToWordConverter
         using (var stream = alternativePart.GetStream(FileMode.Create, FileAccess.Write))
         using (var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false)))
         {
-            writer.Write(BuildPositionedHtml(page));
+            writer.Write(BuildPositionedHtml(page.MediaBox, page.ExtractLayout()));
         }
 
         body.AppendChild(new AltChunk { Id = chunkId });
     }
 
-    private static void AppendPageSizing(Body body, IReadOnlyList<Page> pages)
+    private static void AppendPageSizing(Body body, IReadOnlyList<IPdfPage> pages)
     {
         if (pages.Count == 0)
             return;
 
-        var maxWidth = Math.Max(1, pages.Max(page => page.Width));
-        var maxHeight = Math.Max(1, pages.Max(page => page.Height));
+        var maxWidth = Math.Max(1, pages.Max(page => page.MediaBox.Width));
+        var maxHeight = Math.Max(1, pages.Max(page => page.MediaBox.Height));
 
         body.AppendChild(
             new SectionProperties(
@@ -270,124 +274,40 @@ internal sealed class PdfToWordConverter
         return (UInt32Value)(uint)Math.Clamp(Math.Round(points * PointsToTwipsRatio), 1, uint.MaxValue);
     }
 
-    private static string BuildPositionedHtml(Page page)
+    private static string BuildPositionedHtml(PdfRectangle mediaBox, PdfPageLayout layout)
     {
         var html = new System.Text.StringBuilder();
         html.Append("""<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#fff;">""");
-        html.Append($"""<div style="position:relative;width:{FormatCssNumber(page.Width)}pt;height:{FormatCssNumber(page.Height)}pt;overflow:hidden;background:#fff;">""");
+        html.Append($"""<div style="position:relative;width:{FormatCssNumber(mediaBox.Width)}pt;height:{FormatCssNumber(mediaBox.Height)}pt;overflow:hidden;background:#fff;">""");
 
-        foreach (var image in page.GetImages())
+        foreach (var image in layout.Images)
         {
-            if (!TryBuildImageDataUri(image, out var dataUri))
-                continue;
-
-            var boundingBox = image.BoundingBox;
-            var top = Math.Max(0, page.Height - boundingBox.Top);
-            var left = Math.Max(0, boundingBox.Left);
-            var width = Math.Max(1, boundingBox.Width);
-            var height = Math.Max(1, boundingBox.Height);
-            var styles = $"position:absolute;left:{FormatCssNumber(left)}pt;top:{FormatCssNumber(top)}pt;width:{FormatCssNumber(width)}pt;height:{FormatCssNumber(height)}pt;object-fit:fill;";
-            html.Append($"""<img alt="" src="{dataUri}" style="{styles}">""");
+            var styles = $"position:absolute;left:{FormatCssNumber(image.Left)}pt;top:{FormatCssNumber(image.Top)}pt;width:{FormatCssNumber(image.Width)}pt;height:{FormatCssNumber(image.Height)}pt;object-fit:fill;";
+            html.Append($"""<img alt="" src="{image.DataUri}" style="{styles}">""");
         }
 
-        foreach (var letter in page.Letters)
+        foreach (var text in layout.Text)
         {
-            if (string.IsNullOrWhiteSpace(letter.Value))
+            if (string.IsNullOrWhiteSpace(text.Text))
                 continue;
 
-            var top = Math.Max(0, page.Height - letter.BoundingBox.Top);
-            var left = Math.Max(0, letter.BoundingBox.Left);
-            var fontSize = Math.Max(1, letter.PointSize > 0 ? letter.PointSize : letter.FontSize);
-            var fontFamily = NormalizeFontFamily(letter.FontName);
-            var styles = $"position:absolute;left:{FormatCssNumber(left)}pt;top:{FormatCssNumber(top)}pt;font-size:{FormatCssNumber(fontSize)}pt;line-height:1;white-space:pre;";
+            var fontFamily = NormalizeFontFamily(text.FontName);
+            var styles = $"position:absolute;left:{FormatCssNumber(text.Left)}pt;top:{FormatCssNumber(text.Top)}pt;font-size:{FormatCssNumber(text.FontSize)}pt;line-height:1;white-space:pre;";
 
             if (!string.IsNullOrWhiteSpace(fontFamily))
                 styles += $"font-family:'{EscapeCssString(fontFamily)}',sans-serif;";
 
-            if (IsBoldFont(letter.FontName))
+            if (text.IsBold)
                 styles += "font-weight:bold;";
 
-            if (IsItalicFont(letter.FontName))
+            if (text.IsItalic)
                 styles += "font-style:italic;";
 
-            html.Append($"""<span style="{styles}">{System.Net.WebUtility.HtmlEncode(letter.Value)}</span>""");
+            html.Append($"""<span style="{styles}">{System.Net.WebUtility.HtmlEncode(text.Text)}</span>""");
         }
 
         html.Append("</div></body></html>");
         return html.ToString();
-    }
-
-    private static bool TryBuildImageDataUri(IPdfImage image, out string dataUri)
-    {
-        if (image.TryGetPng(out var pngBytes) && pngBytes is { Length: > 0 })
-        {
-            dataUri = BuildDataUri("image/png", pngBytes);
-            return true;
-        }
-
-        if (image.TryGetBytesAsMemory(out var imageBytes)
-            && TryDetectEmbeddedImageMimeType(imageBytes.Span, out var mimeType))
-        {
-            dataUri = BuildDataUri(mimeType, imageBytes.ToArray());
-            return true;
-        }
-
-        dataUri = string.Empty;
-        return false;
-    }
-
-    private static string BuildDataUri(string mimeType, byte[] imageBytes)
-    {
-        return $"data:{mimeType};base64,{System.Convert.ToBase64String(imageBytes)}";
-    }
-
-    private static bool TryDetectEmbeddedImageMimeType(ReadOnlySpan<byte> data, out string mimeType)
-    {
-        if (data.Length >= 8
-            && data[0] == 0x89
-            && data[1] == 0x50
-            && data[2] == 0x4E
-            && data[3] == 0x47
-            && data[4] == 0x0D
-            && data[5] == 0x0A
-            && data[6] == 0x1A
-            && data[7] == 0x0A)
-        {
-            mimeType = "image/png";
-            return true;
-        }
-
-        if (data.Length >= 3
-            && data[0] == 0xFF
-            && data[1] == 0xD8
-            && data[2] == 0xFF)
-        {
-            mimeType = "image/jpeg";
-            return true;
-        }
-
-        if (data.Length >= 6
-            && data[0] == 0x47
-            && data[1] == 0x49
-            && data[2] == 0x46
-            && data[3] == 0x38
-            && (data[4] == 0x37 || data[4] == 0x39)
-            && data[5] == 0x61)
-        {
-            mimeType = "image/gif";
-            return true;
-        }
-
-        if (data.Length >= 2
-            && data[0] == 0x42
-            && data[1] == 0x4D)
-        {
-            mimeType = "image/bmp";
-            return true;
-        }
-
-        mimeType = string.Empty;
-        return false;
     }
 
     private static string FormatCssNumber(double value)
@@ -420,18 +340,5 @@ internal sealed class PdfToWordConverter
     private static string EscapeCssString(string value)
     {
         return value.Replace(@"\", @"\\", StringComparison.Ordinal).Replace("'", @"\'", StringComparison.Ordinal);
-    }
-
-    private static bool IsBoldFont(string? fontName)
-    {
-        return !string.IsNullOrWhiteSpace(fontName)
-            && fontName.Contains("Bold", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsItalicFont(string? fontName)
-    {
-        return !string.IsNullOrWhiteSpace(fontName)
-            && (fontName.Contains("Italic", StringComparison.OrdinalIgnoreCase)
-                || fontName.Contains("Oblique", StringComparison.OrdinalIgnoreCase));
     }
 }
