@@ -749,15 +749,20 @@ internal static class PaintWalker
             // (originRect) which defaults to the padding-box.
             float tileW = 0, tileH = 0;
             var sizeStr = fragment.Style.BackgroundSize;
-            if (!string.IsNullOrEmpty(sizeStr) && !sizeStr.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            if (fragment.BackgroundImageHandle is RImage sizeImg)
             {
-                float imgW = 0, imgH = 0;
-                if (fragment.BackgroundImageHandle is RImage sizeImg)
-                {
-                    imgW = (float)sizeImg.Width;
-                    imgH = (float)sizeImg.Height;
-                }
-                ParseBackgroundSizeForImage(sizeStr, originRect.Width, originRect.Height, imgW, imgH, out tileW, out tileH);
+                ParseBackgroundSizeForImage(
+                    sizeStr,
+                    originRect.Width,
+                    originRect.Height,
+                    (float)sizeImg.Width,
+                    (float)sizeImg.Height,
+                    sizeImg.HasIntrinsicRatio,
+                    (float)sizeImg.IntrinsicAspectRatio,
+                    sizeImg.HasIntrinsicWidth,
+                    sizeImg.HasIntrinsicHeight,
+                    out tileW,
+                    out tileH);
             }
 
             // CSS2.1 §14.2.1: For fixed attachment, the tiling origin is
@@ -2107,16 +2112,71 @@ internal static class PaintWalker
     /// Parses CSS <c>background-size</c> for a URL-based image, maintaining
     /// aspect ratio when one dimension is <c>auto</c>.
     /// </summary>
-    private static void ParseBackgroundSizeForImage(string sizeStr, float containerW, float containerH, float imgW, float imgH, out float w, out float h)
+    private static void ParseBackgroundSizeForImage(
+        string sizeStr,
+        float containerW,
+        float containerH,
+        float imgW,
+        float imgH,
+        bool hasIntrinsicRatio,
+        float intrinsicRatio,
+        bool hasIntrinsicWidth,
+        bool hasIntrinsicHeight,
+        out float w,
+        out float h)
     {
+        float ratio = hasIntrinsicRatio && intrinsicRatio > 0 ? intrinsicRatio : 0;
+
+        bool autoAutoRequested = string.IsNullOrEmpty(sizeStr)
+            || sizeStr.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            || sizeStr.Equals("auto auto", StringComparison.OrdinalIgnoreCase);
+
+        if (autoAutoRequested)
+        {
+            // CSS Images / Backgrounds sizing for auto auto:
+            // - no intrinsic dimensions & no ratio => fill positioning area
+            // - no intrinsic dimensions & ratio => contain in positioning area
+            // - otherwise use intrinsic size (tileW/H = 0 => source bitmap size)
+            if (!hasIntrinsicWidth && !hasIntrinsicHeight)
+            {
+                if (ratio > 0)
+                {
+                    if (containerW / ratio <= containerH)
+                    {
+                        w = containerW;
+                        h = containerW / ratio;
+                    }
+                    else
+                    {
+                        h = containerH;
+                        w = containerH * ratio;
+                    }
+                }
+                else
+                {
+                    w = containerW;
+                    h = containerH;
+                }
+            }
+            else
+            {
+                w = 0;
+                h = 0;
+            }
+            return;
+        }
+
         w = 0;
         h = 0;
-        if (string.IsNullOrEmpty(sizeStr) || sizeStr.Equals("auto", StringComparison.OrdinalIgnoreCase))
-            return;
 
         if (sizeStr.Equals("contain", StringComparison.OrdinalIgnoreCase))
         {
-            if (imgW <= 0 || imgH <= 0) return;
+            if (ratio <= 0) return;
+            if (imgW <= 0 || imgH <= 0)
+            {
+                imgW = ratio;
+                imgH = 1;
+            }
             float scaleX = containerW / imgW;
             float scaleY = containerH / imgH;
             float scale = Math.Min(scaleX, scaleY);
@@ -2127,7 +2187,12 @@ internal static class PaintWalker
 
         if (sizeStr.Equals("cover", StringComparison.OrdinalIgnoreCase))
         {
-            if (imgW <= 0 || imgH <= 0) return;
+            if (ratio <= 0) return;
+            if (imgW <= 0 || imgH <= 0)
+            {
+                imgW = ratio;
+                imgH = 1;
+            }
             float scaleX = containerW / imgW;
             float scaleY = containerH / imgH;
             float scale = Math.Max(scaleX, scaleY);
@@ -2169,13 +2234,38 @@ internal static class PaintWalker
         }
 
         // Maintain aspect ratio when one dimension is auto
-        if (wIsAuto && !hIsAuto && h > 0 && imgW > 0 && imgH > 0)
-            w = h * (imgW / imgH);
-        else if (!wIsAuto && hIsAuto && w > 0 && imgW > 0 && imgH > 0)
-            h = w * (imgH / imgW);
+        if (wIsAuto && !hIsAuto && h > 0 && ratio > 0)
+            w = h * ratio;
+        else if (!wIsAuto && hIsAuto && w > 0 && ratio > 0)
+            h = w / ratio;
         else if (wIsAuto && hIsAuto)
         {
-            w = 0; h = 0; // auto auto = use intrinsic size
+            if (!hasIntrinsicWidth && !hasIntrinsicHeight)
+            {
+                if (ratio > 0)
+                {
+                    if (containerW / ratio <= containerH)
+                    {
+                        w = containerW;
+                        h = containerW / ratio;
+                    }
+                    else
+                    {
+                        h = containerH;
+                        w = containerH * ratio;
+                    }
+                }
+                else
+                {
+                    w = containerW;
+                    h = containerH;
+                }
+            }
+            else
+            {
+                w = 0;
+                h = 0;
+            }
         }
     }
 

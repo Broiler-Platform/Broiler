@@ -8,6 +8,12 @@ public abstract class RImage : IDisposable
     public abstract double Height { get; }
 
     /// <summary>
+    /// The intrinsic aspect ratio (width ÷ height) when available.
+    /// Defaults to the decoded bitmap ratio.
+    /// </summary>
+    public virtual double IntrinsicAspectRatio => Height > 0 ? Width / Height : 0;
+
+    /// <summary>
     /// Whether the image has an intrinsic aspect ratio.  Raster images
     /// always have one (width÷height of the bitmap).  SVGs without a
     /// viewBox have no intrinsic ratio, which affects how CSS min/max

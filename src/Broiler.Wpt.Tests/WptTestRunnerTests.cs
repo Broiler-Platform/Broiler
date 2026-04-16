@@ -2872,6 +2872,26 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_BackgroundSizeVector_WideAutoPercentWidthOmittedHeight_MatchesReference()
+    {
+        var result = RunCssBackgroundsMatchTest(
+            "background-size/vector/wide--auto--percent-width-omitted-height.html");
+        Assert.True(result.Passed,
+            $"wide--auto--percent-width-omitted-height should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundSizeVector_WideAutoPercentWidthOmittedHeightViewbox_MatchesReference()
+    {
+        var result = RunCssBackgroundsMatchTest(
+            "background-size/vector/wide--auto--percent-width-omitted-height-viewbox.html");
+        Assert.True(result.Passed,
+            $"wide--auto--percent-width-omitted-height-viewbox should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_BackgroundClipRoot_MatchesReference()
     {
         // CSS Backgrounds §2.11.4: background-clip has no effect on the root

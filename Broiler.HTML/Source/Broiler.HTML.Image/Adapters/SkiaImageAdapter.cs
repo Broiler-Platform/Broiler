@@ -420,12 +420,17 @@ internal sealed class SkiaImageAdapter : RAdapter
         canvas.DrawPicture(svg.Picture);
 
         // Only SVGs with both explicit width and height have intrinsic
-        // dimensions and an intrinsic ratio (matching Chrome's behavior).
-        // All other SVGs use the 300×150 default and have no ratio.
+        // dimensions.  SVGs with a viewBox expose an intrinsic ratio even
+        // when width/height are omitted or non-intrinsic (e.g. percentages).
+        bool hasIntrinsicRatio = hasBothDimensions || vbRatio > 0;
+        double intrinsicRatio = hasBothDimensions
+            ? svgWidth / svgHeight
+            : vbRatio;
         return new ImageAdapter(bitmap,
-            hasIntrinsicRatio: hasBothDimensions,
+            hasIntrinsicRatio: hasIntrinsicRatio,
             hasIntrinsicWidth: hasBothDimensions,
-            hasIntrinsicHeight: hasBothDimensions);
+            hasIntrinsicHeight: hasBothDimensions,
+            intrinsicAspectRatio: intrinsicRatio > 0 ? intrinsicRatio : null);
     }
 
     /// <summary>
@@ -451,14 +456,56 @@ internal sealed class SkiaImageAdapter : RAdapter
         if (tagEnd < 0)
             return svgContent;
 
-        var inject = "";
-        if (parsedWidth <= 0)
-            inject += $" width=\"{targetWidth}\"";
-        if (parsedHeight <= 0)
-            inject += $" height=\"{targetHeight}\"";
+        var tag = svgContent.Substring(svgIdx, tagEnd - svgIdx + 1);
+        var updatedTag = tag;
+        double viewBoxW = -1, viewBoxH = -1;
+        var vbMatch = System.Text.RegularExpressions.Regex.Match(
+            tag, @"viewBox\s*=\s*[""']([^""']+)[""']",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (vbMatch.Success)
+        {
+            var parts = vbMatch.Groups[1].Value.Split(
+                new[] { ' ', ',', '\t', '\n', '\r' },
+                StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 4
+                && double.TryParse(parts[2], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out double vbW)
+                && double.TryParse(parts[3], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out double vbH)
+                && vbW > 0 && vbH > 0)
+            {
+                viewBoxW = vbW;
+                viewBoxH = vbH;
+            }
+        }
 
-        // Insert the attributes right after "<svg".
-        return svgContent.Insert(svgIdx + 4, inject);
+        if (parsedWidth <= 0)
+        {
+            // Replace non-intrinsic/percentage width (or missing width) with
+            // an explicit viewport width so Svg.Skia can resolve percentages.
+            int effectiveWidth = viewBoxW > 0 ? (int)Math.Ceiling(viewBoxW) : targetWidth;
+            updatedTag = System.Text.RegularExpressions.Regex.Replace(
+                updatedTag,
+                @"\swidth\s*=\s*[""'][^""']*[""']",
+                string.Empty,
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            updatedTag = updatedTag.Insert(updatedTag.Length - 1, $" width=\"{effectiveWidth}\"");
+        }
+
+        if (parsedHeight <= 0)
+        {
+            // Replace non-intrinsic/percentage height (or missing height)
+            // with an explicit viewport height.
+            int effectiveHeight = viewBoxH > 0 ? (int)Math.Ceiling(viewBoxH) : targetHeight;
+            updatedTag = System.Text.RegularExpressions.Regex.Replace(
+                updatedTag,
+                @"\sheight\s*=\s*[""'][^""']*[""']",
+                string.Empty,
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            updatedTag = updatedTag.Insert(updatedTag.Length - 1, $" height=\"{effectiveHeight}\"");
+        }
+
+        return svgContent.Substring(0, svgIdx) + updatedTag + svgContent[(tagEnd + 1)..];
     }
 
     /// <summary>
@@ -557,10 +604,9 @@ internal sealed class SkiaImageAdapter : RAdapter
         int scanLength = Math.Min(data.Length, offset + 1024);
         var header = System.Text.Encoding.UTF8.GetString(data, offset, scanLength - offset);
 
-        // Check for XML declaration followed by <svg, or a direct <svg element
-        return (header.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) &&
-               header.Contains("<svg", StringComparison.OrdinalIgnoreCase)) ||
-               header.StartsWith("<svg", StringComparison.OrdinalIgnoreCase);
+        // Accept SVG content even when the file starts with comments or
+        // DOCTYPE declarations before the root <svg> tag.
+        return header.Contains("<svg", StringComparison.OrdinalIgnoreCase);
     }
 
     protected override RFont CreateFontInt(string family, double size, FontStyle style)
