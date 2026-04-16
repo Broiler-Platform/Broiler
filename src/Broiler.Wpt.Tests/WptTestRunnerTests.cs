@@ -2794,6 +2794,25 @@ document.getElementById('out').appendChild(p);
         return runner.RunMatchTest(testFile, refHtmlPath, wptRoot);
     }
 
+    /// <summary>
+    /// Helper to run a css-backgrounds WPT visual test against Chromium PNG
+    /// references, matching the real WPT runner path used by
+    /// <see cref="Broiler.Wpt.WptTestRunner.RunTest"/>.
+    /// </summary>
+    private WptTestResult RunCssBackgroundsVisualTest(string subPath)
+    {
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var refDir = Path.Combine(wptRoot, "references");
+        var testFile = Path.Combine(wptRoot, "css", "css-backgrounds", subPath);
+
+        if (!File.Exists(testFile))
+            throw new FileNotFoundException($"WPT test file not found: {testFile}");
+
+        var runner = new WptTestRunner(1024, 768);
+        return runner.RunTest(testFile, refDir, wptRoot);
+    }
+
     [Fact]
     public void Wpt_BackgroundColorAnimationInBody_MatchesReference()
     {
@@ -2874,7 +2893,7 @@ document.getElementById('out').appendChild(p);
     [Fact]
     public void Wpt_BackgroundSizeVector_WideAutoPercentWidthOmittedHeight_MatchesReference()
     {
-        var result = RunCssBackgroundsMatchTest(
+        var result = RunCssBackgroundsVisualTest(
             "background-size/vector/wide--auto--percent-width-omitted-height.html");
         Assert.True(result.Passed,
             $"wide--auto--percent-width-omitted-height should pass. " +
@@ -2884,7 +2903,7 @@ document.getElementById('out').appendChild(p);
     [Fact]
     public void Wpt_BackgroundSizeVector_WideAutoPercentWidthOmittedHeightViewbox_MatchesReference()
     {
-        var result = RunCssBackgroundsMatchTest(
+        var result = RunCssBackgroundsVisualTest(
             "background-size/vector/wide--auto--percent-width-omitted-height-viewbox.html");
         Assert.True(result.Passed,
             $"wide--auto--percent-width-omitted-height-viewbox should pass. " +
@@ -2902,7 +2921,7 @@ document.getElementById('out').appendChild(p);
     [InlineData("background-size/vector/wide--auto--nonpercent-width-percent-height.html")]
     public void Wpt_BackgroundSizeVector_AdditionalVectorCases_MatchReference(string subPath)
     {
-        var result = RunCssBackgroundsMatchTest(subPath);
+        var result = RunCssBackgroundsVisualTest(subPath);
         Assert.True(result.Passed,
             $"{Path.GetFileNameWithoutExtension(subPath)} should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");

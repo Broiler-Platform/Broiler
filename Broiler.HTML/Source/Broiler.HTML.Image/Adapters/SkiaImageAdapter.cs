@@ -468,32 +468,15 @@ internal sealed class SkiaImageAdapter : RAdapter
 
         var tag = svgContent.Substring(svgIdx, tagEnd - svgIdx + 1);
         var updatedTag = tag;
-        double viewBoxW = -1, viewBoxH = -1;
-        var vbMatch = System.Text.RegularExpressions.Regex.Match(
-            tag, @"viewBox\s*=\s*[""']([^""']+)[""']",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        if (vbMatch.Success)
-        {
-            var parts = vbMatch.Groups[1].Value.Split(
-                new[] { ' ', ',', '\t', '\n', '\r' },
-                StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 4
-                && double.TryParse(parts[2], System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out double vbW)
-                && double.TryParse(parts[3], System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out double vbH)
-                && vbW > 0 && vbH > 0)
-            {
-                viewBoxW = vbW;
-                viewBoxH = vbH;
-            }
-        }
-
         if (parsedWidth <= 0)
         {
             // Replace non-intrinsic/percentage width (or missing width) with
             // an explicit viewport width so Svg.Skia can resolve percentages.
-            int effectiveWidth = viewBoxW > 0 ? (int)Math.Ceiling(viewBoxW) : targetWidth;
+            // Use the raster target size rather than raw viewBox dimensions:
+            // extreme viewBox values (used by WPT SVG sizing tests) are
+            // coordinate-space metadata, not the CSS viewport size that
+            // percentage children should resolve against.
+            int effectiveWidth = targetWidth;
             updatedTag = System.Text.RegularExpressions.Regex.Replace(
                 updatedTag,
                 @"\swidth\s*=\s*[""'][^""']*[""']",
@@ -505,8 +488,8 @@ internal sealed class SkiaImageAdapter : RAdapter
         if (parsedHeight <= 0)
         {
             // Replace non-intrinsic/percentage height (or missing height)
-            // with an explicit viewport height.
-            int effectiveHeight = viewBoxH > 0 ? (int)Math.Ceiling(viewBoxH) : targetHeight;
+            // with an explicit viewport height.  See width handling above.
+            int effectiveHeight = targetHeight;
             updatedTag = System.Text.RegularExpressions.Regex.Replace(
                 updatedTag,
                 @"\sheight\s*=\s*[""'][^""']*[""']",
@@ -645,7 +628,8 @@ internal sealed class SkiaImageAdapter : RAdapter
         var fillValue = fillMatch.Groups[1].Value.Trim();
         try
         {
-            color = SKColor.Parse(fillValue);
+            var parsed = System.Drawing.ColorTranslator.FromHtml(fillValue);
+            color = new SKColor(parsed.R, parsed.G, parsed.B, parsed.A);
             return true;
         }
         catch
