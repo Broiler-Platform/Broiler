@@ -58,7 +58,10 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                     RenderSvgLine(g, svgLine);
                     break;
                 case ClipItem clip:
-                    g.PushClip(clip.ClipRect);
+                    if (clip.CornerNw > 0 || clip.CornerNe > 0 || clip.CornerSe > 0 || clip.CornerSw > 0)
+                        g.PushClipRounded(clip.ClipRect, clip.CornerNw, clip.CornerNe, clip.CornerSe, clip.CornerSw);
+                    else
+                        g.PushClip(clip.ClipRect);
                     break;
                 case RestoreItem:
                     g.PopClip();
@@ -278,6 +281,11 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
             ? new RectangleF(0, 0, (float)image.Width, (float)image.Height)
             : item.SourceRect;
 
+        // CSS background-size: when TileWidth/TileHeight are specified,
+        // the visual tile dimensions differ from the source image dimensions.
+        float tileW = item.TileWidth > 0 ? item.TileWidth : srcRect.Width;
+        float tileH = item.TileHeight > 0 ? item.TileHeight : srcRect.Height;
+
         var fill = item.FillRect;
         var origin = item.TileOrigin;
 
@@ -289,33 +297,59 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         switch (item.Repeat)
         {
             case "no-repeat":
-                g.DrawImage(image, new RectangleF(origin.X, origin.Y, srcRect.Width, srcRect.Height), srcRect);
+                g.DrawImage(image, new RectangleF(origin.X, origin.Y, tileW, tileH), srcRect);
                 break;
             case "repeat-x":
                 {
                     // Shift origin left to cover the fill area
                     float ox = origin.X;
-                    while (ox > fill.X) ox -= srcRect.Width;
-                    using var brush = g.GetTextureBrush(image, srcRect, new PointF(ox, origin.Y));
-                    g.DrawRectangle(brush, fill.X, origin.Y, fill.Width, srcRect.Height);
+                    while (ox > fill.X) ox -= tileW;
+                    if (tileW == srcRect.Width && tileH == srcRect.Height)
+                    {
+                        using var brush = g.GetTextureBrush(image, srcRect, new PointF(ox, origin.Y));
+                        g.DrawRectangle(brush, fill.X, origin.Y, fill.Width, tileH);
+                    }
+                    else
+                    {
+                        // Scaled tiles: draw individual tiles
+                        for (float tx = ox; tx < fill.Right; tx += tileW)
+                            g.DrawImage(image, new RectangleF(tx, origin.Y, tileW, tileH), srcRect);
+                    }
                     break;
                 }
             case "repeat-y":
                 {
                     float oy = origin.Y;
-                    while (oy > fill.Y) oy -= srcRect.Height;
-                    using var brush = g.GetTextureBrush(image, srcRect, new PointF(origin.X, oy));
-                    g.DrawRectangle(brush, origin.X, fill.Y, srcRect.Width, fill.Height);
+                    while (oy > fill.Y) oy -= tileH;
+                    if (tileW == srcRect.Width && tileH == srcRect.Height)
+                    {
+                        using var brush = g.GetTextureBrush(image, srcRect, new PointF(origin.X, oy));
+                        g.DrawRectangle(brush, origin.X, fill.Y, tileW, fill.Height);
+                    }
+                    else
+                    {
+                        for (float ty = oy; ty < fill.Bottom; ty += tileH)
+                            g.DrawImage(image, new RectangleF(origin.X, ty, tileW, tileH), srcRect);
+                    }
                     break;
                 }
             default: // "repeat"
                 {
                     float ox = origin.X;
-                    while (ox > fill.X) ox -= srcRect.Width;
+                    while (ox > fill.X) ox -= tileW;
                     float oy = origin.Y;
-                    while (oy > fill.Y) oy -= srcRect.Height;
-                    using var brush = g.GetTextureBrush(image, srcRect, new PointF(ox, oy));
-                    g.DrawRectangle(brush, fill.X, fill.Y, fill.Width, fill.Height);
+                    while (oy > fill.Y) oy -= tileH;
+                    if (tileW == srcRect.Width && tileH == srcRect.Height)
+                    {
+                        using var brush = g.GetTextureBrush(image, srcRect, new PointF(ox, oy));
+                        g.DrawRectangle(brush, fill.X, fill.Y, fill.Width, fill.Height);
+                    }
+                    else
+                    {
+                        for (float ty = oy; ty < fill.Bottom; ty += tileH)
+                            for (float tx = ox; tx < fill.Right; tx += tileW)
+                                g.DrawImage(image, new RectangleF(tx, ty, tileW, tileH), srcRect);
+                    }
                     break;
                 }
         }

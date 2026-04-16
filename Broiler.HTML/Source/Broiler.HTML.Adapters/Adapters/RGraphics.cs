@@ -26,6 +26,15 @@ public abstract class RGraphics : IDisposable
     public abstract void PushClip(RectangleF rect);
     public abstract void PushClipExclude(RectangleF rect);
 
+    /// <summary>
+    /// Pushes a rounded-rectangle clip onto the clip stack.
+    /// Default implementation falls back to a rectangular clip.
+    /// </summary>
+    public virtual void PushClipRounded(RectangleF rect, double cornerNw, double cornerNe, double cornerSe, double cornerSw)
+    {
+        PushClip(rect);
+    }
+
     public abstract object SetAntiAliasSmoothingMode();
     public abstract void ReturnPreviousSmoothingMode(object prevMode);
     public abstract RBrush GetTextureBrush(RImage image, RectangleF dstRect, PointF translateTransformLocation);

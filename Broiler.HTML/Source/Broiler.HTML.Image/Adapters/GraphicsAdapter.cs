@@ -27,6 +27,32 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
         canvas.ClipRect(Utilities.Utils.Convert(rect), SKClipOperation.Difference);
     }
 
+    public override void PushClipRounded(RectangleF rect, double cornerNw, double cornerNe, double cornerSe, double cornerSw)
+    {
+        _clipStack.Push(rect);
+        canvas.Save();
+        if (cornerNw <= 0 && cornerNe <= 0 && cornerSe <= 0 && cornerSw <= 0)
+        {
+            canvas.ClipRect(Utilities.Utils.Convert(rect));
+        }
+        else
+        {
+            var skRect = Utilities.Utils.Convert(rect);
+            // SKRoundRect radii: [topLeft.x, topLeft.y, topRight.x, topRight.y,
+            //                     bottomRight.x, bottomRight.y, bottomLeft.x, bottomLeft.y]
+            var radii = new[]
+            {
+                new SKPoint((float)cornerNw, (float)cornerNw),
+                new SKPoint((float)cornerNe, (float)cornerNe),
+                new SKPoint((float)cornerSe, (float)cornerSe),
+                new SKPoint((float)cornerSw, (float)cornerSw),
+            };
+            var rrect = new SKRoundRect();
+            rrect.SetRectRadii(skRect, radii);
+            canvas.ClipRoundRect(rrect);
+        }
+    }
+
     public override object SetAntiAliasSmoothingMode() =>
         // SkiaSharp uses antialiasing by default in paint objects
         null;
