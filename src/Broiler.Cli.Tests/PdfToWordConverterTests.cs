@@ -1,4 +1,5 @@
 using System.Text;
+using System.IO.Compression;
 namespace Broiler.Cli.Tests;
 
 public class PdfToWordConverterTests
@@ -36,6 +37,28 @@ public class PdfToWordConverterTests
 
             Assert.Equal(1, exitCode);
             Assert.False(File.Exists(Path.Combine(tempDirectory, "missing.docx")));
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task Program_Main_ConvertPdf_WithPreserveLayout_Creates_AltChunk_Output()
+    {
+        var tempDirectory = CreateTempDirectory();
+        try
+        {
+            var pdfPath = Path.Combine(tempDirectory, "cli-layout.pdf");
+            File.WriteAllText(pdfPath, CreateMinimalPdf("CLI Layout"), Encoding.ASCII);
+
+            var exitCode = await Program.Main(["--convert-pdf", pdfPath, "--preserve-layout"]);
+
+            var outputPath = Path.Combine(tempDirectory, "cli-layout.docx");
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outputPath));
+            Assert.Contains("position:absolute", ReadAlternativeChunk(outputPath), StringComparison.Ordinal);
         }
         finally
         {
@@ -92,5 +115,15 @@ public class PdfToWordConverterTests
         builder.Append(startXref);
         builder.Append("\n%%EOF\n");
         return builder.ToString();
+    }
+
+    private static string ReadAlternativeChunk(string outputPath)
+    {
+        using var archive = ZipFile.OpenRead(outputPath);
+        var entry = archive.Entries.FirstOrDefault(entry => entry.FullName.StartsWith("word/afchunk", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(entry);
+        using var stream = entry!.Open();
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        return reader.ReadToEnd();
     }
 }
