@@ -11,6 +11,7 @@ public class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        string? pdfInputPath = null;
         string? url = null;
         string? captureImageUrl = null;
         string? output = null;
@@ -28,6 +29,9 @@ public class Program
         {
             switch (args[i])
             {
+                case "--convert-pdf" when i + 1 < args.Length:
+                    pdfInputPath = args[++i];
+                    break;
                 case "--url" when i + 1 < args.Length:
                     url = args[++i];
                     break;
@@ -80,6 +84,7 @@ public class Program
                         return 1;
                     }
                     break;
+                case "--convert-pdf":
                 case "--url":
                 case "--capture-image":
                 case "--output":
@@ -125,7 +130,37 @@ public class Program
 
         int exitCode;
 
-        if (captureImageUrl is not null)
+        if (pdfInputPath is not null)
+        {
+            try
+            {
+                var converter = new PdfToWordConverter();
+                var outputPath = converter.Convert(pdfInputPath, output);
+                Console.WriteLine($"Word document saved to {outputPath}");
+                exitCode = 0;
+            }
+            catch (FileNotFoundException ex)
+            {
+                Console.Error.WriteLine($"PDF conversion failed: {ex.Message}");
+                exitCode = 1;
+            }
+            catch (IOException ex)
+            {
+                Console.Error.WriteLine($"File I/O error: {ex.Message}");
+                exitCode = 1;
+            }
+            catch (InvalidOperationException ex)
+            {
+                Console.Error.WriteLine($"PDF conversion failed: {ex.Message}");
+                exitCode = 1;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error: {ex.Message}");
+                exitCode = 1;
+            }
+        }
+        else if (captureImageUrl is not null)
         {
             if (output is null)
             {
@@ -257,15 +292,17 @@ public class Program
 
     private static void PrintUsage()
     {
+        Console.WriteLine("Usage: Broiler.Cli --convert-pdf <PDF> [--output <FILE|DIR>]");
         Console.WriteLine("Usage: Broiler.Cli --url <URL> --output <FILE> [OPTIONS]");
         Console.WriteLine("       Broiler.Cli --capture-image <URL> --output <FILE> [OPTIONS]");
         Console.WriteLine("       Broiler.Cli --test-engines");
         Console.WriteLine("       Broiler.Cli --fuzz-layout [--count <N>] [--output <DIR>]");
         Console.WriteLine();
         Console.WriteLine("Options:");
+        Console.WriteLine("  --convert-pdf <PDF>    Convert a PDF file to a Word document (.docx)");
         Console.WriteLine("  --url <URL>            The URL of the website to capture");
         Console.WriteLine("  --capture-image <URL>  Capture the website as an image (PNG or JPEG)");
-        Console.WriteLine("  --output <FILE>        The output file path for the captured content");
+        Console.WriteLine("  --output <FILE|DIR>    Output file path, or output directory for PDF conversion");
         Console.WriteLine("  --width <PIXELS>       Image width in pixels (default: 1024, used with --capture-image)");
         Console.WriteLine("  --height <PIXELS>      Image height in pixels (default: 768, used with --capture-image)");
         Console.WriteLine("  --full-page            Capture the full page content");
