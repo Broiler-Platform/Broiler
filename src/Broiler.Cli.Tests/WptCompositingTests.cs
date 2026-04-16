@@ -73,6 +73,90 @@ body { background-color: green; }
     }
 
     /// <summary>
+    /// Regression: <c>background-clip: border-area</c> must be parsed and must
+    /// respect the actual visible border geometry instead of filling the whole box.
+    /// </summary>
+    [Fact]
+    public void BackgroundClip_BorderArea_UsesVisibleBorderGeometry()
+    {
+        const string bluePixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/5ncLrgAAAABJRU5ErkJggg==";
+        var html = $@"<!DOCTYPE html>
+<html>
+<head><style>
+body {{ margin: 0; background: white; }}
+.test {{
+  width: 100px;
+  height: 100px;
+  box-sizing: border-box;
+  border: 20px solid transparent;
+  border-right-style: hidden;
+  background-clip: border-area;
+  background-image: url(data:image/png;base64,{bluePixelPng});
+}}
+</style></head>
+<body><div class=""test""></div></body>
+</html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 120, 120);
+
+        var topBorder = bitmap.GetPixel(50, 10);
+        var center = bitmap.GetPixel(50, 50);
+        var hiddenRightBorder = bitmap.GetPixel(95, 50);
+
+        Assert.True(topBorder.Blue >= 245 && topBorder.Red <= 10 && topBorder.Green <= 10,
+            $"Expected a blue top border pixel but got ({topBorder.Red},{topBorder.Green},{topBorder.Blue})");
+        Assert.True(center.Red >= 245 && center.Green >= 245 && center.Blue >= 245,
+            $"Expected center to remain white but got ({center.Red},{center.Green},{center.Blue})");
+        Assert.True(hiddenRightBorder.Red >= 245 && hiddenRightBorder.Green >= 245 && hiddenRightBorder.Blue >= 245,
+            $"Expected hidden right border to remain white but got ({hiddenRightBorder.Red},{hiddenRightBorder.Green},{hiddenRightBorder.Blue})");
+    }
+
+    /// <summary>
+    /// Regression: wrapped inline-block rows must honor vertical margins so
+    /// successive WPT background-clip boxes line up like Chromium.
+    /// </summary>
+    [Fact]
+    public void BackgroundClip_BorderArea_InlineBlockRows_HonorVerticalMargins()
+    {
+        const string bluePixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/5ncLrgAAAABJRU5ErkJggg==";
+        var html = $@"<!DOCTYPE html>
+<html>
+<head><style>
+body {{ margin: 8px; background: white; }}
+.test {{
+  display: inline-block;
+  margin: 20px;
+  width: 300px;
+  height: 150px;
+  box-sizing: border-box;
+  border: 50px solid transparent;
+  background-clip: border-area;
+  background-image: url(data:image/png;base64,{bluePixelPng});
+}}
+</style></head>
+<body>
+  <div class=""test""></div><div class=""test""></div><div class=""test""></div>
+</body>
+</html>";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+
+        var aboveFirstRow = bitmap.GetPixel(28, 8);
+        var firstRowBorder = bitmap.GetPixel(28, 28);
+        var gapBeforeSecondRow = bitmap.GetPixel(28, 200);
+        var secondRowBorder = bitmap.GetPixel(28, 222);
+
+        Assert.True(aboveFirstRow.Red >= 245 && aboveFirstRow.Green >= 245 && aboveFirstRow.Blue >= 245,
+            $"Expected whitespace above first inline-block row but got ({aboveFirstRow.Red},{aboveFirstRow.Green},{aboveFirstRow.Blue})");
+        Assert.True(firstRowBorder.Blue >= 245 && firstRowBorder.Red <= 10 && firstRowBorder.Green <= 10,
+            $"Expected first row border to be blue but got ({firstRowBorder.Red},{firstRowBorder.Green},{firstRowBorder.Blue})");
+        Assert.True(gapBeforeSecondRow.Red >= 245 && gapBeforeSecondRow.Green >= 245 && gapBeforeSecondRow.Blue >= 245,
+            $"Expected whitespace before second row but got ({gapBeforeSecondRow.Red},{gapBeforeSecondRow.Green},{gapBeforeSecondRow.Blue})");
+        Assert.True(secondRowBorder.Blue >= 245 && secondRowBorder.Red <= 10 && secondRowBorder.Green <= 10,
+            $"Expected second row border to be blue but got ({secondRowBorder.Red},{secondRowBorder.Green},{secondRowBorder.Blue})");
+    }
+
+    /// <summary>
     /// WPT: css/compositing/root-element-background-contain-hidden-crash.html
     /// A crash test with contain: layout, visibility: hidden, and background-image.
     /// Must not throw.

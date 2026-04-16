@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 
 namespace Broiler.HTML.Adapters.Adapters;
 
@@ -33,6 +34,17 @@ public abstract class RImage : IDisposable
     /// SVG with an explicit <c>height</c> attribute).  Defaults to <c>true</c>.
     /// </summary>
     public virtual bool HasIntrinsicHeight => true;
+
+    /// <summary>
+    /// Attempts to report a single uniform color for the entire image.
+    /// Returns <c>false</c> when the adapter cannot determine a uniform color
+    /// or when the image contains multiple colors.
+    /// </summary>
+    public virtual bool TryGetUniformColor(out Color color)
+    {
+        color = Color.Empty;
+        return false;
+    }
 
     public abstract void Dispose();
 }
