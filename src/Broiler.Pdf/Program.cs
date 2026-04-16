@@ -276,6 +276,20 @@ internal sealed class PdfToWordConverter
         html.Append("""<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#fff;">""");
         html.Append($"""<div style="position:relative;width:{FormatCssNumber(page.Width)}pt;height:{FormatCssNumber(page.Height)}pt;overflow:hidden;background:#fff;">""");
 
+        foreach (var image in page.GetImages())
+        {
+            if (!TryBuildImageDataUri(image, out var dataUri))
+                continue;
+
+            var boundingBox = image.BoundingBox;
+            var top = Math.Max(0, page.Height - boundingBox.Top);
+            var left = Math.Max(0, boundingBox.Left);
+            var width = Math.Max(1, boundingBox.Width);
+            var height = Math.Max(1, boundingBox.Height);
+            var styles = $"position:absolute;left:{FormatCssNumber(left)}pt;top:{FormatCssNumber(top)}pt;width:{FormatCssNumber(width)}pt;height:{FormatCssNumber(height)}pt;object-fit:fill;";
+            html.Append($"""<img alt="" src="{dataUri}" style="{styles}">""");
+        }
+
         foreach (var letter in page.Letters)
         {
             if (string.IsNullOrWhiteSpace(letter.Value))
@@ -301,6 +315,79 @@ internal sealed class PdfToWordConverter
 
         html.Append("</div></body></html>");
         return html.ToString();
+    }
+
+    private static bool TryBuildImageDataUri(IPdfImage image, out string dataUri)
+    {
+        if (image.TryGetPng(out var pngBytes) && pngBytes is { Length: > 0 })
+        {
+            dataUri = BuildDataUri("image/png", pngBytes);
+            return true;
+        }
+
+        if (image.TryGetBytesAsMemory(out var imageBytes)
+            && TryDetectEmbeddedImageMimeType(imageBytes.Span, out var mimeType))
+        {
+            dataUri = BuildDataUri(mimeType, imageBytes.ToArray());
+            return true;
+        }
+
+        dataUri = string.Empty;
+        return false;
+    }
+
+    private static string BuildDataUri(string mimeType, byte[] imageBytes)
+    {
+        return $"data:{mimeType};base64,{System.Convert.ToBase64String(imageBytes)}";
+    }
+
+    private static bool TryDetectEmbeddedImageMimeType(ReadOnlySpan<byte> data, out string mimeType)
+    {
+        if (data.Length >= 8
+            && data[0] == 0x89
+            && data[1] == 0x50
+            && data[2] == 0x4E
+            && data[3] == 0x47
+            && data[4] == 0x0D
+            && data[5] == 0x0A
+            && data[6] == 0x1A
+            && data[7] == 0x0A)
+        {
+            mimeType = "image/png";
+            return true;
+        }
+
+        if (data.Length >= 3
+            && data[0] == 0xFF
+            && data[1] == 0xD8
+            && data[2] == 0xFF)
+        {
+            mimeType = "image/jpeg";
+            return true;
+        }
+
+        if (data.Length >= 6
+            && data[0] == 0x47
+            && data[1] == 0x49
+            && data[2] == 0x46
+            && data[3] == 0x38
+            && (data[4] == 0x37 || data[4] == 0x39)
+            && data[5] == 0x61)
+        {
+            mimeType = "image/gif";
+            return true;
+        }
+
+        if (data.Length >= 2
+            && data[0] == 0x42
+            && data[1] == 0x4D)
+        {
+            mimeType = "image/bmp";
+            return true;
+        }
+
+        mimeType = string.Empty;
+        return false;
     }
 
     private static string FormatCssNumber(double value)

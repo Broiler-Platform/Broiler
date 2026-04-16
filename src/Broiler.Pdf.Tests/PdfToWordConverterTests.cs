@@ -1,7 +1,11 @@
 using System.Text;
 using System.IO.Compression;
+using System.Buffers.Binary;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
+using UglyToad.PdfPig.Core;
+using UglyToad.PdfPig.Fonts.Standard14Fonts;
+using UglyToad.PdfPig.Writer;
 
 namespace Broiler.Pdf.Tests;
 
@@ -153,6 +157,40 @@ public class PdfToWordConverterTests
         }
     }
 
+    [Fact]
+    public void Convert_WithPreserveLayout_Embeds_Positioned_Images()
+    {
+        var tempDirectory = CreateTempDirectory();
+        try
+        {
+            var pdfPath = Path.Combine(tempDirectory, "layout-image.pdf");
+            File.WriteAllBytes(pdfPath, CreatePdfWithImageAndText());
+
+            var converter = new PdfToWordConverter();
+            var outputPath = converter.Convert(
+                pdfPath,
+                options: new PdfConversionOptions
+                {
+                    PreserveLayout = true,
+                });
+
+            Assert.True(File.Exists(outputPath));
+
+            var html = ReadAlternativeChunk(outputPath);
+            Assert.Contains("<img", html, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("data:image/png;base64,", html, StringComparison.Ordinal);
+            Assert.Contains("left:100pt", html, StringComparison.Ordinal);
+            Assert.Contains("top:532pt", html, StringComparison.Ordinal);
+            Assert.Contains("width:60pt", html, StringComparison.Ordinal);
+            Assert.Contains("height:60pt", html, StringComparison.Ordinal);
+            Assert.Contains(">I<", html, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, true);
+        }
+    }
+
     private static string CreateTempDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), "broiler-pdf-" + Guid.NewGuid().ToString("N"));
@@ -244,5 +282,84 @@ public class PdfToWordConverterTests
         builder.Append(startXref);
         builder.Append("\n%%EOF\n");
         return builder.ToString();
+    }
+
+    private static byte[] CreatePdfWithImageAndText()
+    {
+        var builder = new PdfDocumentBuilder();
+        var font = builder.AddStandard14Font(Standard14Font.Helvetica);
+        var page = builder.AddPage(612, 792);
+        page.AddText("Image Layout", 18, new PdfPoint(72, 720), font);
+        page.AddPng(CreateSolidColorPng(2, 2, 0x22, 0x88, 0xCC), new PdfRectangle(100, 200, 160, 260));
+        return builder.Build();
+    }
+
+    private static byte[] CreateSolidColorPng(int width, int height, byte red, byte green, byte blue, byte alpha = 0xFF)
+    {
+        using var output = new MemoryStream();
+        output.Write([137, 80, 78, 71, 13, 10, 26, 10]);
+
+        var ihdr = new byte[13];
+        BinaryPrimitives.WriteUInt32BigEndian(ihdr.AsSpan(0, 4), (uint)width);
+        BinaryPrimitives.WriteUInt32BigEndian(ihdr.AsSpan(4, 4), (uint)height);
+        ihdr[8] = 8;
+        ihdr[9] = 6;
+        WritePngChunk(output, "IHDR", ihdr);
+
+        using var rawImageData = new MemoryStream();
+        for (int y = 0; y < height; y++)
+        {
+            rawImageData.WriteByte(0);
+            for (int x = 0; x < width; x++)
+            {
+                rawImageData.WriteByte(red);
+                rawImageData.WriteByte(green);
+                rawImageData.WriteByte(blue);
+                rawImageData.WriteByte(alpha);
+            }
+        }
+
+        using var compressedImageData = new MemoryStream();
+        using (var zlib = new ZLibStream(compressedImageData, CompressionLevel.SmallestSize, true))
+        {
+            rawImageData.Position = 0;
+            rawImageData.CopyTo(zlib);
+        }
+
+        WritePngChunk(output, "IDAT", compressedImageData.ToArray());
+        WritePngChunk(output, "IEND", []);
+        return output.ToArray();
+    }
+
+    private static void WritePngChunk(Stream output, string chunkType, byte[] chunkData)
+    {
+        Span<byte> lengthBytes = stackalloc byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(lengthBytes, (uint)chunkData.Length);
+        output.Write(lengthBytes);
+
+        var chunkTypeBytes = Encoding.ASCII.GetBytes(chunkType);
+        output.Write(chunkTypeBytes);
+        output.Write(chunkData);
+
+        var crcBuffer = new byte[chunkTypeBytes.Length + chunkData.Length];
+        Buffer.BlockCopy(chunkTypeBytes, 0, crcBuffer, 0, chunkTypeBytes.Length);
+        Buffer.BlockCopy(chunkData, 0, crcBuffer, chunkTypeBytes.Length, chunkData.Length);
+
+        Span<byte> crcBytes = stackalloc byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(crcBytes, ComputeCrc32(crcBuffer));
+        output.Write(crcBytes);
+    }
+
+    private static uint ComputeCrc32(ReadOnlySpan<byte> data)
+    {
+        uint crc = 0xFFFFFFFF;
+        foreach (var value in data)
+        {
+            crc ^= value;
+            for (int bit = 0; bit < 8; bit++)
+                crc = (crc & 1) == 0 ? crc >> 1 : 0xEDB88320u ^ (crc >> 1);
+        }
+
+        return ~crc;
     }
 }
