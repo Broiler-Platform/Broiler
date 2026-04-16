@@ -110,6 +110,8 @@ public sealed class PdfConversionOptions
 
 internal sealed class PdfToWordConverter
 {
+    private const double PointsToTwipsRatio = 20d;
+
     public string Convert(string inputPdfPath, string? outputPath = null, PdfConversionOptions? options = null)
     {
         if (string.IsNullOrWhiteSpace(inputPdfPath))
@@ -241,8 +243,8 @@ internal sealed class PdfToWordConverter
         if (pages.Count == 0)
             return;
 
-        var maxWidth = pages.Max(page => page.Width);
-        var maxHeight = pages.Max(page => page.Height);
+        var maxWidth = Math.Max(1, pages.Max(page => page.Width));
+        var maxHeight = Math.Max(1, pages.Max(page => page.Height));
 
         body.AppendChild(
             new SectionProperties(
@@ -265,7 +267,7 @@ internal sealed class PdfToWordConverter
 
     private static UInt32Value ConvertPointsToTwips(double points)
     {
-        return (UInt32Value)(uint)Math.Clamp(Math.Round(points * 20d), 1, uint.MaxValue);
+        return (UInt32Value)(uint)Math.Clamp(Math.Round(points * PointsToTwipsRatio), 1, uint.MaxValue);
     }
 
     private static string BuildPositionedHtml(Page page)
@@ -313,8 +315,8 @@ internal sealed class PdfToWordConverter
 
         var normalized = fontName;
         var subsetSeparator = normalized.IndexOf('+');
-        if (subsetSeparator >= 0 && subsetSeparator < normalized.Length - 1)
-            normalized = normalized[(subsetSeparator + 1)..];
+        if (subsetSeparator >= 0)
+            normalized = subsetSeparator < normalized.Length - 1 ? normalized[(subsetSeparator + 1)..] : string.Empty;
 
         normalized = normalized.Replace(',', ' ').Trim();
 
