@@ -112,6 +112,14 @@ A cross-platform command-line tool for capturing website screenshots.
 See the [CLI Roadmap](docs/roadmap/cli-website-capture.md) and
 [ADR-004](docs/adr/004-os-independent-cli-capture-tool.md) for details.
 
+The CLI also supports converting PDF files to Word documents:
+
+```bash
+dotnet run --project src/Broiler.Cli -- --convert-pdf ./input.pdf
+dotnet run --project src/Broiler.Cli -- --convert-pdf ./input.pdf --output ./converted/
+dotnet run --project src/Broiler.Cli -- --help
+```
+
 #### CI Website Capture
 
 The CI workflow (`.github/workflows/build.yml`) automatically captures a
