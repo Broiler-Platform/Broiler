@@ -30,8 +30,7 @@ internal sealed class PdfToWordConverter
         try
         {
             using var pdfDocument = PdfDocument.Open(fullInputPath);
-            using var outputStream = new FileStream(resolvedOutputPath, FileMode.Create, FileAccess.ReadWrite);
-            using var wordDocument = WordprocessingDocument.Create(outputStream, WordprocessingDocumentType.Document);
+            using var wordDocument = WordprocessingDocument.Create(resolvedOutputPath, WordprocessingDocumentType.Document);
 
             var mainPart = wordDocument.AddMainDocumentPart();
             mainPart.Document = new Document(new Body());
@@ -51,8 +50,11 @@ internal sealed class PdfToWordConverter
             mainPart.Document.Save();
             return resolvedOutputPath;
         }
-        catch (Exception ex) when (ex is not IOException and not UnauthorizedAccessException and not InvalidOperationException)
+        catch (Exception ex) when (ex is not FileNotFoundException and not InvalidOperationException)
         {
+            if (ex is IOException or UnauthorizedAccessException)
+                throw new IOException($"Could not write Word document '{resolvedOutputPath}': {ex.Message}", ex);
+
             throw new InvalidOperationException($"Could not convert PDF '{fullInputPath}' to a Word document: {ex.Message}", ex);
         }
     }
