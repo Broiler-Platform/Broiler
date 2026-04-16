@@ -668,35 +668,53 @@ internal static class PaintWalker
 
             // CSS Backgrounds Level 4: background-clip: border-area — paint
             // the background colour only within the border area (4 strips).
-            if (style.BackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
-            {
-                EmitBorderAreaFill(rect, fragment, items, bgColor);
-            }
-            else
-            {
-                items.Add(new FillRectItem { Bounds = fillRect, Color = bgColor });
+        if (style.BackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
+        {
+            EmitBorderAreaBorder(rect, fragment, items, bgColor);
+        }
+        else
+        {
+            items.Add(new FillRectItem { Bounds = fillRect, Color = bgColor });
             }
         }
     }
 
     /// <summary>
     /// CSS Backgrounds Level 4 <c>background-clip: border-area</c>:
-    /// Emits 4 fill-rect items, one for each border strip.
+    /// Emits a border-shaped fill using the same per-side styles as normal
+    /// border painting so <c>hidden</c>, <c>dashed</c>, <c>dotted</c>, etc.
+    /// match the corresponding WPT reference rendering.
     /// </summary>
-    private static void EmitBorderAreaFill(RectangleF bounds, Fragment fragment, List<DisplayItem> items, Color color)
+    private static void EmitBorderAreaBorder(RectangleF bounds, Fragment fragment, List<DisplayItem> items, Color color)
     {
+        var style = fragment.Style;
         var border = fragment.Border;
-        float bLeft = (float)border.Left, bTop = (float)border.Top;
-        float bRight = (float)border.Right, bBottom = (float)border.Bottom;
+        bool hasTop = HasBorder(style.BorderTopStyle, border.Top);
+        bool hasRight = HasBorder(style.BorderRightStyle, border.Right);
+        bool hasBottom = HasBorder(style.BorderBottomStyle, border.Bottom);
+        bool hasLeft = HasBorder(style.BorderLeftStyle, border.Left);
 
-        if (bTop > 0)
-            items.Add(new FillRectItem { Bounds = new RectangleF(bounds.X, bounds.Y, bounds.Width, bTop), Color = color });
-        if (bBottom > 0)
-            items.Add(new FillRectItem { Bounds = new RectangleF(bounds.X, bounds.Bottom - bBottom, bounds.Width, bBottom), Color = color });
-        if (bLeft > 0)
-            items.Add(new FillRectItem { Bounds = new RectangleF(bounds.X, bounds.Y + bTop, bLeft, bounds.Height - bTop - bBottom), Color = color });
-        if (bRight > 0)
-            items.Add(new FillRectItem { Bounds = new RectangleF(bounds.X + bounds.Width - bRight, bounds.Y + bTop, bRight, bounds.Height - bTop - bBottom), Color = color });
+        if (!hasTop && !hasRight && !hasBottom && !hasLeft)
+            return;
+
+        items.Add(new DrawBorderItem
+        {
+            Bounds = bounds,
+            Widths = border,
+            TopColor = hasTop ? color : Color.Empty,
+            RightColor = hasRight ? color : Color.Empty,
+            BottomColor = hasBottom ? color : Color.Empty,
+            LeftColor = hasLeft ? color : Color.Empty,
+            Style = style.BorderTopStyle ?? "solid",
+            TopStyle = style.BorderTopStyle ?? "none",
+            RightStyle = style.BorderRightStyle ?? "none",
+            BottomStyle = style.BorderBottomStyle ?? "none",
+            LeftStyle = style.BorderLeftStyle ?? "none",
+            CornerNw = style.ActualCornerNw,
+            CornerNe = style.ActualCornerNe,
+            CornerSe = style.ActualCornerSe,
+            CornerSw = style.ActualCornerSw,
+        });
     }
 
     private static void EmitBackgroundImage(Fragment fragment, List<DisplayItem> items, RectangleF viewport = default)
@@ -828,7 +846,11 @@ internal static class PaintWalker
             // background image fills only the border area (not the padding/content).
             if (fragment.Style.BackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
             {
-                EmitBorderAreaTiledImage(bounds, fragment, items, tileOrigin, tileW, tileH, repeat);
+                if (fragment.BackgroundImageHandle is RImage borderAreaImage
+                    && borderAreaImage.TryGetUniformColor(out var uniformColor))
+                    EmitBorderAreaBorder(bounds, fragment, items, uniformColor);
+                else
+                    EmitBorderAreaTiledImage(bounds, fragment, items, tileOrigin, tileW, tileH, repeat);
             }
             else
             {

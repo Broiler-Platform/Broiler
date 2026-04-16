@@ -108,6 +108,11 @@ internal sealed class CssLineBox
         // and its Location/ActualBottom directly.
         if (b.Display == CssConstants.InlineBlock)
         {
+            bool usesDefaultBaseline = string.IsNullOrEmpty(b.VerticalAlign)
+                || b.VerticalAlign == CssConstants.Baseline;
+            if (usesDefaultBaseline)
+                return;
+
             if (Math.Abs(baseline - r.Top) > 0.01)
             {
                 Rectangles[b] = new RectangleF(r.X, (float)baseline, r.Width, r.Height);

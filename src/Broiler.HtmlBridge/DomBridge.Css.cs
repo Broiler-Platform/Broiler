@@ -862,7 +862,7 @@ public sealed partial class DomBridge
 
             // CSS3 background-origin / background-clip box values —
             // accept but don't change rendering (not yet implemented).
-            if (lower is "content-box" or "padding-box" or "border-box")
+            if (lower is "content-box" or "padding-box" or "border-box" or "border-area")
             {
                 continue;
             }

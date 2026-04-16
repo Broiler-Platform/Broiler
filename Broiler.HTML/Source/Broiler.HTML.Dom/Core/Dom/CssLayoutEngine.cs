@@ -748,9 +748,9 @@ internal static class CssLayoutEngine
         }
 
         // --- Position and size the inline-block ---
-        b.Location = new PointF((float)ibBorderLeft, (float)cury);
+        b.Location = new PointF((float)ibBorderLeft, (float)(cury + b.ActualMarginTop));
         b.Size = new SizeF((float)ibBoxWidth, 0);
-        b.ActualBottom = cury;
+        b.ActualBottom = b.Location.Y;
 
         // --- Lay out children inside the inline-block ---
         if (b.Display is "grid" or "inline-grid")
@@ -825,7 +825,7 @@ internal static class CssLayoutEngine
             - b.ActualBorderRightWidth - b.ActualPaddingRight;
 
         maxRight = Math.Max(maxRight, ibBorderLeft + ibBoxWidth);
-        maxbottom = Math.Max(maxbottom, b.ActualBottom);
+        maxbottom = Math.Max(maxbottom, b.ActualBottom + b.ActualMarginBottom);
     }
 
     /// <summary>

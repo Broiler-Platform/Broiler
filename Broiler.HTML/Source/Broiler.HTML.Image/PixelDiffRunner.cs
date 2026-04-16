@@ -21,18 +21,21 @@ public static class PixelDiffRunner
     {
         config ??= DeterministicRenderConfig.Default;
 
-        if (actual.Width != baseline.Width || actual.Height != baseline.Height)
+        using var normalizedActual = NormalizeForComparison(actual);
+        using var normalizedBaseline = NormalizeForComparison(baseline);
+
+        if (normalizedActual.Width != normalizedBaseline.Width || normalizedActual.Height != normalizedBaseline.Height)
         {
             return new PixelDiffResult
             {
                 DiffRatio = 1.0,
-                DiffPixelCount = Math.Max(actual.Width * actual.Height, baseline.Width * baseline.Height),
-                TotalPixelCount = Math.Max(actual.Width * actual.Height, baseline.Width * baseline.Height),
+                DiffPixelCount = Math.Max(normalizedActual.Width * normalizedActual.Height, normalizedBaseline.Width * normalizedBaseline.Height),
+                TotalPixelCount = Math.Max(normalizedActual.Width * normalizedActual.Height, normalizedBaseline.Width * normalizedBaseline.Height),
                 IsMatch = false
             };
         }
 
-        int totalPixels = actual.Width * actual.Height;
+        int totalPixels = normalizedActual.Width * normalizedActual.Height;
         if (totalPixels == 0)
         {
             return new PixelDiffResult
@@ -46,15 +49,15 @@ public static class PixelDiffRunner
 
         int tolerance = config.ColorTolerance;
         int diffCount = 0;
-        var diffBitmap = new SKBitmap(actual.Width, actual.Height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        var diffBitmap = new SKBitmap(normalizedActual.Width, normalizedActual.Height, SKColorType.Rgba8888, SKAlphaType.Premul);
         var mismatches = new List<PixelMismatch>();
 
-        for (int y = 0; y < actual.Height; y++)
+        for (int y = 0; y < normalizedActual.Height; y++)
         {
-            for (int x = 0; x < actual.Width; x++)
+            for (int x = 0; x < normalizedActual.Width; x++)
             {
-                var p1 = actual.GetPixel(x, y);
-                var p2 = baseline.GetPixel(x, y);
+                var p1 = normalizedActual.GetPixel(x, y);
+                var p2 = normalizedBaseline.GetPixel(x, y);
 
                 bool match = Math.Abs(p1.Red - p2.Red) <= tolerance &&
                              Math.Abs(p1.Green - p2.Green) <= tolerance &&
@@ -111,5 +114,12 @@ public static class PixelDiffRunner
             IsMatch = false,
             Mismatches = mismatches
         };
+    }
+
+    private static SKBitmap NormalizeForComparison(SKBitmap source)
+    {
+        using var image = SKImage.FromBitmap(source);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return SKBitmap.Decode(data) ?? source.Copy();
     }
 }
