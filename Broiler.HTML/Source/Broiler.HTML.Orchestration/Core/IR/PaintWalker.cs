@@ -542,7 +542,8 @@ internal static class PaintWalker
         // own rendering and are NOT clipped by the element's overflow.
         // They must be emitted before the overflow clip.
         // CSS Backgrounds Level 3 §3.3: When border-radius is set, the
-        // background is clipped to the rounded border-box.
+        // entire border-box (background + borders) is clipped to the
+        // rounded shape.
         bool bgClippedRounded = false;
         if (!ReferenceEquals(fragment, propagatedFrom))
         {
@@ -564,13 +565,14 @@ internal static class PaintWalker
 
             EmitBackground(fragment, items);
             EmitBackgroundImage(fragment, items, viewport);
-
-            if (bgClippedRounded)
-                items.Add(new RestoreItem { Bounds = bounds });
         }
 
-        // Borders
+        // Borders (clipped to the rounded border-box when border-radius is set)
         EmitBorders(fragment, items);
+
+        // Restore the rounded clip after borders are drawn
+        if (bgClippedRounded)
+            items.Add(new RestoreItem { Bounds = bounds });
 
         // Overflow clipping — CSS2.1 §11.1.1: clip at the padding edge of the box.
         // For static rendering, overflow:auto and overflow:scroll clip content
@@ -1189,7 +1191,7 @@ internal static class PaintWalker
         return Color.FromArgb(255, Math.Clamp(r, 0, 255), Math.Clamp(g, 0, 255), Math.Clamp(b, 0, 255));
     }
 
-    private static void PaintChildren(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default, Color? bgClipTextColor = null)
+    private static void PaintChildren(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default, Color? bgClipTextColor = null, bool skipBlockBackgrounds = false)
     {
         if (fragment.Children.Count == 0)
             return;
@@ -1278,7 +1280,10 @@ internal static class PaintWalker
 
         // Step 3: Block backgrounds, background images, borders, and replaced
         //         content only — inline content (text, children) is deferred.
-        if (blocks != null)
+        // When called from PaintFragmentForegroundPhase, block backgrounds were
+        // already painted by the parent's PaintChildrenBackgroundPhase — skip
+        // them to avoid double-drawing semi-transparent backgrounds/borders.
+        if (blocks != null && !skipBlockBackgrounds)
         {
             foreach (var child in blocks)
                 PaintFragmentBackgroundPhase(child, items, propagatedFrom, viewport);
@@ -1362,31 +1367,31 @@ internal static class PaintWalker
         // CSS2.1 §14.2/§11.1.1: Background, background image, and borders
         // are part of the element's own rendering and are NOT clipped by
         // the element's overflow.  Emit them before the overflow clip.
-        // CSS Backgrounds Level 3 §3.3: rounded border-radius clips backgrounds.
+        // CSS Backgrounds Level 3 §3.3: rounded border-radius clips backgrounds and borders.
+        bool hasCornerRadius = style.ActualCornerNw > 0 || style.ActualCornerNe > 0
+            || style.ActualCornerSe > 0 || style.ActualCornerSw > 0;
+        if (hasCornerRadius)
+        {
+            items.Add(new ClipItem
+            {
+                Bounds = bounds,
+                ClipRect = bounds,
+                CornerNw = style.ActualCornerNw,
+                CornerNe = style.ActualCornerNe,
+                CornerSe = style.ActualCornerSe,
+                CornerSw = style.ActualCornerSw,
+            });
+        }
+
         if (!ReferenceEquals(fragment, propagatedFrom))
         {
-            bool hasCornerRadius = style.ActualCornerNw > 0 || style.ActualCornerNe > 0
-                || style.ActualCornerSe > 0 || style.ActualCornerSw > 0;
-            if (hasCornerRadius)
-            {
-                items.Add(new ClipItem
-                {
-                    Bounds = bounds,
-                    ClipRect = bounds,
-                    CornerNw = style.ActualCornerNw,
-                    CornerNe = style.ActualCornerNe,
-                    CornerSe = style.ActualCornerSe,
-                    CornerSw = style.ActualCornerSw,
-                });
-            }
-
             EmitBackground(fragment, items);
             EmitBackgroundImage(fragment, items, viewport);
-
-            if (hasCornerRadius)
-                items.Add(new RestoreItem { Bounds = bounds });
         }
         EmitBorders(fragment, items);
+
+        if (hasCornerRadius)
+            items.Add(new RestoreItem { Bounds = bounds });
 
         // Overflow clipping — paired with RestoreItem at the end.
         // Applied after background/borders so they remain visible.
@@ -1484,9 +1489,10 @@ internal static class PaintWalker
         EmitText(fragment, items, currentBgClipTextColor);
         EmitTextDecoration(fragment, items, currentBgClipTextColor);
 
-        // Process children using the standard Appendix E ordering
-        // (this applies the three-phase split recursively)
-        PaintChildren(fragment, items, propagatedFrom, viewport, bgClipTextColor: currentBgClipTextColor);
+        // Process children using the standard Appendix E ordering.
+        // Skip Step 3 (block backgrounds) because those were already painted
+        // by the corresponding PaintChildrenBackgroundPhase call.
+        PaintChildren(fragment, items, propagatedFrom, viewport, bgClipTextColor: currentBgClipTextColor, skipBlockBackgrounds: true);
 
         if (clipped)
             items.Add(new RestoreItem { Bounds = bounds });

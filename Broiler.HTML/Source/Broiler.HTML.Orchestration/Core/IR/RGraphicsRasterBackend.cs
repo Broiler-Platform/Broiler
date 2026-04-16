@@ -207,10 +207,14 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         var bounds = item.Bounds;
         var widths = item.Widths;
 
-        bool hasTop = widths.Top > 0 && item.TopColor.A > 0 && item.TopStyle == "solid";
-        bool hasRight = widths.Right > 0 && item.RightColor.A > 0 && item.RightStyle == "solid";
-        bool hasBottom = widths.Bottom > 0 && item.BottomColor.A > 0 && item.BottomStyle == "solid";
-        bool hasLeft = widths.Left > 0 && item.LeftColor.A > 0 && item.LeftStyle == "solid";
+        // Only fill opaque corners. Semi-transparent borders (alpha < 255)
+        // must NOT use corner fills because the fill rectangle and the
+        // overlapping border trapezoids would composite the same alpha twice,
+        // producing incorrect (darker) corner pixels.
+        bool hasTop = widths.Top > 0 && item.TopColor.A == 255 && item.TopStyle == "solid";
+        bool hasRight = widths.Right > 0 && item.RightColor.A == 255 && item.RightStyle == "solid";
+        bool hasBottom = widths.Bottom > 0 && item.BottomColor.A == 255 && item.BottomStyle == "solid";
+        bool hasLeft = widths.Left > 0 && item.LeftColor.A == 255 && item.LeftStyle == "solid";
 
         // Top-left corner
         if (hasTop && hasLeft && item.TopColor == item.LeftColor)
