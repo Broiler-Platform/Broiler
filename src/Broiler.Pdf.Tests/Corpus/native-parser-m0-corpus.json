@@ -1,0 +1,91 @@
+{
+  "version": "m0",
+  "entries": [
+    {
+      "id": "simple-text-generated",
+      "category": "simple-text",
+      "automationStatus": "verified",
+      "generator": "PdfTestCorpus.CreateFixtureBytes(\"simple-text-generated\")",
+      "license": "Repository-authored generated fixture",
+      "baseline": {
+        "pageCount": 1,
+        "textByPage": [
+          "Hello PDF"
+        ],
+        "layoutTextByPage": [
+          "HelloPDF"
+        ],
+        "layoutImageCountByPage": [
+          0
+        ]
+      }
+    },
+    {
+      "id": "multi-page-generated",
+      "category": "multi-page-report",
+      "automationStatus": "verified",
+      "generator": "PdfTestCorpus.CreateFixtureBytes(\"multi-page-generated\")",
+      "license": "Repository-authored generated fixture",
+      "baseline": {
+        "pageCount": 2,
+        "textByPage": [
+          "Page 1",
+          "Page 2"
+        ],
+        "layoutTextByPage": [
+          "Page1",
+          "Page2"
+        ],
+        "layoutImageCountByPage": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "image-heavy-generated",
+      "category": "scanned-image-heavy",
+      "automationStatus": "verified",
+      "generator": "PdfTestCorpus.CreateFixtureBytes(\"image-heavy-generated\")",
+      "license": "Repository-authored generated fixture",
+      "baseline": {
+        "pageCount": 1,
+        "textByPage": [
+          "Image Layout"
+        ],
+        "layoutTextByPage": [
+          "ImageLayout"
+        ],
+        "layoutImageCountByPage": [
+          1
+        ]
+      }
+    },
+    {
+      "id": "malformed-generated",
+      "category": "malformed",
+      "automationStatus": "verified",
+      "generator": "PdfTestCorpus.CreateFixtureBytes(\"malformed-generated\")",
+      "license": "Repository-authored generated fixture",
+      "baseline": {
+        "expectsOpenFailure": true
+      }
+    },
+    {
+      "id": "object-stream-import-slot",
+      "category": "object-stream",
+      "automationStatus": "planned",
+      "generator": "Pending committed public-domain sample import",
+      "license": "TBD - public-domain or otherwise redistributable sample required",
+      "notes": "Reserved in M0 so M1 can add object-stream and xref-stream baselines without changing corpus tracking format."
+    },
+    {
+      "id": "encrypted-import-slot",
+      "category": "encrypted",
+      "automationStatus": "planned",
+      "generator": "Pending committed sample import or generated password-protected fixture",
+      "license": "TBD - redistributable sample required",
+      "notes": "Reserved in M0 to capture encrypted-document diagnostics expectations once the first explicit policy decision is made."
+    }
+  ]
+}

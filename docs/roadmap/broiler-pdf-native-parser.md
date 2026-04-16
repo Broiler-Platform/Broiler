@@ -281,16 +281,16 @@ back here.
   `Diagnostics`).
 - [x] Introduce parser/document/page seams inside `Broiler.Pdf` so the current
   CLI contract stays stable while the backing parser changes.
-- [ ] Create a committed sample corpus manifest covering:
+- [x] Create a committed sample corpus manifest covering:
   - simple text PDFs;
   - multi-page reports;
   - scanned/image-heavy PDFs;
   - object-stream PDFs;
   - malformed PDFs;
   - encrypted PDFs.
-- [ ] Add syntax-level test fixtures that can exercise the future native parser
+- [x] Add syntax-level test fixtures that can exercise the future native parser
   independently of the DOCX conversion path.
-- [ ] Capture baseline parity expectations between the current `PdfPig` path and
+- [x] Capture baseline parity expectations between the current `PdfPig` path and
   the future native parser for text extraction and preserve-layout extraction.
 
 #### 6.2.2 M0 Deliverables, Dependencies, and Follow-up Issues
@@ -321,6 +321,24 @@ work:
   features;
 - full CMap/font coverage beyond the first text-extraction baseline; and
 - removing `PdfPig` before native parsing reaches conversion parity.
+
+#### 6.2.4 Committed M0 Artifacts
+
+The following repository artifacts now back the M0 checklist:
+
+| Artifact | Purpose |
+|---|---|
+| `src/Broiler.Pdf.Tests/Corpus/native-parser-m0-corpus.json` | Corpus manifest covering all M0 categories, with verified generated fixtures for simple text, multi-page, image-heavy, and malformed cases plus tracked import slots for object-stream and encrypted samples |
+| `src/Broiler.Pdf.Tests/PdfPigDocumentParserTests.cs` | Parser-level tests that validate fixture baselines independently of DOCX conversion |
+| `src/Broiler.Pdf/PdfParserAbstractions.cs` | Internal parser/document/page seam that keeps the CLI contract stable while the parser implementation evolves |
+
+For M0 baseline tracking, the verified generated fixtures currently lock in:
+
+- page-count and extracted-text expectations for simple-text, multi-page, and
+  image-heavy samples;
+- preserve-layout-oriented extraction expectations via normalized layout text and
+  image-count baselines; and
+- an explicit malformed-file failure baseline.
 
 #### M1 — Syntax and Object Model
 
