@@ -438,8 +438,10 @@ internal sealed class PdfConverterProcessRunner
 
         throw new InvalidOperationException(
             "Broiler PDF conversion now lives in the standalone Broiler.Pdf app. " +
-            "Install/build Broiler.Pdf and either place it beside Broiler.Cli, set BROILER_PDF_APP to the executable or .dll path, " +
-            "or run 'dotnet run --project src/Broiler.Pdf -- --input <PDF> [--output <FILE|DIR>]'.");
+            "To continue, use one of these options: " +
+            "1) place Broiler.Pdf beside Broiler.Cli, " +
+            "2) set BROILER_PDF_APP to the Broiler.Pdf executable or .dll path, or " +
+            "3) run 'dotnet run --project src/Broiler.Pdf -- --input <PDF> [--output <FILE|DIR>]'.");
     }
 
     private static ProcessStartInfo CreateStartInfo(PdfProcessCommand command, string inputPdfPath, string? outputPath)
