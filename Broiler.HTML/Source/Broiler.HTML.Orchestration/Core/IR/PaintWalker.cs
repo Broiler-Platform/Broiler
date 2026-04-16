@@ -457,7 +457,7 @@ internal static class PaintWalker
         return null;
     }
 
-    private static void PaintFragment(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default, bool isRoot = false)
+    private static void PaintFragment(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default, bool isRoot = false, Color? bgClipTextColor = null)
     {
         var style = fragment.Style;
 
@@ -467,7 +467,7 @@ internal static class PaintWalker
         if (style.Visibility != "visible")
         {
             // Even if not visible, children may be visible (CSS spec)
-            PaintChildren(fragment, items, propagatedFrom, viewport);
+            PaintChildren(fragment, items, propagatedFrom, viewport, bgClipTextColor: bgClipTextColor);
             return;
         }
 
@@ -528,17 +528,51 @@ internal static class PaintWalker
             items.Add(new BlendModeItem { Bounds = bounds, Mode = "normal" });
         }
 
+        // CSS Backgrounds Level 4: background-clip: text — detect and compute
+        // the composite text color from the background colour for descendants.
+        Color? currentBgClipTextColor = bgClipTextColor;
+        if (style.BackgroundClip.Equals("text", StringComparison.OrdinalIgnoreCase))
+        {
+            var bgColor = style.ActualBackgroundColor;
+            if (bgColor.A > 0)
+                currentBgClipTextColor = bgColor;
+        }
+
         // CSS2.1 §14.2: Background and borders are part of the element's
         // own rendering and are NOT clipped by the element's overflow.
         // They must be emitted before the overflow clip.
+        // CSS Backgrounds Level 3 §3.3: When border-radius is set, the
+        // entire border-box (background + borders) is clipped to the
+        // rounded shape.
+        bool bgClippedRounded = false;
         if (!ReferenceEquals(fragment, propagatedFrom))
+        {
+            bool hasCornerRadius = style.ActualCornerNw > 0 || style.ActualCornerNe > 0
+                || style.ActualCornerSe > 0 || style.ActualCornerSw > 0;
+            if (hasCornerRadius)
+            {
+                items.Add(new ClipItem
+                {
+                    Bounds = bounds,
+                    ClipRect = bounds,
+                    CornerNw = style.ActualCornerNw,
+                    CornerNe = style.ActualCornerNe,
+                    CornerSe = style.ActualCornerSe,
+                    CornerSw = style.ActualCornerSw,
+                });
+                bgClippedRounded = true;
+            }
+
             EmitBackground(fragment, items);
-
-        if (!ReferenceEquals(fragment, propagatedFrom))
             EmitBackgroundImage(fragment, items, viewport);
+        }
 
-        // Borders
+        // Borders (clipped to the rounded border-box when border-radius is set)
         EmitBorders(fragment, items);
+
+        // Restore the rounded clip after borders are drawn
+        if (bgClippedRounded)
+            items.Add(new RestoreItem { Bounds = bounds });
 
         // Overflow clipping — CSS2.1 §11.1.1: clip at the padding edge of the box.
         // For static rendering, overflow:auto and overflow:scroll clip content
@@ -564,13 +598,13 @@ internal static class PaintWalker
         EmitSelection(fragment, items);
 
         // Text (inline fragments from line boxes)
-        EmitText(fragment, items);
+        EmitText(fragment, items, currentBgClipTextColor);
 
         // Text decoration
-        EmitTextDecoration(fragment, items);
+        EmitTextDecoration(fragment, items, currentBgClipTextColor);
 
         // Child fragments (stacking-context sorted)
-        PaintChildren(fragment, items, propagatedFrom, viewport);
+        PaintChildren(fragment, items, propagatedFrom, viewport, bgClipTextColor: currentBgClipTextColor);
 
         // Restore clip
         if (clipped)
@@ -593,6 +627,11 @@ internal static class PaintWalker
     {
         var style = fragment.Style;
 
+        // CSS Backgrounds Level 4: background-clip:text — the background colour
+        // is not painted normally; it is applied through text shapes instead.
+        if (style.BackgroundClip.Equals("text", StringComparison.OrdinalIgnoreCase))
+            return;
+
         // Determine the set of rectangles to paint: per-line rects for inline elements,
         // or the single fragment bounds for block elements.
         var rects = GetPaintRects(fragment);
@@ -609,27 +648,55 @@ internal static class PaintWalker
             if (fillRect.Width <= 0 || fillRect.Height <= 0)
                 continue;
 
+            Color bgColor;
             // Background gradient
             if (style.ActualBackgroundGradient.A > 0 &&
                 style.ActualBackgroundGradient != style.ActualBackgroundColor)
             {
-                // When the background-color has alpha (typical two-color gradient),
-                // paint the background-color as the base layer; gradient rendering
-                // is deferred to the raster backend.
-                // When background-color is transparent (e.g. uniform CSS gradient
-                // like linear-gradient(green, green) in a background shorthand),
-                // paint the gradient color directly within the element's box.
-                // This avoids canvas propagation of the gradient colour.
-                var fillColor = style.ActualBackgroundColor.A > 0
+                bgColor = style.ActualBackgroundColor.A > 0
                     ? style.ActualBackgroundColor
                     : style.ActualBackgroundGradient;
-                items.Add(new FillRectItem { Bounds = fillRect, Color = fillColor });
             }
             else if (style.ActualBackgroundColor.A > 0)
             {
-                items.Add(new FillRectItem { Bounds = fillRect, Color = style.ActualBackgroundColor });
+                bgColor = style.ActualBackgroundColor;
+            }
+            else
+            {
+                continue;
+            }
+
+            // CSS Backgrounds Level 4: background-clip: border-area — paint
+            // the background colour only within the border area (4 strips).
+            if (style.BackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
+            {
+                EmitBorderAreaFill(rect, fragment, items, bgColor);
+            }
+            else
+            {
+                items.Add(new FillRectItem { Bounds = fillRect, Color = bgColor });
             }
         }
+    }
+
+    /// <summary>
+    /// CSS Backgrounds Level 4 <c>background-clip: border-area</c>:
+    /// Emits 4 fill-rect items, one for each border strip.
+    /// </summary>
+    private static void EmitBorderAreaFill(RectangleF bounds, Fragment fragment, List<DisplayItem> items, Color color)
+    {
+        var border = fragment.Border;
+        float bLeft = (float)border.Left, bTop = (float)border.Top;
+        float bRight = (float)border.Right, bBottom = (float)border.Bottom;
+
+        if (bTop > 0)
+            items.Add(new FillRectItem { Bounds = new RectangleF(bounds.X, bounds.Y, bounds.Width, bTop), Color = color });
+        if (bBottom > 0)
+            items.Add(new FillRectItem { Bounds = new RectangleF(bounds.X, bounds.Bottom - bBottom, bounds.Width, bBottom), Color = color });
+        if (bLeft > 0)
+            items.Add(new FillRectItem { Bounds = new RectangleF(bounds.X, bounds.Y + bTop, bLeft, bounds.Height - bTop - bBottom), Color = color });
+        if (bRight > 0)
+            items.Add(new FillRectItem { Bounds = new RectangleF(bounds.X + bounds.Width - bRight, bounds.Y + bTop, bRight, bounds.Height - bTop - bBottom), Color = color });
     }
 
     private static void EmitBackgroundImage(Fragment fragment, List<DisplayItem> items, RectangleF viewport = default)
@@ -643,6 +710,11 @@ internal static class PaintWalker
             }
             return;
         }
+
+        // CSS Backgrounds Level 4: background-clip:text — background image
+        // is not painted normally (it is clipped to text shapes).
+        if (fragment.Style.BackgroundClip.Equals("text", StringComparison.OrdinalIgnoreCase))
+            return;
 
         // Use GetPaintRects to handle inline elements (which may have zero
         // Size but non-empty InlineRects from per-line-box layout).
@@ -672,6 +744,22 @@ internal static class PaintWalker
             var repeat = fragment.Style.BackgroundRepeat;
             var isFixed = fragment.Style.BackgroundAttachment == "fixed" && viewport.Width > 0 && viewport.Height > 0;
 
+            // CSS Backgrounds Level 3: background-size determines the
+            // visual tile dimensions.  Resolve against the positioning area
+            // (originRect) which defaults to the padding-box.
+            float tileW = 0, tileH = 0;
+            var sizeStr = fragment.Style.BackgroundSize;
+            if (!string.IsNullOrEmpty(sizeStr) && !sizeStr.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            {
+                float imgW = 0, imgH = 0;
+                if (fragment.BackgroundImageHandle is RImage sizeImg)
+                {
+                    imgW = (float)sizeImg.Width;
+                    imgH = (float)sizeImg.Height;
+                }
+                ParseBackgroundSizeForImage(sizeStr, originRect.Width, originRect.Height, imgW, imgH, out tileW, out tileH);
+            }
+
             // CSS2.1 §14.2.1: For fixed attachment, the tiling origin is
             // the viewport origin; the image is visible only within the
             // element's padding area.  For scroll attachment, the origin
@@ -690,8 +778,8 @@ internal static class PaintWalker
                 float imgW = 0, imgH = 0;
                 if (fragment.BackgroundImageHandle is RImage bgImg)
                 {
-                    imgW = (float)bgImg.Width;
-                    imgH = (float)bgImg.Height;
+                    imgW = tileW > 0 ? tileW : (float)bgImg.Width;
+                    imgH = tileH > 0 ? tileH : (float)bgImg.Height;
                 }
 
                 var parts = posStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -731,15 +819,26 @@ internal static class PaintWalker
             if (hasBgBlend)
                 items.Add(new BlendModeItem { Bounds = clipRect, Mode = fragment.Style.BackgroundBlendMode });
 
-            items.Add(new DrawTiledImageItem
+            // CSS Backgrounds Level 4: background-clip: border-area — the
+            // background image fills only the border area (not the padding/content).
+            if (fragment.Style.BackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
             {
-                Bounds = clipRect,
-                ImageHandle = fragment.BackgroundImageHandle,
-                SourceRect = RectangleF.Empty,
-                FillRect = clipRect,
-                TileOrigin = tileOrigin,
-                Repeat = repeat,
-            });
+                EmitBorderAreaTiledImage(bounds, fragment, items, tileOrigin, tileW, tileH, repeat);
+            }
+            else
+            {
+                items.Add(new DrawTiledImageItem
+                {
+                    Bounds = clipRect,
+                    ImageHandle = fragment.BackgroundImageHandle,
+                    SourceRect = RectangleF.Empty,
+                    FillRect = clipRect,
+                    TileOrigin = tileOrigin,
+                    Repeat = repeat,
+                    TileWidth = tileW,
+                    TileHeight = tileH,
+                });
+            }
 
             if (hasBgBlend)
                 items.Add(new RestoreBlendModeItem { Bounds = clipRect });
@@ -956,7 +1055,7 @@ internal static class PaintWalker
         }
     }
 
-    private static void EmitText(Fragment fragment, List<DisplayItem> items)
+    private static void EmitText(Fragment fragment, List<DisplayItem> items, Color? bgClipTextColor = null)
     {
         if (fragment.Lines == null || fragment.Lines.Count == 0)
             return;
@@ -977,6 +1076,13 @@ internal static class PaintWalker
 
                 var inlineStyle = inline.Style;
 
+                // CSS Backgrounds Level 4: background-clip: text — the text
+                // color is composited with the background color so that the
+                // background is visible through the text shape.
+                Color textColor = inlineStyle.ActualColor;
+                if (bgClipTextColor.HasValue)
+                    textColor = CompositeTextColor(bgClipTextColor.Value, textColor);
+
                 var (shadowX, shadowY, shadowColor) = ParseTextShadow(inlineStyle.TextShadow);
 
                 items.Add(new DrawTextItem
@@ -986,7 +1092,7 @@ internal static class PaintWalker
                     FontFamily = inlineStyle.FontFamily,
                     FontSize = (float)ParseFontSize(inlineStyle.FontSize),
                     FontWeight = inlineStyle.FontWeight,
-                    Color = inlineStyle.ActualColor,
+                    Color = textColor,
                     Origin = new PointF(inline.X, inline.Y),
                     FontHandle = inline.FontHandle,
                     IsRtl = isRtl,
@@ -998,7 +1104,7 @@ internal static class PaintWalker
         }
     }
 
-    private static void EmitTextDecoration(Fragment fragment, List<DisplayItem> items)
+    private static void EmitTextDecoration(Fragment fragment, List<DisplayItem> items, Color? bgClipTextColor = null)
     {
         if (fragment.Lines == null || fragment.Lines.Count == 0)
             return;
@@ -1025,6 +1131,12 @@ internal static class PaintWalker
 
         if (string.IsNullOrEmpty(decoration) || decoration == "none")
             return;
+
+        // CSS Backgrounds Level 4: background-clip: text — text-decoration
+        // uses the composited color so decorations also show the background.
+        Color decoColor = fragment.Style.ActualColor;
+        if (bgClipTextColor.HasValue)
+            decoColor = CompositeTextColor(bgClipTextColor.Value, decoColor);
 
         var rects = GetPaintRects(fragment);
 
@@ -1056,7 +1168,7 @@ internal static class PaintWalker
                     Bounds = new RectangleF(x1, y, x2 - x1, 1),
                     Start = new PointF(x1, y),
                     End = new PointF(x2, y),
-                    Color = fragment.Style.ActualColor,
+                    Color = decoColor,
                     Width = 1,
                     DashStyle = "solid",
                 });
@@ -1064,7 +1176,22 @@ internal static class PaintWalker
         }
     }
 
-    private static void PaintChildren(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default)
+    /// <summary>
+    /// Composites a foreground text color over a background color using
+    /// standard alpha compositing (src-over).  For <c>background-clip: text</c>,
+    /// the background shows through the text shape and the foreground text color
+    /// is painted on top.
+    /// </summary>
+    private static Color CompositeTextColor(Color bg, Color fg)
+    {
+        float fgA = fg.A / 255f;
+        int r = (int)(bg.R * (1 - fgA) + fg.R * fgA);
+        int g = (int)(bg.G * (1 - fgA) + fg.G * fgA);
+        int b = (int)(bg.B * (1 - fgA) + fg.B * fgA);
+        return Color.FromArgb(255, Math.Clamp(r, 0, 255), Math.Clamp(g, 0, 255), Math.Clamp(b, 0, 255));
+    }
+
+    private static void PaintChildren(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom = null, RectangleF viewport = default, Color? bgClipTextColor = null, bool skipBlockBackgrounds = false)
     {
         if (fragment.Children.Count == 0)
             return;
@@ -1137,12 +1264,12 @@ internal static class PaintWalker
                 if (viewport.Width > 0 && viewport.Height > 0)
                 {
                     int startIdx = items.Count;
-                    PaintFragment(child, items, propagatedFrom, viewport);
+                    PaintFragment(child, items, propagatedFrom, viewport, bgClipTextColor: bgClipTextColor);
                     OffsetDisplayItems(items, startIdx, viewport.X, viewport.Y);
                 }
                 else
                 {
-                    PaintFragment(child, items, propagatedFrom, viewport);
+                    PaintFragment(child, items, propagatedFrom, viewport, bgClipTextColor: bgClipTextColor);
                 }
             }
         }
@@ -1153,7 +1280,10 @@ internal static class PaintWalker
 
         // Step 3: Block backgrounds, background images, borders, and replaced
         //         content only — inline content (text, children) is deferred.
-        if (blocks != null)
+        // When called from PaintFragmentForegroundPhase, block backgrounds were
+        // already painted by the parent's PaintChildrenBackgroundPhase — skip
+        // them to avoid double-drawing semi-transparent backgrounds/borders.
+        if (blocks != null && !skipBlockBackgrounds)
         {
             foreach (var child in blocks)
                 PaintFragmentBackgroundPhase(child, items, propagatedFrom, viewport);
@@ -1163,7 +1293,7 @@ internal static class PaintWalker
         if (floats != null)
         {
             foreach (var child in floats)
-                PaintFragment(child, items, propagatedFrom, viewport);
+                PaintFragment(child, items, propagatedFrom, viewport, bgClipTextColor: bgClipTextColor);
         }
 
         // Step 5: Inline content from blocks (text, inline children) plus
@@ -1171,12 +1301,12 @@ internal static class PaintWalker
         if (blocks != null)
         {
             foreach (var child in blocks)
-                PaintFragmentForegroundPhase(child, items, propagatedFrom, viewport);
+                PaintFragmentForegroundPhase(child, items, propagatedFrom, viewport, bgClipTextColor);
         }
         if (inlineLevel != null)
         {
             foreach (var child in inlineLevel)
-                PaintFragment(child, items, propagatedFrom, viewport);
+                PaintFragment(child, items, propagatedFrom, viewport, bgClipTextColor: bgClipTextColor);
         }
 
         // Steps 6–7: Positioned children sorted by StackLevel
@@ -1192,12 +1322,12 @@ internal static class PaintWalker
                 if (child.Style.Position == "fixed" && viewport.Width > 0 && viewport.Height > 0)
                 {
                     int startIdx = items.Count;
-                    PaintFragment(child, items, propagatedFrom, viewport);
+                    PaintFragment(child, items, propagatedFrom, viewport, bgClipTextColor: bgClipTextColor);
                     OffsetDisplayItems(items, startIdx, viewport.X, viewport.Y);
                 }
                 else
                 {
-                    PaintFragment(child, items, propagatedFrom, viewport);
+                    PaintFragment(child, items, propagatedFrom, viewport, bgClipTextColor: bgClipTextColor);
                 }
             }
         }
@@ -1237,11 +1367,31 @@ internal static class PaintWalker
         // CSS2.1 §14.2/§11.1.1: Background, background image, and borders
         // are part of the element's own rendering and are NOT clipped by
         // the element's overflow.  Emit them before the overflow clip.
+        // CSS Backgrounds Level 3 §3.3: rounded border-radius clips backgrounds and borders.
+        bool hasCornerRadius = style.ActualCornerNw > 0 || style.ActualCornerNe > 0
+            || style.ActualCornerSe > 0 || style.ActualCornerSw > 0;
+        if (hasCornerRadius)
+        {
+            items.Add(new ClipItem
+            {
+                Bounds = bounds,
+                ClipRect = bounds,
+                CornerNw = style.ActualCornerNw,
+                CornerNe = style.ActualCornerNe,
+                CornerSe = style.ActualCornerSe,
+                CornerSw = style.ActualCornerSw,
+            });
+        }
+
         if (!ReferenceEquals(fragment, propagatedFrom))
+        {
             EmitBackground(fragment, items);
-        if (!ReferenceEquals(fragment, propagatedFrom))
             EmitBackgroundImage(fragment, items, viewport);
+        }
         EmitBorders(fragment, items);
+
+        if (hasCornerRadius)
+            items.Add(new RestoreItem { Bounds = bounds });
 
         // Overflow clipping — paired with RestoreItem at the end.
         // Applied after background/borders so they remain visible.
@@ -1300,7 +1450,7 @@ internal static class PaintWalker
     /// processes its children via <see cref="PaintChildren"/> which applies
     /// the three-phase split recursively.
     /// </summary>
-    private static void PaintFragmentForegroundPhase(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom, RectangleF viewport)
+    private static void PaintFragmentForegroundPhase(Fragment fragment, List<DisplayItem> items, Fragment? propagatedFrom, RectangleF viewport, Color? bgClipTextColor = null)
     {
         var style = fragment.Style;
 
@@ -1308,6 +1458,15 @@ internal static class PaintWalker
             return;
         if (style.Visibility != "visible")
             return;
+
+        // Detect background-clip: text on this fragment (propagate to children)
+        Color? currentBgClipTextColor = bgClipTextColor;
+        if (style.BackgroundClip.Equals("text", StringComparison.OrdinalIgnoreCase))
+        {
+            var bgColor = style.ActualBackgroundColor;
+            if (bgColor.A > 0)
+                currentBgClipTextColor = bgColor;
+        }
 
         var bounds = fragment.Bounds;
 
@@ -1327,12 +1486,13 @@ internal static class PaintWalker
 
         // Foreground content: selection, text, text-decoration
         EmitSelection(fragment, items);
-        EmitText(fragment, items);
-        EmitTextDecoration(fragment, items);
+        EmitText(fragment, items, currentBgClipTextColor);
+        EmitTextDecoration(fragment, items, currentBgClipTextColor);
 
-        // Process children using the standard Appendix E ordering
-        // (this applies the three-phase split recursively)
-        PaintChildren(fragment, items, propagatedFrom, viewport);
+        // Process children using the standard Appendix E ordering.
+        // Skip Step 3 (block backgrounds) because those were already painted
+        // by the corresponding PaintChildrenBackgroundPhase call.
+        PaintChildren(fragment, items, propagatedFrom, viewport, bgClipTextColor: currentBgClipTextColor, skipBlockBackgrounds: true);
 
         if (clipped)
             items.Add(new RestoreItem { Bounds = bounds });
@@ -1940,6 +2100,139 @@ internal static class PaintWalker
             // Single value: width is set, height is auto (maintain aspect ratio).
             // For gradients there's no intrinsic ratio, so use same value for both.
             h = w;
+        }
+    }
+
+    /// <summary>
+    /// Parses CSS <c>background-size</c> for a URL-based image, maintaining
+    /// aspect ratio when one dimension is <c>auto</c>.
+    /// </summary>
+    private static void ParseBackgroundSizeForImage(string sizeStr, float containerW, float containerH, float imgW, float imgH, out float w, out float h)
+    {
+        w = 0;
+        h = 0;
+        if (string.IsNullOrEmpty(sizeStr) || sizeStr.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (sizeStr.Equals("contain", StringComparison.OrdinalIgnoreCase))
+        {
+            if (imgW <= 0 || imgH <= 0) return;
+            float scaleX = containerW / imgW;
+            float scaleY = containerH / imgH;
+            float scale = Math.Min(scaleX, scaleY);
+            w = imgW * scale;
+            h = imgH * scale;
+            return;
+        }
+
+        if (sizeStr.Equals("cover", StringComparison.OrdinalIgnoreCase))
+        {
+            if (imgW <= 0 || imgH <= 0) return;
+            float scaleX = containerW / imgW;
+            float scaleY = containerH / imgH;
+            float scale = Math.Max(scaleX, scaleY);
+            w = imgW * scale;
+            h = imgH * scale;
+            return;
+        }
+
+        var parts = sizeStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        bool wIsAuto = parts.Length < 1 || parts[0].Trim().Equals("auto", StringComparison.OrdinalIgnoreCase);
+        bool hIsAuto = parts.Length < 2 || parts[1].Trim().Equals("auto", StringComparison.OrdinalIgnoreCase);
+
+        if (!wIsAuto)
+        {
+            string wp = parts[0].Trim();
+            if (wp.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+                float.TryParse(wp.AsSpan(0, wp.Length - 2), NumberStyles.Float, CultureInfo.InvariantCulture, out w);
+            else if (wp.EndsWith("%"))
+            {
+                if (float.TryParse(wp.AsSpan(0, wp.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out float pct))
+                    w = containerW * pct / 100f;
+            }
+            else
+                float.TryParse(wp, NumberStyles.Float, CultureInfo.InvariantCulture, out w);
+        }
+
+        if (!hIsAuto && parts.Length >= 2)
+        {
+            string hp = parts[1].Trim();
+            if (hp.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+                float.TryParse(hp.AsSpan(0, hp.Length - 2), NumberStyles.Float, CultureInfo.InvariantCulture, out h);
+            else if (hp.EndsWith("%"))
+            {
+                if (float.TryParse(hp.AsSpan(0, hp.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out float pct))
+                    h = containerH * pct / 100f;
+            }
+            else
+                float.TryParse(hp, NumberStyles.Float, CultureInfo.InvariantCulture, out h);
+        }
+
+        // Maintain aspect ratio when one dimension is auto
+        if (wIsAuto && !hIsAuto && h > 0 && imgW > 0 && imgH > 0)
+            w = h * (imgW / imgH);
+        else if (!wIsAuto && hIsAuto && w > 0 && imgW > 0 && imgH > 0)
+            h = w * (imgH / imgW);
+        else if (wIsAuto && hIsAuto)
+        {
+            w = 0; h = 0; // auto auto = use intrinsic size
+        }
+    }
+
+    /// <summary>
+    /// CSS Backgrounds Level 4 <c>background-clip: border-area</c>:
+    /// Emits 4 tiled-image items, one for each border strip.
+    /// </summary>
+    private static void EmitBorderAreaTiledImage(RectangleF bounds, Fragment fragment, List<DisplayItem> items,
+        PointF tileOrigin, float tileW, float tileH, string repeat)
+    {
+        var border = fragment.Border;
+        float bLeft = (float)border.Left, bTop = (float)border.Top;
+        float bRight = (float)border.Right, bBottom = (float)border.Bottom;
+
+        // Top strip
+        if (bTop > 0)
+        {
+            var strip = new RectangleF(bounds.X, bounds.Y, bounds.Width, bTop);
+            items.Add(new DrawTiledImageItem
+            {
+                Bounds = strip, ImageHandle = fragment.BackgroundImageHandle,
+                SourceRect = RectangleF.Empty, FillRect = strip,
+                TileOrigin = tileOrigin, Repeat = repeat, TileWidth = tileW, TileHeight = tileH,
+            });
+        }
+        // Bottom strip
+        if (bBottom > 0)
+        {
+            var strip = new RectangleF(bounds.X, bounds.Bottom - bBottom, bounds.Width, bBottom);
+            items.Add(new DrawTiledImageItem
+            {
+                Bounds = strip, ImageHandle = fragment.BackgroundImageHandle,
+                SourceRect = RectangleF.Empty, FillRect = strip,
+                TileOrigin = tileOrigin, Repeat = repeat, TileWidth = tileW, TileHeight = tileH,
+            });
+        }
+        // Left strip (between top and bottom)
+        if (bLeft > 0)
+        {
+            var strip = new RectangleF(bounds.X, bounds.Y + bTop, bLeft, bounds.Height - bTop - bBottom);
+            items.Add(new DrawTiledImageItem
+            {
+                Bounds = strip, ImageHandle = fragment.BackgroundImageHandle,
+                SourceRect = RectangleF.Empty, FillRect = strip,
+                TileOrigin = tileOrigin, Repeat = repeat, TileWidth = tileW, TileHeight = tileH,
+            });
+        }
+        // Right strip (between top and bottom)
+        if (bRight > 0)
+        {
+            var strip = new RectangleF(bounds.X + bounds.Width - bRight, bounds.Y + bTop, bRight, bounds.Height - bTop - bBottom);
+            items.Add(new DrawTiledImageItem
+            {
+                Bounds = strip, ImageHandle = fragment.BackgroundImageHandle,
+                SourceRect = RectangleF.Empty, FillRect = strip,
+                TileOrigin = tileOrigin, Repeat = repeat, TileWidth = tileW, TileHeight = tileH,
+            });
         }
     }
 

@@ -119,12 +119,21 @@ public sealed class DrawTiledImageItem : DisplayItem
     public PointF TileOrigin { get; init; }
     /// <summary>CSS background-repeat value.</summary>
     public string Repeat { get; init; } = "repeat";
+    /// <summary>Visual tile width from CSS background-size (0 = use source image width).</summary>
+    public float TileWidth { get; init; }
+    /// <summary>Visual tile height from CSS background-size (0 = use source image height).</summary>
+    public float TileHeight { get; init; }
 }
 
 /// <summary>Pushes a clip rectangle onto the clip stack.</summary>
 public sealed class ClipItem : DisplayItem
 {
     public RectangleF ClipRect { get; init; }
+    /// <summary>Corner radii for rounded clips (0 = sharp corners).</summary>
+    public double CornerNw { get; init; }
+    public double CornerNe { get; init; }
+    public double CornerSe { get; init; }
+    public double CornerSw { get; init; }
 }
 
 /// <summary>Pops the most recent clip from the clip stack.</summary>
