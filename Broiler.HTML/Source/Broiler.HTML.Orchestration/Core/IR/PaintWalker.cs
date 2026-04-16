@@ -2200,7 +2200,12 @@ internal static class PaintWalker
 
         if (sizeStr.Equals("contain", StringComparison.OrdinalIgnoreCase))
         {
-            if (ratio <= 0) return;
+            if (ratio <= 0)
+            {
+                w = containerW;
+                h = containerH;
+                return;
+            }
             if (!(hasIntrinsicWidth && hasIntrinsicHeight && intrinsicW > 0 && intrinsicH > 0))
             {
                 intrinsicW = ratio;
@@ -2216,7 +2221,12 @@ internal static class PaintWalker
 
         if (sizeStr.Equals("cover", StringComparison.OrdinalIgnoreCase))
         {
-            if (ratio <= 0) return;
+            if (ratio <= 0)
+            {
+                w = containerW;
+                h = containerH;
+                return;
+            }
             if (!(hasIntrinsicWidth && hasIntrinsicHeight && intrinsicW > 0 && intrinsicH > 0))
             {
                 intrinsicW = ratio;

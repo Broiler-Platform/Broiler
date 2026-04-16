@@ -370,6 +370,7 @@ internal sealed class SkiaImageAdapter : RAdapter
 
         // Parse the SVG root element's width, height and viewBox attributes.
         var (svgWidth, svgHeight, vbRatio) = ParseSvgIntrinsicDimensions(svgContent);
+        bool preserveAspectRatioNone = HasPreserveAspectRatioNone(svgContent);
 
         bool hasIntrinsicWidth = svgWidth > 0;
         bool hasIntrinsicHeight = svgHeight > 0;
@@ -425,12 +426,14 @@ internal sealed class SkiaImageAdapter : RAdapter
             bitmap.Erase(solidFill);
 
         // Only SVGs with both explicit width and height have intrinsic
-        // dimensions.  SVGs with a viewBox expose an intrinsic ratio even
-        // when width/height are omitted or non-intrinsic (e.g. percentages).
-        bool hasIntrinsicRatio = hasBothDimensions || vbRatio > 0;
+        // dimensions.  A viewBox exposes an intrinsic ratio only when the
+        // root element preserves aspect ratio; preserveAspectRatio="none"
+        // allows non-uniform scaling and therefore does not contribute an
+        // intrinsic ratio for CSS background-size calculations.
+        bool hasIntrinsicRatio = hasBothDimensions || (vbRatio > 0 && !preserveAspectRatioNone);
         double intrinsicRatio = hasBothDimensions
             ? svgWidth / svgHeight
-            : vbRatio;
+            : (preserveAspectRatioNone ? 0 : vbRatio);
         return new ImageAdapter(bitmap,
             hasIntrinsicRatio: hasIntrinsicRatio,
             hasIntrinsicWidth: hasIntrinsicWidth,
@@ -556,6 +559,23 @@ internal sealed class SkiaImageAdapter : RAdapter
         }
 
         return (w, h, ratio);
+    }
+
+    private static bool HasPreserveAspectRatioNone(string svg)
+    {
+        int svgIdx = svg.IndexOf("<svg", StringComparison.OrdinalIgnoreCase);
+        if (svgIdx < 0) return false;
+        int tagEnd = svg.IndexOf('>', svgIdx);
+        if (tagEnd < 0) return false;
+        var tag = svg.Substring(svgIdx, tagEnd - svgIdx + 1);
+
+        var m = System.Text.RegularExpressions.Regex.Match(
+            tag,
+            @"(?<!\w)preserveAspectRatio\s*=\s*[""']([^""']+)[""']",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!m.Success) return false;
+
+        return m.Groups[1].Value.Trim().StartsWith("none", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

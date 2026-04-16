@@ -246,4 +246,28 @@ public class SvgImageRenderingTests
         var bluePixel = bitmap.GetPixel(60, 10);
         Assert.True(bluePixel.Blue > 200, $"Expected blue pixel, got B={bluePixel.Blue}");
     }
+
+    [Theory]
+    [InlineData("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8px\" viewBox=\"0 0 2147483647 1\" preserveAspectRatio=\"none\"><rect y=\"0\" width=\"100%\" height=\"100%\" fill=\"lime\"/></svg>")]
+    [InlineData("<svg xmlns=\"http://www.w3.org/2000/svg\" height=\"8px\" viewBox=\"0 0 1 2147483647\" preserveAspectRatio=\"none\"><rect y=\"0\" width=\"100%\" height=\"100%\" fill=\"lime\"/></svg>")]
+    public void HtmlRender_BackgroundSvgContain_With_PreserveAspectRatioNone_Fills_BackgroundArea(string svgMarkup)
+    {
+        var svgDataUri = "data:image/svg+xml;base64," +
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(svgMarkup));
+
+        var html = $@"<!DOCTYPE html>
+<html>
+<body style=""margin:8px"">
+  <div style=""background-image:url('{svgDataUri}');background-repeat:no-repeat;background-size:contain;border:1px solid black;width:768px;height:256px""></div>
+</body>
+</html>";
+
+        using var bitmap = Broiler.HTML.Image.HtmlRender.RenderToImage(html, 1024, 768);
+
+        var interiorPixel = bitmap.GetPixel(100, 100);
+        Assert.True(interiorPixel.Green > 200,
+            $"Expected contain background interior to be green, got R={interiorPixel.Red} G={interiorPixel.Green} B={interiorPixel.Blue}");
+        Assert.True(interiorPixel.Red < 50, $"Expected red channel < 50, got {interiorPixel.Red}");
+        Assert.True(interiorPixel.Blue < 50, $"Expected blue channel < 50, got {interiorPixel.Blue}");
+    }
 }
