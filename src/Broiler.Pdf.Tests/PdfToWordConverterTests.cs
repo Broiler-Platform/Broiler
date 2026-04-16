@@ -1,11 +1,13 @@
 using System.Text;
 using System.IO.Compression;
 using System.Buffers.Binary;
+using BroilerPdfRectangle = Broiler.Pdf.PdfRectangle;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
-using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.Fonts.Standard14Fonts;
 using UglyToad.PdfPig.Writer;
+using PdfPigPoint = UglyToad.PdfPig.Core.PdfPoint;
+using PdfPigRectangle = UglyToad.PdfPig.Core.PdfRectangle;
 
 namespace Broiler.Pdf.Tests;
 
@@ -191,6 +193,78 @@ public class PdfToWordConverterTests
         }
     }
 
+    [Fact]
+    public void Convert_Uses_Injected_Parser_For_Text_Output()
+    {
+        var tempDirectory = CreateTempDirectory();
+        try
+        {
+            var pdfPath = Path.Combine(tempDirectory, "seam.pdf");
+            File.WriteAllText(pdfPath, "placeholder");
+
+            var parser = new FakePdfDocumentParser(
+                new FakePdfDocument(
+                    new FakePdfPage(
+                        number: 1,
+                        text: "Native parser seam",
+                        mediaBox: new BroilerPdfRectangle(0, 0, 612, 792),
+                        layout: new PdfPageLayout([], []))));
+            var converter = new PdfToWordConverter(parser);
+
+            var outputPath = converter.Convert(pdfPath);
+
+            Assert.Equal(Path.GetFullPath(pdfPath), parser.OpenedPath);
+            Assert.Contains("Native parser seam", ReadWordText(outputPath));
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, true);
+        }
+    }
+
+    [Fact]
+    public void Convert_WithPreserveLayout_Uses_Injected_Parser_Layout()
+    {
+        var tempDirectory = CreateTempDirectory();
+        try
+        {
+            var pdfPath = Path.Combine(tempDirectory, "seam-layout.pdf");
+            File.WriteAllText(pdfPath, "placeholder");
+
+            var parser = new FakePdfDocumentParser(
+                new FakePdfDocument(
+                    new FakePdfPage(
+                        number: 1,
+                        text: "ignored",
+                        mediaBox: new BroilerPdfRectangle(0, 0, 612, 792),
+                        layout: new PdfPageLayout(
+                        [
+                            new PdfPositionedText("Layout Seam", 72, 144, 16, "Helvetica-Bold", true, false),
+                        ],
+                        [
+                            new PdfPositionedImage("data:image/png;base64,AA==", 100, 200, 60, 60),
+                        ]))));
+            var converter = new PdfToWordConverter(parser);
+
+            var outputPath = converter.Convert(
+                pdfPath,
+                options: new PdfConversionOptions
+                {
+                    PreserveLayout = true,
+                });
+
+            var html = ReadAlternativeChunk(outputPath);
+            Assert.Contains(">Layout Seam<", html, StringComparison.Ordinal);
+            Assert.Contains("font-weight:bold", html, StringComparison.Ordinal);
+            Assert.Contains("left:72pt", html, StringComparison.Ordinal);
+            Assert.Contains("data:image/png;base64,AA==", html, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, true);
+        }
+    }
+
     private static string CreateTempDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), "broiler-pdf-" + Guid.NewGuid().ToString("N"));
@@ -289,8 +363,8 @@ public class PdfToWordConverterTests
         var builder = new PdfDocumentBuilder();
         var font = builder.AddStandard14Font(Standard14Font.Helvetica);
         var page = builder.AddPage(612, 792);
-        page.AddText("Image Layout", 18, new PdfPoint(72, 720), font);
-        page.AddPng(CreateSolidColorPng(2, 2, 0x22, 0x88, 0xCC), new PdfRectangle(100, 200, 160, 260));
+        page.AddText("Image Layout", 18, new PdfPigPoint(72, 720), font);
+        page.AddPng(CreateSolidColorPng(2, 2, 0x22, 0x88, 0xCC), new PdfPigRectangle(100, 200, 160, 260));
         return builder.Build();
     }
 
@@ -361,5 +435,36 @@ public class PdfToWordConverterTests
         }
 
         return ~crc;
+    }
+
+    private sealed class FakePdfDocumentParser(FakePdfDocument document) : IPdfDocumentParser
+    {
+        public string? OpenedPath { get; private set; }
+
+        public IPdfDocument Open(string path)
+        {
+            OpenedPath = path;
+            return document;
+        }
+    }
+
+    private sealed class FakePdfDocument(params IPdfPage[] pages) : IPdfDocument
+    {
+        public IReadOnlyList<IPdfPage> Pages { get; } = pages;
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class FakePdfPage(int number, string text, BroilerPdfRectangle mediaBox, PdfPageLayout layout) : IPdfPage
+    {
+        public int Number => number;
+
+        public string Text => text;
+
+        public BroilerPdfRectangle MediaBox => mediaBox;
+
+        public PdfPageLayout ExtractLayout() => layout;
     }
 }

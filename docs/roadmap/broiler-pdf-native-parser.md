@@ -1,7 +1,7 @@
 # Roadmap: Broiler.Pdf Native PDF Parser
 
-> **Status**: Proposed — created 2026-04-16  
-> **Tracking issue**: Create a roadmap for an in-house PDF parser library (`Broiler.Pdf`)
+> **Status**: Active — M0 initiated 2026-04-16  
+> **Tracking issue**: Initiate Milestone 0 (M0) for Native PDF Parser
 
 ---
 
@@ -267,6 +267,78 @@ Broiler work. Adjust dates if the effort becomes a dedicated project.
 - Define supported versus unsupported features.
 - Add parser interfaces and internal seams so the current converter can later
   switch implementations without changing its CLI contract.
+
+### 6.2 M0 Execution Tracker
+
+This roadmap issue is the central coordination point for M0. Keep the checklist
+and dependency notes below updated as work lands so follow-up issues can link
+back here.
+
+#### 6.2.1 Core Task Breakdown
+
+- [x] Document the target parser layering and recommended module boundaries
+  (`IO`, `Syntax`, `Structure`, `Filters`, `Content`, `Fonts`, `Extraction`,
+  `Diagnostics`).
+- [x] Introduce parser/document/page seams inside `Broiler.Pdf` so the current
+  CLI contract stays stable while the backing parser changes.
+- [x] Create a committed sample corpus manifest covering:
+  - simple text PDFs;
+  - multi-page reports;
+  - scanned/image-heavy PDFs;
+  - object-stream PDFs;
+  - malformed PDFs;
+  - encrypted PDFs.
+- [x] Add syntax-level test fixtures that can exercise the future native parser
+  independently of the DOCX conversion path.
+- [x] Capture baseline parity expectations between the current `PdfPig` path and
+  the future native parser for text extraction and preserve-layout extraction.
+
+#### 6.2.2 M0 Deliverables, Dependencies, and Follow-up Issues
+
+| Workstream | M0 deliverable | Immediate dependency | Suggested follow-up issue |
+|---|---|---|---|
+| Parser seam | `IPdfDocumentParser` / document / page abstractions wired into `Broiler.Pdf` | None | Implement native byte reader and primitive parser |
+| Corpus | Representative fixture inventory with ownership and licensing notes | Decide where PDF fixtures live in-repo | Add corpus files + regression harness |
+| Support boundary | Explicit supported/deferred feature list for the first native-parser target | Corpus categories to validate against | Convert support boundary into diagnostics and docs |
+| Validation | Targeted parser tests plus existing compatibility tests | Parser seam in place | Add M1 syntax/xref tests |
+
+#### 6.2.3 Initial Supported Boundary for Native Parser Work
+
+Treat the following as the M0 baseline contract for upcoming implementation
+work:
+
+**Initially in scope**
+
+- common read-only PDF 1.4–1.7 documents;
+- standard xref tables before xref streams/object streams;
+- unencrypted text/image pages needed by current DOCX conversion modes; and
+- explicit diagnostics when the parser hits unsupported structures.
+
+**Explicitly deferred beyond M0**
+
+- document editing/writing;
+- forms, annotations, tagged PDF, signatures, and incremental-save authoring
+  features;
+- full CMap/font coverage beyond the first text-extraction baseline; and
+- removing `PdfPig` before native parsing reaches conversion parity.
+
+#### 6.2.4 Committed M0 Artifacts
+
+The following repository artifacts now back the M0 checklist:
+
+| Artifact | Purpose |
+|---|---|
+| `src/Broiler.Pdf.Tests/Corpus/native-parser-m0-corpus.json` | Corpus manifest covering all M0 categories, with verified generated fixtures for simple text, multi-page, image-heavy, and malformed cases plus tracked import slots for object-stream and encrypted samples |
+| `src/Broiler.Pdf.Tests/PdfPigDocumentParserTests.cs` | Parser-level tests that validate fixture baselines independently of DOCX conversion |
+| `src/Broiler.Pdf/PdfParserAbstractions.cs` | Internal parser/document/page seam that keeps the CLI contract stable while the parser implementation evolves |
+
+For M0 baseline tracking, the verified generated fixtures currently lock in:
+
+- page-count and extracted-text expectations for simple-text, multi-page, and
+  image-heavy samples;
+- preserve-layout-oriented extraction expectations via normalized layout text and
+  image-count baselines; and
+- an explicit malformed-file failure baseline.
 
 #### M1 — Syntax and Object Model
 
