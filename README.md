@@ -112,11 +112,23 @@ A cross-platform command-line tool for capturing website screenshots.
 See the [CLI Roadmap](docs/roadmap/cli-website-capture.md) and
 [ADR-004](docs/adr/004-os-independent-cli-capture-tool.md) for details.
 
-The CLI also supports converting PDF files to Word documents:
+PDF conversion now lives in the standalone `Broiler.Pdf` app, which can be
+developed and versioned independently from the main website-capture CLI.
+Use it directly for PDF-to-Word conversion:
+
+```bash
+dotnet run --project src/Broiler.Pdf -- --input ./input.pdf
+dotnet run --project src/Broiler.Pdf -- --input ./input.pdf --output ./converted/
+```
+
+`Broiler.Cli --convert-pdf` now acts as a compatibility wrapper around the
+external converter. Place `Broiler.Pdf` beside `Broiler.Cli`, or set
+`BROILER_PDF_APP` to the `Broiler.Pdf` executable or `.dll` path:
 
 ```bash
 dotnet run --project src/Broiler.Cli -- --convert-pdf ./input.pdf
-dotnet run --project src/Broiler.Cli -- --convert-pdf ./input.pdf --output ./converted/
+BROILER_PDF_APP=./src/Broiler.Pdf/bin/Debug/net8.0/Broiler.Pdf.dll \
+  dotnet run --project src/Broiler.Cli -- --convert-pdf ./input.pdf --output ./converted/
 dotnet run --project src/Broiler.Cli -- --help
 ```
 

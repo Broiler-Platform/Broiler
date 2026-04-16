@@ -1,22 +1,26 @@
 using System.Text;
-namespace Broiler.Cli.Tests;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Wordprocessing;
+
+namespace Broiler.Pdf.Tests;
 
 public class PdfToWordConverterTests
 {
     [Fact]
-    public async Task Program_Main_ConvertPdf_Creates_Default_Output_File()
+    public void Convert_Creates_Docx_With_Extracted_Text()
     {
         var tempDirectory = CreateTempDirectory();
         try
         {
-            var pdfPath = Path.Combine(tempDirectory, "cli.pdf");
-            File.WriteAllText(pdfPath, CreateMinimalPdf("CLI Conversion"), Encoding.ASCII);
+            var pdfPath = Path.Combine(tempDirectory, "sample.pdf");
+            File.WriteAllText(pdfPath, CreateMinimalPdf("Hello PDF"), Encoding.ASCII);
 
-            var exitCode = await Program.Main(["--convert-pdf", pdfPath]);
+            var converter = new PdfToWordConverter();
+            var outputPath = converter.Convert(pdfPath);
 
-            var outputPath = Path.Combine(tempDirectory, "cli.docx");
-            Assert.Equal(0, exitCode);
+            Assert.Equal(Path.Combine(tempDirectory, "sample.docx"), outputPath);
             Assert.True(File.Exists(outputPath));
+            Assert.Contains("Hello PDF", ReadWordText(outputPath));
         }
         finally
         {
@@ -25,14 +29,56 @@ public class PdfToWordConverterTests
     }
 
     [Fact]
-    public async Task Program_Main_ConvertPdf_Missing_File_Returns_Error()
+    public void ResolveOutputPath_Uses_Existing_Output_Directory()
+    {
+        var tempDirectory = CreateTempDirectory();
+        try
+        {
+            var pdfPath = Path.Combine(tempDirectory, "sample.pdf");
+            var outputDirectory = Path.Combine(tempDirectory, "out");
+            Directory.CreateDirectory(outputDirectory);
+
+            var outputPath = PdfToWordConverter.ResolveOutputPath(pdfPath, outputDirectory);
+
+            Assert.Equal(Path.Combine(outputDirectory, "sample.docx"), outputPath);
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, true);
+        }
+    }
+
+    [Fact]
+    public void Program_Main_Creates_Default_Output_File()
+    {
+        var tempDirectory = CreateTempDirectory();
+        try
+        {
+            var pdfPath = Path.Combine(tempDirectory, "cli.pdf");
+            File.WriteAllText(pdfPath, CreateMinimalPdf("CLI Conversion"), Encoding.ASCII);
+
+            var exitCode = Program.Main(["--input", pdfPath]);
+
+            var outputPath = Path.Combine(tempDirectory, "cli.docx");
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(outputPath));
+            Assert.Contains("CLI Conversion", ReadWordText(outputPath));
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, true);
+        }
+    }
+
+    [Fact]
+    public void Program_Main_Missing_File_Returns_Error()
     {
         var tempDirectory = CreateTempDirectory();
         try
         {
             var missingPdfPath = Path.Combine(tempDirectory, "missing.pdf");
 
-            var exitCode = await Program.Main(["--convert-pdf", missingPdfPath]);
+            var exitCode = Program.Main(["--input", missingPdfPath]);
 
             Assert.Equal(1, exitCode);
             Assert.False(File.Exists(Path.Combine(tempDirectory, "missing.docx")));
@@ -48,6 +94,16 @@ public class PdfToWordConverterTests
         var path = Path.Combine(Path.GetTempPath(), "broiler-pdf-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);
         return path;
+    }
+
+    private static string ReadWordText(string outputPath)
+    {
+        using var document = WordprocessingDocument.Open(outputPath, false);
+        return string.Join(
+            "\n",
+            document.MainDocumentPart!.Document.Body!
+                .Descendants<Text>()
+                .Select(text => text.Text));
     }
 
     private static string CreateMinimalPdf(string text)

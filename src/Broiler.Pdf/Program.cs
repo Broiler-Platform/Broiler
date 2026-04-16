@@ -3,11 +3,94 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using UglyToad.PdfPig;
 
-namespace Broiler.Cli;
+namespace Broiler.Pdf;
 
-/// <summary>
-/// Converts PDF files into simple Word documents by extracting page text.
-/// </summary>
+public class Program
+{
+    public static int Main(string[] args)
+    {
+        string? inputPdfPath = null;
+        string? outputPath = null;
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--input" when i + 1 < args.Length:
+                    inputPdfPath = args[++i];
+                    break;
+                case "--output" when i + 1 < args.Length:
+                    outputPath = args[++i];
+                    break;
+                case "--input":
+                case "--output":
+                    Console.Error.WriteLine($"Error: '{args[i]}' requires a value.");
+                    PrintUsage();
+                    return 1;
+                case "--help":
+                    PrintUsage();
+                    return 0;
+                default:
+                    if (inputPdfPath is null && !args[i].StartsWith('-'))
+                    {
+                        inputPdfPath = args[i];
+                        break;
+                    }
+
+                    Console.Error.WriteLine($"Error: Unrecognized argument '{args[i]}'.");
+                    PrintUsage();
+                    return 1;
+            }
+        }
+
+        if (inputPdfPath is null)
+        {
+            Console.Error.WriteLine("Error: An input PDF file is required.");
+            PrintUsage();
+            return 1;
+        }
+
+        try
+        {
+            var converter = new PdfToWordConverter();
+            var resolvedOutputPath = converter.Convert(inputPdfPath, outputPath);
+            Console.WriteLine($"Word document saved to {resolvedOutputPath}");
+            return 0;
+        }
+        catch (FileNotFoundException ex)
+        {
+            Console.Error.WriteLine($"PDF conversion failed: {ex.Message}");
+            return 1;
+        }
+        catch (IOException ex)
+        {
+            Console.Error.WriteLine($"File I/O error: {ex.Message}");
+            return 1;
+        }
+        catch (InvalidOperationException ex)
+        {
+            Console.Error.WriteLine($"PDF conversion failed: {ex.Message}");
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Unexpected error: {ex.Message}");
+            return 1;
+        }
+    }
+
+    private static void PrintUsage()
+    {
+        Console.WriteLine("Usage: Broiler.Pdf --input <PDF> [--output <FILE|DIR>]");
+        Console.WriteLine("   or: Broiler.Pdf <PDF> [--output <FILE|DIR>]");
+        Console.WriteLine();
+        Console.WriteLine("Options:");
+        Console.WriteLine("  --input <PDF>          Input PDF file to convert");
+        Console.WriteLine("  --output <FILE|DIR>    Output .docx file path or directory");
+        Console.WriteLine("  --help                 Show this help message");
+    }
+}
+
 internal sealed class PdfToWordConverter
 {
     public string Convert(string inputPdfPath, string? outputPath = null)
@@ -42,9 +125,7 @@ internal sealed class PdfToWordConverter
                 AppendPage(body, pages[i].Text);
 
                 if (i < pages.Count - 1)
-                {
                     body.AppendChild(new Paragraph(new Run(new Break { Type = BreakValues.Page })));
-                }
             }
 
             mainPart.Document.Save();
