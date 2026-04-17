@@ -1033,9 +1033,9 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
             if (double.IsNaN(_actualLineHeight))
             {
                 // CSS2.1 §10.8: "normal" line-height uses a UA-chosen value,
-                // typically 1.0–1.2 × font-size. We use 1.2× for spec compliance.
+                // typically about 1.2 × font-size.
                 if (LineHeight == "normal" || string.IsNullOrEmpty(LineHeight))
-                    _actualLineHeight = 0; // 0 = let font metrics determine line height
+                    _actualLineHeight = GetEmHeight() * 1.2;
                 else
                     _actualLineHeight = CssValueParser.ParseLength(LineHeight, Size.Height, GetEmHeight());
             }

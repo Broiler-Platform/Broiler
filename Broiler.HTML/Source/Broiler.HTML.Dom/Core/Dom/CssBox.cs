@@ -2573,7 +2573,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             }
             CollapsedMarginTop = value;
         }
-        else if (_parentBox != null && ActualPaddingTop < 0.1 && ActualPaddingBottom < 0.1 && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1 && _parentBox.ActualBorderTopWidth < 0.1 && _parentBox.ActualBorderBottomWidth < 0.1
+        else if (_parentBox != null && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1 && _parentBox.ActualBorderTopWidth < 0.1 && _parentBox.ActualBorderBottomWidth < 0.1
             // CSS Box Alignment §5.4: align-content != normal establishes
             // a BFC, which prevents parent–child margin collapsing.
             && (_parentBox.AlignContent == null || _parentBox.AlignContent == "normal"))
