@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Broiler.Wpt;
 
 using System.Text.Json;
@@ -85,12 +87,47 @@ public class Program
 
         var runner = new WptTestRunner();
         var subsetPatterns = WptTestRunner.ParseSubsetPatterns(subset ?? "");
+        var discoveredTests = WptTestRunner.DiscoverTests(wptPath, subsetPatterns).ToList();
         int passed = 0, failed = 0, skipped = 0;
         var failures = new List<WptTestResult>();
 
-        // Collect all results first so they can be sorted by percent match
-        // before writing to the logfile.
-        var allResults = runner.RunAll(wptPath, referenceDir, subsetPatterns).ToList();
+        Console.WriteLine($"Discovered    : {discoveredTests.Count} test(s)");
+
+        if (discoveredTests.Count > 0)
+        {
+            Console.WriteLine("--- Progress ---");
+        }
+
+        // Collect all results first so they can still be sorted by percent
+        // match before writing the final summary/log output.
+        var allResults = new List<WptTestResult>(discoveredTests.Count);
+        var progressStopwatch = Stopwatch.StartNew();
+        int completed = 0, currentPassed = 0, currentFailed = 0, currentSkipped = 0;
+
+        foreach (var testPath in discoveredTests)
+        {
+            var displayPath = Path.GetRelativePath(wptPath, testPath).Replace('\\', '/');
+            Console.WriteLine($"[RUN ] ({completed + 1}/{discoveredTests.Count}) {displayPath}");
+
+            var result = runner.RunTest(testPath, referenceDir, wptPath);
+            allResults.Add(result);
+            completed++;
+
+            if (result.Passed)
+                currentPassed++;
+            else if (result.Skipped)
+                currentSkipped++;
+            else
+                currentFailed++;
+
+            if (completed == discoveredTests.Count || completed % 25 == 0)
+            {
+                Console.WriteLine(
+                    $"[INFO] Completed {completed}/{discoveredTests.Count} tests " +
+                    $"({currentPassed} passed, {currentFailed} failed, {currentSkipped} skipped) " +
+                    $"after {progressStopwatch.Elapsed:hh\\:mm\\:ss}");
+            }
+        }
 
         // Separate skipped results (no percent match) from compared results,
         // then sort compared results ascending by percent match so that the
