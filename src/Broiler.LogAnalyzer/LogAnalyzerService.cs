@@ -183,10 +183,10 @@ public sealed class LogAnalyzerService
             filtered = filtered.Where(e => e.StatusCode >= minStatus.Value);
         if (maxStatus is not null)
             filtered = filtered.Where(e => e.StatusCode <= maxStatus.Value);
-        if (ip is not null)
-            filtered = filtered.Where(e => e.RemoteHost.Equals(ip, StringComparison.OrdinalIgnoreCase));
-        if (endpointPattern is not null)
-            filtered = filtered.Where(e => e.Endpoint.Contains(endpointPattern, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(ip))
+            filtered = filtered.Where(e => e.RemoteHost.Equals(ip.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(endpointPattern))
+            filtered = filtered.Where(e => e.Endpoint.Contains(endpointPattern.Trim(), StringComparison.OrdinalIgnoreCase));
         if (from is not null)
             filtered = filtered.Where(e => e.Timestamp >= from.Value);
         if (to is not null)
