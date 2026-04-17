@@ -14,6 +14,8 @@ using Broiler.HTML.Image;
 /// </summary>
 public class Program
 {
+    private const int ProgressCheckpointInterval = 25;
+
     public static int Main(string[] args)
     {
         string? wptPath = null;
@@ -88,43 +90,44 @@ public class Program
         var runner = new WptTestRunner();
         var subsetPatterns = WptTestRunner.ParseSubsetPatterns(subset ?? "");
         var discoveredTests = WptTestRunner.DiscoverTests(wptPath, subsetPatterns).ToList();
+        int totalTests = discoveredTests.Count;
         int passed = 0, failed = 0, skipped = 0;
         var failures = new List<WptTestResult>();
 
-        Console.WriteLine($"Discovered    : {discoveredTests.Count} test(s)");
+        Console.WriteLine($"Discovered    : {totalTests} test(s)");
 
-        if (discoveredTests.Count > 0)
+        if (totalTests > 0)
         {
             Console.WriteLine("--- Progress ---");
         }
 
         // Collect all results first so they can still be sorted by percent
         // match before writing the final summary/log output.
-        var allResults = new List<WptTestResult>(discoveredTests.Count);
+        var allResults = new List<WptTestResult>(totalTests);
         var progressStopwatch = Stopwatch.StartNew();
-        int completed = 0, currentPassed = 0, currentFailed = 0, currentSkipped = 0;
+        int completed = 0, runningPassed = 0, runningFailed = 0, runningSkipped = 0;
 
         foreach (var testPath in discoveredTests)
         {
             var displayPath = Path.GetRelativePath(wptPath, testPath).Replace('\\', '/');
-            Console.WriteLine($"[RUN ] ({completed + 1}/{discoveredTests.Count}) {displayPath}");
+            Console.WriteLine($"[RUN ] ({completed + 1}/{totalTests}) {displayPath}");
 
             var result = runner.RunTest(testPath, referenceDir, wptPath);
             allResults.Add(result);
             completed++;
 
             if (result.Passed)
-                currentPassed++;
+                runningPassed++;
             else if (result.Skipped)
-                currentSkipped++;
+                runningSkipped++;
             else
-                currentFailed++;
+                runningFailed++;
 
-            if (completed == discoveredTests.Count || completed % 25 == 0)
+            if (completed == totalTests || completed % ProgressCheckpointInterval == 0)
             {
                 Console.WriteLine(
-                    $"[INFO] Completed {completed}/{discoveredTests.Count} tests " +
-                    $"({currentPassed} passed, {currentFailed} failed, {currentSkipped} skipped) " +
+                    $"[INFO] Completed {completed}/{totalTests} tests " +
+                    $"({runningPassed} passed, {runningFailed} failed, {runningSkipped} skipped) " +
                     $"after {progressStopwatch.Elapsed:hh\\:mm\\:ss}");
             }
         }
