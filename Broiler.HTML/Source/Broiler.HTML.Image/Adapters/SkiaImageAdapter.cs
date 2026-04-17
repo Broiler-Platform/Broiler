@@ -369,7 +369,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         var svgContent = System.Text.Encoding.UTF8.GetString(data);
 
         // Parse the SVG root element's width, height and viewBox attributes.
-        var (svgWidth, svgHeight, vbRatio) = ParseSvgIntrinsicDimensions(svgContent);
+        var (svgWidth, svgHeight, vbRatio, hasDegenerateViewBox) = ParseSvgIntrinsicDimensions(svgContent);
         bool preserveAspectRatioNone = HasPreserveAspectRatioNone(svgContent);
 
         bool parsedIntrinsicWidth = svgWidth > 0;
@@ -396,7 +396,12 @@ internal sealed class SkiaImageAdapter : RAdapter
             preserveAspectRatioNone && vbRatio > 0 && !hasBothDimensions;
 
         SKBitmap? bitmap;
-        if (suppressPartialIntrinsicDimensions)
+        if (hasDegenerateViewBox)
+        {
+            bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+            bitmap.Erase(SKColors.Transparent);
+        }
+        else if (suppressPartialIntrinsicDimensions)
         {
             const int fallbackRenderScale = 4;
             int renderWidth = width * fallbackRenderScale;
@@ -427,7 +432,7 @@ internal sealed class SkiaImageAdapter : RAdapter
         if (bitmap == null)
             return null;
 
-        if (TryParseSolidViewportFill(svgContent, out var solidFill))
+        if (!hasDegenerateViewBox && TryParseSolidViewportFill(svgContent, out var solidFill))
             bitmap.Erase(solidFill);
 
         // Only SVGs with both explicit width and height have intrinsic
@@ -604,18 +609,20 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     /// <summary>
     /// Parses the SVG root element to extract intrinsic width, height and
-    /// viewBox aspect ratio.  Returns (width, height, viewBoxRatio) where
+    /// viewBox aspect ratio.  Returns (width, height, viewBoxRatio,
+    /// hasDegenerateViewBox) where
     /// values ≤ 0 indicate the attribute was absent or non-numeric.
     /// </summary>
-    private static (double width, double height, double viewBoxRatio) ParseSvgIntrinsicDimensions(string svg)
+    private static (double width, double height, double viewBoxRatio, bool hasDegenerateViewBox) ParseSvgIntrinsicDimensions(string svg)
     {
         double w = -1, h = -1, ratio = -1;
+        bool hasDegenerateViewBox = false;
 
         // Find the <svg ...> opening tag.
         int svgIdx = svg.IndexOf("<svg", StringComparison.OrdinalIgnoreCase);
-        if (svgIdx < 0) return (w, h, ratio);
+        if (svgIdx < 0) return (w, h, ratio, hasDegenerateViewBox);
         int tagEnd = svg.IndexOf('>', svgIdx);
-        if (tagEnd < 0) return (w, h, ratio);
+        if (tagEnd < 0) return (w, h, ratio, hasDegenerateViewBox);
         var tag = svg.Substring(svgIdx, tagEnd - svgIdx + 1);
 
         // Parse width attribute (only absolute units / plain numbers).
@@ -635,14 +642,16 @@ internal sealed class SkiaImageAdapter : RAdapter
                 && double.TryParse(parts[2], System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out double vbW)
                 && double.TryParse(parts[3], System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out double vbH)
-                && vbW > 0 && vbH > 0)
+                    System.Globalization.CultureInfo.InvariantCulture, out double vbH))
             {
-                ratio = vbW / vbH;
+                if (vbW > 0 && vbH > 0)
+                    ratio = vbW / vbH;
+                else
+                    hasDegenerateViewBox = true;
             }
         }
 
-        return (w, h, ratio);
+        return (w, h, ratio, hasDegenerateViewBox);
     }
 
     private static bool HasPreserveAspectRatioNone(string svg)
