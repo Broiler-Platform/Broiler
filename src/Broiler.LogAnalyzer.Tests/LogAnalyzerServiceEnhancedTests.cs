@@ -149,6 +149,25 @@ public class LogAnalyzerServiceEnhancedTests
     }
 
     [Fact]
+    public void Filter_BySearchTerm_SearchResultsExtractFormat_ReturnsMatches()
+    {
+        var lines = new[]
+        {
+            @"277 2a02:3100:1c00:: - - [10/Apr/2026:10:24:10 +0200] ""GET /music/Track8.mp3 HTTP/1.1"" 200 7668917 www.people-and-earth.org ""-"" ""Mozilla/5.0"" ""-""",
+            @"278 2a02:3100:1c00:: - - [10/Apr/2026:10:24:11 +0200] ""GET /music/Track8.mp3 HTTP/1.1"" 304 - www.people-and-earth.org ""https://www.people-and-earth.org/music/Track8.mp3"" ""Mozilla/5.0"" ""-""",
+            @"299 2a02:3100:1c00:: - - [10/Apr/2026:10:32:52 +0200] ""GET /music/Track7.mp3 HTTP/1.1"" 206 3145728 www.people-and-earth.org ""https://www.people-and-earth.org/music/seit-10-jahren-du.html"" ""Mozilla/5.0"" ""-""",
+        };
+
+        var (entries, _) = LogParser.ParseLines(lines);
+        var service = new LogAnalyzerService(entries);
+
+        var filtered = service.Filter(searchTerm: "Track8.mp3");
+
+        Assert.Equal(2, filtered.TotalRequests);
+        Assert.All(filtered.Entries, entry => Assert.Contains("Track8.mp3", entry.Endpoint, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void Filter_BySearchTerm_MatchesApacheTimestampFormatting()
     {
         var lines = new[]

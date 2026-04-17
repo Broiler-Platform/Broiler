@@ -147,6 +147,31 @@ public class ProgramEnhancedTests
         }
     }
 
+    [Fact]
+    public void Main_Search_SearchResultsExtractFormat_ReturnsMatchingEntriesInTextOutput()
+    {
+        var tempFile = Path.GetTempFileName();
+        File.WriteAllLines(tempFile, [
+            @"277 2a02:3100:1c00:: - - [10/Apr/2026:10:24:10 +0200] ""GET /music/Track8.mp3 HTTP/1.1"" 200 7668917 www.people-and-earth.org ""-"" ""Mozilla/5.0 (Windows NT 10.0; Win64; x64)"" ""-""",
+            @"278 2a02:3100:1c00:: - - [10/Apr/2026:10:24:11 +0200] ""GET /music/Track8.mp3 HTTP/1.1"" 304 - www.people-and-earth.org ""https://www.people-and-earth.org/music/Track8.mp3"" ""Mozilla/5.0 (Windows NT 10.0; Win64; x64)"" ""-""",
+            @"282 2a02:3100:1c00:: - - [10/Apr/2026:10:25:52 +0200] ""GET /music/Track4.mp3 HTTP/1.1"" 206 4194304 www.people-and-earth.org ""https://www.people-and-earth.org/music/politik-fuer-frieden.html"" ""Mozilla/5.0 (Windows NT 10.0; Win64; x64)"" ""-""",
+        ]);
+
+        try
+        {
+            var (exitCode, stdOut, _) = RunMainCapturingOutput("--file", tempFile, "--search", "Track8.mp3");
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("Matching Entries", stdOut);
+            Assert.Contains("/music/Track8.mp3", stdOut);
+            Assert.DoesNotContain("/music/Track4.mp3", stdOut);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
     // ── --from / --to ──
 
     [Fact]

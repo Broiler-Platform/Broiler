@@ -14,7 +14,8 @@ public static partial class LogParser
     // Apache Common Log Format (subset without Referer/User-Agent):
     // %h %l %u %t "%r" %>s %b
     [GeneratedRegex(
-        @"^(?<host>\S+)\s+"        +  // remote host
+        @"^(?:(?<lineNumber>\d+)\s+)?" + // optional line-number prefix from extracted search results
+        @"(?<host>\S+)\s+"        +  // remote host
         @"(?<ident>\S+)\s+"        +  // RFC 1413 identity (usually -)
         @"(?<user>\S+)\s+"         +  // authenticated user (usually -)
         @"\[(?<time>[^\]]+)\]\s+"  +  // [day/month/year:hour:min:sec zone]
@@ -23,7 +24,9 @@ public static partial class LogParser
         @"(?<protocol>[^""]*)""\s+"+  //  HTTP/x.x"
         @"(?<status>\d{3})\s+"     +  // status code
         @"(?<size>\S+)"            +  // response size (or -)
-        @"(?:\s+""(?<referer>[^""]*)""\s+""(?<agent>[^""]*)"")?", // optional referer & user-agent
+        @"(?:\s+(?<vhost>\S+))?"   +  // optional virtual host (e.g. nginx $host)
+        @"(?:\s+""(?<referer>[^""]*)""\s+""(?<agent>[^""]*)"")?" + // optional referer & user-agent
+        @"(?:\s+""[^""]*"")*$",    // optional trailing quoted fields
         RegexOptions.Compiled)]
     private static partial Regex AccessLogPattern();
 
