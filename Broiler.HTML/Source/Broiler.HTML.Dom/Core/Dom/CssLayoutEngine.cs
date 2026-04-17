@@ -271,6 +271,33 @@ internal static class CssLayoutEngine
                 maxBottom = Math.Max(maxBottom, word.Bottom);
                 minTop = Math.Min(minTop, word.Top);
             }
+
+            if (blockBox.ActualLineHeight > 0)
+            {
+                double lineTop = double.MaxValue;
+                bool hasLineContent = false;
+
+                foreach (var rect in linebox.Rectangles)
+                {
+                    if (IsInAbsposSubtree(rect.Key, blockBox))
+                        continue;
+
+                    lineTop = Math.Min(lineTop, rect.Value.Top);
+                    hasLineContent = true;
+                }
+
+                foreach (var word in linebox.Words)
+                {
+                    if (IsInAbsposSubtree(word.OwnerBox, blockBox))
+                        continue;
+
+                    lineTop = Math.Min(lineTop, word.Top);
+                    hasLineContent = true;
+                }
+
+                if (hasLineContent)
+                    maxBottom = Math.Max(maxBottom, lineTop + blockBox.ActualLineHeight);
+            }
         }
         // CSS2.1 §10.8.1: The line box height is the distance between
         // the uppermost box top and the lowermost box bottom.  When

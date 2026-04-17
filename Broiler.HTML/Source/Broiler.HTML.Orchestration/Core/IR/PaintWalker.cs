@@ -673,14 +673,21 @@ internal static class PaintWalker
 
             // CSS Backgrounds Level 4: background-clip: border-area — paint
             // the background colour only within the border area (4 strips).
-        if (effectiveBackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
-        {
-            EmitBorderAreaBorder(rect, fragment, items, bgColor);
-        }
-        else
-        {
-            items.Add(new FillRectItem { Bounds = fillRect, Color = bgColor });
+            bool hasRoundedClip = TryCreateRoundedBackgroundClipItem(rect, fragment, effectiveBackgroundClip, out var roundedClip);
+            if (hasRoundedClip)
+                items.Add(roundedClip);
+
+            if (effectiveBackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
+            {
+                EmitBorderAreaBorder(rect, fragment, items, bgColor);
             }
+            else
+            {
+                items.Add(new FillRectItem { Bounds = fillRect, Color = bgColor });
+            }
+
+            if (hasRoundedClip)
+                items.Add(new RestoreItem { Bounds = fillRect });
         }
     }
 
@@ -767,6 +774,7 @@ internal static class PaintWalker
 
             var repeat = fragment.Style.BackgroundRepeat;
             var isFixed = fragment.Style.BackgroundAttachment == "fixed" && viewport.Width > 0 && viewport.Height > 0;
+            bool hasRoundedClip = TryCreateRoundedBackgroundClipItem(bounds, fragment, effectiveBackgroundClip, out var roundedClip);
 
             // CSS Backgrounds Level 3: background-size determines the
             // visual tile dimensions.  Resolve against the positioning area
@@ -845,6 +853,8 @@ internal static class PaintWalker
             // background image blends with the background color underneath.
             bool hasBgBlend = !string.IsNullOrEmpty(fragment.Style.BackgroundBlendMode)
                 && !fragment.Style.BackgroundBlendMode.Equals("normal", StringComparison.OrdinalIgnoreCase);
+            if (hasRoundedClip)
+                items.Add(roundedClip);
             if (hasBgBlend)
                 items.Add(new BlendModeItem { Bounds = clipRect, Mode = fragment.Style.BackgroundBlendMode });
 
@@ -875,6 +885,8 @@ internal static class PaintWalker
 
             if (hasBgBlend)
                 items.Add(new RestoreBlendModeItem { Bounds = clipRect });
+            if (hasRoundedClip)
+                items.Add(new RestoreItem { Bounds = clipRect });
         }
     }
 
@@ -1715,6 +1727,60 @@ internal static class PaintWalker
             return "border-box";
 
         return backgroundClip;
+    }
+
+    private static bool TryCreateRoundedBackgroundClipItem(RectangleF borderBoxRect, Fragment fragment, string backgroundClip, out ClipItem clipItem)
+    {
+        clipItem = null!;
+
+        if (!backgroundClip.Equals("padding-box", StringComparison.OrdinalIgnoreCase)
+            && !backgroundClip.Equals("content-box", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var style = fragment.Style;
+        bool hasCornerRadius = style.ActualCornerNw > 0 || style.ActualCornerNe > 0
+            || style.ActualCornerSe > 0 || style.ActualCornerSw > 0;
+        if (!hasCornerRadius)
+            return false;
+
+        var clipRect = GetBackgroundClipRect(borderBoxRect, fragment, backgroundClip);
+        if (clipRect.Width <= 0 || clipRect.Height <= 0)
+            return false;
+
+        var border = fragment.Border;
+        var padding = fragment.Padding;
+        float insetLeft = (float)border.Left;
+        float insetTop = (float)border.Top;
+        float insetRight = (float)border.Right;
+        float insetBottom = (float)border.Bottom;
+
+        if (backgroundClip.Equals("content-box", StringComparison.OrdinalIgnoreCase))
+        {
+            insetLeft += (float)padding.Left;
+            insetTop += (float)padding.Top;
+            insetRight += (float)padding.Right;
+            insetBottom += (float)padding.Bottom;
+        }
+
+        double cornerNwY = GetEffectiveCornerRadiusY(style.CornerNwRadiusRaw, style.ActualCornerNw, borderBoxRect);
+        double cornerNeY = GetEffectiveCornerRadiusY(style.CornerNeRadiusRaw, style.ActualCornerNe, borderBoxRect);
+        double cornerSeY = GetEffectiveCornerRadiusY(style.CornerSeRadiusRaw, style.ActualCornerSe, borderBoxRect);
+        double cornerSwY = GetEffectiveCornerRadiusY(style.CornerSwRadiusRaw, style.ActualCornerSw, borderBoxRect);
+
+        clipItem = new ClipItem
+        {
+            Bounds = clipRect,
+            ClipRect = clipRect,
+            CornerNw = Math.Max(0, style.ActualCornerNw - insetLeft),
+            CornerNwY = Math.Max(0, cornerNwY - insetTop),
+            CornerNe = Math.Max(0, style.ActualCornerNe - insetRight),
+            CornerNeY = Math.Max(0, cornerNeY - insetTop),
+            CornerSe = Math.Max(0, style.ActualCornerSe - insetRight),
+            CornerSeY = Math.Max(0, cornerSeY - insetBottom),
+            CornerSw = Math.Max(0, style.ActualCornerSw - insetLeft),
+            CornerSwY = Math.Max(0, cornerSwY - insetBottom),
+        };
+        return true;
     }
 
     private static double GetEffectiveCornerRadiusY(string rawRadius, double cornerRadiusX, RectangleF bounds)
