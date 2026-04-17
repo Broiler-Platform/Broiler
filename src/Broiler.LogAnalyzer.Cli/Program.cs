@@ -630,14 +630,7 @@ public class Program
 
     internal static string FormatEntry(LogEntry entry)
     {
-        var offset = entry.Timestamp.Offset;
-        var sign = offset < TimeSpan.Zero ? "-" : "+";
-        offset = offset.Duration();
-        var timestamp = $"{entry.Timestamp.ToString("dd/MMM/yyyy:HH:mm:ss", CultureInfo.InvariantCulture)} {sign}{offset.Hours:00}{offset.Minutes:00}";
-        var referer = string.IsNullOrWhiteSpace(entry.Referer) ? "-" : entry.Referer;
-        var userAgent = string.IsNullOrWhiteSpace(entry.UserAgent) ? "-" : entry.UserAgent;
-
-        return $"{entry.RemoteHost} {entry.Ident} {entry.User} [{timestamp}] \"{entry.Method} {entry.Endpoint} {entry.Protocol}\" {entry.StatusCode} {entry.ResponseSize} \"{referer}\" \"{userAgent}\"";
+        return LogAnalyzerService.FormatApacheLogEntry(entry);
     }
 
     /// <summary>

@@ -211,25 +211,22 @@ public sealed class LogAnalyzerService
 
     private static string BuildSearchableText(LogEntry entry)
     {
-        var sb = new StringBuilder();
-        sb.Append(entry.RemoteHost).Append(' ')
-            .Append(entry.Ident).Append(' ')
-            .Append(entry.User).Append(' ')
-            .Append('[').Append(FormatApacheTimestamp(entry.Timestamp)).Append("] ")
-            .Append('"').Append(entry.Method).Append(' ').Append(entry.Endpoint).Append(' ').Append(entry.Protocol).Append("\" ")
-            .Append(entry.StatusCode).Append(' ')
-            .Append(entry.ResponseSize).Append(' ');
-
-        if (!string.IsNullOrWhiteSpace(entry.Referer))
-            sb.Append(entry.Referer).Append(' ');
-        if (!string.IsNullOrWhiteSpace(entry.UserAgent))
-            sb.Append(entry.UserAgent).Append(' ');
-
-        sb.Append(entry.Timestamp.ToString("O", CultureInfo.InvariantCulture));
-        return sb.ToString();
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{FormatApacheLogEntry(entry)} {entry.Timestamp.ToString("O", CultureInfo.InvariantCulture)}");
     }
 
-    private static string FormatApacheTimestamp(DateTimeOffset timestamp)
+    public static string FormatApacheLogEntry(LogEntry entry)
+    {
+        var referer = string.IsNullOrWhiteSpace(entry.Referer) ? "-" : entry.Referer;
+        var userAgent = string.IsNullOrWhiteSpace(entry.UserAgent) ? "-" : entry.UserAgent;
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{entry.RemoteHost} {entry.Ident} {entry.User} [{FormatApacheTimestamp(entry.Timestamp)}] \"{entry.Method} {entry.Endpoint} {entry.Protocol}\" {entry.StatusCode} {entry.ResponseSize} \"{referer}\" \"{userAgent}\"");
+    }
+
+    public static string FormatApacheTimestamp(DateTimeOffset timestamp)
     {
         var offset = timestamp.Offset;
         var sign = offset < TimeSpan.Zero ? "-" : "+";
