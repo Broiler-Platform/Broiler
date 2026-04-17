@@ -2114,7 +2114,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 if (a.Length > 0 && a[0] is JSFunction fn)
-                    fn.InvokeFunction(new Arguments(fn));
+                    fn.InvokeFunction(new Arguments(JSUndefined.Value, JSUndefined.Value));
                 return ready;
             }, "then", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);

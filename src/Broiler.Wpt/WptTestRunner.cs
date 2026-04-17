@@ -968,6 +968,8 @@ internal sealed class WptTestRunner
 
         void DrainAsyncWork()
         {
+            // Match the broader DomBridge timer drain cap so promise/timer chains
+            // used by WPT can settle without risking an infinite loop.
             const int maxIterations = 1000;
             for (var iteration = 0; iteration < maxIterations; iteration++)
             {

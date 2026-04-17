@@ -2638,7 +2638,7 @@ public sealed partial class DomBridge
         if (element.Parent == null)
             return 0;
 
-        double offset = ParseCssLengthToPixelsWithViewport(GetComputedProps(element).GetValueOrDefault("margin-top"), true);
+        double offset = ParseCssLengthToPixelsWithViewport(GetComputedProps(element).GetValueOrDefault("margin-top"));
         foreach (var sibling in element.Parent.Children)
         {
             if (ReferenceEquals(sibling, element))
@@ -2647,15 +2647,15 @@ public sealed partial class DomBridge
                 continue;
 
             var siblingProps = GetComputedProps(sibling);
-            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"), true);
-            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("height"), true);
-            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"), true);
+            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"));
+            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("height"));
+            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"));
         }
 
         return offset;
     }
 
-    private double ParseCssLengthToPixelsWithViewport(string? value, bool vertical)
+    private double ParseCssLengthToPixelsWithViewport(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
             return 0;
