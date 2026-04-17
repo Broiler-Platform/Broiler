@@ -644,7 +644,8 @@ internal static class PaintWalker
             // CSS Backgrounds §2.11.4: background-clip determines the painting area.
             // Default is border-box; padding-box clips to inside borders;
             // content-box clips to inside padding.
-            var fillRect = GetBackgroundClipRect(rect, fragment, style.BackgroundClip);
+            var effectiveBackgroundClip = GetEffectiveBackgroundClip(fragment, style.BackgroundClip);
+            var fillRect = GetBackgroundClipRect(rect, fragment, effectiveBackgroundClip);
             if (fillRect.Width <= 0 || fillRect.Height <= 0)
                 continue;
 
@@ -668,7 +669,7 @@ internal static class PaintWalker
 
             // CSS Backgrounds Level 4: background-clip: border-area — paint
             // the background colour only within the border area (4 strips).
-        if (style.BackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
+        if (effectiveBackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
         {
             EmitBorderAreaBorder(rect, fragment, items, bgColor);
         }
@@ -754,7 +755,8 @@ internal static class PaintWalker
                 bounds.Width - (float)(border.Left + border.Right),
                 bounds.Height - (float)(border.Top + border.Bottom));
 
-            var clipRect = GetBackgroundClipRect(bounds, fragment, fragment.Style.BackgroundClip);
+            var effectiveBackgroundClip = GetEffectiveBackgroundClip(fragment, fragment.Style.BackgroundClip);
+            var clipRect = GetBackgroundClipRect(bounds, fragment, effectiveBackgroundClip);
 
             if (clipRect.Width <= 0 || clipRect.Height <= 0)
                 continue;
@@ -844,7 +846,7 @@ internal static class PaintWalker
 
             // CSS Backgrounds Level 4: background-clip: border-area — the
             // background image fills only the border area (not the padding/content).
-            if (fragment.Style.BackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
+            if (effectiveBackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
             {
                 if (fragment.BackgroundImageHandle is RImage borderAreaImage
                     && borderAreaImage.TryGetUniformColor(out var uniformColor))
@@ -1697,6 +1699,14 @@ internal static class PaintWalker
 
         // For unsupported values (e.g. "text", "border-area"), fall back to border-box.
         return borderBoxRect;
+    }
+
+    private static string GetEffectiveBackgroundClip(Fragment fragment, string backgroundClip)
+    {
+        if (backgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
+            return "border-box";
+
+        return backgroundClip;
     }
 
     /// <summary>

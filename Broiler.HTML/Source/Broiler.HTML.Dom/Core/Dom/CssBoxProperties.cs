@@ -431,6 +431,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string BackgroundBlendMode { get; set; } = "normal";
     public string Filter { get; set; } = "none";
     public string Isolation { get; set; } = "auto";
+    public string BoxSizing { get; set; } = "content-box";
     public string BackgroundClip { get; set; } = "border-box";
 
     /// <summary>
@@ -836,12 +837,24 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         }
     }
 
+    private double ParseCornerRadius(string radius)
+    {
+        double basis = radius != null && radius.Contains('%', StringComparison.Ordinal)
+            ? Math.Max(0, Size.Width)
+            : 0;
+
+        return CssValueParser.ParseLength(radius, basis, GetEmHeight());
+    }
+
     public double ActualCornerNw
     {
         get
         {
+            if (CornerNwRadius != null && CornerNwRadius.Contains('%', StringComparison.Ordinal))
+                return ParseCornerRadius(CornerNwRadius);
+
             if (double.IsNaN(_actualCornerNw))
-                _actualCornerNw = CssValueParser.ParseLength(CornerNwRadius, 0, GetEmHeight());
+                _actualCornerNw = ParseCornerRadius(CornerNwRadius);
 
             return _actualCornerNw;
         }
@@ -851,8 +864,11 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     {
         get
         {
+            if (CornerNeRadius != null && CornerNeRadius.Contains('%', StringComparison.Ordinal))
+                return ParseCornerRadius(CornerNeRadius);
+
             if (double.IsNaN(_actualCornerNe))
-                _actualCornerNe = CssValueParser.ParseLength(CornerNeRadius, 0, GetEmHeight());
+                _actualCornerNe = ParseCornerRadius(CornerNeRadius);
 
             return _actualCornerNe;
         }
@@ -862,8 +878,11 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     {
         get
         {
+            if (CornerSeRadius != null && CornerSeRadius.Contains('%', StringComparison.Ordinal))
+                return ParseCornerRadius(CornerSeRadius);
+
             if (double.IsNaN(_actualCornerSe))
-                _actualCornerSe = CssValueParser.ParseLength(CornerSeRadius, 0, GetEmHeight());
+                _actualCornerSe = ParseCornerRadius(CornerSeRadius);
 
             return _actualCornerSe;
         }
@@ -873,8 +892,11 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     {
         get
         {
+            if (CornerSwRadius != null && CornerSwRadius.Contains('%', StringComparison.Ordinal))
+                return ParseCornerRadius(CornerSwRadius);
+
             if (double.IsNaN(_actualCornerSw))
-                _actualCornerSw = CssValueParser.ParseLength(CornerSwRadius, 0, GetEmHeight());
+                _actualCornerSw = ParseCornerRadius(CornerSwRadius);
 
             return _actualCornerSw;
         }
@@ -1265,6 +1287,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         BackgroundBlendMode = p.BackgroundBlendMode;
         Filter = p.Filter;
         Isolation = p.Isolation;
+        BoxSizing = p.BoxSizing;
         BackgroundClip = p.BackgroundClip;
         FlexDirection = p.FlexDirection;
         JustifyContent = p.JustifyContent;
