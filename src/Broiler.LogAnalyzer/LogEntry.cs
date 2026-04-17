@@ -15,4 +15,7 @@ public sealed record LogEntry(
     int StatusCode,
     long ResponseSize,
     string? Referer,
-    string? UserAgent);
+    string? UserAgent)
+{
+    public string FormattedEntry => LogAnalyzerService.FormatApacheLogEntry(this);
+}

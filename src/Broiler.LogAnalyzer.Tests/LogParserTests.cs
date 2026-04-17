@@ -137,4 +137,16 @@ public class LogParserTests
         Assert.Null(entry.Referer);
         Assert.Equal("Mozilla/5.0 (Windows NT 10.0; Win64; x64)", entry.UserAgent);
     }
+
+    [Fact]
+    public void ParseLine_SearchResultsExtractFormat_ExposesFormattedEntryForUiDisplay()
+    {
+        var line = @"278 2a02:3100:1c00:: - - [10/Apr/2026:10:24:11 +0200] ""GET /music/Track8.mp3 HTTP/1.1"" 304 - www.people-and-earth.org ""https://www.people-and-earth.org/music/Track8.mp3"" ""Mozilla/5.0 (Windows NT 10.0; Win64; x64)"" ""-""";
+        var entry = LogParser.ParseLine(line);
+
+        Assert.NotNull(entry);
+        Assert.Equal(
+            @"2a02:3100:1c00:: - - [10/Apr/2026:10:24:11 +0200] ""GET /music/Track8.mp3 HTTP/1.1"" 304 0 ""https://www.people-and-earth.org/music/Track8.mp3"" ""Mozilla/5.0 (Windows NT 10.0; Win64; x64)""",
+            entry!.FormattedEntry);
+    }
 }
