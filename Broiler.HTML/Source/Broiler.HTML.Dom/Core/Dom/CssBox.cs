@@ -29,6 +29,33 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     internal CssBox SplitPositionedAncestor { get; set; }
 
+    private bool UsesBorderBoxSizing =>
+        BoxSizing != null && BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase);
+
+    private double ResolveSpecifiedWidthToBorderBox(double cssWidth)
+    {
+        if (!UsesBorderBoxSizing)
+            cssWidth += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
+
+        return Math.Max(0, cssWidth);
+    }
+
+    private double ResolveSpecifiedHeightToBorderBox(double cssHeight)
+    {
+        if (!UsesBorderBoxSizing)
+            cssHeight += ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+
+        return Math.Max(0, cssHeight);
+    }
+
+    private double ResolveSpecifiedWidthToContentBox(double cssWidth)
+    {
+        if (UsesBorderBoxSizing)
+            cssWidth -= ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
+
+        return Math.Max(0, cssWidth);
+    }
+
     /// <summary>
     /// When the block-inside-inline correction splits a positioned inline
     /// element, the original box loses its children to anonymous "left" and
@@ -602,7 +629,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                         if (width < minW) width = minW;
                     }
 
-                    width += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
+                    width = ResolveSpecifiedWidthToBorderBox(width);
                 }
                 else if ((Position == CssConstants.Absolute || Position == CssConstants.Fixed)
                     && Left != null && Left != CssConstants.Auto
@@ -619,7 +646,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                     double cssRight = CssValueParser.ParseLength(Right, cbContentWidth, GetEmHeight());
                     width = cbContentWidth - cssLeft - cssRight - ActualMarginLeft - ActualMarginRight;
                     if (width < 0) width = 0;
-                    width += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
+                    width = ResolveSpecifiedWidthToBorderBox(width);
                 }
 
                 // CSS2.1 §10.4: Apply max-width constraint even when
@@ -628,7 +655,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                 if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
                 {
                     double maxW = CssValueParser.ParseLength(MaxWidth, width, GetEmHeight());
-                    maxW += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
+                    maxW = ResolveSpecifiedWidthToBorderBox(maxW);
                     if (width > maxW) width = maxW;
                 }
 
@@ -637,7 +664,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                 if (MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
                 {
                     double minW = CssValueParser.ParseLength(MinWidth, width, GetEmHeight());
-                    minW += ActualPaddingLeft + ActualPaddingRight + ActualBorderLeftWidth + ActualBorderRightWidth;
+                    minW = ResolveSpecifiedWidthToBorderBox(minW);
                     if (width < minW) width = minW;
                 }
 
@@ -1205,8 +1232,8 @@ internal class CssBox : CssBoxProperties, IDisposable
                     cbHeight = ContainerInt.ViewportSize.Height;
                 else
                     cbHeight = ContainingBlock.Size.Height;
-                double preHeight = CssValueParser.ParseLength(Height, cbHeight, GetEmHeight());
-                preHeight += ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+                double preHeight = ResolveSpecifiedHeightToBorderBox(
+                    CssValueParser.ParseLength(Height, cbHeight, GetEmHeight()));
                 Size = new SizeF(Size.Width, (float)preHeight);
             }
 
@@ -1425,7 +1452,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                     contentHeight = ActualHeight;
                 }
 
-                double borderBoxHeight = contentHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+                double borderBoxHeight = ResolveSpecifiedHeightToBorderBox(contentHeight);
 
                 // CSS2.1 §10.6.3: An explicit height sets the content box
                 // height.  Content that exceeds this height overflows
@@ -1527,7 +1554,7 @@ internal class CssBox : CssBoxProperties, IDisposable
 
             if (constrained)
             {
-                ActualBottom = Location.Y + contentHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+                ActualBottom = Location.Y + ResolveSpecifiedHeightToBorderBox(contentHeight);
             }
         }
 
@@ -1561,7 +1588,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                 {
                     contentHeight = ActualHeight;
                 }
-                double borderBoxHeight = contentHeight + ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+                double borderBoxHeight = ResolveSpecifiedHeightToBorderBox(contentHeight);
                 ActualBottom = Location.Y + borderBoxHeight;
             }
         }

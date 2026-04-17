@@ -556,9 +556,13 @@ internal static class PaintWalker
                     Bounds = bounds,
                     ClipRect = bounds,
                     CornerNw = style.ActualCornerNw,
+                    CornerNwY = GetEffectiveCornerRadiusY(style.CornerNwRadiusRaw, style.ActualCornerNw, bounds),
                     CornerNe = style.ActualCornerNe,
+                    CornerNeY = GetEffectiveCornerRadiusY(style.CornerNeRadiusRaw, style.ActualCornerNe, bounds),
                     CornerSe = style.ActualCornerSe,
+                    CornerSeY = GetEffectiveCornerRadiusY(style.CornerSeRadiusRaw, style.ActualCornerSe, bounds),
                     CornerSw = style.ActualCornerSw,
+                    CornerSwY = GetEffectiveCornerRadiusY(style.CornerSwRadiusRaw, style.ActualCornerSw, bounds),
                 });
                 bgClippedRounded = true;
             }
@@ -644,7 +648,8 @@ internal static class PaintWalker
             // CSS Backgrounds §2.11.4: background-clip determines the painting area.
             // Default is border-box; padding-box clips to inside borders;
             // content-box clips to inside padding.
-            var fillRect = GetBackgroundClipRect(rect, fragment, style.BackgroundClip);
+            var effectiveBackgroundClip = GetEffectiveBackgroundClip(fragment, style.BackgroundClip);
+            var fillRect = GetBackgroundClipRect(rect, fragment, effectiveBackgroundClip);
             if (fillRect.Width <= 0 || fillRect.Height <= 0)
                 continue;
 
@@ -668,7 +673,7 @@ internal static class PaintWalker
 
             // CSS Backgrounds Level 4: background-clip: border-area — paint
             // the background colour only within the border area (4 strips).
-        if (style.BackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
+        if (effectiveBackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
         {
             EmitBorderAreaBorder(rect, fragment, items, bgColor);
         }
@@ -754,7 +759,8 @@ internal static class PaintWalker
                 bounds.Width - (float)(border.Left + border.Right),
                 bounds.Height - (float)(border.Top + border.Bottom));
 
-            var clipRect = GetBackgroundClipRect(bounds, fragment, fragment.Style.BackgroundClip);
+            var effectiveBackgroundClip = GetEffectiveBackgroundClip(fragment, fragment.Style.BackgroundClip);
+            var clipRect = GetBackgroundClipRect(bounds, fragment, effectiveBackgroundClip);
 
             if (clipRect.Width <= 0 || clipRect.Height <= 0)
                 continue;
@@ -844,7 +850,7 @@ internal static class PaintWalker
 
             // CSS Backgrounds Level 4: background-clip: border-area — the
             // background image fills only the border area (not the padding/content).
-            if (fragment.Style.BackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
+            if (effectiveBackgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
             {
                 if (fragment.BackgroundImageHandle is RImage borderAreaImage
                     && borderAreaImage.TryGetUniformColor(out var uniformColor))
@@ -1404,9 +1410,13 @@ internal static class PaintWalker
                 Bounds = bounds,
                 ClipRect = bounds,
                 CornerNw = style.ActualCornerNw,
+                CornerNwY = GetEffectiveCornerRadiusY(style.CornerNwRadiusRaw, style.ActualCornerNw, bounds),
                 CornerNe = style.ActualCornerNe,
+                CornerNeY = GetEffectiveCornerRadiusY(style.CornerNeRadiusRaw, style.ActualCornerNe, bounds),
                 CornerSe = style.ActualCornerSe,
+                CornerSeY = GetEffectiveCornerRadiusY(style.CornerSeRadiusRaw, style.ActualCornerSe, bounds),
                 CornerSw = style.ActualCornerSw,
+                CornerSwY = GetEffectiveCornerRadiusY(style.CornerSwRadiusRaw, style.ActualCornerSw, bounds),
             });
         }
 
@@ -1699,6 +1709,24 @@ internal static class PaintWalker
         return borderBoxRect;
     }
 
+    private static string GetEffectiveBackgroundClip(Fragment fragment, string backgroundClip)
+    {
+        if (backgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
+            return "border-box";
+
+        return backgroundClip;
+    }
+
+    private static double GetEffectiveCornerRadiusY(string rawRadius, double cornerRadiusX, RectangleF bounds)
+    {
+        if (!string.IsNullOrEmpty(rawRadius)
+            && rawRadius.Contains('%', StringComparison.Ordinal)
+            && bounds.Width > 0)
+            return cornerRadiusX * bounds.Height / bounds.Width;
+
+        return cornerRadiusX;
+    }
+
     /// <summary>
     /// Offsets all display items starting at <paramref name="startIndex"/> by
     /// (<paramref name="dx"/>, <paramref name="dy"/>).  Used to reposition
@@ -1781,7 +1809,19 @@ internal static class PaintWalker
                 Stops = tg.Stops,
                 Angle = tg.Angle,
             },
-            ClipItem c => new ClipItem { Bounds = ob, ClipRect = OffsetRect(c.ClipRect, dx, dy) },
+            ClipItem c => new ClipItem
+            {
+                Bounds = ob,
+                ClipRect = OffsetRect(c.ClipRect, dx, dy),
+                CornerNw = c.CornerNw,
+                CornerNwY = c.CornerNwY,
+                CornerNe = c.CornerNe,
+                CornerNeY = c.CornerNeY,
+                CornerSe = c.CornerSe,
+                CornerSeY = c.CornerSeY,
+                CornerSw = c.CornerSw,
+                CornerSwY = c.CornerSwY,
+            },
             RestoreItem => new RestoreItem { Bounds = ob },
             OpacityItem o => new OpacityItem { Bounds = ob, Opacity = o.Opacity },
             RestoreOpacityItem => new RestoreOpacityItem { Bounds = ob },

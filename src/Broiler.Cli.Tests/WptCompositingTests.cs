@@ -73,11 +73,12 @@ body { background-color: green; }
     }
 
     /// <summary>
-    /// Regression: <c>background-clip: border-area</c> must be parsed and must
-    /// respect the actual visible border geometry instead of filling the whole box.
+    /// Regression: Chromium currently treats <c>background-clip: border-area</c>
+    /// like an unsupported value, so Broiler must fall back to
+    /// <c>background-clip: border-box</c> for screenshot parity.
     /// </summary>
     [Fact]
-    public void BackgroundClip_BorderArea_UsesVisibleBorderGeometry()
+    public void BackgroundClip_BorderArea_FallsBackToBorderBoxLikeChromium()
     {
         const string bluePixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/5ncLrgAAAABJRU5ErkJggg==";
         var html = $@"<!DOCTYPE html>
@@ -105,10 +106,10 @@ body {{ margin: 0; background: white; }}
 
         Assert.True(topBorder.Blue >= 245 && topBorder.Red <= 10 && topBorder.Green <= 10,
             $"Expected a blue top border pixel but got ({topBorder.Red},{topBorder.Green},{topBorder.Blue})");
-        Assert.True(center.Red >= 245 && center.Green >= 245 && center.Blue >= 245,
-            $"Expected center to remain white but got ({center.Red},{center.Green},{center.Blue})");
-        Assert.True(hiddenRightBorder.Red >= 245 && hiddenRightBorder.Green >= 245 && hiddenRightBorder.Blue >= 245,
-            $"Expected hidden right border to remain white but got ({hiddenRightBorder.Red},{hiddenRightBorder.Green},{hiddenRightBorder.Blue})");
+        Assert.True(center.Blue >= 245 && center.Red <= 10 && center.Green <= 10,
+            $"Expected center to be blue but got ({center.Red},{center.Green},{center.Blue})");
+        Assert.True(hiddenRightBorder.Blue >= 245 && hiddenRightBorder.Red <= 10 && hiddenRightBorder.Green <= 10,
+            $"Expected hidden right side to remain blue but got ({hiddenRightBorder.Red},{hiddenRightBorder.Green},{hiddenRightBorder.Blue})");
     }
 
     /// <summary>
@@ -154,6 +155,74 @@ body {{ margin: 8px; background: white; }}
             $"Expected whitespace before second row but got ({gapBeforeSecondRow.Red},{gapBeforeSecondRow.Green},{gapBeforeSecondRow.Blue})");
         Assert.True(secondRowBorder.Blue >= 245 && secondRowBorder.Red <= 10 && secondRowBorder.Green <= 10,
             $"Expected second row border to be blue but got ({secondRowBorder.Red},{secondRowBorder.Green},{secondRowBorder.Blue})");
+    }
+
+    /// <summary>
+    /// Regression: <c>box-sizing: border-box</c> must constrain explicit
+    /// width/height before background painting so WPT background-clip boxes
+    /// match Chromium's 300×150 border-box sizing.
+    /// </summary>
+    [Fact]
+    public void BackgroundClip_BorderArea_BorderBoxSizing_UsesSpecifiedBorderBoxDimensions()
+    {
+        var html = @"<!DOCTYPE html>
+<html>
+<head><style>
+.test {
+  width: 300px;
+  height: 150px;
+  box-sizing: border-box;
+  border: 50px solid transparent;
+}
+</style></head>
+<body><div id=""target"" class=""test""></div><div id=""result""></div>
+<script>
+var el = document.getElementById('target');
+document.getElementById('result').textContent =
+  'offsetWidth=' + el.offsetWidth + '|offsetHeight=' + el.offsetHeight;
+</script>
+</body>
+</html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("offsetWidth=300", result);
+        Assert.Contains("offsetHeight=150", result);
+    }
+
+    /// <summary>
+    /// Regression: Chromium paints the body's <c>background-clip:border-area</c>
+    /// across the viewport, so Broiler must not leave the body interior white.
+    /// </summary>
+    [Fact]
+    public void BackgroundClip_BorderArea_OnBody_FillsViewportLikeChromium()
+    {
+        var html = @"<!DOCTYPE html>
+<title>background-clip:border-area on the root</title>
+<style>
+html, body {
+  box-sizing: border-box;
+  height: 100%;
+  margin: 0;
+}
+html {
+  background-color: white;
+}
+body {
+  border: 20px solid transparent;
+  background-color: green;
+  background-clip: border-area;
+  padding: 10px;
+}
+</style>
+There should be a 20px green border around the edge of the viewport.";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 1024, 768);
+
+        var center = bitmap.GetPixel(512, 384);
+
+        Assert.True(center.Green >= 120 && center.Red <= 10 && center.Blue <= 10,
+            $"Expected viewport center to be green but got ({center.Red},{center.Green},{center.Blue})");
     }
 
     /// <summary>

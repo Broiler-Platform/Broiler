@@ -100,6 +100,7 @@ internal static class CssUtils
             "list-style-image" => cssBox.ListStyleImage,
             "list-style-type" => cssBox.ListStyleType,
             "overflow" => cssBox.Overflow,
+            "box-sizing" => cssBox.BoxSizing,
             "transform" => cssBox.Transform,
             "align-content" => cssBox.AlignContent,
             "justify-self" => cssBox.JustifySelf,
@@ -182,6 +183,9 @@ internal static class CssUtils
                 break;
             case "isolation":
                 cssBox.Isolation = value;
+                break;
+            case "box-sizing":
+                cssBox.BoxSizing = value;
                 break;
             case "background-clip":
                 cssBox.BackgroundClip = value;

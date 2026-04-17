@@ -62,6 +62,10 @@ internal static class ComputedStyleBuilder
             ActualCornerNe = box.ActualCornerNe,
             ActualCornerSe = box.ActualCornerSe,
             ActualCornerSw = box.ActualCornerSw,
+            CornerNwRadiusRaw = box.CornerNwRadius,
+            CornerNeRadiusRaw = box.CornerNeRadius,
+            CornerSeRadiusRaw = box.CornerSeRadius,
+            CornerSwRadiusRaw = box.CornerSwRadius,
 
             // Typography
             FontFamily = box.FontFamily ?? string.Empty,

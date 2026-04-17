@@ -51,6 +51,10 @@ public sealed class ComputedStyle
     public double ActualCornerNe { get; init; }
     public double ActualCornerSe { get; init; }
     public double ActualCornerSw { get; init; }
+    public string CornerNwRadiusRaw { get; init; } = "0";
+    public string CornerNeRadiusRaw { get; init; } = "0";
+    public string CornerSeRadiusRaw { get; init; } = "0";
+    public string CornerSwRadiusRaw { get; init; } = "0";
 
     // --- Typography ---
 

@@ -678,6 +678,13 @@ internal static class CssLayoutEngine
         if (b.Width != CssConstants.Auto && !string.IsNullOrEmpty(b.Width))
         {
             ibContentWidth = CssValueParser.ParseLength(b.Width, containerWidth, b.GetEmHeight());
+            if (b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase))
+            {
+                ibContentWidth -= b.ActualBorderLeftWidth + b.ActualBorderRightWidth
+                    + b.ActualPaddingLeft + b.ActualPaddingRight;
+                if (ibContentWidth < 0)
+                    ibContentWidth = 0;
+            }
         }
         else
         {
@@ -707,9 +714,10 @@ internal static class CssLayoutEngine
         if (b.MinWidth != "0" && !string.IsNullOrEmpty(b.MinWidth))
         {
             double minW = CssValueParser.ParseLength(b.MinWidth, containerWidth, b.GetEmHeight());
-            double minContentW = minW
-                - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
-                - b.ActualPaddingLeft - b.ActualPaddingRight;
+            double minContentW = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)
+                ? minW - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
+                    - b.ActualPaddingLeft - b.ActualPaddingRight
+                : minW;
             if (minContentW > ibContentWidth)
                 ibContentWidth = minContentW;
         }
@@ -721,9 +729,10 @@ internal static class CssLayoutEngine
         if (b.MaxWidth != "none" && !string.IsNullOrEmpty(b.MaxWidth))
         {
             double maxW = CssValueParser.ParseLength(b.MaxWidth, containerWidth, b.GetEmHeight());
-            double maxContentW = maxW
-                - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
-                - b.ActualPaddingLeft - b.ActualPaddingRight;
+            double maxContentW = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)
+                ? maxW - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
+                    - b.ActualPaddingLeft - b.ActualPaddingRight
+                : maxW;
             if (maxContentW < ibContentWidth)
                 ibContentWidth = maxContentW;
         }
@@ -741,8 +750,13 @@ internal static class CssLayoutEngine
         double totalExtent = b.ActualMarginLeft + ibBoxWidth + b.ActualMarginRight;
         if (edgeBeforeBox + totalExtent > limitRight && edgeBeforeBox > startx)
         {
+            double lineStrut = blockbox.ActualLineHeight > 0
+                ? blockbox.ActualLineHeight
+                : blockbox.ActualFont.Height * PtToCssPx;
+            double baselineDescent = lineStrut * (1.0 - TypicalAscentRatio);
+
             curx = startx + leftspacing;
-            cury = maxbottom + linespacing;
+            cury = maxbottom + linespacing + baselineDescent;
             line = new CssLineBox(blockbox);
             ibBorderLeft = curx - b.ActualBorderLeftWidth - b.ActualPaddingLeft;
         }
@@ -789,9 +803,11 @@ internal static class CssLayoutEngine
         if (b.Height != CssConstants.Auto && !string.IsNullOrEmpty(b.Height))
         {
             double cssHeight = CssValueParser.ParseLength(b.Height, containerWidth, b.GetEmHeight());
-            ibHeight = cssHeight
-                + b.ActualBorderTopWidth + b.ActualBorderBottomWidth
-                + b.ActualPaddingTop + b.ActualPaddingBottom;
+            ibHeight = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)
+                ? cssHeight
+                : cssHeight
+                    + b.ActualBorderTopWidth + b.ActualBorderBottomWidth
+                    + b.ActualPaddingTop + b.ActualPaddingBottom;
         }
         else
         {
@@ -802,9 +818,11 @@ internal static class CssLayoutEngine
         if (b.MinHeight != "0" && !string.IsNullOrEmpty(b.MinHeight))
         {
             double minH = CssValueParser.ParseLength(b.MinHeight, containerWidth, b.GetEmHeight());
-            double minBoxH = minH
-                + b.ActualBorderTopWidth + b.ActualBorderBottomWidth
-                + b.ActualPaddingTop + b.ActualPaddingBottom;
+            double minBoxH = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)
+                ? minH
+                : minH
+                    + b.ActualBorderTopWidth + b.ActualBorderBottomWidth
+                    + b.ActualPaddingTop + b.ActualPaddingBottom;
             if (minBoxH > ibHeight)
                 ibHeight = minBoxH;
         }

@@ -30,7 +30,11 @@ public abstract class RGraphics : IDisposable
     /// Pushes a rounded-rectangle clip onto the clip stack.
     /// Default implementation falls back to a rectangular clip.
     /// </summary>
-    public virtual void PushClipRounded(RectangleF rect, double cornerNw, double cornerNe, double cornerSe, double cornerSw)
+    public virtual void PushClipRounded(RectangleF rect,
+        double cornerNw, double cornerNwY,
+        double cornerNe, double cornerNeY,
+        double cornerSe, double cornerSeY,
+        double cornerSw, double cornerSwY)
     {
         PushClip(rect);
     }
