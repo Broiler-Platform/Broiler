@@ -46,6 +46,7 @@ public abstract class RGraphics : IDisposable
     public abstract SizeF MeasureString(string str, RFont font);
     public abstract void MeasureString(string str, RFont font, double maxWidth, out int charFit, out double charFitWidth);
     public abstract void DrawString(string str, RFont font, Color color, PointF point, SizeF size, bool rtl);
+    public abstract void DrawGradientString(string str, RFont font, RectangleF rect, PointF point, SizeF size, bool rtl, Color[] colors, float[] positions, float angle);
     public abstract void DrawLine(RPen pen, double x1, double y1, double x2, double y2);
     public abstract void DrawRectangle(RPen pen, double x, double y, double width, double height);
     public abstract void DrawRectangle(RBrush brush, double x, double y, double width, double height);

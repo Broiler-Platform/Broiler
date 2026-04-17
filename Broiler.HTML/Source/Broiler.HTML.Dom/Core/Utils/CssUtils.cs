@@ -119,6 +119,12 @@ internal static class CssUtils
 
     public static void SetPropertyValue(CssBox cssBox, string propName, string value)
     {
+        if (propName.StartsWith("--", StringComparison.Ordinal))
+        {
+            cssBox.SetCustomProperty(propName, value);
+            return;
+        }
+
         switch (propName)
         {
             case "border-bottom-width":
@@ -198,6 +204,10 @@ internal static class CssUtils
                 break;
             case "text-shadow":
                 cssBox.TextShadow = value;
+                break;
+            case "text-fill-color":
+            case "-webkit-text-fill-color":
+                cssBox.Color = value;
                 break;
             case "flex-direction":
                 cssBox.FlexDirection = value;

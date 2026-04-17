@@ -731,6 +731,11 @@ internal static class PaintWalker
 
     private static void EmitBackgroundImage(Fragment fragment, List<DisplayItem> items, RectangleF viewport = default)
     {
+        // CSS Backgrounds Level 4: background-clip:text — background image
+        // is not painted normally (it is clipped to text shapes).
+        if (fragment.Style.BackgroundClip.Equals("text", StringComparison.OrdinalIgnoreCase))
+            return;
+
         // CSS3: handle gradient background layers even without a url-based image.
         if (fragment.BackgroundImageHandle == null)
         {
@@ -740,11 +745,6 @@ internal static class PaintWalker
             }
             return;
         }
-
-        // CSS Backgrounds Level 4: background-clip:text — background image
-        // is not painted normally (it is clipped to text shapes).
-        if (fragment.Style.BackgroundClip.Equals("text", StringComparison.OrdinalIgnoreCase))
-            return;
 
         // Use GetPaintRects to handle inline elements (which may have zero
         // Size but non-empty InlineRects from per-line-box layout).
@@ -1107,9 +1107,35 @@ internal static class PaintWalker
 
         var style = fragment.Style;
         bool isRtl = style.Direction == "rtl";
+        GradientInfo? bgClipTextGradient = null;
+        if (style.BackgroundClip.Equals("text", StringComparison.OrdinalIgnoreCase)
+            && HasGradientBackgroundImage(style.BackgroundImage))
+        {
+            foreach (var layer in SplitGradientLayers(style.BackgroundImage))
+            {
+                bgClipTextGradient = ParseGradientFunction(layer.Trim());
+                if (bgClipTextGradient?.Stops.Count > 0)
+                    break;
+            }
+        }
 
         foreach (var line in fragment.Lines)
         {
+            RectangleF lineGradientBounds = RectangleF.Empty;
+            if (bgClipTextGradient != null)
+            {
+                foreach (var candidate in line.Inlines)
+                {
+                    if (string.IsNullOrEmpty(candidate.Text) || candidate.Text == "\n")
+                        continue;
+
+                    var candidateBounds = new RectangleF(candidate.X, candidate.Y, candidate.Width, candidate.Height);
+                    lineGradientBounds = lineGradientBounds == RectangleF.Empty
+                        ? candidateBounds
+                        : RectangleF.Union(lineGradientBounds, candidateBounds);
+                }
+            }
+
             foreach (var inline in line.Inlines)
             {
                 if (string.IsNullOrEmpty(inline.Text))
@@ -1120,6 +1146,8 @@ internal static class PaintWalker
                     continue;
 
                 var inlineStyle = inline.Style;
+                var inlineBounds = new RectangleF(inline.X, inline.Y, inline.Width, inline.Height);
+                var gradientBounds = lineGradientBounds == RectangleF.Empty ? inlineBounds : lineGradientBounds;
 
                 // CSS Backgrounds Level 4: background-clip: text — the text
                 // color is composited with the background color so that the
@@ -1132,7 +1160,7 @@ internal static class PaintWalker
 
                 items.Add(new DrawTextItem
                 {
-                    Bounds = new RectangleF(inline.X, inline.Y, inline.Width, inline.Height),
+                    Bounds = inlineBounds,
                     Text = inline.Text,
                     FontFamily = inlineStyle.FontFamily,
                     FontSize = (float)ParseFontSize(inlineStyle.FontSize),
@@ -1144,6 +1172,10 @@ internal static class PaintWalker
                     TextShadowOffsetX = shadowX,
                     TextShadowOffsetY = shadowY,
                     TextShadowColor = shadowColor,
+                    GradientStops = bgClipTextGradient?.Stops,
+                    GradientAngle = bgClipTextGradient?.Angle ?? 180f,
+                    GradientInterpolationSpace = bgClipTextGradient?.InterpolationSpace ?? "srgb",
+                    GradientBounds = gradientBounds,
                 });
             }
         }
@@ -1846,6 +1878,10 @@ internal static class PaintWalker
                 TextShadowOffsetX = t.TextShadowOffsetX,
                 TextShadowOffsetY = t.TextShadowOffsetY,
                 TextShadowColor = t.TextShadowColor,
+                GradientStops = t.GradientStops,
+                GradientAngle = t.GradientAngle,
+                GradientInterpolationSpace = t.GradientInterpolationSpace,
+                GradientBounds = OffsetRect(t.GradientBounds, dx, dy),
             },
             DrawImageItem img => new DrawImageItem
             {
@@ -1874,6 +1910,7 @@ internal static class PaintWalker
                 Repeat = tg.Repeat,
                 Stops = tg.Stops,
                 Angle = tg.Angle,
+                InterpolationSpace = tg.InterpolationSpace,
             },
             ClipItem c => new ClipItem
             {
@@ -2140,6 +2177,7 @@ internal static class PaintWalker
                 Repeat = repeatStr,
                 Stops = gradInfo.Stops,
                 Angle = gradInfo.Angle,
+                InterpolationSpace = gradInfo.InterpolationSpace,
             });
         }
     }
@@ -2488,6 +2526,7 @@ internal static class PaintWalker
     private sealed class GradientInfo
     {
         public float Angle { get; set; } = 180f; // default: to bottom
+        public string InterpolationSpace { get; set; } = "srgb";
         public List<GradientStop> Stops { get; set; } = new();
     }
 
@@ -2530,28 +2569,46 @@ internal static class PaintWalker
 
         // Check if first token is a direction/angle.
         string first = tokens[0].Trim();
-        if (first.StartsWith("to ", StringComparison.OrdinalIgnoreCase))
+        string firstLower = first.ToLowerInvariant();
+        if (firstLower.StartsWith("in "))
         {
-            info.Angle = ParseCssDirection(first);
+            info.InterpolationSpace = ParseGradientInterpolationSpace(first[3..].Trim());
             colorStartIdx = 1;
         }
-        else if (first.EndsWith("deg", StringComparison.OrdinalIgnoreCase))
+        else
         {
-            if (float.TryParse(first.AsSpan(0, first.Length - 3), NumberStyles.Float, CultureInfo.InvariantCulture, out float deg))
-                info.Angle = deg;
-            colorStartIdx = 1;
-        }
-        else if (first.EndsWith("turn", StringComparison.OrdinalIgnoreCase))
-        {
-            if (float.TryParse(first.AsSpan(0, first.Length - 4), NumberStyles.Float, CultureInfo.InvariantCulture, out float turn))
-                info.Angle = turn * 360f;
-            colorStartIdx = 1;
-        }
-        else if (first.EndsWith("rad", StringComparison.OrdinalIgnoreCase))
-        {
-            if (float.TryParse(first.AsSpan(0, first.Length - 3), NumberStyles.Float, CultureInfo.InvariantCulture, out float rad))
-                info.Angle = (float)(rad * 180.0 / Math.PI);
-            colorStartIdx = 1;
+            string angleToken = first;
+            int interpolationIdx = firstLower.IndexOf(" in ", StringComparison.Ordinal);
+            if (interpolationIdx >= 0)
+            {
+                angleToken = first[..interpolationIdx].Trim();
+                info.InterpolationSpace = ParseGradientInterpolationSpace(first[(interpolationIdx + 4)..].Trim());
+                colorStartIdx = 1;
+            }
+
+            if (angleToken.StartsWith("to ", StringComparison.OrdinalIgnoreCase))
+            {
+                info.Angle = ParseCssDirection(angleToken);
+                colorStartIdx = 1;
+            }
+            else if (angleToken.EndsWith("deg", StringComparison.OrdinalIgnoreCase))
+            {
+                if (float.TryParse(angleToken.AsSpan(0, angleToken.Length - 3), NumberStyles.Float, CultureInfo.InvariantCulture, out float deg))
+                    info.Angle = deg;
+                colorStartIdx = 1;
+            }
+            else if (angleToken.EndsWith("turn", StringComparison.OrdinalIgnoreCase))
+            {
+                if (float.TryParse(angleToken.AsSpan(0, angleToken.Length - 4), NumberStyles.Float, CultureInfo.InvariantCulture, out float turn))
+                    info.Angle = turn * 360f;
+                colorStartIdx = 1;
+            }
+            else if (angleToken.EndsWith("rad", StringComparison.OrdinalIgnoreCase))
+            {
+                if (float.TryParse(angleToken.AsSpan(0, angleToken.Length - 3), NumberStyles.Float, CultureInfo.InvariantCulture, out float rad))
+                    info.Angle = (float)(rad * 180.0 / Math.PI);
+                colorStartIdx = 1;
+            }
         }
 
         // Parse color stops.
@@ -2646,6 +2703,15 @@ internal static class PaintWalker
             return null;
 
         return new GradientStop { Color = color, Position = Math.Clamp(position, 0f, 1f) };
+    }
+
+    private static string ParseGradientInterpolationSpace(string interpolation)
+    {
+        if (interpolation.StartsWith("hsl", StringComparison.OrdinalIgnoreCase))
+            return "hsl";
+        if (interpolation.StartsWith("oklch", StringComparison.OrdinalIgnoreCase))
+            return "oklch";
+        return "srgb";
     }
 
     /// <summary>

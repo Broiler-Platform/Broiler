@@ -2955,6 +2955,33 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_BackgroundGradientInterpolation003_MatchesReference()
+    {
+        var result = RunCssBackgroundsMatchTest("background-gradient-interpolation-003.html");
+        Assert.True(result.Passed,
+            $"background-gradient-interpolation-003 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundGradientInterpolation002_DiffersFromNotRef()
+    {
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(root, "tests", "wpt");
+        var testFile = Path.Combine(wptRoot, "css", "css-backgrounds", "background-gradient-interpolation-002.html");
+        var notRefFile = Path.Combine(wptRoot, "css", "css-backgrounds", "background-gradient-interpolation-002-notref.html");
+
+        var runner = new WptTestRunner(1024, 768);
+        var result = runner.RunMatchTest(testFile, notRefFile, wptRoot);
+
+        Assert.False(result.Passed,
+            "background-gradient-interpolation-002 should not match the notref rendering where all three gradients are identical.");
+        Assert.NotNull(result.MatchPercent);
+        Assert.True(result.MatchPercent < 99.9,
+            $"background-gradient-interpolation-002 should be visually distinct from the notref. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_BackgroundClipRoot_MatchesReference()
     {
         // CSS Backgrounds §2.11.4: background-clip has no effect on the root

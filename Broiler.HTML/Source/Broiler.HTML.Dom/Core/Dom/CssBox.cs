@@ -96,6 +96,8 @@ internal class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     internal HashSet<string> AuthorProperties { get; private set; }
 
+    internal Dictionary<string, string> CustomProperties { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Marks a property as having been set via an <c>!important</c>
     /// declaration so that subsequent normal-priority rules cannot
@@ -115,6 +117,14 @@ internal class CssBox : CssBoxProperties, IDisposable
     {
         AuthorProperties ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         AuthorProperties.Add(propertyName);
+    }
+
+    internal void SetCustomProperty(string propertyName, string value)
+    {
+        if (string.IsNullOrEmpty(propertyName))
+            return;
+
+        CustomProperties[propertyName] = value;
     }
 
     /// <summary>
@@ -161,6 +171,18 @@ internal class CssBox : CssBoxProperties, IDisposable
     public List<CssBox> Boxes { get; } = [];
 
     public override bool AvoidGeometryAntialias => ContainerInt?.AvoidGeometryAntialias ?? false;
+
+    protected override bool TryGetCustomPropertyValue(string propertyName, out string value)
+    {
+        if (CustomProperties.TryGetValue(propertyName, out value))
+            return true;
+
+        if (ParentBox != null)
+            return ParentBox.TryGetCustomPropertyValue(propertyName, out value);
+
+        value = string.Empty;
+        return false;
+    }
 
     public bool IsBrElement => HtmlTag != null && HtmlTag.Name.Equals("br", StringComparison.InvariantCultureIgnoreCase);
     public bool IsInline => (Display == CssConstants.Inline || Display == CssConstants.InlineBlock

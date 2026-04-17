@@ -36,6 +36,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     private string _paddingRight = "0";
     private string _paddingTop = "0";
     private string _right = "auto";
+    private string _backgroundImage = "none";
     private string _textIndent = "0";
     private string _top = "auto";
     private string _wordSpacing = "normal";
@@ -342,7 +343,11 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string MaxHeight { get; set; } = "none";
     public string MinHeight { get; set; } = "0";
     public string BackgroundColor { get; set; } = "transparent";
-    public string BackgroundImage { get; set; } = "none";
+    public string BackgroundImage
+    {
+        get => ResolveCssVariables(_backgroundImage);
+        set => _backgroundImage = value;
+    }
     public string BackgroundPosition { get; set; } = "0% 0%";
     public string BackgroundRepeat { get; set; } = "repeat";
     public string BackgroundAttachment { get; set; } = "scroll";
@@ -808,6 +813,37 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     protected abstract PointF GetActualLocation(string X, string Y);
 
     protected abstract Color GetActualColor(string colorStr);
+
+    protected virtual bool TryGetCustomPropertyValue(string propertyName, out string value)
+    {
+        value = string.Empty;
+        return false;
+    }
+
+    private string ResolveCssVariables(string value)
+    {
+        if (string.IsNullOrEmpty(value) || value.IndexOf("var(", StringComparison.OrdinalIgnoreCase) < 0)
+            return value;
+
+        string resolved = value;
+        for (int i = 0; i < 8 && resolved.IndexOf("var(", StringComparison.OrdinalIgnoreCase) >= 0; i++)
+        {
+            resolved = Regex.Replace(
+                resolved,
+                @"var\(\s*(--[A-Za-z0-9_-]+)\s*(?:,\s*([^)]+))?\)",
+                match =>
+                {
+                    var propertyName = match.Groups[1].Value;
+                    if (TryGetCustomPropertyValue(propertyName, out var propertyValue))
+                        return propertyValue;
+
+                    return match.Groups[2].Success ? match.Groups[2].Value.Trim() : string.Empty;
+                },
+                RegexOptions.IgnoreCase);
+        }
+
+        return resolved;
+    }
 
     public Color ActualBorderLeftColor
     {
