@@ -110,7 +110,7 @@ public class Program
         foreach (var testPath in discoveredTests)
         {
             var displayPath = Path.GetRelativePath(wptPath, testPath).Replace('\\', '/');
-            Console.WriteLine($"[RUN ] ({completed + 1}/{totalTests}) {displayPath}");
+            //Console.WriteLine($"[RUN ] ({completed + 1}/{totalTests}) {displayPath}");
 
             var result = runner.RunTest(testPath, referenceDir, wptPath);
             allResults.Add(result);
