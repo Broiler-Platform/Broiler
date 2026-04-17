@@ -17,6 +17,7 @@ public class Program
         string? filterStatus = null;
         string? filterIp = null;
         string? filterEndpoint = null;
+        string? searchTerm = null;
         string? fromStr = null;
         string? toStr = null;
         string? exportCsv = null;
@@ -48,6 +49,9 @@ public class Program
                     break;
                 case "--filter-endpoint" when i + 1 < args.Length:
                     filterEndpoint = args[++i];
+                    break;
+                case "--search" when i + 1 < args.Length:
+                    searchTerm = args[++i];
                     break;
                 case "--from" when i + 1 < args.Length:
                     fromStr = args[++i];
@@ -83,6 +87,7 @@ public class Program
                 case "--filter-status":
                 case "--filter-ip":
                 case "--filter-endpoint":
+                case "--search":
                 case "--from":
                 case "--to":
                 case "--export-csv":
@@ -201,6 +206,7 @@ public class Program
         // Apply filters if any were specified.
         bool hasFilters = minStatus is not null || maxStatus is not null ||
                           filterIp is not null || filterEndpoint is not null ||
+                          searchTerm is not null ||
                           from is not null || to is not null;
         if (hasFilters)
         {
@@ -210,7 +216,8 @@ public class Program
                 ip: filterIp,
                 endpointPattern: filterEndpoint,
                 from: from,
-                to: to);
+                to: to,
+                searchTerm: searchTerm);
 
             if (analyzer.TotalRequests == 0)
             {
@@ -296,7 +303,7 @@ public class Program
                 Console.Write(analyzer.ExportHtml(top));
                 break;
             default: // "text" or null (default)
-                PrintReport(analyzer, top, skipped, filesProcessed, showCharts);
+                PrintReport(analyzer, top, skipped, filesProcessed, showCharts, searchTerm);
                 break;
         }
 
@@ -356,7 +363,7 @@ public class Program
         return 0;
     }
 
-    internal static void PrintReport(LogAnalyzerService analyzer, int top, int skippedLines, int filesProcessed, bool showCharts = false)
+    internal static void PrintReport(LogAnalyzerService analyzer, int top, int skippedLines, int filesProcessed, bool showCharts = false, string? searchTerm = null)
     {
         string topLabel = top > 0 ? $"Top {top}" : "All";
 
@@ -526,6 +533,16 @@ public class Program
         Console.WriteLine($"  {analyzer.GenerateSummary()}");
         Console.WriteLine();
 
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            Console.WriteLine($"── Matching Entries for \"{searchTerm}\" ─────────");
+            foreach (var entry in analyzer.Entries)
+            {
+                Console.WriteLine($"  {FormatEntry(entry)}");
+            }
+            Console.WriteLine();
+        }
+
         // ── ASCII Charts (--chart) ──
         if (showCharts)
         {
@@ -571,6 +588,7 @@ public class Program
         Console.WriteLine("  --filter-status <RANGE> Filter by HTTP status code or range (e.g. 404 or 400-499)");
         Console.WriteLine("  --filter-ip <IP>       Filter entries by remote host / IP");
         Console.WriteLine("  --filter-endpoint <PATTERN> Filter entries by endpoint substring (case-insensitive)");
+        Console.WriteLine("  --search <TEXT>        Full-text search across parsed log entry content (case-insensitive)");
         Console.WriteLine("  --from <DATETIME>      Include entries from this date/time (ISO 8601)");
         Console.WriteLine("  --to <DATETIME>        Include entries up to this date/time (ISO 8601)");
         Console.WriteLine("  --format <FORMAT>      Output format: text (default), json, csv, markdown, html");
@@ -588,6 +606,7 @@ public class Program
         Console.WriteLine("  Broiler.LogAnalyzer access.log --filter-status 500-599");
         Console.WriteLine("  Broiler.LogAnalyzer access.log --filter-ip 192.168.1.1");
         Console.WriteLine("  Broiler.LogAnalyzer access.log --filter-endpoint /api");
+        Console.WriteLine("  Broiler.LogAnalyzer access.log --search people-and-earth.org");
         Console.WriteLine("  Broiler.LogAnalyzer access.log --from 2024-01-01 --to 2024-01-31");
         Console.WriteLine("  Broiler.LogAnalyzer access.log --format json");
         Console.WriteLine("  Broiler.LogAnalyzer access.log --format html > report.html");
@@ -607,6 +626,11 @@ public class Program
             index++;
         }
         return $"{value:F2} {suffixes[index]}";
+    }
+
+    internal static string FormatEntry(LogEntry entry)
+    {
+        return LogAnalyzerService.FormatApacheLogEntry(entry);
     }
 
     /// <summary>

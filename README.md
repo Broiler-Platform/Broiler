@@ -157,6 +157,9 @@ dotnet run --project src/Broiler.LogAnalyzer.Cli -- --file /var/log/apache2/ --t
 
 # Show all results (no limit)
 dotnet run --project src/Broiler.LogAnalyzer.Cli -- --file /var/log/apache2/ --top 0
+
+# Full-text search across parsed log entries (case-insensitive)
+dotnet run --project src/Broiler.LogAnalyzer.Cli -- access.log --search people-and-earth.org
 ```
 
 The report includes:
@@ -172,6 +175,11 @@ The report includes:
 
 Use `--top 0` to remove the default top-10 limit and display all entries for
 deeper investigation.
+
+Use `--search <TEXT>` to run a case-insensitive full-text search across the
+parsed log entry content (host, timestamp, request line, status, size, referer,
+and user agent). Matching entries are returned in the CLI text output, library
+filters, and the WPF quick-filter toolbar.
 
 ### Current Phase: Project Initialization
 

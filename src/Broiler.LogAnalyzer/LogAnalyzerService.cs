@@ -167,13 +167,15 @@ public sealed class LogAnalyzerService
     /// <param name="endpointPattern">Substring that the endpoint must contain (case-insensitive).</param>
     /// <param name="from">Inclusive minimum timestamp.</param>
     /// <param name="to">Inclusive maximum timestamp.</param>
+    /// <param name="searchTerm">Full-text term that may appear anywhere in the log entry (case-insensitive).</param>
     public LogAnalyzerService Filter(
         int? minStatus = null,
         int? maxStatus = null,
         string? ip = null,
         string? endpointPattern = null,
         DateTimeOffset? from = null,
-        DateTimeOffset? to = null)
+        DateTimeOffset? to = null,
+        string? searchTerm = null)
     {
         IEnumerable<LogEntry> filtered = _entries;
 
@@ -189,8 +191,49 @@ public sealed class LogAnalyzerService
             filtered = filtered.Where(e => e.Timestamp >= from.Value);
         if (to is not null)
             filtered = filtered.Where(e => e.Timestamp <= to.Value);
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+            filtered = filtered.Where(e => MatchesSearchTerm(e, searchTerm));
 
         return new LogAnalyzerService(filtered.ToList());
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when the supplied full-text search term appears anywhere
+    /// in the normalized log-entry content. Matching is case-insensitive.
+    /// </summary>
+    public static bool MatchesSearchTerm(LogEntry entry, string? searchTerm)
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+            return true;
+
+        return BuildSearchableText(entry).Contains(searchTerm.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildSearchableText(LogEntry entry)
+    {
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{FormatApacheLogEntry(entry)} {entry.Timestamp.ToString("O", CultureInfo.InvariantCulture)}");
+    }
+
+    public static string FormatApacheLogEntry(LogEntry entry)
+    {
+        var referer = string.IsNullOrWhiteSpace(entry.Referer) ? "-" : entry.Referer;
+        var userAgent = string.IsNullOrWhiteSpace(entry.UserAgent) ? "-" : entry.UserAgent;
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{entry.RemoteHost} {entry.Ident} {entry.User} [{FormatApacheTimestamp(entry.Timestamp)}] \"{entry.Method} {entry.Endpoint} {entry.Protocol}\" {entry.StatusCode} {entry.ResponseSize} \"{referer}\" \"{userAgent}\"");
+    }
+
+    public static string FormatApacheTimestamp(DateTimeOffset timestamp)
+    {
+        var offset = timestamp.Offset;
+        var sign = offset < TimeSpan.Zero ? "-" : "+";
+        offset = offset.Duration();
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{timestamp.ToString("dd/MMM/yyyy:HH:mm:ss", CultureInfo.InvariantCulture)} {sign}{offset.Hours:00}{offset.Minutes:00}");
     }
 
     // ── Error Aggregation ──────────────────────────────────────────────

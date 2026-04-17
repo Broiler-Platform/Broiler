@@ -114,6 +114,57 @@ public class LogAnalyzerServiceEnhancedTests
     }
 
     [Fact]
+    public void Filter_BySearchTerm_ReturnsMatchesFromFullEntryContent()
+    {
+        var lines = new[]
+        {
+            @"2a02:3100:1c00:: - - [10/Apr/2026:10:24:10 +0200] ""GET /music/Track8.mp3 HTTP/1.1"" 200 7668917 ""https://www.people-and-earth.org/playlist"" ""Mozilla/5.0""",
+            @"176.74.7.227 - - [11/Apr/2026:06:59:52 +0200] ""GET /music/Track2.mp3 HTTP/1.1"" 200 3699982 ""https://people-and-earth.org/archive"" ""curl/8.0""",
+            @"203.0.113.5 - - [12/Apr/2026:08:00:00 +0200] ""GET /images/logo.png HTTP/1.1"" 200 1234 ""-"" ""TestAgent/1.0""",
+        };
+
+        var (entries, _) = LogParser.ParseLines(lines);
+        var service = new LogAnalyzerService(entries);
+
+        var filtered = service.Filter(searchTerm: "people-and-earth.org");
+
+        Assert.Equal(2, filtered.TotalRequests);
+        Assert.All(filtered.Entries, entry => Assert.True(LogAnalyzerService.MatchesSearchTerm(entry, "people-and-earth.org")));
+    }
+
+    [Fact]
+    public void Filter_BySearchTerm_IsCaseInsensitive()
+    {
+        var lines = new[]
+        {
+            @"2a02:3100:1c00:: - - [10/Apr/2026:10:24:10 +0200] ""GET /music/Track8.mp3 HTTP/1.1"" 200 7668917 ""-"" ""Mozilla/5.0""",
+        };
+
+        var (entries, _) = LogParser.ParseLines(lines);
+        var service = new LogAnalyzerService(entries);
+
+        var filtered = service.Filter(searchTerm: "track8.MP3");
+
+        Assert.Single(filtered.Entries);
+    }
+
+    [Fact]
+    public void Filter_BySearchTerm_MatchesApacheTimestampFormatting()
+    {
+        var lines = new[]
+        {
+            @"2a02:3100:1c00:: - - [10/Apr/2026:10:24:10 +0200] ""GET /music/Track8.mp3 HTTP/1.1"" 200 7668917 ""-"" ""Mozilla/5.0""",
+        };
+
+        var (entries, _) = LogParser.ParseLines(lines);
+        var service = new LogAnalyzerService(entries);
+
+        var filtered = service.Filter(searchTerm: "10/Apr/2026:10:24:10 +0200");
+
+        Assert.Single(filtered.Entries);
+    }
+
+    [Fact]
     public void Filter_NullParameters_ReturnsAll()
     {
         var service = CreateService();
