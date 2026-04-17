@@ -173,6 +173,16 @@ public class LogAnalyzerServiceEnhancedTests
         Assert.Equal(6, filtered.TotalRequests);
     }
 
+    [Fact]
+    public void Filter_EmptyIpAndEndpointParameters_ReturnAllEntries()
+    {
+        var service = CreateService();
+
+        var filtered = service.Filter(ip: string.Empty, endpointPattern: "   ");
+
+        Assert.Equal(6, filtered.TotalRequests);
+    }
+
     // ── Error Summary Tests ────────────────────────────────────────
 
     [Fact]
