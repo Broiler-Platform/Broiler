@@ -476,6 +476,8 @@ internal sealed class SkiaImageAdapter : RAdapter
 
     private static SKBitmap NormalizeSvgContentBounds(SKBitmap bitmap, int width, int height)
     {
+        var rowHasOpaque = new bool[bitmap.Height];
+        var colHasOpaque = new bool[bitmap.Width];
         int minX = bitmap.Width;
         int minY = bitmap.Height;
         int maxX = -1;
@@ -487,6 +489,8 @@ internal sealed class SkiaImageAdapter : RAdapter
                 if (bitmap.GetPixel(x, y).Alpha == 0)
                     continue;
 
+                rowHasOpaque[y] = true;
+                colHasOpaque[x] = true;
                 minX = Math.Min(minX, x);
                 minY = Math.Min(minY, y);
                 maxX = Math.Max(maxX, x);
@@ -503,41 +507,21 @@ internal sealed class SkiaImageAdapter : RAdapter
         var nonEmptyCols = new List<int>(croppedWidth);
         for (int x = minX; x <= maxX; x++)
         {
-            bool hasOpaquePixel = false;
-            for (int y = minY; y <= maxY; y++)
-            {
-                if (bitmap.GetPixel(x, y).Alpha != 0)
-                {
-                    hasOpaquePixel = true;
-                    break;
-                }
-            }
-
-            if (hasOpaquePixel)
+            if (colHasOpaque[x])
                 nonEmptyCols.Add(x);
         }
 
         var nonEmptyRows = new List<int>(croppedHeight);
         for (int y = minY; y <= maxY; y++)
         {
-            bool hasOpaquePixel = false;
-            for (int x = minX; x <= maxX; x++)
-            {
-                if (bitmap.GetPixel(x, y).Alpha != 0)
-                {
-                    hasOpaquePixel = true;
-                    break;
-                }
-            }
-
-            if (hasOpaquePixel)
+            if (rowHasOpaque[y])
                 nonEmptyRows.Add(y);
         }
 
         if (nonEmptyCols.Count == 0 || nonEmptyRows.Count == 0)
             return bitmap;
 
-        var condensed = new SKBitmap(nonEmptyCols.Count, nonEmptyRows.Count, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var condensed = new SKBitmap(nonEmptyCols.Count, nonEmptyRows.Count, SKColorType.Rgba8888, SKAlphaType.Premul);
         for (int destY = 0; destY < nonEmptyRows.Count; destY++)
         {
             int srcY = nonEmptyRows[destY];
@@ -556,7 +540,6 @@ internal sealed class SkiaImageAdapter : RAdapter
             IsAntialias = false,
         };
         canvas.DrawBitmap(condensed, new SKRect(0, 0, width, height), paint);
-        condensed.Dispose();
         bitmap.Dispose();
         return normalized;
     }
