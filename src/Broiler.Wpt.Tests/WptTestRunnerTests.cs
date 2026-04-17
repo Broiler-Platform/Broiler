@@ -255,6 +255,34 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Program_Output_Includes_Progress_Updates_During_Run()
+    {
+        var testDir = Path.Combine(_tempDir, "progress");
+        Directory.CreateDirectory(testDir);
+        File.WriteAllText(Path.Combine(testDir, "a.html"), "<html><body>A</body></html>");
+        File.WriteAllText(Path.Combine(testDir, "b.html"), "<html><body>B</body></html>");
+
+        var originalOut = Console.Out;
+        var sw = new StringWriter();
+        Console.SetOut(sw);
+        try
+        {
+            Program.Main([testDir]);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        var output = sw.ToString();
+
+        Assert.Contains("Discovered    : 2 test(s)", output);
+        Assert.Contains("[RUN ] (1/2) a.html", output);
+        Assert.Contains("[RUN ] (2/2) b.html", output);
+        Assert.Contains("[INFO] Completed 2/2 tests (0 passed, 0 failed, 2 skipped)", output);
+    }
+
+    [Fact]
     public void Program_Returns_Error_When_No_Arguments()
     {
         var exitCode = Program.Main([]);
