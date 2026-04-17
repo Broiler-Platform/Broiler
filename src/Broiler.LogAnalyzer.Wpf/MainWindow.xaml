@@ -125,6 +125,8 @@
                         <Style TargetType="DataGridRow">
                             <Setter Property="Background"
                                     Value="{Binding StatusCode, Converter={StaticResource StatusCodeToBrush}}"/>
+                            <Setter Property="ToolTip"
+                                    Value="{Binding FormattedEntry}"/>
                         </Style>
                     </DataGrid.RowStyle>
                     <DataGrid.Columns>
@@ -134,7 +136,9 @@
                         <DataGridTextColumn Header="Endpoint" Binding="{Binding Endpoint}" Width="*"/>
                         <DataGridTextColumn Header="Status" Binding="{Binding StatusCode}" Width="60"/>
                         <DataGridTextColumn Header="Size" Binding="{Binding ResponseSize}" Width="80"/>
+                        <DataGridTextColumn Header="Referer" Binding="{Binding Referer}" Width="220"/>
                         <DataGridTextColumn Header="User Agent" Binding="{Binding UserAgent}" Width="200"/>
+                        <DataGridTextColumn Header="Log Entry" Binding="{Binding FormattedEntry}" Width="420"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </TabItem>
