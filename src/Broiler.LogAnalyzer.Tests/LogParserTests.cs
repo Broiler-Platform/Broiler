@@ -120,4 +120,21 @@ public class LogParserTests
         Assert.NotNull(entry);
         Assert.Equal(new TimeSpan(5, 30, 0), entry.Timestamp.Offset);
     }
+
+    [Fact]
+    public void ParseLine_SearchResultsExtractFormat_ReturnsEntry()
+    {
+        var line = @"277 2a02:3100:1c00:: - - [10/Apr/2026:10:24:10 +0200] ""GET /music/Track8.mp3 HTTP/1.1"" 200 7668917 www.people-and-earth.org ""-"" ""Mozilla/5.0 (Windows NT 10.0; Win64; x64)"" ""-""";
+        var entry = LogParser.ParseLine(line);
+
+        Assert.NotNull(entry);
+        Assert.Equal("2a02:3100:1c00::", entry.RemoteHost);
+        Assert.Equal("GET", entry.Method);
+        Assert.Equal("/music/Track8.mp3", entry.Endpoint);
+        Assert.Equal("HTTP/1.1", entry.Protocol);
+        Assert.Equal(200, entry.StatusCode);
+        Assert.Equal(7668917, entry.ResponseSize);
+        Assert.Null(entry.Referer);
+        Assert.Equal("Mozilla/5.0 (Windows NT 10.0; Win64; x64)", entry.UserAgent);
+    }
 }
