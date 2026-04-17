@@ -1,4 +1,5 @@
 using Broiler.LogAnalyzer.Cli;
+using System.Text;
 
 namespace Broiler.LogAnalyzer.Tests;
 
@@ -21,6 +22,27 @@ public class ProgramEnhancedTests
         var tempFile = Path.GetTempFileName();
         File.WriteAllLines(tempFile, SampleLogLines);
         return tempFile;
+    }
+
+    private static (int ExitCode, string StdOut, string StdErr) RunMainCapturingOutput(params string[] args)
+    {
+        var originalOut = Console.Out;
+        var originalError = Console.Error;
+        using var stdOut = new StringWriter(new StringBuilder());
+        using var stdErr = new StringWriter(new StringBuilder());
+
+        try
+        {
+            Console.SetOut(stdOut);
+            Console.SetError(stdErr);
+            var exitCode = Program.Main(args);
+            return (exitCode, stdOut.ToString(), stdErr.ToString());
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+            Console.SetError(originalError);
+        }
     }
 
     // ── --filter-status ──
@@ -97,6 +119,32 @@ public class ProgramEnhancedTests
             Assert.Equal(0, exitCode);
         }
         finally { File.Delete(tempFile); }
+    }
+
+    [Fact]
+    public void Main_Search_ReturnsMatchingEntriesInTextOutput()
+    {
+        var tempFile = Path.GetTempFileName();
+        File.WriteAllLines(tempFile, [
+            @"2a02:3100:1c00:: - - [10/Apr/2026:10:24:10 +0200] ""GET /music/Track8.mp3 HTTP/1.1"" 200 7668917 ""https://www.people-and-earth.org/playlist"" ""Mozilla/5.0""",
+            @"176.74.7.227 - - [11/Apr/2026:06:59:52 +0200] ""GET /music/Track2.mp3 HTTP/1.1"" 200 3699982 ""https://people-and-earth.org/archive"" ""curl/8.0""",
+            @"203.0.113.5 - - [12/Apr/2026:08:00:00 +0200] ""GET /images/logo.png HTTP/1.1"" 200 1234 ""-"" ""TestAgent/1.0""",
+        ]);
+
+        try
+        {
+            var (exitCode, stdOut, _) = RunMainCapturingOutput("--file", tempFile, "--search", "people-and-earth.org");
+
+            Assert.Equal(0, exitCode);
+            Assert.Contains("Matching Entries", stdOut);
+            Assert.Contains("/music/Track8.mp3", stdOut);
+            Assert.Contains("/music/Track2.mp3", stdOut);
+            Assert.DoesNotContain("/images/logo.png", stdOut);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
     }
 
     // ── --from / --to ──
@@ -202,6 +250,13 @@ public class ProgramEnhancedTests
     }
 
     [Fact]
+    public void Main_SearchMissingValue_ReturnsError()
+    {
+        var exitCode = Program.Main(["--file", "dummy.log", "--search"]);
+        Assert.Equal(1, exitCode);
+    }
+
+    [Fact]
     public void Main_FromMissingValue_ReturnsError()
     {
         var exitCode = Program.Main(["--file", "dummy.log", "--from"]);
@@ -227,6 +282,15 @@ public class ProgramEnhancedTests
     {
         var exitCode = Program.Main(["--file", "dummy.log", "--export-json"]);
         Assert.Equal(1, exitCode);
+    }
+
+    [Fact]
+    public void Main_Help_IncludesSearchOption()
+    {
+        var (exitCode, stdOut, _) = RunMainCapturingOutput("--help");
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("--search <TEXT>", stdOut);
     }
 
     // ── Combined filters + export ──

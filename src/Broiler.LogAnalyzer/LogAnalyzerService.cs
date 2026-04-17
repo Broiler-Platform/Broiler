@@ -167,13 +167,15 @@ public sealed class LogAnalyzerService
     /// <param name="endpointPattern">Substring that the endpoint must contain (case-insensitive).</param>
     /// <param name="from">Inclusive minimum timestamp.</param>
     /// <param name="to">Inclusive maximum timestamp.</param>
+    /// <param name="searchTerm">Full-text term that may appear anywhere in the log entry (case-insensitive).</param>
     public LogAnalyzerService Filter(
         int? minStatus = null,
         int? maxStatus = null,
         string? ip = null,
         string? endpointPattern = null,
         DateTimeOffset? from = null,
-        DateTimeOffset? to = null)
+        DateTimeOffset? to = null,
+        string? searchTerm = null)
     {
         IEnumerable<LogEntry> filtered = _entries;
 
@@ -189,8 +191,52 @@ public sealed class LogAnalyzerService
             filtered = filtered.Where(e => e.Timestamp >= from.Value);
         if (to is not null)
             filtered = filtered.Where(e => e.Timestamp <= to.Value);
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+            filtered = filtered.Where(e => MatchesSearchTerm(e, searchTerm));
 
         return new LogAnalyzerService(filtered.ToList());
+    }
+
+    /// <summary>
+    /// Returns <c>true</c> when the supplied full-text search term appears anywhere
+    /// in the normalized log-entry content. Matching is case-insensitive.
+    /// </summary>
+    public static bool MatchesSearchTerm(LogEntry entry, string? searchTerm)
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm))
+            return true;
+
+        return BuildSearchableText(entry).Contains(searchTerm.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildSearchableText(LogEntry entry)
+    {
+        var sb = new StringBuilder();
+        sb.Append(entry.RemoteHost).Append(' ')
+            .Append(entry.Ident).Append(' ')
+            .Append(entry.User).Append(' ')
+            .Append('[').Append(FormatApacheTimestamp(entry.Timestamp)).Append("] ")
+            .Append('"').Append(entry.Method).Append(' ').Append(entry.Endpoint).Append(' ').Append(entry.Protocol).Append("\" ")
+            .Append(entry.StatusCode).Append(' ')
+            .Append(entry.ResponseSize).Append(' ');
+
+        if (!string.IsNullOrWhiteSpace(entry.Referer))
+            sb.Append(entry.Referer).Append(' ');
+        if (!string.IsNullOrWhiteSpace(entry.UserAgent))
+            sb.Append(entry.UserAgent).Append(' ');
+
+        sb.Append(entry.Timestamp.ToString("O", CultureInfo.InvariantCulture));
+        return sb.ToString();
+    }
+
+    private static string FormatApacheTimestamp(DateTimeOffset timestamp)
+    {
+        var offset = timestamp.Offset;
+        var sign = offset < TimeSpan.Zero ? "-" : "+";
+        offset = offset.Duration();
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"{timestamp.ToString("dd/MMM/yyyy:HH:mm:ss", CultureInfo.InvariantCulture)} {sign}{offset.Hours:00}{offset.Minutes:00}");
     }
 
     // ── Error Aggregation ──────────────────────────────────────────────

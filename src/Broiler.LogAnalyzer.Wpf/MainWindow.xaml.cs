@@ -223,6 +223,7 @@ public partial class MainWindow : Window
             FilterMethodCombo.SelectedIndex = 0;
         FilterIpTextBox.Text = string.Empty;
         FilterEndpointTextBox.Text = string.Empty;
+        FilterSearchTextBox.Text = string.Empty;
         ApplyFilters();
     }
 
@@ -231,21 +232,47 @@ public partial class MainWindow : Window
         if (_allEntries is null)
             return;
 
-        IEnumerable<LogEntry> filtered = _allEntries;
+        int? minStatus = null;
+        int? maxStatus = null;
 
         // Status code filter
         if (FilterStatusCombo.SelectedItem is ComboBoxItem statusItem)
         {
             var statusText = statusItem.Content?.ToString();
             if (statusText == "2xx")
-                filtered = filtered.Where(e => e.StatusCode >= 200 && e.StatusCode < 300);
+            {
+                minStatus = 200;
+                maxStatus = 299;
+            }
             else if (statusText == "3xx")
-                filtered = filtered.Where(e => e.StatusCode >= 300 && e.StatusCode < 400);
+            {
+                minStatus = 300;
+                maxStatus = 399;
+            }
             else if (statusText == "4xx")
-                filtered = filtered.Where(e => e.StatusCode >= 400 && e.StatusCode < 500);
+            {
+                minStatus = 400;
+                maxStatus = 499;
+            }
             else if (statusText == "5xx")
-                filtered = filtered.Where(e => e.StatusCode >= 500 && e.StatusCode < 600);
+            {
+                minStatus = 500;
+                maxStatus = 599;
+            }
         }
+
+        var ipFilter = FilterIpTextBox.Text?.Trim();
+        var endpointFilter = FilterEndpointTextBox.Text?.Trim();
+        var searchFilter = FilterSearchTextBox.Text?.Trim();
+
+        IEnumerable<LogEntry> filtered = new LogAnalyzerService(_allEntries)
+            .Filter(
+                minStatus: minStatus,
+                maxStatus: maxStatus,
+                ip: ipFilter,
+                endpointPattern: endpointFilter,
+                searchTerm: searchFilter)
+            .Entries;
 
         // Method filter
         if (FilterMethodCombo.SelectedItem is ComboBoxItem methodItem)
@@ -254,16 +281,6 @@ public partial class MainWindow : Window
             if (methodText is not null && methodText != "All")
                 filtered = filtered.Where(e => e.Method.Equals(methodText, StringComparison.OrdinalIgnoreCase));
         }
-
-        // IP filter
-        var ipFilter = FilterIpTextBox.Text?.Trim();
-        if (!string.IsNullOrEmpty(ipFilter))
-            filtered = filtered.Where(e => e.RemoteHost.Contains(ipFilter, StringComparison.OrdinalIgnoreCase));
-
-        // Endpoint filter
-        var endpointFilter = FilterEndpointTextBox.Text?.Trim();
-        if (!string.IsNullOrEmpty(endpointFilter))
-            filtered = filtered.Where(e => e.Endpoint.Contains(endpointFilter, StringComparison.OrdinalIgnoreCase));
 
         var list = filtered.ToList();
         LogEntriesGrid.ItemsSource = list;
