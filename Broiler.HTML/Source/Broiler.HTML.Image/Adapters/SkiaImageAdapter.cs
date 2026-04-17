@@ -372,15 +372,15 @@ internal sealed class SkiaImageAdapter : RAdapter
         var (svgWidth, svgHeight, vbRatio) = ParseSvgIntrinsicDimensions(svgContent);
         bool preserveAspectRatioNone = HasPreserveAspectRatioNone(svgContent);
 
-        bool hasIntrinsicWidth = svgWidth > 0;
-        bool hasIntrinsicHeight = svgHeight > 0;
+        bool parsedIntrinsicWidth = svgWidth > 0;
+        bool parsedIntrinsicHeight = svgHeight > 0;
         int width, height;
         // Chrome's SVG sizing for <img> elements: only when BOTH explicit
         // width and height attributes are present does the SVG have true
         // intrinsic dimensions and an intrinsic aspect ratio.  When either
         // dimension is missing Chrome falls back to the 300×150 default
         // object size, regardless of viewBox or partial attributes.
-        bool hasBothDimensions = hasIntrinsicWidth && hasIntrinsicHeight;
+        bool hasBothDimensions = parsedIntrinsicWidth && parsedIntrinsicHeight;
         if (hasBothDimensions)
         {
             width = (int)Math.Ceiling(svgWidth);
@@ -392,35 +392,40 @@ internal sealed class SkiaImageAdapter : RAdapter
             height = 150;
         }
 
-        // SVGs that use percentage-based dimensions internally (e.g.
-        // width="100%" on child elements) need explicit viewport dimensions
-        // on the root <svg> element for percentage resolution.  Inject the
-        // computed width/height before parsing when the root element is
-        // missing one or both attributes.
-        var svgForRender = EnsureSvgViewport(svgContent, svgWidth, svgHeight, width, height);
+        bool suppressPartialIntrinsicDimensions =
+            preserveAspectRatioNone && vbRatio > 0 && !hasBothDimensions;
 
-        using var svg = new Svg.Skia.SKSvg();
-        svg.FromSvg(svgForRender);
-
-        if (svg.Picture == null)
-            return null;
-
-        var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bitmap);
-        canvas.Clear(SKColors.Transparent);
-
-        // Scale the SVG picture to fit the target bitmap dimensions.
-        var cullRect = svg.Picture.CullRect;
-        if (cullRect.Width > 0 && cullRect.Height > 0
-            && ((int)Math.Ceiling(cullRect.Width) != width
-                || (int)Math.Ceiling(cullRect.Height) != height))
+        SKBitmap? bitmap;
+        if (suppressPartialIntrinsicDimensions)
         {
-            float scaleX = width / cullRect.Width;
-            float scaleY = height / cullRect.Height;
-            canvas.Scale(scaleX, scaleY);
+            const int fallbackRenderScale = 4;
+            int renderWidth = width * fallbackRenderScale;
+            int renderHeight = height * fallbackRenderScale;
+            bitmap = RenderSvgToBitmap(svgContent, renderWidth, renderHeight);
+            if (bitmap != null && !IsBitmapFullyTransparent(bitmap))
+            {
+                bitmap = NormalizeSvgContentBounds(bitmap, renderWidth, renderHeight);
+            }
+            else
+            {
+                bitmap?.Dispose();
+                var svgForRender = EnsureSvgViewport(svgContent, svgWidth, svgHeight, width, height);
+                bitmap = RenderSvgToBitmap(svgForRender, renderWidth, renderHeight);
+            }
+        }
+        else
+        {
+            // SVGs that use percentage-based dimensions internally (e.g.
+            // width="100%" on child elements) need explicit viewport dimensions
+            // on the root <svg> element for percentage resolution.  Inject the
+            // computed width/height before parsing when the root element is
+            // missing one or both attributes.
+            var svgForRender = EnsureSvgViewport(svgContent, svgWidth, svgHeight, width, height);
+            bitmap = RenderSvgToBitmap(svgForRender, width, height);
         }
 
-        canvas.DrawPicture(svg.Picture);
+        if (bitmap == null)
+            return null;
 
         if (TryParseSolidViewportFill(svgContent, out var solidFill))
             bitmap.Erase(solidFill);
@@ -436,11 +441,124 @@ internal sealed class SkiaImageAdapter : RAdapter
             : (preserveAspectRatioNone ? 0 : vbRatio);
         return new ImageAdapter(bitmap,
             hasIntrinsicRatio: hasIntrinsicRatio,
-            hasIntrinsicWidth: hasIntrinsicWidth,
-            hasIntrinsicHeight: hasIntrinsicHeight,
+            hasIntrinsicWidth: parsedIntrinsicWidth && !suppressPartialIntrinsicDimensions,
+            hasIntrinsicHeight: parsedIntrinsicHeight && !suppressPartialIntrinsicDimensions,
             intrinsicAspectRatio: intrinsicRatio > 0 ? intrinsicRatio : null,
-            intrinsicWidth: hasIntrinsicWidth ? svgWidth : 0,
-            intrinsicHeight: hasIntrinsicHeight ? svgHeight : 0);
+            intrinsicWidth: parsedIntrinsicWidth && !suppressPartialIntrinsicDimensions ? svgWidth : 0,
+            intrinsicHeight: parsedIntrinsicHeight && !suppressPartialIntrinsicDimensions ? svgHeight : 0);
+    }
+
+    private static SKBitmap? RenderSvgToBitmap(string svgContent, int width, int height)
+    {
+        using var svg = new Svg.Skia.SKSvg();
+        svg.FromSvg(svgContent);
+
+        if (svg.Picture == null)
+            return null;
+
+        var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.Transparent);
+
+        var cullRect = svg.Picture.CullRect;
+        if (cullRect.Width > 0 && cullRect.Height > 0
+            && ((int)Math.Ceiling(cullRect.Width) != width
+                || (int)Math.Ceiling(cullRect.Height) != height))
+        {
+            float scaleX = width / cullRect.Width;
+            float scaleY = height / cullRect.Height;
+            canvas.Scale(scaleX, scaleY);
+        }
+
+        canvas.DrawPicture(svg.Picture);
+        return bitmap;
+    }
+
+    private static SKBitmap NormalizeSvgContentBounds(SKBitmap bitmap, int width, int height)
+    {
+        int minX = bitmap.Width;
+        int minY = bitmap.Height;
+        int maxX = -1;
+        int maxY = -1;
+        for (int y = 0; y < bitmap.Height; y++)
+        {
+            for (int x = 0; x < bitmap.Width; x++)
+            {
+                if (bitmap.GetPixel(x, y).Alpha == 0)
+                    continue;
+
+                minX = Math.Min(minX, x);
+                minY = Math.Min(minY, y);
+                maxX = Math.Max(maxX, x);
+                maxY = Math.Max(maxY, y);
+            }
+        }
+
+        if (maxX < minX || maxY < minY
+            || (minX == 0 && minY == 0 && maxX == bitmap.Width - 1 && maxY == bitmap.Height - 1))
+            return bitmap;
+
+        int croppedWidth = maxX - minX + 1;
+        int croppedHeight = maxY - minY + 1;
+        var nonEmptyCols = new List<int>(croppedWidth);
+        for (int x = minX; x <= maxX; x++)
+        {
+            bool hasOpaquePixel = false;
+            for (int y = minY; y <= maxY; y++)
+            {
+                if (bitmap.GetPixel(x, y).Alpha != 0)
+                {
+                    hasOpaquePixel = true;
+                    break;
+                }
+            }
+
+            if (hasOpaquePixel)
+                nonEmptyCols.Add(x);
+        }
+
+        var nonEmptyRows = new List<int>(croppedHeight);
+        for (int y = minY; y <= maxY; y++)
+        {
+            bool hasOpaquePixel = false;
+            for (int x = minX; x <= maxX; x++)
+            {
+                if (bitmap.GetPixel(x, y).Alpha != 0)
+                {
+                    hasOpaquePixel = true;
+                    break;
+                }
+            }
+
+            if (hasOpaquePixel)
+                nonEmptyRows.Add(y);
+        }
+
+        if (nonEmptyCols.Count == 0 || nonEmptyRows.Count == 0)
+            return bitmap;
+
+        var condensed = new SKBitmap(nonEmptyCols.Count, nonEmptyRows.Count, SKColorType.Rgba8888, SKAlphaType.Premul);
+        for (int destY = 0; destY < nonEmptyRows.Count; destY++)
+        {
+            int srcY = nonEmptyRows[destY];
+            for (int destX = 0; destX < nonEmptyCols.Count; destX++)
+            {
+                condensed.SetPixel(destX, destY, bitmap.GetPixel(nonEmptyCols[destX], srcY));
+            }
+        }
+
+        var normalized = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(normalized);
+        canvas.Clear(SKColors.Transparent);
+        using var paint = new SKPaint
+        {
+            FilterQuality = SKFilterQuality.None,
+            IsAntialias = false,
+        };
+        canvas.DrawBitmap(condensed, new SKRect(0, 0, width, height), paint);
+        condensed.Dispose();
+        bitmap.Dispose();
+        return normalized;
     }
 
     /// <summary>
