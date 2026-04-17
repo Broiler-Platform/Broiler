@@ -2,7 +2,9 @@ using System.Text.RegularExpressions;
 using Broiler.HtmlBridge;
 using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.Image;
+using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Runtime;
 using SkiaSharp;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -835,6 +837,7 @@ internal sealed class WptTestRunner
     {
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
+        var microTasks = new MicroTaskQueue();
 
         // Determine the base directory for resolving relative script paths.
         string? testDir = null;
@@ -940,16 +943,61 @@ internal sealed class WptTestRunner
 
         using var context = new JSContext();
         var bridge = new DomBridge();
+        context["queueMicrotask"] = new JSFunction((in Arguments a) =>
+        {
+            if (a.Length > 0 && a[0] is JSFunction fn)
+            {
+                microTasks.Enqueue(() =>
+                {
+                    try { fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
+                    catch (Exception ex)
+                    {
+                        RenderLogger.LogError(LogCategory.JavaScript, "WptTestRunner.queueMicrotask",
+                            $"Callback error: {ex.Message}", ex);
+                    }
+                });
+            }
+
+            return JSUndefined.Value;
+        }, "queueMicrotask", 1);
         bridge.Attach(context, html, url);
+        try { context.Eval("window.queueMicrotask = queueMicrotask;"); } catch { /* best-effort */ }
 
         // Register DOM elements with IDs as globals (HTML5 named access).
         bridge.RegisterNamedElementGlobals(context);
+
+        void DrainAsyncWork()
+        {
+            // Match the broader DomBridge timer drain cap so promise/timer chains
+            // used by WPT can settle without risking an infinite loop.
+            const int maxIterations = 1000;
+            for (var iteration = 0; iteration < maxIterations; iteration++)
+            {
+                bool hadWork = false;
+
+                if (microTasks.Count > 0)
+                {
+                    microTasks.Drain();
+                    hadWork = true;
+                }
+
+                if (bridge.HasPendingTimers)
+                {
+                    bridge.FlushTimerStep();
+                    hadWork = true;
+                }
+
+                if (!hadWork)
+                    break;
+            }
+        }
 
         foreach (var script in scripts)
         {
             try
             {
                 context.Eval(script);
+                DrainAsyncWork();
             }
             catch (Exception ex)
             {
@@ -963,6 +1011,7 @@ internal sealed class WptTestRunner
             try
             {
                 context.Eval(script);
+                DrainAsyncWork();
             }
             catch (Exception ex)
             {
@@ -972,7 +1021,7 @@ internal sealed class WptTestRunner
         }
 
         bridge.FireWindowLoadEvent();
-        bridge.FlushTimers();
+        DrainAsyncWork();
 
         // Resolve CSS animation snapshots: for elements with animation + negative
         // delay, compute the animated property values at t=0 and write them as
