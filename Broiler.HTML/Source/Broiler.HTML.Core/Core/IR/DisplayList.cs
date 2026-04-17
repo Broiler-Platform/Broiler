@@ -97,6 +97,18 @@ public sealed class DrawTextItem : DisplayItem
 
     /// <summary>Text shadow color. Empty means no shadow.</summary>
     public Color TextShadowColor { get; init; }
+
+    /// <summary>Optional gradient color stops used for background-clip:text.</summary>
+    public IReadOnlyList<GradientStop>? GradientStops { get; init; }
+
+    /// <summary>Gradient angle in degrees (0 = to top, 90 = to right, 180 = to bottom).</summary>
+    public float GradientAngle { get; init; } = 180f;
+
+    /// <summary>Color-interpolation space for the gradient ("srgb", "hsl", "oklch").</summary>
+    public string GradientInterpolationSpace { get; init; } = "srgb";
+
+    /// <summary>Background painting bounds used to align background-clip:text gradients.</summary>
+    public RectangleF GradientBounds { get; init; }
 }
 
 /// <summary>Draws an image into a destination rectangle.</summary>
@@ -184,6 +196,8 @@ public sealed class DrawTiledGradientItem : DisplayItem
     public IReadOnlyList<GradientStop>? Stops { get; init; }
     /// <summary>Gradient angle in degrees (0 = to top, 90 = to right, 180 = to bottom).</summary>
     public float Angle { get; init; } = 180f;
+    /// <summary>Color-interpolation space for the gradient ("srgb", "hsl", "oklch").</summary>
+    public string InterpolationSpace { get; init; } = "srgb";
 }
 
 /// <summary>A single color stop in a CSS gradient.</summary>

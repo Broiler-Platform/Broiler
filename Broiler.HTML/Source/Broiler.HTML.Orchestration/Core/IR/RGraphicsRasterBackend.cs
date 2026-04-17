@@ -1,6 +1,7 @@
 using Broiler.HTML.Adapters.Adapters;
 using Broiler.HTML.Core.Core.IR;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 
@@ -266,7 +267,16 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                 g.DrawString(item.Text, font, item.TextShadowColor, shadowOrigin, size, item.IsRtl);
             }
 
-            g.DrawString(item.Text, font, item.Color, origin, size, item.IsRtl);
+            if (item.GradientStops != null && item.GradientStops.Count > 0)
+            {
+                var (colors, positions) = ExpandGradientStops(item.GradientStops, item.GradientInterpolationSpace);
+                var gradientBounds = item.GradientBounds == RectangleF.Empty ? item.Bounds : item.GradientBounds;
+                g.DrawGradientString(item.Text, font, gradientBounds, origin, size, item.IsRtl, colors, positions, item.GradientAngle);
+            }
+            else
+            {
+                g.DrawString(item.Text, font, item.Color, origin, size, item.IsRtl);
+            }
         }
     }
 
@@ -409,23 +419,12 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
         var fill = item.FillRect;
         var origin = item.TileOrigin;
 
-        // Build color/position arrays from the pre-parsed stops.
-        Color[] colors;
-        float[] positions;
-        if (item.Stops != null && item.Stops.Count > 0)
-        {
-            colors = new Color[item.Stops.Count];
-            positions = new float[item.Stops.Count];
-            for (int i = 0; i < item.Stops.Count; i++)
-            {
-                colors[i] = item.Stops[i].Color;
-                positions[i] = item.Stops[i].Position;
-            }
-        }
-        else
+        if (item.Stops == null || item.Stops.Count == 0)
         {
             return; // No stops to render.
         }
+
+        var (colors, positions) = ExpandGradientStops(item.Stops, item.InterpolationSpace);
 
         using var tileImage = g.CreateLinearGradientTile(tileW, tileH, colors, positions, item.Angle);
         if (tileImage == null)
@@ -473,6 +472,196 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
 
         g.PopClip();
     }
+
+    private static (Color[] colors, float[] positions) ExpandGradientStops(IReadOnlyList<GradientStop> stops, string interpolationSpace)
+    {
+        if (stops.Count == 0)
+            return ([], []);
+
+        if (!interpolationSpace.Equals("hsl", StringComparison.OrdinalIgnoreCase)
+            && !interpolationSpace.Equals("oklch", StringComparison.OrdinalIgnoreCase))
+        {
+            var directColors = new Color[stops.Count];
+            var directPositions = new float[stops.Count];
+            for (int i = 0; i < stops.Count; i++)
+            {
+                directColors[i] = stops[i].Color;
+                directPositions[i] = stops[i].Position;
+            }
+
+            return (directColors, directPositions);
+        }
+
+        const int samplesPerSegment = 24;
+        var expandedColors = new List<Color>();
+        var expandedPositions = new List<float>();
+
+        for (int i = 0; i < stops.Count - 1; i++)
+        {
+            var start = stops[i];
+            var end = stops[i + 1];
+
+            for (int step = 0; step < samplesPerSegment; step++)
+            {
+                float t = step / (float)samplesPerSegment;
+                expandedColors.Add(InterpolateColor(start.Color, end.Color, t, interpolationSpace));
+                expandedPositions.Add(Lerp(start.Position, end.Position, t));
+            }
+        }
+
+        expandedColors.Add(stops[^1].Color);
+        expandedPositions.Add(stops[^1].Position);
+        return (expandedColors.ToArray(), expandedPositions.ToArray());
+    }
+
+    private static Color InterpolateColor(Color start, Color end, float t, string interpolationSpace)
+    {
+        if (interpolationSpace.Equals("hsl", StringComparison.OrdinalIgnoreCase))
+        {
+            var startHsl = RgbToHsl(start);
+            var endHsl = RgbToHsl(end);
+            double h = InterpolateHue(startHsl.h, endHsl.h, t);
+            double s = Lerp(startHsl.s, endHsl.s, t);
+            double l = Lerp(startHsl.l, endHsl.l, t);
+            return HslToRgb(h, s, l, Lerp(start.A, end.A, t));
+        }
+
+        if (interpolationSpace.Equals("oklch", StringComparison.OrdinalIgnoreCase))
+        {
+            var startLch = RgbToOklch(start);
+            var endLch = RgbToOklch(end);
+            double l = Lerp(startLch.l, endLch.l, t);
+            double c = Lerp(startLch.c, endLch.c, t);
+            double h = InterpolateHue(startLch.h, endLch.h, t);
+            return OklchToRgb(l, c, h, Lerp(start.A, end.A, t));
+        }
+
+        return Color.FromArgb(
+            ClampByte(Lerp(start.A, end.A, t)),
+            ClampByte(Lerp(start.R, end.R, t)),
+            ClampByte(Lerp(start.G, end.G, t)),
+            ClampByte(Lerp(start.B, end.B, t)));
+    }
+
+    private static (double h, double s, double l) RgbToHsl(Color color)
+    {
+        double r = color.R / 255d;
+        double g = color.G / 255d;
+        double b = color.B / 255d;
+        double max = Math.Max(r, Math.Max(g, b));
+        double min = Math.Min(r, Math.Min(g, b));
+        double h = 0;
+        double l = (max + min) / 2d;
+        double d = max - min;
+        double s = 0;
+
+        if (d > 0)
+        {
+            s = d / (1d - Math.Abs(2d * l - 1d));
+            h = max == r
+                ? 60d * (((g - b) / d) % 6d)
+                : max == g
+                    ? 60d * (((b - r) / d) + 2d)
+                    : 60d * (((r - g) / d) + 4d);
+        }
+
+        if (h < 0)
+            h += 360d;
+
+        return (h, s, l);
+    }
+
+    private static Color HslToRgb(double h, double s, double l, double alpha)
+    {
+        double c = (1d - Math.Abs(2d * l - 1d)) * s;
+        double x = c * (1d - Math.Abs((h / 60d) % 2d - 1d));
+        double m = l - c / 2d;
+
+        double r1, g1, b1;
+        if (h < 60d) (r1, g1, b1) = (c, x, 0);
+        else if (h < 120d) (r1, g1, b1) = (x, c, 0);
+        else if (h < 180d) (r1, g1, b1) = (0, c, x);
+        else if (h < 240d) (r1, g1, b1) = (0, x, c);
+        else if (h < 300d) (r1, g1, b1) = (x, 0, c);
+        else (r1, g1, b1) = (c, 0, x);
+
+        return Color.FromArgb(
+            ClampByte(alpha),
+            ClampByte((r1 + m) * 255d),
+            ClampByte((g1 + m) * 255d),
+            ClampByte((b1 + m) * 255d));
+    }
+
+    private static (double l, double c, double h) RgbToOklch(Color color)
+    {
+        double r = SrgbToLinear(color.R / 255d);
+        double g = SrgbToLinear(color.G / 255d);
+        double b = SrgbToLinear(color.B / 255d);
+
+        double l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+        double m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+        double s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+
+        double lRoot = Math.Cbrt(l);
+        double mRoot = Math.Cbrt(m);
+        double sRoot = Math.Cbrt(s);
+
+        double okL = 0.2104542553 * lRoot + 0.7936177850 * mRoot - 0.0040720468 * sRoot;
+        double okA = 1.9779984951 * lRoot - 2.4285922050 * mRoot + 0.4505937099 * sRoot;
+        double okB = 0.0259040371 * lRoot + 0.7827717662 * mRoot - 0.8086757660 * sRoot;
+
+        double c = Math.Sqrt(okA * okA + okB * okB);
+        double h = Math.Atan2(okB, okA) * 180d / Math.PI;
+        if (h < 0)
+            h += 360d;
+
+        return (okL, c, h);
+    }
+
+    private static Color OklchToRgb(double l, double c, double h, double alpha)
+    {
+        double radians = h * Math.PI / 180d;
+        double okA = c * Math.Cos(radians);
+        double okB = c * Math.Sin(radians);
+
+        double lRoot = l + 0.3963377774 * okA + 0.2158037573 * okB;
+        double mRoot = l - 0.1055613458 * okA - 0.0638541728 * okB;
+        double sRoot = l - 0.0894841775 * okA - 1.2914855480 * okB;
+
+        double lLinear = lRoot * lRoot * lRoot;
+        double mLinear = mRoot * mRoot * mRoot;
+        double sLinear = sRoot * sRoot * sRoot;
+
+        double r = LinearToSrgb(+4.0767416621 * lLinear - 3.3077115913 * mLinear + 0.2309699292 * sLinear);
+        double g = LinearToSrgb(-1.2684380046 * lLinear + 2.6097574011 * mLinear - 0.3413193965 * sLinear);
+        double b = LinearToSrgb(-0.0041960863 * lLinear - 0.7034186147 * mLinear + 1.7076147010 * sLinear);
+
+        return Color.FromArgb(
+            ClampByte(alpha),
+            ClampByte(r * 255d),
+            ClampByte(g * 255d),
+            ClampByte(b * 255d));
+    }
+
+    private static double SrgbToLinear(double channel)
+        => channel <= 0.04045d ? channel / 12.92d : Math.Pow((channel + 0.055d) / 1.055d, 2.4d);
+
+    private static double LinearToSrgb(double channel)
+    {
+        channel = Math.Clamp(channel, 0d, 1d);
+        return channel <= 0.0031308d ? channel * 12.92d : 1.055d * Math.Pow(channel, 1d / 2.4d) - 0.055d;
+    }
+
+    private static double InterpolateHue(double start, double end, double t)
+    {
+        double delta = ((end - start + 540d) % 360d) - 180d;
+        double hue = (start + delta * t) % 360d;
+        return hue < 0 ? hue + 360d : hue;
+    }
+
+    private static float Lerp(float start, float end, float t) => start + (end - start) * t;
+    private static double Lerp(double start, double end, double t) => start + (end - start) * t;
+    private static int ClampByte(double value) => (int)Math.Clamp(Math.Round(value), 0d, 255d);
 
     private static void RenderDrawLine(RGraphics g, DrawLineItem item)
     {

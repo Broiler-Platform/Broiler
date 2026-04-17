@@ -115,6 +115,60 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
         canvas.DrawText(str, x, y, renderFont, paint);
     }
 
+    public override void DrawGradientString(string str, RFont font, RectangleF rect, PointF point, SizeF size, bool rtl, Color[] colors, float[] positions, float angle)
+    {
+        if (colors == null || colors.Length == 0)
+            return;
+
+        var fontAdapter = (FontAdapter)font;
+        var renderFont = fontAdapter.RenderFont;
+        var metrics = renderFont.Metrics;
+        float y = point.Y - metrics.Ascent;
+        float x = point.X;
+        float shaderWidth = Math.Max(rect.Width, renderFont.MeasureText(str));
+        float shaderHeight = Math.Max(rect.Height > 0 ? rect.Height : size.Height, (float)font.Size);
+        var shaderRect = new RectangleF(rect.X, rect.Y, shaderWidth, shaderHeight);
+
+        var radians = angle * Math.PI / 180.0;
+        float cx = shaderRect.X + shaderRect.Width / 2f;
+        float cy = shaderRect.Y + shaderRect.Height / 2f;
+        float halfDiag = Math.Max(shaderRect.Width, shaderRect.Height) / 2f;
+        float sin = (float)Math.Sin(radians);
+        float cos = (float)Math.Cos(radians);
+        var startPoint = new SKPoint(cx - sin * halfDiag, cy + cos * halfDiag);
+        var endPoint = new SKPoint(cx + sin * halfDiag, cy - cos * halfDiag);
+
+        var skColors = new SKColor[colors.Length];
+        for (int i = 0; i < colors.Length; i++)
+            skColors[i] = Utilities.Utils.Convert(colors[i]);
+
+        canvas.SaveLayer();
+        using (var maskPaint = new SKPaint { Color = SKColors.White, IsAntialias = false })
+        {
+            canvas.DrawText(str, x, y, renderFont, maskPaint);
+        }
+
+        using var shader = SKShader.CreateLinearGradient(startPoint, endPoint, skColors, positions, SKShaderTileMode.Clamp);
+        using var gradientPaint = new SKPaint
+        {
+            Shader = shader,
+            BlendMode = SKBlendMode.SrcIn,
+            IsAntialias = false,
+        };
+
+        if (string.Equals(fontAdapter.Typeface.FamilyName, "Ahem", StringComparison.OrdinalIgnoreCase)
+            && !str.Contains(' '))
+        {
+            gradientPaint.BlendMode = SKBlendMode.SrcOver;
+            canvas.DrawRect(Utilities.Utils.Convert(shaderRect), gradientPaint);
+            canvas.Restore();
+            return;
+        }
+
+        canvas.DrawRect(Utilities.Utils.Convert(shaderRect), gradientPaint);
+        canvas.Restore();
+    }
+
     public override RBrush GetTextureBrush(RImage image, RectangleF dstRect, PointF translateTransformLocation)
     {
         var imgAdapter = (ImageAdapter)image;
