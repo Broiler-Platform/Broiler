@@ -2825,6 +2825,24 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_BackgroundColorAnimationWillChangeContents_MatchesReference()
+    {
+        var result = RunCssBackgroundsMatchTest("animations/background-color-animation-will-change-contents.html");
+        Assert.True(result.Passed,
+            $"background-color-animation-will-change-contents should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundColorScrollIntoViewport_MatchesReference()
+    {
+        var result = RunCssBackgroundsMatchTest("animations/background-color-scroll-into-viewport.html");
+        Assert.True(result.Passed,
+            $"background-color-scroll-into-viewport should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_BackgroundAttachmentMarginRoot001_MatchesReference()
     {
         // CSS Backgrounds §2.11.2: scroll attachment positioned relative to
