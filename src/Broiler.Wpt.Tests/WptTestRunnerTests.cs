@@ -2921,6 +2921,13 @@ document.getElementById('out').appendChild(p);
     [InlineData("background-size/vector/wide--auto--nonpercent-width-percent-height.html")]
     [InlineData("background-size/vector/wide--auto--nonpercent-width-omitted-height-viewbox.html")]
     [InlineData("background-size/vector/wide--auto--nonpercent-width-percent-height-viewbox.html")]
+    [InlineData("background-size/vector/zero-height-ratio-contain.html")]
+    [InlineData("background-size/vector/zero-height-ratio-cover.html")]
+    [InlineData("background-size/vector/zero-ratio-no-dimensions-auto-auto.html")]
+    [InlineData("background-size/vector/zero-ratio-no-dimensions-contain.html")]
+    [InlineData("background-size/vector/zero-ratio-no-dimensions-cover.html")]
+    [InlineData("background-size/vector/zero-width-ratio-contain.html")]
+    [InlineData("background-size/vector/zero-width-ratio-cover.html")]
     public void Wpt_BackgroundSizeVector_AdditionalVectorCases_MatchReference(string subPath)
     {
         var result = RunCssBackgroundsVisualTest(subPath);
