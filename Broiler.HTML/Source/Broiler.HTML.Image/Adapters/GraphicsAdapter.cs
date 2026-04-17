@@ -27,11 +27,18 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
         canvas.ClipRect(Utilities.Utils.Convert(rect), SKClipOperation.Difference);
     }
 
-    public override void PushClipRounded(RectangleF rect, double cornerNw, double cornerNe, double cornerSe, double cornerSw)
+    public override void PushClipRounded(RectangleF rect,
+        double cornerNw, double cornerNwY,
+        double cornerNe, double cornerNeY,
+        double cornerSe, double cornerSeY,
+        double cornerSw, double cornerSwY)
     {
         _clipStack.Push(rect);
         canvas.Save();
-        if (cornerNw <= 0 && cornerNe <= 0 && cornerSe <= 0 && cornerSw <= 0)
+        if ((cornerNw <= 0 && cornerNwY <= 0)
+            && (cornerNe <= 0 && cornerNeY <= 0)
+            && (cornerSe <= 0 && cornerSeY <= 0)
+            && (cornerSw <= 0 && cornerSwY <= 0))
         {
             canvas.ClipRect(Utilities.Utils.Convert(rect));
         }
@@ -42,10 +49,10 @@ internal sealed class GraphicsAdapter(SKCanvas canvas, RectangleF initialClip, b
             //                     bottomRight.x, bottomRight.y, bottomLeft.x, bottomLeft.y]
             var radii = new[]
             {
-                new SKPoint((float)cornerNw, (float)cornerNw),
-                new SKPoint((float)cornerNe, (float)cornerNe),
-                new SKPoint((float)cornerSe, (float)cornerSe),
-                new SKPoint((float)cornerSw, (float)cornerSw),
+                new SKPoint((float)cornerNw, (float)cornerNwY),
+                new SKPoint((float)cornerNe, (float)cornerNeY),
+                new SKPoint((float)cornerSe, (float)cornerSeY),
+                new SKPoint((float)cornerSw, (float)cornerSwY),
             };
             var rrect = new SKRoundRect();
             rrect.SetRectRadii(skRect, radii);

@@ -59,7 +59,12 @@ internal sealed class RGraphicsRasterBackend : IRasterBackend
                     break;
                 case ClipItem clip:
                     if (clip.CornerNw > 0 || clip.CornerNe > 0 || clip.CornerSe > 0 || clip.CornerSw > 0)
-                        g.PushClipRounded(clip.ClipRect, clip.CornerNw, clip.CornerNe, clip.CornerSe, clip.CornerSw);
+                        g.PushClipRounded(
+                            clip.ClipRect,
+                            clip.CornerNw, clip.CornerNwY,
+                            clip.CornerNe, clip.CornerNeY,
+                            clip.CornerSe, clip.CornerSeY,
+                            clip.CornerSw, clip.CornerSwY);
                     else
                         g.PushClip(clip.ClipRect);
                     break;

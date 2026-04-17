@@ -556,9 +556,13 @@ internal static class PaintWalker
                     Bounds = bounds,
                     ClipRect = bounds,
                     CornerNw = style.ActualCornerNw,
+                    CornerNwY = GetEffectiveCornerRadiusY(style.CornerNwRadiusRaw, style.ActualCornerNw, bounds),
                     CornerNe = style.ActualCornerNe,
+                    CornerNeY = GetEffectiveCornerRadiusY(style.CornerNeRadiusRaw, style.ActualCornerNe, bounds),
                     CornerSe = style.ActualCornerSe,
+                    CornerSeY = GetEffectiveCornerRadiusY(style.CornerSeRadiusRaw, style.ActualCornerSe, bounds),
                     CornerSw = style.ActualCornerSw,
+                    CornerSwY = GetEffectiveCornerRadiusY(style.CornerSwRadiusRaw, style.ActualCornerSw, bounds),
                 });
                 bgClippedRounded = true;
             }
@@ -1406,9 +1410,13 @@ internal static class PaintWalker
                 Bounds = bounds,
                 ClipRect = bounds,
                 CornerNw = style.ActualCornerNw,
+                CornerNwY = GetEffectiveCornerRadiusY(style.CornerNwRadiusRaw, style.ActualCornerNw, bounds),
                 CornerNe = style.ActualCornerNe,
+                CornerNeY = GetEffectiveCornerRadiusY(style.CornerNeRadiusRaw, style.ActualCornerNe, bounds),
                 CornerSe = style.ActualCornerSe,
+                CornerSeY = GetEffectiveCornerRadiusY(style.CornerSeRadiusRaw, style.ActualCornerSe, bounds),
                 CornerSw = style.ActualCornerSw,
+                CornerSwY = GetEffectiveCornerRadiusY(style.CornerSwRadiusRaw, style.ActualCornerSw, bounds),
             });
         }
 
@@ -1709,6 +1717,16 @@ internal static class PaintWalker
         return backgroundClip;
     }
 
+    private static double GetEffectiveCornerRadiusY(string rawRadius, double cornerRadiusX, RectangleF bounds)
+    {
+        if (!string.IsNullOrEmpty(rawRadius)
+            && rawRadius.Contains('%', StringComparison.Ordinal)
+            && bounds.Width > 0)
+            return cornerRadiusX * bounds.Height / bounds.Width;
+
+        return cornerRadiusX;
+    }
+
     /// <summary>
     /// Offsets all display items starting at <paramref name="startIndex"/> by
     /// (<paramref name="dx"/>, <paramref name="dy"/>).  Used to reposition
@@ -1791,7 +1809,19 @@ internal static class PaintWalker
                 Stops = tg.Stops,
                 Angle = tg.Angle,
             },
-            ClipItem c => new ClipItem { Bounds = ob, ClipRect = OffsetRect(c.ClipRect, dx, dy) },
+            ClipItem c => new ClipItem
+            {
+                Bounds = ob,
+                ClipRect = OffsetRect(c.ClipRect, dx, dy),
+                CornerNw = c.CornerNw,
+                CornerNwY = c.CornerNwY,
+                CornerNe = c.CornerNe,
+                CornerNeY = c.CornerNeY,
+                CornerSe = c.CornerSe,
+                CornerSeY = c.CornerSeY,
+                CornerSw = c.CornerSw,
+                CornerSwY = c.CornerSwY,
+            },
             RestoreItem => new RestoreItem { Bounds = ob },
             OpacityItem o => new OpacityItem { Bounds = ob, Opacity = o.Opacity },
             RestoreOpacityItem => new RestoreOpacityItem { Bounds = ob },

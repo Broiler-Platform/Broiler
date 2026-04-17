@@ -210,32 +210,37 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get { return _cornerRadius; }
         set
         {
-            MatchCollection r = RegexParserUtils.Match(RegexParserUtils.CssLengthRegex(), value);
+            string raw = value ?? string.Empty;
+            int slashIndex = raw.IndexOf('/');
+            if (slashIndex >= 0)
+                raw = raw[..slashIndex];
 
-            switch (r.Count)
+            string[] r = raw.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+
+            switch (r.Length)
             {
                 case 1:
-                    CornerNeRadius = r[0].Value;
-                    CornerNwRadius = r[0].Value;
-                    CornerSeRadius = r[0].Value;
-                    CornerSwRadius = r[0].Value;
+                    CornerNeRadius = r[0];
+                    CornerNwRadius = r[0];
+                    CornerSeRadius = r[0];
+                    CornerSwRadius = r[0];
                     break;
                 case 2:
-                    CornerNeRadius = r[0].Value;
-                    CornerNwRadius = r[0].Value;
-                    CornerSeRadius = r[1].Value;
-                    CornerSwRadius = r[1].Value;
+                    CornerNeRadius = r[0];
+                    CornerNwRadius = r[0];
+                    CornerSeRadius = r[1];
+                    CornerSwRadius = r[1];
                     break;
                 case 3:
-                    CornerNeRadius = r[0].Value;
-                    CornerNwRadius = r[1].Value;
-                    CornerSeRadius = r[2].Value;
+                    CornerNeRadius = r[0];
+                    CornerNwRadius = r[1];
+                    CornerSeRadius = r[2];
                     break;
                 case 4:
-                    CornerNeRadius = r[0].Value;
-                    CornerNwRadius = r[1].Value;
-                    CornerSeRadius = r[2].Value;
-                    CornerSwRadius = r[3].Value;
+                    CornerNeRadius = r[0];
+                    CornerNwRadius = r[1];
+                    CornerSeRadius = r[2];
+                    CornerSwRadius = r[3];
                     break;
             }
 

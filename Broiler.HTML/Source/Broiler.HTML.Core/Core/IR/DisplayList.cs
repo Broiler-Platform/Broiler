@@ -131,9 +131,13 @@ public sealed class ClipItem : DisplayItem
     public RectangleF ClipRect { get; init; }
     /// <summary>Corner radii for rounded clips (0 = sharp corners).</summary>
     public double CornerNw { get; init; }
+    public double CornerNwY { get; init; }
     public double CornerNe { get; init; }
+    public double CornerNeY { get; init; }
     public double CornerSe { get; init; }
+    public double CornerSeY { get; init; }
     public double CornerSw { get; init; }
+    public double CornerSwY { get; init; }
 }
 
 /// <summary>Pops the most recent clip from the clip stack.</summary>
