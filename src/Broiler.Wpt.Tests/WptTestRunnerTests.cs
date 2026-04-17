@@ -2919,6 +2919,8 @@ document.getElementById('out').appendChild(p);
     [InlineData("background-size/vector/wide--auto--percent-width-nonpercent-height-viewbox.html")]
     [InlineData("background-size/vector/wide--auto--nonpercent-width-omitted-height.html")]
     [InlineData("background-size/vector/wide--auto--nonpercent-width-percent-height.html")]
+    [InlineData("background-size/vector/wide--auto--nonpercent-width-omitted-height-viewbox.html")]
+    [InlineData("background-size/vector/wide--auto--nonpercent-width-percent-height-viewbox.html")]
     public void Wpt_BackgroundSizeVector_AdditionalVectorCases_MatchReference(string subPath)
     {
         var result = RunCssBackgroundsVisualTest(subPath);
