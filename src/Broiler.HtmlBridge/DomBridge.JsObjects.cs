@@ -2335,6 +2335,15 @@ public sealed partial class DomBridge
                     return isRoot ? new JSArray(new JSValue[] { rect }) : new JSArray();
                 }, "getClientRects", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
+
+            obj.FastAddValue(
+                (KeyString)"scrollIntoView",
+                new JSFunction((in Arguments _) =>
+                {
+                    bridgeForOffset.ScrollElementIntoView(elForOffset);
+                    return JSUndefined.Value;
+                }, "scrollIntoView", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         // -- Phase 6: SVG DOM interfaces --
@@ -2585,6 +2594,89 @@ public sealed partial class DomBridge
         obj.FastAddValue((KeyString)"DOCUMENT_FRAGMENT_NODE", new JSNumber(11), JSPropertyAttributes.EnumerableConfigurableValue);
 
         return obj;
+    }
+
+    private void ScrollElementIntoView(DomElement element)
+    {
+        var scrollContainer = FindScrollContainer(element) ?? DocumentElement;
+        var scrollTop = ComputeOffsetWithinAncestor(element, scrollContainer);
+        if (scrollTop > 0)
+            scrollContainer.DomProperties["_scrollTop"] = scrollTop;
+    }
+
+    private DomElement? FindScrollContainer(DomElement element)
+    {
+        for (var current = element.Parent; current != null; current = current.Parent)
+        {
+            var props = GetComputedProps(current);
+            if (HasOverflowClipping(props))
+                return current;
+        }
+
+        return DocumentElement;
+    }
+
+    private double ComputeOffsetWithinAncestor(DomElement element, DomElement ancestor)
+    {
+        double offset = 0;
+        var current = element;
+
+        while (current.Parent != null && !ReferenceEquals(current.Parent, ancestor))
+        {
+            offset += ComputeOffsetWithinParent(current);
+            current = current.Parent;
+        }
+
+        if (current.Parent != null && ReferenceEquals(current.Parent, ancestor))
+            offset += ComputeOffsetWithinParent(current);
+
+        return offset;
+    }
+
+    private double ComputeOffsetWithinParent(DomElement element)
+    {
+        if (element.Parent == null)
+            return 0;
+
+        double offset = ParseCssLengthToPixelsWithViewport(GetComputedProps(element).GetValueOrDefault("margin-top"), true);
+        foreach (var sibling in element.Parent.Children)
+        {
+            if (ReferenceEquals(sibling, element))
+                break;
+            if (sibling.IsTextNode)
+                continue;
+
+            var siblingProps = GetComputedProps(sibling);
+            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"), true);
+            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("height"), true);
+            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"), true);
+        }
+
+        return offset;
+    }
+
+    private double ParseCssLengthToPixelsWithViewport(string? value, bool vertical)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return 0;
+
+        var normalized = value.Trim().ToLowerInvariant();
+        if (normalized.EndsWith("vh") &&
+            double.TryParse(normalized[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var vh))
+        {
+            return (vh / 100.0) * _viewportHeight;
+        }
+
+        if (normalized.EndsWith("vw") &&
+            double.TryParse(normalized[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var vw))
+        {
+            return (vw / 100.0) * _viewportWidth;
+        }
+
+        var px = ParseCssLengthToPixels(value);
+        return px >= 0 ? px : 0;
     }
 
     // ── Phase 6: Sub-document cache ──────────────────────────────────────────

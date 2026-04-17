@@ -278,10 +278,11 @@ public sealed partial class DomBridge
         double durationSec = 0;
         double delaySec = 0;
         string timingFunction = "ease";
+        string fillMode = "none";
 
         if (!string.IsNullOrWhiteSpace(animationShorthand))
         {
-            var parts = animationShorthand!.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var parts = TokenizeAnimationShorthand(animationShorthand!);
             var durations = new List<double>();
 
             foreach (var part in parts)
@@ -290,6 +291,8 @@ public sealed partial class DomBridge
                     durations.Add(sec);
                 else if (IsTimingFunction(part))
                     timingFunction = part;
+                else if (part is "none" or "forwards" or "backwards" or "both")
+                    fillMode = part;
                 else if (name == null && !IsKnownAnimationKeyword(part))
                     name = part;
             }
@@ -311,12 +314,48 @@ public sealed partial class DomBridge
         if (!keyframesMap.TryGetValue(name!, out var keyframes) || keyframes.Count == 0)
             return;
 
-        // Only resolve for negative delays (animation already running at t=0).
-        if (delaySec >= 0)
-            return;
+        double currentTimeMs = 0;
+        var hasCurrentTimeOverride = false;
+        if (element.DomProperties.TryGetValue("_animationCurrentTimeMs", out var currentTimeValue) &&
+            currentTimeValue is double currentTimeMsValue)
+        {
+            currentTimeMs = currentTimeMsValue;
+            hasCurrentTimeOverride = true;
+        }
 
-        // Compute progress: elapsed = abs(delay), progress = elapsed / duration.
-        double elapsed = Math.Abs(delaySec);
+        double elapsed;
+        if (hasCurrentTimeOverride)
+        {
+            var currentTimeSec = currentTimeMs / 1000.0;
+            if (delaySec >= 0)
+            {
+                if (currentTimeSec < delaySec)
+                {
+                    if (fillMode is "backwards" or "both")
+                    {
+                        foreach (var kv in keyframes[0].Properties)
+                            element.Style[kv.Key] = kv.Value;
+                    }
+                    return;
+                }
+
+                elapsed = currentTimeSec - delaySec;
+            }
+            else
+            {
+                elapsed = currentTimeSec;
+            }
+        }
+        else
+        {
+            // Only resolve for negative delays (animation already running at t=0).
+            if (delaySec >= 0)
+                return;
+
+            elapsed = Math.Abs(delaySec);
+        }
+
+        // Compute progress: elapsed / duration.
         double rawProgress = elapsed / durationSec;
 
         // Clamp progress to [0, 1] for a single iteration.
@@ -545,6 +584,39 @@ public sealed partial class DomBridge
         }
 
         return false;
+    }
+
+    private static IReadOnlyList<string> TokenizeAnimationShorthand(string shorthand)
+    {
+        var tokens = new List<string>();
+        var current = new System.Text.StringBuilder();
+        var depth = 0;
+
+        foreach (var ch in shorthand.Trim())
+        {
+            if (char.IsWhiteSpace(ch) && depth == 0)
+            {
+                if (current.Length > 0)
+                {
+                    tokens.Add(current.ToString());
+                    current.Clear();
+                }
+
+                continue;
+            }
+
+            if (ch == '(')
+                depth++;
+            else if (ch == ')' && depth > 0)
+                depth--;
+
+            current.Append(ch);
+        }
+
+        if (current.Length > 0)
+            tokens.Add(current.ToString());
+
+        return tokens;
     }
 
     private static bool IsTimingFunction(string text) => text switch
