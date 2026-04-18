@@ -2424,10 +2424,14 @@ internal static class PaintWalker
             w = h * ratio;
         else if (wIsAuto && !hIsAuto && hasIntrinsicWidth && intrinsicW > 0)
             w = intrinsicW;
+        else if (wIsAuto && !hIsAuto)
+            w = containerW;
         else if (!wIsAuto && hIsAuto && w > 0 && ratio > 0)
             h = w / ratio;
         else if (!wIsAuto && hIsAuto && hasIntrinsicHeight && intrinsicH > 0)
             h = intrinsicH;
+        else if (!wIsAuto && hIsAuto)
+            h = containerH;
         else if (wIsAuto && hIsAuto)
         {
             if (hasIntrinsicWidth && hasIntrinsicHeight && intrinsicW > 0 && intrinsicH > 0)

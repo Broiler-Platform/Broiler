@@ -413,7 +413,16 @@ internal sealed class SkiaImageAdapter : RAdapter
             const int fallbackRenderScale = 4;
             int renderWidth = rasterWidth * fallbackRenderScale;
             int renderHeight = rasterHeight * fallbackRenderScale;
-            bitmap = RenderSvgToBitmap(svgContent, renderWidth, renderHeight);
+            bool shouldInjectViewportForMissingWidth = !parsedIntrinsicWidth && parsedIntrinsicHeight;
+            if (shouldInjectViewportForMissingWidth)
+            {
+                var svgForRender = EnsureSvgViewport(svgContent, svgWidth, svgHeight, rasterWidth, rasterHeight);
+                bitmap = RenderSvgToBitmap(svgForRender, renderWidth, renderHeight);
+            }
+            else
+            {
+                bitmap = RenderSvgToBitmap(svgContent, renderWidth, renderHeight);
+            }
             if (bitmap != null && !IsBitmapFullyTransparent(bitmap))
             {
                 bitmap = NormalizeSvgContentBounds(bitmap, renderWidth, renderHeight);
@@ -600,15 +609,17 @@ internal sealed class SkiaImageAdapter : RAdapter
 
         var tag = svgContent.Substring(svgIdx, tagEnd - svgIdx + 1);
         var updatedTag = tag;
-        if (parsedWidth <= 0)
+        bool needsViewportDimensions = parsedWidth <= 0 || parsedHeight <= 0;
+        if (needsViewportDimensions)
         {
-            // Replace non-intrinsic/percentage width (or missing width) with
-            // an explicit viewport width so Svg.Skia can resolve percentages.
-            // Use the raster target size rather than raw viewBox dimensions:
-            // extreme viewBox values (used by WPT SVG sizing tests) are
-            // coordinate-space metadata, not the CSS viewport size that
-            // percentage children should resolve against.
-            int effectiveWidth = targetWidth;
+            // When either intrinsic dimension is missing, Svg.Skia needs a
+            // concrete viewport size for percentage children. Preserve any
+            // parsed absolute dimension on the other axis, but always inject
+            // an explicit width/height pair so partial-dimension SVGs have a
+            // concrete viewport.
+            int effectiveWidth = parsedWidth > 0
+                ? (int)Math.Ceiling(parsedWidth)
+                : targetWidth;
             updatedTag = System.Text.RegularExpressions.Regex.Replace(
                 updatedTag,
                 @"\swidth\s*=\s*[""'][^""']*[""']",
@@ -617,11 +628,11 @@ internal sealed class SkiaImageAdapter : RAdapter
             updatedTag = updatedTag.Insert(updatedTag.Length - 1, $" width=\"{effectiveWidth}\"");
         }
 
-        if (parsedHeight <= 0)
+        if (needsViewportDimensions)
         {
-            // Replace non-intrinsic/percentage height (or missing height)
-            // with an explicit viewport height.  See width handling above.
-            int effectiveHeight = targetHeight;
+            int effectiveHeight = parsedHeight > 0
+                ? (int)Math.Ceiling(parsedHeight)
+                : targetHeight;
             updatedTag = System.Text.RegularExpressions.Regex.Replace(
                 updatedTag,
                 @"\sheight\s*=\s*[""'][^""']*[""']",

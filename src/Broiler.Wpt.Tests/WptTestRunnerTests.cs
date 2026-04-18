@@ -3055,6 +3055,29 @@ div {{ width: 256px; height: 768px; }}
 </svg>";
     }
 
+    private static string BuildTempWideBackgroundSizeVectorSvg(
+        string? widthAttribute,
+        string? heightAttribute,
+        bool includeViewBox)
+    {
+        var dimensionAttributes = new List<string>();
+        if (!string.IsNullOrWhiteSpace(widthAttribute))
+            dimensionAttributes.Add(widthAttribute);
+        if (!string.IsNullOrWhiteSpace(heightAttribute))
+            dimensionAttributes.Add(heightAttribute);
+        if (includeViewBox)
+        {
+            dimensionAttributes.Add(@"viewBox=""0 0 4 64""");
+            dimensionAttributes.Add(@"preserveAspectRatio=""none""");
+        }
+
+        return $@"<svg xmlns=""http://www.w3.org/2000/svg""
+     {string.Join(" ", dimensionAttributes)}>
+  <rect y=""0"" width=""100%"" height=""50%"" fill=""lime""/>
+  <rect y=""50%"" width=""100%"" height=""50%"" fill=""aqua""/>
+</svg>";
+    }
+
     private WptTestResult RunTempBackgroundSizeVectorVisualTest(
         string fileName,
         string backgroundSize,
@@ -3089,6 +3112,46 @@ div {{ width: 256px; height: 768px; }}
         File.WriteAllText(
             Path.Combine(supportDir, "nonpercent-width-nonpercent-height-viewbox.svg"),
             BuildTempBackgroundSizeVectorSvg(widthAttribute, heightAttribute));
+
+        var runner = new WptTestRunner(1024, 768);
+        return runner.RunTest(Path.Combine(wptRoot, fileName), repoRefDir, _tempDir);
+    }
+
+    private WptTestResult RunTempWideBackgroundSizeVectorVisualTest(
+        string fileName,
+        string supportFileName,
+        string? widthAttribute,
+        string? heightAttribute,
+        bool includeViewBox)
+    {
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(_tempDir, "css", "css-backgrounds", "background-size", "vector");
+        var supportDir = Path.Combine(wptRoot, "support");
+        var repoRefDir = Path.Combine(root, "tests", "wpt", "references");
+        Directory.CreateDirectory(supportDir);
+
+        File.WriteAllText(Path.Combine(wptRoot, fileName), $@"<!DOCTYPE html>
+<html>
+ <head>
+  <style type=""text/css"">
+  div {{
+    background-image: url(""support/{supportFileName}"");
+    background-repeat: no-repeat;
+    background-size: 12px auto;
+    border: black solid 1px;
+    height: 256px;
+    width: 768px;
+  }}
+  </style>
+ </head>
+ <body>
+  <div></div>
+ </body>
+</html>");
+
+        File.WriteAllText(
+            Path.Combine(supportDir, supportFileName),
+            BuildTempWideBackgroundSizeVectorSvg(widthAttribute, heightAttribute, includeViewBox));
 
         var runner = new WptTestRunner(1024, 768);
         return runner.RunTest(Path.Combine(wptRoot, fileName), repoRefDir, _tempDir);
@@ -3319,6 +3382,39 @@ div {{ width: 256px; height: 768px; }}
         string? heightAttribute)
     {
         var result = RunTempBackgroundSizeVectorVisualTest(fileName, backgroundSize, widthAttribute, heightAttribute);
+        Assert.True(result.Passed,
+            $"{Path.GetFileNameWithoutExtension(fileName)} should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Theory]
+    [InlineData("wide--12px-auto--nonpercent-width-omitted-height.html", "nonpercent-width-omitted-height.svg", @"width=""8px""", null, false)]
+    [InlineData("wide--12px-auto--nonpercent-width-percent-height.html", "nonpercent-width-percent-height.svg", @"width=""8px""", @"height=""50%""", false)]
+    [InlineData("wide--12px-auto--omitted-width-omitted-height.html", "omitted-width-omitted-height.svg", null, null, false)]
+    [InlineData("wide--12px-auto--omitted-width-percent-height.html", "omitted-width-percent-height.svg", null, @"height=""50%""", false)]
+    [InlineData("wide--12px-auto--percent-width-omitted-height.html", "percent-width-omitted-height.svg", @"width=""50%""", null, false)]
+    [InlineData("wide--12px-auto--percent-width-percent-height.html", "percent-width-percent-height.svg", @"width=""50%""", @"height=""50%""", false)]
+    [InlineData("wide--12px-auto--nonpercent-width-omitted-height-viewbox.html", "nonpercent-width-omitted-height-viewbox.svg", @"width=""8px""", null, true)]
+    [InlineData("wide--12px-auto--nonpercent-width-percent-height-viewbox.html", "nonpercent-width-percent-height-viewbox.svg", @"width=""8px""", @"height=""50%""", true)]
+    [InlineData("wide--12px-auto--omitted-width-nonpercent-height-viewbox.html", "omitted-width-nonpercent-height-viewbox.svg", null, @"height=""32px""", true)]
+    [InlineData("wide--12px-auto--omitted-width-omitted-height-viewbox.html", "omitted-width-omitted-height-viewbox.svg", null, null, true)]
+    [InlineData("wide--12px-auto--omitted-width-percent-height-viewbox.html", "omitted-width-percent-height-viewbox.svg", null, @"height=""50%""", true)]
+    [InlineData("wide--12px-auto--percent-width-nonpercent-height-viewbox.html", "percent-width-nonpercent-height-viewbox.svg", @"width=""50%""", @"height=""32px""", true)]
+    [InlineData("wide--12px-auto--percent-width-omitted-height-viewbox.html", "percent-width-omitted-height-viewbox.svg", @"width=""50%""", null, true)]
+    [InlineData("wide--12px-auto--percent-width-percent-height-viewbox.html", "percent-width-percent-height-viewbox.svg", @"width=""50%""", @"height=""50%""", true)]
+    public void Wpt_BackgroundSizeVector_Wide12PxAutoPartialDimensionCases_MatchReference(
+        string fileName,
+        string supportFileName,
+        string? widthAttribute,
+        string? heightAttribute,
+        bool includeViewBox)
+    {
+        var result = RunTempWideBackgroundSizeVectorVisualTest(
+            fileName,
+            supportFileName,
+            widthAttribute,
+            heightAttribute,
+            includeViewBox);
         Assert.True(result.Passed,
             $"{Path.GetFileNameWithoutExtension(fileName)} should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
