@@ -10,6 +10,9 @@ namespace Broiler.HTML.Image.Adapters;
 
 internal sealed class SkiaImageAdapter : RAdapter
 {
+    private const int MinSvgRasterLongestSide = 128;
+    private const int MaxSvgRasterScale = 8;
+
     /// <summary>
     /// Typefaces loaded from font files via <see cref="LoadFontFromFile"/>,
     /// keyed by CSS family name (case-insensitive).  SkiaSharp's system
@@ -395,17 +398,21 @@ internal sealed class SkiaImageAdapter : RAdapter
         bool suppressPartialIntrinsicDimensions =
             preserveAspectRatioNone && vbRatio > 0 && !hasBothDimensions;
 
+        int rasterScale = GetSvgRasterizationScale(width, height, hasBothDimensions, vbRatio);
+        int rasterWidth = width * rasterScale;
+        int rasterHeight = height * rasterScale;
+
         SKBitmap? bitmap;
         if (hasDegenerateViewBox)
         {
-            bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+            bitmap = new SKBitmap(rasterWidth, rasterHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
             bitmap.Erase(SKColors.Transparent);
         }
         else if (suppressPartialIntrinsicDimensions)
         {
             const int fallbackRenderScale = 4;
-            int renderWidth = width * fallbackRenderScale;
-            int renderHeight = height * fallbackRenderScale;
+            int renderWidth = rasterWidth * fallbackRenderScale;
+            int renderHeight = rasterHeight * fallbackRenderScale;
             bitmap = RenderSvgToBitmap(svgContent, renderWidth, renderHeight);
             if (bitmap != null && !IsBitmapFullyTransparent(bitmap))
             {
@@ -414,7 +421,7 @@ internal sealed class SkiaImageAdapter : RAdapter
             else
             {
                 bitmap?.Dispose();
-                var svgForRender = EnsureSvgViewport(svgContent, svgWidth, svgHeight, width, height);
+                var svgForRender = EnsureSvgViewport(svgContent, svgWidth, svgHeight, rasterWidth, rasterHeight);
                 bitmap = RenderSvgToBitmap(svgForRender, renderWidth, renderHeight);
             }
         }
@@ -425,8 +432,15 @@ internal sealed class SkiaImageAdapter : RAdapter
             // on the root <svg> element for percentage resolution.  Inject the
             // computed width/height before parsing when the root element is
             // missing one or both attributes.
-            var svgForRender = EnsureSvgViewport(svgContent, svgWidth, svgHeight, width, height);
-            bitmap = RenderSvgToBitmap(svgForRender, width, height);
+            var svgForRender = EnsureSvgViewport(svgContent, svgWidth, svgHeight, rasterWidth, rasterHeight);
+            bitmap = RenderSvgToBitmap(svgForRender, rasterWidth, rasterHeight);
+            if (bitmap != null
+                && rasterScale > 1
+                && preserveAspectRatioNone
+                && vbRatio > 0)
+            {
+                bitmap = NormalizeSvgContentBounds(bitmap, rasterWidth, rasterHeight);
+            }
         }
 
         if (bitmap == null)
@@ -451,6 +465,18 @@ internal sealed class SkiaImageAdapter : RAdapter
             intrinsicAspectRatio: intrinsicRatio > 0 ? intrinsicRatio : null,
             intrinsicWidth: parsedIntrinsicWidth && !suppressPartialIntrinsicDimensions ? svgWidth : 0,
             intrinsicHeight: parsedIntrinsicHeight && !suppressPartialIntrinsicDimensions ? svgHeight : 0);
+    }
+
+    private static int GetSvgRasterizationScale(int width, int height, bool hasBothDimensions, double viewBoxRatio)
+    {
+        if (!hasBothDimensions || viewBoxRatio <= 0)
+            return 1;
+
+        int longestSide = Math.Max(width, height);
+        if (longestSide >= MinSvgRasterLongestSide)
+            return 1;
+
+        return Math.Clamp((int)Math.Ceiling((double)MinSvgRasterLongestSide / longestSide), 1, MaxSvgRasterScale);
     }
 
     private static SKBitmap? RenderSvgToBitmap(string svgContent, int width, int height)

@@ -2976,6 +2976,67 @@ document.getElementById('out').appendChild(p);
         return runner.RunTest(testFile, refDir, wptRoot);
     }
 
+    private WptTestResult RunTempBackgroundSizeVectorMatchTest(string fileName, bool crispEdges)
+    {
+        var wptRoot = Path.Combine(_tempDir, "css", "css-backgrounds", "background-size", "vector");
+        var supportDir = Path.Combine(wptRoot, "support");
+        var referenceDir = Path.Combine(wptRoot, "reference");
+        Directory.CreateDirectory(supportDir);
+        Directory.CreateDirectory(referenceDir);
+
+        var imageRenderingRule = crispEdges ? "\n  image-rendering: -moz-crisp-edges;" : string.Empty;
+        File.WriteAllText(Path.Combine(wptRoot, fileName), $@"<!DOCTYPE html>
+<html>
+ <head>
+  <link rel=""match"" href=""reference/ref-tall-lime256x512-aqua256x256.html"">
+  <style type=""text/css"">
+  div {{
+  background-image: url(""support/nonpercent-width-nonpercent-height-viewbox.svg"");
+  background-repeat: no-repeat;
+  background-size: cover;
+  border: black solid 1px;
+  height: 768px;{imageRenderingRule}
+  width: 256px;
+  }}
+  </style>
+ </head>
+ <body>
+  <div></div>
+ </body>
+</html>");
+
+        File.WriteAllText(Path.Combine(supportDir, "nonpercent-width-nonpercent-height-viewbox.svg"), @"<svg xmlns=""http://www.w3.org/2000/svg""
+     width=""8px"" height=""32px""
+     viewBox=""0 0 4 64""
+     preserveAspectRatio=""none"">
+  <rect y=""0"" width=""100%"" height=""50%"" fill=""lime""/>
+  <rect y=""50%"" width=""100%"" height=""50%"" fill=""aqua""/>
+</svg>");
+
+        File.WriteAllText(Path.Combine(referenceDir, "ref-tall-lime256x512-aqua256x256.html"), @"<!DOCTYPE html>
+<html>
+<head>
+  <style type=""text/css"">
+div { width: 256px; height: 768px; }
+#outer { border: 1px solid black; }
+#inner { width: 256px; height: 768px; }
+#inner > div { width: 256px; }
+#top { background-color: lime; height: 512px; }
+#bottom { background-color: aqua; height: 256px; }
+  </style>
+</head>
+<body>
+<div id=""outer""><div id=""inner""><div id=""top""></div><div id=""bottom""></div></div></div>
+</body>
+</html>");
+
+        var runner = new WptTestRunner(1024, 768);
+        return runner.RunMatchTest(
+            Path.Combine(wptRoot, fileName),
+            Path.Combine(referenceDir, "ref-tall-lime256x512-aqua256x256.html"),
+            _tempDir);
+    }
+
     [Fact]
     public void Wpt_BackgroundColorAnimationInBody_MatchesReference()
     {
@@ -3160,6 +3221,17 @@ document.getElementById('out').appendChild(p);
         var result = RunCssBackgroundsVisualTest(subPath);
         Assert.True(result.Passed,
             $"{Path.GetFileNameWithoutExtension(subPath)} should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Theory]
+    [InlineData("tall--cover--nonpercent-width-nonpercent-height-viewbox.html", false)]
+    [InlineData("tall--cover--nonpercent-width-nonpercent-height-viewbox--crisp.html", true)]
+    public void Wpt_BackgroundSizeVector_TallCoverViewboxCases_MatchReference(string fileName, bool crispEdges)
+    {
+        var result = RunTempBackgroundSizeVectorMatchTest(fileName, crispEdges);
+        Assert.True(result.Passed,
+            $"{Path.GetFileNameWithoutExtension(fileName)} should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
