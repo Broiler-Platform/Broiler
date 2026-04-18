@@ -9,6 +9,7 @@
 - `scripts/run-wpt-tests.sh` and `.github/workflows/wpt-tests.yml` now standardize on `tests/wpt-results/`.
 - Phase 1 has started: the `background-clip-006.html` null-reference no longer reproduces in targeted local WPT runner coverage, and the regression is now guarded by a focused test in `src/Broiler.Wpt.Tests/`.
 - Phase 2 has started: the `background-size` vector bucket now covers the previously failing tall `cover` + `viewBox` cases in focused tests, and the targeted subset repro passes locally again.
+- The `background-clip*` subset has now been rerun against the in-repo WPT corpus; the raw subset still fails broadly on full-page visual noise, so guard rails now focus on the reproducible box-model cases (`border-box`, `padding-box`, `content-box`, size/position/radius variants, and `border-area` corner-shape) instead of the instruction text around them.
 - **Deviation from the original proposal:** the roadmap-friendly Markdown file is generated directly by `Broiler.Wpt` instead of a separate post-processing step so the same logic is shared by local runs and CI.
 - **Current blocker:** the hard crash is fixed, but the wider `background-clip` bucket still contains visual mismatches that belong to the next near-pass remediation steps rather than this crash-only fix.
 - **Current near-pass focus:** continue harvesting the remaining `background-clip` and `background-size` cases with the smallest reproducible `--subset` commands rather than broad CSS reruns.
@@ -141,7 +142,7 @@ The worst failures include several 0% matches in `css/css-values/*` (`calc-in-ca
 ## Phase 1 — Fix crash / deterministic rendering errors
 
 - [x] Fix the null-reference in `css/css-backgrounds/background-clip-006.html`.
-- [ ] Re-run the `css/css-backgrounds/background-clip*` subset and convert that suite into a stable guard rail.
+- [x] Re-run the `css/css-backgrounds/background-clip*` subset and convert that suite into a stable guard rail.
 
 **Why first:** crash-style failures are usually small in count but high in leverage.
 

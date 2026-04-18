@@ -3351,6 +3351,14 @@ div { width: 256px; height: 768px; }
     }
 
     [Fact]
+    public void Wpt_ClipBorderAreaCornerShape_VisualSubsetGuardRail_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-border-area-corner-shape.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-border-area-corner-shape: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_ClipPaddingBox_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-padding-box.html");
