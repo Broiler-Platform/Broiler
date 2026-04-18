@@ -7,8 +7,10 @@
 
 - `Broiler.Wpt` now emits bucket summaries in console output, machine-readable skip reasons in `wpt-results.json`, and a triage-focused Markdown report via `--markdown-output`.
 - `scripts/run-wpt-tests.sh` and `.github/workflows/wpt-tests.yml` now standardize on `tests/wpt-results/`.
+- Phase 1 has started: the `background-clip-006.html` null-reference no longer reproduces in targeted local WPT runner coverage, and the regression is now guarded by a focused test in `src/Broiler.Wpt.Tests/`.
 - **Deviation from the original proposal:** the roadmap-friendly Markdown file is generated directly by `Broiler.Wpt` instead of a separate post-processing step so the same logic is shared by local runs and CI.
-- **Current blocker:** full-solution validation still hits an unrelated compile failure in `Broiler.HTML.WPF/Adapters/GraphicsAdapter.cs` (`DrawGradientString` override missing), so WPT triage work should continue using targeted `Broiler.Wpt` validation until that project is repaired.
+- **Current blocker:** the hard crash is fixed, but the wider `background-clip` bucket still contains visual mismatches that belong to the next near-pass remediation steps rather than this crash-only fix.
+- **Secondary blocker:** full-solution validation still hits an unrelated compile failure in `Broiler.HTML.WPF/Adapters/GraphicsAdapter.cs` (`DrawGradientString` override missing), so WPT triage work should continue using targeted `Broiler.Wpt` validation until that project is repaired.
 - Related WPT bucket issues: #956 (`background-clip` failures), #958 (`css-background-clip` follow-up), #962 (`background-size` vector cases).
 
 ---
@@ -128,15 +130,15 @@ The worst failures include several 0% matches in `css/css-values/*` (`calc-in-ca
 
 ## Phase 0 — Stabilize triage inputs
 
-- [ ] Keep `tests/wpt-results/wpt-results.json` as the canonical input for grouping and prioritization.
-- [ ] Standardize on a single results path name. Today the repository contains `tests/wpt-results/`, while the runner/workflow currently write to `tests/wpt/results`.
+- [x] Keep `tests/wpt-results/wpt-results.json` as the canonical input for grouping and prioritization.
+- [x] Standardize on a single results path name. Today the repository contains `tests/wpt-results/`, while the runner/workflow currently write to `tests/wpt/results`.
 - [ ] When investigating a bucket, always rerun via `--subset` instead of the full CSS corpus.
 
 **Exit criteria:** every follow-up issue/PR names a specific bucket and uses a reproducible subset command.
 
 ## Phase 1 — Fix crash / deterministic rendering errors
 
-- [ ] Fix the null-reference in `css/css-backgrounds/background-clip-006.html`.
+- [x] Fix the null-reference in `css/css-backgrounds/background-clip-006.html`.
 - [ ] Re-run the `css/css-backgrounds/background-clip*` subset and convert that suite into a stable guard rail.
 
 **Why first:** crash-style failures are usually small in count but high in leverage.

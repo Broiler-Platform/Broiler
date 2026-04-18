@@ -3061,6 +3061,52 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_BackgroundClipInherit_DoesNotThrow_RenderingError()
+    {
+        var testFile = Path.Combine(_tempDir, "background-clip-006.html");
+        File.WriteAllText(testFile, @"<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset=""utf-8"">
+    <style>
+        #container { background-clip: content-box; }
+        #test-overlapped-red {
+            background-clip: inherit;
+            background-color: red;
+            border: transparent dotted 5px;
+            height: 100px;
+            padding: 25px;
+            width: 100px;
+        }
+        #ref-overlapping-green {
+            background-color: green;
+            bottom: 130px;
+            height: 100px;
+            left: 30px;
+            position: relative;
+            width: 100px;
+        }
+    </style>
+  </head>
+  <body>
+    <div id=""container"">
+      <div id=""test-overlapped-red""></div>
+      <div id=""ref-overlapping-green""></div>
+    </div>
+  </body>
+</html>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner(320, 240);
+        var result = runner.RunTest(testFile, refDir, _tempDir);
+
+        Assert.True(result.Skipped, $"Expected skip after successful render, got: {result.Message}");
+        Assert.NotEqual(FailureCategory.RenderingError, result.Category);
+    }
+
+    [Fact]
     public void Wpt_DocumentCanvasRemoveBody_MatchesReference()
     {
         // CSS Backgrounds §2.11: removing body via JS should clear its
