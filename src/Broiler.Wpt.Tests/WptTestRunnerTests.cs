@@ -3368,6 +3368,28 @@ div {{ width: 256px; height: 768px; }}
     }
 
     [Theory]
+    [InlineData("wide--contain--nonpercent-width-nonpercent-height-viewbox.html", "nonpercent-width-nonpercent-height-viewbox.svg", "contain", @"width=""8px""", @"height=""32px""", true)]
+    public void Wpt_BackgroundSizeVector_WideContainViewboxCase_MatchReference(
+        string fileName,
+        string supportFileName,
+        string backgroundSize,
+        string? widthAttribute,
+        string? heightAttribute,
+        bool includeViewBox)
+    {
+        var result = RunTempWideBackgroundSizeVectorVisualTest(
+            fileName,
+            supportFileName,
+            backgroundSize,
+            widthAttribute,
+            heightAttribute,
+            includeViewBox);
+        Assert.True(result.Passed,
+            $"{Path.GetFileNameWithoutExtension(fileName)} should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Theory]
     [InlineData("tall--contain--nonpercent-width-omitted-height-viewbox.html", "contain", @"width=""8px""", null)]
     [InlineData("tall--contain--omitted-width-nonpercent-height-viewbox.html", "contain", null, @"height=""32px""")]
     [InlineData("tall--contain--percent-width-nonpercent-height-viewbox.html", "contain", @"width=""100%""", @"height=""32px""")]
