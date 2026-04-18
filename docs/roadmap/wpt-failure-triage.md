@@ -9,6 +9,7 @@
 - `scripts/run-wpt-tests.sh` and `.github/workflows/wpt-tests.yml` now standardize on `tests/wpt-results/`.
 - Phase 1 has started: the `background-clip-006.html` null-reference no longer reproduces in targeted local WPT runner coverage, and the regression is now guarded by a focused test in `src/Broiler.Wpt.Tests/`.
 - Phase 2 has started: the `background-size` vector bucket now covers the previously failing tall `cover` + `viewBox` cases in focused tests, and the targeted subset repro passes locally again.
+- Phase 2 has expanded again: the tall `contain` + `viewBox` vector repro now matches the in-repo WPT reference image in focused local coverage, so the near-pass `background-size` workstream now guards both the tall `cover` and tall `contain` cases.
 - The `background-clip*` subset has now been rerun against the in-repo WPT corpus; the raw subset still fails broadly on full-page visual noise, so guard rails now focus on the reproducible box-model cases (`border-box`, `padding-box`, `content-box`, size/position/radius variants, and `border-area` corner-shape) instead of the instruction text around them.
 - **Deviation from the original proposal:** the roadmap-friendly Markdown file is generated directly by `Broiler.Wpt` instead of a separate post-processing step so the same logic is shared by local runs and CI.
 - **Current blocker:** the hard crash is fixed, but the wider `background-clip` bucket still contains visual mismatches that belong to the next near-pass remediation steps rather than this crash-only fix.
