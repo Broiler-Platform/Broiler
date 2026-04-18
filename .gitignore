@@ -71,7 +71,7 @@ package*.json
 capture.png
 
 # WPT testsuite results (generated at runtime)
-tests/wpt/results/
+tests/wpt-results/
 tests/wpt/checkout/
 # Ignore bulk-generated WPT references but allow curated CSS regression images.
 tests/wpt/references/*

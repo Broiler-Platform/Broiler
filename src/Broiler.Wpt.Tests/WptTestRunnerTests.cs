@@ -811,8 +811,126 @@ document.getElementById('out').appendChild(p);
 
         Assert.True(summaryEl.TryGetProperty("failed", out var failedEl));
         Assert.True(failedEl.GetInt32() > 0);
+        Assert.True(doc.RootElement.TryGetProperty("triage", out var triageEl));
+        Assert.True(triageEl.TryGetProperty("topFailingDirectories", out _));
 
         Assert.True(resultsEl.GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public void Program_Output_Includes_Bucket_Summaries()
+    {
+        var testDir = Path.Combine(_tempDir, "bucket-output");
+        var failDir = Path.Combine(testDir, "css", "failing-bucket");
+        var skipDir = Path.Combine(testDir, "css", "skipped-bucket");
+        var mismatchDir = Path.Combine(testDir, "css", "mismatch-bucket");
+        Directory.CreateDirectory(failDir);
+        Directory.CreateDirectory(skipDir);
+        Directory.CreateDirectory(mismatchDir);
+
+        File.WriteAllText(Path.Combine(failDir, "decode.html"), "<html><body>Decode</body></html>");
+        File.WriteAllText(Path.Combine(skipDir, "skip.html"), "<html><body>Skip</body></html>");
+        File.WriteAllText(Path.Combine(mismatchDir, "mismatch.html"),
+            @"<!DOCTYPE html><html><body style=""margin:0""><div style=""width:100px;height:100px;background:red""></div></body></html>");
+
+        var refDir = Path.Combine(testDir, "references");
+        Directory.CreateDirectory(refDir);
+        File.WriteAllText(Path.Combine(refDir, "decode.png"), "not-a-png");
+
+        using (var refBmp = new SkiaSharp.SKBitmap(1024, 768, SkiaSharp.SKColorType.Rgba8888, SkiaSharp.SKAlphaType.Premul))
+        using (var stream = File.OpenWrite(Path.Combine(refDir, "mismatch.png")))
+        {
+            refBmp.Erase(SkiaSharp.SKColors.Blue);
+            refBmp.Encode(stream, SkiaSharp.SKEncodedImageFormat.Png, 100);
+        }
+
+        var originalOut = Console.Out;
+        var sw = new StringWriter();
+        Console.SetOut(sw);
+        try
+        {
+            Program.Main(["--wpt-dir", testDir, "--reference-dir", refDir]);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        var output = sw.ToString();
+
+        Assert.Contains("=== Bucket Summary ===", output);
+        Assert.Contains("Top failing directories:", output);
+        Assert.Contains("css/failing-bucket", output);
+        Assert.Contains("css/mismatch-bucket", output);
+        Assert.Contains("Top skipped directories:", output);
+        Assert.Contains("css/skipped-bucket", output);
+        Assert.Contains("Mismatch sub-categories:", output);
+        Assert.Contains("Lowest-match failures:", output);
+        Assert.Contains("Skip reasons:", output);
+        Assert.Contains("MissingReferenceImage", output);
+    }
+
+    [Fact]
+    public void Program_Outputs_Triage_Report_With_Skip_Reasons_And_Markdown_Summary()
+    {
+        var testDir = Path.Combine(_tempDir, "triage-report");
+        var missingRefDir = Path.Combine(testDir, "css", "skip");
+        var mediaDir = Path.Combine(testDir, "css", "media");
+        Directory.CreateDirectory(missingRefDir);
+        Directory.CreateDirectory(mediaDir);
+
+        File.WriteAllText(Path.Combine(missingRefDir, "missing-ref.html"), "<html><body>Missing ref</body></html>");
+        File.WriteAllText(Path.Combine(mediaDir, "media.html"),
+            @"<!DOCTYPE html><html><body><video autoplay><source type=""video/mp4"" src=""support/video.mp4""></video></body></html>");
+
+        var refDir = Path.Combine(testDir, "references");
+        Directory.CreateDirectory(refDir);
+        var jsonPath = Path.Combine(_tempDir, "triage-report.json");
+        var markdownPath = Path.Combine(_tempDir, "triage-report.md");
+
+        var originalOut = Console.Out;
+        Console.SetOut(new StringWriter());
+        try
+        {
+            Program.Main([
+                "--wpt-dir", testDir,
+                "--reference-dir", refDir,
+                "--json-output", jsonPath,
+                "--markdown-output", markdownPath,
+            ]);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        Assert.True(File.Exists(jsonPath));
+        Assert.True(File.Exists(markdownPath));
+
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(jsonPath));
+        var triage = doc.RootElement.GetProperty("triage");
+        Assert.True(triage.GetProperty("topSkippedDirectories").GetArrayLength() > 0);
+        Assert.True(triage.GetProperty("skipReasons").GetArrayLength() > 0);
+
+        var reasons = triage.GetProperty("skipReasons")
+            .EnumerateArray()
+            .Select(el => el.GetProperty("reason").GetString())
+            .ToList();
+        Assert.Contains("MissingReferenceImage", reasons);
+        Assert.Contains("UnsupportedMediaPlayback", reasons);
+
+        var resultReasons = doc.RootElement.GetProperty("results")
+            .EnumerateArray()
+            .Where(el => el.GetProperty("skipped").GetBoolean())
+            .Select(el => el.GetProperty("skipReason").GetString())
+            .ToList();
+        Assert.Contains("MissingReferenceImage", resultReasons);
+        Assert.Contains("UnsupportedMediaPlayback", resultReasons);
+
+        var markdown = File.ReadAllText(markdownPath);
+        Assert.Contains("# WPT Triage Summary", markdown);
+        Assert.Contains("## Suggested next subset commands", markdown);
+        Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/skip\"", markdown);
     }
 
     [Fact]
@@ -890,6 +1008,23 @@ document.getElementById('out').appendChild(p);
         Assert.Equal("ColorShift", diag["subCategory"]);
         Assert.Equal(42.5, diag["averageChannelDelta"]);
         Assert.Equal(100, diag["maxChannelDelta"]);
+        Assert.False(json.ContainsKey("skipReason"));
+    }
+
+    [Fact]
+    public void WptTestResult_ToJsonObject_Includes_SkipReason_When_Present()
+    {
+        var result = new WptTestResult
+        {
+            TestPath = "/skip.html",
+            Skipped = true,
+            SkipReason = SkipReason.MissingReferenceImage,
+            Message = "No reference image",
+        };
+
+        var json = result.ToJsonObject();
+
+        Assert.Equal("MissingReferenceImage", json["skipReason"]);
     }
 
     // ──────────── CSS2 regression tests ──────────────────────────────

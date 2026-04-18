@@ -3,6 +3,14 @@
 > **Status**: Active — created 2026-04-18  
 > **Scope**: Investigate the failures captured in `tests/wpt-results/` and define the smallest practical plan for reducing them over time.
 
+## Implementation update — 2026-04-18
+
+- `Broiler.Wpt` now emits bucket summaries in console output, machine-readable skip reasons in `wpt-results.json`, and a triage-focused Markdown report via `--markdown-output`.
+- `scripts/run-wpt-tests.sh` and `.github/workflows/wpt-tests.yml` now standardize on `tests/wpt-results/`.
+- **Deviation from the original proposal:** the roadmap-friendly Markdown file is generated directly by `Broiler.Wpt` instead of a separate post-processing step so the same logic is shared by local runs and CI.
+- **Current blocker:** full-solution validation still hits an unrelated compile failure in `Broiler.HTML.WPF/Adapters/GraphicsAdapter.cs` (`DrawGradientString` override missing), so WPT triage work should continue using targeted `Broiler.Wpt` validation until that project is repaired.
+- Related WPT bucket issues: #956 (`background-clip` failures), #958 (`css-background-clip` follow-up), #962 (`background-size` vector cases).
+
 ---
 
 ## 1. Current Snapshot
