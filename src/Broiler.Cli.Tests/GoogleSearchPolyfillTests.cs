@@ -449,6 +449,46 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("VALUES:11,11,21,21,11,51,11,11,21,21,11,51,10,11,0,1", result);
     }
 
+    [Fact]
+    public void MatchMedia_Uses_Viewport_Dimensions_And_Viewport_Lengths()
+    {
+        var result = ExecJs(@"
+            var checks = [
+                window.matchMedia('(min-width: 1000px)').matches,
+                window.matchMedia('(min-height: 700px)').matches,
+                window.matchMedia('(min-width: 50vw)').matches,
+                window.matchMedia('(max-height: calc(100vh))').matches,
+                window.matchMedia('(min-width: 2000px)').matches
+            ];
+
+            document.getElementById('result').textContent = checks.join(',');
+        ");
+        Assert.Contains("true,true,true,true,false", result);
+    }
+
+    [Fact]
+    public void MediaQueries_Use_MainDocument_Viewport_Lengths_In_Computed_Styles()
+    {
+        var result = ExecJs(@"
+            var style = document.createElement('style');
+            style.textContent = `
+                #target { width: 20px; height: 20px; }
+                @media (min-width: 50vw) and (max-height: calc(100vh)) {
+                    #target { width: 40px; }
+                }
+            `;
+            document.head.appendChild(style);
+
+            var target = document.createElement('div');
+            target.id = 'target';
+            document.body.appendChild(target);
+
+            document.getElementById('result').textContent =
+                window.getComputedStyle(target).width;
+        ");
+        Assert.Contains("40px", result);
+    }
+
     // ---------------------------------------------------------------
     //  TODO-G6: Image() constructor
     // ---------------------------------------------------------------

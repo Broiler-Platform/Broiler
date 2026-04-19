@@ -286,21 +286,70 @@ public sealed partial class DomBridge
         // processing so that their internal selectors (e.g. "from", "50%", "to")
         // are not mistakenly added to _cssRules.
         cssText = StripBlockAtRules(cssText);
+        ExtractRulesFromCssWithMediaQueries(cssText);
+    }
 
-        var remaining = MediaQueryPattern.Replace(cssText, m =>
+    private void ExtractRulesFromCssWithMediaQueries(string cssText)
+    {
+        int pos = 0;
+        int lastRuleStart = 0;
+        while (pos < cssText.Length)
         {
-            var query = m.Groups["query"].Value.Trim();
-            var content = m.Groups["content"].Value;
+            SkipWhitespaceAndComments(cssText, ref pos);
+            if (pos >= cssText.Length)
+                break;
 
-            if (query.Contains("screen", StringComparison.OrdinalIgnoreCase) ||
-                query.Equals("all", StringComparison.OrdinalIgnoreCase))
+            if (cssText.Length > pos + 6 &&
+                cssText.Substring(pos, 6).Equals("@media", StringComparison.OrdinalIgnoreCase))
             {
-                ExtractRulesFromCss(content);
-            }
-            return string.Empty;
-        });
+                if (pos > lastRuleStart)
+                    ExtractRulesFromCss(cssText[lastRuleStart..pos]);
 
-        ExtractRulesFromCss(remaining);
+                pos += 6;
+                SkipWhitespaceAndComments(cssText, ref pos);
+                int braceStart = IndexOfSkippingComments(cssText, '{', pos);
+                if (braceStart < 0)
+                    break;
+
+                var mediaQuery = StripCssComments(cssText[pos..braceStart]).Trim();
+                pos = braceStart + 1;
+
+                int depth = 1;
+                int blockStart = pos;
+                while (pos < cssText.Length && depth > 0)
+                {
+                    if (pos + 1 < cssText.Length && cssText[pos] == '/' && cssText[pos + 1] == '*')
+                    {
+                        pos += 2;
+                        while (pos + 1 < cssText.Length && !(cssText[pos] == '*' && cssText[pos + 1] == '/'))
+                            pos++;
+                        if (pos + 1 < cssText.Length)
+                            pos += 2;
+                    }
+                    else
+                    {
+                        if (cssText[pos] == '{') depth++;
+                        else if (cssText[pos] == '}') depth--;
+                        if (depth > 0)
+                            pos++;
+                    }
+                }
+
+                if (pos > blockStart && EvaluateMediaQuery(mediaQuery, _viewportWidth, _viewportHeight))
+                    ExtractRulesFromCss(cssText[blockStart..pos]);
+
+                if (pos < cssText.Length)
+                    pos++;
+
+                lastRuleStart = pos;
+                continue;
+            }
+
+            pos++;
+        }
+
+        if (lastRuleStart < cssText.Length)
+            ExtractRulesFromCss(cssText[lastRuleStart..]);
     }
 
     private void ExtractRulesFromCss(string css)
@@ -1647,28 +1696,28 @@ public sealed partial class DomBridge
             case "min-height":
                 if (value != null)
                 {
-                    var px = ParseCssLengthToPixels(value);
+                    var px = ParseCssLengthToPixels(value, viewportWidth, viewportHeight);
                     return px >= 0 && viewportHeight >= px;
                 }
                 return false;
             case "max-height":
                 if (value != null)
                 {
-                    var px = ParseCssLengthToPixels(value);
+                    var px = ParseCssLengthToPixels(value, viewportWidth, viewportHeight);
                     return px >= 0 && viewportHeight <= px;
                 }
                 return true; // No value = bare feature check; height exists
             case "min-width":
                 if (value != null)
                 {
-                    var px = ParseCssLengthToPixels(value);
+                    var px = ParseCssLengthToPixels(value, viewportWidth, viewportHeight);
                     return px >= 0 && viewportWidth >= px;
                 }
                 return false;
             case "max-width":
                 if (value != null)
                 {
-                    var px = ParseCssLengthToPixels(value);
+                    var px = ParseCssLengthToPixels(value, viewportWidth, viewportHeight);
                     return px >= 0 && viewportWidth <= px;
                 }
                 return true; // No value = bare feature check; width exists
@@ -1725,11 +1774,33 @@ public sealed partial class DomBridge
     /// Returns -1 if the value cannot be parsed.
     /// Default font size for em conversion is 16px.
     /// </summary>
-    private static double ParseCssLengthToPixels(string value)
+    private static double ParseCssLengthToPixels(string value, int viewportWidth = 0, int viewportHeight = 0)
     {
         if (string.IsNullOrWhiteSpace(value)) return -1;
 
         var v = NormalizeSingleValueLengthFunction(value).Trim().ToLowerInvariant();
+        if (viewportHeight > 0 && v.EndsWith("vh"))
+        {
+            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var vh))
+            {
+                return (vh / 100.0) * viewportHeight;
+            }
+
+            return -1;
+        }
+
+        if (viewportWidth > 0 && v.EndsWith("vw"))
+        {
+            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var vw))
+            {
+                return (vw / 100.0) * viewportWidth;
+            }
+
+            return -1;
+        }
+
         if (v.EndsWith("px"))
         {
             if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
@@ -1868,7 +1939,7 @@ public sealed partial class DomBridge
     /// </summary>
     private (int Width, int Height) GetViewportForDocRoot(DomElement docRoot)
     {
-        if (ReferenceEquals(docRoot, DocumentElement))
+        if (ReferenceEquals(docRoot, DocumentElement) || docRoot.Parent == null)
             return (_viewportWidth, _viewportHeight);
 
         // Walk up from docRoot to find the containing iframe/object element

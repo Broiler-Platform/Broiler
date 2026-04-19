@@ -292,6 +292,38 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssValues_ViewportMediaQueryLengths_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #target { width: 100%; height: 100%; background: red; }
+    @media (min-width: 50vw) and (max-height: calc(100vh)) {
+      #target { background: green; }
+    }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #target { width: 100%; height: 100%; background: green; }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "viewport-media-query-lengths");
+        Assert.True(result.Passed,
+            $"viewport media-query lengths should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void RunAll_Processes_Multiple_Tests()
     {
         // Arrange

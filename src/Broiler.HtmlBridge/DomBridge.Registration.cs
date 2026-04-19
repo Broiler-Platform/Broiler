@@ -1031,7 +1031,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var query = a.Length > 0 ? a[0].ToString() : string.Empty;
-                var matches = !string.IsNullOrEmpty(query) && EvaluateMediaQuery(query);
+                var matches = !string.IsNullOrEmpty(query) && EvaluateMediaQuery(query, _viewportWidth, _viewportHeight);
                 var result = new JSObject();
                 result.FastAddValue(
                     (KeyString)"matches",
