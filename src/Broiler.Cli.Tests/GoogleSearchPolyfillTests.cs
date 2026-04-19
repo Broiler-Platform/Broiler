@@ -329,6 +329,7 @@ public class GoogleSearchPolyfillTests
             zoomedInner.style.zoom = '2';
             zoomedInner.style.width = '100px';
             zoomedInner.style.height = '100px';
+            zoomedInner.style.margin = '1px';
             zoomedInner.style.border = '1px solid black';
             unzoomedMiddle.appendChild(zoomedInner);
             outerDiv2.appendChild(unzoomedMiddle);
@@ -349,6 +350,103 @@ public class GoogleSearchPolyfillTests
                 ',IW:' + zoomedInner.offsetWidth + ',OW:' + outerDiv.offsetWidth;
         ");
         Assert.Contains("OK:true,UW:10,ZW:10,IW:102,OW:102", result);
+    }
+
+    [Fact]
+    public void Element_OffsetPosition_Uses_OffsetParent_And_Excludes_Target_Zoom()
+    {
+        var result = ExecJs(@"
+            function makeOuter(margin, zoom) {
+                var el = document.createElement('div');
+                el.style.width = '100px';
+                el.style.height = '100px';
+                el.style.border = '1px solid black';
+                el.style.position = 'relative';
+                el.style.margin = margin || '10px';
+                if (zoom) {
+                    el.style.zoom = zoom;
+                }
+                return el;
+            }
+
+            function makeSquare(className) {
+                var el = document.createElement('div');
+                el.style.width = '10px';
+                el.style.height = '10px';
+                el.style.margin = '1px';
+                if (className === 'one') {
+                    el.style.position = 'relative';
+                    el.style.top = '10px';
+                    el.style.left = '10px';
+                } else if (className === 'two') {
+                    el.style.position = 'absolute';
+                    el.style.top = '20px';
+                    el.style.left = '20px';
+                    el.style.zoom = '2';
+                } else if (className === 'three') {
+                    el.style.position = 'absolute';
+                    el.style.top = '10px';
+                    el.style.left = '50px';
+                    el.style.zoom = '0.5';
+                }
+                return el;
+            }
+
+            var unzoomedOuter = makeOuter();
+            var unzoomedOne = makeSquare('one');
+            var unzoomedTwo = makeSquare('two');
+            var unzoomedThree = makeSquare('three');
+            unzoomedOuter.appendChild(unzoomedOne);
+            unzoomedOuter.appendChild(unzoomedTwo);
+            unzoomedOuter.appendChild(unzoomedThree);
+
+            var zoomedOuter = makeOuter('10px', '3');
+            var zoomedOne = makeSquare('one');
+            var zoomedTwo = makeSquare('two');
+            var zoomedThree = makeSquare('three');
+            zoomedOuter.appendChild(zoomedOne);
+            zoomedOuter.appendChild(zoomedTwo);
+            zoomedOuter.appendChild(zoomedThree);
+
+            var outerDiv = makeOuter('30px');
+            var zoomedMiddle = document.createElement('div');
+            zoomedMiddle.style.margin = '10px';
+            zoomedMiddle.style.zoom = '2';
+            var unzoomedInner = document.createElement('div');
+            unzoomedInner.style.width = '10px';
+            unzoomedInner.style.height = '10px';
+            unzoomedInner.style.margin = '1px';
+            zoomedMiddle.appendChild(unzoomedInner);
+            outerDiv.appendChild(zoomedMiddle);
+
+            var outerDiv2 = makeOuter('30px');
+            var unzoomedMiddle = document.createElement('div');
+            var zoomedInner = document.createElement('div');
+            zoomedInner.style.zoom = '2';
+            zoomedInner.style.width = '100px';
+            zoomedInner.style.height = '100px';
+            zoomedInner.style.margin = '1px';
+            zoomedInner.style.border = '1px solid black';
+            unzoomedMiddle.appendChild(zoomedInner);
+            outerDiv2.appendChild(unzoomedMiddle);
+
+            document.body.appendChild(unzoomedOuter);
+            document.body.appendChild(zoomedOuter);
+            document.body.appendChild(outerDiv);
+            document.body.appendChild(outerDiv2);
+
+            document.getElementById('result').textContent = 'VALUES:' + [
+                unzoomedOne.offsetTop, unzoomedOne.offsetLeft,
+                unzoomedTwo.offsetTop, unzoomedTwo.offsetLeft,
+                unzoomedThree.offsetTop, unzoomedThree.offsetLeft,
+                zoomedOne.offsetTop, zoomedOne.offsetLeft,
+                zoomedTwo.offsetTop, zoomedTwo.offsetLeft,
+                zoomedThree.offsetTop, zoomedThree.offsetLeft,
+                unzoomedInner.offsetTop, unzoomedInner.offsetLeft,
+                zoomedInner.offsetTop, zoomedInner.offsetLeft
+            ].join(',');
+        ");
+        Assert.Contains("VALUES:11,11,21,21,11,51,11,11,21,21,11,51,10,11,0,1", result);
     }
 
     // ---------------------------------------------------------------
