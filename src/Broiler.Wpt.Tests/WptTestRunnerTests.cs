@@ -292,6 +292,72 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssomView_ClientAndScrollMetricsIncludePadding_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    function measure(zoom) {
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left = '-10000px';
+      container.style.top = '-10000px';
+      container.style.width = '20px';
+      container.style.height = '20px';
+      container.style.padding = '10px 20px';
+      container.style.overflow = 'auto';
+      if (zoom) {
+        container.style.zoom = zoom;
+      }
+
+      const child = document.createElement('div');
+      child.style.width = '20px';
+      child.style.height = '20px';
+      child.style.margin = '-5px -7px';
+      container.appendChild(child);
+      document.body.appendChild(container);
+
+      const passed = container.clientWidth === 60 &&
+                     container.clientHeight === 40 &&
+                     container.scrollWidth === 60 &&
+                     container.scrollHeight === 40;
+      container.remove();
+      return passed;
+    }
+
+    if (measure('1') && measure('2')) {
+      document.getElementById('pass').style.background = 'green';
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "client-scroll-padding");
+        Assert.True(result.Passed,
+            $"client/scroll metrics should include padding without negative-margin overflow. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_ViewportMediaQueryLengths_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>

@@ -2649,7 +2649,9 @@ public sealed partial class DomBridge
             return _viewportWidth;
 
         var props = GetComputedProps(element);
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"));
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"))
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"))
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"));
     }
 
     private double GetClientHeightForDomElement(DomElement element, bool isRoot)
@@ -2658,7 +2660,9 @@ public sealed partial class DomBridge
             return _viewportHeight;
 
         var props = GetComputedProps(element);
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"));
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"))
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"))
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"));
     }
 
     private double GetClientTopForDomElement(DomElement element)
