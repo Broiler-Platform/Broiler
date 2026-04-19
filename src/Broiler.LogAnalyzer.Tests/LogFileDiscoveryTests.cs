@@ -105,6 +105,63 @@ public class LogFileDiscoveryTests : IDisposable
     }
 
     [Fact]
+    public void Resolve_DirectoryWithProductiveLogVariants_FindsAll()
+    {
+        string[] expectedFiles =
+        [
+            "access.log.07.gz",
+            "access.log.08.gz",
+            "access.log.09.gz",
+            "access.log.10.gz",
+            "access.log.11.gz",
+            "access.log.12.gz",
+            "access.log.13.gz",
+            "access.log.14.1.gz",
+            "access.log.14.2.gz",
+            "access.log.14.3.gz",
+            "access.log.14.4.gz",
+            "access.log.14.5.gz",
+            "access.log.14.6.gz",
+            "access.log.14.7.gz",
+            "access.log.14.gz",
+            "access.log.15.1.gz",
+            "access.log.15.2.gz",
+            "access.log.15.3.gz",
+            "access.log.15.4.gz",
+            "access.log.15.5",
+            "access.log.15.5.gz",
+            "access.log.15.6",
+            "access.log.15.6.gz",
+            "access.log.15.7.gz",
+            "access.log.16.1.gz",
+            "access.log.16.2",
+            "access.log.16.2.gz",
+            "access.log.16.3",
+            "access.log.16.3.gz",
+            "access.log.16.4",
+            "access.log.16.4.gz",
+            "access.log.16.5",
+            "access.log.16.5.gz",
+            "access.log.16.6.gz",
+            "access.log.16.7",
+            "access.log.current",
+        ];
+
+        foreach (var file in expectedFiles)
+            CreateLogFile(file);
+
+        CreateFile("error.log", "err");
+        CreateFile("access.log.txt", "text");
+
+        var result = LogFileDiscovery.Resolve(_tempDir)
+            .Select(Path.GetFileName)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(expectedFiles.OrderBy(name => name, StringComparer.Ordinal), result);
+    }
+
+    [Fact]
     public void Resolve_Directory_SortedByRotationIndex()
     {
         CreateFile("access.log.2", "");
@@ -118,6 +175,35 @@ public class LogFileDiscoveryTests : IDisposable
         Assert.EndsWith("access.log.1", result[1]);
         Assert.EndsWith("access.log.2", result[2]);
         Assert.EndsWith("access.log.3.gz", result[3]);
+    }
+
+    [Fact]
+    public void Resolve_DirectoryWithProductiveLogVariants_SortedNaturally()
+    {
+        CreateLogFile("access.log.current");
+        CreateGzipFile("access.log.14.gz", "");
+        CreateGzipFile("access.log.14.1.gz", "");
+        CreateGzipFile("access.log.14.2.gz", "");
+        CreateFile("access.log.15.5", "");
+        CreateGzipFile("access.log.15.5.gz", "");
+        CreateFile("access.log.16.2", "");
+        CreateGzipFile("access.log.16.2.gz", "");
+
+        var result = LogFileDiscovery.Resolve(_tempDir)
+            .Select(Path.GetFileName)
+            .ToArray();
+
+        Assert.Equal(
+        [
+            "access.log.current",
+            "access.log.14.gz",
+            "access.log.14.1.gz",
+            "access.log.14.2.gz",
+            "access.log.15.5",
+            "access.log.15.5.gz",
+            "access.log.16.2",
+            "access.log.16.2.gz",
+        ], result);
     }
 
     [Fact]
@@ -136,11 +222,18 @@ public class LogFileDiscoveryTests : IDisposable
     [InlineData("access.log.10", true)]
     [InlineData("access.log.1.gz", true)]
     [InlineData("access.log.10.gz", true)]
+    [InlineData("access.log.14.1.gz", true)]
+    [InlineData("access.log.15.5", true)]
+    [InlineData("access.log.current", true)]
     [InlineData("access_log.1", true)]
     [InlineData("access_log.1.gz", true)]
+    [InlineData("access_log.14.1", true)]
+    [InlineData("access_log.current", true)]
     [InlineData("error.log", false)]
     [InlineData("access.log.bak", false)]
     [InlineData("access.log.txt", false)]
+    [InlineData("access.log.current.txt", false)]
+    [InlineData("access.log.14.current.gz", false)]
     [InlineData("readme.txt", false)]
     [InlineData("access.log.gz", false)] // no rotation number before .gz
     public void IsAccessLogFile_DetectsCorrectly(string filename, bool expected)
@@ -197,5 +290,12 @@ public class LogFileDiscoveryTests : IDisposable
 
         var result = LogFileDiscovery.Resolve(_tempDir);
         Assert.Equal(2, result.Count);
+    }
+
+    private string CreateLogFile(string name, string content = "")
+    {
+        return name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)
+            ? CreateGzipFile(name, content)
+            : CreateFile(name, content);
     }
 }
