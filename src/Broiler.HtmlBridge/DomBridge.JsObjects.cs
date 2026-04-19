@@ -3043,11 +3043,11 @@ public sealed partial class DomBridge
     {
         var scrollContainer = FindScrollContainer(element) ?? DocumentElement;
         var scrollTop = ComputeOffsetWithinAncestor(element, scrollContainer, vertical: true)
-                      - ResolveScrollIntoViewInset(element, "scroll-margin-top")
-                      - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-top");
+            - ResolveScrollIntoViewInset(element, "scroll-margin-top")
+            - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-top");
         var scrollLeft = ComputeOffsetWithinAncestor(element, scrollContainer, vertical: false)
-                       - ResolveScrollIntoViewInset(element, "scroll-margin-left")
-                       - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-left");
+            - ResolveScrollIntoViewInset(element, "scroll-margin-left")
+            - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-left");
 
         scrollContainer.DomProperties["_scrollTop"] = Math.Max(0, scrollTop);
         scrollContainer.DomProperties["_scrollLeft"] = Math.Max(0, scrollLeft);
