@@ -13,6 +13,7 @@ public static class AccessedFilesTreeFormatter
             return string.Empty;
 
         var accessPaths = entries
+            .Where(IsAccessible)
             .Select(entry => AccessPath.Parse(entry.Endpoint))
             .Where(path => path is not null)
             .Cast<AccessPath>()
@@ -45,6 +46,11 @@ public static class AccessedFilesTreeFormatter
         }
 
         return builder.ToString();
+    }
+
+    private static bool IsAccessible(LogEntry entry)
+    {
+        return entry.StatusCode is >= 200 and < 400;
     }
 
     private static void AddPath(AccessTreeNode root, IReadOnlyList<string> segments)
