@@ -390,6 +390,38 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssValues_ViewportMinMaxMediaQueryLengths_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #target { width: 100%; height: 100%; background: red; }
+    @media (min-width: 50vmin) and (max-width: 200vmax) {
+      #target { background: green; }
+    }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #target { width: 100%; height: 100%; background: green; }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "viewport-minmax-media-query-lengths");
+        Assert.True(result.Passed,
+            $"viewport min/max media-query lengths should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssViewport_ZoomScrollPadding_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>

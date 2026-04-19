@@ -1801,6 +1801,30 @@ public sealed partial class DomBridge
             return -1;
         }
 
+        var viewportMin = Math.Min(viewportWidth, viewportHeight);
+        if (viewportMin > 0 && v.EndsWith("vmin"))
+        {
+            if (double.TryParse(v[..^4], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var vmin))
+            {
+                return (vmin / 100.0) * viewportMin;
+            }
+
+            return -1;
+        }
+
+        var viewportMax = Math.Max(viewportWidth, viewportHeight);
+        if (viewportMax > 0 && v.EndsWith("vmax"))
+        {
+            if (double.TryParse(v[..^4], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var vmax))
+            {
+                return (vmax / 100.0) * viewportMax;
+            }
+
+            return -1;
+        }
+
         if (v.EndsWith("px"))
         {
             if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,

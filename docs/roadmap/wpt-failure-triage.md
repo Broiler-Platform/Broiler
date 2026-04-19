@@ -28,7 +28,7 @@
 - Phase 3 has started: main-document media queries now evaluate against the real viewport again, single-value `calc()` / `max()` / `min()` lengths are normalized in both the DOM bridge and renderer parser, and focused local guard rails now cover representative `css-values`, `css-viewport/zoom`, and `cssom-view/*zoom*` regressions.
 - Phase 3 has widened again: zoom-sensitive element metrics now expose `clientTop` / `clientLeft` and border-inclusive `offsetWidth` / `offsetHeight` without applying the target element's own zoom, and focused DOM-bridge regressions now cover representative `cssom-view/*zoom*` client/offset expectations locally too.
 - Phase 3 has widened again: `offsetParent` / `offsetTop` / `offsetLeft` now resolve against the nearest positioned ancestor in raw CSS pixels instead of document-space zoomed coordinates, including the nested collapsed-margin cases from the zoom-sensitive CSSOM view bucket.
-- Phase 3 has widened again: viewport-aware media-query lengths now resolve through `matchMedia()` too, including `vw` / `vh` and single-value `calc()` wrappers in both JS and stylesheet `@media` paths.
+- Phase 3 has widened again: viewport-aware media-query lengths now resolve through `matchMedia()` too, including `vw` / `vh`, `vmin` / `vmax`, and single-value `calc()` wrappers in both JS and stylesheet `@media` paths.
 - Phase 3 has widened again: `scrollIntoView()` now respects `scroll-padding-*` and `scroll-margin-*` offsets in raw CSS pixels, including inherited `scroll-padding-top` / `scroll-margin-top` under zoomed containers.
 - Phase 3 has widened again: `scrollIntoView()` now uses positioned `top` / `left` offsets for absolutely positioned targets in raw CSS pixels, including zoomed scroll containers.
 - Phase 3 has widened again: `scrollIntoView()` now resolves percentage `top` / `left` insets for absolutely positioned targets in raw CSS pixels, including fixed and zoomed scroll containers.
@@ -194,7 +194,7 @@ Target the clusters with many `LayoutShift` or 0% mismatches:
 
 **Working rule:** land these fixes only with focused regression tests because these bugs are likely cross-cutting.
 
-**Status:** Phase 3 has started; representative `calc-*`, viewport-aware media-query resolution, `ch` font-relative lengths, padded client/scroll metrics, zoom rendering, zoom-sensitive CSSOM view guard rails, and zoomed `scrollIntoView()` spacing/absolute-position/percentage-inset cases now pass locally, including client/offset metric and offset-parent follow-up coverage, but the broader Phase 3 buckets still need follow-up triage.
+**Status:** Phase 3 has started; representative `calc-*`, viewport-aware media-query resolution including `vmin` / `vmax`, `ch` font-relative lengths, padded client/scroll metrics, zoom rendering, zoom-sensitive CSSOM view guard rails, and zoomed `scrollIntoView()` spacing/absolute-position/percentage-inset cases now pass locally, including client/offset metric and offset-parent follow-up coverage, but the broader Phase 3 buckets still need follow-up triage.
 
 ## Phase 4 — Triage unsupported feature clusters separately
 

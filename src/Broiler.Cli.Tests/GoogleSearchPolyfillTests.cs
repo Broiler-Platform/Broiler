@@ -503,6 +503,21 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void MatchMedia_Uses_Vmin_And_Vmax_Viewport_Lengths()
+    {
+        var result = ExecJs(@"
+            var checks = [
+                window.matchMedia('(min-width: 50vmin)').matches,
+                window.matchMedia('(min-width: 90vmax)').matches,
+                window.matchMedia('(max-width: 200vmax)').matches
+            ];
+
+            document.getElementById('result').textContent = checks.join(',');
+        ");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
     public void MediaQueries_Use_MainDocument_Viewport_Lengths_In_Computed_Styles()
     {
         var result = ExecJs(@"
@@ -510,6 +525,29 @@ public class GoogleSearchPolyfillTests
             style.textContent = `
                 #target { width: 20px; height: 20px; }
                 @media (min-width: 50vw) and (max-height: calc(100vh)) {
+                    #target { width: 40px; }
+                }
+            `;
+            document.head.appendChild(style);
+
+            var target = document.createElement('div');
+            target.id = 'target';
+            document.body.appendChild(target);
+
+            document.getElementById('result').textContent =
+                window.getComputedStyle(target).width;
+        ");
+        Assert.Contains("40px", result);
+    }
+
+    [Fact]
+    public void MediaQueries_Use_Vmin_And_Vmax_Lengths_In_Computed_Styles()
+    {
+        var result = ExecJs(@"
+            var style = document.createElement('style');
+            style.textContent = `
+                #target { width: 20px; height: 20px; }
+                @media (min-width: 50vmin) and (max-width: 200vmax) {
                     #target { width: 40px; }
                 }
             `;
