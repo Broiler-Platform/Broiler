@@ -3,7 +3,7 @@ using System.Text;
 namespace Broiler.LogAnalyzer;
 
 /// <summary>
-/// Formats accessed endpoint paths into a sorted tree with per-file access counts.
+/// Formats accessed endpoints into a sorted tree with per-file access counts.
 /// </summary>
 public static class AccessedFilesTreeFormatter
 {

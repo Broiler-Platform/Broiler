@@ -396,7 +396,7 @@ public class ProgramEnhancedTests
     }
 
     [Fact]
-    public void FormatAccessedFilesTree_CollapsesCommonAbsoluteRoot()
+    public void FormatAccessedFilesTree_UsesCommonAbsolutePrefixAsRoot()
     {
         var timestamp = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
         var entries = new[]
