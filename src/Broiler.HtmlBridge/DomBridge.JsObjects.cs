@@ -3088,27 +3088,36 @@ public sealed partial class DomBridge
             return 0;
 
         var parentProps = GetComputedProps(element.Parent);
+        var elementProps = GetComputedProps(element);
+        var position = elementProps.GetValueOrDefault("position");
         double offset = ParseCssLengthToPixelsWithViewport(
             parentProps.GetValueOrDefault(vertical ? "padding-top" : "padding-left"));
-
-        var elementProps = GetComputedProps(element);
         offset += ParseCssLengthToPixelsWithViewport(
             elementProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"));
 
-        foreach (var sibling in element.Parent.Children)
+        if (!string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase))
         {
-            if (ReferenceEquals(sibling, element))
-                break;
-            if (sibling.IsTextNode)
-                continue;
+            foreach (var sibling in element.Parent.Children)
+            {
+                if (ReferenceEquals(sibling, element))
+                    break;
+                if (sibling.IsTextNode)
+                    continue;
 
-            var siblingProps = GetComputedProps(sibling);
-            offset += ParseCssLengthToPixelsWithViewport(
-                siblingProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"));
-            offset += ParseCssLengthToPixelsWithViewport(
-                siblingProps.GetValueOrDefault(vertical ? "height" : "width"));
-            offset += ParseCssLengthToPixelsWithViewport(
-                siblingProps.GetValueOrDefault(vertical ? "margin-bottom" : "margin-right"));
+                var siblingProps = GetComputedProps(sibling);
+                offset += ParseCssLengthToPixelsWithViewport(
+                    siblingProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"));
+                offset += ParseCssLengthToPixelsWithViewport(
+                    siblingProps.GetValueOrDefault(vertical ? "height" : "width"));
+                offset += ParseCssLengthToPixelsWithViewport(
+                    siblingProps.GetValueOrDefault(vertical ? "margin-bottom" : "margin-right"));
+            }
+        }
+
+        if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(position, "relative", StringComparison.OrdinalIgnoreCase))
+        {
+            offset += ResolvePositionedInset(element, vertical);
         }
 
         return offset;
@@ -3122,6 +3131,36 @@ public sealed partial class DomBridge
             return ResolveScrollIntoViewInset(element.Parent, propertyName);
 
         return ParseCssLengthToPixelsWithViewport(value);
+    }
+
+    private double ResolvePositionedInset(DomElement element, bool vertical)
+    {
+        if (element.Parent == null)
+            return 0;
+
+        var props = GetComputedProps(element);
+        var value = props.GetValueOrDefault(vertical ? "top" : "left");
+        if (string.IsNullOrWhiteSpace(value) ||
+            string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return 0;
+        }
+
+        var px = ParseCssLengthToPixelsWithViewport(value);
+        if (px >= 0)
+            return px;
+
+        var normalized = value.Trim().ToLowerInvariant();
+        if (!normalized.EndsWith("%") ||
+            !double.TryParse(normalized[..^1], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var percent))
+        {
+            return 0;
+        }
+
+        var parentProps = GetComputedProps(element.Parent);
+        var reference = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault(vertical ? "height" : "width"));
+        return reference <= 0 ? 0 : reference * (percent / 100.0);
     }
 
     private double ParseCssLengthToPixelsWithViewport(string? value)

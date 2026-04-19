@@ -573,6 +573,46 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("950,950", result);
     }
 
+    [Fact]
+    public void ScrollIntoView_Scrolls_Absolutely_Positioned_Targets_In_Raw_Css_Pixels()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function buildContainer(zoom) {
+                var container = document.createElement('div');
+                container.style.position = 'relative';
+                container.style.width = '150px';
+                container.style.height = '150px';
+                container.style.overflow = 'auto';
+                if (zoom) {
+                    container.style.zoom = zoom;
+                }
+
+                var content = document.createElement('div');
+                content.style.width = '600px';
+                content.style.height = '600px';
+
+                var target = document.createElement('div');
+                target.style.position = 'absolute';
+                target.style.left = '300px';
+                target.style.top = '240px';
+                target.style.width = '20px';
+                target.style.height = '20px';
+
+                container.appendChild(content);
+                container.appendChild(target);
+                document.body.appendChild(container);
+                target.scrollIntoView();
+                return container.scrollLeft + ',' + container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                buildContainer('1') + '|' + buildContainer('2');
+        ");
+        Assert.Contains("300,240|300,240", result);
+    }
+
     // ---------------------------------------------------------------
     //  TODO-G6: Image() constructor
     // ---------------------------------------------------------------
