@@ -109,6 +109,7 @@ internal static class CssConstants
     public const string In = "in";
     public const string Em = "em";
     public const string Ex = "ex";
+    public const string Ch = "ch";
     public const string Pt = "pt";
     public const string Pc = "pc";
     public const string Rem = "rem";

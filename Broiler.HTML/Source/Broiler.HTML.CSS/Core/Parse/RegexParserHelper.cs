@@ -10,7 +10,7 @@ internal static partial class RegexParserHelper
     public const string CssBlocks = @"[^\{\}]*\{[^\{\}]*\}";
     public const string CssNumber = @"([0-9]+|[0-9]*\.[0-9]+)";
     public const string CssPercentage = @"([0-9]+|[0-9]*\.[0-9]+)\%";
-    public const string CssLength = @"([0-9]+|[0-9]*\.[0-9]+)(em|ex|px|in|cm|mm|pt|pc)";
+    public const string CssLength = @"([0-9]+|[0-9]*\.[0-9]+)(em|ex|ch|px|in|cm|mm|pt|pc)";
     public const string CssColors = @"(#\S{6}|#\S{3}|rgb\(\s*[0-9]{1,3}\%?\s*\,\s*[0-9]{1,3}\%?\s*\,\s*[0-9]{1,3}\%?\s*\)|maroon|red|orange|yellow|olive|purple|fuchsia|white|lime|green|navy|blue|aqua|teal|black|silver|gray)";
     public const string CssLineHeight = "(normal|" + CssNumber + "|" + CssLength + "|" + CssPercentage + ")";
     public const string CssBorderStyle = @"(none|hidden|dotted|dashed|solid|double|groove|ridge|inset|outset)";

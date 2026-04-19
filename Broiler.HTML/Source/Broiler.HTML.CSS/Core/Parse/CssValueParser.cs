@@ -130,6 +130,7 @@ internal sealed class CssValueParser
             {
                 case CssConstants.Em:
                 case CssConstants.Ex:
+                case CssConstants.Ch:
                 case CssConstants.Px:
                 case CssConstants.Mm:
                 case CssConstants.Cm:
@@ -212,6 +213,9 @@ internal sealed class CssValueParser
                 factor = CssConstants.FontSize * (96.0 / 72.0);
                 break;
             case CssConstants.Ex:
+                factor = emFactor / 2;
+                break;
+            case CssConstants.Ch:
                 factor = emFactor / 2;
                 break;
             case CssConstants.Px:
@@ -357,6 +361,7 @@ internal sealed class CssValueParser
         {
             case CssConstants.Em:
             case CssConstants.Ex:
+            case CssConstants.Ch:
             case CssConstants.Px:
             case CssConstants.Mm:
             case CssConstants.Cm:

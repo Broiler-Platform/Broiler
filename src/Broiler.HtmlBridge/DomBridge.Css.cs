@@ -1816,6 +1816,13 @@ public sealed partial class DomBridge
                 return em * 16.0; // 1em = 16px default
             return -1;
         }
+        if (v.EndsWith("ch"))
+        {
+            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var ch))
+                return ch * 8.0; // 1ch ≈ half of the default 16px font-size
+            return -1;
+        }
         // Plain number (treat as pixels)
         if (double.TryParse(v, System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out var raw))
