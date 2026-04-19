@@ -406,7 +406,7 @@ public class ProgramEnhancedTests
             new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/music/live/Track1.mp3", "HTTP/1.1", 200, 10, "-", "TestAgent/1.0"),
         };
 
-        var tree = Program.FormatAccessedFilesTree(entries);
+        var tree = AccessedFilesTreeFormatter.Format(entries);
 
         Assert.Equal(
             """
@@ -432,7 +432,7 @@ public class ProgramEnhancedTests
             new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/root/fileA.txt", "HTTP/1.1", 200, 10, "-", "TestAgent/1.0"),
         };
 
-        var tree = Program.FormatAccessedFilesTree(entries);
+        var tree = AccessedFilesTreeFormatter.Format(entries);
 
         Assert.Contains("├─ fileA.txt (3)", tree);
         Assert.Contains("├─ fileB.txt (1)", tree);
