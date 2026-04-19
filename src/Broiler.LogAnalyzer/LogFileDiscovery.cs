@@ -108,8 +108,10 @@ public static class LogFileDiscovery
             return false;
         }
 
-        var numericParts = suffix.Split('.', StringSplitOptions.RemoveEmptyEntries);
-        if (numericParts.Length == 0 || numericParts.Any(part => !int.TryParse(part, out _)))
+        var parsedNumericParts = suffix.Split('.', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => int.TryParse(part, out var value) ? value : (int?)null)
+            .ToArray();
+        if (parsedNumericParts.Length == 0 || parsedNumericParts.Any(part => part is null))
         {
             sortKey = default;
             return false;
@@ -117,7 +119,7 @@ public static class LogFileDiscovery
 
         sortKey = (
             1,
-            string.Join('.', numericParts.Select(part => int.Parse(part).ToString("D10"))),
+            string.Join('.', parsedNumericParts.Select(part => part!.Value.ToString("D10"))),
             isGz ? 1 : 0,
             name);
         return true;
