@@ -445,4 +445,27 @@ public class ProgramEnhancedTests
         Assert.True(fileAIndex < fileBIndex);
         Assert.True(fileBIndex < subdirIndex);
     }
+
+    [Fact]
+    public void FormatAccessedFilesTree_ExcludesEndpointsWithOnlyErrorResponses()
+    {
+        var timestamp = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var entries = new[]
+        {
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/root/existing.txt", "HTTP/1.1", 200, 10, "-", "TestAgent/1.0"),
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/root/existing.txt", "HTTP/1.1", 404, 10, "-", "TestAgent/1.0"),
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/root/redirected.txt", "HTTP/1.1", 301, 10, "-", "TestAgent/1.0"),
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/root/missing.txt", "HTTP/1.1", 404, 10, "-", "TestAgent/1.0"),
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/root/forbidden.txt", "HTTP/1.1", 403, 10, "-", "TestAgent/1.0"),
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/root/error.txt", "HTTP/1.1", 500, 10, "-", "TestAgent/1.0"),
+        };
+
+        var tree = AccessedFilesTreeFormatter.Format(entries);
+
+        Assert.Contains("├─ existing.txt (1)", tree);
+        Assert.Contains("└─ redirected.txt (1)", tree);
+        Assert.DoesNotContain("missing.txt", tree);
+        Assert.DoesNotContain("forbidden.txt", tree);
+        Assert.DoesNotContain("error.txt", tree);
+    }
 }
