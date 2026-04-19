@@ -202,6 +202,26 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void Lang_Matches_Html_Lang_With_Quoted_And_Unquoted_Arguments()
+    {
+        var html = @"<!DOCTYPE html>
+<html lang=""en-US""><body>
+<div id=""target"">English</div>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(document.querySelector('#target:lang(en-US)') !== null);
+r.push(document.querySelector('#target:lang(""en-US"")') !== null);
+r.push(document.querySelector('#target:lang(fr)') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
     public void Open_Matches_Details_With_Open_Attribute()
     {
         var html = @"<!DOCTYPE html>
