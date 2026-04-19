@@ -49,7 +49,7 @@ public sealed partial class DomBridge
 
         var props = GetComputedProps(element);
         var specifiedZoom = props.GetValueOrDefault("zoom");
-        var usedZoom = ResolveUsedZoom(specifiedZoom, parentZoom);
+        var usedZoom = ResolveSpecifiedZoom(specifiedZoom, parentZoom);
 
         if (Math.Abs(usedZoom - 1.0) > 0.0001)
         {
@@ -79,24 +79,6 @@ public sealed partial class DomBridge
         "font-size", "line-height", "letter-spacing", "word-spacing", "text-indent",
         "border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius"
     ];
-
-    private static double ResolveUsedZoom(string? specifiedZoom, double parentZoom)
-    {
-        if (string.IsNullOrWhiteSpace(specifiedZoom) ||
-            specifiedZoom.Equals("normal", StringComparison.OrdinalIgnoreCase) ||
-            specifiedZoom.Equals("inherit", StringComparison.OrdinalIgnoreCase))
-        {
-            return parentZoom;
-        }
-
-        if (double.TryParse(specifiedZoom, System.Globalization.NumberStyles.Float,
-            System.Globalization.CultureInfo.InvariantCulture, out var zoom) && zoom > 0)
-        {
-            return parentZoom * zoom;
-        }
-
-        return parentZoom;
-    }
 
     private static bool TryScaleSerializableCssValue(string value, double factor, out string scaled)
     {

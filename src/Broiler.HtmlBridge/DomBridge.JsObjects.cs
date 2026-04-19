@@ -21,6 +21,8 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
+    private const double DefaultBodyMarginPixels = 8;
+
     private readonly Dictionary<DomElement, JSObject> _jsObjectCache = [];
     /// <summary>Counter for tracking top-layer insertion order via showModal().</summary>
     private int _topLayerCounter;
@@ -2710,7 +2712,7 @@ public sealed partial class DomBridge
         foreach (var child in element.Children.Where(c => !c.IsTextNode))
         {
             var childRect = ComputeRenderedRect(child);
-            var widthInContainerSpace = ownZoom > 0 ? (childRect.Width / ownZoom) : childRect.Width;
+            var widthInContainerSpace = ownZoom > 0.0001 ? (childRect.Width / ownZoom) : childRect.Width;
             maxWidth = Math.Max(maxWidth, widthInContainerSpace);
         }
 
@@ -2728,7 +2730,7 @@ public sealed partial class DomBridge
         foreach (var child in element.Children.Where(c => !c.IsTextNode))
         {
             var childRect = ComputeRenderedRect(child);
-            var heightInContainerSpace = ownZoom > 0 ? (childRect.Height / ownZoom) : childRect.Height;
+            var heightInContainerSpace = ownZoom > 0.0001 ? (childRect.Height / ownZoom) : childRect.Height;
             maxHeight = Math.Max(maxHeight, heightInContainerSpace);
         }
 
@@ -2767,8 +2769,8 @@ public sealed partial class DomBridge
 
         if (string.Equals(element.TagName, "body", StringComparison.OrdinalIgnoreCase))
         {
-            var bodyMarginTop = marginTop > 0 ? marginTop : 8;
-            var bodyMarginLeft = marginLeft > 0 ? marginLeft : 8;
+            var bodyMarginTop = marginTop > 0 ? marginTop : DefaultBodyMarginPixels;
+            var bodyMarginLeft = marginLeft > 0 ? marginLeft : DefaultBodyMarginPixels;
             return (bodyMarginLeft, bodyMarginTop, width, height);
         }
 
