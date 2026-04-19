@@ -182,6 +182,93 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
+    [Fact]
+    public void Lang_Matches_Quoted_Argument()
+    {
+        var html = @"<!DOCTYPE html>
+<html lang=""en-US""><body>
+<div id=""target"">English</div>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(document.querySelector('#target:lang(""EN-US"")') !== null);
+r.push(document.querySelector('#target:lang(""FR"")') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Lang_Matches_Html_Lang_With_Quoted_And_Unquoted_Arguments()
+    {
+        var html = @"<!DOCTYPE html>
+<html lang=""en-US""><body>
+<div id=""target"">English</div>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(document.querySelector('#target:lang(en-US)') !== null);
+r.push(document.querySelector('#target:lang(""en-US"")') !== null);
+r.push(document.querySelector('#target:lang(fr)') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void Open_Matches_Details_With_Open_Attribute()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<details id=""target"" open>
+  <summary>Summary</summary>
+  <p>Details</p>
+</details>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(document.querySelector('details:open') !== null);
+r.push(document.querySelector('#target:open') !== null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Open_Tracks_Details_Open_State_Changes()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<details id=""target"">
+  <summary>Summary</summary>
+  <p>Details</p>
+</details>
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var r = [];
+r.push(document.querySelector('#target:open') === null);
+target.open = true;
+r.push(document.querySelector('#target:open') !== null);
+target.open = false;
+r.push(document.querySelector('#target:open') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
     // ─────────── Pseudo-classes: :enabled, :disabled, :checked ────────────
 
     [Fact]
@@ -387,6 +474,66 @@ r.push(document.querySelector('#p0:nth-child(odd)') !== null);
 r.push(document.querySelector('#p1:nth-child(odd)') === null);
 r.push(document.querySelector('#p1:nth-child(even)') !== null);
 r.push(document.querySelector('#p0:nth-child(even)') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void NthChild_OfSelector_Matches_Filtered_Siblings()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var container = document.createElement('div');
+document.body.appendChild(container);
+var ids = ['a', 'b', 'c', 'd', 'e'];
+var classes = ['', 'c', 'c', '', 'c'];
+for (var i = 0; i < ids.length; i++) {
+    var p = document.createElement('p');
+    p.id = ids[i];
+    if (classes[i]) p.className = classes[i];
+    container.appendChild(p);
+}
+var r = [];
+r.push(document.querySelector('#b:nth-child(1 of .c)') !== null);
+r.push(document.querySelector('#c:nth-child(2 of .c)') !== null);
+r.push(document.querySelector('#e:nth-child(3 of .c)') !== null);
+r.push(document.querySelector('#c:nth-child(odd of .c)') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void NthLastChild_OfSelector_Matches_Filtered_Siblings()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var container = document.createElement('div');
+document.body.appendChild(container);
+var ids = ['p0', 'p1', 'p2', 'p3', 'p4'];
+var hits = [true, false, true, true, true];
+for (var i = 0; i < ids.length; i++) {
+    var p = document.createElement('p');
+    p.id = ids[i];
+    if (hits[i]) p.className = 'hit';
+    container.appendChild(p);
+}
+var r = [];
+r.push(document.querySelector('#p4:nth-last-child(1 of .hit)') !== null);
+r.push(document.querySelector('#p3:nth-last-child(2 of .hit)') !== null);
+r.push(document.querySelector('#p2:nth-last-child(odd of .hit)') !== null);
+r.push(document.querySelector('#p1:nth-last-child(1 of .hit)') === null);
 document.getElementById('result').textContent = r.join(',');
 </script>
 </body></html>";

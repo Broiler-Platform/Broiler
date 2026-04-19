@@ -811,8 +811,126 @@ document.getElementById('out').appendChild(p);
 
         Assert.True(summaryEl.TryGetProperty("failed", out var failedEl));
         Assert.True(failedEl.GetInt32() > 0);
+        Assert.True(doc.RootElement.TryGetProperty("triage", out var triageEl));
+        Assert.True(triageEl.TryGetProperty("topFailingDirectories", out _));
 
         Assert.True(resultsEl.GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public void Program_Output_Includes_Bucket_Summaries()
+    {
+        var testDir = Path.Combine(_tempDir, "bucket-output");
+        var failDir = Path.Combine(testDir, "css", "failing-bucket");
+        var skipDir = Path.Combine(testDir, "css", "skipped-bucket");
+        var mismatchDir = Path.Combine(testDir, "css", "mismatch-bucket");
+        Directory.CreateDirectory(failDir);
+        Directory.CreateDirectory(skipDir);
+        Directory.CreateDirectory(mismatchDir);
+
+        File.WriteAllText(Path.Combine(failDir, "decode.html"), "<html><body>Decode</body></html>");
+        File.WriteAllText(Path.Combine(skipDir, "skip.html"), "<html><body>Skip</body></html>");
+        File.WriteAllText(Path.Combine(mismatchDir, "mismatch.html"),
+            @"<!DOCTYPE html><html><body style=""margin:0""><div style=""width:100px;height:100px;background:red""></div></body></html>");
+
+        var refDir = Path.Combine(testDir, "references");
+        Directory.CreateDirectory(refDir);
+        File.WriteAllText(Path.Combine(refDir, "decode.png"), "not-a-png");
+
+        using (var refBmp = new SkiaSharp.SKBitmap(1024, 768, SkiaSharp.SKColorType.Rgba8888, SkiaSharp.SKAlphaType.Premul))
+        using (var stream = File.OpenWrite(Path.Combine(refDir, "mismatch.png")))
+        {
+            refBmp.Erase(SkiaSharp.SKColors.Blue);
+            refBmp.Encode(stream, SkiaSharp.SKEncodedImageFormat.Png, 100);
+        }
+
+        var originalOut = Console.Out;
+        var sw = new StringWriter();
+        Console.SetOut(sw);
+        try
+        {
+            Program.Main(["--wpt-dir", testDir, "--reference-dir", refDir]);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        var output = sw.ToString();
+
+        Assert.Contains("=== Bucket Summary ===", output);
+        Assert.Contains("Top failing directories:", output);
+        Assert.Contains("css/failing-bucket", output);
+        Assert.Contains("css/mismatch-bucket", output);
+        Assert.Contains("Top skipped directories:", output);
+        Assert.Contains("css/skipped-bucket", output);
+        Assert.Contains("Mismatch sub-categories:", output);
+        Assert.Contains("Lowest-match failures:", output);
+        Assert.Contains("Skip reasons:", output);
+        Assert.Contains("MissingReferenceImage", output);
+    }
+
+    [Fact]
+    public void Program_Outputs_Triage_Report_With_Skip_Reasons_And_Markdown_Summary()
+    {
+        var testDir = Path.Combine(_tempDir, "triage-report");
+        var missingRefDir = Path.Combine(testDir, "css", "skip");
+        var mediaDir = Path.Combine(testDir, "css", "media");
+        Directory.CreateDirectory(missingRefDir);
+        Directory.CreateDirectory(mediaDir);
+
+        File.WriteAllText(Path.Combine(missingRefDir, "missing-ref.html"), "<html><body>Missing ref</body></html>");
+        File.WriteAllText(Path.Combine(mediaDir, "media.html"),
+            @"<!DOCTYPE html><html><body><video autoplay><source type=""video/mp4"" src=""support/video.mp4""></video></body></html>");
+
+        var refDir = Path.Combine(testDir, "references");
+        Directory.CreateDirectory(refDir);
+        var jsonPath = Path.Combine(_tempDir, "triage-report.json");
+        var markdownPath = Path.Combine(_tempDir, "triage-report.md");
+
+        var originalOut = Console.Out;
+        Console.SetOut(new StringWriter());
+        try
+        {
+            Program.Main([
+                "--wpt-dir", testDir,
+                "--reference-dir", refDir,
+                "--json-output", jsonPath,
+                "--markdown-output", markdownPath,
+            ]);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        Assert.True(File.Exists(jsonPath));
+        Assert.True(File.Exists(markdownPath));
+
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(jsonPath));
+        var triage = doc.RootElement.GetProperty("triage");
+        Assert.True(triage.GetProperty("topSkippedDirectories").GetArrayLength() > 0);
+        Assert.True(triage.GetProperty("skipReasons").GetArrayLength() > 0);
+
+        var reasons = triage.GetProperty("skipReasons")
+            .EnumerateArray()
+            .Select(el => el.GetProperty("reason").GetString())
+            .ToList();
+        Assert.Contains("MissingReferenceImage", reasons);
+        Assert.Contains("UnsupportedMediaPlayback", reasons);
+
+        var resultReasons = doc.RootElement.GetProperty("results")
+            .EnumerateArray()
+            .Where(el => el.GetProperty("skipped").GetBoolean())
+            .Select(el => el.GetProperty("skipReason").GetString())
+            .ToList();
+        Assert.Contains("MissingReferenceImage", resultReasons);
+        Assert.Contains("UnsupportedMediaPlayback", resultReasons);
+
+        var markdown = File.ReadAllText(markdownPath);
+        Assert.Contains("# WPT Triage Summary", markdown);
+        Assert.Contains("## Suggested next subset commands", markdown);
+        Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/skip\"", markdown);
     }
 
     [Fact]
@@ -890,6 +1008,23 @@ document.getElementById('out').appendChild(p);
         Assert.Equal("ColorShift", diag["subCategory"]);
         Assert.Equal(42.5, diag["averageChannelDelta"]);
         Assert.Equal(100, diag["maxChannelDelta"]);
+        Assert.False(json.ContainsKey("skipReason"));
+    }
+
+    [Fact]
+    public void WptTestResult_ToJsonObject_Includes_SkipReason_When_Present()
+    {
+        var result = new WptTestResult
+        {
+            TestPath = "/skip.html",
+            Skipped = true,
+            SkipReason = SkipReason.MissingReferenceImage,
+            Message = "No reference image",
+        };
+
+        var json = result.ToJsonObject();
+
+        Assert.Equal("MissingReferenceImage", json["skipReason"]);
     }
 
     // ──────────── CSS2 regression tests ──────────────────────────────
@@ -2841,6 +2976,188 @@ document.getElementById('out').appendChild(p);
         return runner.RunTest(testFile, refDir, wptRoot);
     }
 
+    private WptTestResult RunTempBackgroundSizeVectorMatchTest(
+        string fileName,
+        string backgroundSize,
+        int referenceWidth,
+        bool crispEdges = false)
+    {
+        var wptRoot = Path.Combine(_tempDir, "css", "css-backgrounds", "background-size", "vector");
+        var supportDir = Path.Combine(wptRoot, "support");
+        var referenceDir = Path.Combine(wptRoot, "reference");
+        Directory.CreateDirectory(supportDir);
+        Directory.CreateDirectory(referenceDir);
+
+        var imageRenderingRule = crispEdges ? "\n  image-rendering: -moz-crisp-edges;" : string.Empty;
+        File.WriteAllText(Path.Combine(wptRoot, fileName), $@"<!DOCTYPE html>
+<html>
+ <head>
+  <link rel=""match"" href=""reference/ref-tall-lime256x512-aqua256x256.html"">
+  <style type=""text/css"">
+  div {{
+  background-image: url(""support/nonpercent-width-nonpercent-height-viewbox.svg"");
+  background-repeat: no-repeat;
+  background-size: {backgroundSize};
+  border: black solid 1px;
+  height: 768px;{imageRenderingRule}
+  width: 256px;
+  }}
+  </style>
+ </head>
+ <body>
+  <div></div>
+ </body>
+</html>");
+
+        File.WriteAllText(Path.Combine(supportDir, "nonpercent-width-nonpercent-height-viewbox.svg"), @"<svg xmlns=""http://www.w3.org/2000/svg""
+     width=""8px"" height=""32px""
+     viewBox=""0 0 4 64""
+     preserveAspectRatio=""none"">
+  <rect y=""0"" width=""100%"" height=""50%"" fill=""lime""/>
+  <rect y=""50%"" width=""100%"" height=""50%"" fill=""aqua""/>
+</svg>");
+
+        File.WriteAllText(Path.Combine(referenceDir, "ref-tall-lime256x512-aqua256x256.html"), $@"<!DOCTYPE html>
+<html>
+<head>
+  <style type=""text/css"">
+div {{ width: 256px; height: 768px; }}
+#outer {{ border: 1px solid black; }}
+#inner {{ width: {referenceWidth}px; height: 768px; }}
+#inner > div {{ width: {referenceWidth}px; }}
+#top {{ background-color: lime; height: 512px; }}
+#bottom {{ background-color: aqua; height: 256px; }}
+  </style>
+</head>
+<body>
+<div id=""outer""><div id=""inner""><div id=""top""></div><div id=""bottom""></div></div></div>
+</body>
+</html>");
+
+        var runner = new WptTestRunner(1024, 768);
+        return runner.RunMatchTest(
+            Path.Combine(wptRoot, fileName),
+            Path.Combine(referenceDir, "ref-tall-lime256x512-aqua256x256.html"),
+            _tempDir);
+    }
+
+    private static string BuildTempBackgroundSizeVectorSvg(string? widthAttribute, string? heightAttribute)
+    {
+        var dimensionAttributes = string.Join(" ",
+            new[] { widthAttribute, heightAttribute }.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+        return $@"<svg xmlns=""http://www.w3.org/2000/svg""
+     {dimensionAttributes}
+     viewBox=""0 0 4 64""
+     preserveAspectRatio=""none"">
+  <rect y=""0"" width=""100%"" height=""50%"" fill=""lime""/>
+  <rect y=""50%"" width=""100%"" height=""50%"" fill=""aqua""/>
+</svg>";
+    }
+
+    private static string BuildTempWideBackgroundSizeVectorSvg(
+        string? widthAttribute,
+        string? heightAttribute,
+        bool includeViewBox)
+    {
+        var dimensionAttributes = new List<string>();
+        if (!string.IsNullOrWhiteSpace(widthAttribute))
+            dimensionAttributes.Add(widthAttribute);
+        if (!string.IsNullOrWhiteSpace(heightAttribute))
+            dimensionAttributes.Add(heightAttribute);
+        if (includeViewBox)
+        {
+            dimensionAttributes.Add(@"viewBox=""0 0 4 64""");
+            dimensionAttributes.Add(@"preserveAspectRatio=""none""");
+        }
+
+        return $@"<svg xmlns=""http://www.w3.org/2000/svg""
+     {string.Join(" ", dimensionAttributes)}>
+  <rect y=""0"" width=""100%"" height=""50%"" fill=""lime""/>
+  <rect y=""50%"" width=""100%"" height=""50%"" fill=""aqua""/>
+</svg>";
+    }
+
+    private WptTestResult RunTempBackgroundSizeVectorVisualTest(
+        string fileName,
+        string backgroundSize,
+        string? widthAttribute = @"width=""8px""",
+        string? heightAttribute = @"height=""32px""")
+    {
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(_tempDir, "css", "css-backgrounds", "background-size", "vector");
+        var supportDir = Path.Combine(wptRoot, "support");
+        var repoRefDir = Path.Combine(root, "tests", "wpt", "references");
+        Directory.CreateDirectory(supportDir);
+
+        File.WriteAllText(Path.Combine(wptRoot, fileName), $@"<!DOCTYPE html>
+<html>
+ <head>
+  <style type=""text/css"">
+  div {{
+    background-image: url(""support/nonpercent-width-nonpercent-height-viewbox.svg"");
+    background-repeat: no-repeat;
+    background-size: {backgroundSize};
+    border: black solid 1px;
+    height: 768px;
+    width: 256px;
+  }}
+  </style>
+ </head>
+ <body>
+  <div></div>
+ </body>
+</html>");
+
+        File.WriteAllText(
+            Path.Combine(supportDir, "nonpercent-width-nonpercent-height-viewbox.svg"),
+            BuildTempBackgroundSizeVectorSvg(widthAttribute, heightAttribute));
+
+        var runner = new WptTestRunner(1024, 768);
+        return runner.RunTest(Path.Combine(wptRoot, fileName), repoRefDir, _tempDir);
+    }
+
+    private WptTestResult RunTempWideBackgroundSizeVectorVisualTest(
+        string fileName,
+        string supportFileName,
+        string backgroundSize,
+        string? widthAttribute,
+        string? heightAttribute,
+        bool includeViewBox)
+    {
+        var root = FindRepoRoot();
+        var wptRoot = Path.Combine(_tempDir, "css", "css-backgrounds", "background-size", "vector");
+        var supportDir = Path.Combine(wptRoot, "support");
+        var repoRefDir = Path.Combine(root, "tests", "wpt", "references");
+        Directory.CreateDirectory(supportDir);
+
+        File.WriteAllText(Path.Combine(wptRoot, fileName), $@"<!DOCTYPE html>
+<html>
+ <head>
+  <style type=""text/css"">
+  div {{
+    background-image: url(""support/{supportFileName}"");
+    background-repeat: no-repeat;
+    background-size: {backgroundSize};
+    border: black solid 1px;
+    height: 256px;
+    width: 768px;
+  }}
+  </style>
+ </head>
+ <body>
+  <div></div>
+ </body>
+</html>");
+
+        File.WriteAllText(
+            Path.Combine(supportDir, supportFileName),
+            BuildTempWideBackgroundSizeVectorSvg(widthAttribute, heightAttribute, includeViewBox));
+
+        var runner = new WptTestRunner(1024, 768);
+        return runner.RunTest(Path.Combine(wptRoot, fileName), repoRefDir, _tempDir);
+    }
+
     [Fact]
     public void Wpt_BackgroundColorAnimationInBody_MatchesReference()
     {
@@ -2926,6 +3243,52 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_BackgroundClipInherit_DoesNotThrow_RenderingError()
+    {
+        var testFile = Path.Combine(_tempDir, "background-clip-006.html");
+        File.WriteAllText(testFile, @"<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset=""utf-8"">
+    <style>
+        #container { background-clip: content-box; }
+        #test-overlapped-red {
+            background-clip: inherit;
+            background-color: red;
+            border: transparent dotted 5px;
+            height: 100px;
+            padding: 25px;
+            width: 100px;
+        }
+        #ref-overlapping-green {
+            background-color: green;
+            bottom: 130px;
+            height: 100px;
+            left: 30px;
+            position: relative;
+            width: 100px;
+        }
+    </style>
+  </head>
+  <body>
+    <div id=""container"">
+      <div id=""test-overlapped-red""></div>
+      <div id=""ref-overlapping-green""></div>
+    </div>
+  </body>
+</html>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner(320, 240);
+        var result = runner.RunTest(testFile, refDir, _tempDir);
+
+        Assert.True(result.Skipped, $"Expected skip after successful render, got: {result.Message}");
+        Assert.NotEqual(FailureCategory.RenderingError, result.Category);
+    }
+
+    [Fact]
     public void Wpt_DocumentCanvasRemoveBody_MatchesReference()
     {
         // CSS Backgrounds §2.11: removing body via JS should clear its
@@ -2956,6 +3319,78 @@ document.getElementById('out').appendChild(p);
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
+    [Fact]
+    public void Wpt_BackgroundSizeVector_BackgroundSizeVector003_MatchReference()
+    {
+        var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-003.html");
+        Assert.True(result.Passed,
+            $"background-size-vector-003 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundSizeVector_BackgroundSizeVector005_MatchReference()
+    {
+        var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-005.html");
+        Assert.True(result.Passed,
+            $"background-size-vector-005 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundSizeVector_BackgroundSizeVector007_MatchReference()
+    {
+        var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-007.html");
+        Assert.True(result.Passed,
+            $"background-size-vector-007 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundSizeVector_BackgroundSizeVector009_MatchReference()
+    {
+        var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-009.html");
+        Assert.True(result.Passed,
+            $"background-size-vector-009 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundSizeVector_BackgroundSizeVector011_MatchReference()
+    {
+        var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-011.html");
+        Assert.True(result.Passed,
+            $"background-size-vector-011 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundSizeVector_BackgroundSizeVector013_MatchReference()
+    {
+        var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-013.html");
+        Assert.True(result.Passed,
+            $"background-size-vector-013 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundSizeVector_BackgroundSizeVector015_MatchReference()
+    {
+        var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-015.html");
+        Assert.True(result.Passed,
+            $"background-size-vector-015 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundSizeVector_BackgroundSizeVector017_MatchReference()
+    {
+        var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-017.html");
+        Assert.True(result.Passed,
+            $"background-size-vector-017 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
     [Theory]
     [InlineData("background-size/vector/wide--contain--height.html")]
     [InlineData("background-size/vector/wide--contain--width.html")]
@@ -2979,6 +3414,199 @@ document.getElementById('out').appendChild(p);
         var result = RunCssBackgroundsVisualTest(subPath);
         Assert.True(result.Passed,
             $"{Path.GetFileNameWithoutExtension(subPath)} should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Theory]
+    [InlineData("tall--cover--nonpercent-width-nonpercent-height-viewbox.html", false)]
+    [InlineData("tall--cover--nonpercent-width-nonpercent-height-viewbox--crisp.html", true)]
+    public void Wpt_BackgroundSizeVector_TallCoverViewboxCases_MatchReference(string fileName, bool crispEdges)
+    {
+        var result = RunTempBackgroundSizeVectorMatchTest(fileName, "cover", 256, crispEdges);
+        Assert.True(result.Passed,
+            $"{Path.GetFileNameWithoutExtension(fileName)} should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundSizeVector_TallContainViewboxCase_MatchReference()
+    {
+        var result = RunTempBackgroundSizeVectorVisualTest(
+            "tall--contain--nonpercent-width-nonpercent-height-viewbox.html",
+            "contain");
+        Assert.True(result.Passed,
+            "tall--contain--nonpercent-width-nonpercent-height-viewbox should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Theory]
+    [InlineData("wide--contain--nonpercent-width-nonpercent-height.html", "nonpercent-width-nonpercent-height.svg", "contain", @"width=""8px""", @"height=""32px""", false)]
+    [InlineData("wide--contain--nonpercent-width-omitted-height.html", "nonpercent-width-omitted-height.svg", "contain", @"width=""8px""", null, false)]
+    [InlineData("wide--contain--nonpercent-width-percent-height.html", "nonpercent-width-percent-height.svg", "contain", @"width=""8px""", @"height=""50%""", false)]
+    [InlineData("wide--contain--omitted-width-nonpercent-height.html", "omitted-width-nonpercent-height.svg", "contain", null, @"height=""32px""", false)]
+    [InlineData("wide--contain--omitted-width-omitted-height.html", "omitted-width-omitted-height.svg", "contain", null, null, false)]
+    [InlineData("wide--contain--omitted-width-percent-height.html", "omitted-width-percent-height.svg", "contain", null, @"height=""50%""", false)]
+    [InlineData("wide--contain--percent-width-nonpercent-height.html", "percent-width-nonpercent-height.svg", "contain", @"width=""50%""", @"height=""32px""", false)]
+    [InlineData("wide--contain--percent-width-omitted-height.html", "percent-width-omitted-height.svg", "contain", @"width=""50%""", null, false)]
+    [InlineData("wide--contain--percent-width-percent-height.html", "percent-width-percent-height.svg", "contain", @"width=""50%""", @"height=""50%""", false)]
+    [InlineData("wide--contain--nonpercent-width-nonpercent-height-viewbox.html", "nonpercent-width-nonpercent-height-viewbox.svg", "contain", @"width=""8px""", @"height=""32px""", true)]
+    [InlineData("wide--contain--nonpercent-width-omitted-height-viewbox.html", "nonpercent-width-omitted-height-viewbox.svg", "contain", @"width=""8px""", null, true)]
+    [InlineData("wide--contain--nonpercent-width-percent-height-viewbox.html", "nonpercent-width-percent-height-viewbox.svg", "contain", @"width=""8px""", @"height=""50%""", true)]
+    [InlineData("wide--contain--omitted-width-nonpercent-height-viewbox.html", "omitted-width-nonpercent-height-viewbox.svg", "contain", null, @"height=""32px""", true)]
+    [InlineData("wide--contain--omitted-width-omitted-height-viewbox.html", "omitted-width-omitted-height-viewbox.svg", "contain", null, null, true)]
+    [InlineData("wide--contain--omitted-width-percent-height-viewbox.html", "omitted-width-percent-height-viewbox.svg", "contain", null, @"height=""50%""", true)]
+    [InlineData("wide--contain--percent-width-nonpercent-height-viewbox.html", "percent-width-nonpercent-height-viewbox.svg", "contain", @"width=""50%""", @"height=""32px""", true)]
+    [InlineData("wide--contain--percent-width-omitted-height-viewbox.html", "percent-width-omitted-height-viewbox.svg", "contain", @"width=""50%""", null, true)]
+    [InlineData("wide--contain--percent-width-percent-height-viewbox.html", "percent-width-percent-height-viewbox.svg", "contain", @"width=""50%""", @"height=""50%""", true)]
+    public void Wpt_BackgroundSizeVector_WideContainPartialDimensionCases_MatchReference(
+        string fileName,
+        string supportFileName,
+        string backgroundSize,
+        string? widthAttribute,
+        string? heightAttribute,
+        bool includeViewBox)
+    {
+        var result = RunTempWideBackgroundSizeVectorVisualTest(
+            fileName,
+            supportFileName,
+            backgroundSize,
+            widthAttribute,
+            heightAttribute,
+            includeViewBox);
+        Assert.True(result.Passed,
+            $"{Path.GetFileNameWithoutExtension(fileName)} should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Theory]
+    [InlineData("wide--cover--nonpercent-width-nonpercent-height.html", "nonpercent-width-nonpercent-height.svg", "cover", @"width=""8px""", @"height=""32px""", false)]
+    [InlineData("wide--cover--nonpercent-width-omitted-height.html", "nonpercent-width-omitted-height.svg", "cover", @"width=""8px""", null, false)]
+    [InlineData("wide--cover--nonpercent-width-percent-height.html", "nonpercent-width-percent-height.svg", "cover", @"width=""8px""", @"height=""50%""", false)]
+    [InlineData("wide--cover--omitted-width-nonpercent-height.html", "omitted-width-nonpercent-height.svg", "cover", null, @"height=""32px""", false)]
+    [InlineData("wide--cover--omitted-width-omitted-height.html", "omitted-width-omitted-height.svg", "cover", null, null, false)]
+    [InlineData("wide--cover--omitted-width-percent-height.html", "omitted-width-percent-height.svg", "cover", null, @"height=""50%""", false)]
+    [InlineData("wide--cover--percent-width-nonpercent-height.html", "percent-width-nonpercent-height.svg", "cover", @"width=""50%""", @"height=""32px""", false)]
+    [InlineData("wide--cover--percent-width-omitted-height.html", "percent-width-omitted-height.svg", "cover", @"width=""50%""", null, false)]
+    [InlineData("wide--cover--percent-width-percent-height.html", "percent-width-percent-height.svg", "cover", @"width=""50%""", @"height=""50%""", false)]
+    [InlineData("wide--cover--nonpercent-width-nonpercent-height-viewbox.html", "nonpercent-width-nonpercent-height-viewbox.svg", "cover", @"width=""8px""", @"height=""32px""", true)]
+    [InlineData("wide--cover--nonpercent-width-omitted-height-viewbox.html", "nonpercent-width-omitted-height-viewbox.svg", "cover", @"width=""8px""", null, true)]
+    [InlineData("wide--cover--nonpercent-width-percent-height-viewbox.html", "nonpercent-width-percent-height-viewbox.svg", "cover", @"width=""8px""", @"height=""50%""", true)]
+    [InlineData("wide--cover--omitted-width-nonpercent-height-viewbox.html", "omitted-width-nonpercent-height-viewbox.svg", "cover", null, @"height=""32px""", true)]
+    [InlineData("wide--cover--omitted-width-omitted-height-viewbox.html", "omitted-width-omitted-height-viewbox.svg", "cover", null, null, true)]
+    [InlineData("wide--cover--omitted-width-percent-height-viewbox.html", "omitted-width-percent-height-viewbox.svg", "cover", null, @"height=""50%""", true)]
+    [InlineData("wide--cover--percent-width-nonpercent-height-viewbox.html", "percent-width-nonpercent-height-viewbox.svg", "cover", @"width=""50%""", @"height=""32px""", true)]
+    [InlineData("wide--cover--percent-width-omitted-height-viewbox.html", "percent-width-omitted-height-viewbox.svg", "cover", @"width=""50%""", null, true)]
+    [InlineData("wide--cover--percent-width-percent-height-viewbox.html", "percent-width-percent-height-viewbox.svg", "cover", @"width=""50%""", @"height=""50%""", true)]
+    public void Wpt_BackgroundSizeVector_WideCoverPartialDimensionCases_MatchReference(
+        string fileName,
+        string supportFileName,
+        string backgroundSize,
+        string? widthAttribute,
+        string? heightAttribute,
+        bool includeViewBox)
+    {
+        var result = RunTempWideBackgroundSizeVectorVisualTest(
+            fileName,
+            supportFileName,
+            backgroundSize,
+            widthAttribute,
+            heightAttribute,
+            includeViewBox);
+        Assert.True(result.Passed,
+            $"{Path.GetFileNameWithoutExtension(fileName)} should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Theory]
+    [InlineData("tall--contain--nonpercent-width-omitted-height-viewbox.html", "contain", @"width=""8px""", null)]
+    [InlineData("tall--contain--omitted-width-nonpercent-height-viewbox.html", "contain", null, @"height=""32px""")]
+    [InlineData("tall--contain--percent-width-nonpercent-height-viewbox.html", "contain", @"width=""100%""", @"height=""32px""")]
+    [InlineData("tall--contain--percent-width-omitted-height-viewbox.html", "contain", @"width=""100%""", null)]
+    [InlineData("tall--cover--nonpercent-width-omitted-height-viewbox.html", "cover", @"width=""8px""", null)]
+    [InlineData("tall--cover--omitted-width-nonpercent-height-viewbox.html", "cover", null, @"height=""32px""")]
+    [InlineData("tall--cover--percent-width-nonpercent-height-viewbox.html", "cover", @"width=""100%""", @"height=""32px""")]
+    [InlineData("tall--cover--percent-width-omitted-height-viewbox.html", "cover", @"width=""100%""", null)]
+    public void Wpt_BackgroundSizeVector_AdditionalTallViewboxCases_MatchReference(
+        string fileName,
+        string backgroundSize,
+        string? widthAttribute,
+        string? heightAttribute)
+    {
+        var result = RunTempBackgroundSizeVectorVisualTest(fileName, backgroundSize, widthAttribute, heightAttribute);
+        Assert.True(result.Passed,
+            $"{Path.GetFileNameWithoutExtension(fileName)} should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Theory]
+    [InlineData("wide--12px-auto--nonpercent-width-omitted-height.html", "nonpercent-width-omitted-height.svg", @"width=""8px""", null, false)]
+    [InlineData("wide--12px-auto--nonpercent-width-percent-height.html", "nonpercent-width-percent-height.svg", @"width=""8px""", @"height=""50%""", false)]
+    [InlineData("wide--12px-auto--omitted-width-omitted-height.html", "omitted-width-omitted-height.svg", null, null, false)]
+    [InlineData("wide--12px-auto--omitted-width-percent-height.html", "omitted-width-percent-height.svg", null, @"height=""50%""", false)]
+    [InlineData("wide--12px-auto--percent-width-omitted-height.html", "percent-width-omitted-height.svg", @"width=""50%""", null, false)]
+    [InlineData("wide--12px-auto--percent-width-percent-height.html", "percent-width-percent-height.svg", @"width=""50%""", @"height=""50%""", false)]
+    [InlineData("wide--12px-auto--nonpercent-width-omitted-height-viewbox.html", "nonpercent-width-omitted-height-viewbox.svg", @"width=""8px""", null, true)]
+    [InlineData("wide--12px-auto--nonpercent-width-percent-height-viewbox.html", "nonpercent-width-percent-height-viewbox.svg", @"width=""8px""", @"height=""50%""", true)]
+    [InlineData("wide--12px-auto--omitted-width-nonpercent-height-viewbox.html", "omitted-width-nonpercent-height-viewbox.svg", null, @"height=""32px""", true)]
+    [InlineData("wide--12px-auto--omitted-width-omitted-height-viewbox.html", "omitted-width-omitted-height-viewbox.svg", null, null, true)]
+    [InlineData("wide--12px-auto--omitted-width-percent-height-viewbox.html", "omitted-width-percent-height-viewbox.svg", null, @"height=""50%""", true)]
+    [InlineData("wide--12px-auto--percent-width-nonpercent-height-viewbox.html", "percent-width-nonpercent-height-viewbox.svg", @"width=""50%""", @"height=""32px""", true)]
+    [InlineData("wide--12px-auto--percent-width-omitted-height-viewbox.html", "percent-width-omitted-height-viewbox.svg", @"width=""50%""", null, true)]
+    [InlineData("wide--12px-auto--percent-width-percent-height-viewbox.html", "percent-width-percent-height-viewbox.svg", @"width=""50%""", @"height=""50%""", true)]
+    public void Wpt_BackgroundSizeVector_Wide12PxAutoPartialDimensionCases_MatchReference(
+        string fileName,
+        string supportFileName,
+        string? widthAttribute,
+        string? heightAttribute,
+        bool includeViewBox)
+    {
+        var result = RunTempWideBackgroundSizeVectorVisualTest(
+            fileName,
+            supportFileName,
+            "12px auto",
+            widthAttribute,
+            heightAttribute,
+            includeViewBox);
+        Assert.True(result.Passed,
+            $"{Path.GetFileNameWithoutExtension(fileName)} should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Theory]
+    [InlineData("wide--auto-32px--nonpercent-width-nonpercent-height.html", "nonpercent-width-nonpercent-height.svg", @"width=""8px""", @"height=""32px""", false)]
+    [InlineData("wide--auto-32px--nonpercent-width-omitted-height.html", "nonpercent-width-omitted-height.svg", @"width=""8px""", null, false)]
+    [InlineData("wide--auto-32px--nonpercent-width-percent-height.html", "nonpercent-width-percent-height.svg", @"width=""8px""", @"height=""50%""", false)]
+    [InlineData("wide--auto-32px--omitted-width-nonpercent-height.html", "omitted-width-nonpercent-height.svg", null, @"height=""32px""", false)]
+    [InlineData("wide--auto-32px--omitted-width-omitted-height.html", "omitted-width-omitted-height.svg", null, null, false)]
+    [InlineData("wide--auto-32px--omitted-width-percent-height.html", "omitted-width-percent-height.svg", null, @"height=""50%""", false)]
+    [InlineData("wide--auto-32px--percent-width-nonpercent-height.html", "percent-width-nonpercent-height.svg", @"width=""50%""", @"height=""32px""", false)]
+    [InlineData("wide--auto-32px--percent-width-omitted-height.html", "percent-width-omitted-height.svg", @"width=""50%""", null, false)]
+    [InlineData("wide--auto-32px--percent-width-percent-height.html", "percent-width-percent-height.svg", @"width=""50%""", @"height=""50%""", false)]
+    [InlineData("wide--auto-32px--nonpercent-width-nonpercent-height-viewbox.html", "nonpercent-width-nonpercent-height-viewbox.svg", @"width=""8px""", @"height=""32px""", true)]
+    [InlineData("wide--auto-32px--nonpercent-width-omitted-height-viewbox.html", "nonpercent-width-omitted-height-viewbox.svg", @"width=""8px""", null, true)]
+    [InlineData("wide--auto-32px--nonpercent-width-percent-height-viewbox.html", "nonpercent-width-percent-height-viewbox.svg", @"width=""8px""", @"height=""50%""", true)]
+    [InlineData("wide--auto-32px--omitted-width-nonpercent-height-viewbox.html", "omitted-width-nonpercent-height-viewbox.svg", null, @"height=""32px""", true)]
+    [InlineData("wide--auto-32px--omitted-width-omitted-height-viewbox.html", "omitted-width-omitted-height-viewbox.svg", null, null, true)]
+    [InlineData("wide--auto-32px--omitted-width-percent-height-viewbox.html", "omitted-width-percent-height-viewbox.svg", null, @"height=""50%""", true)]
+    [InlineData("wide--auto-32px--percent-width-nonpercent-height-viewbox.html", "percent-width-nonpercent-height-viewbox.svg", @"width=""50%""", @"height=""32px""", true)]
+    [InlineData("wide--auto-32px--percent-width-omitted-height-viewbox.html", "percent-width-omitted-height-viewbox.svg", @"width=""50%""", null, true)]
+    [InlineData("wide--auto-32px--percent-width-percent-height-viewbox.html", "percent-width-percent-height-viewbox.svg", @"width=""50%""", @"height=""50%""", true)]
+    public void Wpt_BackgroundSizeVector_WideAuto32PxPartialDimensionCases_MatchReference(
+        string fileName,
+        string supportFileName,
+        string? widthAttribute,
+        string? heightAttribute,
+        bool includeViewBox)
+    {
+        var result = RunTempWideBackgroundSizeVectorVisualTest(
+            fileName,
+            supportFileName,
+            "auto 32px",
+            widthAttribute,
+            heightAttribute,
+            includeViewBox);
+        Assert.True(result.Passed,
+            $"{Path.GetFileNameWithoutExtension(fileName)} should pass. " +
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
@@ -3095,6 +3723,14 @@ document.getElementById('out').appendChild(p);
         var result = RunBackgroundClipVisualTest("clip-border-box_with_size.html");
         Assert.True(result.MatchPercent >= 90,
             $"clip-border-box_with_size: Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_ClipBorderAreaCornerShape_VisualSubsetGuardRail_MatchesReference()
+    {
+        var result = RunBackgroundClipVisualTest("clip-border-area-corner-shape.html");
+        Assert.True(result.MatchPercent >= 90,
+            $"clip-border-area-corner-shape: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]

@@ -33,6 +33,16 @@ internal enum FailureCategory
 }
 
 /// <summary>
+/// Machine-readable reason for skipped WPT cases.
+/// </summary>
+internal enum SkipReason
+{
+    None,
+    MissingReferenceImage,
+    UnsupportedMediaPlayback,
+}
+
+/// <summary>
 /// Result of rendering and comparing a single WPT test case.
 /// </summary>
 internal sealed class WptTestResult
@@ -48,6 +58,12 @@ internal sealed class WptTestResult
 
     /// <summary>Optional reason for skip or failure.</summary>
     public string? Message { get; init; }
+
+    /// <summary>
+    /// Machine-readable reason for skipped tests. <see cref="SkipReason.None"/>
+    /// for passed/failed tests.
+    /// </summary>
+    public SkipReason SkipReason { get; init; }
 
     /// <summary>
     /// Percent match between the rendered output and the reference image
@@ -84,6 +100,7 @@ internal sealed class WptTestResult
             ["testPath"] = TestPath,
             ["passed"] = Passed,
             ["skipped"] = Skipped,
+            ["skipReason"] = SkipReason != SkipReason.None ? SkipReason.ToString() : null,
             ["matchPercent"] = MatchPercent,
             ["category"] = Category.ToString(),
             ["message"] = Message,
@@ -517,6 +534,7 @@ internal sealed class WptTestRunner
             {
                 TestPath = testPath,
                 Skipped = true,
+                SkipReason = SkipReason.UnsupportedMediaPlayback,
                 Message = "Test requires media playback (video/audio) which is not supported.",
             };
         }
@@ -614,6 +632,7 @@ internal sealed class WptTestRunner
                 {
                     TestPath = testPath,
                     Skipped = true,
+                    SkipReason = SkipReason.MissingReferenceImage,
                     Message = $"No reference image at: {referencePath}",
                 };
             }

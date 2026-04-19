@@ -593,6 +593,124 @@ document.getElementById('result').textContent =
         Assert.Contains("fw=700", result);
     }
 
+    /// <summary>
+    /// Verifies that id/class mutations update the serialized CSS-derived
+    /// inline styles used by the post-script render pass.
+    /// </summary>
+    [Fact]
+    public void Class_And_Id_Mutations_Recalculate_Serialized_Styles()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.foo { background-color: blue; }
+[id=""baz""] { color: green; }
+</style>
+</head><body>
+<div id=""foo"">first</div>
+<div id=""bar"">second</div>
+<script>
+document.getElementById('foo').classList.add('foo');
+document.getElementById('bar').setAttribute('id', 'baz');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("id=\"foo\"", result);
+        Assert.Contains("class=\"foo\"", result);
+        Assert.Contains("background-color: blue", result);
+        Assert.Contains("id=\"baz\"", result);
+        Assert.Contains("color: green", result);
+    }
+
+    /// <summary>
+    /// Verifies that sibling-dependent selectors are recalculated for the
+    /// neighboring element when a previous sibling gains a matching class.
+    /// </summary>
+    [Fact]
+    public void Class_Change_Invalidates_Sibling_Dependent_Styles()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.sibling + .target { color: green; }
+</style>
+</head><body>
+<div>
+  <p id=""toggler"">Ignored</p>
+  <p id=""target"" class=""target"">Should become green</p>
+</div>
+<script>
+document.getElementById('toggler').classList.add('sibling');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("id=\"toggler\"", result);
+        Assert.Contains("class=\"sibling\"", result);
+        Assert.Contains("id=\"target\"", result);
+        Assert.Contains("color: green", result);
+    }
+
+    /// <summary>
+    /// Verifies that reflected boolean property changes invalidate serialized
+    /// selector-driven styles such as :disabled.
+    /// </summary>
+    [Fact]
+    public void Disabled_Property_Recalculates_Serialized_Styles()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+input { position: absolute; left: 200px; top: 300px; }
+:disabled { top: 400px; }
+</style>
+</head><body>
+<input id=""target"" type=""button"" value=""First"">
+<script>
+document.getElementById('target').disabled = true;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("id=\"target\"", result);
+        Assert.Contains("disabled=\"disabled\"", result);
+        Assert.Contains("position: absolute", result);
+        Assert.Contains("top: 400px", result);
+    }
+
+    /// <summary>
+    /// Verifies that selector invalidation recomputes filtered sibling positions
+    /// for <c>:nth-child(... of selector)</c> after a class mutation.
+    /// </summary>
+    [Fact]
+    public void NthChild_OfSelector_Recomputes_After_Class_Change()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+p:nth-child(even of .c) { font-style: italic; }
+</style>
+</head><body>
+<div>
+  <p id=""a"" class=""c"">a</p>
+  <p id=""b"" class=""c"">b</p>
+  <p id=""toggler"" class=""c"">toggle</p>
+  <p id=""target"" class=""c"">target</p>
+</div>
+<div id=""result""></div>
+<script>
+var before = window.getComputedStyle(document.getElementById('target')).fontStyle;
+document.getElementById('toggler').classList.remove('c');
+var after = window.getComputedStyle(document.getElementById('target')).fontStyle;
+document.getElementById('result').textContent = before + ',' + after;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("italic,normal", result);
+    }
+
     // ────────────── D2: :root cascade overriding html ──────────────
 
     /// <summary>

@@ -52,6 +52,7 @@ public sealed partial class DomBridge
                 var val = a.Length > 0 ? a[0].ToString() : string.Empty;
                 element.Id = val;
                 element.Attributes["id"] = val;
+                bridge.InvalidateStyleScope(element);
                 return JSUndefined.Value;
             }, "set id"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -73,7 +74,7 @@ public sealed partial class DomBridge
                 var val = a.Length > 0 ? a[0].ToString() : string.Empty;
                 element.ClassName = val;
                 element.Attributes["class"] = val;
-                bridge.InvalidateElementStyles(element);
+                bridge.InvalidateStyleScope(element);
                 return JSUndefined.Value;
             }, "set className"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -162,7 +163,7 @@ public sealed partial class DomBridge
         // classList — class list manipulation
         obj.FastAddValue(
             (KeyString)"classList",
-            BuildClassListObject(element, bridge.InvalidateElementStyles),
+            BuildClassListObject(element, bridge.InvalidateStyleScope),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // attributes — NamedNodeMap interface
@@ -188,10 +189,7 @@ public sealed partial class DomBridge
                     if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
                         element.Id = attrVal;
                     else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
-                    {
                         element.ClassName = attrVal;
-                        bridgeForSet.InvalidateElementStyles(element);
-                    }
                     else if (string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
                     {
                         element.Style.Clear();
@@ -203,6 +201,9 @@ public sealed partial class DomBridge
                     {
                         bridgeForSet.CompileInlineEventAttribute(element, attrName, attrVal);
                     }
+
+                    if (!string.Equals(attrName, "style", StringComparison.OrdinalIgnoreCase))
+                        bridgeForSet.InvalidateStyleScope(element);
                 }
                 return JSUndefined.Value;
             }, "setAttribute", 2),
@@ -622,10 +623,9 @@ public sealed partial class DomBridge
                     if (string.Equals(attrName, "id", StringComparison.OrdinalIgnoreCase))
                         element.Id = null;
                     else if (string.Equals(attrName, "class", StringComparison.OrdinalIgnoreCase))
-                    {
                         element.ClassName = null;
-                        bridgeForSet.InvalidateElementStyles(element);
-                    }
+
+                    bridgeForSet.InvalidateStyleScope(element);
                 }
                 return JSUndefined.Value;
             }, "removeAttribute", 1),
@@ -644,6 +644,7 @@ public sealed partial class DomBridge
                     var localName = qName.Contains(':') ? qName[(qName.IndexOf(':') + 1)..] : qName;
                     element.Attributes[qName] = val;
                     element.NsAttrMap[(ns, localName)] = qName;
+                    bridgeForSet.InvalidateStyleScope(element);
                 }
                 return JSUndefined.Value;
             }, "setAttributeNS", 3),
@@ -677,6 +678,7 @@ public sealed partial class DomBridge
                     {
                         element.Attributes.Remove(qName);
                         element.NsAttrMap.Remove((ns, localName));
+                        bridgeForSet.InvalidateStyleScope(element);
                     }
                 }
                 return JSUndefined.Value;
@@ -742,6 +744,7 @@ public sealed partial class DomBridge
                     newEl.Parent?.Children.Remove(newEl);
                     newEl.Parent = element;
                     element.Children.Add(newEl);
+                    bridgeForInsert.InvalidateStyleScope(element);
 
                     // Fire onload for iframe/object children after DOM insertion
                     var ntag = newEl.TagName?.ToLowerInvariant();
@@ -767,6 +770,7 @@ public sealed partial class DomBridge
                 // indices if newEl was a sibling of refEl within this same parent.
                 idx = element.Children.IndexOf(refEl);
                 element.Children.Insert(idx, newEl);
+                bridgeForInsert.InvalidateStyleScope(element);
 
                 // Fire onload for iframe/object children after DOM insertion
                 var newTag = newEl.TagName?.ToLowerInvariant();
@@ -882,6 +886,7 @@ public sealed partial class DomBridge
                 childEl.Parent?.Children.Remove(childEl);
                 childEl.Parent = element;
                 element.Children.Add(childEl);
+                bridgeForAppend.InvalidateStyleScope(element);
 
                 // Fire onload for iframe/object children after DOM insertion
                 var childTag = childEl.TagName?.ToLowerInvariant();
@@ -910,6 +915,7 @@ public sealed partial class DomBridge
                 NotifyNodeIteratorPreRemoval(childEl);
                 element.Children.RemoveAt(idx);
                 childEl.Parent = null;
+                bridgeForAppend.InvalidateStyleScope(element);
                 NotifyChildRemoved(element, childEl, idx);
                 return a[0];
             }, "removeChild", 1),
@@ -951,6 +957,7 @@ public sealed partial class DomBridge
                 oldEl.Parent = null;
                 newEl.Parent = element;
                 element.Children[idx] = newEl;
+                bridgeForAppend.InvalidateStyleScope(element);
                 return a[1]; // returns the old child
             }, "replaceChild", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -969,6 +976,7 @@ public sealed partial class DomBridge
                         element.Parent.Children.RemoveAt(idx);
                         var parent = element.Parent;
                         element.Parent = null;
+                        InvalidateStyleScope(parent);
                         NotifyChildRemoved(parent, element, idx);
                     }
                 }
@@ -1270,13 +1278,14 @@ public sealed partial class DomBridge
                 element.Attributes.ContainsKey("disabled") ? JSBoolean.True : JSBoolean.False,
                 "get disabled"),
             new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0 && a[0].BooleanValue)
-                    element.Attributes["disabled"] = "disabled";
-                else
-                    element.Attributes.Remove("disabled");
-                return JSUndefined.Value;
-            }, "set disabled"),
+                {
+                    if (a.Length > 0 && a[0].BooleanValue)
+                        element.Attributes["disabled"] = "disabled";
+                    else
+                        element.Attributes.Remove("disabled");
+                    bridge.InvalidateStyleScope(element);
+                    return JSUndefined.Value;
+                }, "set disabled"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // required (read/write) — form validation
@@ -1286,13 +1295,14 @@ public sealed partial class DomBridge
                 element.Attributes.ContainsKey("required") ? JSBoolean.True : JSBoolean.False,
                 "get required"),
             new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0 && a[0].BooleanValue)
-                    element.Attributes["required"] = "required";
-                else
-                    element.Attributes.Remove("required");
-                return JSUndefined.Value;
-            }, "set required"),
+                {
+                    if (a.Length > 0 && a[0].BooleanValue)
+                        element.Attributes["required"] = "required";
+                    else
+                        element.Attributes.Remove("required");
+                    bridge.InvalidateStyleScope(element);
+                    return JSUndefined.Value;
+                }, "set required"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // checkValidity() — form validation
@@ -1816,6 +1826,26 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
+        if (tag == "details")
+        {
+            obj.FastAddProperty(
+                (KeyString)"open",
+                new JSFunction((in Arguments _) =>
+                    element.Attributes.ContainsKey("open") ? JSBoolean.True : JSBoolean.False,
+                    "get open"),
+                new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length > 0 && a[0].BooleanValue)
+                        element.Attributes["open"] = "";
+                    else
+                        element.Attributes.Remove("open");
+
+                    bridge.InvalidateStyleScope(element);
+                    return JSUndefined.Value;
+                }, "set open"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
         // HTMLDialogElement interface
         if (tag == "dialog")
         {
@@ -1827,6 +1857,7 @@ public sealed partial class DomBridge
                     element.Attributes["open"] = "";
                     element.DomProperties["_modal"] = true;
                     element.DomProperties["_topLayerOrder"] = ++bridge._topLayerCounter;
+                    bridge.InvalidateStyleScope(element);
                     return JSUndefined.Value;
                 }, "showModal", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1837,6 +1868,7 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments _) =>
                 {
                     element.Attributes["open"] = "";
+                    bridge.InvalidateStyleScope(element);
                     return JSUndefined.Value;
                 }, "show", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1850,6 +1882,7 @@ public sealed partial class DomBridge
                     element.DomProperties.Remove("_modal");
                     if (a.Length > 0)
                         element.DomProperties["_returnValue"] = a[0].ToString();
+                    bridge.InvalidateStyleScope(element);
                     return JSUndefined.Value;
                 }, "close", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1866,6 +1899,7 @@ public sealed partial class DomBridge
                         element.Attributes["open"] = "";
                     else
                         element.Attributes.Remove("open");
+                    bridge.InvalidateStyleScope(element);
                     return JSUndefined.Value;
                 }, "set open"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -4142,10 +4176,8 @@ public sealed partial class DomBridge
                 if (string.Equals(name, "id", StringComparison.OrdinalIgnoreCase))
                     element.Id = value;
                 else if (string.Equals(name, "class", StringComparison.OrdinalIgnoreCase))
-                {
                     element.ClassName = value;
-                    InvalidateElementStyles(element);
-                }
+                InvalidateStyleScope(element);
                 return old;
             }, "setNamedItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -4164,10 +4196,8 @@ public sealed partial class DomBridge
                 if (string.Equals(name, "id", StringComparison.OrdinalIgnoreCase))
                     element.Id = null;
                 else if (string.Equals(name, "class", StringComparison.OrdinalIgnoreCase))
-                {
                     element.ClassName = null;
-                    InvalidateElementStyles(element);
-                }
+                InvalidateStyleScope(element);
                 return BuildAttrNode(name, val, element, ownerObj);
             }, "removeNamedItem", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);

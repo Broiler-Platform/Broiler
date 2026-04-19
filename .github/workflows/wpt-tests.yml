@@ -39,7 +39,7 @@ jobs:
       - name: Print summary
         if: always()
         run: |
-          SUMMARY="tests/wpt/results/wpt-summary.txt"
+          SUMMARY="tests/wpt-results/wpt-summary.txt"
           if [ -f "$SUMMARY" ]; then
             echo "### WPT Test Summary" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -50,7 +50,7 @@ jobs:
             echo "No summary file found."
           fi
 
-          ANALYSIS="tests/wpt/results/wpt-root-cause-analysis.txt"
+          ANALYSIS="tests/wpt-results/wpt-root-cause-analysis.txt"
           if [ -f "$ANALYSIS" ]; then
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "### Root Cause Analysis" >> "$GITHUB_STEP_SUMMARY"
@@ -62,15 +62,25 @@ jobs:
             cat "$ANALYSIS"
           fi
 
+          TRIAGE="tests/wpt-results/wpt-triage-summary.md"
+          if [ -f "$TRIAGE" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            cat "$TRIAGE" >> "$GITHUB_STEP_SUMMARY"
+            echo ""
+            echo "--- Triage Summary ---"
+            cat "$TRIAGE"
+          fi
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: wpt-results
           path: |
-            tests/wpt/results/wpt-results.log
-            tests/wpt/results/wpt-summary.txt
-            tests/wpt/results/wpt-root-cause-analysis.txt
-            tests/wpt/results/wpt-results.json
+            tests/wpt-results/wpt-results.log
+            tests/wpt-results/wpt-summary.txt
+            tests/wpt-results/wpt-root-cause-analysis.txt
+            tests/wpt-results/wpt-results.json
+            tests/wpt-results/wpt-triage-summary.md
 
       - name: Check test result
         if: always()

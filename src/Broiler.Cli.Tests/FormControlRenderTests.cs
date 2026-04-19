@@ -195,4 +195,70 @@ public class FormControlRenderTests
         Assert.True(CountNonWhitePixels(bmp) > 10,
             "Compound class + attribute selector buttons must be visible");
     }
+
+    [Fact]
+    public void FormControls_ComputedLogicalSizes_Follow_WritingMode()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<button id='button-h'>Go</button>
+<button id='button-v' style='writing-mode: vertical-rl'>Go</button>
+<select id='select-h'><option>One</option></select>
+<select id='select-v' style='writing-mode: vertical-lr'><option>One</option></select>
+<div id='result'></div>
+<script>
+function check(id, vertical) {
+  var style = window.getComputedStyle(document.getElementById(id));
+  var blockSize = parseInt(style.blockSize, 10);
+  var inlineSize = parseInt(style.inlineSize, 10);
+  var width = style.width;
+  var height = style.height;
+  return blockSize > 0 &&
+         inlineSize > 0 &&
+         (vertical ? blockSize === parseInt(width, 10) && inlineSize === parseInt(height, 10)
+                   : blockSize === parseInt(height, 10) && inlineSize === parseInt(width, 10));
+}
+document.getElementById('result').textContent = [
+  check('button-h', false),
+  check('button-v', true),
+  check('select-h', false),
+  check('select-v', true)
+].join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void DateInput_ComputedLogicalSizes_Follow_WritingMode()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<input type='date' id='date-h'>
+<input type='date' id='date-v' style='writing-mode: vertical-lr'>
+<div id='result'></div>
+<script>
+function check(id, vertical) {
+  var style = window.getComputedStyle(document.getElementById(id));
+  var blockSize = parseInt(style.blockSize, 10);
+  var inlineSize = parseInt(style.inlineSize, 10);
+  var width = parseInt(style.width, 10);
+  var height = parseInt(style.height, 10);
+  return blockSize > 0 &&
+         inlineSize > 0 &&
+         (vertical ? blockSize === width && inlineSize === height
+                   : blockSize === height && inlineSize === width);
+}
+document.getElementById('result').textContent = [
+  check('date-h', false),
+  check('date-v', true)
+].join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
 }

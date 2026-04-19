@@ -531,7 +531,7 @@ internal static class PaintWalker
         // CSS Backgrounds Level 4: background-clip: text — detect and compute
         // the composite text color from the background colour for descendants.
         Color? currentBgClipTextColor = bgClipTextColor;
-        if (style.BackgroundClip.Equals("text", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(style.BackgroundClip, "text", StringComparison.OrdinalIgnoreCase))
         {
             var bgColor = style.ActualBackgroundColor;
             if (bgColor.A > 0)
@@ -633,7 +633,7 @@ internal static class PaintWalker
 
         // CSS Backgrounds Level 4: background-clip:text — the background colour
         // is not painted normally; it is applied through text shapes instead.
-        if (style.BackgroundClip.Equals("text", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(style.BackgroundClip, "text", StringComparison.OrdinalIgnoreCase))
             return;
 
         // Determine the set of rectangles to paint: per-line rects for inline elements,
@@ -733,7 +733,7 @@ internal static class PaintWalker
     {
         // CSS Backgrounds Level 4: background-clip:text — background image
         // is not painted normally (it is clipped to text shapes).
-        if (fragment.Style.BackgroundClip.Equals("text", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(fragment.Style.BackgroundClip, "text", StringComparison.OrdinalIgnoreCase))
             return;
 
         // CSS3: handle gradient background layers even without a url-based image.
@@ -1108,7 +1108,7 @@ internal static class PaintWalker
         var style = fragment.Style;
         bool isRtl = style.Direction == "rtl";
         GradientInfo? bgClipTextGradient = null;
-        if (style.BackgroundClip.Equals("text", StringComparison.OrdinalIgnoreCase)
+        if (string.Equals(style.BackgroundClip, "text", StringComparison.OrdinalIgnoreCase)
             && HasGradientBackgroundImage(style.BackgroundImage))
         {
             foreach (var layer in SplitGradientLayers(style.BackgroundImage))
@@ -1542,7 +1542,7 @@ internal static class PaintWalker
 
         // Detect background-clip: text on this fragment (propagate to children)
         Color? currentBgClipTextColor = bgClipTextColor;
-        if (style.BackgroundClip.Equals("text", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(style.BackgroundClip, "text", StringComparison.OrdinalIgnoreCase))
         {
             var bgColor = style.ActualBackgroundColor;
             if (bgColor.A > 0)
@@ -1755,6 +1755,9 @@ internal static class PaintWalker
 
     private static string GetEffectiveBackgroundClip(Fragment fragment, string backgroundClip)
     {
+        if (string.IsNullOrEmpty(backgroundClip))
+            return "border-box";
+
         if (backgroundClip.Equals("border-area", StringComparison.OrdinalIgnoreCase))
             return "border-box";
 
@@ -1765,8 +1768,8 @@ internal static class PaintWalker
     {
         clipItem = null!;
 
-        if (!backgroundClip.Equals("padding-box", StringComparison.OrdinalIgnoreCase)
-            && !backgroundClip.Equals("content-box", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(backgroundClip, "padding-box", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(backgroundClip, "content-box", StringComparison.OrdinalIgnoreCase))
             return false;
 
         var style = fragment.Style;
@@ -2421,10 +2424,14 @@ internal static class PaintWalker
             w = h * ratio;
         else if (wIsAuto && !hIsAuto && hasIntrinsicWidth && intrinsicW > 0)
             w = intrinsicW;
+        else if (wIsAuto && !hIsAuto)
+            w = containerW;
         else if (!wIsAuto && hIsAuto && w > 0 && ratio > 0)
             h = w / ratio;
         else if (!wIsAuto && hIsAuto && hasIntrinsicHeight && intrinsicH > 0)
             h = intrinsicH;
+        else if (!wIsAuto && hIsAuto)
+            h = containerH;
         else if (wIsAuto && hIsAuto)
         {
             if (hasIntrinsicWidth && hasIntrinsicHeight && intrinsicW > 0 && intrinsicH > 0)

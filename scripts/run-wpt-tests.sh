@@ -6,7 +6,7 @@
 #     ./scripts/run-wpt-tests.sh [OPTIONS]
 #
 # Options:
-#     --output-dir <dir>   Directory for results (default: tests/wpt/results)
+#     --output-dir <dir>   Directory for results (default: tests/wpt-results)
 #     --wpt-dir <dir>      Use an existing WPT checkout instead of cloning
 #     --shallow             Shallow-clone only (depth 1, much faster)
 #     --subset <patterns>   Semicolon-separated list of sub-path patterns with
@@ -23,7 +23,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-OUTPUT_DIR="$REPO_ROOT/tests/wpt/results"
+OUTPUT_DIR="$REPO_ROOT/tests/wpt-results"
 WPT_DIR=""
 SHALLOW=true
 SUBSET=""
@@ -51,7 +51,7 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --output-dir <dir>   Directory for results (default: tests/wpt/results)"
+            echo "  --output-dir <dir>   Directory for results (default: tests/wpt-results)"
             echo "  --wpt-dir <dir>      Use an existing WPT checkout instead of cloning"
             echo "  --shallow            Shallow-clone only (depth 1, faster; default)"
             echo "  --subset <patterns>  Semicolon-separated sub-path patterns with wildcards"
@@ -208,7 +208,9 @@ if [[ -d "$REFERENCE_DIR" ]]; then
 fi
 
 JSON_REPORT="$OUTPUT_DIR/wpt-results.json"
+MARKDOWN_REPORT="$OUTPUT_DIR/wpt-triage-summary.md"
 REF_ARGS+=(--json-output "$JSON_REPORT")
+REF_ARGS+=(--markdown-output "$MARKDOWN_REPORT")
 
 set +e
 dotnet run --project "$REPO_ROOT/src/Broiler.Wpt" \
@@ -221,6 +223,8 @@ echo ""
 echo "=== WPT Test Run Complete ==="
 echo "Exit code : $WPT_EXIT"
 echo "Log file  : $LOGFILE"
+echo "JSON file : $JSON_REPORT"
+echo "Markdown  : $MARKDOWN_REPORT"
 
 # --- Step 5: Generate summary -----------------------------------------------
 
@@ -255,6 +259,9 @@ if [[ -f "$LOGFILE" ]]; then
         fi
     } > "$SUMMARY"
     echo "  Summary: $SUMMARY"
+    if [[ -f "$MARKDOWN_REPORT" ]]; then
+        echo "  Triage : $MARKDOWN_REPORT"
+    fi
 
     # Write a root-cause analysis report when there are failures.
     if [[ "$FAILED" -gt 0 ]]; then

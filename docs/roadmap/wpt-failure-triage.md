@@ -3,6 +3,35 @@
 > **Status**: Active — created 2026-04-18  
 > **Scope**: Investigate the failures captured in `tests/wpt-results/` and define the smallest practical plan for reducing them over time.
 
+## Implementation update — 2026-04-18
+
+- `Broiler.Wpt` now emits bucket summaries in console output, machine-readable skip reasons in `wpt-results.json`, and a triage-focused Markdown report via `--markdown-output`.
+- `scripts/run-wpt-tests.sh` and `.github/workflows/wpt-tests.yml` now standardize on `tests/wpt-results/`.
+- Phase 1 has started: the `background-clip-006.html` null-reference no longer reproduces in targeted local WPT runner coverage, and the regression is now guarded by a focused test in `src/Broiler.Wpt.Tests/`.
+- Phase 2 has started: the `background-size` vector bucket now covers the previously failing tall `cover` + `viewBox` cases in focused tests, and the targeted subset repro passes locally again.
+- Phase 2 has expanded again: the tall `contain` + `viewBox` vector repro now matches the in-repo WPT reference image in focused local coverage, so the near-pass `background-size` workstream now guards both the tall `cover` and tall `contain` cases.
+- Phase 2 has widened again: the additional tall `viewBox` vector variants with omitted and percentage root dimensions now reproduce at 100% against the in-repo reference PNGs, so the focused guard rails cover the next smallest tall `contain`/`cover` subset instead of just the fully explicit SVG dimensions.
+- Phase 2 has widened again: the next near-pass `background-size` subset (`wide--12px-auto--*`) now resolves percentage children against a fully injected raster viewport when an SVG root is missing either intrinsic dimension, and focused local coverage now guards both the non-`viewBox` and `viewBox` partial-dimension variants.
+- Phase 2 has widened again: the adjacent `wide--auto-32px--*` vector subset now reproduces cleanly against the in-repo reference PNGs in focused local coverage as well, so the roadmap guard rails now cover both wide `auto`-height and wide fixed-height partial-dimension SVG cases.
+- Phase 2 has widened again: the adjacent wide `contain` partial-dimension vector subset now reproduces cleanly against the in-repo reference PNGs in focused local coverage too, so the roadmap guard rails now cover both non-`viewBox` and `viewBox` variants across the wide `contain` bucket.
+- Phase 2 has widened again: the adjacent wide `cover` partial-dimension vector subset now reproduces cleanly against the in-repo reference PNGs in focused local coverage too, so the roadmap guard rails now cover both non-`viewBox` and `viewBox` variants across the wide `cover` bucket as well.
+- Phase 2 has widened again: the next in-repo `background-size` vector near-pass (`background-size-vector-003.html`) now reproduces cleanly against the committed reference PNG too, so the focused guard rails cover the adjacent fixed-width tall vector case in addition to the reduced wide/tall matrix buckets.
+- Phase 2 has widened again: the adjacent in-repo `background-size` vector near-passes (`background-size-vector-005.html` and `background-size-vector-007.html`) now reproduce cleanly against the committed reference PNGs too, so the focused guard rails cover the next tall fixed-width `viewBox` variants with percent and omitted root dimensions as well.
+- Phase 2 has widened again: the next adjacent in-repo `background-size` vector near-passes (`background-size-vector-009.html` and `background-size-vector-011.html`) now reproduce cleanly against the committed reference PNGs too, so the focused guard rails cover the remaining tall fixed-width omitted-dimension `viewBox` variants in that in-repo sequence as well.
+- Phase 2 has widened again: the next adjacent in-repo `background-size` vector near-passes (`background-size-vector-013.html`, `background-size-vector-015.html`, and `background-size-vector-017.html`) now reproduce cleanly against the committed reference PNGs too, so the focused guard rails cover the remaining tall fixed-width percent-width `viewBox` variants in that in-repo sequence as well.
+- Phase 2 has widened again: the adjacent `selectors-4` near-pass workstream now handles quoted `:lang(...)` arguments and the `:open` pseudo-class for `details`, including JS-driven `open` state reflection, and focused selector regression coverage now guards those fixes locally as well.
+- Phase 2 has widened again: the representative `selectors-4` near-pass regressions now also cover document-root `lang-*` matching alongside the earlier `details-open-pseudo-*` and descendant `:lang(...)` cases, so that bucket's known near-pass issues are now closed locally instead of relying on only a subset of the selector patterns.
+- Phase 2 has widened again: the selector invalidation workstream now reapplies CSS-derived inline styles across the whole document scope after selector-affecting class, id, reflected-attribute, and DOM sibling mutations, and focused serialization regressions now guard representative `class-id-attr`, sibling-combinator, and `:disabled`-style updates locally.
+- Phase 2 has widened again: the focused `background-size` guard rails covering the in-repo near-pass vector bucket now still pass as a single validation set, so that Phase 2 bucket is now considered closed locally instead of being tracked as an open near-pass tranche.
+- Phase 2 has widened again: the remaining selectors invalidation coverage now includes representative `:nth-child(... of selector)` / `:nth-last-child(... of selector)` matching plus class-mutation invalidation guard rails, so that bucket is now closed locally alongside the earlier document-scope style invalidation fixes.
+- Phase 2 has widened again: the remaining writing-modes forms coverage now includes representative writing-mode-aware logical computed sizes (`block-size` / `inline-size`) for form controls, so that bucket is now closed locally with focused button/select/date guard rails.
+- The `background-clip*` subset has now been rerun against the in-repo WPT corpus; the raw subset still fails broadly on full-page visual noise, so guard rails now focus on the reproducible box-model cases (`border-box`, `padding-box`, `content-box`, size/position/radius variants, and `border-area` corner-shape) instead of the instruction text around them.
+- **Deviation from the original proposal:** the roadmap-friendly Markdown file is generated directly by `Broiler.Wpt` instead of a separate post-processing step so the same logic is shared by local runs and CI.
+- **Current blocker:** the hard crash is fixed, but the wider `background-clip` bucket still contains visual mismatches that belong to the next near-pass remediation steps rather than this crash-only fix.
+- **Current near-pass focus:** continue harvesting the remaining `background-clip` and `background-size` cases with the smallest reproducible `--subset` commands rather than broad CSS reruns.
+- **Secondary blocker:** full-solution validation still hits an unrelated compile failure in `Broiler.HTML.WPF/Adapters/GraphicsAdapter.cs` (`DrawGradientString` override missing), so WPT triage work should continue using targeted `Broiler.Wpt` validation until that project is repaired.
+- Related WPT bucket issues: #956 (`background-clip` failures), #958 (`css-background-clip` follow-up), #962 (`background-size` vector cases).
+
 ---
 
 ## 1. Current Snapshot
@@ -120,16 +149,16 @@ The worst failures include several 0% matches in `css/css-values/*` (`calc-in-ca
 
 ## Phase 0 — Stabilize triage inputs
 
-- [ ] Keep `tests/wpt-results/wpt-results.json` as the canonical input for grouping and prioritization.
-- [ ] Standardize on a single results path name. Today the repository contains `tests/wpt-results/`, while the runner/workflow currently write to `tests/wpt/results`.
+- [x] Keep `tests/wpt-results/wpt-results.json` as the canonical input for grouping and prioritization.
+- [x] Standardize on a single results path name. Today the repository contains `tests/wpt-results/`, while the runner/workflow currently write to `tests/wpt/results`.
 - [ ] When investigating a bucket, always rerun via `--subset` instead of the full CSS corpus.
 
 **Exit criteria:** every follow-up issue/PR names a specific bucket and uses a reproducible subset command.
 
 ## Phase 1 — Fix crash / deterministic rendering errors
 
-- [ ] Fix the null-reference in `css/css-backgrounds/background-clip-006.html`.
-- [ ] Re-run the `css/css-backgrounds/background-clip*` subset and convert that suite into a stable guard rail.
+- [x] Fix the null-reference in `css/css-backgrounds/background-clip-006.html`.
+- [x] Re-run the `css/css-backgrounds/background-clip*` subset and convert that suite into a stable guard rail.
 
 **Why first:** crash-style failures are usually small in count but high in leverage.
 
@@ -137,12 +166,14 @@ The worst failures include several 0% matches in `css/css-values/*` (`calc-in-ca
 
 Target the buckets with the highest concentration of `MinorDiff` and mid/high match percentages:
 
-- [ ] `css/css-writing-modes/forms`
-- [ ] `css/selectors/invalidation`
-- [ ] `css/css-backgrounds/background-size`
-- [ ] `css/selectors/selectors-4`
+- [x] `css/css-writing-modes/forms`
+- [x] `css/selectors/invalidation`
+- [x] `css/css-backgrounds/background-size`
+- [x] `css/selectors/selectors-4`
 
 **Working rule:** prefer small renderer/layout fixes that retire dozens of visually-close failures at once.
+
+**Status:** Phase 2 finished.
 
 ## Phase 3 — Address systemic value/layout bugs
 

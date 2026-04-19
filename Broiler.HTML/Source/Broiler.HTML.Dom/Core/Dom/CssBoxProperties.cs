@@ -37,6 +37,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     private string _paddingTop = "0";
     private string _right = "auto";
     private string _backgroundImage = "none";
+    private string _backgroundClip = "border-box";
     private string _textIndent = "0";
     private string _top = "auto";
     private string _wordSpacing = "normal";
@@ -442,7 +443,21 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string Filter { get; set; } = "none";
     public string Isolation { get; set; } = "auto";
     public string BoxSizing { get; set; } = "content-box";
-    public string BackgroundClip { get; set; } = "border-box";
+
+    public string BackgroundClip
+    {
+        get
+        {
+            if (_backgroundClip.Equals("inherit", StringComparison.OrdinalIgnoreCase) && GetParent() != null)
+                return GetParent().BackgroundClip;
+
+            return _backgroundClip;
+        }
+        set
+        {
+            _backgroundClip = value ?? "border-box";
+        }
+    }
 
     /// <summary>
     /// CSS Containment Module Level 2: the <c>contain</c> property.
