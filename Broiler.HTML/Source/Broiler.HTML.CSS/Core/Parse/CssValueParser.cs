@@ -96,6 +96,8 @@ internal sealed class CssValueParser
 
     public static bool IsValidLength(string value)
     {
+        value = NormalizeSingleValueLengthFunction(value);
+
         // CSS2.1 §4.3.2: "0" is a valid length (unit identifier optional after zero).
         if (value == "0")
             return true;
@@ -179,6 +181,8 @@ internal sealed class CssValueParser
         if (string.IsNullOrEmpty(length) || length == "0")
             return 0f;
 
+        length = NormalizeSingleValueLengthFunction(length);
+
         //If percentage, use ParseNumber
         if (length.EndsWith("%"))
             return ParseNumber(length, hundredPercent);
@@ -259,6 +263,72 @@ internal sealed class CssValueParser
         }
 
         return factor * ParseNumber(number, hundredPercent);
+    }
+
+    private static string NormalizeSingleValueLengthFunction(string value)
+    {
+        var current = value.Trim();
+        while (TryUnwrapSingleValueFunction(current, "calc", out var inner) ||
+               TryUnwrapSingleValueFunction(current, "max", out inner) ||
+               TryUnwrapSingleValueFunction(current, "min", out inner))
+        {
+            current = inner.Trim();
+        }
+
+        while (current.Length >= 2 && current[0] == '(' && current[^1] == ')' && HasBalancedParens(current[1..^1]))
+            current = current[1..^1].Trim();
+
+        return current;
+    }
+
+    private static bool TryUnwrapSingleValueFunction(string value, string functionName, out string inner)
+    {
+        inner = string.Empty;
+        if (!value.StartsWith(functionName + "(", StringComparison.OrdinalIgnoreCase) || value[^1] != ')')
+            return false;
+
+        var content = value[(functionName.Length + 1)..^1];
+        if (!HasBalancedParens(content))
+            return false;
+
+        var depth = 0;
+        foreach (var ch in content)
+        {
+            switch (ch)
+            {
+                case '(':
+                    depth++;
+                    break;
+                case ')':
+                    depth--;
+                    break;
+                case ',' when depth == 0:
+                    return false;
+            }
+        }
+
+        inner = content;
+        return true;
+    }
+
+    private static bool HasBalancedParens(string value)
+    {
+        var depth = 0;
+        foreach (var ch in value)
+        {
+            if (ch == '(')
+            {
+                depth++;
+            }
+            else if (ch == ')')
+            {
+                depth--;
+                if (depth < 0)
+                    return false;
+            }
+        }
+
+        return depth == 0;
     }
 
     private static string GetUnit(string length, string defaultUnit, out bool hasUnit)

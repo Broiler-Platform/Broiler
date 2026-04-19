@@ -1040,6 +1040,8 @@ public sealed partial class DomBridge
         foreach (var kv in element.Style)
             props[kv.Key] = kv.Value;
 
+        ExpandCssShorthands(props);
+
         // Expand the inset shorthand → top, right, bottom, left so that
         // downstream code (ComputeElementBox, TryApplyFallback, etc.) can
         // read the individual inset properties directly.

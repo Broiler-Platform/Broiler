@@ -58,6 +58,7 @@ public sealed partial class DomBridge
     // viewport dimensions for window.innerWidth/innerHeight and element box-model properties
     private int _viewportWidth = 1024;
     private int _viewportHeight = 768;
+    private bool _serializationTransformsApplied;
 
     // window.location fields
     private string _pageUrl = string.Empty;
@@ -372,6 +373,7 @@ public sealed partial class DomBridge
         _elements.Clear();
         _jsObjectCache.Clear();
         _documentNode.Children.Clear();
+        _serializationTransformsApplied = false;
 
         // Parse DOCTYPE from the HTML and add it as first child of _documentNode
         var doctype = ParseDocType(html);

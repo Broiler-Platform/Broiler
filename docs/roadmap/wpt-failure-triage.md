@@ -25,6 +25,7 @@
 - Phase 2 has widened again: the focused `background-size` guard rails covering the in-repo near-pass vector bucket now still pass as a single validation set, so that Phase 2 bucket is now considered closed locally instead of being tracked as an open near-pass tranche.
 - Phase 2 has widened again: the remaining selectors invalidation coverage now includes representative `:nth-child(... of selector)` / `:nth-last-child(... of selector)` matching plus class-mutation invalidation guard rails, so that bucket is now closed locally alongside the earlier document-scope style invalidation fixes.
 - Phase 2 has widened again: the remaining writing-modes forms coverage now includes representative writing-mode-aware logical computed sizes (`block-size` / `inline-size`) for form controls, so that bucket is now closed locally with focused button/select/date guard rails.
+- Phase 3 has started: main-document media queries now evaluate against the real viewport again, single-value `calc()` / `max()` / `min()` lengths are normalized in both the DOM bridge and renderer parser, and focused local guard rails now cover representative `css-values`, `css-viewport/zoom`, and `cssom-view/*zoom*` regressions.
 - The `background-clip*` subset has now been rerun against the in-repo WPT corpus; the raw subset still fails broadly on full-page visual noise, so guard rails now focus on the reproducible box-model cases (`border-box`, `padding-box`, `content-box`, size/position/radius variants, and `border-area` corner-shape) instead of the instruction text around them.
 - **Deviation from the original proposal:** the roadmap-friendly Markdown file is generated directly by `Broiler.Wpt` instead of a separate post-processing step so the same logic is shared by local runs and CI.
 - **Current blocker:** the hard crash is fixed, but the wider `background-clip` bucket still contains visual mismatches that belong to the next near-pass remediation steps rather than this crash-only fix.
@@ -184,6 +185,8 @@ Target the clusters with many `LayoutShift` or 0% mismatches:
 - [ ] `css/cssom-view/*zoom*`
 
 **Working rule:** land these fixes only with focused regression tests because these bugs are likely cross-cutting.
+
+**Status:** Phase 3 has started; representative `calc-*`, zoom rendering, and zoom-sensitive CSSOM view guard rails now pass locally, but the broader Phase 3 buckets still need follow-up triage.
 
 ## Phase 4 — Triage unsupported feature clusters separately
 

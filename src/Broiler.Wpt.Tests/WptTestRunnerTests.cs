@@ -23,6 +23,17 @@ public class WptTestRunnerTests : IDisposable
             Directory.Delete(_tempDir, recursive: true);
     }
 
+    private WptTestResult RunTempMatchTest(string testHtml, string referenceHtml, string namePrefix)
+    {
+        var testFile = Path.Combine(_tempDir, $"{namePrefix}.html");
+        var refFile = Path.Combine(_tempDir, $"{namePrefix}-ref.html");
+        File.WriteAllText(testFile, testHtml);
+        File.WriteAllText(refFile, referenceHtml);
+
+        var runner = new WptTestRunner(320, 240);
+        return runner.RunMatchTest(testFile, refFile, _tempDir);
+    }
+
     [Fact]
     public void DiscoverTests_Finds_Html_Files_Recursively()
     {
@@ -169,6 +180,115 @@ document.getElementById('out').appendChild(p);
 
         // Assert — skipped because no reference, but the pipeline ran.
         Assert.True(result.Skipped);
+    }
+
+    [Theory]
+    [InlineData("calc(calc(100%))", "calc-in-calc")]
+    [InlineData("max(calc(100%))", "calc-in-max")]
+    public void Wpt_CssValues_SingleArgumentMathLengths_MatchReference(string heightValue, string namePrefix)
+    {
+        var testHtml = $@"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body {{ margin: 0; padding: 0; }}
+    html {{ background: red; overflow: hidden; }}
+    #outer {{ position: absolute; inset: 0; background: green; width: 100%; height: {heightValue}; }}
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: absolute; inset: 0; background: green; width: 100%; height: 100%; }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, namePrefix);
+        Assert.True(result.Passed,
+            $"{namePrefix} should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomBasic_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    div { width: 40px; height: 40px; background: green; }
+    #zoomed { zoom: 2; }
+  </style>
+</head>
+<body>
+  <div></div>
+  <div id=""zoomed""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    #first { width: 40px; height: 40px; background: green; }
+    #second { width: 80px; height: 80px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""first""></div>
+  <div id=""second""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-basic");
+        Assert.True(result.Passed,
+            $"zoom basic should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomInherited_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .container { zoom: 2; }
+    .child { width: 40px; height: 40px; background: green; }
+  </style>
+</head>
+<body>
+  <div class=""child""></div>
+  <div class=""container"">
+    <div class=""child""></div>
+  </div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    #first { width: 40px; height: 40px; background: green; }
+    #second { width: 80px; height: 80px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""first""></div>
+  <div id=""second""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-inherited");
+        Assert.True(result.Passed,
+            $"zoom inheritance should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]

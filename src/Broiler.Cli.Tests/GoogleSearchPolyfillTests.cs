@@ -173,6 +173,60 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("TOP:0", result);
     }
 
+    [Fact]
+    public void Element_ClientDimensions_Ignore_Zoom()
+    {
+        var result = ExecJs(@"
+            var plain = document.createElement('div');
+            plain.style.width = '64px';
+            plain.style.height = '64px';
+            var zoomed = document.createElement('div');
+            zoomed.style.width = '64px';
+            zoomed.style.height = '64px';
+            zoomed.style.zoom = '4';
+            document.body.appendChild(plain);
+            document.body.appendChild(zoomed);
+            document.getElementById('result').textContent =
+                'PW:' + plain.clientWidth + ',ZW:' + zoomed.clientWidth + ',ZH:' + zoomed.clientHeight;
+        ");
+        Assert.Contains("PW:64,ZW:64,ZH:64", result);
+    }
+
+    [Fact]
+    public void Element_BoundingClientRect_Scales_With_Zoom()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var zoomed = document.createElement('div');
+            zoomed.style.width = '64px';
+            zoomed.style.height = '64px';
+            zoomed.style.zoom = '4';
+            document.body.appendChild(zoomed);
+            var rect = zoomed.getBoundingClientRect();
+            document.getElementById('result').textContent = 'W:' + rect.width + ',H:' + rect.height;
+        ");
+        Assert.Contains("W:256,H:256", result);
+    }
+
+    [Fact]
+    public void Element_ScrollTo_Updates_ScrollOffsets()
+    {
+        var result = ExecJs(@"
+            var container = document.createElement('div');
+            container.style.width = '100px';
+            container.style.height = '100px';
+            container.style.overflow = 'scroll';
+            var content = document.createElement('div');
+            content.style.width = '250px';
+            content.style.height = '250px';
+            container.appendChild(content);
+            document.body.appendChild(container);
+            container.scrollTo(13, 27);
+            document.getElementById('result').textContent = 'L:' + container.scrollLeft + ',T:' + container.scrollTop;
+        ");
+        Assert.Contains("L:13,T:27", result);
+    }
+
     // ---------------------------------------------------------------
     //  TODO-G6: Image() constructor
     // ---------------------------------------------------------------

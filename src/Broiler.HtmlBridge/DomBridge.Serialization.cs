@@ -26,10 +26,135 @@ public sealed partial class DomBridge
     /// </summary>
     public string SerializeToHtml()
     {
+        ApplySerializationTransforms();
         var sb = new StringBuilder();
         sb.AppendLine("<!DOCTYPE html>");
         SerializeElement(DocumentElement, sb);
         return sb.ToString();
+    }
+
+    private void ApplySerializationTransforms()
+    {
+        if (_serializationTransformsApplied)
+            return;
+
+        _serializationTransformsApplied = true;
+        ApplyZoomSerializationStyles(DocumentElement, 1.0);
+    }
+
+    private void ApplyZoomSerializationStyles(DomElement element, double parentZoom)
+    {
+        if (element.IsTextNode)
+            return;
+
+        var props = GetComputedProps(element);
+        var specifiedZoom = props.GetValueOrDefault("zoom");
+        var usedZoom = ResolveUsedZoom(specifiedZoom, parentZoom);
+
+        if (Math.Abs(usedZoom - 1.0) > 0.0001)
+        {
+            foreach (var property in ZoomScaledSerializationProperties)
+            {
+                if (!props.TryGetValue(property, out var value))
+                    continue;
+
+                if (TryScaleSerializableCssValue(value, usedZoom, out var scaled))
+                    element.Style[property] = scaled;
+            }
+        }
+
+        element.Style.Remove("zoom");
+
+        foreach (var child in element.Children)
+            ApplyZoomSerializationStyles(child, usedZoom);
+    }
+
+    private static readonly string[] ZoomScaledSerializationProperties =
+    [
+        "width", "height", "min-width", "min-height", "max-width", "max-height",
+        "top", "right", "bottom", "left",
+        "margin-top", "margin-right", "margin-bottom", "margin-left",
+        "padding-top", "padding-right", "padding-bottom", "padding-left",
+        "border-top-width", "border-right-width", "border-bottom-width", "border-left-width",
+        "font-size", "line-height", "letter-spacing", "word-spacing", "text-indent",
+        "border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius"
+    ];
+
+    private static double ResolveUsedZoom(string? specifiedZoom, double parentZoom)
+    {
+        if (string.IsNullOrWhiteSpace(specifiedZoom) ||
+            specifiedZoom.Equals("normal", StringComparison.OrdinalIgnoreCase) ||
+            specifiedZoom.Equals("inherit", StringComparison.OrdinalIgnoreCase))
+        {
+            return parentZoom;
+        }
+
+        if (double.TryParse(specifiedZoom, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var zoom) && zoom > 0)
+        {
+            return parentZoom * zoom;
+        }
+
+        return parentZoom;
+    }
+
+    private static bool TryScaleSerializableCssValue(string value, double factor, out string scaled)
+    {
+        scaled = string.Empty;
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0 ||
+            trimmed.Equals("auto", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("none", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("normal", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (TryScaleLengthToken(trimmed, factor, out scaled))
+            return true;
+
+        var parts = trimmed.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length is 2 or 3 or 4)
+        {
+            var scaledParts = new string[parts.Length];
+            for (var i = 0; i < parts.Length; i++)
+            {
+                if (!TryScaleLengthToken(parts[i], factor, out scaledParts[i]))
+                    return false;
+            }
+
+            scaled = string.Join(" ", scaledParts);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryScaleLengthToken(string token, double factor, out string scaled)
+    {
+        scaled = string.Empty;
+        var trimmed = token.Trim();
+        if (trimmed.Length == 0)
+            return false;
+
+        ReadOnlySpan<string> units = ["px", "pt", "em", "rem"];
+        foreach (var unit in units)
+        {
+            if (!trimmed.EndsWith(unit, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var numericPart = trimmed[..^unit.Length];
+            if (!double.TryParse(numericPart, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var number))
+            {
+                return false;
+            }
+
+            scaled = $"{(number * factor).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}{unit}";
+            return true;
+        }
+
+        return false;
     }
 
     private static void SerializeElement(DomElement element, StringBuilder sb, int depth = 0)
