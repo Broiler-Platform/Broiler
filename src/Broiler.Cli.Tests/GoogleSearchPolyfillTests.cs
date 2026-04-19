@@ -227,6 +227,130 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("L:13,T:27", result);
     }
 
+    [Fact]
+    public void Element_ClientMetrics_Ignore_Effective_Zoom()
+    {
+        var result = ExecJs(@"
+            function makeBox(zoom) {
+                var el = document.createElement('div');
+                el.style.width = '64px';
+                el.style.height = '64px';
+                if (zoom) {
+                    el.style.zoom = zoom;
+                }
+                return el;
+            }
+
+            var noZoom = makeBox();
+            var zoomed = makeBox('4');
+            var zoomedParent = makeBox('4');
+            var directChild = makeBox();
+            var wrapper = document.createElement('div');
+            var indirectChild = makeBox();
+            var bothZoomed = makeBox('4');
+
+            wrapper.appendChild(indirectChild);
+            zoomedParent.appendChild(directChild);
+            zoomedParent.appendChild(wrapper);
+            zoomedParent.appendChild(bothZoomed);
+
+            document.body.appendChild(noZoom);
+            document.body.appendChild(zoomed);
+            document.body.appendChild(zoomedParent);
+
+            var same =
+                zoomed.clientTop === noZoom.clientTop &&
+                zoomed.clientLeft === noZoom.clientLeft &&
+                zoomed.clientWidth === noZoom.clientWidth &&
+                zoomed.clientHeight === noZoom.clientHeight &&
+                directChild.clientWidth === noZoom.clientWidth &&
+                indirectChild.clientHeight === noZoom.clientHeight &&
+                bothZoomed.clientWidth === noZoom.clientWidth;
+
+            document.getElementById('result').textContent =
+                'OK:' + same + ',W:' + noZoom.clientWidth + ',H:' + noZoom.clientHeight +
+                ',T:' + noZoom.clientTop + ',L:' + noZoom.clientLeft;
+        ");
+        Assert.Contains("OK:true,W:64,H:64,T:0,L:0", result);
+    }
+
+    [Fact]
+    public void Element_OffsetDimensions_Exclude_Target_Zoom_But_Include_Borders()
+    {
+        var result = ExecJs(@"
+            function makeOuter(margin) {
+                var el = document.createElement('div');
+                el.style.width = '100px';
+                el.style.height = '100px';
+                el.style.border = '1px solid black';
+                el.style.position = 'relative';
+                el.style.margin = margin || '10px';
+                return el;
+            }
+
+            function makeSquare(zoom) {
+                var el = document.createElement('div');
+                el.style.width = '10px';
+                el.style.height = '10px';
+                el.style.margin = '1px';
+                el.style.position = 'relative';
+                el.style.top = '10px';
+                el.style.left = '10px';
+                if (zoom) {
+                    el.style.zoom = zoom;
+                }
+                return el;
+            }
+
+            var unzoomedOuter = makeOuter();
+            var unzoomed = makeSquare();
+            unzoomedOuter.appendChild(unzoomed);
+
+            var zoomedOuter = makeOuter();
+            zoomedOuter.style.zoom = '3';
+            var zoomed = makeSquare('2');
+            zoomedOuter.appendChild(zoomed);
+
+            var outerDiv = makeOuter('30px');
+            outerDiv.id = 'outer_div';
+            var middle = document.createElement('div');
+            middle.style.margin = '10px';
+            middle.style.zoom = '2';
+            var unzoomedInner = document.createElement('div');
+            unzoomedInner.style.width = '10px';
+            unzoomedInner.style.height = '10px';
+            unzoomedInner.style.margin = '1px';
+            middle.appendChild(unzoomedInner);
+            outerDiv.appendChild(middle);
+
+            var outerDiv2 = makeOuter('30px');
+            var unzoomedMiddle = document.createElement('div');
+            var zoomedInner = document.createElement('div');
+            zoomedInner.style.zoom = '2';
+            zoomedInner.style.width = '100px';
+            zoomedInner.style.height = '100px';
+            zoomedInner.style.border = '1px solid black';
+            unzoomedMiddle.appendChild(zoomedInner);
+            outerDiv2.appendChild(unzoomedMiddle);
+
+            document.body.appendChild(unzoomedOuter);
+            document.body.appendChild(zoomedOuter);
+            document.body.appendChild(outerDiv);
+            document.body.appendChild(outerDiv2);
+
+            var ok =
+                unzoomed.offsetWidth === zoomed.offsetWidth &&
+                unzoomed.offsetHeight === zoomed.offsetHeight &&
+                zoomedInner.offsetWidth === outerDiv.offsetWidth &&
+                zoomedInner.offsetHeight === outerDiv.offsetHeight;
+
+            document.getElementById('result').textContent =
+                'OK:' + ok + ',UW:' + unzoomed.offsetWidth + ',ZW:' + zoomed.offsetWidth +
+                ',IW:' + zoomedInner.offsetWidth + ',OW:' + outerDiv.offsetWidth;
+        ");
+        Assert.Contains("OK:true,UW:10,ZW:10,IW:102,OW:102", result);
+    }
+
     // ---------------------------------------------------------------
     //  TODO-G6: Image() constructor
     // ---------------------------------------------------------------

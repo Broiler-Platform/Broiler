@@ -2224,6 +2224,16 @@ public sealed partial class DomBridge
             var elForOffset = element;
 
             obj.FastAddProperty(
+                (KeyString)"clientTop",
+                new JSFunction((in Arguments _) => new JSNumber(bridgeForOffset.GetClientTopForDomElement(elForOffset)), "get clientTop"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
+                (KeyString)"clientLeft",
+                new JSFunction((in Arguments _) => new JSNumber(bridgeForOffset.GetClientLeftForDomElement(elForOffset)), "get clientLeft"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
                 (KeyString)"clientWidth",
                 new JSFunction((in Arguments _) => new JSNumber(bridgeForOffset.GetClientWidthForDomElement(elForOffset, isRoot)), "get clientWidth"),
                 null,
@@ -2647,6 +2657,18 @@ public sealed partial class DomBridge
         return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"));
     }
 
+    private double GetClientTopForDomElement(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-top-width"));
+    }
+
+    private double GetClientLeftForDomElement(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-left-width"));
+    }
+
     private double GetOffsetWidthForDomElement(DomElement element, bool isRoot)
     {
         if (isRoot)
@@ -2657,7 +2679,7 @@ public sealed partial class DomBridge
             return resolved.Value.width;
 
         var props = GetComputedProps(element);
-        var width = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"));
+        var width = GetBorderBoxWidth(props);
         if (width > 0)
             return width;
 
@@ -2674,7 +2696,7 @@ public sealed partial class DomBridge
             return resolved.Value.height;
 
         var props = GetComputedProps(element);
-        var height = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"));
+        var height = GetBorderBoxHeight(props);
         if (height > 0)
             return height;
 
@@ -2854,6 +2876,24 @@ public sealed partial class DomBridge
         }
 
         return 1;
+    }
+
+    private double GetBorderBoxWidth(Dictionary<string, string> props)
+    {
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"))
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"))
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"))
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-left-width"))
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-right-width"));
+    }
+
+    private double GetBorderBoxHeight(Dictionary<string, string> props)
+    {
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"))
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"))
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"))
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-top-width"))
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-bottom-width"));
     }
 
     private void ScrollElementIntoView(DomElement element)
