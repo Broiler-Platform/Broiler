@@ -3368,8 +3368,25 @@ div {{ width: 256px; height: 768px; }}
     }
 
     [Theory]
+    [InlineData("wide--contain--nonpercent-width-nonpercent-height.html", "nonpercent-width-nonpercent-height.svg", "contain", @"width=""8px""", @"height=""32px""", false)]
+    [InlineData("wide--contain--nonpercent-width-omitted-height.html", "nonpercent-width-omitted-height.svg", "contain", @"width=""8px""", null, false)]
+    [InlineData("wide--contain--nonpercent-width-percent-height.html", "nonpercent-width-percent-height.svg", "contain", @"width=""8px""", @"height=""50%""", false)]
+    [InlineData("wide--contain--omitted-width-nonpercent-height.html", "omitted-width-nonpercent-height.svg", "contain", null, @"height=""32px""", false)]
+    [InlineData("wide--contain--omitted-width-omitted-height.html", "omitted-width-omitted-height.svg", "contain", null, null, false)]
+    [InlineData("wide--contain--omitted-width-percent-height.html", "omitted-width-percent-height.svg", "contain", null, @"height=""50%""", false)]
+    [InlineData("wide--contain--percent-width-nonpercent-height.html", "percent-width-nonpercent-height.svg", "contain", @"width=""50%""", @"height=""32px""", false)]
+    [InlineData("wide--contain--percent-width-omitted-height.html", "percent-width-omitted-height.svg", "contain", @"width=""50%""", null, false)]
+    [InlineData("wide--contain--percent-width-percent-height.html", "percent-width-percent-height.svg", "contain", @"width=""50%""", @"height=""50%""", false)]
     [InlineData("wide--contain--nonpercent-width-nonpercent-height-viewbox.html", "nonpercent-width-nonpercent-height-viewbox.svg", "contain", @"width=""8px""", @"height=""32px""", true)]
-    public void Wpt_BackgroundSizeVector_WideContainViewboxCase_MatchReference(
+    [InlineData("wide--contain--nonpercent-width-omitted-height-viewbox.html", "nonpercent-width-omitted-height-viewbox.svg", "contain", @"width=""8px""", null, true)]
+    [InlineData("wide--contain--nonpercent-width-percent-height-viewbox.html", "nonpercent-width-percent-height-viewbox.svg", "contain", @"width=""8px""", @"height=""50%""", true)]
+    [InlineData("wide--contain--omitted-width-nonpercent-height-viewbox.html", "omitted-width-nonpercent-height-viewbox.svg", "contain", null, @"height=""32px""", true)]
+    [InlineData("wide--contain--omitted-width-omitted-height-viewbox.html", "omitted-width-omitted-height-viewbox.svg", "contain", null, null, true)]
+    [InlineData("wide--contain--omitted-width-percent-height-viewbox.html", "omitted-width-percent-height-viewbox.svg", "contain", null, @"height=""50%""", true)]
+    [InlineData("wide--contain--percent-width-nonpercent-height-viewbox.html", "percent-width-nonpercent-height-viewbox.svg", "contain", @"width=""50%""", @"height=""32px""", true)]
+    [InlineData("wide--contain--percent-width-omitted-height-viewbox.html", "percent-width-omitted-height-viewbox.svg", "contain", @"width=""50%""", null, true)]
+    [InlineData("wide--contain--percent-width-percent-height-viewbox.html", "percent-width-percent-height-viewbox.svg", "contain", @"width=""50%""", @"height=""50%""", true)]
+    public void Wpt_BackgroundSizeVector_WideContainPartialDimensionCases_MatchReference(
         string fileName,
         string supportFileName,
         string backgroundSize,
