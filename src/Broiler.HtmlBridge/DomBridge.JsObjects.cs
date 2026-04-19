@@ -1816,6 +1816,26 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
+        if (tag == "details")
+        {
+            obj.FastAddProperty(
+                (KeyString)"open",
+                new JSFunction((in Arguments _) =>
+                    element.Attributes.ContainsKey("open") ? JSBoolean.True : JSBoolean.False,
+                    "get open"),
+                new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length > 0 && a[0].BooleanValue)
+                        element.Attributes["open"] = "";
+                    else
+                        element.Attributes.Remove("open");
+
+                    bridge.InvalidateElementStyles(element);
+                    return JSUndefined.Value;
+                }, "set open"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+        }
+
         // HTMLDialogElement interface
         if (tag == "dialog")
         {
@@ -1866,6 +1886,7 @@ public sealed partial class DomBridge
                         element.Attributes["open"] = "";
                     else
                         element.Attributes.Remove("open");
+                    bridge.InvalidateElementStyles(element);
                     return JSUndefined.Value;
                 }, "set open"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);

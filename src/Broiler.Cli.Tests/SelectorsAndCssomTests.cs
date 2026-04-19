@@ -182,6 +182,73 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
+    [Fact]
+    public void Lang_Matches_Quoted_Argument()
+    {
+        var html = @"<!DOCTYPE html>
+<html lang=""en-US""><body>
+<div id=""target"">English</div>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(document.querySelector('#target:lang(""EN-US"")') !== null);
+r.push(document.querySelector('#target:lang(""FR"")') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Open_Matches_Details_With_Open_Attribute()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<details id=""target"" open>
+  <summary>Summary</summary>
+  <p>Details</p>
+</details>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(document.querySelector('details:open') !== null);
+r.push(document.querySelector('#target:open') !== null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Open_Tracks_Details_Open_State_Changes()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<details id=""target"">
+  <summary>Summary</summary>
+  <p>Details</p>
+</details>
+<div id=""result""></div>
+<script>
+var target = document.getElementById('target');
+var r = [];
+r.push(document.querySelector('#target:open') === null);
+target.open = true;
+r.push(document.querySelector('#target:open') !== null);
+target.open = false;
+r.push(document.querySelector('#target:open') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
     // ─────────── Pseudo-classes: :enabled, :disabled, :checked ────────────
 
     [Fact]

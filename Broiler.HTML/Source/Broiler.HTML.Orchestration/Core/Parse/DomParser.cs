@@ -616,6 +616,9 @@ internal sealed class DomParser
 
         switch (pseudoClass)
         {
+            case "open":
+                return MatchesOpenPseudoClass(box);
+
             case "first-child":
                 // CSS2.1 §5.11.1: :first-child matches an element that is the
                 // first child element of its parent.
@@ -665,6 +668,10 @@ internal sealed class DomParser
     /// </summary>
     private static bool MatchesLangPseudoClass(CssBox box, string lang)
     {
+        lang = NormalizeLangPseudoArgument(lang);
+        if (string.IsNullOrWhiteSpace(lang))
+            return false;
+
         for (var current = box; current != null; current = current.ParentBox)
         {
             if (current.HtmlTag == null) continue;
@@ -682,6 +689,32 @@ internal sealed class DomParser
             }
         }
         return false;
+    }
+
+    private static string NormalizeLangPseudoArgument(string lang)
+    {
+        lang = lang.Trim();
+        if (lang.Length >= 2)
+        {
+            char first = lang[0];
+            char last = lang[^1];
+            if ((first == '"' && last == '"') || (first == '\'' && last == '\''))
+                lang = lang.Substring(1, lang.Length - 2).Trim();
+        }
+
+        return lang;
+    }
+
+    private static bool MatchesOpenPseudoClass(CssBox box)
+    {
+        if (box.HtmlTag == null)
+            return false;
+
+        if (!box.HtmlTag.Name.Equals("details", StringComparison.OrdinalIgnoreCase)
+            && !box.HtmlTag.Name.Equals("dialog", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return box.HtmlTag.TryGetAttribute("open") != null;
     }
 
     private static void AssignCssBlock(CssBox box, CssBlock block)

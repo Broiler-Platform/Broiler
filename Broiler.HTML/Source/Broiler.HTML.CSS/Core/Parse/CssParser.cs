@@ -535,10 +535,11 @@ internal sealed class CssParser
 
     /// <summary>
     /// CSS2.1 §5.11.1: Recognised structural pseudo-classes.
-    /// Also includes <c>:lang()</c> (CSS2.1 §5.11.4).
+    /// Also includes <c>:lang()</c> (CSS2.1 §5.11.4) and <c>:open</c>
+    /// (Selectors Level 4 open-state pseudo-class).
     /// </summary>
     private static bool IsStructuralPseudoClass(string name) =>
-        (name is "first-child" or "last-child" or "only-child" or "root")
+        (name is "first-child" or "last-child" or "only-child" or "root" or "open")
         || name.StartsWith("lang(", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>

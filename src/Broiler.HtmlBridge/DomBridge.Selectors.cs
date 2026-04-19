@@ -442,6 +442,9 @@ public sealed partial class DomBridge
                 case "lang":
                     if (arg == null || !MatchesLang(el, arg)) return false;
                     break;
+                case "open":
+                    if (!MatchesOpenPseudo(el)) return false;
+                    break;
                 case "enabled":
                     if (!IsFormElement(el) || el.Attributes.ContainsKey("disabled")) return false;
                     break;
@@ -579,6 +582,10 @@ public sealed partial class DomBridge
 
     private static bool MatchesLang(DomElement el, string lang)
     {
+        lang = NormalizeLangPseudoArgument(lang);
+        if (string.IsNullOrWhiteSpace(lang))
+            return false;
+
         var current = el;
         while (current != null)
         {
@@ -591,6 +598,25 @@ public sealed partial class DomBridge
         }
         return false;
     }
+
+    private static string NormalizeLangPseudoArgument(string lang)
+    {
+        lang = lang.Trim();
+        if (lang.Length >= 2)
+        {
+            char first = lang[0];
+            char last = lang[^1];
+            if ((first == '"' && last == '"') || (first == '\'' && last == '\''))
+                lang = lang.Substring(1, lang.Length - 2).Trim();
+        }
+
+        return lang;
+    }
+
+    private static bool MatchesOpenPseudo(DomElement el) =>
+        (string.Equals(el.TagName, "details", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(el.TagName, "dialog", StringComparison.OrdinalIgnoreCase))
+        && el.Attributes.ContainsKey("open");
 
     private static bool IsFormElement(DomElement el)
     {
