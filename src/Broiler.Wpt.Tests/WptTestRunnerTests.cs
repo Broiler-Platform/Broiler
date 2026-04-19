@@ -3364,6 +3364,33 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
+    [Fact]
+    public void Wpt_BackgroundSizeVector_BackgroundSizeVector013_MatchReference()
+    {
+        var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-013.html");
+        Assert.True(result.Passed,
+            $"background-size-vector-013 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundSizeVector_BackgroundSizeVector015_MatchReference()
+    {
+        var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-015.html");
+        Assert.True(result.Passed,
+            $"background-size-vector-015 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundSizeVector_BackgroundSizeVector017_MatchReference()
+    {
+        var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-017.html");
+        Assert.True(result.Passed,
+            $"background-size-vector-017 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
     [Theory]
     [InlineData("background-size/vector/wide--contain--height.html")]
     [InlineData("background-size/vector/wide--contain--width.html")]
