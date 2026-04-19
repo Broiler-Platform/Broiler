@@ -827,7 +827,7 @@ public class Program
                 return null;
 
             var path = endpoint.Trim();
-            int queryIndex = path.IndexOfAny(['?', '#']);
+            int queryIndex = path.IndexOf('?');
             if (queryIndex >= 0)
                 path = path[..queryIndex];
 
@@ -836,7 +836,7 @@ public class Program
 
             path = path.Replace('\\', '/');
             var isAbsolute = path.StartsWith("/", StringComparison.Ordinal);
-            var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
             return new AccessPath(isAbsolute, segments);
         }
