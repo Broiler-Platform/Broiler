@@ -3346,6 +3346,24 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
+    [Fact]
+    public void Wpt_BackgroundSizeVector_BackgroundSizeVector009_MatchReference()
+    {
+        var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-009.html");
+        Assert.True(result.Passed,
+            $"background-size-vector-009 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_BackgroundSizeVector_BackgroundSizeVector011_MatchReference()
+    {
+        var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-011.html");
+        Assert.True(result.Passed,
+            $"background-size-vector-011 should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
     [Theory]
     [InlineData("background-size/vector/wide--contain--height.html")]
     [InlineData("background-size/vector/wide--contain--width.html")]
