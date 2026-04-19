@@ -167,6 +167,7 @@ The report includes:
 | Section | Description |
 |---------|-------------|
 | Summary | Total requests, unique IPs, bytes transferred |
+| Accessed Files | Tree view of accessed paths with per-file access counts |
 | Status Code Distribution | Breakdown of HTTP status codes |
 | HTTP Methods | Request method distribution |
 | Top Endpoints | Most-requested endpoints |
