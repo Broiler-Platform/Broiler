@@ -4,8 +4,8 @@ namespace Broiler.LogAnalyzer;
 
 /// <summary>
 /// Discovers Apache access log files in a directory, including rotated
-/// files (access.log.1, access.log.2, …) and gzip-compressed variants
-/// (access.log.2.gz, access.log.3.gz, …).
+/// files (access.log.1, access.log.2, access.log.14.1, …), productive
+/// current files (access.log.current), and gzip-compressed variants.
 /// </summary>
 public static class LogFileDiscovery
 {
@@ -35,34 +35,10 @@ public static class LogFileDiscovery
 
     /// <summary>
     /// Returns true if the filename looks like an Apache access log
-    /// (access.log, access.log.N, access.log.N.gz, access_log variants).
+    /// (access.log, access.log.current, access.log.N, access.log.N.M.gz,
+    /// access_log variants).
     /// </summary>
-    public static bool IsAccessLogFile(string filePath)
-    {
-        var name = Path.GetFileName(filePath);
-        bool isGz = name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase);
-
-        // Strip trailing .gz to check the base name
-        var baseName = isGz ? name[..^3] : name;
-
-        // Exact match: access.log or access_log (only plain files, not bare .gz)
-        if (!isGz &&
-            (baseName.Equals("access.log", StringComparison.OrdinalIgnoreCase) ||
-             baseName.Equals("access_log", StringComparison.OrdinalIgnoreCase)))
-            return true;
-
-        // Rotated: access.log.N or access_log.N (plain or .gz)
-        if (baseName.StartsWith("access.log.", StringComparison.OrdinalIgnoreCase) ||
-            baseName.StartsWith("access_log.", StringComparison.OrdinalIgnoreCase))
-        {
-            var suffix = baseName.StartsWith("access.log.", StringComparison.OrdinalIgnoreCase)
-                ? baseName["access.log.".Length..]
-                : baseName["access_log.".Length..];
-            return int.TryParse(suffix, out _);
-        }
-
-        return false;
-    }
+    public static bool IsAccessLogFile(string filePath) => TryGetSortKey(filePath, out _);
 
     /// <summary>
     /// Returns true if the file is gzip-compressed (ends with .gz).
@@ -96,25 +72,74 @@ public static class LogFileDiscovery
 
     /// <summary>
     /// Sort key that keeps current log first, then numerically by rotation index.
-    /// access.log → (0, 0), access.log.1 → (0, 1), access.log.5.gz → (0, 5)
+    /// access.log.current → (0, "current", 0), access.log.14 → (1, "14", 0),
+    /// access.log.14.1.gz → (1, "14.1", 1)
     /// </summary>
-    private static (int Group, int Index) GetSortKey(string filePath)
+    private static (int Group, string RotationKey, int Compression, string Name) GetSortKey(string filePath)
+    {
+        return TryGetSortKey(filePath, out var sortKey)
+            ? sortKey
+            : (int.MaxValue, string.Empty, int.MaxValue, Path.GetFileName(filePath));
+    }
+
+    private static bool TryGetSortKey(string filePath, out (int Group, string RotationKey, int Compression, string Name) sortKey)
     {
         var name = Path.GetFileName(filePath);
-        var baseName = name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)
-            ? name[..^3]
-            : name;
+        bool isGz = name.EndsWith(".gz", StringComparison.OrdinalIgnoreCase);
+        var baseName = isGz ? name[..^3] : name;
 
-        // Current log (no rotation number)
         if (baseName.Equals("access.log", StringComparison.OrdinalIgnoreCase) ||
             baseName.Equals("access_log", StringComparison.OrdinalIgnoreCase))
-            return (0, 0);
+        {
+            sortKey = (0, string.Empty, isGz ? 1 : 0, name);
+            return !isGz;
+        }
 
-        // Extract rotation number
-        var dotIdx = baseName.LastIndexOf('.');
-        if (dotIdx >= 0 && int.TryParse(baseName[(dotIdx + 1)..], out var idx))
-            return (0, idx);
+        if (baseName.Equals("access.log.current", StringComparison.OrdinalIgnoreCase) ||
+            baseName.Equals("access_log.current", StringComparison.OrdinalIgnoreCase))
+        {
+            sortKey = (0, "current", isGz ? 1 : 0, name);
+            return true;
+        }
 
-        return (1, 0);
+        if (!TryGetRotationSuffix(baseName, out var suffix))
+        {
+            sortKey = default;
+            return false;
+        }
+
+        var parsedNumericParts = suffix.Split('.', StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => int.TryParse(part, out var value) ? value : (int?)null)
+            .ToArray();
+        if (parsedNumericParts.Length == 0 || parsedNumericParts.Any(part => part is null))
+        {
+            sortKey = default;
+            return false;
+        }
+
+        sortKey = (
+            1,
+            string.Join('.', parsedNumericParts.Select(part => part!.Value.ToString("D10"))),
+            isGz ? 1 : 0,
+            name);
+        return true;
+    }
+
+    private static bool TryGetRotationSuffix(string baseName, out string suffix)
+    {
+        if (baseName.StartsWith("access.log.", StringComparison.OrdinalIgnoreCase))
+        {
+            suffix = baseName["access.log.".Length..];
+            return true;
+        }
+
+        if (baseName.StartsWith("access_log.", StringComparison.OrdinalIgnoreCase))
+        {
+            suffix = baseName["access_log.".Length..];
+            return true;
+        }
+
+        suffix = string.Empty;
+        return false;
     }
 }
