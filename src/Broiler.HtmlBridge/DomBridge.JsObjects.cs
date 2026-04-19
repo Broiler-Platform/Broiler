@@ -3151,8 +3151,12 @@ public sealed partial class DomBridge
             return px;
 
         var normalized = value.Trim().ToLowerInvariant();
-        if (!normalized.EndsWith("%") ||
-            !double.TryParse(normalized[..^1], System.Globalization.NumberStyles.Float,
+        if (!normalized.EndsWith("%"))
+        {
+            return 0;
+        }
+
+        if (!double.TryParse(normalized[..^1], System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var percent))
         {
             return 0;
