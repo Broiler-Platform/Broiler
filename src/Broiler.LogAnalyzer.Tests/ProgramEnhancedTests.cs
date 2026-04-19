@@ -394,4 +394,55 @@ public class ProgramEnhancedTests
     {
         Assert.False(Program.TryParseTimestamp("not-a-date", out _));
     }
+
+    [Fact]
+    public void FormatAccessedFilesTree_UsesCommonAbsolutePrefixAsRoot()
+    {
+        var timestamp = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var entries = new[]
+        {
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/music/Track2.mp3", "HTTP/1.1", 200, 10, "-", "TestAgent/1.0"),
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/music/Track10.mp3", "HTTP/1.1", 200, 10, "-", "TestAgent/1.0"),
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/music/live/Track1.mp3", "HTTP/1.1", 200, 10, "-", "TestAgent/1.0"),
+        };
+
+        var tree = AccessedFilesTreeFormatter.Format(entries);
+
+        Assert.Equal(
+            """
+            /music
+            ├─ live
+            │  └─ Track1.mp3 (1)
+            ├─ Track10.mp3 (1)
+            └─ Track2.mp3 (1)
+            """ + Environment.NewLine,
+            tree);
+    }
+
+    [Fact]
+    public void FormatAccessedFilesTree_SortsFilesAndStripsQueryStrings()
+    {
+        var timestamp = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var entries = new[]
+        {
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/root/fileB.txt", "HTTP/1.1", 200, 10, "-", "TestAgent/1.0"),
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/root/fileA.txt", "HTTP/1.1", 200, 10, "-", "TestAgent/1.0"),
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/root/fileA.txt?download=1", "HTTP/1.1", 200, 10, "-", "TestAgent/1.0"),
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/root/subdir/fileC.log", "HTTP/1.1", 200, 10, "-", "TestAgent/1.0"),
+            new LogEntry("127.0.0.1", "-", "-", timestamp, "GET", "/root/fileA.txt", "HTTP/1.1", 200, 10, "-", "TestAgent/1.0"),
+        };
+
+        var tree = AccessedFilesTreeFormatter.Format(entries);
+
+        Assert.Contains("├─ fileA.txt (3)", tree);
+        Assert.Contains("├─ fileB.txt (1)", tree);
+        Assert.Contains("└─ subdir", tree);
+        Assert.Contains("└─ fileC.log (1)", tree);
+
+        var fileAIndex = tree.IndexOf("fileA.txt", StringComparison.Ordinal);
+        var fileBIndex = tree.IndexOf("fileB.txt", StringComparison.Ordinal);
+        var subdirIndex = tree.IndexOf("subdir", StringComparison.Ordinal);
+        Assert.True(fileAIndex < fileBIndex);
+        Assert.True(fileBIndex < subdirIndex);
+    }
 }

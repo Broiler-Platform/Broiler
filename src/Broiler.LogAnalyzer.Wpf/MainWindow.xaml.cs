@@ -769,6 +769,14 @@ public partial class MainWindow : Window
         }
         sb.AppendLine();
 
+        var accessedFilesTree = AccessedFilesTreeFormatter.Format(analyzer.Entries);
+        if (!string.IsNullOrEmpty(accessedFilesTree))
+        {
+            sb.AppendLine("── Accessed Files ─────────────────────────");
+            sb.Append(accessedFilesTree);
+            sb.AppendLine();
+        }
+
         // ── Top 404 Endpoints ──
         var top404 = analyzer.Top404Endpoints(top);
         if (top404.Count > 0)

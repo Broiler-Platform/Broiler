@@ -436,6 +436,15 @@ public class Program
         }
         Console.WriteLine();
 
+        // ── Accessed Files ──
+        var accessedFilesTree = FormatAccessedFilesTree(analyzer.Entries);
+        if (!string.IsNullOrEmpty(accessedFilesTree))
+        {
+            Console.WriteLine("── Accessed Files ─────────────────────────");
+            Console.Write(accessedFilesTree);
+            Console.WriteLine();
+        }
+
         // ── Top 404 Endpoints ──
         var top404 = analyzer.Top404Endpoints(top);
         if (top404.Count > 0)
@@ -631,6 +640,11 @@ public class Program
     internal static string FormatEntry(LogEntry entry)
     {
         return LogAnalyzerService.FormatApacheLogEntry(entry);
+    }
+
+    internal static string FormatAccessedFilesTree(IReadOnlyList<LogEntry> entries)
+    {
+        return AccessedFilesTreeFormatter.Format(entries);
     }
 
     /// <summary>
