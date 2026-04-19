@@ -664,6 +664,106 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssViewport_ZoomScrollIntoViewPercentageAbsolutePosition_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 120px;
+      height: 120px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 600px;
+      height: 600px;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      top: 200%;
+      left: 200%;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <div class=""container"" style=""zoom: 2;"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <script>
+    for (const match of document.querySelectorAll('.target')) {
+      match.scrollIntoView();
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 120px;
+      height: 120px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 600px;
+      height: 600px;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      top: 200%;
+      left: 200%;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <div class=""container"" style=""zoom: 2;"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <script>
+    document.querySelectorAll('.container')[0].scrollTo(300, 300);
+    document.querySelectorAll('.container')[1].scrollTo(300, 300);
+  </script>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-into-view-percentage-absolute-position");
+        Assert.True(result.Passed,
+            $"zoom scrollIntoView percentage absolute positioning should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_ChUnit_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>

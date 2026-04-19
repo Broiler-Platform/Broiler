@@ -650,6 +650,49 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void ScrollIntoView_Scrolls_Percentage_Positioned_Targets_In_Raw_Css_Pixels()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function buildContainer(position, zoom) {
+                var container = document.createElement('div');
+                container.style.position = position;
+                container.style.width = '150px';
+                container.style.height = '150px';
+                container.style.overflow = 'auto';
+                if (zoom) {
+                    container.style.zoom = zoom;
+                }
+
+                var content = document.createElement('div');
+                content.style.width = '600px';
+                content.style.height = '600px';
+
+                var target = document.createElement('div');
+                target.style.position = 'absolute';
+                target.style.left = '200%';
+                target.style.top = '200%';
+                target.style.width = '20px';
+                target.style.height = '20px';
+
+                container.appendChild(content);
+                container.appendChild(target);
+                document.body.appendChild(container);
+                target.scrollIntoView();
+                return container.scrollLeft + ',' + container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                buildContainer('relative', '1') + '|' +
+                buildContainer('relative', '2') + '|' +
+                buildContainer('fixed', '1') + '|' +
+                buildContainer('fixed', '2');
+        ");
+        Assert.Contains("300,300|300,300|300,300|300,300", result);
+    }
+
+    [Fact]
     public void FontRelative_Ch_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
     {
         var result = ExecJs(@"

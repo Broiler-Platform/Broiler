@@ -3150,25 +3150,21 @@ public sealed partial class DomBridge
             return 0;
         }
 
-        var px = ParseCssLengthToPixelsWithViewport(value);
-        if (px >= 0)
-            return px;
-
         var normalized = value.Trim().ToLowerInvariant();
-        if (!normalized.EndsWith("%"))
+        if (normalized.EndsWith("%"))
         {
-            return 0;
+            if (!double.TryParse(normalized[..^1], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var percent))
+            {
+                return 0;
+            }
+
+            var parentProps = GetComputedProps(element.Parent);
+            var reference = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault(vertical ? "height" : "width"));
+            return reference <= 0 ? 0 : reference * (percent / 100.0);
         }
 
-        if (!double.TryParse(normalized[..^1], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var percent))
-        {
-            return 0;
-        }
-
-        var parentProps = GetComputedProps(element.Parent);
-        var reference = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault(vertical ? "height" : "width"));
-        return reference <= 0 ? 0 : reference * (percent / 100.0);
+        return ParseCssLengthToPixelsWithViewport(value);
     }
 
     private double ParseCssLengthToPixelsWithViewport(string? value)
