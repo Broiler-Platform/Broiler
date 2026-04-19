@@ -838,6 +838,48 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssValues_ExUnit_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      font: 16px monospace;
+      width: 5ex;
+      height: 10ex;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      width: 40px;
+      height: 80px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "ex-unit");
+        Assert.True(result.Passed,
+            $"ex unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void RunAll_Processes_Multiple_Tests()
     {
         // Arrange

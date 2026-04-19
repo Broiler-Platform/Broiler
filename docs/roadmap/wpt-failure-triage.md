@@ -32,7 +32,7 @@
 - Phase 3 has widened again: `scrollIntoView()` now respects `scroll-padding-*` and `scroll-margin-*` offsets in raw CSS pixels, including inherited `scroll-padding-top` / `scroll-margin-top` under zoomed containers.
 - Phase 3 has widened again: `scrollIntoView()` now uses positioned `top` / `left` offsets for absolutely positioned targets in raw CSS pixels, including zoomed scroll containers.
 - Phase 3 has widened again: `scrollIntoView()` now resolves percentage `top` / `left` insets for absolutely positioned targets in raw CSS pixels, including fixed and zoomed scroll containers.
-- Phase 3 has widened again: `ch` font-relative lengths now resolve in both layout and CSSOM width/height helpers, including raw CSS pixel metrics under zoom.
+- Phase 3 has widened again: `ch` and `ex` font-relative lengths now resolve in both layout and CSSOM width/height helpers, including raw CSS pixel metrics under zoom.
 - Phase 3 has widened again: CSSOM `clientWidth` / `clientHeight` now include padding, and the focused padded `scrollWidth` / `scrollHeight` negative-margin case stays aligned with the padded client box under zoom.
 - The `background-clip*` subset has now been rerun against the in-repo WPT corpus; the raw subset still fails broadly on full-page visual noise, so guard rails now focus on the reproducible box-model cases (`border-box`, `padding-box`, `content-box`, size/position/radius variants, and `border-area` corner-shape) instead of the instruction text around them.
 - **Deviation from the original proposal:** the roadmap-friendly Markdown file is generated directly by `Broiler.Wpt` instead of a separate post-processing step so the same logic is shared by local runs and CI.
@@ -194,7 +194,7 @@ Target the clusters with many `LayoutShift` or 0% mismatches:
 
 **Working rule:** land these fixes only with focused regression tests because these bugs are likely cross-cutting.
 
-**Status:** Phase 3 has started; representative `calc-*`, viewport-aware media-query resolution including `vmin` / `vmax`, `ch` font-relative lengths, padded client/scroll metrics, zoom rendering, zoom-sensitive CSSOM view guard rails, and zoomed `scrollIntoView()` spacing/absolute-position/percentage-inset cases now pass locally, including client/offset metric and offset-parent follow-up coverage, but the broader Phase 3 buckets still need follow-up triage.
+**Status:** Phase 3 has started; representative `calc-*`, viewport-aware media-query resolution including `vmin` / `vmax`, `ch` / `ex` font-relative lengths, padded client/scroll metrics, zoom rendering, zoom-sensitive CSSOM view guard rails, and zoomed `scrollIntoView()` spacing/absolute-position/percentage-inset cases now pass locally, including client/offset metric and offset-parent follow-up coverage, but the broader Phase 3 buckets still need follow-up triage.
 
 ## Phase 4 — Triage unsupported feature clusters separately
 

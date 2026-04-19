@@ -755,6 +755,31 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("40,80|40,80", result);
     }
 
+    [Fact]
+    public void FontRelative_Ex_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function measure(zoom) {
+                var box = document.createElement('div');
+                box.style.width = '5ex';
+                box.style.height = '10ex';
+                box.style.font = '16px monospace';
+                if (zoom) {
+                    box.style.zoom = zoom;
+                }
+
+                document.body.appendChild(box);
+                return box.offsetWidth + ',' + box.offsetHeight;
+            }
+
+            document.getElementById('result').textContent =
+                measure('1') + '|' + measure('2');
+        ");
+        Assert.Contains("40,80|40,80", result);
+    }
+
     // ---------------------------------------------------------------
     //  TODO-G6: Image() constructor
     // ---------------------------------------------------------------
