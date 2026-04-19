@@ -21,6 +21,8 @@
 - Phase 2 has widened again: the next adjacent in-repo `background-size` vector near-passes (`background-size-vector-013.html`, `background-size-vector-015.html`, and `background-size-vector-017.html`) now reproduce cleanly against the committed reference PNGs too, so the focused guard rails cover the remaining tall fixed-width percent-width `viewBox` variants in that in-repo sequence as well.
 - Phase 2 has widened again: the adjacent `selectors-4` near-pass workstream now handles quoted `:lang(...)` arguments and the `:open` pseudo-class for `details`, including JS-driven `open` state reflection, and focused selector regression coverage now guards those fixes locally as well.
 - Phase 2 has widened again: the representative `selectors-4` near-pass regressions now also cover document-root `lang-*` matching alongside the earlier `details-open-pseudo-*` and descendant `:lang(...)` cases, so that bucket's known near-pass issues are now closed locally instead of relying on only a subset of the selector patterns.
+- Phase 2 has widened again: the selector invalidation workstream now reapplies CSS-derived inline styles across the whole document scope after selector-affecting class, id, reflected-attribute, and DOM sibling mutations, and focused serialization regressions now guard representative `class-id-attr`, sibling-combinator, and `:disabled`-style updates locally.
+- Phase 2 has widened again: the focused `background-size` guard rails covering the in-repo near-pass vector bucket now still pass as a single validation set, so that Phase 2 bucket is now considered closed locally instead of being tracked as an open near-pass tranche.
 - The `background-clip*` subset has now been rerun against the in-repo WPT corpus; the raw subset still fails broadly on full-page visual noise, so guard rails now focus on the reproducible box-model cases (`border-box`, `padding-box`, `content-box`, size/position/radius variants, and `border-area` corner-shape) instead of the instruction text around them.
 - **Deviation from the original proposal:** the roadmap-friendly Markdown file is generated directly by `Broiler.Wpt` instead of a separate post-processing step so the same logic is shared by local runs and CI.
 - **Current blocker:** the hard crash is fixed, but the wider `background-clip` bucket still contains visual mismatches that belong to the next near-pass remediation steps rather than this crash-only fix.
@@ -164,7 +166,7 @@ Target the buckets with the highest concentration of `MinorDiff` and mid/high ma
 
 - [ ] `css/css-writing-modes/forms`
 - [ ] `css/selectors/invalidation`
-- [ ] `css/css-backgrounds/background-size`
+- [x] `css/css-backgrounds/background-size`
 - [x] `css/selectors/selectors-4`
 
 **Working rule:** prefer small renderer/layout fixes that retire dozens of visually-close failures at once.

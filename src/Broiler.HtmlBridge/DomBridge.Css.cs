@@ -385,6 +385,29 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Recalculates CSS-derived inline styles for every element in the current
+    /// document scope after a selector-affecting mutation such as a class,
+    /// attribute, or sibling structure change.
+    /// </summary>
+    internal void InvalidateStyleScope(DomElement anchor)
+    {
+        var docRoot = GetDocumentRootFor(anchor);
+        InvalidateStyleScopeRecursive(docRoot);
+    }
+
+    private void InvalidateStyleScopeRecursive(DomElement element)
+    {
+        if (!element.IsTextNode && !element.TagName.StartsWith("#", StringComparison.Ordinal))
+            InvalidateElementStyles(element);
+
+        foreach (var child in element.Children)
+        {
+            if (!child.IsTextNode && !child.TagName.StartsWith("#subdoc", StringComparison.OrdinalIgnoreCase))
+                InvalidateStyleScopeRecursive(child);
+        }
+    }
+
+    /// <summary>
     /// Finds the document root ancestor for the given element by walking up the
     /// parent chain. Stops at <c>#subdoc-root</c> or <c>#document</c> boundaries.
     /// Returns the topmost node within the element's document scope.
