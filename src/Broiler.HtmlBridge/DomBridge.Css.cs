@@ -299,8 +299,8 @@ public sealed partial class DomBridge
             if (pos >= cssText.Length)
                 break;
 
-            if (cssText.Length > pos + 6 &&
-                cssText.Substring(pos, 6).Equals("@media", StringComparison.OrdinalIgnoreCase))
+            if (cssText.Length >= pos + 6 &&
+                cssText.AsSpan(pos, 6).Equals("@media", StringComparison.OrdinalIgnoreCase))
             {
                 if (pos > lastRuleStart)
                     ExtractRulesFromCss(cssText[lastRuleStart..pos]);
@@ -1939,7 +1939,8 @@ public sealed partial class DomBridge
     /// </summary>
     private (int Width, int Height) GetViewportForDocRoot(DomElement docRoot)
     {
-        if (ReferenceEquals(docRoot, DocumentElement) || docRoot.Parent == null)
+        if (ReferenceEquals(docRoot, DocumentElement) ||
+            string.Equals(docRoot.TagName, "#document", StringComparison.OrdinalIgnoreCase))
             return (_viewportWidth, _viewportHeight);
 
         // Walk up from docRoot to find the containing iframe/object element
