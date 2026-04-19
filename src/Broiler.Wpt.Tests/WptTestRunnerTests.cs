@@ -3407,6 +3407,45 @@ div {{ width: 256px; height: 768px; }}
     }
 
     [Theory]
+    [InlineData("wide--cover--nonpercent-width-nonpercent-height.html", "nonpercent-width-nonpercent-height.svg", "cover", @"width=""8px""", @"height=""32px""", false)]
+    [InlineData("wide--cover--nonpercent-width-omitted-height.html", "nonpercent-width-omitted-height.svg", "cover", @"width=""8px""", null, false)]
+    [InlineData("wide--cover--nonpercent-width-percent-height.html", "nonpercent-width-percent-height.svg", "cover", @"width=""8px""", @"height=""50%""", false)]
+    [InlineData("wide--cover--omitted-width-nonpercent-height.html", "omitted-width-nonpercent-height.svg", "cover", null, @"height=""32px""", false)]
+    [InlineData("wide--cover--omitted-width-omitted-height.html", "omitted-width-omitted-height.svg", "cover", null, null, false)]
+    [InlineData("wide--cover--omitted-width-percent-height.html", "omitted-width-percent-height.svg", "cover", null, @"height=""50%""", false)]
+    [InlineData("wide--cover--percent-width-nonpercent-height.html", "percent-width-nonpercent-height.svg", "cover", @"width=""50%""", @"height=""32px""", false)]
+    [InlineData("wide--cover--percent-width-omitted-height.html", "percent-width-omitted-height.svg", "cover", @"width=""50%""", null, false)]
+    [InlineData("wide--cover--percent-width-percent-height.html", "percent-width-percent-height.svg", "cover", @"width=""50%""", @"height=""50%""", false)]
+    [InlineData("wide--cover--nonpercent-width-nonpercent-height-viewbox.html", "nonpercent-width-nonpercent-height-viewbox.svg", "cover", @"width=""8px""", @"height=""32px""", true)]
+    [InlineData("wide--cover--nonpercent-width-omitted-height-viewbox.html", "nonpercent-width-omitted-height-viewbox.svg", "cover", @"width=""8px""", null, true)]
+    [InlineData("wide--cover--nonpercent-width-percent-height-viewbox.html", "nonpercent-width-percent-height-viewbox.svg", "cover", @"width=""8px""", @"height=""50%""", true)]
+    [InlineData("wide--cover--omitted-width-nonpercent-height-viewbox.html", "omitted-width-nonpercent-height-viewbox.svg", "cover", null, @"height=""32px""", true)]
+    [InlineData("wide--cover--omitted-width-omitted-height-viewbox.html", "omitted-width-omitted-height-viewbox.svg", "cover", null, null, true)]
+    [InlineData("wide--cover--omitted-width-percent-height-viewbox.html", "omitted-width-percent-height-viewbox.svg", "cover", null, @"height=""50%""", true)]
+    [InlineData("wide--cover--percent-width-nonpercent-height-viewbox.html", "percent-width-nonpercent-height-viewbox.svg", "cover", @"width=""50%""", @"height=""32px""", true)]
+    [InlineData("wide--cover--percent-width-omitted-height-viewbox.html", "percent-width-omitted-height-viewbox.svg", "cover", @"width=""50%""", null, true)]
+    [InlineData("wide--cover--percent-width-percent-height-viewbox.html", "percent-width-percent-height-viewbox.svg", "cover", @"width=""50%""", @"height=""50%""", true)]
+    public void Wpt_BackgroundSizeVector_WideCoverPartialDimensionCases_MatchReference(
+        string fileName,
+        string supportFileName,
+        string backgroundSize,
+        string? widthAttribute,
+        string? heightAttribute,
+        bool includeViewBox)
+    {
+        var result = RunTempWideBackgroundSizeVectorVisualTest(
+            fileName,
+            supportFileName,
+            backgroundSize,
+            widthAttribute,
+            heightAttribute,
+            includeViewBox);
+        Assert.True(result.Passed,
+            $"{Path.GetFileNameWithoutExtension(fileName)} should pass. " +
+            $"Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Theory]
     [InlineData("tall--contain--nonpercent-width-omitted-height-viewbox.html", "contain", @"width=""8px""", null)]
     [InlineData("tall--contain--omitted-width-nonpercent-height-viewbox.html", "contain", null, @"height=""32px""")]
     [InlineData("tall--contain--percent-width-nonpercent-height-viewbox.html", "contain", @"width=""100%""", @"height=""32px""")]
