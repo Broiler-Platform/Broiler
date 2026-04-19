@@ -489,6 +489,90 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("40px", result);
     }
 
+    [Fact]
+    public void ScrollIntoView_Applies_ScrollPadding_And_ScrollMargin()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function buildContainer(zoom) {
+                var container = document.createElement('div');
+                container.style.width = '200px';
+                container.style.height = '100px';
+                container.style.overflow = 'hidden';
+                container.style.scrollPaddingTop = '20px';
+                if (zoom) {
+                    container.style.zoom = zoom;
+                }
+
+                var buffer = document.createElement('div');
+                buffer.style.height = '1000px';
+                var target = document.createElement('div');
+                target.style.height = '20px';
+                target.style.scrollMarginTop = '30px';
+                var tail = document.createElement('div');
+                tail.style.height = '1000px';
+
+                container.appendChild(buffer);
+                container.appendChild(target);
+                container.appendChild(tail);
+                document.body.appendChild(container);
+                target.scrollIntoView();
+                return container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                buildContainer('1') + ',' + buildContainer('2');
+        ");
+        Assert.Contains("950,950", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Resolves_Inherited_ScrollPadding_And_ScrollMargin_Under_Zoom()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function buildContainer(zoom) {
+                var host = document.createElement('div');
+                host.style.scrollPaddingTop = '20px';
+
+                var container = document.createElement('div');
+                container.style.width = '200px';
+                container.style.height = '100px';
+                container.style.overflow = 'hidden';
+                container.style.scrollPaddingTop = 'inherit';
+                container.style.scrollMarginTop = '30px';
+                if (zoom) {
+                    container.style.zoom = zoom;
+                }
+
+                var buffer = document.createElement('div');
+                buffer.style.height = '1000px';
+                var target = document.createElement('div');
+                target.style.height = '20px';
+                target.style.scrollMarginTop = 'inherit';
+                if (zoom) {
+                    target.style.zoom = zoom;
+                }
+                var tail = document.createElement('div');
+                tail.style.height = '1000px';
+
+                container.appendChild(buffer);
+                container.appendChild(target);
+                container.appendChild(tail);
+                host.appendChild(container);
+                document.body.appendChild(host);
+                target.scrollIntoView();
+                return container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                buildContainer('1') + ',' + buildContainer('2');
+        ");
+        Assert.Contains("950,950", result);
+    }
+
     // ---------------------------------------------------------------
     //  TODO-G6: Image() constructor
     // ---------------------------------------------------------------

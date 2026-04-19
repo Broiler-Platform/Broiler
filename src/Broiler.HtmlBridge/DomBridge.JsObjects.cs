@@ -3042,9 +3042,15 @@ public sealed partial class DomBridge
     private void ScrollElementIntoView(DomElement element)
     {
         var scrollContainer = FindScrollContainer(element) ?? DocumentElement;
-        var scrollTop = ComputeOffsetWithinAncestor(element, scrollContainer);
-        if (scrollTop > 0)
-            scrollContainer.DomProperties["_scrollTop"] = scrollTop;
+        var scrollTop = ComputeOffsetWithinAncestor(element, scrollContainer, vertical: true)
+                      - ResolveScrollIntoViewInset(element, "scroll-margin-top")
+                      - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-top");
+        var scrollLeft = ComputeOffsetWithinAncestor(element, scrollContainer, vertical: false)
+                       - ResolveScrollIntoViewInset(element, "scroll-margin-left")
+                       - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-left");
+
+        scrollContainer.DomProperties["_scrollTop"] = Math.Max(0, scrollTop);
+        scrollContainer.DomProperties["_scrollLeft"] = Math.Max(0, scrollLeft);
     }
 
     private DomElement? FindScrollContainer(DomElement element)
@@ -3059,29 +3065,36 @@ public sealed partial class DomBridge
         return DocumentElement;
     }
 
-    private double ComputeOffsetWithinAncestor(DomElement element, DomElement ancestor)
+    private double ComputeOffsetWithinAncestor(DomElement element, DomElement ancestor, bool vertical)
     {
         double offset = 0;
         var current = element;
 
         while (current.Parent != null && !ReferenceEquals(current.Parent, ancestor))
         {
-            offset += ComputeOffsetWithinParent(current);
+            offset += ComputeOffsetWithinParent(current, vertical);
             current = current.Parent;
         }
 
         if (current.Parent != null && ReferenceEquals(current.Parent, ancestor))
-            offset += ComputeOffsetWithinParent(current);
+            offset += ComputeOffsetWithinParent(current, vertical);
 
         return offset;
     }
 
-    private double ComputeOffsetWithinParent(DomElement element)
+    private double ComputeOffsetWithinParent(DomElement element, bool vertical)
     {
         if (element.Parent == null)
             return 0;
 
-        double offset = ParseCssLengthToPixelsWithViewport(GetComputedProps(element).GetValueOrDefault("margin-top"));
+        var parentProps = GetComputedProps(element.Parent);
+        double offset = ParseCssLengthToPixelsWithViewport(
+            parentProps.GetValueOrDefault(vertical ? "padding-top" : "padding-left"));
+
+        var elementProps = GetComputedProps(element);
+        offset += ParseCssLengthToPixelsWithViewport(
+            elementProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"));
+
         foreach (var sibling in element.Parent.Children)
         {
             if (ReferenceEquals(sibling, element))
@@ -3090,12 +3103,25 @@ public sealed partial class DomBridge
                 continue;
 
             var siblingProps = GetComputedProps(sibling);
-            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"));
-            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("height"));
-            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"));
+            offset += ParseCssLengthToPixelsWithViewport(
+                siblingProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"));
+            offset += ParseCssLengthToPixelsWithViewport(
+                siblingProps.GetValueOrDefault(vertical ? "height" : "width"));
+            offset += ParseCssLengthToPixelsWithViewport(
+                siblingProps.GetValueOrDefault(vertical ? "margin-bottom" : "margin-right"));
         }
 
         return offset;
+    }
+
+    private double ResolveScrollIntoViewInset(DomElement element, string propertyName)
+    {
+        var props = GetComputedProps(element);
+        var value = props.GetValueOrDefault(propertyName);
+        if (string.Equals(value, "inherit", StringComparison.OrdinalIgnoreCase) && element.Parent != null)
+            return ResolveScrollIntoViewInset(element.Parent, propertyName);
+
+        return ParseCssLengthToPixelsWithViewport(value);
     }
 
     private double ParseCssLengthToPixelsWithViewport(string? value)

@@ -29,6 +29,7 @@
 - Phase 3 has widened again: zoom-sensitive element metrics now expose `clientTop` / `clientLeft` and border-inclusive `offsetWidth` / `offsetHeight` without applying the target element's own zoom, and focused DOM-bridge regressions now cover representative `cssom-view/*zoom*` client/offset expectations locally too.
 - Phase 3 has widened again: `offsetParent` / `offsetTop` / `offsetLeft` now resolve against the nearest positioned ancestor in raw CSS pixels instead of document-space zoomed coordinates, including the nested collapsed-margin cases from the zoom-sensitive CSSOM view bucket.
 - Phase 3 has widened again: viewport-aware media-query lengths now resolve through `matchMedia()` too, including `vw` / `vh` and single-value `calc()` wrappers in both JS and stylesheet `@media` paths.
+- Phase 3 has widened again: `scrollIntoView()` now respects `scroll-padding-*` and `scroll-margin-*` offsets in raw CSS pixels, including inherited `scroll-padding-top` / `scroll-margin-top` under zoomed containers.
 - The `background-clip*` subset has now been rerun against the in-repo WPT corpus; the raw subset still fails broadly on full-page visual noise, so guard rails now focus on the reproducible box-model cases (`border-box`, `padding-box`, `content-box`, size/position/radius variants, and `border-area` corner-shape) instead of the instruction text around them.
 - **Deviation from the original proposal:** the roadmap-friendly Markdown file is generated directly by `Broiler.Wpt` instead of a separate post-processing step so the same logic is shared by local runs and CI.
 - **Current blocker:** the hard crash is fixed, but the wider `background-clip` bucket still contains visual mismatches that belong to the next near-pass remediation steps rather than this crash-only fix.
@@ -189,7 +190,7 @@ Target the clusters with many `LayoutShift` or 0% mismatches:
 
 **Working rule:** land these fixes only with focused regression tests because these bugs are likely cross-cutting.
 
-**Status:** Phase 3 has started; representative `calc-*`, viewport-aware media-query resolution, zoom rendering, and zoom-sensitive CSSOM view guard rails now pass locally, including client/offset metric and offset-parent follow-up coverage, but the broader Phase 3 buckets still need follow-up triage.
+**Status:** Phase 3 has started; representative `calc-*`, viewport-aware media-query resolution, zoom rendering, zoom-sensitive CSSOM view guard rails, and zoomed `scrollIntoView()` spacing cases now pass locally, including client/offset metric and offset-parent follow-up coverage, but the broader Phase 3 buckets still need follow-up triage.
 
 ## Phase 4 — Triage unsupported feature clusters separately
 

@@ -324,6 +324,180 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssViewport_ZoomScrollPadding_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow: hidden;
+      border: 1px solid black;
+      scroll-padding-top: 20px;
+      margin-right: 12px;
+    }
+    .buffer { height: 1000px; }
+    .target { height: 20px; background: black; }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""buffer""></div>
+    <div class=""target""></div>
+    <div class=""buffer""></div>
+  </div>
+  <div style=""display:inline-block; scroll-padding-top: 20px;"">
+    <div class=""container"" style=""scroll-padding-top: inherit; zoom: 2;"">
+      <div class=""buffer""></div>
+      <div class=""target""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <script>
+    for (const match of document.querySelectorAll('.target')) {
+      match.scrollIntoView();
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow: hidden;
+      border: 1px solid black;
+      scroll-padding-top: 20px;
+      margin-right: 12px;
+    }
+    .buffer { height: 1000px; }
+    .target { height: 20px; background: black; }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""buffer""></div>
+    <div class=""target""></div>
+    <div class=""buffer""></div>
+  </div>
+  <div style=""display:inline-block; scroll-padding-top: 20px;"">
+    <div class=""container"" style=""scroll-padding-top: inherit; zoom: 2;"">
+      <div class=""buffer""></div>
+      <div class=""target""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll('.container')[0].scrollTo(0, 980);
+    document.querySelectorAll('.container')[1].scrollTo(0, 980);
+  </script>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-padding");
+        Assert.True(result.Passed,
+            $"zoom scroll-padding should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomScrollMargin_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .group { display: inline-block; margin-right: 12px; }
+    .container {
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow-y: scroll;
+      overflow-x: hidden;
+      padding-top: 40px;
+      border: 1px solid black;
+    }
+    .buffer { height: 300px; }
+    .target { height: 10px; background: black; }
+  </style>
+</head>
+<body>
+  <div class=""group"">
+    <div class=""container"" style=""scroll-margin-top: 20px;"">
+      <div class=""buffer""></div>
+      <div class=""target"" style=""scroll-margin-top: inherit;""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <div class=""group"">
+    <div class=""container"" style=""scroll-margin-top: 20px; zoom: 2;"">
+      <div class=""buffer""></div>
+      <div class=""target"" style=""scroll-margin-top: inherit; zoom: 2;""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <script>
+    for (const match of document.querySelectorAll('.target')) {
+      match.scrollIntoView();
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .group { display: inline-block; margin-right: 12px; }
+    .container {
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow-y: scroll;
+      overflow-x: hidden;
+      padding-top: 40px;
+      border: 1px solid black;
+    }
+    .buffer { height: 300px; }
+    .target { height: 10px; background: black; }
+  </style>
+</head>
+<body>
+  <div class=""group"">
+    <div class=""container"" style=""scroll-margin-top: 20px;"">
+      <div class=""buffer""></div>
+      <div class=""target"" style=""scroll-margin-top: inherit;""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <div class=""group"">
+    <div class=""container"" style=""scroll-margin-top: 20px; zoom: 2;"">
+      <div class=""buffer""></div>
+      <div class=""target"" style=""scroll-margin-top: inherit; zoom: 2;""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll('.container')[0].scrollTo(0, 320);
+    document.querySelectorAll('.container')[1].scrollTo(0, 320);
+  </script>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-margin");
+        Assert.True(result.Passed,
+            $"zoom scroll-margin should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void RunAll_Processes_Multiple_Tests()
     {
         // Arrange
