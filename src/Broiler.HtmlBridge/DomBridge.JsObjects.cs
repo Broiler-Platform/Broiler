@@ -2809,18 +2809,15 @@ public sealed partial class DomBridge
     private double ComputeOffsetRelativeToAncestor(DomElement element, DomElement ancestor, bool vertical)
     {
         double offset = 0;
-        for (var current = element; current.Parent != null && !ReferenceEquals(current.Parent, ancestor); current = current.Parent)
-            offset += ComputeOffsetWithinParentForOffset(current, vertical);
-
-        if (element.Parent != null)
+        var current = element;
+        while (current.Parent != null && !ReferenceEquals(current.Parent, ancestor))
         {
-            var current = element;
-            while (current.Parent != null && !ReferenceEquals(current.Parent, ancestor))
-                current = current.Parent;
-
-            if (current.Parent != null && ReferenceEquals(current.Parent, ancestor))
-                offset += ComputeOffsetWithinParentForOffset(current, vertical);
+            offset += ComputeOffsetWithinParentForOffset(current, vertical);
+            current = current.Parent;
         }
+
+        if (current.Parent != null && ReferenceEquals(current.Parent, ancestor))
+            offset += ComputeOffsetWithinParentForOffset(current, vertical);
 
         return offset;
     }
@@ -2886,8 +2883,7 @@ public sealed partial class DomBridge
         var props = GetComputedProps(element);
         var position = props.GetValueOrDefault("position");
         if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(position, "fixed", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(position, "relative", StringComparison.OrdinalIgnoreCase))
+            string.Equals(position, "fixed", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
