@@ -1820,7 +1820,7 @@ public sealed partial class DomBridge
         {
             if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var ch))
-                return ch * 8.0; // 1ch ≈ half of the default 16px font-size
+                return ch * 8.0; // Approximate 1ch as 8px for a 16px monospace glyph advance.
             return -1;
         }
         // Plain number (treat as pixels)

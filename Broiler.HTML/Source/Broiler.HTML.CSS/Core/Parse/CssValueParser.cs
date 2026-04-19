@@ -216,6 +216,8 @@ internal sealed class CssValueParser
                 factor = emFactor / 2;
                 break;
             case CssConstants.Ch:
+                // Approximate 1ch as half an em so 16px monospace text resolves
+                // to an 8px character advance in the current focused Phase 3 slice.
                 factor = emFactor / 2;
                 break;
             case CssConstants.Px:
