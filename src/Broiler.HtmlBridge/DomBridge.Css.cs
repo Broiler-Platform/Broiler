@@ -537,6 +537,9 @@ public sealed partial class DomBridge
                 if (!computed.ContainsKey(kv.Key))
                     computed[kv.Key] = kv.Value;
             }
+
+            ApplyApproximateFormControlComputedSizes(computed, element);
+            ApplyLogicalSizeAliases(computed);
         }
 
         var obj = new JSObject();
@@ -589,6 +592,103 @@ public sealed partial class DomBridge
 
         return obj;
     }
+
+    private static void ApplyApproximateFormControlComputedSizes(
+        Dictionary<string, string> computed,
+        DomElement element)
+    {
+        string tag = element.TagName.ToLowerInvariant();
+        if (tag is not ("input" or "button" or "select" or "textarea" or "progress" or "meter"))
+            return;
+
+        string writingMode = computed.GetValueOrDefault("writing-mode") ?? "horizontal-tb";
+        bool vertical = string.Equals(writingMode, "vertical-rl", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(writingMode, "vertical-lr", StringComparison.OrdinalIgnoreCase);
+
+        double logicalInlineSize = 60;
+        double logicalBlockSize = 20;
+
+        switch (tag)
+        {
+            case "input":
+                string type = element.Attributes.GetValueOrDefault("type")?.ToLowerInvariant() ?? "text";
+                switch (type)
+                {
+                    case "hidden":
+                        logicalInlineSize = 0;
+                        logicalBlockSize = 0;
+                        break;
+                    case "checkbox":
+                    case "radio":
+                        logicalInlineSize = 13;
+                        logicalBlockSize = 13;
+                        break;
+                    case "submit":
+                    case "button":
+                    case "reset":
+                        logicalInlineSize = 72;
+                        logicalBlockSize = 20;
+                        break;
+                    default:
+                        logicalInlineSize = 173;
+                        logicalBlockSize = 16;
+                        break;
+                }
+                break;
+            case "button":
+                logicalInlineSize = 72;
+                logicalBlockSize = 20;
+                break;
+            case "select":
+                logicalInlineSize = 60;
+                logicalBlockSize = 19;
+                break;
+            case "textarea":
+                logicalInlineSize = 170;
+                logicalBlockSize = 40;
+                break;
+            case "progress":
+            case "meter":
+                logicalInlineSize = 120;
+                logicalBlockSize = 16;
+                break;
+        }
+
+        double physicalWidth = vertical ? logicalBlockSize : logicalInlineSize;
+        double physicalHeight = vertical ? logicalInlineSize : logicalBlockSize;
+
+        if (!HasExplicitPixelSize(computed, "width") && physicalWidth > 0)
+            computed["width"] = FormatPx(physicalWidth);
+        if (!HasExplicitPixelSize(computed, "height") && physicalHeight > 0)
+            computed["height"] = FormatPx(physicalHeight);
+    }
+
+    private static void ApplyLogicalSizeAliases(Dictionary<string, string> computed)
+    {
+        string writingMode = computed.GetValueOrDefault("writing-mode") ?? "horizontal-tb";
+        bool vertical = string.Equals(writingMode, "vertical-rl", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(writingMode, "vertical-lr", StringComparison.OrdinalIgnoreCase);
+
+        string width = computed.GetValueOrDefault("width") ?? "auto";
+        string height = computed.GetValueOrDefault("height") ?? "auto";
+
+        computed["block-size"] = vertical ? width : height;
+        computed["inline-size"] = vertical ? height : width;
+    }
+
+    private static bool HasExplicitPixelSize(Dictionary<string, string> computed, string property)
+    {
+        if (!computed.TryGetValue(property, out var value))
+            return false;
+
+        value = value?.Trim() ?? string.Empty;
+        return value.Length > 0 &&
+               !string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase) &&
+               TryParsePx(value).HasValue;
+    }
+
+    private static string FormatPx(double value) =>
+        $"{Math.Round(value).ToString(System.Globalization.CultureInfo.InvariantCulture)}px";
 
     /// <summary>
     /// Expands CSS shorthand properties into individual longhand properties.

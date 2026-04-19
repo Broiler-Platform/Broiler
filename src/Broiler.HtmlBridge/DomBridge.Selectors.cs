@@ -642,16 +642,8 @@ public sealed partial class DomBridge
     /// </summary>
     private static bool MatchesNthChild(DomElement el, string expr)
     {
-        if (el.Parent == null) return false;
-        int index = 0;
-        foreach (var child in el.Parent.Children)
-        {
-            if (child.IsTextNode) continue;
-            index++;
-            if (ReferenceEquals(child, el)) break;
-        }
-
-        return EvaluateNthExpression(index, expr);
+        return TryGetNthFilteredIndex(el, expr, fromEnd: false, out var index, out var nthExpr)
+            && EvaluateNthExpression(index, nthExpr);
     }
 
     /// <summary>
@@ -660,23 +652,148 @@ public sealed partial class DomBridge
     /// </summary>
     private static bool MatchesNthLastChild(DomElement el, string expr)
     {
-        if (el.Parent == null) return false;
-        int totalNonText = 0;
-        int positionFromEnd = 0;
-        bool found = false;
-        for (int i = el.Parent.Children.Count - 1; i >= 0; i--)
+        return TryGetNthFilteredIndex(el, expr, fromEnd: true, out var index, out var nthExpr)
+            && EvaluateNthExpression(index, nthExpr);
+    }
+
+    private static bool TryGetNthFilteredIndex(
+        DomElement el,
+        string expr,
+        bool fromEnd,
+        out int index,
+        out string nthExpr)
+    {
+        index = 0;
+        nthExpr = expr.Trim();
+        if (!HasElementParent(el))
+            return false;
+
+        SplitNthArgument(expr, out nthExpr, out var selectorFilter);
+
+        var siblings = el.Parent!.Children
+            .Where(child => !child.IsTextNode)
+            .Where(child => selectorFilter == null || MatchesSelectorList(child, selectorFilter))
+            .ToList();
+
+        if (siblings.Count == 0)
+            return false;
+
+        if (fromEnd)
         {
-            var child = el.Parent.Children[i];
-            if (child.IsTextNode) continue;
-            totalNonText++;
-            if (ReferenceEquals(child, el))
+            for (var i = siblings.Count - 1; i >= 0; i--)
             {
-                positionFromEnd = totalNonText;
-                found = true;
+                index++;
+                if (ReferenceEquals(siblings[i], el))
+                    return true;
             }
         }
-        if (!found) return false;
-        return EvaluateNthExpression(positionFromEnd, expr);
+        else
+        {
+            foreach (var child in siblings)
+            {
+                index++;
+                if (ReferenceEquals(child, el))
+                    return true;
+            }
+        }
+
+        index = 0;
+        return false;
+    }
+
+    private static void SplitNthArgument(string expr, out string nthExpr, out string? selectorFilter)
+    {
+        expr = expr.Trim();
+        int parenDepth = 0;
+        int bracketDepth = 0;
+
+        for (var i = 0; i <= expr.Length - 4; i++)
+        {
+            var c = expr[i];
+            switch (c)
+            {
+                case '(':
+                    parenDepth++;
+                    break;
+                case ')':
+                    parenDepth--;
+                    break;
+                case '[':
+                    bracketDepth++;
+                    break;
+                case ']':
+                    bracketDepth--;
+                    break;
+            }
+
+            if (parenDepth == 0 &&
+                bracketDepth == 0 &&
+                i > 0 &&
+                expr[i] == ' ' &&
+                string.Compare(expr, i + 1, "of ", 0, 3, StringComparison.OrdinalIgnoreCase) == 0)
+            {
+                nthExpr = expr[..i].Trim();
+                selectorFilter = expr[(i + 4)..].Trim();
+                return;
+            }
+        }
+
+        nthExpr = expr;
+        selectorFilter = null;
+    }
+
+    private static bool MatchesSelectorList(DomElement el, string selectorList)
+    {
+        foreach (var selector in SplitSelectorList(selectorList))
+        {
+            if (MatchesSelector(el, selector))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<string> SplitSelectorList(string selectorList)
+    {
+        var current = new StringBuilder();
+        int parenDepth = 0;
+        int bracketDepth = 0;
+
+        foreach (var c in selectorList)
+        {
+            switch (c)
+            {
+                case '(':
+                    parenDepth++;
+                    current.Append(c);
+                    break;
+                case ')':
+                    parenDepth--;
+                    current.Append(c);
+                    break;
+                case '[':
+                    bracketDepth++;
+                    current.Append(c);
+                    break;
+                case ']':
+                    bracketDepth--;
+                    current.Append(c);
+                    break;
+                case ',' when parenDepth == 0 && bracketDepth == 0:
+                    var selector = current.ToString().Trim();
+                    if (selector.Length > 0)
+                        yield return selector;
+                    current.Clear();
+                    break;
+                default:
+                    current.Append(c);
+                    break;
+            }
+        }
+
+        var tail = current.ToString().Trim();
+        if (tail.Length > 0)
+            yield return tail;
     }
 
     /// <summary>

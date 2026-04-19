@@ -482,6 +482,66 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
+    [Fact]
+    public void NthChild_OfSelector_Matches_Filtered_Siblings()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var container = document.createElement('div');
+document.body.appendChild(container);
+var ids = ['a', 'b', 'c', 'd', 'e'];
+var classes = ['', 'c', 'c', '', 'c'];
+for (var i = 0; i < ids.length; i++) {
+    var p = document.createElement('p');
+    p.id = ids[i];
+    if (classes[i]) p.className = classes[i];
+    container.appendChild(p);
+}
+var r = [];
+r.push(document.querySelector('#b:nth-child(1 of .c)') !== null);
+r.push(document.querySelector('#c:nth-child(2 of .c)') !== null);
+r.push(document.querySelector('#e:nth-child(3 of .c)') !== null);
+r.push(document.querySelector('#c:nth-child(odd of .c)') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void NthLastChild_OfSelector_Matches_Filtered_Siblings()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var container = document.createElement('div');
+document.body.appendChild(container);
+var ids = ['p0', 'p1', 'p2', 'p3', 'p4'];
+var hits = [true, false, true, true, true];
+for (var i = 0; i < ids.length; i++) {
+    var p = document.createElement('p');
+    p.id = ids[i];
+    if (hits[i]) p.className = 'hit';
+    container.appendChild(p);
+}
+var r = [];
+r.push(document.querySelector('#p4:nth-last-child(1 of .hit)') !== null);
+r.push(document.querySelector('#p3:nth-last-child(2 of .hit)') !== null);
+r.push(document.querySelector('#p2:nth-last-child(odd of .hit)') !== null);
+r.push(document.querySelector('#p1:nth-last-child(1 of .hit)') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
     // ──────── Attribute selectors: |=, ~=, ^=, $=, *= ────────────────────
 
     [Fact]

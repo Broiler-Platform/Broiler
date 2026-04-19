@@ -679,6 +679,38 @@ document.getElementById('target').disabled = true;
         Assert.Contains("top: 400px", result);
     }
 
+    /// <summary>
+    /// Verifies that selector invalidation recomputes filtered sibling positions
+    /// for <c>:nth-child(... of selector)</c> after a class mutation.
+    /// </summary>
+    [Fact]
+    public void NthChild_OfSelector_Recomputes_After_Class_Change()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+p:nth-child(even of .c) { font-style: italic; }
+</style>
+</head><body>
+<div>
+  <p id=""a"" class=""c"">a</p>
+  <p id=""b"" class=""c"">b</p>
+  <p id=""toggler"" class=""c"">toggle</p>
+  <p id=""target"" class=""c"">target</p>
+</div>
+<div id=""result""></div>
+<script>
+var before = window.getComputedStyle(document.getElementById('target')).fontStyle;
+document.getElementById('toggler').classList.remove('c');
+var after = window.getComputedStyle(document.getElementById('target')).fontStyle;
+document.getElementById('result').textContent = before + ',' + after;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("italic,normal", result);
+    }
+
     // ────────────── D2: :root cascade overriding html ──────────────
 
     /// <summary>
