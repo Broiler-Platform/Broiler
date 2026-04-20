@@ -672,6 +672,48 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Viewport_Calc_Lengths_Resolve_In_BoundingClientRect()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.width = 'calc(100vw + 50px)';
+            target.style.height = 'calc(100vh + 50px)';
+            target.style.left = '-50px';
+            target.style.top = '-50px';
+            document.body.appendChild(target);
+
+            var rect = target.getBoundingClientRect();
+            document.getElementById('result').textContent =
+                'RECT:' + rect.left + ',' + rect.top + ',' + rect.width + ',' + rect.height;
+        ");
+        Assert.Contains("RECT:-50,-50,1074,818", result);
+    }
+
+    [Fact]
+    public void Viewport_Calc_Lengths_With_Percentages_Resolve_In_BoundingClientRect()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.width = 'calc(100vw + 50%)';
+            target.style.height = 'calc(100vh + 50%)';
+            target.style.left = '-50%';
+            target.style.top = '-50%';
+            document.body.appendChild(target);
+
+            var rect = target.getBoundingClientRect();
+            document.getElementById('result').textContent =
+                'RECT:' + rect.left + ',' + rect.top + ',' + rect.width + ',' + rect.height;
+        ");
+        Assert.Contains("RECT:-512,-384,1536,1152", result);
+    }
+
+    [Fact]
     public void ScrollIntoView_Applies_ScrollPadding_And_ScrollMargin()
     {
         var result = ExecJs(@"

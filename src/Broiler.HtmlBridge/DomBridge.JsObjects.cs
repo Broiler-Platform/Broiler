@@ -2652,9 +2652,10 @@ public sealed partial class DomBridge
             return _viewportWidth;
 
         var props = GetComputedProps(element);
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element)
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"), element)
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element);
+        var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element, percentageBasis: containingBlockWidth);
     }
 
     private double GetClientHeightForDomElement(DomElement element, bool isRoot)
@@ -2663,9 +2664,11 @@ public sealed partial class DomBridge
             return _viewportHeight;
 
         var props = GetComputedProps(element);
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element)
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"), element)
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element);
+        var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
+        var containingBlockHeight = ResolveContainingBlockReferenceLength(element, vertical: true);
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element, percentageBasis: containingBlockHeight)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element, percentageBasis: containingBlockWidth);
     }
 
     private double GetClientTopForDomElement(DomElement element)
@@ -2934,12 +2937,14 @@ public sealed partial class DomBridge
     private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRect(DomElement element)
     {
         var props = GetComputedProps(element);
-        var width = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element);
-        var height = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element);
-        var marginTop = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("margin-top"), element);
-        var marginLeft = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("margin-left"), element);
-        var top = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("top"), element);
-        var left = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("left"), element);
+        var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
+        var containingBlockHeight = ResolveContainingBlockReferenceLength(element, vertical: true);
+        var width = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element, percentageBasis: containingBlockWidth);
+        var height = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element, percentageBasis: containingBlockHeight);
+        var marginTop = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("margin-top"), element, percentageBasis: containingBlockWidth);
+        var marginLeft = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("margin-left"), element, percentageBasis: containingBlockWidth);
+        var top = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("top"), element, percentageBasis: containingBlockHeight);
+        var left = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("left"), element, percentageBasis: containingBlockWidth);
         var position = props.GetValueOrDefault("position");
 
         if (element.Parent == null || string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase))
@@ -2947,8 +2952,10 @@ public sealed partial class DomBridge
 
         if (string.Equals(element.TagName, "body", StringComparison.OrdinalIgnoreCase))
         {
-            var bodyMarginTop = marginTop > 0 ? marginTop : DefaultBodyMarginPixels;
-            var bodyMarginLeft = marginLeft > 0 ? marginLeft : DefaultBodyMarginPixels;
+            var specifiedMarginTop = props.GetValueOrDefault("margin-top");
+            var specifiedMarginLeft = props.GetValueOrDefault("margin-left");
+            var bodyMarginTop = HasExplicitBodyMargin(specifiedMarginTop) ? marginTop : DefaultBodyMarginPixels;
+            var bodyMarginLeft = HasExplicitBodyMargin(specifiedMarginLeft) ? marginLeft : DefaultBodyMarginPixels;
             return (bodyMarginLeft, bodyMarginTop, width, height);
         }
 
@@ -3036,18 +3043,21 @@ public sealed partial class DomBridge
 
     private double GetBorderBoxWidth(Dictionary<string, string> props, DomElement? element = null)
     {
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element)
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"), element)
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element)
+        var containingBlockWidth = element != null ? ResolveContainingBlockReferenceLength(element, vertical: false) : (double?)null;
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element, percentageBasis: containingBlockWidth)
              + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-left-width"), element)
              + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-right-width"), element);
     }
 
     private double GetBorderBoxHeight(Dictionary<string, string> props, DomElement? element = null)
     {
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element)
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"), element)
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element)
+        var containingBlockWidth = element != null ? ResolveContainingBlockReferenceLength(element, vertical: false) : (double?)null;
+        var containingBlockHeight = element != null ? ResolveContainingBlockReferenceLength(element, vertical: true) : (double?)null;
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element, percentageBasis: containingBlockHeight)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element, percentageBasis: containingBlockWidth)
              + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-top-width"), element)
              + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-bottom-width"), element);
     }
@@ -3252,44 +3262,244 @@ public sealed partial class DomBridge
         return ParseCssLengthToPixelsWithViewport(value, element);
     }
 
-    private double ParseCssLengthToPixelsWithViewport(string? value, DomElement? referenceElement = null, bool forLineHeight = false)
+    private double ParseCssLengthToPixelsWithViewport(
+        string? value,
+        DomElement? referenceElement = null,
+        bool forLineHeight = false,
+        double? percentageBasis = null)
     {
         if (string.IsNullOrWhiteSpace(value))
             return 0;
 
-        var normalized = value.Trim().ToLowerInvariant();
-        if (normalized.EndsWith("vh") &&
-            double.TryParse(normalized[..^2], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var vh))
+        return TryEvaluateCssLengthWithViewport(value, referenceElement, forLineHeight, percentageBasis, out var px)
+            ? px
+            : 0;
+    }
+
+    private bool TryEvaluateCssLengthWithViewport(
+        string value,
+        DomElement? referenceElement,
+        bool forLineHeight,
+        double? percentageBasis,
+        out double result)
+    {
+        result = 0;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var normalized = value.Trim();
+        while (normalized.Length >= 2 &&
+               normalized[0] == '(' &&
+               normalized[^1] == ')' &&
+               HasBalancedParens(normalized[1..^1]))
         {
-            return (vh / 100.0) * _viewportHeight;
+            normalized = normalized[1..^1].Trim();
         }
 
-        if (normalized.EndsWith("vw") &&
-            double.TryParse(normalized[..^2], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var vw))
+        if (TryEvaluateMathLengthFunction(normalized, referenceElement, forLineHeight, percentageBasis, out result))
+            return true;
+
+        var additiveOperatorIndex = FindTopLevelAdditiveOperator(normalized);
+        if (additiveOperatorIndex > 0)
         {
-            return (vw / 100.0) * _viewportWidth;
+            if (!TryEvaluateCssLengthWithViewport(
+                    normalized[..additiveOperatorIndex],
+                    referenceElement,
+                    forLineHeight,
+                    percentageBasis,
+                    out var left) ||
+                !TryEvaluateCssLengthWithViewport(
+                    normalized[(additiveOperatorIndex + 1)..],
+                    referenceElement,
+                    forLineHeight,
+                    percentageBasis,
+                    out var right))
+            {
+                return false;
+            }
+
+            result = normalized[additiveOperatorIndex] == '+'
+                ? left + right
+                : left - right;
+            return true;
+        }
+
+        var lower = normalized.ToLowerInvariant();
+        if (percentageBasis.HasValue &&
+            lower.EndsWith("%", StringComparison.Ordinal) &&
+            double.TryParse(lower[..^1], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var percent))
+        {
+            result = percentageBasis.Value * (percent / 100.0);
+            return true;
         }
 
         if (referenceElement != null &&
-            normalized.EndsWith("rlh") &&
-            double.TryParse(normalized[..^3], System.Globalization.NumberStyles.Float,
+            lower.EndsWith("rlh") &&
+            double.TryParse(lower[..^3], System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var rlh))
         {
-            return rlh * ResolveLineHeightForLength(referenceElement, rootRelative: true);
+            result = rlh * ResolveLineHeightForLength(referenceElement, rootRelative: true);
+            return true;
         }
 
         if (referenceElement != null &&
-            normalized.EndsWith("lh") &&
-            double.TryParse(normalized[..^2], System.Globalization.NumberStyles.Float,
+            lower.EndsWith("lh") &&
+            double.TryParse(lower[..^2], System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var lh))
         {
-            return lh * ResolveLineHeightForLength(referenceElement, rootRelative: false, forLineHeight);
+            result = lh * ResolveLineHeightForLength(referenceElement, rootRelative: false, forLineHeight);
+            return true;
         }
 
-        var px = ParseCssLengthToPixels(value);
-        return !double.IsNaN(px) ? px : 0;
+        var px = ParseCssLengthToPixels(normalized, _viewportWidth, _viewportHeight);
+        if (double.IsNaN(px))
+            return false;
+
+        result = px;
+        return true;
+    }
+
+    private bool TryEvaluateMathLengthFunction(
+        string value,
+        DomElement? referenceElement,
+        bool forLineHeight,
+        double? percentageBasis,
+        out double result)
+    {
+        result = 0;
+        if (string.IsNullOrWhiteSpace(value) || value[^1] != ')')
+            return false;
+
+        static bool StartsWithFunction(string candidate, string functionName)
+            => candidate.StartsWith(functionName + "(", StringComparison.OrdinalIgnoreCase);
+
+        if (StartsWithFunction(value, "calc"))
+        {
+            var content = value[5..^1];
+            return HasBalancedParens(content) &&
+                   TryEvaluateCssLengthWithViewport(content, referenceElement, forLineHeight, percentageBasis, out result);
+        }
+
+        if (!StartsWithFunction(value, "min") && !StartsWithFunction(value, "max"))
+            return false;
+
+        var isMax = StartsWithFunction(value, "max");
+        var contentValue = value[4..^1];
+        if (!HasBalancedParens(contentValue))
+            return false;
+
+        var parts = SplitTopLevelArguments(contentValue);
+        if (parts.Count == 0)
+            return false;
+
+        double? candidate = null;
+        foreach (var part in parts)
+        {
+            if (!TryEvaluateCssLengthWithViewport(part, referenceElement, forLineHeight, percentageBasis, out var parsed))
+                return false;
+
+            candidate = candidate.HasValue
+                ? (isMax ? Math.Max(candidate.Value, parsed) : Math.Min(candidate.Value, parsed))
+                : parsed;
+        }
+
+        if (!candidate.HasValue)
+            return false;
+
+        result = candidate.Value;
+        return true;
+    }
+
+    private static int FindTopLevelAdditiveOperator(string expression)
+    {
+        var depth = 0;
+        for (int i = expression.Length - 1; i >= 1; i--)
+        {
+            switch (expression[i])
+            {
+                case ')':
+                    depth++;
+                    break;
+                case '(':
+                    depth--;
+                    break;
+                case '+':
+                case '-':
+                    if (depth != 0)
+                        break;
+
+                    var leftIndex = i - 1;
+                    while (leftIndex >= 0 && char.IsWhiteSpace(expression[leftIndex]))
+                        leftIndex--;
+
+                    var rightIndex = i + 1;
+                    while (rightIndex < expression.Length && char.IsWhiteSpace(expression[rightIndex]))
+                        rightIndex++;
+
+                    if (leftIndex >= 0 &&
+                        rightIndex < expression.Length &&
+                        expression[leftIndex] != '(' &&
+                        expression[leftIndex] != ',' &&
+                        expression[leftIndex] != '+' &&
+                        expression[leftIndex] != '-')
+                    {
+                        return i;
+                    }
+                    break;
+            }
+        }
+
+        return -1;
+    }
+
+    private static List<string> SplitTopLevelArguments(string value)
+    {
+        var parts = new List<string>();
+        var depth = 0;
+        var start = 0;
+
+        for (int i = 0; i < value.Length; i++)
+        {
+            switch (value[i])
+            {
+                case '(':
+                    depth++;
+                    break;
+                case ')':
+                    depth--;
+                    break;
+                case ',' when depth == 0:
+                    parts.Add(value[start..i].Trim());
+                    start = i + 1;
+                    break;
+            }
+        }
+
+        parts.Add(value[start..].Trim());
+        return parts;
+    }
+
+    private double ResolveContainingBlockReferenceLength(DomElement element, bool vertical)
+    {
+        if (element.Parent == null ||
+            string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(element.TagName, "body", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(element.Parent.TagName, "html", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(element.Parent.TagName, "body", StringComparison.OrdinalIgnoreCase))
+        {
+            return vertical ? _viewportHeight : _viewportWidth;
+        }
+
+        var parentRect = ComputeUnzoomedLayoutRect(element.Parent);
+        var reference = vertical ? parentRect.Height : parentRect.Width;
+        return reference > 0 ? reference : (vertical ? _viewportHeight : _viewportWidth);
+    }
+
+    private static bool HasExplicitBodyMargin(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value) &&
+               !string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase);
     }
 
     private double ResolveLineHeightForLength(DomElement element, bool rootRelative, bool forLineHeight = false)

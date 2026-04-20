@@ -635,6 +635,41 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssValues_ViewportCalcLengthsWithPixels_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; }
+    #target {
+      position: absolute;
+      background: green;
+      width: calc(100vw + 50px);
+      height: calc(100vh + 50px);
+      top: -50px;
+      left: -50px;
+    }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: green; overflow: hidden; }
+  </style>
+</head>
+<body></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-calc-support");
+        Assert.True(result.Passed,
+            $"viewport calc lengths with pixel offsets should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssViewport_ZoomScrollPadding_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
