@@ -228,6 +228,63 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Element_Scroll_Alias_And_Object_Arguments_Update_Offsets()
+    {
+        var result = ExecJs(@"
+            var container = document.createElement('div');
+            container.style.width = '100px';
+            container.style.height = '100px';
+            container.style.overflow = 'scroll';
+            var content = document.createElement('div');
+            content.style.width = '250px';
+            content.style.height = '250px';
+            container.appendChild(content);
+            document.body.appendChild(container);
+            container.scroll(50, 60);
+            container.scrollTo({ left: 75 });
+            container.scrollBy({ top: 15 });
+            container.scroll({});
+            document.getElementById('result').textContent = 'L:' + container.scrollLeft + ',T:' + container.scrollTop;
+        ");
+        Assert.Contains("L:75,T:75", result);
+    }
+
+    [Fact]
+    public void Element_ScrollOffsets_Clamp_And_Respect_WritingMode_Direction()
+    {
+        var result = ExecJs(@"
+            function makeScroller(writingMode, direction) {
+                var scroller = document.createElement('div');
+                scroller.style.overflow = 'scroll';
+                scroller.style.width = '150px';
+                scroller.style.height = '100px';
+                scroller.style.writingMode = writingMode;
+                scroller.style.direction = direction;
+
+                var content = document.createElement('div');
+                content.style.width = '300px';
+                content.style.height = '400px';
+                scroller.appendChild(content);
+                document.body.appendChild(scroller);
+
+                scroller.scrollLeft = writingMode === 'vertical-lr' || direction !== 'rtl' ? 999 : -999;
+                scroller.scrollTop = direction === 'rtl' && writingMode !== 'horizontal-tb' ? -999 : 999;
+                return scroller.scrollLeft + ',' + scroller.scrollTop;
+            }
+
+            document.getElementById('result').textContent = [
+                makeScroller('horizontal-tb', 'ltr'),
+                makeScroller('horizontal-tb', 'rtl'),
+                makeScroller('vertical-lr', 'ltr'),
+                makeScroller('vertical-lr', 'rtl'),
+                makeScroller('vertical-rl', 'ltr'),
+                makeScroller('vertical-rl', 'rtl')
+            ].join('|');
+        ");
+        Assert.Contains("150,300|-150,300|150,300|150,-300|0,300|-150,-300", result);
+    }
+
+    [Fact]
     public void Element_ClientMetrics_Ignore_Effective_Zoom()
     {
         var result = ExecJs(@"

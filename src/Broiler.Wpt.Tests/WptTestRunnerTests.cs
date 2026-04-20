@@ -2948,6 +2948,73 @@ document.getElementById('out').appendChild(p);
             $"Expected target display:none but styles = [{string.Join(", ", targetEl.Style.Select(kv => $"{kv.Key}:{kv.Value}"))}]");
     }
 
+    [Fact]
+    public void Wpt_CssomView_ElementScroll_Alias_And_Object_Arguments_Work()
+    {
+        const string html = @"<!DOCTYPE html>
+<div id=""sc"" style=""width:150px; height:100px; overflow:scroll;"">
+  <div style=""width:300px; height:400px;""></div>
+</div>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        ctx.Eval("""
+            var sc = document.getElementById('sc');
+            sc.scroll(50, 60);
+            sc.scrollTo({ left: 75 });
+            sc.scrollBy({ top: 15 });
+            """);
+
+        Broiler.HtmlBridge.DomElement? sc = null;
+        FindDomElement(bridge.DocumentElement, "sc", ref sc);
+        Assert.NotNull(sc);
+        Assert.True(
+            sc!.DomProperties.TryGetValue("_scrollLeft", out var scrollLeft) && scrollLeft is double left && left == 75 &&
+            sc.DomProperties.TryGetValue("_scrollTop", out var scrollTop) && scrollTop is double top && top == 75,
+            $"Expected scrollLeft=75 and scrollTop=75, got left={sc.DomProperties.GetValueOrDefault("_scrollLeft")}, top={sc.DomProperties.GetValueOrDefault("_scrollTop")}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped()
+    {
+        const string html = @"<!DOCTYPE html>
+<div id=""rtl"" style=""overflow:scroll; width:150px; height:100px; writing-mode:horizontal-tb; direction:rtl;"">
+  <div style=""width:300px; height:400px;""></div>
+</div>
+<div id=""verticalRtl"" style=""overflow:scroll; width:150px; height:100px; writing-mode:vertical-rl; direction:rtl;"">
+  <div style=""width:300px; height:400px;""></div>
+</div>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        ctx.Eval("""
+            var rtl = document.getElementById('rtl');
+            rtl.scrollLeft = -999;
+            rtl.scrollTop = 999;
+            var verticalRtl = document.getElementById('verticalRtl');
+            verticalRtl.scrollLeft = -999;
+            verticalRtl.scrollTop = -999;
+            """);
+
+        Broiler.HtmlBridge.DomElement? rtl = null;
+        FindDomElement(bridge.DocumentElement, "rtl", ref rtl);
+        Assert.NotNull(rtl);
+        Assert.True(
+            rtl!.DomProperties.TryGetValue("_scrollLeft", out var rtlLeftValue) && rtlLeftValue is double rtlLeft && rtlLeft == -150 &&
+            rtl.DomProperties.TryGetValue("_scrollTop", out var rtlTopValue) && rtlTopValue is double rtlTop && rtlTop == 300,
+            $"Expected rtl scroller left=-150 top=300, got left={rtl.DomProperties.GetValueOrDefault("_scrollLeft")}, top={rtl.DomProperties.GetValueOrDefault("_scrollTop")}");
+
+        Broiler.HtmlBridge.DomElement? verticalRtl = null;
+        FindDomElement(bridge.DocumentElement, "verticalRtl", ref verticalRtl);
+        Assert.NotNull(verticalRtl);
+        Assert.True(
+            verticalRtl!.DomProperties.TryGetValue("_scrollLeft", out var verticalLeftValue) && verticalLeftValue is double verticalLeft && verticalLeft == -150 &&
+            verticalRtl.DomProperties.TryGetValue("_scrollTop", out var verticalTopValue) && verticalTopValue is double verticalTop && verticalTop == -300,
+            $"Expected vertical rtl scroller left=-150 top=-300, got left={verticalRtl.DomProperties.GetValueOrDefault("_scrollLeft")}, top={verticalRtl.DomProperties.GetValueOrDefault("_scrollTop")}");
+    }
+
     /// <summary>
     /// Runs a css-anchor-position test against a Chromium reference PNG.
     /// </summary>

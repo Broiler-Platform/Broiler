@@ -2274,7 +2274,7 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments a) =>
                 {
                     if (a.Length > 0)
-                        element.DomProperties["_scrollTop"] = a[0].DoubleValue;
+                        bridgeForOffset.SetElementScrollOffsets(element, top: a[0].DoubleValue);
                     return JSUndefined.Value;
                 }, "set scrollTop"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -2289,7 +2289,7 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments a) =>
                 {
                     if (a.Length > 0)
-                        element.DomProperties["_scrollLeft"] = a[0].DoubleValue;
+                        bridgeForOffset.SetElementScrollOffsets(element, left: a[0].DoubleValue);
                     return JSUndefined.Value;
                 }, "set scrollLeft"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -2368,13 +2368,20 @@ public sealed partial class DomBridge
                 }, "scrollIntoView", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
             obj.FastAddValue(
+                (KeyString)"scroll",
+                new JSFunction((in Arguments a) =>
+                {
+                    var (left, top) = bridgeForOffset.GetScrollArguments(a);
+                    bridgeForOffset.SetElementScrollOffsets(element, left, top, clamp: false);
+                    return JSUndefined.Value;
+                }, "scroll", 2),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue(
                 (KeyString)"scrollTo",
                 new JSFunction((in Arguments a) =>
                 {
-                    if (a.Length > 0)
-                        element.DomProperties["_scrollLeft"] = a[0].DoubleValue;
-                    if (a.Length > 1)
-                        element.DomProperties["_scrollTop"] = a[1].DoubleValue;
+                    var (left, top) = bridgeForOffset.GetScrollArguments(a);
+                    bridgeForOffset.SetElementScrollOffsets(element, left, top, clamp: false);
                     return JSUndefined.Value;
                 }, "scrollTo", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -2382,12 +2389,8 @@ public sealed partial class DomBridge
                 (KeyString)"scrollBy",
                 new JSFunction((in Arguments a) =>
                 {
-                    var currentLeft = element.DomProperties.TryGetValue("_scrollLeft", out var sl) && sl is double left ? left : 0;
-                    var currentTop = element.DomProperties.TryGetValue("_scrollTop", out var st) && st is double top ? top : 0;
-                    if (a.Length > 0)
-                        element.DomProperties["_scrollLeft"] = currentLeft + a[0].DoubleValue;
-                    if (a.Length > 1)
-                        element.DomProperties["_scrollTop"] = currentTop + a[1].DoubleValue;
+                    var (left, top) = bridgeForOffset.GetScrollArguments(a);
+                    bridgeForOffset.SetElementScrollOffsets(element, left, top, relative: true, clamp: false);
                     return JSUndefined.Value;
                 }, "scrollBy", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -3055,6 +3058,67 @@ public sealed partial class DomBridge
 
         scrollContainer.DomProperties["_scrollTop"] = Math.Max(0, scrollTop);
         scrollContainer.DomProperties["_scrollLeft"] = Math.Max(0, scrollLeft);
+    }
+
+    private (double? Left, double? Top) GetScrollArguments(in Arguments args)
+    {
+        if (args.Length == 0)
+            return (null, null);
+
+        if (args[0] is JSObject options)
+        {
+            return (GetOptionalScrollCoordinate(options, "left"), GetOptionalScrollCoordinate(options, "top"));
+        }
+
+        return (args.Length > 0 ? args[0].DoubleValue : null, args.Length > 1 ? args[1].DoubleValue : null);
+    }
+
+    private static double? GetOptionalScrollCoordinate(JSObject options, string propertyName)
+    {
+        var value = options[(KeyString)propertyName];
+        return value == null || value.IsUndefined || value.IsNull ? null : value.DoubleValue;
+    }
+
+    private void SetElementScrollOffsets(DomElement element, double? left = null, double? top = null, bool relative = false, bool clamp = true)
+    {
+        var currentLeft = element.DomProperties.TryGetValue("_scrollLeft", out var sl) && sl is double leftValue ? leftValue : 0;
+        var currentTop = element.DomProperties.TryGetValue("_scrollTop", out var st) && st is double topValue ? topValue : 0;
+
+        var nextLeft = left.HasValue ? (relative ? currentLeft + left.Value : left.Value) : currentLeft;
+        var nextTop = top.HasValue ? (relative ? currentTop + top.Value : top.Value) : currentTop;
+
+        if (clamp)
+        {
+            var (minLeft, maxLeft, minTop, maxTop) = GetScrollBounds(element);
+            nextLeft = Math.Clamp(nextLeft, minLeft, maxLeft);
+            nextTop = Math.Clamp(nextTop, minTop, maxTop);
+        }
+
+        element.DomProperties["_scrollLeft"] = nextLeft;
+        element.DomProperties["_scrollTop"] = nextTop;
+    }
+
+    private (double MinLeft, double MaxLeft, double MinTop, double MaxTop) GetScrollBounds(DomElement element)
+    {
+        var isRoot = ReferenceEquals(element, DocumentElement) ||
+                     string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase);
+        var maxLeft = Math.Max(0, GetScrollWidthForDomElement(element, isRoot) - GetClientWidthForDomElement(element, isRoot));
+        var maxTop = Math.Max(0, GetScrollHeightForDomElement(element, isRoot) - GetClientHeightForDomElement(element, isRoot));
+
+        var props = GetComputedProps(element);
+        var writingMode = props.GetValueOrDefault("writing-mode");
+        var direction = props.GetValueOrDefault("direction");
+        var isRtl = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
+        var isVerticalRl = string.Equals(writingMode, "vertical-rl", StringComparison.OrdinalIgnoreCase);
+        var isVertical = isVerticalRl || string.Equals(writingMode, "vertical-lr", StringComparison.OrdinalIgnoreCase);
+        var usesNegativeLeft = isVerticalRl || (string.Equals(writingMode, "horizontal-tb", StringComparison.OrdinalIgnoreCase) && isRtl);
+        var usesNegativeTop = isVertical && isRtl;
+
+        var minLeft = usesNegativeLeft ? -maxLeft : 0;
+        var boundedMaxLeft = usesNegativeLeft ? 0 : maxLeft;
+        var minTop = usesNegativeTop ? -maxTop : 0;
+        var boundedMaxTop = usesNegativeTop ? 0 : maxTop;
+        return (minLeft, boundedMaxLeft, minTop, boundedMaxTop);
     }
 
     private DomElement? FindScrollContainer(DomElement element)
