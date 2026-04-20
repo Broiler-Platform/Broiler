@@ -3468,6 +3468,8 @@ public sealed partial class DomBridge
                     break;
                 case ')':
                     depth--;
+                    if (depth < 0)
+                        return [];
                     break;
                 case ',' when depth == 0:
                     parts.Add(value[start..i].Trim());
@@ -3475,6 +3477,9 @@ public sealed partial class DomBridge
                     break;
             }
         }
+
+        if (depth != 0)
+            return [];
 
         parts.Add(value[start..].Trim());
         return parts;
