@@ -43,6 +43,7 @@
 - Phase 3 has widened again: `ic` font-relative lengths now resolve through the shared parser and bridge-side CSSOM length helpers, including focused static css-values coverage and zoom-stable raw-CSS-pixel guard rails.
 - Phase 3 has widened again: focused `attr(... type(<length>))` value resolution now works in direct length and `max(...)` width cases, including fallback handling in both renderer-applied stylesheet declarations and bridge-side CSSOM/inlined-style length consumers.
 - Phase 3 has widened again: zoom-sensitive CSSOM view geometry now excludes preceding absolute/fixed siblings from normal-flow stacking, which stabilizes focused `getBoundingClientRect()`, `getClientRects()`, `scrollTo()`/scroll metrics, and offset metric cases in raw CSS pixels.
+- Phase 4 has started: `Broiler.Wpt` triage output now emits a dedicated deferred feature-gap section in console, JSON, and Markdown output, explicitly aggregates `css/css-view-transitions/*` and larger `filter-effects` failures, surfaces other `MissingContent`-dominant buckets separately, and stops suggesting those suites as the next near-pass `--subset` commands.
 - The `background-clip*` subset has now been rerun against the in-repo WPT corpus; the raw subset still fails broadly on full-page visual noise, so guard rails now focus on the reproducible box-model cases (`border-box`, `padding-box`, `content-box`, size/position/radius variants, and `border-area` corner-shape) instead of the instruction text around them.
 - **Deviation from the original proposal:** the roadmap-friendly Markdown file is generated directly by `Broiler.Wpt` instead of a separate post-processing step so the same logic is shared by local runs and CI.
 - **Current blocker:** the hard crash is fixed, but the wider `background-clip` bucket still contains visual mismatches that belong to the next near-pass remediation steps rather than this crash-only fix.
@@ -209,11 +210,13 @@ Target the clusters with many `LayoutShift` or 0% mismatches:
 
 Do not mix these into the near-pass work. Track them as explicit feature gaps or deferred suites:
 
-- [ ] `css/css-view-transitions/*`
-- [ ] larger `filter-effects` failures
-- [ ] other suites dominated by `MissingContent` rather than near-pass diffs
+- [x] `css/css-view-transitions/*`
+- [x] larger `filter-effects` failures
+- [x] other suites dominated by `MissingContent` rather than near-pass diffs
 
 **Working rule:** if the platform feature is incomplete, document the gap instead of repeatedly re-triaging the same failures.
+
+**Status:** Phase 4 is now accounted for in the runner/reporting layer instead of via repeated manual triage. `Broiler.Wpt` now keeps the explicit unsupported suites (`css/css-view-transitions/*` and larger `filter-effects` buckets) out of the "Suggested next subset commands" section, and it surfaces additional `MissingContent`-dominant buckets as deferred feature gaps in console output plus the generated JSON/Markdown artifacts. This keeps the near-pass work queue focused on smaller reproducible wins while still preserving machine-readable tracking for broader unsupported areas such as the current `css/css-values/calc-size`, `css/css-writing-modes`, `css/selectors`, `css/motion`, and stale `css/css-viewport/zoom` leftovers seen in the committed artifact set.
 
 ## Phase 5 — Expand reference coverage for skipped suites
 

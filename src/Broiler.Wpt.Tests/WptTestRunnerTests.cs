@@ -42,6 +42,18 @@ public class WptTestRunnerTests : IDisposable
         return runner.RunMatchTest(testFile, refFile, _tempDir);
     }
 
+    private static void CreateSolidReferencePng(string path, SkiaSharp.SKColor color)
+    {
+        using var bitmap = new SkiaSharp.SKBitmap(
+            1024,
+            768,
+            SkiaSharp.SKColorType.Rgba8888,
+            SkiaSharp.SKAlphaType.Premul);
+        bitmap.Erase(color);
+        using var stream = File.OpenWrite(path);
+        bitmap.Encode(stream, SkiaSharp.SKEncodedImageFormat.Png, 100);
+    }
+
     [Fact]
     public void DiscoverTests_Finds_Html_Files_Recursively()
     {
@@ -2627,20 +2639,51 @@ document.getElementById('out').appendChild(p);
         var testDir = Path.Combine(_tempDir, "triage-report");
         var missingRefDir = Path.Combine(testDir, "css", "skip");
         var mediaDir = Path.Combine(testDir, "css", "media");
+        var viewTransitionsDir = Path.Combine(testDir, "css", "css-view-transitions");
+        var filterEffectsDir = Path.Combine(testDir, "css", "filter-effects");
+        var calcSizeDir = Path.Combine(testDir, "css", "css-values", "calc-size");
         Directory.CreateDirectory(missingRefDir);
         Directory.CreateDirectory(mediaDir);
+        Directory.CreateDirectory(viewTransitionsDir);
+        Directory.CreateDirectory(filterEffectsDir);
+        Directory.CreateDirectory(calcSizeDir);
 
-        File.WriteAllText(Path.Combine(missingRefDir, "missing-ref.html"), "<html><body>Missing ref</body></html>");
+        File.WriteAllText(Path.Combine(missingRefDir, "missing-ref-case.html"), "<html><body>Missing ref</body></html>");
         File.WriteAllText(Path.Combine(mediaDir, "media.html"),
             @"<!DOCTYPE html><html><body><video autoplay><source type=""video/mp4"" src=""support/video.mp4""></video></body></html>");
+        File.WriteAllText(Path.Combine(viewTransitionsDir, "vt-gap.html"),
+            @"<!DOCTYPE html><html><body style=""margin:0;background:#f00""></body></html>");
+        File.WriteAllText(Path.Combine(filterEffectsDir, "filter-gap.html"),
+            @"<!DOCTYPE html><html><body style=""margin:0;background:#0f0""></body></html>");
+        File.WriteAllText(Path.Combine(calcSizeDir, "calc-gap-1.html"),
+            @"<!DOCTYPE html><html><body style=""margin:0;background:#00f""></body></html>");
+        File.WriteAllText(Path.Combine(calcSizeDir, "calc-gap-2.html"),
+            @"<!DOCTYPE html><html><body style=""margin:0;background:#00f""></body></html>");
+        File.WriteAllText(Path.Combine(calcSizeDir, "calc-gap-3.html"),
+            @"<!DOCTYPE html><html><body style=""margin:0;background:#00f""></body></html>");
+        File.WriteAllText(Path.Combine(calcSizeDir, "calc-gap-4.html"),
+            @"<!DOCTYPE html><html><body style=""margin:0;background:#00f""></body></html>");
+        File.WriteAllText(Path.Combine(calcSizeDir, "calc-gap-5.html"),
+            @"<!DOCTYPE html><html><body style=""margin:0;background:#00f""></body></html>");
 
         var refDir = Path.Combine(testDir, "references");
         Directory.CreateDirectory(refDir);
         var jsonPath = Path.Combine(_tempDir, "triage-report.json");
         var markdownPath = Path.Combine(_tempDir, "triage-report.md");
+        Directory.CreateDirectory(Path.Combine(refDir, "css", "css-view-transitions"));
+        Directory.CreateDirectory(Path.Combine(refDir, "css", "filter-effects"));
+        Directory.CreateDirectory(Path.Combine(refDir, "css", "css-values", "calc-size"));
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-view-transitions", "vt-gap.png"), SkiaSharp.SKColors.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "filter-effects", "filter-gap.png"), SkiaSharp.SKColors.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-1.png"), SkiaSharp.SKColors.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-2.png"), SkiaSharp.SKColors.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-3.png"), SkiaSharp.SKColors.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-4.png"), SkiaSharp.SKColors.White);
+        CreateSolidReferencePng(Path.Combine(refDir, "css", "css-values", "calc-size", "calc-gap-5.png"), SkiaSharp.SKColors.White);
 
         var originalOut = Console.Out;
-        Console.SetOut(new StringWriter());
+        var consoleOutput = new StringWriter();
+        Console.SetOut(consoleOutput);
         try
         {
             Program.Main([
@@ -2678,10 +2721,34 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("MissingReferenceImage", resultReasons);
         Assert.Contains("UnsupportedMediaPlayback", resultReasons);
 
+        var deferredBuckets = triage.GetProperty("deferredFeatureBuckets")
+            .EnumerateArray()
+            .Select(el => new
+            {
+                Directory = el.GetProperty("directory").GetString(),
+                Kind = el.GetProperty("kind").GetString(),
+            })
+            .ToList();
+        Assert.Contains(deferredBuckets, bucket => bucket.Directory == "css/css-view-transitions" && bucket.Kind == "ExplicitFeatureGap");
+        Assert.Contains(deferredBuckets, bucket => bucket.Directory == "css/filter-effects" && bucket.Kind == "ExplicitFeatureGap");
+        Assert.Contains(deferredBuckets, bucket => bucket.Directory == "css/css-values/calc-size" && bucket.Kind == "MissingContentDominant");
+
         var markdown = File.ReadAllText(markdownPath);
         Assert.Contains("# WPT Triage Summary", markdown);
+        Assert.Contains("## Deferred unsupported / MissingContent-dominant buckets", markdown);
+        Assert.Contains("`css/css-view-transitions` — 1 failure(s) [ExplicitFeatureGap]", markdown);
+        Assert.Contains("`css/filter-effects` — 1 failure(s) [ExplicitFeatureGap]", markdown);
+        Assert.Contains("`css/css-values/calc-size` — 5 failure(s) [MissingContentDominant]", markdown);
+        Assert.Contains("MissingContent 100.0", markdown);
         Assert.Contains("## Suggested next subset commands", markdown);
         Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/skip\"", markdown);
+        Assert.DoesNotContain("./scripts/run-wpt-tests.sh --subset \"css/css-view-transitions\"", markdown);
+        Assert.DoesNotContain("./scripts/run-wpt-tests.sh --subset \"css/filter-effects\"", markdown);
+
+        var output = consoleOutput.ToString();
+        Assert.Contains("Deferred feature-gap buckets:", output);
+        Assert.Contains("css/css-view-transitions [ExplicitFeatureGap]", output);
+        Assert.Contains("css/filter-effects [ExplicitFeatureGap]", output);
     }
 
     [Fact]
