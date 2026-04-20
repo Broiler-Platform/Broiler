@@ -837,6 +837,60 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("40,80|40,80", result);
     }
 
+    [Fact]
+    public void FontRelative_Lh_Units_Resolve_From_Parent_LineHeight_Under_Zoom()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function measure(zoom) {
+                var parent = document.createElement('div');
+                parent.style.lineHeight = '20px';
+
+                var box = document.createElement('div');
+                box.style.font = '16px monospace';
+                box.style.lineHeight = '2lh';
+                box.style.width = '1lh';
+                box.style.height = '1lh';
+                if (zoom) {
+                    box.style.zoom = zoom;
+                }
+
+                parent.appendChild(box);
+                document.body.appendChild(parent);
+                return box.offsetWidth + ',' + box.offsetHeight;
+            }
+
+            document.getElementById('result').textContent =
+                measure('1') + '|' + measure('2');
+        ");
+        Assert.Contains("40,40|40,40", result);
+    }
+
+    [Fact]
+    public void FontRelative_Rlh_Units_Resolve_From_Root_LineHeight_Under_Zoom()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function measure(zoom) {
+                var box = document.createElement('div');
+                box.style.width = '3rlh';
+                box.style.height = '2rlh';
+                if (zoom) {
+                    box.style.zoom = zoom;
+                }
+
+                document.body.appendChild(box);
+                return box.offsetWidth + ',' + box.offsetHeight;
+            }
+
+            document.getElementById('result').textContent =
+                measure('1') + '|' + measure('2');
+        ");
+        Assert.Contains("57.599999999999994,38.4|57.599999999999994,38.4", result);
+    }
+
     // ---------------------------------------------------------------
     //  TODO-G6: Image() constructor
     // ---------------------------------------------------------------

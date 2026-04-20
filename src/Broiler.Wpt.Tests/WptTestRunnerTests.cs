@@ -880,6 +880,95 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssValues_LhUnit_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      font: 20px monospace;
+      width: 5lh;
+      height: 5lh;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      width: 120px;
+      height: 120px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "lh-unit");
+        Assert.True(result.Passed,
+            $"lh unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_RlhUnit_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 3rlh;
+      height: 2rlh;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 57.6px;
+      height: 38.4px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "rlh-unit");
+        Assert.True(result.Passed,
+            $"rlh unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void RunAll_Processes_Multiple_Tests()
     {
         // Arrange

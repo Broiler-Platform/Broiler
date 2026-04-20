@@ -2652,9 +2652,9 @@ public sealed partial class DomBridge
             return _viewportWidth;
 
         var props = GetComputedProps(element);
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"))
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"))
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"));
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element);
     }
 
     private double GetClientHeightForDomElement(DomElement element, bool isRoot)
@@ -2663,21 +2663,21 @@ public sealed partial class DomBridge
             return _viewportHeight;
 
         var props = GetComputedProps(element);
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"))
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"))
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"));
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element);
     }
 
     private double GetClientTopForDomElement(DomElement element)
     {
         var props = GetComputedProps(element);
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-top-width"));
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-top-width"), element);
     }
 
     private double GetClientLeftForDomElement(DomElement element)
     {
         var props = GetComputedProps(element);
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-left-width"));
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-left-width"), element);
     }
 
     private double GetOffsetWidthForDomElement(DomElement element, bool isRoot)
@@ -2690,7 +2690,7 @@ public sealed partial class DomBridge
             return resolved.Value.width;
 
         var props = GetComputedProps(element);
-        var width = GetBorderBoxWidth(props);
+        var width = GetBorderBoxWidth(props, element);
         if (width > 0)
             return width;
 
@@ -2707,7 +2707,7 @@ public sealed partial class DomBridge
             return resolved.Value.height;
 
         var props = GetComputedProps(element);
-        var height = GetBorderBoxHeight(props);
+        var height = GetBorderBoxHeight(props, element);
         if (height > 0)
             return height;
 
@@ -2836,8 +2836,8 @@ public sealed partial class DomBridge
 
         var props = GetComputedProps(element);
         var position = props.GetValueOrDefault("position");
-        var margin = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "margin-top" : "margin-left"));
-        var positional = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "top" : "left"));
+        var margin = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), element);
+        var positional = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "top" : "left"), element);
 
         if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase))
             return margin + positional;
@@ -2861,11 +2861,11 @@ public sealed partial class DomBridge
                 }
 
                 if (!ShouldCollapseTopMarginWithParent(sibling))
-                    offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"));
-                offset += GetBorderBoxHeight(siblingProps);
-                offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"));
+                    offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"), sibling);
+                offset += GetBorderBoxHeight(siblingProps, sibling);
+                offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"), sibling);
                 if (string.Equals(siblingPosition, "relative", StringComparison.OrdinalIgnoreCase))
-                    offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("top"));
+                    offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("top"), sibling);
             }
 
             if (!ShouldCollapseTopMarginWithParent(element))
@@ -2905,8 +2905,8 @@ public sealed partial class DomBridge
         }
 
         var parentProps = GetComputedProps(element.Parent);
-        return ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("border-top-width")) == 0 &&
-               ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("padding-top")) == 0;
+        return ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("border-top-width"), element.Parent) == 0 &&
+               ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("padding-top"), element.Parent) == 0;
     }
 
     private (double Left, double Top, double Width, double Height) GetBoundingClientRectForDomElement(DomElement element, bool isRoot)
@@ -2928,12 +2928,12 @@ public sealed partial class DomBridge
     private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRect(DomElement element)
     {
         var props = GetComputedProps(element);
-        var width = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"));
-        var height = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"));
-        var marginTop = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("margin-top"));
-        var marginLeft = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("margin-left"));
-        var top = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("top"));
-        var left = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("left"));
+        var width = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element);
+        var height = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element);
+        var marginTop = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("margin-top"), element);
+        var marginLeft = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("margin-left"), element);
+        var top = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("top"), element);
+        var left = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("left"), element);
         var position = props.GetValueOrDefault("position");
 
         if (element.Parent == null || string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase))
@@ -2948,10 +2948,10 @@ public sealed partial class DomBridge
 
         var parentRect = ComputeUnzoomedLayoutRect(element.Parent);
         var parentProps = GetComputedProps(element.Parent);
-        var parentBorderTop = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("border-top-width"));
-        var parentBorderLeft = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("border-left-width"));
-        var parentPaddingTop = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("padding-top"));
-        var parentPaddingLeft = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("padding-left"));
+        var parentBorderTop = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("border-top-width"), element.Parent);
+        var parentBorderLeft = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("border-left-width"), element.Parent);
+        var parentPaddingTop = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("padding-top"), element.Parent);
+        var parentPaddingLeft = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("padding-left"), element.Parent);
 
         var baseTop = parentRect.Top + parentBorderTop + parentPaddingTop;
         var baseLeft = parentRect.Left + parentBorderLeft + parentPaddingLeft;
@@ -2968,8 +2968,8 @@ public sealed partial class DomBridge
                 var siblingRect = ComputeRenderedRect(sibling);
                 var siblingProps = GetComputedProps(sibling);
                 baseTop += siblingRect.Height;
-                baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"));
-                baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"));
+                baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"), sibling);
+                baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"), sibling);
             }
         }
 
@@ -3028,22 +3028,22 @@ public sealed partial class DomBridge
         return 1;
     }
 
-    private double GetBorderBoxWidth(Dictionary<string, string> props)
+    private double GetBorderBoxWidth(Dictionary<string, string> props, DomElement? element = null)
     {
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"))
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"))
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"))
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-left-width"))
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-right-width"));
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-left-width"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-right-width"), element);
     }
 
-    private double GetBorderBoxHeight(Dictionary<string, string> props)
+    private double GetBorderBoxHeight(Dictionary<string, string> props, DomElement? element = null)
     {
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"))
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"))
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"))
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-top-width"))
-             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-bottom-width"));
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-top-width"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-bottom-width"), element);
     }
 
     private void ScrollElementIntoView(DomElement element)
@@ -3159,9 +3159,9 @@ public sealed partial class DomBridge
         var elementProps = GetComputedProps(element);
         var position = elementProps.GetValueOrDefault("position");
         double offset = ParseCssLengthToPixelsWithViewport(
-            parentProps.GetValueOrDefault(vertical ? "padding-top" : "padding-left"));
+            parentProps.GetValueOrDefault(vertical ? "padding-top" : "padding-left"), element.Parent);
         offset += ParseCssLengthToPixelsWithViewport(
-            elementProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"));
+            elementProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), element);
 
         if (!string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase))
         {
@@ -3174,11 +3174,11 @@ public sealed partial class DomBridge
 
                 var siblingProps = GetComputedProps(sibling);
                 offset += ParseCssLengthToPixelsWithViewport(
-                    siblingProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"));
+                    siblingProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), sibling);
                 offset += ParseCssLengthToPixelsWithViewport(
-                    siblingProps.GetValueOrDefault(vertical ? "height" : "width"));
+                    siblingProps.GetValueOrDefault(vertical ? "height" : "width"), sibling);
                 offset += ParseCssLengthToPixelsWithViewport(
-                    siblingProps.GetValueOrDefault(vertical ? "margin-bottom" : "margin-right"));
+                    siblingProps.GetValueOrDefault(vertical ? "margin-bottom" : "margin-right"), sibling);
             }
         }
 
@@ -3198,7 +3198,7 @@ public sealed partial class DomBridge
         if (string.Equals(value, "inherit", StringComparison.OrdinalIgnoreCase) && element.Parent != null)
             return ResolveScrollIntoViewInset(element.Parent, propertyName);
 
-        return ParseCssLengthToPixelsWithViewport(value);
+        return ParseCssLengthToPixelsWithViewport(value, element);
     }
 
     private double ResolvePositionedInset(DomElement element, bool vertical)
@@ -3224,14 +3224,14 @@ public sealed partial class DomBridge
             }
 
             var parentProps = GetComputedProps(element.Parent);
-            var reference = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault(vertical ? "height" : "width"));
+            var reference = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault(vertical ? "height" : "width"), element.Parent);
             return reference <= 0 ? 0 : reference * (percent / 100.0);
         }
 
-        return ParseCssLengthToPixelsWithViewport(value);
+        return ParseCssLengthToPixelsWithViewport(value, element);
     }
 
-    private double ParseCssLengthToPixelsWithViewport(string? value)
+    private double ParseCssLengthToPixelsWithViewport(string? value, DomElement? referenceElement = null, bool forLineHeight = false)
     {
         if (string.IsNullOrWhiteSpace(value))
             return 0;
@@ -3251,8 +3251,67 @@ public sealed partial class DomBridge
             return (vw / 100.0) * _viewportWidth;
         }
 
+        if (referenceElement != null &&
+            normalized.EndsWith("rlh") &&
+            double.TryParse(normalized[..^3], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var rlh))
+        {
+            return rlh * ResolveLineHeightForLength(referenceElement, rootRelative: true);
+        }
+
+        if (referenceElement != null &&
+            normalized.EndsWith("lh") &&
+            double.TryParse(normalized[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var lh))
+        {
+            return lh * ResolveLineHeightForLength(referenceElement, rootRelative: false, forLineHeight);
+        }
+
         var px = ParseCssLengthToPixels(value);
         return px >= 0 ? px : 0;
+    }
+
+    private double ResolveLineHeightForLength(DomElement element, bool rootRelative, bool forLineHeight = false)
+    {
+        var target = rootRelative ? GetRootElement(element) : (forLineHeight ? element.Parent ?? element : element);
+        return ResolveLineHeightForElement(target);
+    }
+
+    private DomElement GetRootElement(DomElement element)
+    {
+        var current = element;
+        while (current.Parent != null)
+            current = current.Parent;
+
+        return current;
+    }
+
+    private double ResolveLineHeightForElement(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        var fontSize = ResolveFontSizeForElement(element);
+        var lineHeight = props.GetValueOrDefault("line-height");
+        if (string.IsNullOrWhiteSpace(lineHeight) ||
+            string.Equals(lineHeight, "normal", StringComparison.OrdinalIgnoreCase))
+        {
+            return fontSize * 1.2;
+        }
+
+        var normalized = lineHeight.Trim().ToLowerInvariant();
+        if (double.TryParse(normalized, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var multiplier))
+        {
+            return fontSize * multiplier;
+        }
+
+        return ParseCssLengthToPixelsWithViewport(lineHeight, element, forLineHeight: true);
+    }
+
+    private double ResolveFontSizeForElement(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        var fontSize = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("font-size"));
+        return fontSize > 0 ? fontSize : 16;
     }
 
     // ── Phase 6: Sub-document cache ──────────────────────────────────────────

@@ -600,7 +600,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualHeight))
-                _actualHeight = CssValueParser.ParseLength(Height, Size.Height, GetEmHeight());
+                _actualHeight = ParseLengthWithLineHeight(Height, Size.Height);
 
             return _actualHeight;
         }
@@ -611,7 +611,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualWidth))
-                _actualWidth = CssValueParser.ParseLength(Width, Size.Width, GetEmHeight());
+                _actualWidth = ParseLengthWithLineHeight(Width, Size.Width);
 
             return _actualWidth;
         }
@@ -622,7 +622,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualPaddingTop))
-                _actualPaddingTop = CssValueParser.ParseLength(PaddingTop, Size.Width, GetEmHeight());
+                _actualPaddingTop = ParseLengthWithLineHeight(PaddingTop, Size.Width);
 
             return _actualPaddingTop;
         }
@@ -633,7 +633,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualPaddingLeft))
-                _actualPaddingLeft = CssValueParser.ParseLength(PaddingLeft, Size.Width, GetEmHeight());
+                _actualPaddingLeft = ParseLengthWithLineHeight(PaddingLeft, Size.Width);
 
             return _actualPaddingLeft;
         }
@@ -644,7 +644,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualPaddingBottom))
-                _actualPaddingBottom = CssValueParser.ParseLength(PaddingBottom, Size.Width, GetEmHeight());
+                _actualPaddingBottom = ParseLengthWithLineHeight(PaddingBottom, Size.Width);
 
             return _actualPaddingBottom;
         }
@@ -655,7 +655,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualPaddingRight))
-                _actualPaddingRight = CssValueParser.ParseLength(PaddingRight, Size.Width, GetEmHeight());
+                _actualPaddingRight = ParseLengthWithLineHeight(PaddingRight, Size.Width);
 
             return _actualPaddingRight;
         }
@@ -670,7 +670,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
                 if (MarginTop == CssConstants.Auto)
                     MarginTop = "0";
 
-                var actualMarginTop = CssValueParser.ParseLength(MarginTop, Size.Width, GetEmHeight());
+                var actualMarginTop = ParseLengthWithLineHeight(MarginTop, Size.Width);
 
                 if (MarginTop.EndsWith("%"))
                     return actualMarginTop;
@@ -697,7 +697,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
                 if (MarginLeft == CssConstants.Auto)
                     MarginLeft = "0";
 
-                var actualMarginLeft = CssValueParser.ParseLength(MarginLeft, Size.Width, GetEmHeight());
+                var actualMarginLeft = ParseLengthWithLineHeight(MarginLeft, Size.Width);
 
                 if (MarginLeft.EndsWith("%"))
                     return actualMarginLeft;
@@ -717,7 +717,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
                 if (MarginBottom == CssConstants.Auto)
                     MarginBottom = "0";
 
-                var actualMarginBottom = CssValueParser.ParseLength(MarginBottom, Size.Width, GetEmHeight());
+                var actualMarginBottom = ParseLengthWithLineHeight(MarginBottom, Size.Width);
 
                 if (MarginBottom.EndsWith("%"))
                     return actualMarginBottom;
@@ -738,7 +738,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
                 if (MarginRight == CssConstants.Auto)
                     MarginRight = "0";
 
-                var actualMarginRight = CssValueParser.ParseLength(MarginRight, Size.Width, GetEmHeight());
+                var actualMarginRight = ParseLengthWithLineHeight(MarginRight, Size.Width);
                 
                 if (MarginRight.EndsWith("%"))
                     return actualMarginRight;
@@ -1088,7 +1088,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
                 if (LineHeight == "normal" || string.IsNullOrEmpty(LineHeight))
                     _actualLineHeight = GetEmHeight() * 1.2;
                 else
-                    _actualLineHeight = CssValueParser.ParseLength(LineHeight, Size.Height, GetEmHeight());
+                    _actualLineHeight = ParseLineHeightLength(LineHeight, Size.Height);
             }
 
             return _actualLineHeight;
@@ -1100,7 +1100,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualTextIndent))
-                _actualTextIndent = CssValueParser.ParseLength(TextIndent, Size.Width, GetEmHeight());
+                _actualTextIndent = ParseLengthWithLineHeight(TextIndent, Size.Width);
 
             return _actualTextIndent;
         }
@@ -1120,7 +1120,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
                 }
                 else if (matches.Count > 0)
                 {
-                    _actualBorderSpacingHorizontal = CssValueParser.ParseLength(matches[0].Value, 1, GetEmHeight());
+                    _actualBorderSpacingHorizontal = ParseLengthWithLineHeight(matches[0].Value, 1);
                 }
             }
 
@@ -1142,11 +1142,11 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
                 }
                 else if (matches.Count == 1)
                 {
-                    _actualBorderSpacingVertical = CssValueParser.ParseLength(matches[0].Value, 1, GetEmHeight());
+                    _actualBorderSpacingVertical = ParseLengthWithLineHeight(matches[0].Value, 1);
                 }
                 else
                 {
-                    _actualBorderSpacingVertical = CssValueParser.ParseLength(matches[1].Value, 1, GetEmHeight());
+                    _actualBorderSpacingVertical = ParseLengthWithLineHeight(matches[1].Value, 1);
                 }
             }
 
@@ -1157,6 +1157,57 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     protected abstract CssBoxProperties GetParent();
 
     public double GetEmHeight() => ActualFont.Size * (96.0 / 72.0);
+
+    private double ParseLengthWithLineHeight(string length, double hundredPercent)
+        => CssValueParser.ParseLength(
+            length,
+            hundredPercent,
+            GetEmHeight(),
+            null,
+            false,
+            false,
+            ActualLineHeight,
+            GetRootLineHeight());
+
+    private double ParseLineHeightLength(string length, double hundredPercent)
+    {
+        var parentLineHeight = GetParent()?.ActualLineHeight ?? GetEmHeight() * 1.2;
+        return CssValueParser.ParseLength(
+            length,
+            hundredPercent,
+            GetEmHeight(),
+            null,
+            false,
+            false,
+            parentLineHeight,
+            GetRootLineHeight());
+    }
+
+    private double GetRootLineHeight()
+    {
+        CssBoxProperties root = this;
+        while (root.GetParent() != null)
+            root = root.GetParent();
+
+        if (!ReferenceEquals(root, this))
+            return root.ActualLineHeight;
+
+        if (!double.IsNaN(_actualLineHeight))
+            return _actualLineHeight;
+
+        if (LineHeight == "normal" || string.IsNullOrEmpty(LineHeight))
+            return GetEmHeight() * 1.2;
+
+        return CssValueParser.ParseLength(
+            LineHeight,
+            Size.Height,
+            GetEmHeight(),
+            null,
+            false,
+            false,
+            GetEmHeight() * 1.2,
+            GetEmHeight() * 1.2);
+    }
 
     /// <summary>
     /// Resolves a CSS font-weight value to a numeric weight (100–900)

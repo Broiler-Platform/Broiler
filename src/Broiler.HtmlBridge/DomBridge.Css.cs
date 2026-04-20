@@ -1854,6 +1854,20 @@ public sealed partial class DomBridge
                 return ch * 8.0; // Approximate 1ch as 8px for a 16px monospace glyph advance.
             return -1;
         }
+        if (v.EndsWith("rlh"))
+        {
+            if (double.TryParse(v[..^3], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var rlh))
+                return rlh * 19.2; // Approximate 1rlh as the default 16px root line-height × 1.2.
+            return -1;
+        }
+        if (v.EndsWith("lh"))
+        {
+            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var lh))
+                return lh * 19.2; // Approximate 1lh as the default 16px line-height × 1.2.
+            return -1;
+        }
         // Plain number (treat as pixels)
         if (double.TryParse(v, System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out var raw))

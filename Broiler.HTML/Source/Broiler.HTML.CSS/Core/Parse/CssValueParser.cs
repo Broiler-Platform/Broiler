@@ -115,6 +115,10 @@ internal sealed class CssValueParser
         {
             number = value.Substring(0, value.Length - 3);
         }
+        else if (value.EndsWith(CssConstants.Rlh, StringComparison.OrdinalIgnoreCase) && value.Length > 3)
+        {
+            number = value.Substring(0, value.Length - 3);
+        }
         // CSS Values 3 §5.1.2: 4-character viewport units (vmin, vmax)
         else if (value.Length > 4 &&
                  (value.EndsWith(CssConstants.Vmin, StringComparison.OrdinalIgnoreCase) ||
@@ -131,6 +135,7 @@ internal sealed class CssValueParser
                 case CssConstants.Em:
                 case CssConstants.Ex:
                 case CssConstants.Ch:
+                case CssConstants.Lh:
                 case CssConstants.Px:
                 case CssConstants.Mm:
                 case CssConstants.Cm:
@@ -176,7 +181,7 @@ internal sealed class CssValueParser
 
     public static double ParseLength(string length, double hundredPercent, double emFactor, bool fontAdjust = false) => ParseLength(length, hundredPercent, emFactor, null, fontAdjust, false);
     public static double ParseLength(string length, double hundredPercent, double emFactor, string defaultUnit) => ParseLength(length, hundredPercent, emFactor, defaultUnit, false, false);
-    public static double ParseLength(string length, double hundredPercent, double emFactor, string defaultUnit, bool fontAdjust, bool returnPoints)
+    public static double ParseLength(string length, double hundredPercent, double emFactor, string defaultUnit, bool fontAdjust, bool returnPoints, double? lineHeightFactor = null, double? rootLineHeightFactor = null)
     {
         //Return zero if no length specified, zero specified
         if (string.IsNullOrEmpty(length) || length == "0")
@@ -193,9 +198,12 @@ internal sealed class CssValueParser
 
         //Factor will depend on the unit
         double factor;
+        var computedLineHeightFactor = lineHeightFactor ?? (emFactor * 1.2);
+        var computedRootLineHeightFactor = rootLineHeightFactor
+            ?? (CssConstants.FontSize * (96.0 / 72.0) * 1.2);
 
         //Number of the length
-        int unitLen = unit == CssConstants.Rem ? 3 :
+        int unitLen = unit == CssConstants.Rem || unit == CssConstants.Rlh ? 3 :
                       unit == CssConstants.Vmin || unit == CssConstants.Vmax ? 4 :
                       unit == CssConstants.Q ? 1 : 2;
         string number = hasUnit
@@ -220,6 +228,9 @@ internal sealed class CssValueParser
                 // to an 8px character advance in the current focused Phase 3 slice.
                 factor = emFactor / 2;
                 break;
+            case CssConstants.Lh:
+                factor = computedLineHeightFactor;
+                break;
             case CssConstants.Px:
                 factor = fontAdjust ? 72f / 96f : 1f; //TODO:a check support for hi dpi
                 break;
@@ -243,6 +254,9 @@ internal sealed class CssValueParser
                 break;
             case CssConstants.Pc:
                 factor = 16f; // 1 pica = 12 points
+                break;
+            case CssConstants.Rlh:
+                factor = computedRootLineHeightFactor;
                 break;
             case CssConstants.Q:
                 factor = 37.795275591f / 40f; // 1Q = 1/40 cm ≈ 0.945 px
@@ -352,10 +366,19 @@ internal sealed class CssValueParser
         }
 
         // Check for 3-character units first (e.g. "rem")
-        if (length.Length >= 4 && length.EndsWith(CssConstants.Rem, StringComparison.Ordinal))
+        if (length.Length >= 4)
         {
-            hasUnit = true;
-            return CssConstants.Rem;
+            if (length.EndsWith(CssConstants.Rem, StringComparison.Ordinal))
+            {
+                hasUnit = true;
+                return CssConstants.Rem;
+            }
+
+            if (length.EndsWith(CssConstants.Rlh, StringComparison.OrdinalIgnoreCase))
+            {
+                hasUnit = true;
+                return CssConstants.Rlh;
+            }
         }
 
         var unit = length.Length >= 3 ? length.Substring(length.Length - 2, 2) : string.Empty;
@@ -364,6 +387,7 @@ internal sealed class CssValueParser
             case CssConstants.Em:
             case CssConstants.Ex:
             case CssConstants.Ch:
+            case CssConstants.Lh:
             case CssConstants.Px:
             case CssConstants.Mm:
             case CssConstants.Cm:
