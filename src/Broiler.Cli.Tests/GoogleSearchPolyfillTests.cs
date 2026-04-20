@@ -1027,6 +1027,37 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Attr_Lengths_Resolve_In_Direct_And_Max_Length_Cases()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function addBox(id, attrValue) {
+                var box = document.createElement('div');
+                box.id = id;
+                box.style.position = 'absolute';
+                box.style.height = '20px';
+                box.setAttribute('data-test', attrValue);
+                document.body.appendChild(box);
+                return box;
+            }
+
+            var valid = addBox('valid', '200px');
+            valid.style.width = 'attr(data-test type(<length>))';
+            var fallback = addBox('fallback', 'qqffuutt');
+            fallback.style.top = '30px';
+            fallback.style.width = 'attr(data-test type(<length>), 200px)';
+            var maxed = addBox('maxed', '200px');
+            maxed.style.top = '60px';
+            maxed.style.width = 'max(attr(data-test type(<length>)))';
+
+            document.getElementById('result').textContent =
+                valid.offsetWidth + ',' + fallback.offsetWidth + ',' + maxed.offsetWidth;
+        ");
+        Assert.Contains("200,200,200", result);
+    }
+
+    [Fact]
     public void FontRelative_Lh_Units_Resolve_From_Parent_LineHeight_Under_Zoom()
     {
         var result = ExecJs(@"

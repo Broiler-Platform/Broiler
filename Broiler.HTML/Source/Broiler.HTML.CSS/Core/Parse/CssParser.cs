@@ -976,8 +976,37 @@ internal sealed class CssParser
 
     private static void ParseLengthProperty(string propName, string propValue, Dictionary<string, string> properties)
     {
-        if (CssValueParser.IsValidLength(propValue) || propValue.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase))
-            properties[propName] = propValue;
+        if (CssValueParser.IsValidLength(propValue) ||
+            propValue.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase) ||
+            IsValidAttrLengthExpression(propValue))
+        properties[propName] = propValue;
+    }
+
+    private static readonly Regex LengthAttrFunctionPattern = new(
+        @"attr\(\s*(?<name>[A-Za-z_][A-Za-z0-9_-]*)\s+type\(\s*<length>\s*\)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static bool IsValidAttrLengthExpression(string propValue)
+    {
+        if (string.IsNullOrWhiteSpace(propValue) ||
+            propValue.IndexOf("attr(", StringComparison.OrdinalIgnoreCase) < 0)
+        {
+            return false;
+        }
+
+        var normalized = LengthAttrFunctionPattern.Replace(
+            propValue,
+            match =>
+            {
+                var fallback = match.Groups["fallback"].Success
+                    ? match.Groups["fallback"].Value.Trim()
+                    : string.Empty;
+
+                return CssValueParser.IsValidLength(fallback) ? fallback : "1px";
+            });
+
+        return !ReferenceEquals(normalized, propValue) &&
+               CssValueParser.IsValidLength(normalized);
     }
 
     /// <summary>

@@ -1041,6 +1041,7 @@ public sealed partial class DomBridge
             props[kv.Key] = kv.Value;
 
         ExpandCssShorthands(props);
+        ResolveLengthAttrFunctions(props, element);
 
         // Expand the inset shorthand → top, right, bottom, left so that
         // downstream code (ComputeElementBox, TryApplyFallback, etc.) can

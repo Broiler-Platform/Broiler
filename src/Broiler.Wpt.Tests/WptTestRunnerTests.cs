@@ -1294,6 +1294,135 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssValues_AttrLengthValid_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: relative;
+      background: green;
+      width: attr(data-test type(<length>));
+      height: 200px;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box"" data-test=""200px""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "attr-length-valid");
+        Assert.True(result.Passed,
+            $"attr() length should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_AttrLengthInvalidCast_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: relative;
+      background: green;
+      width: attr(data-test type(<length>), 200px);
+      height: 200px;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box"" data-test=""qqffuutt""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "attr-length-invalid-cast");
+        Assert.True(result.Passed,
+            $"invalid attr() length casts should use fallback. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_AttrInMax_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: relative;
+      background: green;
+      width: max(attr(data-test type(<length>)));
+      height: 200px;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box"" data-test=""200px""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "attr-in-max");
+        Assert.True(result.Passed,
+            $"attr() should resolve inside max(). Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_LhUnit_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>

@@ -123,6 +123,10 @@ public sealed partial class DomBridge
         @"::?[a-zA-Z-]+(?:\([^)]*\))?",
         RegexOptions.Compiled);
 
+    private static readonly Regex LengthAttrFunctionPattern = new(
+        @"attr\(\s*(?<name>[A-Za-z_][A-Za-z0-9_-]*)\s+type\(\s*<length>\s*\)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     /// <summary>
     /// Parsed CSS rules extracted from <c>&lt;style&gt;</c> blocks, stored as
     /// (selector, specificity, declarations) triples.
@@ -131,6 +135,57 @@ public sealed partial class DomBridge
 
     /// <summary>Parsed CSS rules from embedded style blocks.</summary>
     public IReadOnlyList<(string Selector, int Specificity, Dictionary<string, string> Declarations)> CssRules => _cssRules;
+
+    private static bool IsRecognizedLengthValue(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var trimmed = value.Trim();
+        return trimmed == "0" || !double.IsNaN(ParseCssLengthToPixels(trimmed));
+    }
+
+    private static void ResolveLengthAttrFunctions(
+        Dictionary<string, string> computed,
+        DomElement element)
+    {
+        foreach (var key in computed.Keys.ToList())
+        {
+            var value = computed[key];
+            if (string.IsNullOrWhiteSpace(value) ||
+                value.IndexOf("attr(", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                continue;
+            }
+
+            computed[key] = LengthAttrFunctionPattern.Replace(
+                value,
+                match =>
+                {
+                    var attrName = match.Groups["name"].Value;
+                    var fallback = match.Groups["fallback"].Success
+                        ? match.Groups["fallback"].Value.Trim()
+                        : string.Empty;
+                    var attributeValue = element.Attributes.TryGetValue(attrName, out var raw)
+                        ? raw.Trim()
+                        : string.Empty;
+
+                    if (!string.IsNullOrEmpty(attributeValue) &&
+                        IsRecognizedLengthValue(attributeValue))
+                    {
+                        return attributeValue;
+                    }
+
+                    if (!string.IsNullOrEmpty(fallback) &&
+                        IsRecognizedLengthValue(fallback))
+                    {
+                        return fallback;
+                    }
+
+                    return string.Empty;
+                });
+        }
+    }
 
     /// <summary>
     /// Calculates CSS Specificity (Level 3) for a simple selector.
@@ -574,6 +629,7 @@ public sealed partial class DomBridge
             // This ensures that querying e.g. marginTop works when only the
             // shorthand "margin" was set in the stylesheet.
             ExpandCssShorthands(computed);
+            ResolveLengthAttrFunctions(computed, element);
 
             // Resolve relative font-weight keywords (bolder/lighter) to numeric
             // values per CSS 2.1 §15.6.  Real browsers always return the resolved
