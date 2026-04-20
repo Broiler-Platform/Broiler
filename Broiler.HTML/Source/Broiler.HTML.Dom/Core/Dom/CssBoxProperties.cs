@@ -1207,9 +1207,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
     private double GetRootLineHeight()
     {
-        CssBoxProperties root = this;
-        while (root.GetParent() != null)
-            root = root.GetParent();
+        var root = GetEffectiveRootBoxProperties();
 
         if (!ReferenceEquals(root, this))
             return root.ActualLineHeight;
@@ -1233,9 +1231,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
     private double GetRootEmHeight()
     {
-        CssBoxProperties root = this;
-        while (root.GetParent() != null)
-            root = root.GetParent();
+        var root = GetEffectiveRootBoxProperties();
 
         const double defaultRootEmHeight = CssConstants.FontSize * (96.0 / 72.0);
         if (!string.IsNullOrWhiteSpace(root.FontSize))
@@ -1255,6 +1251,23 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         }
 
         return root.GetEmHeight();
+    }
+
+    private CssBoxProperties GetEffectiveRootBoxProperties()
+    {
+        CssBoxProperties root = this;
+        while (root.GetParent() != null)
+            root = root.GetParent();
+
+        if (root is CssBox cssRoot)
+        {
+            while (cssRoot.HtmlTag == null && cssRoot.Boxes.Count == 1)
+                cssRoot = cssRoot.Boxes[0];
+
+            root = cssRoot;
+        }
+
+        return root;
     }
 
     /// <summary>
