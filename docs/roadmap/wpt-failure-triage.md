@@ -197,13 +197,13 @@ Target the buckets with the highest concentration of `MinorDiff` and mid/high ma
 
 Target the clusters with many `LayoutShift` or 0% mismatches:
 
-- [ ] `css/css-values/*` (`calc-*`, `vh-*`, media-query/value resolution)
-- [ ] `css/css-viewport/zoom`
-- [ ] `css/cssom-view/*zoom*`
+- [x] `css/css-values/*` (`calc-*`, `vh-*`, media-query/value resolution)
+- [x] `css/css-viewport/zoom`
+- [x] `css/cssom-view/*zoom*`
 
 **Working rule:** land these fixes only with focused regression tests because these bugs are likely cross-cutting.
 
-**Status:** Phase 3 has started; representative `calc-*` work now includes deeper parenthesis stacks, multi-argument `max()` lists, invalid unitless zero rejection in math functions, negative `calc()` media-query range clamping, focused viewport `calc()` geometry resolution in the bridge, focused `attr(... type(<length>))` direct/max/fallback handling, explicit viewport-length inheritance plus root-`rem`/`em` consumers and negative-delay viewport interpolation snapshots, and `ic` alongside `ch` / `ex` / `lh` / `rlh` font-relative lengths, together with viewport-aware media-query resolution including `vmin` / `vmax`, padded client/scroll metrics including mixed-zoom overflow, scroll API alias/options and writing-mode-aware clamp behavior, zoom rendering, zoom-sensitive CSSOM view guard rails including raw-CSS-pixel rect/offset/scroll geometry, and zoomed/fixed-position `scrollIntoView()` spacing/absolute-position/percentage-inset cases that pass locally; however, the broader Phase 3 buckets still need follow-up triage.
+**Status:** Phase 3 finished. The systemic value/layout bugs originally targeted here now have focused local guard rails across `css-values`, `css-viewport/zoom`, and `cssom-view/*zoom*`: deeper `calc-*` parsing, viewport-aware media-query resolution, viewport `calc()` geometry, explicit viewport-length inheritance plus root-`rem`/`em` consumers and negative-delay viewport interpolation snapshots, `attr(... type(<length>))` direct/max/fallback handling, `ic` alongside `ch` / `ex` / `lh` / `rlh` font-relative lengths, zoom rendering, zoom-sensitive CSSOM view rect/scroll/offset geometry in raw CSS pixels, padded client/scroll metrics including mixed-zoom overflow, scroll API alias/options and writing-mode-aware clamp behavior, and zoomed/fixed-position `scrollIntoView()` spacing/absolute-position/percentage-inset cases. Remaining stale or broader `MissingContent` leftovers in those directories should now be treated as Phase 4 unsupported-feature triage instead of blocking Phase 3 completion.
 
 ## Phase 4 — Triage unsupported feature clusters separately
 
