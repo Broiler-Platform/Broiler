@@ -629,7 +629,7 @@ document.getElementById('out').appendChild(p);
 <body><div id=""outer""></div></body>
 </html>";
 
-        var result = RunTempMatchTest(testHtml, referenceHtml, "max-unitless-zero-invalid");
+        var result = RunTempMatchTest(testHtml, referenceHtml, "min-unitless-zero-invalid");
         Assert.True(result.Passed,
             $"unitless zero should invalidate min/max length declarations. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
