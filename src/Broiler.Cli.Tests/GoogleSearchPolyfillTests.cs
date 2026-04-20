@@ -829,6 +829,77 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void ScrollIntoView_Does_Not_Scroll_Root_For_Targets_Inside_Unscrollable_Fixed_Containers()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.style.width = '2000px';
+            document.body.style.height = '2000px';
+
+            var container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.left = '10px';
+            container.style.bottom = '10px';
+            container.style.width = '150px';
+            container.style.height = '150px';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.left = '50%';
+            target.style.top = '50%';
+            target.style.width = '10px';
+            target.style.height = '10px';
+
+            container.appendChild(target);
+            document.body.appendChild(container);
+            target.scrollIntoView();
+
+            document.getElementById('result').textContent =
+                document.documentElement.scrollLeft + ',' + document.documentElement.scrollTop;
+        ");
+        Assert.Contains("0,0", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Scrolls_Fixed_Scrollers_Without_Bubbling_To_The_Root()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.style.width = '2000px';
+            document.body.style.height = '2000px';
+
+            var container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.right = '10px';
+            container.style.bottom = '10px';
+            container.style.width = '150px';
+            container.style.height = '150px';
+            container.style.overflow = 'auto';
+
+            var filler = document.createElement('div');
+            filler.style.width = '600px';
+            filler.style.height = '600px';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.left = '200%';
+            target.style.top = '200%';
+            target.style.width = '10px';
+            target.style.height = '10px';
+
+            container.appendChild(filler);
+            container.appendChild(target);
+            document.body.appendChild(container);
+            target.scrollIntoView();
+
+            document.getElementById('result').textContent =
+                document.documentElement.scrollLeft + ',' + document.documentElement.scrollTop + '|' +
+                container.scrollLeft + ',' + container.scrollTop;
+        ");
+        Assert.Contains("0,0|300,300", result);
+    }
+
+    [Fact]
     public void FontRelative_Ch_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
     {
         var result = ExecJs(@"

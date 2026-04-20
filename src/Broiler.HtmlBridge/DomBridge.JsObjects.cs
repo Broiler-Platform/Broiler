@@ -3055,6 +3055,9 @@ public sealed partial class DomBridge
     private void ScrollElementIntoView(DomElement element)
     {
         var scrollContainer = FindScrollContainer(element) ?? DocumentElement;
+        if (ReferenceEquals(scrollContainer, DocumentElement) && HasFixedPositionAncestorBefore(element, scrollContainer))
+            return;
+
         var scrollTop = ComputeOffsetWithinAncestor(element, scrollContainer, vertical: true)
             - ResolveScrollIntoViewInset(element, "scroll-margin-top")
             - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-top");
@@ -3137,6 +3140,18 @@ public sealed partial class DomBridge
         }
 
         return DocumentElement;
+    }
+
+    private bool HasFixedPositionAncestorBefore(DomElement element, DomElement ancestor)
+    {
+        for (var current = element.Parent; current != null && !ReferenceEquals(current, ancestor); current = current.Parent)
+        {
+            var props = GetComputedProps(current);
+            if (string.Equals(props.GetValueOrDefault("position"), "fixed", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private double ComputeOffsetWithinAncestor(DomElement element, DomElement ancestor, bool vertical)

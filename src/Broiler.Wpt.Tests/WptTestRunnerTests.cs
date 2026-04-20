@@ -865,6 +865,130 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssomView_ScrollIntoView_DoesNotScrollRootForUnscrollableFixedContainers_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; }
+    body { width: 2000px; height: 2000px; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    var container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.left = '10px';
+    container.style.bottom = '10px';
+    container.style.width = '150px';
+    container.style.height = '150px';
+
+    var target = document.createElement('div');
+    target.style.position = 'absolute';
+    target.style.left = '50%';
+    target.style.top = '50%';
+    target.style.width = '10px';
+    target.style.height = '10px';
+
+    container.appendChild(target);
+    document.body.appendChild(container);
+    target.scrollIntoView();
+
+    if (document.documentElement.scrollLeft === 0 &&
+        document.documentElement.scrollTop === 0) {
+      document.getElementById('pass').style.background = 'green';
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-no-root-scroll");
+        Assert.True(result.Passed,
+            $"scrollIntoView in an unscrollable fixed container should not scroll the root. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollIntoView_ScrollsFixedScrollerWithoutScrollingRoot_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; }
+    body { width: 2000px; height: 2000px; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    var container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.right = '10px';
+    container.style.bottom = '10px';
+    container.style.width = '150px';
+    container.style.height = '150px';
+    container.style.overflow = 'auto';
+
+    var filler = document.createElement('div');
+    filler.style.width = '600px';
+    filler.style.height = '600px';
+
+    var target = document.createElement('div');
+    target.style.position = 'absolute';
+    target.style.left = '200%';
+    target.style.top = '200%';
+    target.style.width = '10px';
+    target.style.height = '10px';
+
+    container.appendChild(filler);
+    container.appendChild(target);
+    document.body.appendChild(container);
+    target.scrollIntoView();
+
+    if (document.documentElement.scrollLeft === 0 &&
+        document.documentElement.scrollTop === 0 &&
+        container.scrollLeft === 300 &&
+        container.scrollTop === 300) {
+      document.getElementById('pass').style.background = 'green';
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-scroller");
+        Assert.True(result.Passed,
+            $"scrollIntoView in a fixed scroller should scroll that scroller without scrolling the root. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_ChUnit_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
