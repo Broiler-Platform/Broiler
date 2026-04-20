@@ -275,7 +275,9 @@ public class Program
 
         var failures = allResults.Where(r => !r.Passed && !r.Skipped).ToList();
         var skippedResults = allResults.Where(r => r.Skipped).ToList();
+        var missingReferenceSkips = GetSkippedResults(skippedResults, SkipReason.MissingReferenceImage);
         var deferredFeatureBuckets = GetDeferredFeatureBuckets(failures, wptPath);
+        var referenceCoverageStatus = GetReferenceCoverageStatus(missingReferenceSkips, wptPath);
 
         var report = new Dictionary<string, object?>
         {
@@ -291,6 +293,7 @@ public class Program
             {
                 ["topFailingDirectories"] = CreateDirectoryBucketObjects(failures, wptPath),
                 ["topSkippedDirectories"] = CreateDirectoryBucketObjects(skippedResults, wptPath),
+                ["topMissingReferenceDirectories"] = CreateDirectoryBucketObjects(missingReferenceSkips, wptPath),
                 ["mismatchSubCategories"] = failures
                     .Where(r => r.MismatchDiagnostics is not null)
                     .GroupBy(r => r.MismatchDiagnostics!.Category.ToString())
@@ -328,6 +331,7 @@ public class Program
                 ["deferredFeatureBuckets"] = deferredFeatureBuckets
                     .Select(bucket => bucket.ToJsonObject())
                     .ToList(),
+                ["referenceCoverage"] = referenceCoverageStatus.ToJsonObject(),
             },
             ["results"] = allResults.Select(r => r.ToJsonObject()).ToList(),
         };
@@ -356,9 +360,11 @@ public class Program
 
         var failures = allResults.Where(r => !r.Passed && !r.Skipped).ToList();
         var skippedResults = allResults.Where(r => r.Skipped).ToList();
+        var missingReferenceSkips = GetSkippedResults(skippedResults, SkipReason.MissingReferenceImage);
         var topFailingDirectories = GetDirectoryBuckets(failures, wptPath);
         var topSkippedDirectories = GetDirectoryBuckets(skippedResults, wptPath);
         var deferredFeatureBuckets = GetDeferredFeatureBuckets(failures, wptPath);
+        var referenceCoverageStatus = GetReferenceCoverageStatus(missingReferenceSkips, wptPath);
         var nonPixelFailures = failures
             .Where(r => r.Category != FailureCategory.PixelMismatch)
             .OrderBy(r => r.TestPath, StringComparer.Ordinal)
@@ -385,6 +391,7 @@ public class Program
         writer.WriteLine($"- Skipped: {skipped}");
         WriteBucketSection(writer, "Top failing buckets", topFailingDirectories);
         WriteBucketSection(writer, "Top skipped buckets", topSkippedDirectories);
+        WriteReferenceCoverageSection(writer, referenceCoverageStatus);
         WriteDeferredFeatureBucketSection(writer, deferredFeatureBuckets);
         writer.WriteLine();
         writer.WriteLine("## Non-pixel / exception failures");
@@ -430,6 +437,7 @@ public class Program
         Console.WriteLine("=== Bucket Summary ===");
         PrintDirectoryBuckets("Top failing directories", failures, wptPath);
         PrintDirectoryBuckets("Top skipped directories", skippedResults, wptPath);
+        PrintReferenceCoverageSummary(skippedResults, wptPath);
         PrintDeferredFeatureBuckets(failures, wptPath);
 
         Console.WriteLine("Mismatch sub-categories:");
@@ -502,6 +510,29 @@ public class Program
             Console.WriteLine($"  {bucket.Value,3}  {bucket.Key}");
     }
 
+    private static void PrintReferenceCoverageSummary(
+        IReadOnlyCollection<WptTestResult> skippedResults,
+        string wptPath)
+    {
+        var missingReferenceSkips = GetSkippedResults(skippedResults, SkipReason.MissingReferenceImage);
+        var status = GetReferenceCoverageStatus(missingReferenceSkips, wptPath);
+
+        Console.WriteLine("Reference-generation priority buckets:");
+        if (status.PriorityBuckets.Count == 0)
+        {
+            Console.WriteLine("  (none)");
+        }
+        else
+        {
+            foreach (var bucket in status.PriorityBuckets)
+                Console.WriteLine($"  {bucket.Value,3}  {bucket.Key}");
+        }
+
+        Console.WriteLine("Pass-rate comparison status:");
+        Console.WriteLine($"  {status.Note}");
+        Console.WriteLine($"  Remaining missing-reference skips: {status.MissingReferenceSkipCount}");
+    }
+
     private static void PrintDeferredFeatureBuckets(IEnumerable<WptTestResult> failures, string wptPath)
     {
         Console.WriteLine("Deferred feature-gap buckets:");
@@ -536,6 +567,13 @@ public class Program
                 ["directory"] = bucket.Key,
                 ["count"] = bucket.Value,
             })
+            .ToList();
+
+    private static List<WptTestResult> GetSkippedResults(
+        IEnumerable<WptTestResult> skippedResults,
+        SkipReason skipReason) =>
+        skippedResults
+            .Where(result => result.SkipReason == skipReason)
             .ToList();
 
     private static List<DeferredFeatureBucket> GetDeferredFeatureBuckets(IEnumerable<WptTestResult> failures, string wptPath)
@@ -643,6 +681,42 @@ public class Program
         }
     }
 
+    private static void WriteReferenceCoverageSection(
+        StreamWriter writer,
+        ReferenceCoverageStatus status)
+    {
+        writer.WriteLine();
+        writer.WriteLine("## Reference coverage priorities");
+        writer.WriteLine();
+        writer.WriteLine($"- Missing-reference skips: {status.MissingReferenceSkipCount}");
+        writer.WriteLine($"- Pass-rate comparison ready: {(status.PassRateComparable ? "Yes" : "No")}");
+        writer.WriteLine($"- {status.Note}");
+        writer.WriteLine();
+        writer.WriteLine("### Top missing-reference buckets");
+        writer.WriteLine();
+        if (status.PriorityBuckets.Count == 0)
+        {
+            writer.WriteLine("- None");
+        }
+        else
+        {
+            foreach (var bucket in status.PriorityBuckets)
+                writer.WriteLine($"- `{bucket.Key}` — {bucket.Value} missing-reference skip(s)");
+        }
+
+        writer.WriteLine();
+        writer.WriteLine("### Suggested reference-generation commands");
+        writer.WriteLine();
+        if (status.PriorityBuckets.Count == 0)
+        {
+            writer.WriteLine("- None");
+            return;
+        }
+
+        foreach (var bucket in status.PriorityBuckets)
+            writer.WriteLine($"- `./scripts/run-wpt-tests.sh --subset \"{bucket.Key}\"`");
+    }
+
     private sealed record DeferredFeatureBucket(
         string Directory,
         int Count,
@@ -655,6 +729,48 @@ public class Program
             ["count"] = Count,
             ["kind"] = Kind,
             ["missingContentShare"] = MissingContentShare,
+        };
+    }
+
+    private static ReferenceCoverageStatus GetReferenceCoverageStatus(
+        IReadOnlyCollection<WptTestResult> missingReferenceSkips,
+        string wptPath)
+    {
+        var priorityBuckets = GetDirectoryBuckets(missingReferenceSkips, wptPath);
+        if (missingReferenceSkips.Count == 0)
+        {
+            return new ReferenceCoverageStatus(
+                true,
+                0,
+                "Ready — no missing-reference skips remain in this subset.",
+                priorityBuckets);
+        }
+
+        return new ReferenceCoverageStatus(
+            false,
+            missingReferenceSkips.Count,
+            "Hold pass-rate comparisons until these buckets are rerun with generated references for the same subset.",
+            priorityBuckets);
+    }
+
+    private sealed record ReferenceCoverageStatus(
+        bool PassRateComparable,
+        int MissingReferenceSkipCount,
+        string Note,
+        IReadOnlyCollection<KeyValuePair<string, int>> PriorityBuckets)
+    {
+        public Dictionary<string, object?> ToJsonObject() => new()
+        {
+            ["passRateComparable"] = PassRateComparable,
+            ["missingReferenceSkipCount"] = MissingReferenceSkipCount,
+            ["note"] = Note,
+            ["priorityBuckets"] = PriorityBuckets
+                .Select(bucket => new Dictionary<string, object?>
+                {
+                    ["directory"] = bucket.Key,
+                    ["count"] = bucket.Value,
+                })
+                .ToList(),
         };
     }
 

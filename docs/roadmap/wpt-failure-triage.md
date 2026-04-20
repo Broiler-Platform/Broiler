@@ -44,9 +44,12 @@
 - Phase 3 has widened again: focused `attr(... type(<length>))` value resolution now works in direct length and `max(...)` width cases, including fallback handling in both renderer-applied stylesheet declarations and bridge-side CSSOM/inlined-style length consumers.
 - Phase 3 has widened again: zoom-sensitive CSSOM view geometry now excludes preceding absolute/fixed siblings from normal-flow stacking, which stabilizes focused `getBoundingClientRect()`, `getClientRects()`, `scrollTo()`/scroll metrics, and offset metric cases in raw CSS pixels.
 - Phase 4 has started: `Broiler.Wpt` triage output now emits a dedicated deferred feature-gap section in console, JSON, and Markdown output, explicitly aggregates `css/css-view-transitions/*` and larger `filter-effects` failures, surfaces other `MissingContent`-dominant buckets separately, and stops suggesting those suites as the next near-pass `--subset` commands.
+- [Phase 5](#phase-5--expand-reference-coverage-for-skipped-suites) has started: `Broiler.Wpt` now emits dedicated missing-reference priority buckets in console, JSON, and Markdown output, suggests the highest-value `--subset` commands to generate references for those skipped suites first, and flags pass-rate comparisons as non-comparable until the same subset is rerun with those references in place.
 - The `background-clip*` subset has now been rerun against the in-repo WPT corpus; the raw subset still fails broadly on full-page visual noise, so guard rails now focus on the reproducible box-model cases (`border-box`, `padding-box`, `content-box`, size/position/radius variants, and `border-area` corner-shape) instead of the instruction text around them.
 - **Deviation from the original proposal:** the roadmap-friendly Markdown file is generated directly by `Broiler.Wpt` instead of a separate post-processing step so the same logic is shared by local runs and CI.
+- **Phase 5 deviation:** this phase now stops short of committing bulk generated reference artifacts into the repository; instead, the runner/reporting layer makes the missing-reference backlog explicit so the largest skipped buckets can be reduced incrementally with reproducible subset commands.
 - **Current blocker:** the hard crash is fixed, but the wider `background-clip` bucket still contains visual mismatches that belong to the next near-pass remediation steps rather than this crash-only fix.
+- **Phase 5 blocker:** the largest skipped buckets still require external Playwright reference-generation time against a WPT checkout, so this repo change focuses on prioritization and pass-rate comparability tracking rather than landing thousands of generated images at once.
 - **Current near-pass focus:** continue harvesting the remaining `background-clip` and `background-size` cases with the smallest reproducible `--subset` commands rather than broad CSS reruns.
 - **Secondary blocker:** full-solution validation still hits an unrelated compile failure in `Broiler.HTML.WPF/Adapters/GraphicsAdapter.cs` (`DrawGradientString` override missing), so WPT triage work should continue using targeted `Broiler.Wpt` validation until that project is repaired.
 - Related WPT bucket issues: #956 (`background-clip` failures), #958 (`css-background-clip` follow-up), #962 (`background-size` vector cases).
@@ -222,11 +225,17 @@ Do not mix these into the near-pass work. Track them as explicit feature gaps or
 
 The current skip count is too large to ignore.
 
-- [ ] Prioritize reference generation for the largest skipped buckets first.
-- [ ] Treat missing-reference skips separately from renderer failures in future progress tracking.
-- [ ] Only compare pass-rate changes after the skip backlog is reduced for the same subset.
+- [x] Prioritize reference generation for the largest skipped buckets first.
+- [x] Treat missing-reference skips separately from renderer failures in future progress tracking.
+- [x] Only compare pass-rate changes after the skip backlog is reduced for the same subset.
 
 **Why this matters:** without better reference coverage, the failure rate understates the real work remaining.
+
+**Status:** Phase 5 is now tracked directly in the runner/reporting layer. `Broiler.Wpt` emits a dedicated missing-reference backlog section in console output plus the generated JSON/Markdown artifacts, ranks the largest missing-reference skip buckets separately from other skips, and surfaces the corresponding `./scripts/run-wpt-tests.sh --subset "<bucket>"` commands so reference generation can be expanded incrementally with explicit traceability.
+
+**Deviation from the original proposal:** instead of landing a bulk repository-wide reference refresh in one PR, this phase now focuses on the smallest practical change that makes the missing-reference backlog measurable and reproducible bucket-by-bucket before broader artifact refreshes are attempted.
+
+**Current blocker:** the largest skipped buckets still need significant external Playwright reference-generation time against a WPT checkout, so the current repo-side implementation can only prioritize and track those suites until the generated images themselves are produced.
 
 ---
 
