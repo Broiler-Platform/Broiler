@@ -1697,28 +1697,28 @@ public sealed partial class DomBridge
                 if (value != null)
                 {
                     var px = ParseCssLengthToPixels(value, viewportWidth, viewportHeight);
-                    return px >= 0 && viewportHeight >= px;
+                    return !double.IsNaN(px) && viewportHeight >= Math.Max(0, px);
                 }
                 return false;
             case "max-height":
                 if (value != null)
                 {
                     var px = ParseCssLengthToPixels(value, viewportWidth, viewportHeight);
-                    return px >= 0 && viewportHeight <= px;
+                    return !double.IsNaN(px) && viewportHeight <= Math.Max(0, px);
                 }
                 return true; // No value = bare feature check; height exists
             case "min-width":
                 if (value != null)
                 {
                     var px = ParseCssLengthToPixels(value, viewportWidth, viewportHeight);
-                    return px >= 0 && viewportWidth >= px;
+                    return !double.IsNaN(px) && viewportWidth >= Math.Max(0, px);
                 }
                 return false;
             case "max-width":
                 if (value != null)
                 {
                     var px = ParseCssLengthToPixels(value, viewportWidth, viewportHeight);
-                    return px >= 0 && viewportWidth <= px;
+                    return !double.IsNaN(px) && viewportWidth <= Math.Max(0, px);
                 }
                 return true; // No value = bare feature check; width exists
             case "color":
@@ -1776,7 +1776,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static double ParseCssLengthToPixels(string value, int viewportWidth = 0, int viewportHeight = 0)
     {
-        if (string.IsNullOrWhiteSpace(value)) return -1;
+        if (string.IsNullOrWhiteSpace(value)) return double.NaN;
 
         var v = NormalizeSingleValueLengthFunction(value).Trim().ToLowerInvariant();
         if (viewportHeight > 0 && v.EndsWith("vh"))
@@ -1787,7 +1787,7 @@ public sealed partial class DomBridge
                 return (vh / 100.0) * viewportHeight;
             }
 
-            return -1;
+            return double.NaN;
         }
 
         if (viewportWidth > 0 && v.EndsWith("vw"))
@@ -1798,7 +1798,7 @@ public sealed partial class DomBridge
                 return (vw / 100.0) * viewportWidth;
             }
 
-            return -1;
+            return double.NaN;
         }
 
         var viewportMin = Math.Min(viewportWidth, viewportHeight);
@@ -1810,7 +1810,7 @@ public sealed partial class DomBridge
                 return (vmin / 100.0) * viewportMin;
             }
 
-            return -1;
+            return double.NaN;
         }
 
         var viewportMax = Math.Max(viewportWidth, viewportHeight);
@@ -1822,7 +1822,7 @@ public sealed partial class DomBridge
                 return (vmax / 100.0) * viewportMax;
             }
 
-            return -1;
+            return double.NaN;
         }
 
         if (v.EndsWith("px"))
@@ -1830,7 +1830,7 @@ public sealed partial class DomBridge
             if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var px))
                 return px;
-            return -1;
+            return double.NaN;
         }
         if (v.EndsWith("em") || v.EndsWith("rem"))
         {
@@ -1838,41 +1838,41 @@ public sealed partial class DomBridge
             if (double.TryParse(numStr, System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var em))
                 return em * 16.0; // 1em = 16px default
-            return -1;
+            return double.NaN;
         }
         if (v.EndsWith("ex"))
         {
             if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var ex))
                 return ex * 8.0; // Match the core parser's 1ex ≈ 0.5em approximation at 16px.
-            return -1;
+            return double.NaN;
         }
         if (v.EndsWith("ch"))
         {
             if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var ch))
                 return ch * 8.0; // Approximate 1ch as 8px for a 16px monospace glyph advance.
-            return -1;
+            return double.NaN;
         }
         if (v.EndsWith("rlh"))
         {
             if (double.TryParse(v[..^3], System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var rlh))
                 return rlh * 19.2; // Approximate 1rlh as the default 16px root line-height × 1.2.
-            return -1;
+            return double.NaN;
         }
         if (v.EndsWith("lh"))
         {
             if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var lh))
                 return lh * 19.2; // Approximate 1lh as the default 16px line-height × 1.2.
-            return -1;
+            return double.NaN;
         }
         // Plain number (treat as pixels)
         if (double.TryParse(v, System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out var raw))
             return raw;
-        return -1;
+        return double.NaN;
     }
 
     private static string NormalizeSingleValueLengthFunction(string value)
@@ -2024,7 +2024,7 @@ public sealed partial class DomBridge
         var semiIdx = style.IndexOf(';', colonIdx);
         var valueStr = semiIdx >= 0 ? style[(colonIdx + 1)..semiIdx].Trim() : style[(colonIdx + 1)..].Trim();
         var px = ParseCssLengthToPixels(valueStr);
-        return px >= 0 ? (int)px : 0;
+        return !double.IsNaN(px) ? (int)px : 0;
     }
 
     /// <summary>

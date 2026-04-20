@@ -2197,7 +2197,7 @@ public sealed partial class DomBridge
                             if (!string.IsNullOrEmpty(cssStr))
                             {
                                 var px = ParseCssLengthToPixels(cssStr);
-                                if (px >= 0) return new JSNumber(px);
+                                if (!double.IsNaN(px)) return new JSNumber(px);
                             }
                         }
                         // Fallback: HTML attribute
@@ -3289,7 +3289,7 @@ public sealed partial class DomBridge
         }
 
         var px = ParseCssLengthToPixels(value);
-        return px >= 0 ? px : 0;
+        return !double.IsNaN(px) ? px : 0;
     }
 
     private double ResolveLineHeightForLength(DomElement element, bool rootRelative, bool forLineHeight = false)

@@ -662,6 +662,16 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void MatchMedia_Clamps_Negative_Calc_Lengths_To_Zero()
+    {
+        var result = ExecJs(@"
+            document.getElementById('result').textContent =
+                'MATCH:' + window.matchMedia('(min-width: calc(-100px))').matches;
+        ");
+        Assert.Contains("MATCH:true", result);
+    }
+
+    [Fact]
     public void ScrollIntoView_Applies_ScrollPadding_And_ScrollMargin()
     {
         var result = ExecJs(@"

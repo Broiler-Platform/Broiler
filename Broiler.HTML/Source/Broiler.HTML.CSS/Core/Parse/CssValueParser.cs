@@ -1,5 +1,6 @@
 using System.Drawing;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using Broiler.HTML.Core.Core;
 using Broiler.HTML.Utils.Core.Utils;
@@ -8,6 +9,7 @@ namespace Broiler.HTML.CSS.Core.Parse;
 
 internal sealed class CssValueParser
 {
+    private readonly record struct LengthEvaluation(double Pixels, bool IsUnitless);
     private readonly IColorResolver _colorResolver;
 
     /// <summary>
@@ -96,6 +98,21 @@ internal sealed class CssValueParser
 
     public static bool IsValidLength(string value)
     {
+        var defaultRootLineHeight = CssConstants.FontSize * (96.0 / 72.0) * 1.2;
+        if (TryEvaluateLengthExpression(
+                value,
+                100f,
+                16f,
+                null,
+                fontAdjust: false,
+                returnPoints: false,
+                lineHeightFactor: 16f * 1.2,
+                rootLineHeightFactor: defaultRootLineHeight,
+                out _))
+        {
+            return true;
+        }
+
         value = NormalizeSingleValueLengthFunction(value);
 
         // CSS2.1 §4.3.2: "0" is a valid length (unit identifier optional after zero).
@@ -187,6 +204,24 @@ internal sealed class CssValueParser
         if (string.IsNullOrEmpty(length) || length == "0")
             return 0f;
 
+        var computedLineHeightFactor = lineHeightFactor ?? (emFactor * 1.2);
+        var computedRootLineHeightFactor = rootLineHeightFactor
+            ?? (CssConstants.FontSize * (96.0 / 72.0) * 1.2);
+
+        if (TryEvaluateLengthExpression(
+                length,
+                hundredPercent,
+                emFactor,
+                defaultUnit,
+                fontAdjust,
+                returnPoints,
+                computedLineHeightFactor,
+                computedRootLineHeightFactor,
+                out var evaluated))
+        {
+            return evaluated;
+        }
+
         length = NormalizeSingleValueLengthFunction(length);
 
         //If percentage, use ParseNumber
@@ -198,10 +233,6 @@ internal sealed class CssValueParser
 
         //Factor will depend on the unit
         double factor;
-        var computedLineHeightFactor = lineHeightFactor ?? (emFactor * 1.2);
-        var computedRootLineHeightFactor = rootLineHeightFactor
-            ?? (CssConstants.FontSize * (96.0 / 72.0) * 1.2);
-
         //Number of the length
         int unitLen = unit == CssConstants.Rem || unit == CssConstants.Rlh ? 3 :
                       unit == CssConstants.Vmin || unit == CssConstants.Vmax ? 4 :
@@ -283,6 +314,350 @@ internal sealed class CssValueParser
         }
 
         return factor * ParseNumber(number, hundredPercent);
+    }
+
+    private static bool TryEvaluateLengthExpression(
+        string expression,
+        double hundredPercent,
+        double emFactor,
+        string defaultUnit,
+        bool fontAdjust,
+        bool returnPoints,
+        double lineHeightFactor,
+        double rootLineHeightFactor,
+        out double result)
+    {
+        if (TryEvaluateLengthExpressionCore(
+                expression,
+                hundredPercent,
+                emFactor,
+                defaultUnit,
+                fontAdjust,
+                returnPoints,
+                lineHeightFactor,
+                rootLineHeightFactor,
+                insideMathFunction: false,
+                out var evaluation))
+        {
+            result = evaluation.Pixels;
+            return true;
+        }
+
+        result = 0;
+        return false;
+    }
+
+    private static bool TryEvaluateLengthExpressionCore(
+        string expression,
+        double hundredPercent,
+        double emFactor,
+        string defaultUnit,
+        bool fontAdjust,
+        bool returnPoints,
+        double lineHeightFactor,
+        double rootLineHeightFactor,
+        bool insideMathFunction,
+        out LengthEvaluation evaluation)
+    {
+        evaluation = default;
+        if (string.IsNullOrWhiteSpace(expression))
+            return false;
+
+        var current = expression.Trim();
+        while (current.Length >= 2 && current[0] == '(' && current[^1] == ')' && HasBalancedParens(current[1..^1]))
+            current = current[1..^1].Trim();
+
+        if (TryEvaluateMathFunction(
+                current,
+                hundredPercent,
+                emFactor,
+                defaultUnit,
+                fontAdjust,
+                returnPoints,
+                lineHeightFactor,
+                rootLineHeightFactor,
+                out evaluation))
+        {
+            return true;
+        }
+
+        var additiveOperatorIndex = FindTopLevelAdditiveOperator(current);
+        if (additiveOperatorIndex > 0)
+        {
+            if (!TryEvaluateLengthExpressionCore(
+                    current[..additiveOperatorIndex],
+                    hundredPercent,
+                    emFactor,
+                    defaultUnit,
+                    fontAdjust,
+                    returnPoints,
+                    lineHeightFactor,
+                    rootLineHeightFactor,
+                    insideMathFunction: true,
+                    out var left))
+            {
+                return false;
+            }
+
+            if (!TryEvaluateLengthExpressionCore(
+                    current[(additiveOperatorIndex + 1)..],
+                    hundredPercent,
+                    emFactor,
+                    defaultUnit,
+                    fontAdjust,
+                    returnPoints,
+                    lineHeightFactor,
+                    rootLineHeightFactor,
+                    insideMathFunction: true,
+                    out var right))
+            {
+                return false;
+            }
+
+            evaluation = new LengthEvaluation(
+                current[additiveOperatorIndex] == '+'
+                    ? left.Pixels + right.Pixels
+                    : left.Pixels - right.Pixels,
+                IsUnitless: false);
+            return true;
+        }
+
+        return TryParseSimpleLength(
+            current,
+            hundredPercent,
+            emFactor,
+            defaultUnit,
+            fontAdjust,
+            returnPoints,
+            lineHeightFactor,
+            rootLineHeightFactor,
+            insideMathFunction,
+            out evaluation);
+    }
+
+    private static bool TryEvaluateMathFunction(
+        string expression,
+        double hundredPercent,
+        double emFactor,
+        string defaultUnit,
+        bool fontAdjust,
+        bool returnPoints,
+        double lineHeightFactor,
+        double rootLineHeightFactor,
+        out LengthEvaluation evaluation)
+    {
+        evaluation = default;
+        if (string.IsNullOrWhiteSpace(expression) || expression[^1] != ')')
+            return false;
+
+        static bool StartsWithFunction(string value, string functionName)
+            => value.StartsWith(functionName + "(", StringComparison.OrdinalIgnoreCase);
+
+        if (StartsWithFunction(expression, "calc"))
+        {
+            var content = expression[5..^1];
+            return HasBalancedParens(content) &&
+                   TryEvaluateLengthExpressionCore(
+                       content,
+                       hundredPercent,
+                       emFactor,
+                       defaultUnit,
+                       fontAdjust,
+                       returnPoints,
+                       lineHeightFactor,
+                       rootLineHeightFactor,
+                       insideMathFunction: true,
+                       out evaluation);
+        }
+
+        if (!StartsWithFunction(expression, "min") && !StartsWithFunction(expression, "max"))
+            return false;
+
+        var isMax = StartsWithFunction(expression, "max");
+        var argsContent = expression[4..^1];
+        if (!HasBalancedParens(argsContent))
+            return false;
+
+        var parts = SplitTopLevelArguments(argsContent);
+        if (parts.Count == 0)
+            return false;
+
+        double? candidate = null;
+        foreach (var part in parts)
+        {
+            if (!TryEvaluateLengthExpressionCore(
+                    part,
+                    hundredPercent,
+                    emFactor,
+                    defaultUnit,
+                    fontAdjust,
+                    returnPoints,
+                    lineHeightFactor,
+                    rootLineHeightFactor,
+                    insideMathFunction: true,
+                    out var value) ||
+                value.IsUnitless)
+            {
+                return false;
+            }
+
+            candidate = candidate.HasValue
+                ? (isMax ? Math.Max(candidate.Value, value.Pixels) : Math.Min(candidate.Value, value.Pixels))
+                : value.Pixels;
+        }
+
+        if (!candidate.HasValue)
+            return false;
+
+        evaluation = new LengthEvaluation(candidate.Value, IsUnitless: false);
+        return true;
+    }
+
+    private static bool TryParseSimpleLength(
+        string expression,
+        double hundredPercent,
+        double emFactor,
+        string defaultUnit,
+        bool fontAdjust,
+        bool returnPoints,
+        double lineHeightFactor,
+        double rootLineHeightFactor,
+        bool insideMathFunction,
+        out LengthEvaluation evaluation)
+    {
+        evaluation = default;
+        var value = expression.Trim();
+        if (string.IsNullOrEmpty(value))
+            return false;
+
+        if (value.EndsWith("%", StringComparison.Ordinal))
+        {
+            evaluation = new LengthEvaluation(ParseNumber(value, hundredPercent), IsUnitless: false);
+            return true;
+        }
+
+        string unit = GetUnit(value, defaultUnit, out bool hasUnit);
+        if (!hasUnit)
+        {
+            if (insideMathFunction)
+                return false;
+
+            if (double.TryParse(value, NumberStyles.Number, NumberFormatInfo.InvariantInfo, out double raw))
+            {
+                evaluation = new LengthEvaluation(raw, IsUnitless: true);
+                return true;
+            }
+
+            return false;
+        }
+
+        int unitLen = unit == CssConstants.Rem || unit == CssConstants.Rlh ? 3 :
+                      unit == CssConstants.Vmin || unit == CssConstants.Vmax ? 4 :
+                      unit == CssConstants.Q ? 1 : 2;
+        string number = value.Substring(0, value.Length - unitLen);
+        if (!double.TryParse(number, NumberStyles.Number, NumberFormatInfo.InvariantInfo, out double parsedNumber))
+            return false;
+
+        double factor = unit switch
+        {
+            CssConstants.Em => emFactor,
+            CssConstants.Rem => CssConstants.FontSize * (96.0 / 72.0),
+            CssConstants.Ex => emFactor / 2,
+            CssConstants.Ch => emFactor / 2,
+            CssConstants.Lh => lineHeightFactor,
+            CssConstants.Px => fontAdjust ? 72f / 96f : 1f,
+            CssConstants.Mm => 3.779527559f,
+            CssConstants.Cm => 37.795275591f,
+            CssConstants.In => 96f,
+            CssConstants.Pt => returnPoints ? 1f : 96f / 72f,
+            CssConstants.Pc => 16f,
+            CssConstants.Rlh => rootLineHeightFactor,
+            CssConstants.Q => 37.795275591f / 40f,
+            CssConstants.Vh => _vhFactor,
+            CssConstants.Vw => _vwFactor,
+            CssConstants.Vmin => _vminFactor,
+            CssConstants.Vmax => _vmaxFactor,
+            _ => double.NaN
+        };
+
+        if (double.IsNaN(factor))
+            return false;
+
+        evaluation = new LengthEvaluation(
+            unit == CssConstants.Pt && returnPoints
+                ? ParseNumber(number, hundredPercent)
+                : factor * parsedNumber,
+            IsUnitless: false);
+        return true;
+    }
+
+    private static int FindTopLevelAdditiveOperator(string expression)
+    {
+        var depth = 0;
+        for (int i = expression.Length - 1; i >= 1; i--)
+        {
+            switch (expression[i])
+            {
+                case ')':
+                    depth++;
+                    break;
+                case '(':
+                    depth--;
+                    break;
+                case '+':
+                case '-':
+                    if (depth != 0)
+                        break;
+
+                    var leftIndex = i - 1;
+                    while (leftIndex >= 0 && char.IsWhiteSpace(expression[leftIndex]))
+                        leftIndex--;
+
+                    var rightIndex = i + 1;
+                    while (rightIndex < expression.Length && char.IsWhiteSpace(expression[rightIndex]))
+                        rightIndex++;
+
+                    if (leftIndex >= 0 &&
+                        rightIndex < expression.Length &&
+                        expression[leftIndex] != '(' &&
+                        expression[leftIndex] != ',' &&
+                        expression[leftIndex] != '+' &&
+                        expression[leftIndex] != '-')
+                    {
+                        return i;
+                    }
+                    break;
+            }
+        }
+
+        return -1;
+    }
+
+    private static List<string> SplitTopLevelArguments(string value)
+    {
+        var parts = new List<string>();
+        var depth = 0;
+        var start = 0;
+
+        for (int i = 0; i < value.Length; i++)
+        {
+            switch (value[i])
+            {
+                case '(':
+                    depth++;
+                    break;
+                case ')':
+                    depth--;
+                    break;
+                case ',' when depth == 0:
+                    parts.Add(value[start..i].Trim());
+                    start = i + 1;
+                    break;
+            }
+        }
+
+        parts.Add(value[start..].Trim());
+        return parts;
     }
 
     private static string NormalizeSingleValueLengthFunction(string value)

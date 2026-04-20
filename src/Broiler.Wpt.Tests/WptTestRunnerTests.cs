@@ -216,6 +216,80 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssValues_MaxTwentyArguments_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer {
+      position: absolute;
+      inset: 0;
+      background: green;
+      width: 100%;
+      height: max(5%, 10%, 15%, 20%, 25%, 30%, 35%, 40%, 45%, 50%, 55%, 60%, 65%, 70%, 75%, 80%, 85%, 90%, 95%, 100%);
+    }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: absolute; inset: 0; background: green; width: 100%; height: 100%; }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "max-20-arguments");
+        Assert.True(result.Passed,
+            $"max() with 20 arguments should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer {
+      position: absolute;
+      inset: 0;
+      background: green;
+      width: 100%;
+      height: calc((((((((((((((((((((((((((((((((100%))))))))))))))))))))))))))))))));
+    }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: absolute; inset: 0; background: green; width: 100%; height: 100%; }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "calc-parenthesis-stack");
+        Assert.True(result.Passed,
+            $"deeply nested calc parentheses should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssViewport_ZoomBasic_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -488,6 +562,76 @@ document.getElementById('out').appendChild(p);
         var result = RunTempMatchTest(testHtml, referenceHtml, "viewport-minmax-media-query-lengths");
         Assert.True(result.Passed,
             $"viewport min/max media-query lengths should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_CalcMediaQueryNegativeLengthsClampToZero_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #target { width: 100%; height: 100%; background: red; }
+    @media (min-width: calc(-100px)) {
+      #target { background: green; }
+    }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #target { width: 100%; height: 100%; background: green; }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "calc-in-media-queries-negative-clamp");
+        Assert.True(result.Passed,
+            $"negative calc media-query lengths should clamp to zero. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_InvalidUnitlessZeroInMathFunction_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer {
+      position: absolute;
+      inset: 0;
+      background: green;
+      width: 100%;
+      height: min(100%);
+      height: min(0, 100%);
+    }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: absolute; inset: 0; background: green; width: 100%; height: 100%; }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "max-unitless-zero-invalid");
+        Assert.True(result.Passed,
+            $"unitless zero should invalidate min/max length declarations. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
