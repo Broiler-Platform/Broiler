@@ -1854,6 +1854,13 @@ public sealed partial class DomBridge
                 return ch * 8.0; // Approximate 1ch as 8px for a 16px monospace glyph advance.
             return double.NaN;
         }
+        if (v.EndsWith("ic"))
+        {
+            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var ic))
+                return ic * 16.0; // Approximate 1ic as 1em for the current focused Phase 3 slice.
+            return double.NaN;
+        }
         if (v.EndsWith("rlh"))
         {
             if (double.TryParse(v[..^3], System.Globalization.NumberStyles.Float,

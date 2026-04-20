@@ -1002,6 +1002,31 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void FontRelative_Ic_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function measure(zoom) {
+                var box = document.createElement('div');
+                box.style.width = '5ic';
+                box.style.height = '10ic';
+                box.style.font = '16px monospace';
+                if (zoom) {
+                    box.style.zoom = zoom;
+                }
+
+                document.body.appendChild(box);
+                return box.offsetWidth + ',' + box.offsetHeight;
+            }
+
+            document.getElementById('result').textContent =
+                measure('1') + '|' + measure('2');
+        ");
+        Assert.Contains("80,160|80,160", result);
+    }
+
+    [Fact]
     public void FontRelative_Lh_Units_Resolve_From_Parent_LineHeight_Under_Zoom()
     {
         var result = ExecJs(@"

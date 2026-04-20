@@ -152,6 +152,7 @@ internal sealed class CssValueParser
                 case CssConstants.Em:
                 case CssConstants.Ex:
                 case CssConstants.Ch:
+                case CssConstants.Ic:
                 case CssConstants.Lh:
                 case CssConstants.Px:
                 case CssConstants.Mm:
@@ -258,6 +259,10 @@ internal sealed class CssValueParser
                 // Approximate 1ch as half an em so 16px monospace text resolves
                 // to an 8px character advance in the current focused Phase 3 slice.
                 factor = emFactor / 2;
+                break;
+            case CssConstants.Ic:
+                // Approximate 1ic as 1em for the current focused Phase 3 slice.
+                factor = emFactor;
                 break;
             case CssConstants.Lh:
                 factor = computedLineHeightFactor;
@@ -564,6 +569,7 @@ internal sealed class CssValueParser
             CssConstants.Rem => CssConstants.FontSize * (96.0 / 72.0),
             CssConstants.Ex => emFactor / 2,
             CssConstants.Ch => emFactor / 2,
+            CssConstants.Ic => emFactor,
             CssConstants.Lh => lineHeightFactor,
             CssConstants.Px => fontAdjust ? 72f / 96f : 1f,
             CssConstants.Mm => 3.779527559f,
@@ -762,6 +768,7 @@ internal sealed class CssValueParser
             case CssConstants.Em:
             case CssConstants.Ex:
             case CssConstants.Ch:
+            case CssConstants.Ic:
             case CssConstants.Lh:
             case CssConstants.Px:
             case CssConstants.Mm:

@@ -1252,6 +1252,48 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssValues_IcUnit_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      font: 16px monospace;
+      width: 5ic;
+      height: 10ic;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      width: 80px;
+      height: 160px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "ic-unit");
+        Assert.True(result.Passed,
+            $"ic unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_LhUnit_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1338,6 +1380,62 @@ document.getElementById('out').appendChild(p);
         var result = RunTempMatchTest(testHtml, referenceHtml, "rlh-unit");
         Assert.True(result.Passed,
             $"rlh unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomIcUnit_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    function measure(zoom) {
+      const box = document.createElement('div');
+      box.style.position = 'absolute';
+      box.style.left = '-10000px';
+      box.style.top = '-10000px';
+      box.style.font = '16px monospace';
+      box.style.width = '5ic';
+      box.style.height = '10ic';
+      if (zoom) {
+        box.style.zoom = zoom;
+      }
+
+      document.body.appendChild(box);
+      const metrics = box.offsetWidth === 80 && box.offsetHeight === 160;
+      box.remove();
+      return metrics;
+    }
+
+    if (measure('1') && measure('2')) {
+      document.getElementById('pass').style.background = 'green';
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-ic-unit");
+        Assert.True(result.Passed,
+            $"ic unit should stay zoom-stable in raw CSS pixels. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]

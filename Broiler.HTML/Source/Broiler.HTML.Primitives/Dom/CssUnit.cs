@@ -7,6 +7,7 @@ public enum CssUnit
     Pixels,
     Ex,
     Ch,
+    Ic,
     Inches,
     Centimeters,
     Milimeters,
