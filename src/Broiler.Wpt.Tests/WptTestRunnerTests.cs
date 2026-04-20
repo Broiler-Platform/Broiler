@@ -2648,7 +2648,7 @@ document.getElementById('out').appendChild(p);
         Directory.CreateDirectory(filterEffectsDir);
         Directory.CreateDirectory(calcSizeDir);
 
-        File.WriteAllText(Path.Combine(missingRefDir, "missing-reference-case.html"), "<html><body>Missing ref</body></html>");
+        File.WriteAllText(Path.Combine(missingRefDir, "missing-ref-case.html"), "<html><body>Missing ref</body></html>");
         File.WriteAllText(Path.Combine(mediaDir, "media.html"),
             @"<!DOCTYPE html><html><body><video autoplay><source type=""video/mp4"" src=""support/video.mp4""></video></body></html>");
         File.WriteAllText(Path.Combine(viewTransitionsDir, "vt-gap.html"),

@@ -516,7 +516,7 @@ public class Program
         {
             Console.WriteLine($"  {bucket.Count,3}  {bucket.Directory} [{bucket.Kind}]");
             if (bucket.MissingContentShare is { } share)
-                Console.WriteLine($"       MissingContent share: {share:P1}");
+                Console.WriteLine($"        MissingContent share: {share:P1}");
         }
     }
 
