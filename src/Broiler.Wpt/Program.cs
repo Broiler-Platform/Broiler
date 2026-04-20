@@ -16,6 +16,13 @@ public class Program
 {
     private const int ProgressCheckpointInterval = 25;
     private const int TopBucketLimit = 5;
+    private const int MissingContentDominantBucketMinimumFailures = 5;
+    private const double MissingContentDominanceThreshold = 0.5;
+    private static readonly string[] ExplicitDeferredFeatureSuites =
+    [
+        "css/css-view-transitions",
+        "css/filter-effects",
+    ];
 
     public static int Main(string[] args)
     {
@@ -268,6 +275,7 @@ public class Program
 
         var failures = allResults.Where(r => !r.Passed && !r.Skipped).ToList();
         var skippedResults = allResults.Where(r => r.Skipped).ToList();
+        var deferredFeatureBuckets = GetDeferredFeatureBuckets(failures, wptPath);
 
         var report = new Dictionary<string, object?>
         {
@@ -317,6 +325,9 @@ public class Program
                         ["count"] = g.Count(),
                     })
                     .ToList(),
+                ["deferredFeatureBuckets"] = deferredFeatureBuckets
+                    .Select(bucket => bucket.ToJsonObject())
+                    .ToList(),
             },
             ["results"] = allResults.Select(r => r.ToJsonObject()).ToList(),
         };
@@ -347,6 +358,7 @@ public class Program
         var skippedResults = allResults.Where(r => r.Skipped).ToList();
         var topFailingDirectories = GetDirectoryBuckets(failures, wptPath);
         var topSkippedDirectories = GetDirectoryBuckets(skippedResults, wptPath);
+        var deferredFeatureBuckets = GetDeferredFeatureBuckets(failures, wptPath);
         var nonPixelFailures = failures
             .Where(r => r.Category != FailureCategory.PixelMismatch)
             .OrderBy(r => r.TestPath, StringComparer.Ordinal)
@@ -355,6 +367,7 @@ public class Program
             .Select(bucket => bucket.Key)
             .Concat(topSkippedDirectories.Select(bucket => bucket.Key))
             .Distinct(StringComparer.Ordinal)
+            .Where(bucket => !IsDeferredFeatureBucket(bucket, deferredFeatureBuckets))
             .Take(TopBucketLimit)
             .ToList();
 
@@ -372,6 +385,7 @@ public class Program
         writer.WriteLine($"- Skipped: {skipped}");
         WriteBucketSection(writer, "Top failing buckets", topFailingDirectories);
         WriteBucketSection(writer, "Top skipped buckets", topSkippedDirectories);
+        WriteDeferredFeatureBucketSection(writer, deferredFeatureBuckets);
         writer.WriteLine();
         writer.WriteLine("## Non-pixel / exception failures");
         writer.WriteLine();
@@ -416,6 +430,7 @@ public class Program
         Console.WriteLine("=== Bucket Summary ===");
         PrintDirectoryBuckets("Top failing directories", failures, wptPath);
         PrintDirectoryBuckets("Top skipped directories", skippedResults, wptPath);
+        PrintDeferredFeatureBuckets(failures, wptPath);
 
         Console.WriteLine("Mismatch sub-categories:");
         var subCategories = failures
@@ -487,6 +502,24 @@ public class Program
             Console.WriteLine($"  {bucket.Value,3}  {bucket.Key}");
     }
 
+    private static void PrintDeferredFeatureBuckets(IEnumerable<WptTestResult> failures, string wptPath)
+    {
+        Console.WriteLine("Deferred feature-gap buckets:");
+        var buckets = GetDeferredFeatureBuckets(failures, wptPath);
+        if (buckets.Count == 0)
+        {
+            Console.WriteLine("  (none)");
+            return;
+        }
+
+        foreach (var bucket in buckets)
+        {
+            Console.WriteLine($"  {bucket.Count,3}  {bucket.Directory} [{bucket.Kind}]");
+            if (bucket.MissingContentShare is { } share)
+                Console.WriteLine($"       MissingContent share: {share:P1}");
+        }
+    }
+
     private static List<KeyValuePair<string, int>> GetDirectoryBuckets(IEnumerable<WptTestResult> results, string wptPath) =>
         results
             .GroupBy(result => GetBucketDirectory(result.TestPath, wptPath))
@@ -505,12 +538,73 @@ public class Program
             })
             .ToList();
 
+    private static List<DeferredFeatureBucket> GetDeferredFeatureBuckets(IEnumerable<WptTestResult> failures, string wptPath)
+    {
+        var failureList = failures.ToList();
+        var deferredBuckets = new List<DeferredFeatureBucket>();
+
+        foreach (var suite in ExplicitDeferredFeatureSuites)
+        {
+            var count = failureList.Count(result => IsUnderDirectory(result.TestPath, wptPath, suite));
+            if (count > 0)
+                deferredBuckets.Add(new DeferredFeatureBucket(suite, count, "ExplicitFeatureGap", null));
+        }
+
+        var missingContentDominantBuckets = failureList
+            .GroupBy(result => GetBucketDirectory(result.TestPath, wptPath))
+            .Select(group =>
+            {
+                var total = group.Count();
+                var missingContentCount = group.Count(result =>
+                    result.MismatchDiagnostics?.Category == MismatchCategory.MissingContent);
+                return new
+                {
+                    Directory = group.Key,
+                    Count = total,
+                    MissingContentShare = total == 0 ? 0 : (double)missingContentCount / total,
+                };
+            })
+            .Where(bucket =>
+                bucket.Count >= MissingContentDominantBucketMinimumFailures &&
+                bucket.MissingContentShare > MissingContentDominanceThreshold &&
+                !ExplicitDeferredFeatureSuites.Any(suite =>
+                    bucket.Directory.Equals(suite, StringComparison.Ordinal) ||
+                    bucket.Directory.StartsWith($"{suite}/", StringComparison.Ordinal)))
+            .Select(bucket => new DeferredFeatureBucket(
+                bucket.Directory,
+                bucket.Count,
+                "MissingContentDominant",
+                bucket.MissingContentShare));
+
+        deferredBuckets.AddRange(missingContentDominantBuckets);
+
+        return deferredBuckets
+            .OrderByDescending(bucket => bucket.Count)
+            .ThenBy(bucket => bucket.Directory, StringComparer.Ordinal)
+            .Take(TopBucketLimit)
+            .ToList();
+    }
+
     private static string GetBucketDirectory(string testPath, string wptPath)
     {
         var relativePath = Path.GetRelativePath(wptPath, testPath).Replace('\\', '/');
         var directory = Path.GetDirectoryName(relativePath)?.Replace('\\', '/');
         return string.IsNullOrWhiteSpace(directory) ? "." : directory;
     }
+
+    private static bool IsUnderDirectory(string testPath, string wptPath, string directory)
+    {
+        var bucketDirectory = GetBucketDirectory(testPath, wptPath);
+        return bucketDirectory.Equals(directory, StringComparison.Ordinal) ||
+               bucketDirectory.StartsWith($"{directory}/", StringComparison.Ordinal);
+    }
+
+    private static bool IsDeferredFeatureBucket(
+        string bucket,
+        IReadOnlyCollection<DeferredFeatureBucket> deferredFeatureBuckets) =>
+        deferredFeatureBuckets.Any(candidate =>
+            bucket.Equals(candidate.Directory, StringComparison.Ordinal) ||
+            bucket.StartsWith($"{candidate.Directory}/", StringComparison.Ordinal));
 
     private static void WriteBucketSection(StreamWriter writer, string title, IReadOnlyCollection<KeyValuePair<string, int>> buckets)
     {
@@ -525,6 +619,43 @@ public class Program
 
         foreach (var bucket in buckets)
             writer.WriteLine($"- `{bucket.Key}` — {bucket.Value}");
+    }
+
+    private static void WriteDeferredFeatureBucketSection(
+        StreamWriter writer,
+        IReadOnlyCollection<DeferredFeatureBucket> buckets)
+    {
+        writer.WriteLine();
+        writer.WriteLine("## Deferred unsupported / MissingContent-dominant buckets");
+        writer.WriteLine();
+        if (buckets.Count == 0)
+        {
+            writer.WriteLine("- None");
+            return;
+        }
+
+        foreach (var bucket in buckets)
+        {
+            writer.Write($"- `{bucket.Directory}` — {bucket.Count} failure(s) [{bucket.Kind}]");
+            if (bucket.MissingContentShare is { } share)
+                writer.Write($"; MissingContent {share:P1}");
+            writer.WriteLine();
+        }
+    }
+
+    private sealed record DeferredFeatureBucket(
+        string Directory,
+        int Count,
+        string Kind,
+        double? MissingContentShare)
+    {
+        public Dictionary<string, object?> ToJsonObject() => new()
+        {
+            ["directory"] = Directory,
+            ["count"] = Count,
+            ["kind"] = Kind,
+            ["missingContentShare"] = MissingContentShare,
+        };
     }
 
     private static void PrintUsage()
