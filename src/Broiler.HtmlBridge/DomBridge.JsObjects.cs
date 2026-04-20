@@ -2782,14 +2782,17 @@ public sealed partial class DomBridge
         if (isRoot)
             return _viewportWidth;
 
+        var props = GetComputedProps(element);
         var ownWidth = GetClientWidthForDomElement(element, isRoot: false);
         var ownZoom = GetUsedZoomForElement(element);
+        var trailingPadding = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element);
         var maxWidth = ownWidth;
         foreach (var child in element.Children.Where(c => !c.IsTextNode))
         {
             var childRect = ComputeRenderedRect(child);
             var widthInContainerSpace = ownZoom > 0.0001 ? (childRect.Width / ownZoom) : childRect.Width;
-            maxWidth = Math.Max(maxWidth, widthInContainerSpace);
+            var childOffset = ComputeOffsetWithinParent(child, vertical: false);
+            maxWidth = Math.Max(maxWidth, childOffset + widthInContainerSpace + trailingPadding);
         }
 
         return maxWidth;
@@ -2800,14 +2803,17 @@ public sealed partial class DomBridge
         if (isRoot)
             return _viewportHeight;
 
+        var props = GetComputedProps(element);
         var ownHeight = GetClientHeightForDomElement(element, isRoot: false);
         var ownZoom = GetUsedZoomForElement(element);
+        var trailingPadding = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element);
         var maxHeight = ownHeight;
         foreach (var child in element.Children.Where(c => !c.IsTextNode))
         {
             var childRect = ComputeRenderedRect(child);
             var heightInContainerSpace = ownZoom > 0.0001 ? (childRect.Height / ownZoom) : childRect.Height;
-            maxHeight = Math.Max(maxHeight, heightInContainerSpace);
+            var childOffset = ComputeOffsetWithinParent(child, vertical: true);
+            maxHeight = Math.Max(maxHeight, childOffset + heightInContainerSpace + trailingPadding);
         }
 
         return maxHeight;

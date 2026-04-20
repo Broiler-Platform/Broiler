@@ -358,6 +358,75 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssomView_ScrollMetricsIncludeChildZoomOverflow_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    function measure(containerZoom, childZoom) {
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left = '-10000px';
+      container.style.top = '-10000px';
+      container.style.width = '20px';
+      container.style.height = '20px';
+      container.style.padding = '10px 20px';
+      container.style.overflow = 'auto';
+      if (containerZoom) {
+        container.style.zoom = containerZoom;
+      }
+
+      const child = document.createElement('div');
+      child.style.width = '20px';
+      child.style.height = '20px';
+      if (childZoom) {
+        child.style.zoom = childZoom;
+      }
+
+      container.appendChild(child);
+      document.body.appendChild(container);
+
+      const passed = container.clientWidth === 60 &&
+                     container.clientHeight === 40 &&
+                     container.scrollWidth === (childZoom ? 80 : 60) &&
+                     container.scrollHeight === (childZoom ? 60 : 40);
+      container.remove();
+      return passed;
+    }
+
+    if (measure('', '2') && measure('2', '') && measure('2', '2')) {
+      document.getElementById('pass').style.background = 'green';
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "client-scroll-child-zoom");
+        Assert.True(result.Passed,
+            $"scroll metrics should include child zoom overflow in raw CSS pixels. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_ViewportMediaQueryLengths_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>

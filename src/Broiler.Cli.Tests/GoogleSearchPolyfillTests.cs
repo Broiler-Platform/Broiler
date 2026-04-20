@@ -368,6 +368,47 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Element_ScrollMetrics_Include_Child_Zoom_Overflow_In_Raw_Css_Pixels()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function measure(containerZoom, childZoom) {
+                var container = document.createElement('div');
+                container.style.width = '20px';
+                container.style.height = '20px';
+                container.style.padding = '10px 20px';
+                container.style.overflow = 'auto';
+                if (containerZoom) {
+                    container.style.zoom = containerZoom;
+                }
+
+                var child = document.createElement('div');
+                child.style.width = '20px';
+                child.style.height = '20px';
+                if (childZoom) {
+                    child.style.zoom = childZoom;
+                }
+
+                container.appendChild(child);
+                document.body.appendChild(container);
+                return [
+                    container.clientWidth,
+                    container.clientHeight,
+                    container.scrollWidth,
+                    container.scrollHeight
+                ].join(',');
+            }
+
+            document.getElementById('result').textContent =
+                measure('', '2') + '|' +
+                measure('2', '') + '|' +
+                measure('2', '2');
+        ");
+        Assert.Contains("60,40,80,60|60,40,60,40|60,40,80,60", result);
+    }
+
+    [Fact]
     public void Element_OffsetDimensions_Exclude_Target_Zoom_But_Include_Borders()
     {
         var result = ExecJs(@"
