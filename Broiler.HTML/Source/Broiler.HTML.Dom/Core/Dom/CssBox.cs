@@ -635,7 +635,9 @@ internal class CssBox : CssBoxProperties, IDisposable
                 if (Width != CssConstants.Auto && !string.IsNullOrEmpty(Width))
                 {
                     double containingWidth = width;
-                    width = CssValueParser.ParseLength(Width, containingWidth, GetEmHeight());
+                    width = string.Equals(Width, "inherit", StringComparison.OrdinalIgnoreCase) && GetParent() != null
+                        ? GetParent().ActualWidth
+                        : CssValueParser.ParseLength(Width, containingWidth, GetEmHeight());
 
                     // CSS2.1 §10.4: Apply max-width constraint
                     if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
@@ -1471,7 +1473,9 @@ internal class CssBox : CssBoxProperties, IDisposable
                 }
                 else
                 {
-                    contentHeight = ActualHeight;
+                    contentHeight = string.Equals(Height, "inherit", StringComparison.OrdinalIgnoreCase) && GetParent() != null
+                        ? GetParent().ActualHeight
+                        : ActualHeight;
                 }
 
                 double borderBoxHeight = ResolveSpecifiedHeightToBorderBox(contentHeight);

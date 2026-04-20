@@ -600,7 +600,11 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualHeight))
-                _actualHeight = ParseLengthWithLineHeight(Height, Size.Height);
+            {
+                _actualHeight = string.Equals(Height, "inherit", StringComparison.OrdinalIgnoreCase) && GetParent() != null
+                    ? GetParent().ActualHeight
+                    : ParseLengthWithLineHeight(Height, Size.Height);
+            }
 
             return _actualHeight;
         }
@@ -611,7 +615,11 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         get
         {
             if (double.IsNaN(_actualWidth))
-                _actualWidth = ParseLengthWithLineHeight(Width, Size.Width);
+            {
+                _actualWidth = string.Equals(Width, "inherit", StringComparison.OrdinalIgnoreCase) && GetParent() != null
+                    ? GetParent().ActualWidth
+                    : ParseLengthWithLineHeight(Width, Size.Width);
+            }
 
             return _actualWidth;
         }
@@ -1159,7 +1167,15 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public double GetEmHeight() => ActualFont.Size * (96.0 / 72.0);
 
     private double ParseLengthWithLineHeight(string length, double hundredPercent)
-        => CssValueParser.ParseLength(
+    {
+        if (!string.IsNullOrWhiteSpace(length) &&
+            length.EndsWith("rem", StringComparison.OrdinalIgnoreCase) &&
+            double.TryParse(length[..^3], NumberStyles.Float, CultureInfo.InvariantCulture, out var rem))
+        {
+            return rem * GetRootEmHeight();
+        }
+
+        return CssValueParser.ParseLength(
             length,
             hundredPercent,
             GetEmHeight(),
@@ -1168,6 +1184,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
             false,
             ActualLineHeight,
             GetRootLineHeight());
+    }
 
     private double ParseLineHeightLength(string length, double hundredPercent)
     {
@@ -1207,6 +1224,15 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
             false,
             GetEmHeight() * 1.2,
             GetEmHeight() * 1.2);
+    }
+
+    private double GetRootEmHeight()
+    {
+        CssBoxProperties root = this;
+        while (root.GetParent() != null)
+            root = root.GetParent();
+
+        return root.GetEmHeight();
     }
 
     /// <summary>
