@@ -978,6 +978,9 @@ internal sealed class CssParser
     {
         if (CssValueParser.IsValidLength(propValue) ||
             propValue.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase) ||
+            propValue.Equals(CssConstants.Inherit, StringComparison.OrdinalIgnoreCase) ||
+            propValue.Equals("initial", StringComparison.OrdinalIgnoreCase) ||
+            propValue.Equals("unset", StringComparison.OrdinalIgnoreCase) ||
             IsValidAttrLengthExpression(propValue))
         properties[propName] = propValue;
     }

@@ -24,13 +24,21 @@ public class WptTestRunnerTests : IDisposable
     }
 
     private WptTestResult RunTempMatchTest(string testHtml, string referenceHtml, string namePrefix)
+        => RunTempMatchTest(testHtml, referenceHtml, namePrefix, 320, 240);
+
+    private WptTestResult RunTempMatchTest(
+        string testHtml,
+        string referenceHtml,
+        string namePrefix,
+        int viewportWidth,
+        int viewportHeight)
     {
         var testFile = Path.Combine(_tempDir, $"{namePrefix}.html");
         var refFile = Path.Combine(_tempDir, $"{namePrefix}-ref.html");
         File.WriteAllText(testFile, testHtml);
         File.WriteAllText(refFile, referenceHtml);
 
-        var runner = new WptTestRunner(320, 240);
+        var runner = new WptTestRunner(viewportWidth, viewportHeight);
         return runner.RunMatchTest(testFile, refFile, _tempDir);
     }
 
@@ -906,7 +914,7 @@ document.getElementById('out').appendChild(p);
 </body>
 </html>";
 
-        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-inherit");
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-inherit", 1024, 768);
         Assert.True(result.Passed,
             $"viewport-length inherit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
@@ -941,7 +949,7 @@ document.getElementById('out').appendChild(p);
 </body>
 </html>";
 
-        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-em-inherit");
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-em-inherit", 1024, 768);
         Assert.True(result.Passed,
             $"viewport-sized font-relative lengths should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
@@ -976,7 +984,7 @@ document.getElementById('out').appendChild(p);
 <body></body>
 </html>";
 
-        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-interpolate-vh");
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-interpolate-vh", 1024, 768);
         Assert.True(result.Passed,
             $"viewport-length animation interpolation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
@@ -1011,7 +1019,7 @@ document.getElementById('out').appendChild(p);
 <body></body>
 </html>";
 
-        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-interpolate-pct");
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-interpolate-pct", 1024, 768);
         Assert.True(result.Passed,
             $"mixed percentage and viewport animation interpolation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }

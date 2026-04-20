@@ -526,6 +526,11 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
             }
 
             InvalidateFontDependentValues();
+            if (this is CssBox cssBox)
+            {
+                foreach (var child in cssBox.Boxes)
+                    child.InvalidateFontDependentSubtree();
+            }
         }
     }
 
@@ -1166,7 +1171,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
     public double GetEmHeight() => ActualFont.Size * (96.0 / 72.0);
 
-    private double ParseLengthWithLineHeight(string length, double hundredPercent)
+    protected double ParseLengthWithLineHeight(string length, double hundredPercent)
     {
         if (!string.IsNullOrWhiteSpace(length) &&
             length.EndsWith("rem", StringComparison.OrdinalIgnoreCase) &&
@@ -1231,6 +1236,23 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         CssBoxProperties root = this;
         while (root.GetParent() != null)
             root = root.GetParent();
+
+        const double defaultRootEmHeight = CssConstants.FontSize * (96.0 / 72.0);
+        if (!string.IsNullOrWhiteSpace(root.FontSize))
+        {
+            var resolved = CssValueParser.ParseLength(
+                root.FontSize,
+                defaultRootEmHeight,
+                defaultRootEmHeight,
+                null,
+                false,
+                false,
+                defaultRootEmHeight * 1.2,
+                defaultRootEmHeight * 1.2);
+
+            if (!double.IsNaN(resolved) && resolved > 0)
+                return resolved;
+        }
 
         return root.GetEmHeight();
     }
@@ -1427,7 +1449,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         AlignItems = p.AlignItems;
     }
 
-    private void InvalidateFontDependentValues()
+    protected void InvalidateFontDependentValues()
     {
         _actualFont = null;
         _actualHeight = double.NaN;
