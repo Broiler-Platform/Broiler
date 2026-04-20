@@ -580,6 +580,7 @@ public class CaptureService
 
         // Flush all pending timers and rAF callbacks before capture
         bridge.FlushTimers();
+        bridge.ResolveAnimationSnapshots();
 
         return bridge.SerializeToHtml();
     }

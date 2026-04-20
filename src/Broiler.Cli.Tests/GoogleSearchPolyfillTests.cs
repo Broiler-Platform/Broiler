@@ -714,6 +714,69 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Viewport_Lengths_Can_Be_Explicitly_Inherited_And_Feed_Rem_And_Em_Font_Sizes()
+    {
+        var result = CaptureService.ExecuteScriptsWithDom(@"<!doctype html>
+<html><head><title>Test</title>
+<style>
+html, body { margin:0; padding:0; }
+#outer { position:relative; background:green; width:50vw; height:100vh; }
+#inner { position:absolute; background:green; left:100%; width:inherit; height:inherit; }
+html { font-size:100vw; }
+#target { background:green; width:1rem; height:1em; font-size:100vh; }
+</style>
+</head>
+<body>
+<div id=""result""></div>
+<div id=""outer""><div id=""inner""></div></div>
+<div id=""target""></div>
+<script>
+var outerRect = document.getElementById('outer').getBoundingClientRect();
+var innerRect = document.getElementById('inner').getBoundingClientRect();
+var targetRect = document.getElementById('target').getBoundingClientRect();
+document.getElementById('result').textContent =
+  [outerRect.width, outerRect.height, innerRect.left, innerRect.width, innerRect.height, targetRect.width, targetRect.height].join(',');
+</script>
+</body></html>", "https://www.google.com");
+        Assert.Contains("512,768,512,512,768,1024,768", result);
+    }
+
+    [Fact]
+    public void Viewport_Lengths_Interpolate_In_Animation_Snapshots()
+    {
+        var result = CaptureService.ExecuteScriptsWithDom(@"<!doctype html>
+<html><head><title>Test</title>
+<style>
+@keyframes vhAnim {
+  from { width: 75vw; height: 75vh; }
+  to   { width: 125vw; height: 125vh; }
+}
+@keyframes mixedAnim {
+  from { width: 0%; height: 0%; }
+  to   { width: 200vw; height: 200vh; }
+}
+html, body { margin:0; padding:0; height:100%; }
+.box { position:relative; background:green; }
+#vh-box { animation: vhAnim 2000000s linear; animation-delay: -1000000s; }
+#mixed-box { animation: mixedAnim 2000000s linear; animation-delay: -1000000s; }
+</style>
+</head>
+<body>
+<div id=""result""></div>
+<div id=""vh-box"" class=""box""></div>
+<div id=""mixed-box"" class=""box""></div>
+<script>
+var vhRect = document.getElementById('vh-box').getBoundingClientRect();
+var mixedRect = document.getElementById('mixed-box').getBoundingClientRect();
+document.getElementById('result').textContent =
+  [vhRect.width, vhRect.height, mixedRect.width, mixedRect.height].join(',');
+</script>
+</body></html>", "https://www.google.com");
+        Assert.Contains("id=\"vh-box\" class=\"box\" style=\"width: 1024px; height: 768px\"", result);
+        Assert.Contains("id=\"mixed-box\" class=\"box\" style=\"width: 1024px; height: 768px\"", result);
+    }
+
+    [Fact]
     public void ScrollIntoView_Applies_ScrollPadding_And_ScrollMargin()
     {
         var result = ExecJs(@"

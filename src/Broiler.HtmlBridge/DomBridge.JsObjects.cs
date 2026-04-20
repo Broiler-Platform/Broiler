@@ -3347,6 +3347,24 @@ public sealed partial class DomBridge
         }
 
         if (referenceElement != null &&
+            lower.EndsWith("rem") &&
+            double.TryParse(lower[..^3], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var rem))
+        {
+            result = rem * ResolveFontSizeForLength(referenceElement, rootRelative: true);
+            return true;
+        }
+
+        if (referenceElement != null &&
+            lower.EndsWith("em") &&
+            double.TryParse(lower[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var em))
+        {
+            result = em * ResolveFontSizeForLength(referenceElement, rootRelative: false);
+            return true;
+        }
+
+        if (referenceElement != null &&
             lower.EndsWith("rlh") &&
             double.TryParse(lower[..^3], System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var rlh))
@@ -3525,13 +3543,24 @@ public sealed partial class DomBridge
         return ResolveLineHeightForElement(target);
     }
 
+    private double ResolveFontSizeForLength(DomElement element, bool rootRelative)
+    {
+        var target = rootRelative ? GetRootElement(element) : element;
+        return ResolveFontSizeForElement(target);
+    }
+
     private DomElement GetRootElement(DomElement element)
     {
+        DomElement? htmlElement = null;
         var current = element;
         while (current.Parent != null)
+        {
             current = current.Parent;
+            if (string.Equals(current.TagName, "html", StringComparison.OrdinalIgnoreCase))
+                htmlElement = current;
+        }
 
-        return current;
+        return htmlElement ?? current;
     }
 
     private double ResolveLineHeightForElement(DomElement element)
@@ -3558,7 +3587,7 @@ public sealed partial class DomBridge
     private double ResolveFontSizeForElement(DomElement element)
     {
         var props = GetComputedProps(element);
-        var fontSize = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("font-size"));
+        var fontSize = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("font-size"), element);
         return fontSize > 0 ? fontSize : 16;
     }
 

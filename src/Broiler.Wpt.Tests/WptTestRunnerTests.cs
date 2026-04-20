@@ -875,6 +875,148 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssValues_VhInherit_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: relative; background: green; width: 50vw; height: 100vh; }
+    #inner { position: absolute; background: green; left: 100%; width: inherit; height: inherit; }
+  </style>
+</head>
+<body>
+  <div id=""outer""><div id=""inner""></div></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: relative; background: green; width: 512px; height: 768px; }
+    #inner { position: absolute; background: green; left: 512px; width: 512px; height: 768px; }
+  </style>
+</head>
+<body>
+  <div id=""outer""><div id=""inner""></div></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-inherit");
+        Assert.True(result.Passed,
+            $"viewport-length inherit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_VhEmInherit_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; font-size: 100vw; }
+    #target { background: green; width: 1rem; height: 1em; font-size: 100vh; }
+  </style>
+</head>
+<body>
+  <div id=""target""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #target { background: green; width: 1024px; height: 768px; }
+  </style>
+</head>
+<body>
+  <div id=""target""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-em-inherit");
+        Assert.True(result.Passed,
+            $"viewport-sized font-relative lengths should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_VhInterpolateVh_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    @keyframes anim {
+      from { width: 75vw; height: 75vh; }
+      to   { width: 125vw; height: 125vh; }
+    }
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: relative; background: green; animation: anim 2000000s linear; animation-delay: -1000000s; }
+  </style>
+</head>
+<body>
+  <div id=""outer""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: green; overflow: hidden; }
+  </style>
+</head>
+<body></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-interpolate-vh");
+        Assert.True(result.Passed,
+            $"viewport-length animation interpolation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_VhInterpolatePct_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    @keyframes anim {
+      from { width: 0%; height: 0%; }
+      to   { width: 200vw; height: 200vh; }
+    }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    html { background: red; overflow: hidden; }
+    #outer { position: relative; background: green; animation: anim 2000000s linear; animation-delay: -1000000s; }
+  </style>
+</head>
+<body>
+  <div id=""outer""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: green; overflow: hidden; }
+  </style>
+</head>
+<body></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-interpolate-pct");
+        Assert.True(result.Passed,
+            $"mixed percentage and viewport animation interpolation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssViewport_ZoomScrollPadding_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>

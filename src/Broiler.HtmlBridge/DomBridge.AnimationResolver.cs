@@ -129,7 +129,7 @@ public sealed partial class DomBridge
     // Animation resolution
     // -----------------------------------------------------------------
 
-    private static void ResolveAnimationsOnTree(
+    private void ResolveAnimationsOnTree(
         DomElement element,
         Dictionary<string, List<KeyframeEntry>> keyframesMap)
     {
@@ -266,7 +266,7 @@ public sealed partial class DomBridge
         return false;
     }
 
-    private static void TryResolveAnimation(
+    private void TryResolveAnimation(
         DomElement element,
         Dictionary<string, List<KeyframeEntry>> keyframesMap,
         string? animationShorthand,
@@ -363,7 +363,7 @@ public sealed partial class DomBridge
 
         // Find the two surrounding keyframes and interpolate.
         // NOTE: The timing function is applied per-interval, not globally.
-        var resolvedProps = ResolveKeyframeProperties(keyframes, (float)rawProgress, timingFunction);
+        var resolvedProps = ResolveKeyframeProperties(element, keyframes, (float)rawProgress, timingFunction);
 
         // Apply resolved values as inline styles and remove animation properties.
         foreach (var kv in resolvedProps)
@@ -376,7 +376,8 @@ public sealed partial class DomBridge
         element.Style.Remove("animation-timing-function");
     }
 
-    private static Dictionary<string, string> ResolveKeyframeProperties(
+    private Dictionary<string, string> ResolveKeyframeProperties(
+        DomElement element,
         List<KeyframeEntry> keyframes, float progress, string timingFunction)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -434,7 +435,7 @@ public sealed partial class DomBridge
 
                     // Try color interpolation for background-color, color, etc.
                     var interpolated = TryInterpolateValue(
-                        prop, before.Properties[prop], after.Properties[prop], localProgress);
+                        element, prop, before.Properties[prop], after.Properties[prop], localProgress);
                     result[prop] = interpolated;
                 }
             }
@@ -653,7 +654,7 @@ public sealed partial class DomBridge
     /// Supports color values (rgb, rgba, named colors) and numeric values.
     /// Falls back to discrete stepping for unsupported value types.
     /// </summary>
-    private static string TryInterpolateValue(string prop, string fromValue, string toValue, float progress)
+    private string TryInterpolateValue(DomElement element, string prop, string fromValue, string toValue, float progress)
     {
         // Try color interpolation for color-related properties.
         if (IsColorProperty(prop))
@@ -676,9 +677,59 @@ public sealed partial class DomBridge
             }
         }
 
+        if (TryInterpolateLengthValue(element, prop, fromValue, toValue, progress, out var interpolatedLength))
+            return interpolatedLength;
+
         // Fallback: discrete stepping for non-interpolatable values.
         return progress >= 1.0f ? toValue : fromValue;
     }
+
+    private bool TryInterpolateLengthValue(
+        DomElement element,
+        string prop,
+        string fromValue,
+        string toValue,
+        float progress,
+        out string result)
+    {
+        result = string.Empty;
+        if (!IsLengthInterpolableProperty(prop))
+            return false;
+
+        var percentageBasis = GetInterpolationPercentageBasis(element, prop);
+        if (!TryEvaluateCssLengthWithViewport(fromValue, element, forLineHeight: false, percentageBasis, out var fromPx) ||
+            !TryEvaluateCssLengthWithViewport(toValue, element, forLineHeight: false, percentageBasis, out var toPx))
+        {
+            return false;
+        }
+
+        var interpolated = fromPx + ((toPx - fromPx) * progress);
+        result = interpolated.ToString("0.###", CultureInfo.InvariantCulture) + "px";
+        return true;
+    }
+
+    private double? GetInterpolationPercentageBasis(DomElement element, string prop)
+    {
+        return prop switch
+        {
+            "width" or "min-width" or "max-width" or "left" or "right" => ResolveContainingBlockReferenceLength(element, vertical: false),
+            "height" or "min-height" or "max-height" or "top" or "bottom" => ResolveContainingBlockReferenceLength(element, vertical: true),
+            "margin-left" or "margin-right" or "margin-top" or "margin-bottom" or
+            "padding-left" or "padding-right" or "padding-top" or "padding-bottom" =>
+                ResolveContainingBlockReferenceLength(element, vertical: false),
+            _ => null,
+        };
+    }
+
+    private static bool IsLengthInterpolableProperty(string prop) => prop switch
+    {
+        "width" or "height" or "min-width" or "min-height" or "max-width" or "max-height" or
+        "top" or "right" or "bottom" or "left" or
+        "margin-left" or "margin-right" or "margin-top" or "margin-bottom" or
+        "padding-left" or "padding-right" or "padding-top" or "padding-bottom" or
+        "font-size" => true,
+        _ => false,
+    };
 
     private static bool IsColorProperty(string prop) => prop switch
     {
