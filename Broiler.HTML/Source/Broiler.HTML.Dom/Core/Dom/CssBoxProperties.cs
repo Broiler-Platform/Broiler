@@ -1233,18 +1233,18 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     {
         var root = GetEffectiveRootBoxProperties();
 
-        const double defaultRootEmHeight = CssConstants.FontSize * (96.0 / 72.0);
+        const double baseRootEmHeight = CssConstants.FontSize * (96.0 / 72.0);
         if (!string.IsNullOrWhiteSpace(root.FontSize))
         {
             var resolved = CssValueParser.ParseLength(
                 root.FontSize,
-                defaultRootEmHeight,
-                defaultRootEmHeight,
+                baseRootEmHeight,
+                baseRootEmHeight,
                 null,
                 false,
                 false,
-                defaultRootEmHeight * 1.2,
-                defaultRootEmHeight * 1.2);
+                baseRootEmHeight * 1.2,
+                baseRootEmHeight * 1.2);
 
             if (!double.IsNaN(resolved) && resolved > 0)
                 return resolved;
@@ -1262,7 +1262,13 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         if (root is CssBox cssRoot)
         {
             while (cssRoot.HtmlTag == null && cssRoot.Boxes.Count == 1)
-                cssRoot = cssRoot.Boxes[0];
+            {
+                var child = cssRoot.Boxes[0];
+                if (ReferenceEquals(child, cssRoot))
+                    break;
+
+                cssRoot = child;
+            }
 
             root = cssRoot;
         }
