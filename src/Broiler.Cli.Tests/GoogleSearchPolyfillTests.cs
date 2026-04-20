@@ -1058,6 +1058,129 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Zoom_CssomView_Geometry_APIs_Use_Raw_Css_Pixels()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '8px';
+
+            function makeDiv(id, width, height, zoom, className) {
+                var div = document.createElement('div');
+                div.id = id;
+                div.style.width = width;
+                div.style.height = height;
+                div.style.backgroundColor = 'blue';
+                if (zoom) div.style.zoom = zoom;
+                if (className) div.className = className;
+                document.body.appendChild(div);
+                return div;
+            }
+
+            var noZoom = makeDiv('no_zoom', '64px', '64px');
+            var withZoom = makeDiv('with_zoom', '64px', '64px', '4');
+
+            var outer = document.createElement('div');
+            outer.style.zoom = '2';
+            var nested = makeDiv('nested_zoom', '64px', '64px', '4');
+            outer.appendChild(nested);
+            document.body.appendChild(outer);
+
+            var transformAndZoom = makeDiv('transform_and_zoom', '64px', '64px', '4');
+            transformAndZoom.style.transform = 'scale(2)';
+            transformAndZoom.style.transformOrigin = 'top left';
+
+            var noZoomRect = noZoom.getBoundingClientRect();
+            var withZoomRect = withZoom.getBoundingClientRect();
+            var nestedZoomRect = nested.getClientRects()[0];
+            var transformZoomRect = transformAndZoom.getBoundingClientRect();
+
+            document.getElementById('result').textContent =
+                [noZoomRect.left, noZoomRect.top, noZoomRect.width, noZoomRect.height].join(',') + '|' +
+                [withZoomRect.left, withZoomRect.top, withZoomRect.width, withZoomRect.height].join(',') + '|' +
+                [nestedZoomRect.left, nestedZoomRect.top, nestedZoomRect.width, nestedZoomRect.height].join(',') + '|' +
+                [transformZoomRect.width, transformZoomRect.height].join(',');
+        ");
+        Assert.Contains("8,8,64,64|8,72,256,256|8,328,512,512|512,512", result);
+    }
+
+    [Fact]
+    public void Zoom_Client_Scroll_And_Offset_Metrics_Stay_In_Raw_Css_Pixels()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '8px';
+            try {
+                function makeContainer(id, zoom, childZoom) {
+                    var container = document.createElement('div');
+                    container.id = id;
+                    container.style.width = '100px';
+                    container.style.height = '100px';
+                    container.style.overflow = 'scroll';
+                    if (zoom) container.style.zoom = zoom;
+
+                    var child = document.createElement('div');
+                    child.style.width = '250px';
+                    child.style.height = '250px';
+                    if (childZoom) child.style.zoom = childZoom;
+                    container.appendChild(child);
+                    document.body.appendChild(container);
+                    return container;
+                }
+
+                var noZoom = makeContainer('no_zoom_container', '', '');
+                var zoomed = makeContainer('zoomed_container', '4', '');
+                var zoomedContent = makeContainer('zoomed_content_container', '', '2');
+
+                noZoom.scrollTo(noZoom.scrollWidth / 2, noZoom.scrollHeight / 2);
+                zoomed.scrollTo(zoomed.scrollWidth / 2, zoomed.scrollHeight / 2);
+
+                var outer = document.createElement('div');
+                outer.style.zoom = '3';
+                outer.style.position = 'relative';
+                outer.style.width = '100px';
+                outer.style.height = '100px';
+                outer.style.margin = '10px';
+                outer.style.border = '1px solid black';
+
+                var rel = document.createElement('div');
+                rel.style.position = 'relative';
+                rel.style.top = '10px';
+                rel.style.left = '10px';
+                rel.style.width = '10px';
+                rel.style.height = '10px';
+                rel.style.margin = '1px';
+                outer.appendChild(rel);
+
+                var abs = document.createElement('div');
+                abs.style.position = 'absolute';
+                abs.style.top = '20px';
+                abs.style.left = '20px';
+                abs.style.zoom = '2';
+                abs.style.width = '10px';
+                abs.style.height = '10px';
+                abs.style.margin = '1px';
+                outer.appendChild(abs);
+
+                document.body.appendChild(outer);
+
+                document.getElementById('result').textContent =
+                    zoomed.clientWidth + ',' +
+                    zoomed.clientHeight + ',' +
+                    noZoom.scrollWidth + ',' +
+                    zoomed.scrollWidth + ',' +
+                    zoomedContent.scrollWidth + ',' +
+                    noZoom.scrollTop + ',' +
+                    zoomed.scrollTop + ',' +
+                    rel.offsetTop + ',' +
+                    rel.offsetLeft + ',' +
+                    abs.offsetTop + ',' +
+                    abs.offsetLeft;
+            } catch (e) {
+                document.getElementById('result').textContent = 'ERR:' + e;
+            }
+        ");
+        Assert.Contains("100,100,250,250,500,125,125,11,11,21,21", result);
+    }
+
+    [Fact]
     public void FontRelative_Lh_Units_Resolve_From_Parent_LineHeight_Under_Zoom()
     {
         var result = ExecJs(@"

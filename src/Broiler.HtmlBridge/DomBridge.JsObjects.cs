@@ -2980,6 +2980,12 @@ public sealed partial class DomBridge
 
                 var siblingRect = ComputeRenderedRect(sibling);
                 var siblingProps = GetComputedProps(sibling);
+                var siblingPosition = siblingProps.GetValueOrDefault("position");
+                if (string.Equals(siblingPosition, "absolute", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(siblingPosition, "fixed", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
                 baseTop += siblingRect.Height;
                 baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"), sibling);
                 baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"), sibling);
@@ -3204,6 +3210,12 @@ public sealed partial class DomBridge
                     continue;
 
                 var siblingProps = GetComputedProps(sibling);
+                var siblingPosition = siblingProps.GetValueOrDefault("position");
+                if (string.Equals(siblingPosition, "absolute", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(siblingPosition, "fixed", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
                 offset += ParseCssLengthToPixelsWithViewport(
                     siblingProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), sibling);
                 offset += ParseCssLengthToPixelsWithViewport(

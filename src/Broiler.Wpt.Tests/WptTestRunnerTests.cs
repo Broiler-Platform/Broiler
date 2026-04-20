@@ -501,6 +501,211 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssomView_ZoomGeometryApis_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <script>
+    document.body.style.margin = '8px';
+
+    var created = [];
+    var noZoom = document.createElement('div');
+    noZoom.style.width = '64px';
+    noZoom.style.height = '64px';
+    document.body.appendChild(noZoom);
+    created.push(noZoom);
+
+    var withZoom = document.createElement('div');
+    withZoom.style.width = '64px';
+    withZoom.style.height = '64px';
+    withZoom.style.zoom = '4';
+    document.body.appendChild(withZoom);
+    created.push(withZoom);
+
+    var parent = document.createElement('div');
+    parent.style.width = '64px';
+    parent.style.height = '64px';
+    parent.style.zoom = '2';
+    var nested = document.createElement('div');
+    nested.style.width = '64px';
+    nested.style.height = '64px';
+    nested.style.zoom = '4';
+    parent.appendChild(nested);
+    document.body.appendChild(parent);
+    created.push(parent);
+
+    var transformAndZoom = document.createElement('div');
+    transformAndZoom.style.width = '64px';
+    transformAndZoom.style.height = '64px';
+    transformAndZoom.style.zoom = '4';
+    transformAndZoom.style.transform = 'scale(2)';
+    transformAndZoom.style.transformOrigin = 'top left';
+    document.body.appendChild(transformAndZoom);
+    created.push(transformAndZoom);
+
+    var a = noZoom.getBoundingClientRect();
+    var b = withZoom.getBoundingClientRect();
+    var c = nested.getClientRects()[0];
+    var d = transformAndZoom.getBoundingClientRect();
+
+    var passed =
+      a.left === 8 && a.top === 8 && a.width === 64 && a.height === 64 &&
+      b.left === 8 && b.top === 72 && b.width === 256 && b.height === 256 &&
+      c.left === 8 && c.top === 328 && c.width === 512 && c.height === 512 &&
+      d.width === 512 && d.height === 512;
+
+    for (var i = 0; i < created.length; i++) {
+      created[i].parentNode.removeChild(created[i]);
+    }
+    document.body.style.margin = '0';
+    var pass = document.createElement('div');
+    pass.id = 'pass';
+    pass.style.width = '100px';
+    pass.style.height = '100px';
+    pass.style.background = passed ? 'green' : 'red';
+    document.body.appendChild(pass);
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "cssom-view-zoom-geometry");
+        Assert.True(result.Passed,
+            $"zoom geometry APIs should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ZoomScrollAndOffsetApis_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <script>
+    document.body.style.margin = '8px';
+
+    var created = [];
+    function makeContainer(zoom, childZoom) {
+      var container = document.createElement('div');
+      container.style.width = '100px';
+      container.style.height = '100px';
+      container.style.overflow = 'scroll';
+      if (zoom) container.style.zoom = zoom;
+      var child = document.createElement('div');
+      child.style.width = '250px';
+      child.style.height = '250px';
+      if (childZoom) child.style.zoom = childZoom;
+      container.appendChild(child);
+      document.body.appendChild(container);
+      created.push(container);
+      return container;
+    }
+
+    var noZoom = makeContainer(null, null);
+    var withZoom = makeContainer('4', null);
+    var zoomedContent = makeContainer(null, '2');
+
+    noZoom.scrollTo(noZoom.scrollWidth / 2, noZoom.scrollHeight / 2);
+    withZoom.scrollTo(withZoom.scrollWidth / 2, withZoom.scrollHeight / 2);
+
+    var outer = document.createElement('div');
+    outer.style.zoom = '3';
+    outer.style.width = '100px';
+    outer.style.height = '100px';
+    outer.style.border = '1px solid black';
+    outer.style.margin = '10px';
+    outer.style.position = 'relative';
+
+    var rel = document.createElement('div');
+    rel.style.position = 'relative';
+    rel.style.top = '10px';
+    rel.style.left = '10px';
+    rel.style.width = '10px';
+    rel.style.height = '10px';
+    rel.style.margin = '1px';
+    outer.appendChild(rel);
+
+    var abs = document.createElement('div');
+    abs.style.position = 'absolute';
+    abs.style.top = '20px';
+    abs.style.left = '20px';
+    abs.style.zoom = '2';
+    abs.style.width = '10px';
+    abs.style.height = '10px';
+    abs.style.margin = '1px';
+    outer.appendChild(abs);
+
+    document.body.appendChild(outer);
+
+    var passed =
+      withZoom.clientWidth === 100 &&
+      withZoom.clientHeight === 100 &&
+      noZoom.scrollWidth === 250 &&
+      withZoom.scrollWidth === 250 &&
+      zoomedContent.scrollWidth === 500 &&
+      noZoom.scrollTop === withZoom.scrollTop &&
+      noZoom.scrollLeft === withZoom.scrollLeft &&
+      noZoom.scrollTop === 125 &&
+      withZoom.scrollTop === 125 &&
+      rel.offsetTop === 11 &&
+      rel.offsetLeft === 11 &&
+      abs.offsetTop === 21 &&
+      abs.offsetLeft === 21;
+
+    created.push(outer);
+    for (var i = 0; i < created.length; i++) {
+      created[i].parentNode.removeChild(created[i]);
+    }
+    document.body.style.margin = '0';
+    var pass = document.createElement('div');
+    pass.id = 'pass';
+    pass.style.width = '100px';
+    pass.style.height = '100px';
+    pass.style.background = passed ? 'green' : 'red';
+    document.body.appendChild(pass);
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "cssom-view-zoom-scroll-offset");
+        Assert.True(result.Passed,
+            $"zoom scroll and offset APIs should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_ViewportMediaQueryLengths_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
