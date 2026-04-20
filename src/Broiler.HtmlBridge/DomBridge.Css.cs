@@ -104,6 +104,7 @@ public sealed partial class DomBridge
         ["isolation"] = "auto",
         ["filter"] = "none",
         ["writing-mode"] = "horizontal-tb",
+        ["zoom"] = "1",
     };
 
     private static readonly Regex StyleTagPattern = new(
@@ -122,6 +123,10 @@ public sealed partial class DomBridge
         @"::?[a-zA-Z-]+(?:\([^)]*\))?",
         RegexOptions.Compiled);
 
+    private static readonly Regex LengthAttrFunctionPattern = new(
+        @"attr\(\s*(?<name>[A-Za-z_][A-Za-z0-9_-]*)\s+type\(\s*<length>\s*\)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     /// <summary>
     /// Parsed CSS rules extracted from <c>&lt;style&gt;</c> blocks, stored as
     /// (selector, specificity, declarations) triples.
@@ -130,6 +135,57 @@ public sealed partial class DomBridge
 
     /// <summary>Parsed CSS rules from embedded style blocks.</summary>
     public IReadOnlyList<(string Selector, int Specificity, Dictionary<string, string> Declarations)> CssRules => _cssRules;
+
+    private static bool IsRecognizedLengthValue(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var trimmed = value.Trim();
+        return trimmed == "0" || !double.IsNaN(ParseCssLengthToPixels(trimmed));
+    }
+
+    private static void ResolveLengthAttrFunctions(
+        Dictionary<string, string> computed,
+        DomElement element)
+    {
+        foreach (var key in computed.Keys.ToList())
+        {
+            var value = computed[key];
+            if (string.IsNullOrWhiteSpace(value) ||
+                value.IndexOf("attr(", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                continue;
+            }
+
+            computed[key] = LengthAttrFunctionPattern.Replace(
+                value,
+                match =>
+                {
+                    var attrName = match.Groups["name"].Value;
+                    var fallback = match.Groups["fallback"].Success
+                        ? match.Groups["fallback"].Value.Trim()
+                        : string.Empty;
+                    var attributeValue = element.Attributes.TryGetValue(attrName, out var raw)
+                        ? raw.Trim()
+                        : string.Empty;
+
+                    if (!string.IsNullOrEmpty(attributeValue) &&
+                        IsRecognizedLengthValue(attributeValue))
+                    {
+                        return attributeValue;
+                    }
+
+                    if (!string.IsNullOrEmpty(fallback) &&
+                        IsRecognizedLengthValue(fallback))
+                    {
+                        return fallback;
+                    }
+
+                    return string.Empty;
+                });
+        }
+    }
 
     /// <summary>
     /// Calculates CSS Specificity (Level 3) for a simple selector.
@@ -285,21 +341,70 @@ public sealed partial class DomBridge
         // processing so that their internal selectors (e.g. "from", "50%", "to")
         // are not mistakenly added to _cssRules.
         cssText = StripBlockAtRules(cssText);
+        ExtractRulesFromCssWithMediaQueries(cssText);
+    }
 
-        var remaining = MediaQueryPattern.Replace(cssText, m =>
+    private void ExtractRulesFromCssWithMediaQueries(string cssText)
+    {
+        int pos = 0;
+        int lastRuleStart = 0;
+        while (pos < cssText.Length)
         {
-            var query = m.Groups["query"].Value.Trim();
-            var content = m.Groups["content"].Value;
+            SkipWhitespaceAndComments(cssText, ref pos);
+            if (pos >= cssText.Length)
+                break;
 
-            if (query.Contains("screen", StringComparison.OrdinalIgnoreCase) ||
-                query.Equals("all", StringComparison.OrdinalIgnoreCase))
+            if (cssText.Length >= pos + 6 &&
+                cssText.AsSpan(pos, 6).Equals("@media", StringComparison.OrdinalIgnoreCase))
             {
-                ExtractRulesFromCss(content);
-            }
-            return string.Empty;
-        });
+                if (pos > lastRuleStart)
+                    ExtractRulesFromCss(cssText[lastRuleStart..pos]);
 
-        ExtractRulesFromCss(remaining);
+                pos += 6;
+                SkipWhitespaceAndComments(cssText, ref pos);
+                int braceStart = IndexOfSkippingComments(cssText, '{', pos);
+                if (braceStart < 0)
+                    break;
+
+                var mediaQuery = StripCssComments(cssText[pos..braceStart]).Trim();
+                pos = braceStart + 1;
+
+                int depth = 1;
+                int blockStart = pos;
+                while (pos < cssText.Length && depth > 0)
+                {
+                    if (pos + 1 < cssText.Length && cssText[pos] == '/' && cssText[pos + 1] == '*')
+                    {
+                        pos += 2;
+                        while (pos + 1 < cssText.Length && !(cssText[pos] == '*' && cssText[pos + 1] == '/'))
+                            pos++;
+                        if (pos + 1 < cssText.Length)
+                            pos += 2;
+                    }
+                    else
+                    {
+                        if (cssText[pos] == '{') depth++;
+                        else if (cssText[pos] == '}') depth--;
+                        if (depth > 0)
+                            pos++;
+                    }
+                }
+
+                if (pos > blockStart && EvaluateMediaQuery(mediaQuery, _viewportWidth, _viewportHeight))
+                    ExtractRulesFromCss(cssText[blockStart..pos]);
+
+                if (pos < cssText.Length)
+                    pos++;
+
+                lastRuleStart = pos;
+                continue;
+            }
+
+            pos++;
+        }
+
+        if (lastRuleStart < cssText.Length)
+            ExtractRulesFromCss(cssText[lastRuleStart..]);
     }
 
     private void ExtractRulesFromCss(string css)
@@ -524,6 +629,7 @@ public sealed partial class DomBridge
             // This ensures that querying e.g. marginTop works when only the
             // shorthand "margin" was set in the stylesheet.
             ExpandCssShorthands(computed);
+            ResolveLengthAttrFunctions(computed, element);
 
             // Resolve relative font-weight keywords (bolder/lighter) to numeric
             // values per CSS 2.1 §15.6.  Real browsers always return the resolved
@@ -1646,29 +1752,29 @@ public sealed partial class DomBridge
             case "min-height":
                 if (value != null)
                 {
-                    var px = ParseCssLengthToPixels(value);
-                    return px >= 0 && viewportHeight >= px;
+                    var px = ParseCssLengthToPixels(value, viewportWidth, viewportHeight);
+                    return !double.IsNaN(px) && viewportHeight >= Math.Max(0, px);
                 }
                 return false;
             case "max-height":
                 if (value != null)
                 {
-                    var px = ParseCssLengthToPixels(value);
-                    return px >= 0 && viewportHeight <= px;
+                    var px = ParseCssLengthToPixels(value, viewportWidth, viewportHeight);
+                    return !double.IsNaN(px) && viewportHeight <= Math.Max(0, px);
                 }
                 return true; // No value = bare feature check; height exists
             case "min-width":
                 if (value != null)
                 {
-                    var px = ParseCssLengthToPixels(value);
-                    return px >= 0 && viewportWidth >= px;
+                    var px = ParseCssLengthToPixels(value, viewportWidth, viewportHeight);
+                    return !double.IsNaN(px) && viewportWidth >= Math.Max(0, px);
                 }
                 return false;
             case "max-width":
                 if (value != null)
                 {
-                    var px = ParseCssLengthToPixels(value);
-                    return px >= 0 && viewportWidth <= px;
+                    var px = ParseCssLengthToPixels(value, viewportWidth, viewportHeight);
+                    return !double.IsNaN(px) && viewportWidth <= Math.Max(0, px);
                 }
                 return true; // No value = bare feature check; width exists
             case "color":
@@ -1724,17 +1830,63 @@ public sealed partial class DomBridge
     /// Returns -1 if the value cannot be parsed.
     /// Default font size for em conversion is 16px.
     /// </summary>
-    private static double ParseCssLengthToPixels(string value)
+    private static double ParseCssLengthToPixels(string value, int viewportWidth = 0, int viewportHeight = 0)
     {
-        if (string.IsNullOrWhiteSpace(value)) return -1;
+        if (string.IsNullOrWhiteSpace(value)) return double.NaN;
 
-        var v = value.Trim().ToLowerInvariant();
+        var v = NormalizeSingleValueLengthFunction(value).Trim().ToLowerInvariant();
+        if (viewportHeight > 0 && v.EndsWith("vh"))
+        {
+            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var vh))
+            {
+                return (vh / 100.0) * viewportHeight;
+            }
+
+            return double.NaN;
+        }
+
+        if (viewportWidth > 0 && v.EndsWith("vw"))
+        {
+            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var vw))
+            {
+                return (vw / 100.0) * viewportWidth;
+            }
+
+            return double.NaN;
+        }
+
+        var viewportMin = Math.Min(viewportWidth, viewportHeight);
+        if (viewportMin > 0 && v.EndsWith("vmin"))
+        {
+            if (double.TryParse(v[..^4], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var vmin))
+            {
+                return (vmin / 100.0) * viewportMin;
+            }
+
+            return double.NaN;
+        }
+
+        var viewportMax = Math.Max(viewportWidth, viewportHeight);
+        if (viewportMax > 0 && v.EndsWith("vmax"))
+        {
+            if (double.TryParse(v[..^4], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var vmax))
+            {
+                return (vmax / 100.0) * viewportMax;
+            }
+
+            return double.NaN;
+        }
+
         if (v.EndsWith("px"))
         {
             if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var px))
                 return px;
-            return -1;
+            return double.NaN;
         }
         if (v.EndsWith("em") || v.EndsWith("rem"))
         {
@@ -1742,13 +1894,114 @@ public sealed partial class DomBridge
             if (double.TryParse(numStr, System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out var em))
                 return em * 16.0; // 1em = 16px default
-            return -1;
+            return double.NaN;
+        }
+        if (v.EndsWith("ex"))
+        {
+            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var ex))
+                return ex * 8.0; // Match the core parser's 1ex ≈ 0.5em approximation at 16px.
+            return double.NaN;
+        }
+        if (v.EndsWith("ch"))
+        {
+            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var ch))
+                return ch * 8.0; // Approximate 1ch as 8px for a 16px monospace glyph advance.
+            return double.NaN;
+        }
+        if (v.EndsWith("ic"))
+        {
+            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var ic))
+                return ic * 16.0; // Approximate 1ic as 1em for the current focused Phase 3 slice.
+            return double.NaN;
+        }
+        if (v.EndsWith("rlh"))
+        {
+            if (double.TryParse(v[..^3], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var rlh))
+                return rlh * 19.2; // Approximate 1rlh as the default 16px root line-height × 1.2.
+            return double.NaN;
+        }
+        if (v.EndsWith("lh"))
+        {
+            if (double.TryParse(v[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var lh))
+                return lh * 19.2; // Approximate 1lh as the default 16px line-height × 1.2.
+            return double.NaN;
         }
         // Plain number (treat as pixels)
         if (double.TryParse(v, System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out var raw))
             return raw;
-        return -1;
+        return double.NaN;
+    }
+
+    private static string NormalizeSingleValueLengthFunction(string value)
+    {
+        var current = value.Trim();
+        while (TryUnwrapSingleValueFunction(current, "calc", out var inner) ||
+               TryUnwrapSingleValueFunction(current, "max", out inner) ||
+               TryUnwrapSingleValueFunction(current, "min", out inner))
+        {
+            current = inner.Trim();
+        }
+
+        while (current.Length >= 2 && current[0] == '(' && current[^1] == ')' && HasBalancedParens(current[1..^1]))
+            current = current[1..^1].Trim();
+
+        return current;
+    }
+
+    private static bool TryUnwrapSingleValueFunction(string value, string functionName, out string inner)
+    {
+        inner = string.Empty;
+        if (!value.StartsWith(functionName + "(", StringComparison.OrdinalIgnoreCase) || value[^1] != ')')
+            return false;
+
+        var content = value[(functionName.Length + 1)..^1];
+        if (!HasBalancedParens(content))
+            return false;
+
+        var depth = 0;
+        foreach (var ch in content)
+        {
+            switch (ch)
+            {
+                case '(':
+                    depth++;
+                    break;
+                case ')':
+                    depth--;
+                    break;
+                case ',' when depth == 0:
+                    return false;
+            }
+        }
+
+        inner = content;
+        return true;
+    }
+
+    private static bool HasBalancedParens(string value)
+    {
+        var depth = 0;
+        foreach (var ch in value)
+        {
+            if (ch == '(')
+            {
+                depth++;
+            }
+            else if (ch == ')')
+            {
+                depth--;
+                if (depth < 0)
+                    return false;
+            }
+        }
+
+        return depth == 0;
     }
 
     /// <summary>
@@ -1801,6 +2054,10 @@ public sealed partial class DomBridge
     /// </summary>
     private (int Width, int Height) GetViewportForDocRoot(DomElement docRoot)
     {
+        if (ReferenceEquals(docRoot, DocumentElement) ||
+            string.Equals(docRoot.TagName, "#document", StringComparison.OrdinalIgnoreCase))
+            return (_viewportWidth, _viewportHeight);
+
         // Walk up from docRoot to find the containing iframe/object element
         // The docRoot is typically a #subdoc-root child of the iframe element
         var parent = docRoot.Parent;
@@ -1830,7 +2087,7 @@ public sealed partial class DomBridge
         var semiIdx = style.IndexOf(';', colonIdx);
         var valueStr = semiIdx >= 0 ? style[(colonIdx + 1)..semiIdx].Trim() : style[(colonIdx + 1)..].Trim();
         var px = ParseCssLengthToPixels(valueStr);
-        return px >= 0 ? (int)px : 0;
+        return !double.IsNaN(px) ? (int)px : 0;
     }
 
     /// <summary>

@@ -1040,6 +1040,10 @@ public sealed partial class DomBridge
         foreach (var kv in element.Style)
             props[kv.Key] = kv.Value;
 
+        ExpandCssShorthands(props);
+        ResolveLengthAttrFunctions(props, element);
+        ResolveExplicitInheritedValues(props, element);
+
         // Expand the inset shorthand → top, right, bottom, left so that
         // downstream code (ComputeElementBox, TryApplyFallback, etc.) can
         // read the individual inset properties directly.
@@ -1062,6 +1066,32 @@ public sealed partial class DomBridge
         }
 
         return props;
+    }
+
+    private void ResolveExplicitInheritedValues(Dictionary<string, string> props, DomElement element)
+    {
+        Dictionary<string, string>? parentProps = null;
+        foreach (var key in props.Keys.ToList())
+        {
+            var value = props[key];
+            if (!string.Equals(value?.Trim(), "inherit", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (element.Parent != null)
+            {
+                parentProps ??= GetComputedProps(element.Parent);
+                if (parentProps.TryGetValue(key, out var parentValue) && !string.IsNullOrWhiteSpace(parentValue))
+                {
+                    props[key] = parentValue;
+                    continue;
+                }
+            }
+
+            if (CssInitialValues.TryGetValue(key, out var initialValue))
+                props[key] = initialValue;
+            else
+                props.Remove(key);
+        }
     }
 
     /// <summary>

@@ -635,19 +635,21 @@ internal class CssBox : CssBoxProperties, IDisposable
                 if (Width != CssConstants.Auto && !string.IsNullOrEmpty(Width))
                 {
                     double containingWidth = width;
-                    width = CssValueParser.ParseLength(Width, containingWidth, GetEmHeight());
+                    width = string.Equals(Width, "inherit", StringComparison.OrdinalIgnoreCase) && GetParent() != null
+                        ? GetParent().ActualWidth
+                        : ParseLengthWithLineHeight(Width, containingWidth);
 
                     // CSS2.1 §10.4: Apply max-width constraint
                     if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
                     {
-                        double maxW = CssValueParser.ParseLength(MaxWidth, containingWidth, GetEmHeight());
+                        double maxW = ParseLengthWithLineHeight(MaxWidth, containingWidth);
                         if (width > maxW) width = maxW;
                     }
 
                     // CSS2.1 §10.4: Apply min-width constraint (min wins over max per §10.4)
                     if (MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
                     {
-                        double minW = CssValueParser.ParseLength(MinWidth, containingWidth, GetEmHeight());
+                        double minW = ParseLengthWithLineHeight(MinWidth, containingWidth);
                         if (width < minW) width = minW;
                     }
 
@@ -676,7 +678,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                 // max-width.
                 if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
                 {
-                    double maxW = CssValueParser.ParseLength(MaxWidth, width, GetEmHeight());
+                    double maxW = ParseLengthWithLineHeight(MaxWidth, width);
                     maxW = ResolveSpecifiedWidthToBorderBox(maxW);
                     if (width > maxW) width = maxW;
                 }
@@ -685,7 +687,7 @@ internal class CssBox : CssBoxProperties, IDisposable
                 // max per §10.4) — also when Width is auto.
                 if (MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
                 {
-                    double minW = CssValueParser.ParseLength(MinWidth, width, GetEmHeight());
+                    double minW = ParseLengthWithLineHeight(MinWidth, width);
                     minW = ResolveSpecifiedWidthToBorderBox(minW);
                     if (width < minW) width = minW;
                 }
@@ -768,12 +770,12 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                     if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
                     {
-                        double maxW = CssValueParser.ParseLength(MaxWidth, width, GetEmHeight());
+                        double maxW = ParseLengthWithLineHeight(MaxWidth, width);
                         if (stfWidth > maxW) stfWidth = maxW;
                     }
                     if (MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
                     {
-                        double minW = CssValueParser.ParseLength(MinWidth, width, GetEmHeight());
+                        double minW = ParseLengthWithLineHeight(MinWidth, width);
                         if (stfWidth < minW) stfWidth = minW;
                     }
 
@@ -802,12 +804,12 @@ internal class CssBox : CssBoxProperties, IDisposable
 
                     if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
                     {
-                        double maxW = CssValueParser.ParseLength(MaxWidth, width, GetEmHeight());
+                        double maxW = ParseLengthWithLineHeight(MaxWidth, width);
                         if (stfWidth > maxW) stfWidth = maxW;
                     }
                     if (MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
                     {
-                        double minW = CssValueParser.ParseLength(MinWidth, width, GetEmHeight());
+                        double minW = ParseLengthWithLineHeight(MinWidth, width);
                         if (stfWidth < minW) stfWidth = minW;
                     }
 
@@ -1471,7 +1473,9 @@ internal class CssBox : CssBoxProperties, IDisposable
                 }
                 else
                 {
-                    contentHeight = ActualHeight;
+                    contentHeight = string.Equals(Height, "inherit", StringComparison.OrdinalIgnoreCase) && GetParent() != null
+                        ? GetParent().ActualHeight
+                        : ActualHeight;
                 }
 
                 double borderBoxHeight = ResolveSpecifiedHeightToBorderBox(contentHeight);
@@ -2386,6 +2390,13 @@ internal class CssBox : CssBoxProperties, IDisposable
 
     protected override sealed CssBoxProperties GetParent() => _parentBox;
 
+    internal void InvalidateFontDependentSubtree()
+    {
+        InvalidateFontDependentValues();
+        foreach (var child in Boxes)
+            child.InvalidateFontDependentSubtree();
+    }
+
     private int GetIndexForList()
     {
         // Phase 2: Read list attributes from CssBoxProperties instead of GetAttribute().
@@ -2526,7 +2537,7 @@ internal class CssBox : CssBoxProperties, IDisposable
             {
                 // Explicit width: use declared width + borders/padding
                 double containingBlockWidth = Size.Width > 0 && !double.IsNaN(Size.Width) ? Size.Width : 0;
-                childWidth = CssValueParser.ParseLength(child.Width, containingBlockWidth, child.GetEmHeight())
+                childWidth = child.ParseLengthWithLineHeight(child.Width, containingBlockWidth)
                            + child.ActualBorderLeftWidth + child.ActualBorderRightWidth
                            + child.ActualPaddingLeft + child.ActualPaddingRight;
             }

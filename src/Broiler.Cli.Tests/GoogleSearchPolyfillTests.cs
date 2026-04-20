@@ -173,6 +173,1130 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("TOP:0", result);
     }
 
+    [Fact]
+    public void Element_ClientDimensions_Ignore_Zoom()
+    {
+        var result = ExecJs(@"
+            var plain = document.createElement('div');
+            plain.style.width = '64px';
+            plain.style.height = '64px';
+            var zoomed = document.createElement('div');
+            zoomed.style.width = '64px';
+            zoomed.style.height = '64px';
+            zoomed.style.zoom = '4';
+            document.body.appendChild(plain);
+            document.body.appendChild(zoomed);
+            document.getElementById('result').textContent =
+                'PW:' + plain.clientWidth + ',ZW:' + zoomed.clientWidth + ',ZH:' + zoomed.clientHeight;
+        ");
+        Assert.Contains("PW:64,ZW:64,ZH:64", result);
+    }
+
+    [Fact]
+    public void Element_BoundingClientRect_Scales_With_Zoom()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var zoomed = document.createElement('div');
+            zoomed.style.width = '64px';
+            zoomed.style.height = '64px';
+            zoomed.style.zoom = '4';
+            document.body.appendChild(zoomed);
+            var rect = zoomed.getBoundingClientRect();
+            document.getElementById('result').textContent = 'W:' + rect.width + ',H:' + rect.height;
+        ");
+        Assert.Contains("W:256,H:256", result);
+    }
+
+    [Fact]
+    public void Element_ScrollTo_Updates_ScrollOffsets()
+    {
+        var result = ExecJs(@"
+            var container = document.createElement('div');
+            container.style.width = '100px';
+            container.style.height = '100px';
+            container.style.overflow = 'scroll';
+            var content = document.createElement('div');
+            content.style.width = '250px';
+            content.style.height = '250px';
+            container.appendChild(content);
+            document.body.appendChild(container);
+            container.scrollTo(13, 27);
+            document.getElementById('result').textContent = 'L:' + container.scrollLeft + ',T:' + container.scrollTop;
+        ");
+        Assert.Contains("L:13,T:27", result);
+    }
+
+    [Fact]
+    public void Element_Scroll_Alias_And_Object_Arguments_Update_Offsets()
+    {
+        var result = ExecJs(@"
+            var container = document.createElement('div');
+            container.style.width = '100px';
+            container.style.height = '100px';
+            container.style.overflow = 'scroll';
+            var content = document.createElement('div');
+            content.style.width = '250px';
+            content.style.height = '250px';
+            container.appendChild(content);
+            document.body.appendChild(container);
+            container.scroll(50, 60);
+            container.scrollTo({ left: 75 });
+            container.scrollBy({ top: 15 });
+            container.scroll({});
+            document.getElementById('result').textContent = 'L:' + container.scrollLeft + ',T:' + container.scrollTop;
+        ");
+        Assert.Contains("L:75,T:75", result);
+    }
+
+    [Fact]
+    public void Element_ScrollOffsets_Clamp_And_Respect_WritingMode_Direction()
+    {
+        var result = ExecJs(@"
+            function makeScroller(writingMode, direction) {
+                var scroller = document.createElement('div');
+                scroller.style.overflow = 'scroll';
+                scroller.style.width = '150px';
+                scroller.style.height = '100px';
+                scroller.style.writingMode = writingMode;
+                scroller.style.direction = direction;
+
+                var content = document.createElement('div');
+                content.style.width = '300px';
+                content.style.height = '400px';
+                scroller.appendChild(content);
+                document.body.appendChild(scroller);
+
+                scroller.scrollLeft = writingMode === 'vertical-lr' || direction !== 'rtl' ? 999 : -999;
+                scroller.scrollTop = direction === 'rtl' && writingMode !== 'horizontal-tb' ? -999 : 999;
+                return scroller.scrollLeft + ',' + scroller.scrollTop;
+            }
+
+            document.getElementById('result').textContent = [
+                makeScroller('horizontal-tb', 'ltr'),
+                makeScroller('horizontal-tb', 'rtl'),
+                makeScroller('vertical-lr', 'ltr'),
+                makeScroller('vertical-lr', 'rtl'),
+                makeScroller('vertical-rl', 'ltr'),
+                makeScroller('vertical-rl', 'rtl')
+            ].join('|');
+        ");
+        Assert.Contains("150,300|-150,300|150,300|150,-300|0,300|-150,-300", result);
+    }
+
+    [Fact]
+    public void Element_ClientMetrics_Ignore_Effective_Zoom()
+    {
+        var result = ExecJs(@"
+            function makeBox(zoom) {
+                var el = document.createElement('div');
+                el.style.width = '64px';
+                el.style.height = '64px';
+                if (zoom) {
+                    el.style.zoom = zoom;
+                }
+                return el;
+            }
+
+            var noZoom = makeBox();
+            var zoomed = makeBox('4');
+            var zoomedParent = makeBox('4');
+            var directChild = makeBox();
+            var wrapper = document.createElement('div');
+            var indirectChild = makeBox();
+            var bothZoomed = makeBox('4');
+
+            wrapper.appendChild(indirectChild);
+            zoomedParent.appendChild(directChild);
+            zoomedParent.appendChild(wrapper);
+            zoomedParent.appendChild(bothZoomed);
+
+            document.body.appendChild(noZoom);
+            document.body.appendChild(zoomed);
+            document.body.appendChild(zoomedParent);
+
+            var same =
+                zoomed.clientTop === noZoom.clientTop &&
+                zoomed.clientLeft === noZoom.clientLeft &&
+                zoomed.clientWidth === noZoom.clientWidth &&
+                zoomed.clientHeight === noZoom.clientHeight &&
+                directChild.clientWidth === noZoom.clientWidth &&
+                indirectChild.clientHeight === noZoom.clientHeight &&
+                bothZoomed.clientWidth === noZoom.clientWidth;
+
+            document.getElementById('result').textContent =
+                'OK:' + same + ',W:' + noZoom.clientWidth + ',H:' + noZoom.clientHeight +
+                ',T:' + noZoom.clientTop + ',L:' + noZoom.clientLeft;
+        ");
+        Assert.Contains("OK:true,W:64,H:64,T:0,L:0", result);
+    }
+
+    [Fact]
+    public void Element_ClientAndScrollMetrics_Include_Padding_Without_Counting_Internal_Negative_Margins_As_Overflow()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function makeContainer(zoom) {
+                var container = document.createElement('div');
+                container.style.width = '20px';
+                container.style.height = '20px';
+                container.style.padding = '10px 20px';
+                container.style.overflow = 'auto';
+                if (zoom) {
+                    container.style.zoom = zoom;
+                }
+
+                var child = document.createElement('div');
+                child.style.width = '20px';
+                child.style.height = '20px';
+                child.style.margin = '-5px -7px';
+                container.appendChild(child);
+                document.body.appendChild(container);
+                return [
+                    container.clientWidth,
+                    container.clientHeight,
+                    container.scrollWidth,
+                    container.scrollHeight
+                ].join(',');
+            }
+
+            document.getElementById('result').textContent =
+                makeContainer('1') + '|' + makeContainer('2');
+        ");
+        Assert.Contains("60,40,60,40|60,40,60,40", result);
+    }
+
+    [Fact]
+    public void Element_ScrollMetrics_Include_Child_Zoom_Overflow_In_Raw_Css_Pixels()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function measure(containerZoom, childZoom) {
+                var container = document.createElement('div');
+                container.style.width = '20px';
+                container.style.height = '20px';
+                container.style.padding = '10px 20px';
+                container.style.overflow = 'auto';
+                if (containerZoom) {
+                    container.style.zoom = containerZoom;
+                }
+
+                var child = document.createElement('div');
+                child.style.width = '20px';
+                child.style.height = '20px';
+                if (childZoom) {
+                    child.style.zoom = childZoom;
+                }
+
+                container.appendChild(child);
+                document.body.appendChild(container);
+                return [
+                    container.clientWidth,
+                    container.clientHeight,
+                    container.scrollWidth,
+                    container.scrollHeight
+                ].join(',');
+            }
+
+            document.getElementById('result').textContent =
+                measure('', '2') + '|' +
+                measure('2', '') + '|' +
+                measure('2', '2');
+        ");
+        Assert.Contains("60,40,80,60|60,40,60,40|60,40,80,60", result);
+    }
+
+    [Fact]
+    public void Element_OffsetDimensions_Exclude_Target_Zoom_But_Include_Borders()
+    {
+        var result = ExecJs(@"
+            function makeOuter(margin) {
+                var el = document.createElement('div');
+                el.style.width = '100px';
+                el.style.height = '100px';
+                el.style.border = '1px solid black';
+                el.style.position = 'relative';
+                el.style.margin = margin || '10px';
+                return el;
+            }
+
+            function makeSquare(zoom) {
+                var el = document.createElement('div');
+                el.style.width = '10px';
+                el.style.height = '10px';
+                el.style.margin = '1px';
+                el.style.position = 'relative';
+                el.style.top = '10px';
+                el.style.left = '10px';
+                if (zoom) {
+                    el.style.zoom = zoom;
+                }
+                return el;
+            }
+
+            var unzoomedOuter = makeOuter();
+            var unzoomed = makeSquare();
+            unzoomedOuter.appendChild(unzoomed);
+
+            var zoomedOuter = makeOuter();
+            zoomedOuter.style.zoom = '3';
+            var zoomed = makeSquare('2');
+            zoomedOuter.appendChild(zoomed);
+
+            var outerDiv = makeOuter('30px');
+            outerDiv.id = 'outer_div';
+            var middle = document.createElement('div');
+            middle.style.margin = '10px';
+            middle.style.zoom = '2';
+            var unzoomedInner = document.createElement('div');
+            unzoomedInner.style.width = '10px';
+            unzoomedInner.style.height = '10px';
+            unzoomedInner.style.margin = '1px';
+            middle.appendChild(unzoomedInner);
+            outerDiv.appendChild(middle);
+
+            var outerDiv2 = makeOuter('30px');
+            var unzoomedMiddle = document.createElement('div');
+            var zoomedInner = document.createElement('div');
+            zoomedInner.style.zoom = '2';
+            zoomedInner.style.width = '100px';
+            zoomedInner.style.height = '100px';
+            zoomedInner.style.margin = '1px';
+            zoomedInner.style.border = '1px solid black';
+            unzoomedMiddle.appendChild(zoomedInner);
+            outerDiv2.appendChild(unzoomedMiddle);
+
+            document.body.appendChild(unzoomedOuter);
+            document.body.appendChild(zoomedOuter);
+            document.body.appendChild(outerDiv);
+            document.body.appendChild(outerDiv2);
+
+            var ok =
+                unzoomed.offsetWidth === zoomed.offsetWidth &&
+                unzoomed.offsetHeight === zoomed.offsetHeight &&
+                zoomedInner.offsetWidth === outerDiv.offsetWidth &&
+                zoomedInner.offsetHeight === outerDiv.offsetHeight;
+
+            document.getElementById('result').textContent =
+                'OK:' + ok + ',UW:' + unzoomed.offsetWidth + ',ZW:' + zoomed.offsetWidth +
+                ',IW:' + zoomedInner.offsetWidth + ',OW:' + outerDiv.offsetWidth;
+        ");
+        Assert.Contains("OK:true,UW:10,ZW:10,IW:102,OW:102", result);
+    }
+
+    [Fact]
+    public void Element_OffsetPosition_Uses_OffsetParent_And_Excludes_Target_Zoom()
+    {
+        var result = ExecJs(@"
+            function makeOuter(margin, zoom) {
+                var el = document.createElement('div');
+                el.style.width = '100px';
+                el.style.height = '100px';
+                el.style.border = '1px solid black';
+                el.style.position = 'relative';
+                el.style.margin = margin || '10px';
+                if (zoom) {
+                    el.style.zoom = zoom;
+                }
+                return el;
+            }
+
+            function makeSquare(className) {
+                var el = document.createElement('div');
+                el.style.width = '10px';
+                el.style.height = '10px';
+                el.style.margin = '1px';
+                if (className === 'one') {
+                    el.style.position = 'relative';
+                    el.style.top = '10px';
+                    el.style.left = '10px';
+                } else if (className === 'two') {
+                    el.style.position = 'absolute';
+                    el.style.top = '20px';
+                    el.style.left = '20px';
+                    el.style.zoom = '2';
+                } else if (className === 'three') {
+                    el.style.position = 'absolute';
+                    el.style.top = '10px';
+                    el.style.left = '50px';
+                    el.style.zoom = '0.5';
+                }
+                return el;
+            }
+
+            var unzoomedOuter = makeOuter();
+            var unzoomedOne = makeSquare('one');
+            var unzoomedTwo = makeSquare('two');
+            var unzoomedThree = makeSquare('three');
+            unzoomedOuter.appendChild(unzoomedOne);
+            unzoomedOuter.appendChild(unzoomedTwo);
+            unzoomedOuter.appendChild(unzoomedThree);
+
+            var zoomedOuter = makeOuter('10px', '3');
+            var zoomedOne = makeSquare('one');
+            var zoomedTwo = makeSquare('two');
+            var zoomedThree = makeSquare('three');
+            zoomedOuter.appendChild(zoomedOne);
+            zoomedOuter.appendChild(zoomedTwo);
+            zoomedOuter.appendChild(zoomedThree);
+
+            var outerDiv = makeOuter('30px');
+            var zoomedMiddle = document.createElement('div');
+            zoomedMiddle.style.margin = '10px';
+            zoomedMiddle.style.zoom = '2';
+            var unzoomedInner = document.createElement('div');
+            unzoomedInner.style.width = '10px';
+            unzoomedInner.style.height = '10px';
+            unzoomedInner.style.margin = '1px';
+            zoomedMiddle.appendChild(unzoomedInner);
+            outerDiv.appendChild(zoomedMiddle);
+
+            var outerDiv2 = makeOuter('30px');
+            var unzoomedMiddle = document.createElement('div');
+            var zoomedInner = document.createElement('div');
+            zoomedInner.style.zoom = '2';
+            zoomedInner.style.width = '100px';
+            zoomedInner.style.height = '100px';
+            zoomedInner.style.margin = '1px';
+            zoomedInner.style.border = '1px solid black';
+            unzoomedMiddle.appendChild(zoomedInner);
+            outerDiv2.appendChild(unzoomedMiddle);
+
+            document.body.appendChild(unzoomedOuter);
+            document.body.appendChild(zoomedOuter);
+            document.body.appendChild(outerDiv);
+            document.body.appendChild(outerDiv2);
+
+            document.getElementById('result').textContent = 'VALUES:' + [
+                unzoomedOne.offsetTop, unzoomedOne.offsetLeft,
+                unzoomedTwo.offsetTop, unzoomedTwo.offsetLeft,
+                unzoomedThree.offsetTop, unzoomedThree.offsetLeft,
+                zoomedOne.offsetTop, zoomedOne.offsetLeft,
+                zoomedTwo.offsetTop, zoomedTwo.offsetLeft,
+                zoomedThree.offsetTop, zoomedThree.offsetLeft,
+                unzoomedInner.offsetTop, unzoomedInner.offsetLeft,
+                zoomedInner.offsetTop, zoomedInner.offsetLeft
+            ].join(',');
+        ");
+        Assert.Contains("VALUES:11,11,21,21,11,51,11,11,21,21,11,51,10,11,0,1", result);
+    }
+
+    [Fact]
+    public void MatchMedia_Uses_Viewport_Dimensions_And_Viewport_Lengths()
+    {
+        var result = ExecJs(@"
+            var checks = [
+                window.matchMedia('(min-width: 1000px)').matches,
+                window.matchMedia('(min-height: 700px)').matches,
+                window.matchMedia('(min-width: 50vw)').matches,
+                window.matchMedia('(max-height: calc(100vh))').matches,
+                window.matchMedia('(min-width: 2000px)').matches
+            ];
+
+            document.getElementById('result').textContent = checks.join(',');
+        ");
+        Assert.Contains("true,true,true,true,false", result);
+    }
+
+    [Fact]
+    public void MatchMedia_Uses_Vmin_And_Vmax_Viewport_Lengths()
+    {
+        var result = ExecJs(@"
+            var checks = [
+                window.matchMedia('(min-width: 50vmin)').matches,
+                window.matchMedia('(min-width: 90vmax)').matches,
+                window.matchMedia('(max-width: 200vmax)').matches
+            ];
+
+            document.getElementById('result').textContent = checks.join(',');
+        ");
+        Assert.Contains("true,true,true", result);
+    }
+
+    [Fact]
+    public void MediaQueries_Use_MainDocument_Viewport_Lengths_In_Computed_Styles()
+    {
+        var result = ExecJs(@"
+            var style = document.createElement('style');
+            style.textContent = `
+                #target { width: 20px; height: 20px; }
+                @media (min-width: 50vw) and (max-height: calc(100vh)) {
+                    #target { width: 40px; }
+                }
+            `;
+            document.head.appendChild(style);
+
+            var target = document.createElement('div');
+            target.id = 'target';
+            document.body.appendChild(target);
+
+            document.getElementById('result').textContent =
+                window.getComputedStyle(target).width;
+        ");
+        Assert.Contains("40px", result);
+    }
+
+    [Fact]
+    public void MediaQueries_Use_Vmin_And_Vmax_Lengths_In_Computed_Styles()
+    {
+        var result = ExecJs(@"
+            var style = document.createElement('style');
+            style.textContent = `
+                #target { width: 20px; height: 20px; }
+                @media (min-width: 50vmin) and (max-width: 200vmax) {
+                    #target { width: 40px; }
+                }
+            `;
+            document.head.appendChild(style);
+
+            var target = document.createElement('div');
+            target.id = 'target';
+            document.body.appendChild(target);
+
+            document.getElementById('result').textContent =
+                window.getComputedStyle(target).width;
+        ");
+        Assert.Contains("40px", result);
+    }
+
+    [Fact]
+    public void MatchMedia_Clamps_Negative_Calc_Lengths_To_Zero()
+    {
+        var result = ExecJs(@"
+            document.getElementById('result').textContent =
+                'MATCH:' + window.matchMedia('(min-width: calc(-100px))').matches;
+        ");
+        Assert.Contains("MATCH:true", result);
+    }
+
+    [Fact]
+    public void Viewport_Calc_Lengths_Resolve_In_BoundingClientRect()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.width = 'calc(100vw + 50px)';
+            target.style.height = 'calc(100vh + 50px)';
+            target.style.left = '-50px';
+            target.style.top = '-50px';
+            document.body.appendChild(target);
+
+            var rect = target.getBoundingClientRect();
+            document.getElementById('result').textContent =
+                'RECT:' + rect.left + ',' + rect.top + ',' + rect.width + ',' + rect.height;
+        ");
+        Assert.Contains("RECT:-50,-50,1074,818", result);
+    }
+
+    [Fact]
+    public void Viewport_Calc_Lengths_With_Percentages_Resolve_In_BoundingClientRect()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.width = 'calc(100vw + 50%)';
+            target.style.height = 'calc(100vh + 50%)';
+            target.style.left = '-50%';
+            target.style.top = '-50%';
+            document.body.appendChild(target);
+
+            var rect = target.getBoundingClientRect();
+            document.getElementById('result').textContent =
+                'RECT:' + rect.left + ',' + rect.top + ',' + rect.width + ',' + rect.height;
+        ");
+        Assert.Contains("RECT:-512,-384,1536,1152", result);
+    }
+
+    [Fact]
+    public void Viewport_Lengths_Can_Be_Explicitly_Inherited_And_Feed_Rem_And_Em_Font_Sizes()
+    {
+        var result = CaptureService.ExecuteScriptsWithDom(@"<!doctype html>
+<html><head><title>Test</title>
+<style>
+html, body { margin:0; padding:0; }
+#outer { position:relative; background:green; width:50vw; height:100vh; }
+#inner { position:absolute; background:green; left:100%; width:inherit; height:inherit; }
+html { font-size:100vw; }
+#target { background:green; width:1rem; height:1em; font-size:100vh; }
+</style>
+</head>
+<body>
+<div id=""result""></div>
+<div id=""outer""><div id=""inner""></div></div>
+<div id=""target""></div>
+<script>
+var outerRect = document.getElementById('outer').getBoundingClientRect();
+var innerRect = document.getElementById('inner').getBoundingClientRect();
+var targetRect = document.getElementById('target').getBoundingClientRect();
+document.getElementById('result').textContent =
+  [outerRect.width, outerRect.height, innerRect.left, innerRect.width, innerRect.height, targetRect.width, targetRect.height].join(',');
+</script>
+</body></html>", "https://www.google.com");
+        Assert.Contains("512,768,512,512,768,1024,768", result);
+    }
+
+    [Fact]
+    public void Viewport_Lengths_Interpolate_In_Animation_Snapshots()
+    {
+        var result = CaptureService.ExecuteScriptsWithDom(@"<!doctype html>
+<html><head><title>Test</title>
+<style>
+@keyframes vhAnim {
+  from { width: 75vw; height: 75vh; }
+  to   { width: 125vw; height: 125vh; }
+}
+@keyframes mixedAnim {
+  from { width: 0%; height: 0%; }
+  to   { width: 200vw; height: 200vh; }
+}
+html, body { margin:0; padding:0; height:100%; }
+.box { position:relative; background:green; }
+#vh-box { animation: vhAnim 2000000s linear; animation-delay: -1000000s; }
+#mixed-box { animation: mixedAnim 2000000s linear; animation-delay: -1000000s; }
+</style>
+</head>
+<body>
+<div id=""result""></div>
+<div id=""vh-box"" class=""box""></div>
+<div id=""mixed-box"" class=""box""></div>
+<script>
+var vhRect = document.getElementById('vh-box').getBoundingClientRect();
+var mixedRect = document.getElementById('mixed-box').getBoundingClientRect();
+document.getElementById('result').textContent =
+  [vhRect.width, vhRect.height, mixedRect.width, mixedRect.height].join(',');
+</script>
+</body></html>", "https://www.google.com");
+        Assert.Contains("id=\"vh-box\" class=\"box\" style=\"width: 1024px; height: 768px\"", result);
+        Assert.Contains("id=\"mixed-box\" class=\"box\" style=\"width: 1024px; height: 768px\"", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Applies_ScrollPadding_And_ScrollMargin()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function buildContainer(zoom) {
+                var container = document.createElement('div');
+                container.style.width = '200px';
+                container.style.height = '100px';
+                container.style.overflow = 'hidden';
+                container.style.scrollPaddingTop = '20px';
+                if (zoom) {
+                    container.style.zoom = zoom;
+                }
+
+                var buffer = document.createElement('div');
+                buffer.style.height = '1000px';
+                var target = document.createElement('div');
+                target.style.height = '20px';
+                target.style.scrollMarginTop = '30px';
+                var tail = document.createElement('div');
+                tail.style.height = '1000px';
+
+                container.appendChild(buffer);
+                container.appendChild(target);
+                container.appendChild(tail);
+                document.body.appendChild(container);
+                target.scrollIntoView();
+                return container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                buildContainer('1') + ',' + buildContainer('2');
+        ");
+        Assert.Contains("950,950", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Resolves_Inherited_ScrollPadding_And_ScrollMargin_Under_Zoom()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function buildContainer(zoom) {
+                var host = document.createElement('div');
+                host.style.scrollPaddingTop = '20px';
+
+                var container = document.createElement('div');
+                container.style.width = '200px';
+                container.style.height = '100px';
+                container.style.overflow = 'hidden';
+                container.style.scrollPaddingTop = 'inherit';
+                container.style.scrollMarginTop = '30px';
+                if (zoom) {
+                    container.style.zoom = zoom;
+                }
+
+                var buffer = document.createElement('div');
+                buffer.style.height = '1000px';
+                var target = document.createElement('div');
+                target.style.height = '20px';
+                target.style.scrollMarginTop = 'inherit';
+                if (zoom) {
+                    target.style.zoom = zoom;
+                }
+                var tail = document.createElement('div');
+                tail.style.height = '1000px';
+
+                container.appendChild(buffer);
+                container.appendChild(target);
+                container.appendChild(tail);
+                host.appendChild(container);
+                document.body.appendChild(host);
+                target.scrollIntoView();
+                return container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                buildContainer('1') + ',' + buildContainer('2');
+        ");
+        Assert.Contains("950,950", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Scrolls_Absolutely_Positioned_Targets_In_Raw_Css_Pixels()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function buildContainer(zoom) {
+                var container = document.createElement('div');
+                container.style.position = 'relative';
+                container.style.width = '150px';
+                container.style.height = '150px';
+                container.style.overflow = 'auto';
+                if (zoom) {
+                    container.style.zoom = zoom;
+                }
+
+                var content = document.createElement('div');
+                content.style.width = '600px';
+                content.style.height = '600px';
+
+                var target = document.createElement('div');
+                target.style.position = 'absolute';
+                target.style.left = '300px';
+                target.style.top = '240px';
+                target.style.width = '20px';
+                target.style.height = '20px';
+
+                container.appendChild(content);
+                container.appendChild(target);
+                document.body.appendChild(container);
+                target.scrollIntoView();
+                return container.scrollLeft + ',' + container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                buildContainer('1') + '|' + buildContainer('2');
+        ");
+        Assert.Contains("300,240|300,240", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Scrolls_Percentage_Positioned_Targets_In_Raw_Css_Pixels()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function buildContainer(position, zoom) {
+                var container = document.createElement('div');
+                container.style.position = position;
+                container.style.width = '150px';
+                container.style.height = '150px';
+                container.style.overflow = 'auto';
+                if (zoom) {
+                    container.style.zoom = zoom;
+                }
+
+                var content = document.createElement('div');
+                content.style.width = '600px';
+                content.style.height = '600px';
+
+                var target = document.createElement('div');
+                target.style.position = 'absolute';
+                target.style.left = '200%';
+                target.style.top = '200%';
+                target.style.width = '20px';
+                target.style.height = '20px';
+
+                container.appendChild(content);
+                container.appendChild(target);
+                document.body.appendChild(container);
+                target.scrollIntoView();
+                return container.scrollLeft + ',' + container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                buildContainer('relative', '1') + '|' +
+                buildContainer('relative', '2') + '|' +
+                buildContainer('fixed', '1') + '|' +
+                buildContainer('fixed', '2');
+        ");
+        Assert.Contains("300,300|300,300|300,300|300,300", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Does_Not_Scroll_Root_For_Targets_Inside_Unscrollable_Fixed_Containers()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.style.width = '2000px';
+            document.body.style.height = '2000px';
+
+            var container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.left = '10px';
+            container.style.bottom = '10px';
+            container.style.width = '150px';
+            container.style.height = '150px';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.left = '50%';
+            target.style.top = '50%';
+            target.style.width = '10px';
+            target.style.height = '10px';
+
+            container.appendChild(target);
+            document.body.appendChild(container);
+            target.scrollIntoView();
+
+            document.getElementById('result').textContent =
+                document.documentElement.scrollLeft + ',' + document.documentElement.scrollTop;
+        ");
+        Assert.Contains("0,0", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Scrolls_Fixed_Scrollers_Without_Bubbling_To_The_Root()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.style.width = '2000px';
+            document.body.style.height = '2000px';
+
+            var container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.right = '10px';
+            container.style.bottom = '10px';
+            container.style.width = '150px';
+            container.style.height = '150px';
+            container.style.overflow = 'auto';
+
+            var filler = document.createElement('div');
+            filler.style.width = '600px';
+            filler.style.height = '600px';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.left = '200%';
+            target.style.top = '200%';
+            target.style.width = '10px';
+            target.style.height = '10px';
+
+            container.appendChild(filler);
+            container.appendChild(target);
+            document.body.appendChild(container);
+            target.scrollIntoView();
+
+            document.getElementById('result').textContent =
+                document.documentElement.scrollLeft + ',' + document.documentElement.scrollTop + '|' +
+                container.scrollLeft + ',' + container.scrollTop;
+        ");
+        Assert.Contains("0,0|300,300", result);
+    }
+
+    [Fact]
+    public void FontRelative_Ch_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function measure(zoom) {
+                var box = document.createElement('div');
+                box.style.width = '5ch';
+                box.style.height = '10ch';
+                box.style.font = '16px monospace';
+                if (zoom) {
+                    box.style.zoom = zoom;
+                }
+
+                document.body.appendChild(box);
+                return box.offsetWidth + ',' + box.offsetHeight;
+            }
+
+            document.getElementById('result').textContent =
+                measure('1') + '|' + measure('2');
+        ");
+        Assert.Contains("40,80|40,80", result);
+    }
+
+    [Fact]
+    public void FontRelative_Ex_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function measure(zoom) {
+                var box = document.createElement('div');
+                box.style.width = '5ex';
+                box.style.height = '10ex';
+                box.style.font = '16px monospace';
+                if (zoom) {
+                    box.style.zoom = zoom;
+                }
+
+                document.body.appendChild(box);
+                return box.offsetWidth + ',' + box.offsetHeight;
+            }
+
+            document.getElementById('result').textContent =
+                measure('1') + '|' + measure('2');
+        ");
+        Assert.Contains("40,80|40,80", result);
+    }
+
+    [Fact]
+    public void FontRelative_Ic_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function measure(zoom) {
+                var box = document.createElement('div');
+                box.style.width = '5ic';
+                box.style.height = '10ic';
+                box.style.font = '16px monospace';
+                if (zoom) {
+                    box.style.zoom = zoom;
+                }
+
+                document.body.appendChild(box);
+                return box.offsetWidth + ',' + box.offsetHeight;
+            }
+
+            document.getElementById('result').textContent =
+                measure('1') + '|' + measure('2');
+        ");
+        Assert.Contains("80,160|80,160", result);
+    }
+
+    [Fact]
+    public void Attr_Lengths_Resolve_In_Direct_And_Max_Length_Cases()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function addBox(id, attrValue) {
+                var box = document.createElement('div');
+                box.id = id;
+                box.style.position = 'absolute';
+                box.style.height = '20px';
+                box.setAttribute('data-test', attrValue);
+                document.body.appendChild(box);
+                return box;
+            }
+
+            var valid = addBox('valid', '200px');
+            valid.style.width = 'attr(data-test type(<length>))';
+            var fallback = addBox('fallback', 'qqffuutt');
+            fallback.style.top = '30px';
+            fallback.style.width = 'attr(data-test type(<length>), 200px)';
+            var maxed = addBox('maxed', '200px');
+            maxed.style.top = '60px';
+            maxed.style.width = 'max(attr(data-test type(<length>)))';
+
+            document.getElementById('result').textContent =
+                valid.offsetWidth + ',' + fallback.offsetWidth + ',' + maxed.offsetWidth;
+        ");
+        Assert.Contains("200,200,200", result);
+    }
+
+    [Fact]
+    public void Zoom_CssomView_Geometry_APIs_Use_Raw_Css_Pixels()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '8px';
+
+            function makeDiv(id, width, height, zoom, className) {
+                var div = document.createElement('div');
+                div.id = id;
+                div.style.width = width;
+                div.style.height = height;
+                div.style.backgroundColor = 'blue';
+                if (zoom) div.style.zoom = zoom;
+                if (className) div.className = className;
+                document.body.appendChild(div);
+                return div;
+            }
+
+            var noZoom = makeDiv('no_zoom', '64px', '64px');
+            var withZoom = makeDiv('with_zoom', '64px', '64px', '4');
+
+            var outer = document.createElement('div');
+            outer.style.zoom = '2';
+            var nested = makeDiv('nested_zoom', '64px', '64px', '4');
+            outer.appendChild(nested);
+            document.body.appendChild(outer);
+
+            var transformAndZoom = makeDiv('transform_and_zoom', '64px', '64px', '4');
+            transformAndZoom.style.transform = 'scale(2)';
+            transformAndZoom.style.transformOrigin = 'top left';
+
+            var noZoomRect = noZoom.getBoundingClientRect();
+            var withZoomRect = withZoom.getBoundingClientRect();
+            var nestedZoomRect = nested.getClientRects()[0];
+            var transformZoomRect = transformAndZoom.getBoundingClientRect();
+
+            document.getElementById('result').textContent =
+                [noZoomRect.left, noZoomRect.top, noZoomRect.width, noZoomRect.height].join(',') + '|' +
+                [withZoomRect.left, withZoomRect.top, withZoomRect.width, withZoomRect.height].join(',') + '|' +
+                [nestedZoomRect.left, nestedZoomRect.top, nestedZoomRect.width, nestedZoomRect.height].join(',') + '|' +
+                [transformZoomRect.width, transformZoomRect.height].join(',');
+        ");
+        Assert.Contains("8,8,64,64|8,72,256,256|8,328,512,512|512,512", result);
+    }
+
+    [Fact]
+    public void Zoom_Client_Scroll_And_Offset_Metrics_Stay_In_Raw_Css_Pixels()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '8px';
+            try {
+                function makeContainer(id, zoom, childZoom) {
+                    var container = document.createElement('div');
+                    container.id = id;
+                    container.style.width = '100px';
+                    container.style.height = '100px';
+                    container.style.overflow = 'scroll';
+                    if (zoom) container.style.zoom = zoom;
+
+                    var child = document.createElement('div');
+                    child.style.width = '250px';
+                    child.style.height = '250px';
+                    if (childZoom) child.style.zoom = childZoom;
+                    container.appendChild(child);
+                    document.body.appendChild(container);
+                    return container;
+                }
+
+                var noZoom = makeContainer('no_zoom_container', '', '');
+                var zoomed = makeContainer('zoomed_container', '4', '');
+                var zoomedContent = makeContainer('zoomed_content_container', '', '2');
+
+                noZoom.scrollTo(noZoom.scrollWidth / 2, noZoom.scrollHeight / 2);
+                zoomed.scrollTo(zoomed.scrollWidth / 2, zoomed.scrollHeight / 2);
+
+                var outer = document.createElement('div');
+                outer.style.zoom = '3';
+                outer.style.position = 'relative';
+                outer.style.width = '100px';
+                outer.style.height = '100px';
+                outer.style.margin = '10px';
+                outer.style.border = '1px solid black';
+
+                var rel = document.createElement('div');
+                rel.style.position = 'relative';
+                rel.style.top = '10px';
+                rel.style.left = '10px';
+                rel.style.width = '10px';
+                rel.style.height = '10px';
+                rel.style.margin = '1px';
+                outer.appendChild(rel);
+
+                var abs = document.createElement('div');
+                abs.style.position = 'absolute';
+                abs.style.top = '20px';
+                abs.style.left = '20px';
+                abs.style.zoom = '2';
+                abs.style.width = '10px';
+                abs.style.height = '10px';
+                abs.style.margin = '1px';
+                outer.appendChild(abs);
+
+                document.body.appendChild(outer);
+
+                document.getElementById('result').textContent =
+                    zoomed.clientWidth + ',' +
+                    zoomed.clientHeight + ',' +
+                    noZoom.scrollWidth + ',' +
+                    zoomed.scrollWidth + ',' +
+                    zoomedContent.scrollWidth + ',' +
+                    noZoom.scrollTop + ',' +
+                    zoomed.scrollTop + ',' +
+                    rel.offsetTop + ',' +
+                    rel.offsetLeft + ',' +
+                    abs.offsetTop + ',' +
+                    abs.offsetLeft;
+            } catch (e) {
+                document.getElementById('result').textContent = 'ERR:' + e;
+            }
+        ");
+        Assert.Contains("100,100,250,250,500,125,125,11,11,21,21", result);
+    }
+
+    [Fact]
+    public void FontRelative_Lh_Units_Resolve_From_Parent_LineHeight_Under_Zoom()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function measure(zoom) {
+                var parent = document.createElement('div');
+                parent.style.lineHeight = '20px';
+
+                var box = document.createElement('div');
+                box.style.font = '16px monospace';
+                box.style.lineHeight = '2lh';
+                box.style.width = '1lh';
+                box.style.height = '1lh';
+                if (zoom) {
+                    box.style.zoom = zoom;
+                }
+
+                parent.appendChild(box);
+                document.body.appendChild(parent);
+                return box.offsetWidth + ',' + box.offsetHeight;
+            }
+
+            document.getElementById('result').textContent =
+                measure('1') + '|' + measure('2');
+        ");
+        Assert.Contains("40,40|40,40", result);
+    }
+
+    [Fact]
+    public void FontRelative_Rlh_Units_Resolve_From_Root_LineHeight_Under_Zoom()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function measure(zoom) {
+                var box = document.createElement('div');
+                box.style.width = '3rlh';
+                box.style.height = '2rlh';
+                if (zoom) {
+                    box.style.zoom = zoom;
+                }
+
+                document.body.appendChild(box);
+                return box.offsetWidth + ',' + box.offsetHeight;
+            }
+
+            document.getElementById('result').textContent =
+                measure('1') + '|' + measure('2');
+        ");
+        Assert.Contains("57.599999999999994,38.4|57.599999999999994,38.4", result);
+    }
+
     // ---------------------------------------------------------------
     //  TODO-G6: Image() constructor
     // ---------------------------------------------------------------

@@ -723,7 +723,9 @@ internal sealed class DomParser
         {
             var value = prop.Value;
 
-            if (prop.Value == CssConstants.Inherit && box.ParentBox != null)
+            if (prop.Value == CssConstants.Inherit
+                && box.ParentBox != null
+                && prop.Key is not ("width" or "height" or "min-width" or "max-width" or "min-height" or "max-height"))
                 value = CssUtils.GetPropertyValue(box.ParentBox, prop.Key);
 
             bool newIsImportant = block.ImportantProperties.Contains(prop.Key);

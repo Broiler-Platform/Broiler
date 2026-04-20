@@ -9,7 +9,7 @@ internal static partial class RegexParserUtils
     public const string CssBlocks = @"[^\{\}]*\{[^\{\}]*\}";
     public const string CssNumber = @"([0-9]+|[0-9]*\.[0-9]+)";
     public const string CssPercentage = @"([0-9]+|[0-9]*\.[0-9]+)\%";
-    public const string CssLength = @"([0-9]+|[0-9]*\.[0-9]+)(em|ex|px|in|cm|mm|pt|pc)";
+    public const string CssLength = @"([0-9]+|[0-9]*\.[0-9]+)(em|ex|ch|ic|px|in|cm|mm|pt|pc)";
     public const string CssLineHeight = "(normal|" + CssNumber + "|" + CssLength + "|" + CssPercentage + ")";
     public const string CssFontFamily = "(\"[^\"]*\"|'[^']*'|\\S+\\s*)(\\s*\\,\\s*(\"[^\"]*\"|'[^']*'|\\S+))*";
     public const string CssFontStyle = "(normal|italic|oblique)";

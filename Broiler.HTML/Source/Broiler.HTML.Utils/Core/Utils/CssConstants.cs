@@ -109,9 +109,13 @@ internal static class CssConstants
     public const string In = "in";
     public const string Em = "em";
     public const string Ex = "ex";
+    public const string Ch = "ch";
+    public const string Ic = "ic";
+    public const string Lh = "lh";
     public const string Pt = "pt";
     public const string Pc = "pc";
     public const string Rem = "rem";
+    public const string Rlh = "rlh";
 
     /// <summary>Viewport-height unit: 1vh = 1% of viewport height.</summary>
     public const string Vh = "vh";

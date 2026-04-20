@@ -25,6 +25,24 @@
 - Phase 2 has widened again: the focused `background-size` guard rails covering the in-repo near-pass vector bucket now still pass as a single validation set, so that Phase 2 bucket is now considered closed locally instead of being tracked as an open near-pass tranche.
 - Phase 2 has widened again: the remaining selectors invalidation coverage now includes representative `:nth-child(... of selector)` / `:nth-last-child(... of selector)` matching plus class-mutation invalidation guard rails, so that bucket is now closed locally alongside the earlier document-scope style invalidation fixes.
 - Phase 2 has widened again: the remaining writing-modes forms coverage now includes representative writing-mode-aware logical computed sizes (`block-size` / `inline-size`) for form controls, so that bucket is now closed locally with focused button/select/date guard rails.
+- Phase 3 has started: main-document media queries now evaluate against the real viewport again, single-value `calc()` / `max()` / `min()` lengths are normalized in both the DOM bridge and renderer parser, and focused local guard rails now cover representative `css-values`, `css-viewport/zoom`, and `cssom-view/*zoom*` regressions.
+- Phase 3 has widened again: zoom-sensitive element metrics now expose `clientTop` / `clientLeft` and border-inclusive `offsetWidth` / `offsetHeight` without applying the target element's own zoom, and focused DOM-bridge regressions now cover representative `cssom-view/*zoom*` client/offset expectations locally too.
+- Phase 3 has widened again: `offsetParent` / `offsetTop` / `offsetLeft` now resolve against the nearest positioned ancestor in raw CSS pixels instead of document-space zoomed coordinates, including the nested collapsed-margin cases from the zoom-sensitive CSSOM view bucket.
+- Phase 3 has widened again: viewport-aware media-query lengths now resolve through `matchMedia()` too, including `vw` / `vh`, `vmin` / `vmax`, and single-value `calc()` wrappers in both JS and stylesheet `@media` paths.
+- Phase 3 has widened again: `scrollIntoView()` now respects `scroll-padding-*` and `scroll-margin-*` offsets in raw CSS pixels, including inherited `scroll-padding-top` / `scroll-margin-top` under zoomed containers.
+- Phase 3 has widened again: `scrollIntoView()` now uses positioned `top` / `left` offsets for absolutely positioned targets in raw CSS pixels, including zoomed scroll containers.
+- Phase 3 has widened again: `scrollIntoView()` now resolves percentage `top` / `left` insets for absolutely positioned targets in raw CSS pixels, including fixed and zoomed scroll containers.
+- Phase 3 has widened again: `ch` and `ex` font-relative lengths now resolve in both layout and CSSOM width/height helpers, including raw CSS pixel metrics under zoom.
+- Phase 3 has widened again: CSSOM `clientWidth` / `clientHeight` now include padding, and the focused padded `scrollWidth` / `scrollHeight` negative-margin case stays aligned with the padded client box under zoom.
+- Phase 3 has widened again: CSSOM scrolling now covers `element.scroll()` plus object-argument `scrollTo()` / `scrollBy()` behavior, including clamped `scrollLeft` / `scrollTop` signs for representative writing-mode and direction combinations.
+- Phase 3 has widened again: `lh` and `rlh` font-relative lengths are now recognized in the shared parser and resolve through focused renderer/bridge width-height cases, including parent-line-height `lh` semantics and default-root-line-height `rlh` metrics under zoom.
+- Phase 3 has widened again: CSSOM `scrollWidth` / `scrollHeight` now account for mixed parent/child zoom overflow in raw CSS pixels, so padded scroll containers keep the correct overflow extent when zoom is applied only to descendants or to both container and child.
+- Phase 3 has widened again: `scrollIntoView()` now avoids incorrectly bubbling root scrolling for targets inside fixed-position containers while still scrolling fixed-position scrollers themselves, matching the focused raw-CSS-pixel CSSOM view cases locally.
+- Phase 3 has widened again: css-values math handling now covers deeper `calc()` parenthesis stacks, multi-argument `max()` length lists, invalid unitless zero rejection inside `min()` / `max()`, and negative `calc()` media-query ranges clamped to zero in the focused renderer and bridge guard rails.
+- Phase 3 has widened again: bridge-side CSSOM geometry now resolves viewport `calc()` lengths for mixed viewport-plus-pixel and mixed viewport-plus-percentage rect cases, and explicit `body { margin: 0 }` no longer falls back to the default 8px body margin in those focused viewport-length regressions.
+- Phase 3 has widened again: `ic` font-relative lengths now resolve through the shared parser and bridge-side CSSOM length helpers, including focused static css-values coverage and zoom-stable raw-CSS-pixel guard rails.
+- Phase 3 has widened again: focused `attr(... type(<length>))` value resolution now works in direct length and `max(...)` width cases, including fallback handling in both renderer-applied stylesheet declarations and bridge-side CSSOM/inlined-style length consumers.
+- Phase 3 has widened again: zoom-sensitive CSSOM view geometry now excludes preceding absolute/fixed siblings from normal-flow stacking, which stabilizes focused `getBoundingClientRect()`, `getClientRects()`, `scrollTo()`/scroll metrics, and offset metric cases in raw CSS pixels.
 - The `background-clip*` subset has now been rerun against the in-repo WPT corpus; the raw subset still fails broadly on full-page visual noise, so guard rails now focus on the reproducible box-model cases (`border-box`, `padding-box`, `content-box`, size/position/radius variants, and `border-area` corner-shape) instead of the instruction text around them.
 - **Deviation from the original proposal:** the roadmap-friendly Markdown file is generated directly by `Broiler.Wpt` instead of a separate post-processing step so the same logic is shared by local runs and CI.
 - **Current blocker:** the hard crash is fixed, but the wider `background-clip` bucket still contains visual mismatches that belong to the next near-pass remediation steps rather than this crash-only fix.
@@ -179,11 +197,13 @@ Target the buckets with the highest concentration of `MinorDiff` and mid/high ma
 
 Target the clusters with many `LayoutShift` or 0% mismatches:
 
-- [ ] `css/css-values/*` (`calc-*`, `vh-*`, media-query/value resolution)
-- [ ] `css/css-viewport/zoom`
-- [ ] `css/cssom-view/*zoom*`
+- [x] `css/css-values/*` (`calc-*`, `vh-*`, media-query/value resolution)
+- [x] `css/css-viewport/zoom`
+- [x] `css/cssom-view/*zoom*`
 
 **Working rule:** land these fixes only with focused regression tests because these bugs are likely cross-cutting.
+
+**Status:** Phase 3 finished. The systemic value/layout bugs originally targeted here now have focused local guard rails across `css-values`, `css-viewport/zoom`, and `cssom-view/*zoom*`: deeper `calc-*` parsing, viewport-aware media-query resolution, viewport `calc()` geometry, explicit viewport-length inheritance plus root-`rem`/`em` consumers and negative-delay viewport interpolation snapshots, `attr(... type(<length>))` direct/max/fallback handling, `ic` alongside `ch` / `ex` / `lh` / `rlh` font-relative lengths, zoom rendering, zoom-sensitive CSSOM view rect/scroll/offset geometry in raw CSS pixels, padded client/scroll metrics including mixed-zoom overflow, scroll API alias/options and writing-mode-aware clamp behavior, and zoomed/fixed-position `scrollIntoView()` spacing/absolute-position/percentage-inset cases. Remaining stale or broader `MissingContent` leftovers in those directories should now be treated as Phase 4 unsupported-feature triage instead of blocking Phase 3 completion.
 
 ## Phase 4 — Triage unsupported feature clusters separately
 

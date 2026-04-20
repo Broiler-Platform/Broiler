@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.RegularExpressions;
 using Broiler.HTML.Adapters.Adapters;
 using Broiler.HTML.CSS.Core.Parse;
 using Broiler.HTML.Dom.Core.Dom;
@@ -8,6 +9,10 @@ namespace Broiler.HTML.Dom.Core.Utils;
 
 internal static class CssUtils
 {
+    private static readonly Regex LengthAttrFunctionPattern = new(
+        @"attr\(\s*(?<name>[A-Za-z_][A-Za-z0-9_-]*)\s+type\(\s*<length>\s*\)\s*(?:,\s*(?<fallback>[^)]+?))?\s*\)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     public static double WhiteSpace(RGraphics g, CssBoxProperties box)
     {
         double w = box.ActualFont.GetWhitespaceWidth(g);
@@ -119,6 +124,8 @@ internal static class CssUtils
 
     public static void SetPropertyValue(CssBox cssBox, string propName, string value)
     {
+        value = ResolveLengthAttrFunctions(cssBox, value);
+
         if (propName.StartsWith("--", StringComparison.Ordinal))
         {
             cssBox.SetCustomProperty(propName, value);
@@ -444,5 +451,39 @@ internal static class CssUtils
                 cssBox.ZIndex = value;
                 break;
         }
+    }
+
+    private static string ResolveLengthAttrFunctions(CssBox cssBox, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            value.IndexOf("attr(", StringComparison.OrdinalIgnoreCase) < 0)
+        {
+            return value;
+        }
+
+        return LengthAttrFunctionPattern.Replace(
+            value,
+            match =>
+            {
+                var attrName = match.Groups["name"].Value;
+                var fallback = match.Groups["fallback"].Success
+                    ? match.Groups["fallback"].Value.Trim()
+                    : string.Empty;
+                var attributeValue = cssBox.GetAttribute(attrName, string.Empty).Trim();
+
+                if (!string.IsNullOrEmpty(attributeValue) &&
+                    CssValueParser.IsValidLength(attributeValue))
+                {
+                    return attributeValue;
+                }
+
+                if (!string.IsNullOrEmpty(fallback) &&
+                    CssValueParser.IsValidLength(fallback))
+                {
+                    return fallback;
+                }
+
+                return string.Empty;
+            });
     }
 }

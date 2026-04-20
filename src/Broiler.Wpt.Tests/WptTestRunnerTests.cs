@@ -23,6 +23,25 @@ public class WptTestRunnerTests : IDisposable
             Directory.Delete(_tempDir, recursive: true);
     }
 
+    private WptTestResult RunTempMatchTest(string testHtml, string referenceHtml, string namePrefix)
+        => RunTempMatchTest(testHtml, referenceHtml, namePrefix, 320, 240);
+
+    private WptTestResult RunTempMatchTest(
+        string testHtml,
+        string referenceHtml,
+        string namePrefix,
+        int viewportWidth,
+        int viewportHeight)
+    {
+        var testFile = Path.Combine(_tempDir, $"{namePrefix}.html");
+        var refFile = Path.Combine(_tempDir, $"{namePrefix}-ref.html");
+        File.WriteAllText(testFile, testHtml);
+        File.WriteAllText(refFile, referenceHtml);
+
+        var runner = new WptTestRunner(viewportWidth, viewportHeight);
+        return runner.RunMatchTest(testFile, refFile, _tempDir);
+    }
+
     [Fact]
     public void DiscoverTests_Finds_Html_Files_Recursively()
     {
@@ -169,6 +188,1738 @@ document.getElementById('out').appendChild(p);
 
         // Assert — skipped because no reference, but the pipeline ran.
         Assert.True(result.Skipped);
+    }
+
+    [Theory]
+    [InlineData("calc(calc(100%))", "calc-in-calc")]
+    [InlineData("max(calc(100%))", "calc-in-max")]
+    public void Wpt_CssValues_SingleArgumentMathLengths_MatchReference(string heightValue, string namePrefix)
+    {
+        var testHtml = $@"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body {{ margin: 0; padding: 0; }}
+    html {{ background: red; overflow: hidden; }}
+    #outer {{ position: absolute; inset: 0; background: green; width: 100%; height: {heightValue}; }}
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: absolute; inset: 0; background: green; width: 100%; height: 100%; }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, namePrefix);
+        Assert.True(result.Passed,
+            $"{namePrefix} should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_MaxTwentyArguments_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer {
+      position: absolute;
+      inset: 0;
+      background: green;
+      width: 100%;
+      height: max(5%, 10%, 15%, 20%, 25%, 30%, 35%, 40%, 45%, 50%, 55%, 60%, 65%, 70%, 75%, 80%, 85%, 90%, 95%, 100%);
+    }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: absolute; inset: 0; background: green; width: 100%; height: 100%; }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "max-20-arguments");
+        Assert.True(result.Passed,
+            $"max() with 20 arguments should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer {
+      position: absolute;
+      inset: 0;
+      background: green;
+      width: 100%;
+      height: calc((((((((((((((((((((((((((((((((100%))))))))))))))))))))))))))))))));
+    }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: absolute; inset: 0; background: green; width: 100%; height: 100%; }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "calc-parenthesis-stack");
+        Assert.True(result.Passed,
+            $"deeply nested calc parentheses should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomBasic_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    div { width: 40px; height: 40px; background: green; }
+    #zoomed { zoom: 2; }
+  </style>
+</head>
+<body>
+  <div></div>
+  <div id=""zoomed""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    #first { width: 40px; height: 40px; background: green; }
+    #second { width: 80px; height: 80px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""first""></div>
+  <div id=""second""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-basic");
+        Assert.True(result.Passed,
+            $"zoom basic should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomInherited_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .container { zoom: 2; }
+    .child { width: 40px; height: 40px; background: green; }
+  </style>
+</head>
+<body>
+  <div class=""child""></div>
+  <div class=""container"">
+    <div class=""child""></div>
+  </div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    #first { width: 40px; height: 40px; background: green; }
+    #second { width: 80px; height: 80px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""first""></div>
+  <div id=""second""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-inherited");
+        Assert.True(result.Passed,
+            $"zoom inheritance should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ClientAndScrollMetricsIncludePadding_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    function measure(zoom) {
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left = '-10000px';
+      container.style.top = '-10000px';
+      container.style.width = '20px';
+      container.style.height = '20px';
+      container.style.padding = '10px 20px';
+      container.style.overflow = 'auto';
+      if (zoom) {
+        container.style.zoom = zoom;
+      }
+
+      const child = document.createElement('div');
+      child.style.width = '20px';
+      child.style.height = '20px';
+      child.style.margin = '-5px -7px';
+      container.appendChild(child);
+      document.body.appendChild(container);
+
+      const passed = container.clientWidth === 60 &&
+                     container.clientHeight === 40 &&
+                     container.scrollWidth === 60 &&
+                     container.scrollHeight === 40;
+      container.remove();
+      return passed;
+    }
+
+    if (measure('1') && measure('2')) {
+      document.getElementById('pass').style.background = 'green';
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "client-scroll-padding");
+        Assert.True(result.Passed,
+            $"client/scroll metrics should include padding without negative-margin overflow. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollMetricsIncludeChildZoomOverflow_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    function measure(containerZoom, childZoom) {
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left = '-10000px';
+      container.style.top = '-10000px';
+      container.style.width = '20px';
+      container.style.height = '20px';
+      container.style.padding = '10px 20px';
+      container.style.overflow = 'auto';
+      if (containerZoom) {
+        container.style.zoom = containerZoom;
+      }
+
+      const child = document.createElement('div');
+      child.style.width = '20px';
+      child.style.height = '20px';
+      if (childZoom) {
+        child.style.zoom = childZoom;
+      }
+
+      container.appendChild(child);
+      document.body.appendChild(container);
+
+      const passed = container.clientWidth === 60 &&
+                     container.clientHeight === 40 &&
+                     container.scrollWidth === (childZoom ? 80 : 60) &&
+                     container.scrollHeight === (childZoom ? 60 : 40);
+      container.remove();
+      return passed;
+    }
+
+    if (measure('', '2') && measure('2', '') && measure('2', '2')) {
+      document.getElementById('pass').style.background = 'green';
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "client-scroll-child-zoom");
+        Assert.True(result.Passed,
+            $"scroll metrics should include child zoom overflow in raw CSS pixels. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ZoomGeometryApis_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <script>
+    document.body.style.margin = '8px';
+
+    var created = [];
+    var noZoom = document.createElement('div');
+    noZoom.style.width = '64px';
+    noZoom.style.height = '64px';
+    document.body.appendChild(noZoom);
+    created.push(noZoom);
+
+    var withZoom = document.createElement('div');
+    withZoom.style.width = '64px';
+    withZoom.style.height = '64px';
+    withZoom.style.zoom = '4';
+    document.body.appendChild(withZoom);
+    created.push(withZoom);
+
+    var parent = document.createElement('div');
+    parent.style.width = '64px';
+    parent.style.height = '64px';
+    parent.style.zoom = '2';
+    var nested = document.createElement('div');
+    nested.style.width = '64px';
+    nested.style.height = '64px';
+    nested.style.zoom = '4';
+    parent.appendChild(nested);
+    document.body.appendChild(parent);
+    created.push(parent);
+
+    var transformAndZoom = document.createElement('div');
+    transformAndZoom.style.width = '64px';
+    transformAndZoom.style.height = '64px';
+    transformAndZoom.style.zoom = '4';
+    transformAndZoom.style.transform = 'scale(2)';
+    transformAndZoom.style.transformOrigin = 'top left';
+    document.body.appendChild(transformAndZoom);
+    created.push(transformAndZoom);
+
+    var a = noZoom.getBoundingClientRect();
+    var b = withZoom.getBoundingClientRect();
+    var c = nested.getClientRects()[0];
+    var d = transformAndZoom.getBoundingClientRect();
+
+    var passed =
+      a.left === 8 && a.top === 8 && a.width === 64 && a.height === 64 &&
+      b.left === 8 && b.top === 72 && b.width === 256 && b.height === 256 &&
+      c.left === 8 && c.top === 328 && c.width === 512 && c.height === 512 &&
+      d.width === 512 && d.height === 512;
+
+    for (var i = 0; i < created.length; i++) {
+      created[i].parentNode.removeChild(created[i]);
+    }
+    document.body.style.margin = '0';
+    var pass = document.createElement('div');
+    pass.id = 'pass';
+    pass.style.width = '100px';
+    pass.style.height = '100px';
+    pass.style.background = passed ? 'green' : 'red';
+    document.body.appendChild(pass);
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "cssom-view-zoom-geometry");
+        Assert.True(result.Passed,
+            $"zoom geometry APIs should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ZoomScrollAndOffsetApis_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <script>
+    document.body.style.margin = '8px';
+
+    var created = [];
+    function makeContainer(zoom, childZoom) {
+      var container = document.createElement('div');
+      container.style.width = '100px';
+      container.style.height = '100px';
+      container.style.overflow = 'scroll';
+      if (zoom) container.style.zoom = zoom;
+      var child = document.createElement('div');
+      child.style.width = '250px';
+      child.style.height = '250px';
+      if (childZoom) child.style.zoom = childZoom;
+      container.appendChild(child);
+      document.body.appendChild(container);
+      created.push(container);
+      return container;
+    }
+
+    var noZoom = makeContainer(null, null);
+    var withZoom = makeContainer('4', null);
+    var zoomedContent = makeContainer(null, '2');
+
+    noZoom.scrollTo(noZoom.scrollWidth / 2, noZoom.scrollHeight / 2);
+    withZoom.scrollTo(withZoom.scrollWidth / 2, withZoom.scrollHeight / 2);
+
+    var outer = document.createElement('div');
+    outer.style.zoom = '3';
+    outer.style.width = '100px';
+    outer.style.height = '100px';
+    outer.style.border = '1px solid black';
+    outer.style.margin = '10px';
+    outer.style.position = 'relative';
+
+    var rel = document.createElement('div');
+    rel.style.position = 'relative';
+    rel.style.top = '10px';
+    rel.style.left = '10px';
+    rel.style.width = '10px';
+    rel.style.height = '10px';
+    rel.style.margin = '1px';
+    outer.appendChild(rel);
+
+    var abs = document.createElement('div');
+    abs.style.position = 'absolute';
+    abs.style.top = '20px';
+    abs.style.left = '20px';
+    abs.style.zoom = '2';
+    abs.style.width = '10px';
+    abs.style.height = '10px';
+    abs.style.margin = '1px';
+    outer.appendChild(abs);
+
+    document.body.appendChild(outer);
+
+    var passed =
+      withZoom.clientWidth === 100 &&
+      withZoom.clientHeight === 100 &&
+      noZoom.scrollWidth === 250 &&
+      withZoom.scrollWidth === 250 &&
+      zoomedContent.scrollWidth === 500 &&
+      noZoom.scrollTop === withZoom.scrollTop &&
+      noZoom.scrollLeft === withZoom.scrollLeft &&
+      noZoom.scrollTop === 125 &&
+      withZoom.scrollTop === 125 &&
+      rel.offsetTop === 11 &&
+      rel.offsetLeft === 11 &&
+      abs.offsetTop === 21 &&
+      abs.offsetLeft === 21;
+
+    created.push(outer);
+    for (var i = 0; i < created.length; i++) {
+      created[i].parentNode.removeChild(created[i]);
+    }
+    document.body.style.margin = '0';
+    var pass = document.createElement('div');
+    pass.id = 'pass';
+    pass.style.width = '100px';
+    pass.style.height = '100px';
+    pass.style.background = passed ? 'green' : 'red';
+    document.body.appendChild(pass);
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "cssom-view-zoom-scroll-offset");
+        Assert.True(result.Passed,
+            $"zoom scroll and offset APIs should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_ViewportMediaQueryLengths_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #target { width: 100%; height: 100%; background: red; }
+    @media (min-width: 50vw) and (max-height: calc(100vh)) {
+      #target { background: green; }
+    }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #target { width: 100%; height: 100%; background: green; }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "viewport-media-query-lengths");
+        Assert.True(result.Passed,
+            $"viewport media-query lengths should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_ViewportMinMaxMediaQueryLengths_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #target { width: 100%; height: 100%; background: red; }
+    @media (min-width: 50vmin) and (max-width: 200vmax) {
+      #target { background: green; }
+    }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #target { width: 100%; height: 100%; background: green; }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "viewport-minmax-media-query-lengths");
+        Assert.True(result.Passed,
+            $"viewport min/max media-query lengths should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_CalcMediaQueryNegativeLengthsClampToZero_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #target { width: 100%; height: 100%; background: red; }
+    @media (min-width: calc(-100px)) {
+      #target { background: green; }
+    }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #target { width: 100%; height: 100%; background: green; }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "calc-in-media-queries-negative-clamp");
+        Assert.True(result.Passed,
+            $"negative calc media-query lengths should clamp to zero. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_InvalidUnitlessZeroInMathFunction_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer {
+      position: absolute;
+      inset: 0;
+      background: green;
+      width: 100%;
+      height: min(100%);
+      height: min(0, 100%);
+    }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: absolute; inset: 0; background: green; width: 100%; height: 100%; }
+  </style>
+</head>
+<body><div id=""outer""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "min-unitless-zero-invalid");
+        Assert.True(result.Passed,
+            $"unitless zero should invalidate min/max length declarations. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_ViewportCalcLengthsWithPixels_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; }
+    #target {
+      position: absolute;
+      background: green;
+      width: calc(100vw + 50px);
+      height: calc(100vh + 50px);
+      top: -50px;
+      left: -50px;
+    }
+  </style>
+</head>
+<body><div id=""target""></div></body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: green; overflow: hidden; }
+  </style>
+</head>
+<body></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-calc-support");
+        Assert.True(result.Passed,
+            $"viewport calc lengths with pixel offsets should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_VhInherit_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: relative; background: green; width: 50vw; height: 100vh; }
+    #inner { position: absolute; background: green; left: 100%; width: inherit; height: inherit; }
+  </style>
+</head>
+<body>
+  <div id=""outer""><div id=""inner""></div></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: relative; background: green; width: 512px; height: 768px; }
+    #inner { position: absolute; background: green; left: 512px; width: 512px; height: 768px; }
+  </style>
+</head>
+<body>
+  <div id=""outer""><div id=""inner""></div></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-inherit", 1024, 768);
+        Assert.True(result.Passed,
+            $"viewport-length inherit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_VhEmInherit_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; font-size: 100vw; }
+    #target { background: green; width: 1rem; height: 1em; font-size: 100vh; }
+  </style>
+</head>
+<body>
+  <div id=""target""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #target { background: green; width: 1024px; height: 768px; }
+  </style>
+</head>
+<body>
+  <div id=""target""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-em-inherit", 1024, 768);
+        Assert.True(result.Passed,
+            $"viewport-sized font-relative lengths should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_VhInterpolateVh_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    @keyframes anim {
+      from { width: 75vw; height: 75vh; }
+      to   { width: 125vw; height: 125vh; }
+    }
+    html, body { margin: 0; padding: 0; }
+    html { background: red; overflow: hidden; }
+    #outer { position: relative; background: green; animation: anim 2000000s linear; animation-delay: -1000000s; }
+  </style>
+</head>
+<body>
+  <div id=""outer""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: green; overflow: hidden; }
+  </style>
+</head>
+<body></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-interpolate-vh", 1024, 768);
+        Assert.True(result.Passed,
+            $"viewport-length animation interpolation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_VhInterpolatePct_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    @keyframes anim {
+      from { width: 0%; height: 0%; }
+      to   { width: 200vw; height: 200vh; }
+    }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    html { background: red; overflow: hidden; }
+    #outer { position: relative; background: green; animation: anim 2000000s linear; animation-delay: -1000000s; }
+  </style>
+</head>
+<body>
+  <div id=""outer""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: green; overflow: hidden; }
+  </style>
+</head>
+<body></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "vh-interpolate-pct", 1024, 768);
+        Assert.True(result.Passed,
+            $"mixed percentage and viewport animation interpolation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomScrollPadding_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow: hidden;
+      border: 1px solid black;
+      scroll-padding-top: 20px;
+      margin-right: 12px;
+    }
+    .buffer { height: 1000px; }
+    .target { height: 20px; background: black; }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""buffer""></div>
+    <div class=""target""></div>
+    <div class=""buffer""></div>
+  </div>
+  <div style=""display:inline-block; scroll-padding-top: 20px;"">
+    <div class=""container"" style=""scroll-padding-top: inherit; zoom: 2;"">
+      <div class=""buffer""></div>
+      <div class=""target""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <script>
+    for (const match of document.querySelectorAll('.target')) {
+      match.scrollIntoView();
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow: hidden;
+      border: 1px solid black;
+      scroll-padding-top: 20px;
+      margin-right: 12px;
+    }
+    .buffer { height: 1000px; }
+    .target { height: 20px; background: black; }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""buffer""></div>
+    <div class=""target""></div>
+    <div class=""buffer""></div>
+  </div>
+  <div style=""display:inline-block; scroll-padding-top: 20px;"">
+    <div class=""container"" style=""scroll-padding-top: inherit; zoom: 2;"">
+      <div class=""buffer""></div>
+      <div class=""target""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll('.container')[0].scrollTo(0, 980);
+    document.querySelectorAll('.container')[1].scrollTo(0, 980);
+  </script>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-padding");
+        Assert.True(result.Passed,
+            $"zoom scroll-padding should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomScrollMargin_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .group { display: inline-block; margin-right: 12px; }
+    .container {
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow-y: scroll;
+      overflow-x: hidden;
+      padding-top: 40px;
+      border: 1px solid black;
+    }
+    .buffer { height: 300px; }
+    .target { height: 10px; background: black; }
+  </style>
+</head>
+<body>
+  <div class=""group"">
+    <div class=""container"" style=""scroll-margin-top: 20px;"">
+      <div class=""buffer""></div>
+      <div class=""target"" style=""scroll-margin-top: inherit;""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <div class=""group"">
+    <div class=""container"" style=""scroll-margin-top: 20px; zoom: 2;"">
+      <div class=""buffer""></div>
+      <div class=""target"" style=""scroll-margin-top: inherit; zoom: 2;""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <script>
+    for (const match of document.querySelectorAll('.target')) {
+      match.scrollIntoView();
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .group { display: inline-block; margin-right: 12px; }
+    .container {
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow-y: scroll;
+      overflow-x: hidden;
+      padding-top: 40px;
+      border: 1px solid black;
+    }
+    .buffer { height: 300px; }
+    .target { height: 10px; background: black; }
+  </style>
+</head>
+<body>
+  <div class=""group"">
+    <div class=""container"" style=""scroll-margin-top: 20px;"">
+      <div class=""buffer""></div>
+      <div class=""target"" style=""scroll-margin-top: inherit;""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <div class=""group"">
+    <div class=""container"" style=""scroll-margin-top: 20px; zoom: 2;"">
+      <div class=""buffer""></div>
+      <div class=""target"" style=""scroll-margin-top: inherit; zoom: 2;""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll('.container')[0].scrollTo(0, 320);
+    document.querySelectorAll('.container')[1].scrollTo(0, 320);
+  </script>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-margin");
+        Assert.True(result.Passed,
+            $"zoom scroll-margin should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomScrollIntoViewAbsolutePosition_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 600px;
+      height: 600px;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      top: 240px;
+      left: 300px;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <div class=""container"" style=""zoom: 2;"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <script>
+    for (const match of document.querySelectorAll('.target')) {
+      match.scrollIntoView();
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 600px;
+      height: 600px;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      top: 240px;
+      left: 300px;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <div class=""container"" style=""zoom: 2;"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <script>
+    document.querySelectorAll('.container')[0].scrollTo(300, 240);
+    document.querySelectorAll('.container')[1].scrollTo(300, 240);
+  </script>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-into-view-absolute-position");
+        Assert.True(result.Passed,
+            $"zoom scrollIntoView absolute positioning should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomScrollIntoViewPercentageAbsolutePosition_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 120px;
+      height: 120px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 600px;
+      height: 600px;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      top: 200%;
+      left: 200%;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <div class=""container"" style=""zoom: 2;"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <script>
+    for (const match of document.querySelectorAll('.target')) {
+      match.scrollIntoView();
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 120px;
+      height: 120px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 600px;
+      height: 600px;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      top: 200%;
+      left: 200%;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <div class=""container"" style=""zoom: 2;"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <script>
+    document.querySelectorAll('.container')[0].scrollTo(300, 300);
+    document.querySelectorAll('.container')[1].scrollTo(300, 300);
+  </script>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-into-view-percentage-absolute-position");
+        Assert.True(result.Passed,
+            $"zoom scrollIntoView percentage absolute positioning should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollIntoView_DoesNotScrollRootForUnscrollableFixedContainers_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; }
+    body { width: 2000px; height: 2000px; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    var container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.left = '10px';
+    container.style.bottom = '10px';
+    container.style.width = '150px';
+    container.style.height = '150px';
+
+    var target = document.createElement('div');
+    target.style.position = 'absolute';
+    target.style.left = '50%';
+    target.style.top = '50%';
+    target.style.width = '10px';
+    target.style.height = '10px';
+
+    container.appendChild(target);
+    document.body.appendChild(container);
+    target.scrollIntoView();
+
+    if (document.documentElement.scrollLeft === 0 &&
+        document.documentElement.scrollTop === 0) {
+      document.getElementById('pass').style.background = 'green';
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-no-root-scroll");
+        Assert.True(result.Passed,
+            $"scrollIntoView in an unscrollable fixed container should not scroll the root. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollIntoView_ScrollsFixedScrollerWithoutScrollingRoot_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; }
+    body { width: 2000px; height: 2000px; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    var container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.right = '10px';
+    container.style.bottom = '10px';
+    container.style.width = '150px';
+    container.style.height = '150px';
+    container.style.overflow = 'auto';
+
+    var filler = document.createElement('div');
+    filler.style.width = '600px';
+    filler.style.height = '600px';
+
+    var target = document.createElement('div');
+    target.style.position = 'absolute';
+    target.style.left = '200%';
+    target.style.top = '200%';
+    target.style.width = '10px';
+    target.style.height = '10px';
+
+    container.appendChild(filler);
+    container.appendChild(target);
+    document.body.appendChild(container);
+    target.scrollIntoView();
+
+    if (document.documentElement.scrollLeft === 0 &&
+        document.documentElement.scrollTop === 0 &&
+        container.scrollLeft === 300 &&
+        container.scrollTop === 300) {
+      document.getElementById('pass').style.background = 'green';
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-scroller");
+        Assert.True(result.Passed,
+            $"scrollIntoView in a fixed scroller should scroll that scroller without scrolling the root. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_ChUnit_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      font: 16px monospace;
+      width: 5ch;
+      height: 10ch;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      width: 40px;
+      height: 80px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "ch-unit");
+        Assert.True(result.Passed,
+            $"ch unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_ExUnit_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      font: 16px monospace;
+      width: 5ex;
+      height: 10ex;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      width: 40px;
+      height: 80px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "ex-unit");
+        Assert.True(result.Passed,
+            $"ex unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_IcUnit_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      font: 16px monospace;
+      width: 5ic;
+      height: 10ic;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      width: 80px;
+      height: 160px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "ic-unit");
+        Assert.True(result.Passed,
+            $"ic unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_AttrLengthValid_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: relative;
+      background: green;
+      width: attr(data-test type(<length>));
+      height: 200px;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box"" data-test=""200px""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "attr-length-valid");
+        Assert.True(result.Passed,
+            $"attr() length should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_AttrLengthInvalidCast_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: relative;
+      background: green;
+      width: attr(data-test type(<length>), 200px);
+      height: 200px;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box"" data-test=""qqffuutt""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "attr-length-invalid-cast");
+        Assert.True(result.Passed,
+            $"invalid attr() length casts should use fallback. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_AttrInMax_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: relative;
+      background: green;
+      width: max(attr(data-test type(<length>)));
+      height: 200px;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box"" data-test=""200px""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "attr-in-max");
+        Assert.True(result.Passed,
+            $"attr() should resolve inside max(). Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_LhUnit_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      font: 20px monospace;
+      width: 5lh;
+      height: 5lh;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      width: 120px;
+      height: 120px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "lh-unit");
+        Assert.True(result.Passed,
+            $"lh unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssValues_RlhUnit_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 3rlh;
+      height: 2rlh;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .box {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 57.6px;
+      height: 38.4px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "rlh-unit");
+        Assert.True(result.Passed,
+            $"rlh unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomIcUnit_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    function measure(zoom) {
+      const box = document.createElement('div');
+      box.style.position = 'absolute';
+      box.style.left = '-10000px';
+      box.style.top = '-10000px';
+      box.style.font = '16px monospace';
+      box.style.width = '5ic';
+      box.style.height = '10ic';
+      if (zoom) {
+        box.style.zoom = zoom;
+      }
+
+      document.body.appendChild(box);
+      const metrics = box.offsetWidth === 80 && box.offsetHeight === 160;
+      box.remove();
+      return metrics;
+    }
+
+    if (measure('1') && measure('2')) {
+      document.getElementById('pass').style.background = 'green';
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-ic-unit");
+        Assert.True(result.Passed,
+            $"ic unit should stay zoom-stable in raw CSS pixels. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
@@ -2238,6 +3989,73 @@ document.getElementById('out').appendChild(p);
         Assert.True(
             targetEl!.Style.TryGetValue("display", out var d) && d == "none",
             $"Expected target display:none but styles = [{string.Join(", ", targetEl.Style.Select(kv => $"{kv.Key}:{kv.Value}"))}]");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ElementScroll_Alias_And_Object_Arguments_Work()
+    {
+        const string html = @"<!DOCTYPE html>
+<div id=""sc"" style=""width:150px; height:100px; overflow:scroll;"">
+  <div style=""width:300px; height:400px;""></div>
+</div>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        ctx.Eval("""
+            var sc = document.getElementById('sc');
+            sc.scroll(50, 60);
+            sc.scrollTo({ left: 75 });
+            sc.scrollBy({ top: 15 });
+            """);
+
+        Broiler.HtmlBridge.DomElement? sc = null;
+        FindDomElement(bridge.DocumentElement, "sc", ref sc);
+        Assert.NotNull(sc);
+        Assert.True(
+            sc!.DomProperties.TryGetValue("_scrollLeft", out var scrollLeft) && scrollLeft is double left && left == 75 &&
+            sc.DomProperties.TryGetValue("_scrollTop", out var scrollTop) && scrollTop is double top && top == 75,
+            $"Expected scrollLeft=75 and scrollTop=75, got left={sc.DomProperties.GetValueOrDefault("_scrollLeft")}, top={sc.DomProperties.GetValueOrDefault("_scrollTop")}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped()
+    {
+        const string html = @"<!DOCTYPE html>
+<div id=""rtl"" style=""overflow:scroll; width:150px; height:100px; writing-mode:horizontal-tb; direction:rtl;"">
+  <div style=""width:300px; height:400px;""></div>
+</div>
+<div id=""verticalRtl"" style=""overflow:scroll; width:150px; height:100px; writing-mode:vertical-rl; direction:rtl;"">
+  <div style=""width:300px; height:400px;""></div>
+</div>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        ctx.Eval("""
+            var rtl = document.getElementById('rtl');
+            rtl.scrollLeft = -999;
+            rtl.scrollTop = 999;
+            var verticalRtl = document.getElementById('verticalRtl');
+            verticalRtl.scrollLeft = -999;
+            verticalRtl.scrollTop = -999;
+            """);
+
+        Broiler.HtmlBridge.DomElement? rtl = null;
+        FindDomElement(bridge.DocumentElement, "rtl", ref rtl);
+        Assert.NotNull(rtl);
+        Assert.True(
+            rtl!.DomProperties.TryGetValue("_scrollLeft", out var rtlLeftValue) && rtlLeftValue is double rtlLeft && rtlLeft == -150 &&
+            rtl.DomProperties.TryGetValue("_scrollTop", out var rtlTopValue) && rtlTopValue is double rtlTop && rtlTop == 300,
+            $"Expected rtl scroller left=-150 top=300, got left={rtl.DomProperties.GetValueOrDefault("_scrollLeft")}, top={rtl.DomProperties.GetValueOrDefault("_scrollTop")}");
+
+        Broiler.HtmlBridge.DomElement? verticalRtl = null;
+        FindDomElement(bridge.DocumentElement, "verticalRtl", ref verticalRtl);
+        Assert.NotNull(verticalRtl);
+        Assert.True(
+            verticalRtl!.DomProperties.TryGetValue("_scrollLeft", out var verticalLeftValue) && verticalLeftValue is double verticalLeft && verticalLeft == -150 &&
+            verticalRtl.DomProperties.TryGetValue("_scrollTop", out var verticalTopValue) && verticalTopValue is double verticalTop && verticalTop == -300,
+            $"Expected vertical rtl scroller left=-150 top=-300, got left={verticalRtl.DomProperties.GetValueOrDefault("_scrollLeft")}, top={verticalRtl.DomProperties.GetValueOrDefault("_scrollTop")}");
     }
 
     /// <summary>

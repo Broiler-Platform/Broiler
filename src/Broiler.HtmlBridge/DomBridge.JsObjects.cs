@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
@@ -20,6 +21,8 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
+    private const double DefaultBodyMarginPixels = 8;
+
     private readonly Dictionary<DomElement, JSObject> _jsObjectCache = [];
     /// <summary>Counter for tracking top-layer insertion order via showModal().</summary>
     private int _topLayerCounter;
@@ -2194,7 +2197,7 @@ public sealed partial class DomBridge
                             if (!string.IsNullOrEmpty(cssStr))
                             {
                                 var px = ParseCssLengthToPixels(cssStr);
-                                if (px >= 0) return new JSNumber(px);
+                                if (!double.IsNaN(px)) return new JSNumber(px);
                             }
                         }
                         // Fallback: HTML attribute
@@ -2217,61 +2220,47 @@ public sealed partial class DomBridge
         // scrollTop/scrollLeft, and getBoundingClientRect()
         {
             var isRoot = tag == "html" || tag == "body";
-            var vpW = _viewportWidth;
-            var vpH = _viewportHeight;
             var bridgeForOffset = this;
             var elForOffset = element;
 
             obj.FastAddProperty(
+                (KeyString)"clientTop",
+                new JSFunction((in Arguments _) => new JSNumber(bridgeForOffset.GetClientTopForDomElement(elForOffset)), "get clientTop"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
+                (KeyString)"clientLeft",
+                new JSFunction((in Arguments _) => new JSNumber(bridgeForOffset.GetClientLeftForDomElement(elForOffset)), "get clientLeft"),
+                null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+            obj.FastAddProperty(
                 (KeyString)"clientWidth",
-                new JSFunction((in Arguments _) => new JSNumber(isRoot ? vpW : 0), "get clientWidth"),
+                new JSFunction((in Arguments _) => new JSNumber(bridgeForOffset.GetClientWidthForDomElement(elForOffset, isRoot)), "get clientWidth"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
                 (KeyString)"clientHeight",
-                new JSFunction((in Arguments _) => new JSNumber(isRoot ? vpH : 0), "get clientHeight"),
+                new JSFunction((in Arguments _) => new JSNumber(bridgeForOffset.GetClientHeightForDomElement(elForOffset, isRoot)), "get clientHeight"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
                 (KeyString)"offsetWidth",
-                new JSFunction((in Arguments _) =>
-                {
-                    if (!isRoot)
-                    {
-                        var resolved = bridgeForOffset.ResolvePositionAreaForElement(elForOffset);
-                        if (resolved != null)
-                            return new JSNumber(resolved.Value.width);
-                        var w = TryParsePx(elForOffset.Style.GetValueOrDefault("width"));
-                        if (w.HasValue) return new JSNumber(w.Value);
-                    }
-                    return new JSNumber(isRoot ? vpW : 0);
-                }, "get offsetWidth"),
+                new JSFunction((in Arguments _) => new JSNumber(bridgeForOffset.GetOffsetWidthForDomElement(elForOffset, isRoot)), "get offsetWidth"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
                 (KeyString)"offsetHeight",
-                new JSFunction((in Arguments _) =>
-                {
-                    if (!isRoot)
-                    {
-                        var resolved = bridgeForOffset.ResolvePositionAreaForElement(elForOffset);
-                        if (resolved != null)
-                            return new JSNumber(resolved.Value.height);
-                        var h = TryParsePx(elForOffset.Style.GetValueOrDefault("height"));
-                        if (h.HasValue) return new JSNumber(h.Value);
-                    }
-                    return new JSNumber(isRoot ? vpH : 0);
-                }, "get offsetHeight"),
+                new JSFunction((in Arguments _) => new JSNumber(bridgeForOffset.GetOffsetHeightForDomElement(elForOffset, isRoot)), "get offsetHeight"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
                 (KeyString)"scrollWidth",
-                new JSFunction((in Arguments _) => new JSNumber(isRoot ? vpW : 0), "get scrollWidth"),
+                new JSFunction((in Arguments _) => new JSNumber(bridgeForOffset.GetScrollWidthForDomElement(elForOffset, isRoot)), "get scrollWidth"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
                 (KeyString)"scrollHeight",
-                new JSFunction((in Arguments _) => new JSNumber(isRoot ? vpH : 0), "get scrollHeight"),
+                new JSFunction((in Arguments _) => new JSNumber(bridgeForOffset.GetScrollHeightForDomElement(elForOffset, isRoot)), "get scrollHeight"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
@@ -2285,7 +2274,7 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments a) =>
                 {
                     if (a.Length > 0)
-                        element.DomProperties["_scrollTop"] = a[0].DoubleValue;
+                        bridgeForOffset.SetElementScrollOffsets(element, top: a[0].DoubleValue);
                     return JSUndefined.Value;
                 }, "set scrollTop"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -2300,7 +2289,7 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments a) =>
                 {
                     if (a.Length > 0)
-                        element.DomProperties["_scrollLeft"] = a[0].DoubleValue;
+                        bridgeForOffset.SetElementScrollOffsets(element, left: a[0].DoubleValue);
                     return JSUndefined.Value;
                 }, "set scrollLeft"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -2308,10 +2297,7 @@ public sealed partial class DomBridge
                 (KeyString)"offsetTop",
                 new JSFunction((in Arguments _) =>
                 {
-                    var resolved = bridgeForOffset.ResolvePositionAreaForElement(elForOffset);
-                    if (resolved != null)
-                        return new JSNumber(resolved.Value.top);
-                    return new JSNumber(0);
+                    return new JSNumber(bridgeForOffset.GetOffsetTopForDomElement(elForOffset));
                 }, "get offsetTop"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -2319,35 +2305,35 @@ public sealed partial class DomBridge
                 (KeyString)"offsetLeft",
                 new JSFunction((in Arguments _) =>
                 {
-                    var resolved = bridgeForOffset.ResolvePositionAreaForElement(elForOffset);
-                    if (resolved != null)
-                        return new JSNumber(resolved.Value.left);
-                    return new JSNumber(0);
+                    return new JSNumber(bridgeForOffset.GetOffsetLeftForDomElement(elForOffset));
                 }, "get offsetLeft"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
             obj.FastAddProperty(
                 (KeyString)"offsetParent",
-                new JSFunction((in Arguments _) => JSNull.Value, "get offsetParent"),
+                new JSFunction((in Arguments _) =>
+                {
+                    var offsetParent = bridgeForOffset.GetOffsetParentForDomElement(elForOffset);
+                    return offsetParent != null ? bridgeForOffset.ToJSObject(offsetParent) : JSNull.Value;
+                }, "get offsetParent"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
             // getBoundingClientRect() — returns DOMRect-like object
-            var w = isRoot ? vpW : 0;
-            var h = isRoot ? vpH : 0;
             obj.FastAddValue(
                 (KeyString)"getBoundingClientRect",
                 new JSFunction((in Arguments _) =>
                 {
+                    var rectData = bridgeForOffset.GetBoundingClientRectForDomElement(elForOffset, isRoot);
                     var rect = new JSObject();
-                    rect.FastAddValue((KeyString)"x", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"y", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"top", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"left", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"right", new JSNumber(w), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"bottom", new JSNumber(h), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"width", new JSNumber(w), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"height", new JSNumber(h), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"x", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"y", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"top", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"left", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"right", new JSNumber(rectData.Left + rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"bottom", new JSNumber(rectData.Top + rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"width", new JSNumber(rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"height", new JSNumber(rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
                     return rect;
                 }, "getBoundingClientRect", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -2357,16 +2343,19 @@ public sealed partial class DomBridge
                 (KeyString)"getClientRects",
                 new JSFunction((in Arguments a2) =>
                 {
+                    var rectData = bridgeForOffset.GetBoundingClientRectForDomElement(elForOffset, isRoot);
                     var rect = new JSObject();
-                    rect.FastAddValue((KeyString)"x", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"y", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"top", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"left", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"right", new JSNumber(w), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"bottom", new JSNumber(h), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"width", new JSNumber(w), JSPropertyAttributes.EnumerableConfigurableValue);
-                    rect.FastAddValue((KeyString)"height", new JSNumber(h), JSPropertyAttributes.EnumerableConfigurableValue);
-                    return isRoot ? new JSArray(new JSValue[] { rect }) : new JSArray();
+                    rect.FastAddValue((KeyString)"x", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"y", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"top", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"left", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"right", new JSNumber(rectData.Left + rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"bottom", new JSNumber(rectData.Top + rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"width", new JSNumber(rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
+                    rect.FastAddValue((KeyString)"height", new JSNumber(rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
+                    return rectData.Width > 0 || rectData.Height > 0 || isRoot
+                        ? new JSArray(new JSValue[] { rect })
+                        : new JSArray();
                 }, "getClientRects", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -2377,6 +2366,33 @@ public sealed partial class DomBridge
                     bridgeForOffset.ScrollElementIntoView(elForOffset);
                     return JSUndefined.Value;
                 }, "scrollIntoView", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue(
+                (KeyString)"scroll",
+                new JSFunction((in Arguments a) =>
+                {
+                    var (left, top) = bridgeForOffset.GetScrollArguments(a);
+                    bridgeForOffset.SetElementScrollOffsets(element, left, top, clamp: false);
+                    return JSUndefined.Value;
+                }, "scroll", 2),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue(
+                (KeyString)"scrollTo",
+                new JSFunction((in Arguments a) =>
+                {
+                    var (left, top) = bridgeForOffset.GetScrollArguments(a);
+                    bridgeForOffset.SetElementScrollOffsets(element, left, top, clamp: false);
+                    return JSUndefined.Value;
+                }, "scrollTo", 2),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue(
+                (KeyString)"scrollBy",
+                new JSFunction((in Arguments a) =>
+                {
+                    var (left, top) = bridgeForOffset.GetScrollArguments(a);
+                    bridgeForOffset.SetElementScrollOffsets(element, left, top, relative: true, clamp: false);
+                    return JSUndefined.Value;
+                }, "scrollBy", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
@@ -2630,12 +2646,504 @@ public sealed partial class DomBridge
         return obj;
     }
 
+    private double GetClientWidthForDomElement(DomElement element, bool isRoot)
+    {
+        if (isRoot)
+            return _viewportWidth;
+
+        var props = GetComputedProps(element);
+        var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element, percentageBasis: containingBlockWidth);
+    }
+
+    private double GetClientHeightForDomElement(DomElement element, bool isRoot)
+    {
+        if (isRoot)
+            return _viewportHeight;
+
+        var props = GetComputedProps(element);
+        var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
+        var containingBlockHeight = ResolveContainingBlockReferenceLength(element, vertical: true);
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element, percentageBasis: containingBlockHeight)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element, percentageBasis: containingBlockWidth);
+    }
+
+    private double GetClientTopForDomElement(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-top-width"), element);
+    }
+
+    private double GetClientLeftForDomElement(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-left-width"), element);
+    }
+
+    private double GetOffsetWidthForDomElement(DomElement element, bool isRoot)
+    {
+        if (isRoot)
+            return _viewportWidth;
+
+        var resolved = ResolvePositionAreaForElement(element);
+        if (resolved != null)
+            return resolved.Value.width;
+
+        var props = GetComputedProps(element);
+        var width = GetBorderBoxWidth(props, element);
+        if (width > 0)
+            return width;
+
+        return 0;
+    }
+
+    private double GetOffsetHeightForDomElement(DomElement element, bool isRoot)
+    {
+        if (isRoot)
+            return _viewportHeight;
+
+        var resolved = ResolvePositionAreaForElement(element);
+        if (resolved != null)
+            return resolved.Value.height;
+
+        var props = GetComputedProps(element);
+        var height = GetBorderBoxHeight(props, element);
+        if (height > 0)
+            return height;
+
+        return 0;
+    }
+
+    private double GetOffsetTopForDomElement(DomElement element)
+    {
+        var resolved = ResolvePositionAreaForElement(element);
+        if (resolved != null)
+            return resolved.Value.top;
+
+        var offsetParent = GetOffsetParentForDomElement(element);
+        if (offsetParent != null)
+            return ComputeOffsetRelativeToAncestor(element, offsetParent, vertical: true);
+
+        var layoutRect = ComputeUnzoomedLayoutRect(element);
+        return layoutRect.Top;
+    }
+
+    private double GetOffsetLeftForDomElement(DomElement element)
+    {
+        var resolved = ResolvePositionAreaForElement(element);
+        if (resolved != null)
+            return resolved.Value.left;
+
+        var offsetParent = GetOffsetParentForDomElement(element);
+        if (offsetParent != null)
+            return ComputeOffsetRelativeToAncestor(element, offsetParent, vertical: false);
+
+        var layoutRect = ComputeUnzoomedLayoutRect(element);
+        return layoutRect.Left;
+    }
+
+    private DomElement? GetOffsetParentForDomElement(DomElement element)
+    {
+        if (element.Parent == null ||
+            ReferenceEquals(element, DocumentElement) ||
+            string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(element.TagName, "body", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var props = GetComputedProps(element);
+        if (string.Equals(props.GetValueOrDefault("position"), "fixed", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var fallbackBody = FindBodyElement();
+        for (var current = element.Parent; current != null; current = current.Parent)
+        {
+            if (string.Equals(current.TagName, "body", StringComparison.OrdinalIgnoreCase))
+                return current;
+
+            if (ReferenceEquals(current, DocumentElement))
+                return fallbackBody ?? DocumentElement;
+
+            var currentProps = GetComputedProps(current);
+            var currentPosition = currentProps.GetValueOrDefault("position");
+            if (!string.IsNullOrWhiteSpace(currentPosition) &&
+                !string.Equals(currentPosition, "static", StringComparison.OrdinalIgnoreCase))
+            {
+                return current;
+            }
+        }
+
+        return fallbackBody ?? DocumentElement;
+    }
+
+    private double GetScrollWidthForDomElement(DomElement element, bool isRoot)
+    {
+        if (isRoot)
+            return _viewportWidth;
+
+        var props = GetComputedProps(element);
+        var ownWidth = GetClientWidthForDomElement(element, isRoot: false);
+        var ownZoom = GetUsedZoomForElement(element);
+        var trailingPadding = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element);
+        var maxWidth = ownWidth;
+        foreach (var child in element.Children.Where(c => !c.IsTextNode))
+        {
+            var childRect = ComputeRenderedRect(child);
+            var widthInContainerSpace = ownZoom > 0.0001 ? (childRect.Width / ownZoom) : childRect.Width;
+            var childOffset = ComputeOffsetWithinParent(child, vertical: false);
+            maxWidth = Math.Max(maxWidth, childOffset + widthInContainerSpace + trailingPadding);
+        }
+
+        return maxWidth;
+    }
+
+    private double GetScrollHeightForDomElement(DomElement element, bool isRoot)
+    {
+        if (isRoot)
+            return _viewportHeight;
+
+        var props = GetComputedProps(element);
+        var ownHeight = GetClientHeightForDomElement(element, isRoot: false);
+        var ownZoom = GetUsedZoomForElement(element);
+        var trailingPadding = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element);
+        var maxHeight = ownHeight;
+        foreach (var child in element.Children.Where(c => !c.IsTextNode))
+        {
+            var childRect = ComputeRenderedRect(child);
+            var heightInContainerSpace = ownZoom > 0.0001 ? (childRect.Height / ownZoom) : childRect.Height;
+            var childOffset = ComputeOffsetWithinParent(child, vertical: true);
+            maxHeight = Math.Max(maxHeight, childOffset + heightInContainerSpace + trailingPadding);
+        }
+
+        return maxHeight;
+    }
+
+    private double ComputeOffsetRelativeToAncestor(DomElement element, DomElement ancestor, bool vertical)
+    {
+        double offset = 0;
+        var current = element;
+        while (current.Parent != null && !ReferenceEquals(current.Parent, ancestor))
+        {
+            offset += ComputeOffsetWithinParentForOffset(current, vertical);
+            current = current.Parent;
+        }
+
+        if (current.Parent != null && ReferenceEquals(current.Parent, ancestor))
+            offset += ComputeOffsetWithinParentForOffset(current, vertical);
+
+        return offset;
+    }
+
+    private double ComputeOffsetWithinParentForOffset(DomElement element, bool vertical)
+    {
+        if (element.Parent == null)
+            return 0;
+
+        var props = GetComputedProps(element);
+        var position = props.GetValueOrDefault("position");
+        var margin = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), element);
+        var positional = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "top" : "left"), element);
+
+        if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase))
+            return margin + positional;
+
+        double offset = 0;
+        if (vertical)
+        {
+            foreach (var sibling in element.Parent.Children)
+            {
+                if (ReferenceEquals(sibling, element))
+                    break;
+                if (sibling.IsTextNode)
+                    continue;
+
+                var siblingProps = GetComputedProps(sibling);
+                var siblingPosition = siblingProps.GetValueOrDefault("position");
+                if (string.Equals(siblingPosition, "absolute", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(siblingPosition, "fixed", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (!ShouldCollapseTopMarginWithParent(sibling))
+                    offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"), sibling);
+                offset += GetBorderBoxHeight(siblingProps, sibling);
+                offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"), sibling);
+                if (string.Equals(siblingPosition, "relative", StringComparison.OrdinalIgnoreCase))
+                    offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("top"), sibling);
+            }
+
+            if (!ShouldCollapseTopMarginWithParent(element))
+                offset += margin;
+        }
+        else
+        {
+            offset += margin;
+        }
+
+        if (string.Equals(position, "relative", StringComparison.OrdinalIgnoreCase))
+            offset += positional;
+
+        return offset;
+    }
+
+    private bool ShouldCollapseTopMarginWithParent(DomElement element)
+    {
+        if (element.Parent == null)
+            return false;
+
+        var props = GetComputedProps(element);
+        var position = props.GetValueOrDefault("position");
+        if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(position, "fixed", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        foreach (var sibling in element.Parent.Children)
+        {
+            if (sibling.IsTextNode)
+                continue;
+            if (ReferenceEquals(sibling, element))
+                break;
+            return false;
+        }
+
+        var parentProps = GetComputedProps(element.Parent);
+        return ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("border-top-width"), element.Parent) == 0 &&
+               ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("padding-top"), element.Parent) == 0;
+    }
+
+    private (double Left, double Top, double Width, double Height) GetBoundingClientRectForDomElement(DomElement element, bool isRoot)
+    {
+        if (isRoot)
+            return (0, 0, _viewportWidth, _viewportHeight);
+
+        return ComputeRenderedRect(element);
+    }
+
+    private (double Left, double Top, double Width, double Height) ComputeRenderedRect(DomElement element)
+    {
+        var layoutRect = ComputeUnzoomedLayoutRect(element);
+        var zoom = GetUsedZoomForElement(element);
+        var transformScale = GetTransformScale(element);
+        return (layoutRect.Left, layoutRect.Top, layoutRect.Width * zoom * transformScale, layoutRect.Height * zoom * transformScale);
+    }
+
+    private (double Left, double Top, double Width, double Height) ComputeUnzoomedLayoutRect(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
+        var containingBlockHeight = ResolveContainingBlockReferenceLength(element, vertical: true);
+        var width = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element, percentageBasis: containingBlockWidth);
+        var height = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element, percentageBasis: containingBlockHeight);
+        var marginTop = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("margin-top"), element, percentageBasis: containingBlockWidth);
+        var marginLeft = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("margin-left"), element, percentageBasis: containingBlockWidth);
+        var top = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("top"), element, percentageBasis: containingBlockHeight);
+        var left = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("left"), element, percentageBasis: containingBlockWidth);
+        var position = props.GetValueOrDefault("position");
+
+        if (element.Parent == null || string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase))
+            return (0, 0, width, height);
+
+        if (string.Equals(element.TagName, "body", StringComparison.OrdinalIgnoreCase))
+        {
+            var specifiedMarginTop = props.GetValueOrDefault("margin-top");
+            var specifiedMarginLeft = props.GetValueOrDefault("margin-left");
+            var bodyMarginTop = HasExplicitBodyMargin(specifiedMarginTop) ? marginTop : DefaultBodyMarginPixels;
+            var bodyMarginLeft = HasExplicitBodyMargin(specifiedMarginLeft) ? marginLeft : DefaultBodyMarginPixels;
+            return (bodyMarginLeft, bodyMarginTop, width, height);
+        }
+
+        var parentRect = ComputeUnzoomedLayoutRect(element.Parent);
+        var parentProps = GetComputedProps(element.Parent);
+        var parentBorderTop = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("border-top-width"), element.Parent);
+        var parentBorderLeft = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("border-left-width"), element.Parent);
+        var parentPaddingTop = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("padding-top"), element.Parent);
+        var parentPaddingLeft = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault("padding-left"), element.Parent);
+
+        var baseTop = parentRect.Top + parentBorderTop + parentPaddingTop;
+        var baseLeft = parentRect.Left + parentBorderLeft + parentPaddingLeft;
+
+        if (!string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var sibling in element.Parent.Children)
+            {
+                if (ReferenceEquals(sibling, element))
+                    break;
+                if (sibling.IsTextNode)
+                    continue;
+
+                var siblingRect = ComputeRenderedRect(sibling);
+                var siblingProps = GetComputedProps(sibling);
+                var siblingPosition = siblingProps.GetValueOrDefault("position");
+                if (string.Equals(siblingPosition, "absolute", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(siblingPosition, "fixed", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                baseTop += siblingRect.Height;
+                baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"), sibling);
+                baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"), sibling);
+            }
+        }
+
+        var resolvedTop = baseTop + marginTop;
+        var resolvedLeft = baseLeft + marginLeft;
+
+        if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(position, "relative", StringComparison.OrdinalIgnoreCase))
+        {
+            resolvedTop += top;
+            resolvedLeft += left;
+        }
+
+        return (resolvedLeft, resolvedTop, width, height);
+    }
+
+    private double GetUsedZoomForElement(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        var specifiedZoom = props.GetValueOrDefault("zoom");
+        var parentZoom = element.Parent != null ? GetUsedZoomForElement(element.Parent) : 1.0;
+        return ResolveSpecifiedZoom(specifiedZoom, parentZoom);
+    }
+
+    private static double ResolveSpecifiedZoom(string? specifiedZoom, double parentZoom)
+    {
+        if (string.IsNullOrWhiteSpace(specifiedZoom) ||
+            specifiedZoom.Equals("inherit", StringComparison.OrdinalIgnoreCase) ||
+            specifiedZoom.Equals("normal", StringComparison.OrdinalIgnoreCase))
+        {
+            return parentZoom;
+        }
+
+        if (double.TryParse(specifiedZoom, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var zoom) && zoom > 0)
+            return parentZoom * zoom;
+
+        return parentZoom;
+    }
+
+    private double GetTransformScale(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        var transform = props.GetValueOrDefault("transform");
+        if (string.IsNullOrWhiteSpace(transform))
+            return 1;
+
+        var match = Regex.Match(transform, @"scale\(\s*(?<value>[-+]?[0-9]*\.?[0-9]+)\s*\)", RegexOptions.IgnoreCase);
+        if (match.Success &&
+            double.TryParse(match.Groups["value"].Value, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out double scale))
+        {
+            return scale;
+        }
+
+        return 1;
+    }
+
+    private double GetBorderBoxWidth(Dictionary<string, string> props, DomElement? element = null)
+    {
+        var containingBlockWidth = element != null ? ResolveContainingBlockReferenceLength(element, vertical: false) : (double?)null;
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-left-width"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-right-width"), element);
+    }
+
+    private double GetBorderBoxHeight(Dictionary<string, string> props, DomElement? element = null)
+    {
+        var containingBlockWidth = element != null ? ResolveContainingBlockReferenceLength(element, vertical: false) : (double?)null;
+        var containingBlockHeight = element != null ? ResolveContainingBlockReferenceLength(element, vertical: true) : (double?)null;
+        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element, percentageBasis: containingBlockHeight)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element, percentageBasis: containingBlockWidth)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-top-width"), element)
+             + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-bottom-width"), element);
+    }
+
     private void ScrollElementIntoView(DomElement element)
     {
         var scrollContainer = FindScrollContainer(element) ?? DocumentElement;
-        var scrollTop = ComputeOffsetWithinAncestor(element, scrollContainer);
-        if (scrollTop > 0)
-            scrollContainer.DomProperties["_scrollTop"] = scrollTop;
+        if (ReferenceEquals(scrollContainer, DocumentElement) && HasFixedPositionAncestorBefore(element, scrollContainer))
+            return;
+
+        var scrollTop = ComputeOffsetWithinAncestor(element, scrollContainer, vertical: true)
+            - ResolveScrollIntoViewInset(element, "scroll-margin-top")
+            - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-top");
+        var scrollLeft = ComputeOffsetWithinAncestor(element, scrollContainer, vertical: false)
+            - ResolveScrollIntoViewInset(element, "scroll-margin-left")
+            - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-left");
+
+        scrollContainer.DomProperties["_scrollTop"] = Math.Max(0, scrollTop);
+        scrollContainer.DomProperties["_scrollLeft"] = Math.Max(0, scrollLeft);
+    }
+
+    private (double? Left, double? Top) GetScrollArguments(in Arguments args)
+    {
+        if (args.Length == 0)
+            return (null, null);
+
+        if (args[0] is JSObject options)
+        {
+            return (GetOptionalScrollCoordinate(options, "left"), GetOptionalScrollCoordinate(options, "top"));
+        }
+
+        return (args.Length > 0 ? args[0].DoubleValue : null, args.Length > 1 ? args[1].DoubleValue : null);
+    }
+
+    private static double? GetOptionalScrollCoordinate(JSObject options, string propertyName)
+    {
+        var value = options[(KeyString)propertyName];
+        return value == null || value.IsUndefined || value.IsNull ? null : value.DoubleValue;
+    }
+
+    private void SetElementScrollOffsets(DomElement element, double? left = null, double? top = null, bool relative = false, bool clamp = true)
+    {
+        var currentLeft = element.DomProperties.TryGetValue("_scrollLeft", out var sl) && sl is double leftValue ? leftValue : 0;
+        var currentTop = element.DomProperties.TryGetValue("_scrollTop", out var st) && st is double topValue ? topValue : 0;
+
+        var nextLeft = left.HasValue ? (relative ? currentLeft + left.Value : left.Value) : currentLeft;
+        var nextTop = top.HasValue ? (relative ? currentTop + top.Value : top.Value) : currentTop;
+
+        if (clamp)
+        {
+            var (minLeft, maxLeft, minTop, maxTop) = GetScrollBounds(element);
+            nextLeft = Math.Clamp(nextLeft, minLeft, maxLeft);
+            nextTop = Math.Clamp(nextTop, minTop, maxTop);
+        }
+
+        element.DomProperties["_scrollLeft"] = nextLeft;
+        element.DomProperties["_scrollTop"] = nextTop;
+    }
+
+    private (double MinLeft, double MaxLeft, double MinTop, double MaxTop) GetScrollBounds(DomElement element)
+    {
+        var isRoot = ReferenceEquals(element, DocumentElement) ||
+                     string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase);
+        var maxLeft = Math.Max(0, GetScrollWidthForDomElement(element, isRoot) - GetClientWidthForDomElement(element, isRoot));
+        var maxTop = Math.Max(0, GetScrollHeightForDomElement(element, isRoot) - GetClientHeightForDomElement(element, isRoot));
+
+        var props = GetComputedProps(element);
+        var writingMode = props.GetValueOrDefault("writing-mode");
+        var direction = props.GetValueOrDefault("direction");
+        var isRtl = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
+        var isVerticalRl = string.Equals(writingMode, "vertical-rl", StringComparison.OrdinalIgnoreCase);
+        var isVertical = isVerticalRl || string.Equals(writingMode, "vertical-lr", StringComparison.OrdinalIgnoreCase);
+        var usesNegativeLeft = isVerticalRl || (string.Equals(writingMode, "horizontal-tb", StringComparison.OrdinalIgnoreCase) && isRtl);
+        var usesNegativeTop = isVertical && isRtl;
+
+        var minLeft = usesNegativeLeft ? -maxLeft : 0;
+        var boundedMaxLeft = usesNegativeLeft ? 0 : maxLeft;
+        var minTop = usesNegativeTop ? -maxTop : 0;
+        var boundedMaxTop = usesNegativeTop ? 0 : maxTop;
+        return (minLeft, boundedMaxLeft, minTop, boundedMaxTop);
     }
 
     private DomElement? FindScrollContainer(DomElement element)
@@ -2650,67 +3158,437 @@ public sealed partial class DomBridge
         return DocumentElement;
     }
 
-    private double ComputeOffsetWithinAncestor(DomElement element, DomElement ancestor)
+    private bool HasFixedPositionAncestorBefore(DomElement element, DomElement ancestor)
+    {
+        for (var current = element.Parent; current != null && !ReferenceEquals(current, ancestor); current = current.Parent)
+        {
+            var props = GetComputedProps(current);
+            if (string.Equals(props.GetValueOrDefault("position"), "fixed", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    private double ComputeOffsetWithinAncestor(DomElement element, DomElement ancestor, bool vertical)
     {
         double offset = 0;
         var current = element;
 
         while (current.Parent != null && !ReferenceEquals(current.Parent, ancestor))
         {
-            offset += ComputeOffsetWithinParent(current);
+            offset += ComputeOffsetWithinParent(current, vertical);
             current = current.Parent;
         }
 
         if (current.Parent != null && ReferenceEquals(current.Parent, ancestor))
-            offset += ComputeOffsetWithinParent(current);
+            offset += ComputeOffsetWithinParent(current, vertical);
 
         return offset;
     }
 
-    private double ComputeOffsetWithinParent(DomElement element)
+    private double ComputeOffsetWithinParent(DomElement element, bool vertical)
     {
         if (element.Parent == null)
             return 0;
 
-        double offset = ParseCssLengthToPixelsWithViewport(GetComputedProps(element).GetValueOrDefault("margin-top"));
-        foreach (var sibling in element.Parent.Children)
-        {
-            if (ReferenceEquals(sibling, element))
-                break;
-            if (sibling.IsTextNode)
-                continue;
+        var parentProps = GetComputedProps(element.Parent);
+        var elementProps = GetComputedProps(element);
+        var position = elementProps.GetValueOrDefault("position");
+        double offset = ParseCssLengthToPixelsWithViewport(
+            parentProps.GetValueOrDefault(vertical ? "padding-top" : "padding-left"), element.Parent);
+        offset += ParseCssLengthToPixelsWithViewport(
+            elementProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), element);
 
-            var siblingProps = GetComputedProps(sibling);
-            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"));
-            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("height"));
-            offset += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"));
+        if (!string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var sibling in element.Parent.Children)
+            {
+                if (ReferenceEquals(sibling, element))
+                    break;
+                if (sibling.IsTextNode)
+                    continue;
+
+                var siblingProps = GetComputedProps(sibling);
+                var siblingPosition = siblingProps.GetValueOrDefault("position");
+                if (string.Equals(siblingPosition, "absolute", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(siblingPosition, "fixed", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                offset += ParseCssLengthToPixelsWithViewport(
+                    siblingProps.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), sibling);
+                offset += ParseCssLengthToPixelsWithViewport(
+                    siblingProps.GetValueOrDefault(vertical ? "height" : "width"), sibling);
+                offset += ParseCssLengthToPixelsWithViewport(
+                    siblingProps.GetValueOrDefault(vertical ? "margin-bottom" : "margin-right"), sibling);
+            }
+        }
+
+        if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(position, "relative", StringComparison.OrdinalIgnoreCase))
+        {
+            offset += ResolvePositionedInset(element, vertical);
         }
 
         return offset;
     }
 
-    private double ParseCssLengthToPixelsWithViewport(string? value)
+    private double ResolveScrollIntoViewInset(DomElement element, string propertyName)
+    {
+        var props = GetComputedProps(element);
+        var value = props.GetValueOrDefault(propertyName);
+        if (string.Equals(value, "inherit", StringComparison.OrdinalIgnoreCase) && element.Parent != null)
+            return ResolveScrollIntoViewInset(element.Parent, propertyName);
+
+        return ParseCssLengthToPixelsWithViewport(value, element);
+    }
+
+    private double ResolvePositionedInset(DomElement element, bool vertical)
+    {
+        if (element.Parent == null)
+            return 0;
+
+        var props = GetComputedProps(element);
+        var value = props.GetValueOrDefault(vertical ? "top" : "left");
+        if (string.IsNullOrWhiteSpace(value) ||
+            string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return 0;
+        }
+
+        var normalized = value.Trim().ToLowerInvariant();
+        if (normalized.EndsWith("%"))
+        {
+            if (!double.TryParse(normalized[..^1], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var percent))
+            {
+                return 0;
+            }
+
+            var parentProps = GetComputedProps(element.Parent);
+            var reference = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault(vertical ? "height" : "width"), element.Parent);
+            return reference <= 0 ? 0 : reference * (percent / 100.0);
+        }
+
+        return ParseCssLengthToPixelsWithViewport(value, element);
+    }
+
+    private double ParseCssLengthToPixelsWithViewport(
+        string? value,
+        DomElement? referenceElement = null,
+        bool forLineHeight = false,
+        double? percentageBasis = null)
     {
         if (string.IsNullOrWhiteSpace(value))
             return 0;
 
-        var normalized = value.Trim().ToLowerInvariant();
-        if (normalized.EndsWith("vh") &&
-            double.TryParse(normalized[..^2], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var vh))
+        return TryEvaluateCssLengthWithViewport(value, referenceElement, forLineHeight, percentageBasis, out var px)
+            ? px
+            : 0;
+    }
+
+    private bool TryEvaluateCssLengthWithViewport(
+        string value,
+        DomElement? referenceElement,
+        bool forLineHeight,
+        double? percentageBasis,
+        out double result)
+    {
+        result = 0;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var normalized = value.Trim();
+        while (normalized.Length >= 2 &&
+               normalized[0] == '(' &&
+               normalized[^1] == ')' &&
+               HasBalancedParens(normalized[1..^1]))
         {
-            return (vh / 100.0) * _viewportHeight;
+            normalized = normalized[1..^1].Trim();
         }
 
-        if (normalized.EndsWith("vw") &&
-            double.TryParse(normalized[..^2], System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out var vw))
+        if (TryEvaluateMathLengthFunction(normalized, referenceElement, forLineHeight, percentageBasis, out result))
+            return true;
+
+        var additiveOperatorIndex = FindTopLevelAdditiveOperator(normalized);
+        if (additiveOperatorIndex > 0)
         {
-            return (vw / 100.0) * _viewportWidth;
+            if (!TryEvaluateCssLengthWithViewport(
+                    normalized[..additiveOperatorIndex],
+                    referenceElement,
+                    forLineHeight,
+                    percentageBasis,
+                    out var left) ||
+                !TryEvaluateCssLengthWithViewport(
+                    normalized[(additiveOperatorIndex + 1)..],
+                    referenceElement,
+                    forLineHeight,
+                    percentageBasis,
+                    out var right))
+            {
+                return false;
+            }
+
+            result = normalized[additiveOperatorIndex] == '+'
+                ? left + right
+                : left - right;
+            return true;
         }
 
-        var px = ParseCssLengthToPixels(value);
-        return px >= 0 ? px : 0;
+        var lower = normalized.ToLowerInvariant();
+        if (percentageBasis.HasValue &&
+            lower.EndsWith("%", StringComparison.Ordinal) &&
+            double.TryParse(lower[..^1], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var percent))
+        {
+            result = percentageBasis.Value * (percent / 100.0);
+            return true;
+        }
+
+        if (referenceElement != null &&
+            lower.EndsWith("rem") &&
+            double.TryParse(lower[..^3], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var rem))
+        {
+            result = rem * ResolveFontSizeForLength(referenceElement, rootRelative: true);
+            return true;
+        }
+
+        if (referenceElement != null &&
+            lower.EndsWith("em") &&
+            double.TryParse(lower[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var em))
+        {
+            result = em * ResolveFontSizeForLength(referenceElement, rootRelative: false);
+            return true;
+        }
+
+        if (referenceElement != null &&
+            lower.EndsWith("rlh") &&
+            double.TryParse(lower[..^3], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var rlh))
+        {
+            result = rlh * ResolveLineHeightForLength(referenceElement, rootRelative: true);
+            return true;
+        }
+
+        if (referenceElement != null &&
+            lower.EndsWith("lh") &&
+            double.TryParse(lower[..^2], System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var lh))
+        {
+            result = lh * ResolveLineHeightForLength(referenceElement, rootRelative: false, forLineHeight);
+            return true;
+        }
+
+        var px = ParseCssLengthToPixels(normalized, _viewportWidth, _viewportHeight);
+        if (double.IsNaN(px))
+            return false;
+
+        result = px;
+        return true;
+    }
+
+    private bool TryEvaluateMathLengthFunction(
+        string value,
+        DomElement? referenceElement,
+        bool forLineHeight,
+        double? percentageBasis,
+        out double result)
+    {
+        result = 0;
+        if (string.IsNullOrWhiteSpace(value) || value[^1] != ')')
+            return false;
+
+        static bool StartsWithFunction(string candidate, string functionName)
+            => candidate.StartsWith(functionName + "(", StringComparison.OrdinalIgnoreCase);
+
+        if (StartsWithFunction(value, "calc"))
+        {
+            var content = value[5..^1];
+            return HasBalancedParens(content) &&
+                   TryEvaluateCssLengthWithViewport(content, referenceElement, forLineHeight, percentageBasis, out result);
+        }
+
+        if (!StartsWithFunction(value, "min") && !StartsWithFunction(value, "max"))
+            return false;
+
+        var isMax = StartsWithFunction(value, "max");
+        var contentValue = value[4..^1];
+        if (!HasBalancedParens(contentValue))
+            return false;
+
+        var parts = SplitTopLevelArguments(contentValue);
+        if (parts.Count == 0)
+            return false;
+
+        double? candidate = null;
+        foreach (var part in parts)
+        {
+            if (!TryEvaluateCssLengthWithViewport(part, referenceElement, forLineHeight, percentageBasis, out var parsed))
+                return false;
+
+            candidate = candidate.HasValue
+                ? (isMax ? Math.Max(candidate.Value, parsed) : Math.Min(candidate.Value, parsed))
+                : parsed;
+        }
+
+        if (!candidate.HasValue)
+            return false;
+
+        result = candidate.Value;
+        return true;
+    }
+
+    private static int FindTopLevelAdditiveOperator(string expression)
+    {
+        var depth = 0;
+        for (int i = expression.Length - 1; i >= 1; i--)
+        {
+            switch (expression[i])
+            {
+                case ')':
+                    depth++;
+                    break;
+                case '(':
+                    depth--;
+                    break;
+                case '+':
+                case '-':
+                    if (depth != 0)
+                        break;
+
+                    var leftIndex = i - 1;
+                    while (leftIndex >= 0 && char.IsWhiteSpace(expression[leftIndex]))
+                        leftIndex--;
+
+                    var rightIndex = i + 1;
+                    while (rightIndex < expression.Length && char.IsWhiteSpace(expression[rightIndex]))
+                        rightIndex++;
+
+                    if (leftIndex >= 0 &&
+                        rightIndex < expression.Length &&
+                        expression[leftIndex] != '(' &&
+                        expression[leftIndex] != ',' &&
+                        expression[leftIndex] != '+' &&
+                        expression[leftIndex] != '-')
+                    {
+                        return i;
+                    }
+                    break;
+            }
+        }
+
+        return -1;
+    }
+
+    private static List<string> SplitTopLevelArguments(string value)
+    {
+        var parts = new List<string>();
+        var depth = 0;
+        var start = 0;
+
+        for (int i = 0; i < value.Length; i++)
+        {
+            switch (value[i])
+            {
+                case '(':
+                    depth++;
+                    break;
+                case ')':
+                    depth--;
+                    if (depth < 0)
+                        return [];
+                    break;
+                case ',' when depth == 0:
+                    parts.Add(value[start..i].Trim());
+                    start = i + 1;
+                    break;
+            }
+        }
+
+        if (depth != 0)
+            return [];
+
+        parts.Add(value[start..].Trim());
+        return parts;
+    }
+
+    private double ResolveContainingBlockReferenceLength(DomElement element, bool vertical)
+    {
+        if (element.Parent == null ||
+            string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(element.TagName, "body", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(element.Parent.TagName, "html", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(element.Parent.TagName, "body", StringComparison.OrdinalIgnoreCase))
+        {
+            return vertical ? _viewportHeight : _viewportWidth;
+        }
+
+        var parentRect = ComputeUnzoomedLayoutRect(element.Parent);
+        var reference = vertical ? parentRect.Height : parentRect.Width;
+        return reference > 0 ? reference : (vertical ? _viewportHeight : _viewportWidth);
+    }
+
+    private static bool HasExplicitBodyMargin(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value) &&
+               !string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private double ResolveLineHeightForLength(DomElement element, bool rootRelative, bool forLineHeight = false)
+    {
+        var target = rootRelative ? GetRootElement(element) : (forLineHeight ? element.Parent ?? element : element);
+        return ResolveLineHeightForElement(target);
+    }
+
+    private double ResolveFontSizeForLength(DomElement element, bool rootRelative)
+    {
+        var target = rootRelative ? GetRootElement(element) : element;
+        return ResolveFontSizeForElement(target);
+    }
+
+    private DomElement GetRootElement(DomElement element)
+    {
+        DomElement? htmlElement = null;
+        var current = element;
+        while (current.Parent != null)
+        {
+            current = current.Parent;
+            if (string.Equals(current.TagName, "html", StringComparison.OrdinalIgnoreCase))
+                htmlElement = current;
+        }
+
+        return htmlElement ?? current;
+    }
+
+    private double ResolveLineHeightForElement(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        var fontSize = ResolveFontSizeForElement(element);
+        var lineHeight = props.GetValueOrDefault("line-height");
+        if (string.IsNullOrWhiteSpace(lineHeight) ||
+            string.Equals(lineHeight, "normal", StringComparison.OrdinalIgnoreCase))
+        {
+            return fontSize * 1.2;
+        }
+
+        var normalized = lineHeight.Trim().ToLowerInvariant();
+        if (double.TryParse(normalized, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var multiplier))
+        {
+            return fontSize * multiplier;
+        }
+
+        return ParseCssLengthToPixelsWithViewport(lineHeight, element, forLineHeight: true);
+    }
+
+    private double ResolveFontSizeForElement(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        var fontSize = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("font-size"), element);
+        return fontSize > 0 ? fontSize : 16;
     }
 
     // ── Phase 6: Sub-document cache ──────────────────────────────────────────

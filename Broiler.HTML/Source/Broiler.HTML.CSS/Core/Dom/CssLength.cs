@@ -89,6 +89,14 @@ internal sealed class CssLength
                 Unit = CssUnit.Ex;
                 IsRelative = true;
                 break;
+            case CssConstants.Ch:
+                Unit = CssUnit.Ch;
+                IsRelative = true;
+                break;
+            case CssConstants.Ic:
+                Unit = CssUnit.Ic;
+                IsRelative = true;
+                break;
             case CssConstants.Px:
                 Unit = CssUnit.Pixels;
                 IsRelative = true;
@@ -186,6 +194,12 @@ internal sealed class CssLength
                     break;
                 case CssUnit.Ex:
                     u = "ex";
+                    break;
+                case CssUnit.Ch:
+                    u = "ch";
+                    break;
+                case CssUnit.Ic:
+                    u = "ic";
                     break;
                 case CssUnit.Inches:
                     u = "in";
