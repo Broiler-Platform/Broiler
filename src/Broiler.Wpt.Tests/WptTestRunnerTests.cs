@@ -274,6 +274,74 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssVariables_BackgroundShorthands_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .box {
+      width: 50px;
+      height: 50px;
+      padding: 50px;
+      margin: 10px;
+      display: inline-block;
+      background: red;
+    }
+
+    #d1 {
+      --foo: green;
+      background: var(--foo);
+    }
+
+    #d2 {
+      --foo: green, green;
+      background: linear-gradient(var(--foo));
+    }
+
+    #d3 {
+      --foo: linear-gradient(green, green);
+      background: var(--foo);
+    }
+
+  </style>
+</head>
+<body>
+  <div id=""d1"" class=""box""></div>
+  <div id=""d2"" class=""box""></div>
+  <div id=""d3"" class=""box""></div>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .box {
+      width: 50px;
+      height: 50px;
+      padding: 50px;
+      margin: 10px;
+      display: inline-block;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+  <div class=""box""></div>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-background-shorthand", 480, 240);
+        Assert.True(result.Passed,
+            $"css-variables background shorthand should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>

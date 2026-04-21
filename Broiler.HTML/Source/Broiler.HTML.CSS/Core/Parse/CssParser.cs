@@ -777,6 +777,12 @@ internal sealed class CssParser
                 return; // malformed !important — discard the entire declaration
         }
 
+        if (!propName.StartsWith("--", StringComparison.Ordinal)
+            && propValue.IndexOf("var(", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            propValue = ResolveKnownCustomProperties(propValue, properties);
+        }
+
         // Snapshot current property keys only for shorthand properties that
         // expand into multiple longhands — avoids HashSet allocation for the
         // common case of simple (non-shorthand) declarations.
@@ -901,6 +907,120 @@ internal sealed class CssParser
                     importantProperties.Add("corner-radius");
             }
         }
+    }
+
+    private static string ResolveKnownCustomProperties(string value, Dictionary<string, string> properties, int depth = 0)
+    {
+        if (string.IsNullOrEmpty(value)
+            || depth >= 8
+            || value.IndexOf("var(", StringComparison.OrdinalIgnoreCase) < 0)
+        {
+            return value;
+        }
+
+        var sb = new StringBuilder(value.Length);
+        bool changed = false;
+        int position = 0;
+
+        while (position < value.Length)
+        {
+            int varIndex = value.IndexOf("var(", position, StringComparison.OrdinalIgnoreCase);
+            if (varIndex < 0)
+            {
+                sb.Append(value, position, value.Length - position);
+                break;
+            }
+
+            sb.Append(value, position, varIndex - position);
+
+            int openParenIndex = varIndex + 3;
+            int closeParenIndex = FindMatchingClosingParen(value, openParenIndex);
+            if (closeParenIndex < 0)
+            {
+                sb.Append(value, varIndex, value.Length - varIndex);
+                break;
+            }
+
+            string varFunction = value.Substring(varIndex, closeParenIndex - varIndex + 1);
+            string replacement = ResolveVarFunction(
+                value.Substring(openParenIndex + 1, closeParenIndex - openParenIndex - 1),
+                properties,
+                depth + 1);
+
+            if (replacement == varFunction)
+            {
+                sb.Append(varFunction);
+            }
+            else
+            {
+                sb.Append(replacement);
+                changed = true;
+            }
+
+            position = closeParenIndex + 1;
+        }
+
+        return changed ? sb.ToString() : value;
+    }
+
+    private static string ResolveVarFunction(string inner, Dictionary<string, string> properties, int depth)
+    {
+        string propertyName = inner.Trim();
+        string fallback = string.Empty;
+        bool hasFallback = false;
+
+        int commaIndex = FindTopLevelChar(inner, ',');
+        if (commaIndex >= 0)
+        {
+            propertyName = inner.Substring(0, commaIndex).Trim();
+            fallback = inner.Substring(commaIndex + 1).Trim();
+            hasFallback = true;
+        }
+
+        if (!propertyName.StartsWith("--", StringComparison.Ordinal))
+            return $"var({inner})";
+
+        if (properties.TryGetValue(propertyName, out var propertyValue))
+            return ResolveKnownCustomProperties(propertyValue, properties, depth);
+
+        if (hasFallback)
+            return ResolveKnownCustomProperties(fallback, properties, depth);
+
+        return $"var({inner})";
+    }
+
+    private static int FindMatchingClosingParen(string value, int openParenIndex)
+    {
+        int depth = 0;
+        for (int i = openParenIndex; i < value.Length; i++)
+        {
+            if (value[i] == '(')
+                depth++;
+            else if (value[i] == ')')
+            {
+                depth--;
+                if (depth == 0)
+                    return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int FindTopLevelChar(string value, char target)
+    {
+        int depth = 0;
+        for (int i = 0; i < value.Length; i++)
+        {
+            if (value[i] == '(')
+                depth++;
+            else if (value[i] == ')' && depth > 0)
+                depth--;
+            else if (value[i] == target && depth == 0)
+                return i;
+        }
+
+        return -1;
     }
 
     private static bool IsShorthandProperty(string propName) => propName switch
