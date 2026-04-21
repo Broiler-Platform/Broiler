@@ -273,6 +273,11 @@ public sealed partial class DomBridge
     {
         if (_jsContext == null) return;
 
+        var htmlEl = _elements.FirstOrDefault(e =>
+            string.Equals(e.TagName, "html", StringComparison.OrdinalIgnoreCase));
+        if (htmlEl != null)
+            FireDescendantOnloads(htmlEl);
+
         // 1. Fire window.onload if it was set by script.
         //    In browsers, setting `window.onload = fn` registers a handler
         //    that fires when the page finishes loading.  This is distinct
@@ -300,8 +305,6 @@ public sealed partial class DomBridge
         // _elements list because html/head/body are structural elements
         // pre-created by HtmlTreeBuilder.
         DomElement? body = null;
-        var htmlEl = _elements.FirstOrDefault(e =>
-            string.Equals(e.TagName, "html", StringComparison.OrdinalIgnoreCase));
         if (htmlEl != null)
         {
             body = htmlEl.Children.FirstOrDefault(c =>

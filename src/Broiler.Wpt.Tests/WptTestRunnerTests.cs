@@ -4559,6 +4559,64 @@ document.getElementById('out').appendChild(p);
             $"Expected default overflow element to stay at 0,0 but got left={implicitVisible.DomProperties.GetValueOrDefault("_scrollLeft")}, top={implicitVisible.DomProperties.GetValueOrDefault("_scrollTop")}");
     }
 
+    [Fact]
+    public void Wpt_CssomView_IframeSubframeWindowScroll_Uses_SubdocumentRoot()
+    {
+        const string html = @"<!DOCTYPE html>
+<iframe id=""fr"" srcdoc='<!DOCTYPE html><html><body style=""margin:0""><div id=""target"" style=""width:2000px;height:1000px""></div></body></html>'></iframe>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                var doc = iframe.contentDocument;
+                var win = iframe.contentWindow;
+                var scroller = doc.scrollingElement;
+                win.scrollTo({ left: 40, top: 50 });
+                win.scrollBy({ left: 10, top: 15 });
+                return [
+                    doc !== null,
+                    doc.getElementById('target') !== null,
+                    scroller === doc.documentElement,
+                    doc.defaultView === win,
+                    win.document === doc,
+                    win.location.href,
+                    win.scrollX + ',' + win.scrollY,
+                    win.pageXOffset + ',' + win.pageYOffset,
+                    scroller.scrollLeft + ',' + scroller.scrollTop
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("true|true|true|true|true|about:srcdoc|50,65|50,65|50,65", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_IframeSrcdocLoadEvent_Fires_After_Listener_Registration()
+    {
+        const string html = @"<!DOCTYPE html>
+<iframe id=""fr"" srcdoc='<!DOCTYPE html><html><body><div id=""target""></div></body></html>'></iframe>
+<div id=""out""></div>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        ctx.Eval("""
+            var loaded = 'false';
+            var iframe = document.getElementById('fr');
+            iframe.addEventListener('load', function () {
+                var doc = iframe.contentDocument;
+                loaded = String(doc !== null && doc.getElementById('target') !== null);
+            });
+            """);
+
+        bridge.FireWindowLoadEvent();
+        var result = ctx.Eval("loaded");
+        Assert.Equal("true", result.ToString());
+    }
+
     /// <summary>
     /// Runs a css-anchor-position test against a Chromium reference PNG.
     /// </summary>

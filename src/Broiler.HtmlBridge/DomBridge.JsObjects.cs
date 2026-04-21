@@ -1425,11 +1425,7 @@ public sealed partial class DomBridge
         // contentWindow / contentDocument — for <iframe> elements with full sub-document DOM
         if (string.Equals(element.TagName, "iframe", StringComparison.OrdinalIgnoreCase))
         {
-            // Determine if iframe src points to a non-HTML resource (Content-Type check)
             var iframeSrcValue = element.Attributes.TryGetValue("src", out var srcVal) ? srcVal : string.Empty;
-            var isNonHtmlResource = IsNonHtmlResource(iframeSrcValue);
-
-            // Same-origin check: if iframe src is cross-origin relative to the page, contentDocument returns null
             var isCrossOrigin = IsCrossOrigin(iframeSrcValue, _pageUrl);
 
             obj.FastAddProperty(
@@ -1449,18 +1445,7 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments _) =>
                 {
                     if (isCrossOrigin) return JSNull.Value;
-                    var iframeWindow = new JSObject();
-                    iframeWindow.FastAddProperty(
-                        (KeyString)"document",
-                        new JSFunction((in Arguments __) => GetOrCreateSubDocument(element), "get document"),
-                        null,
-                        JSPropertyAttributes.EnumerableConfigurableProperty);
-                    var iframeLocation = new JSObject();
-                    iframeLocation.FastAddValue((KeyString)"href",
-                        new JSString(!string.IsNullOrEmpty(iframeSrcValue) ? iframeSrcValue : "about:blank"),
-                        JSPropertyAttributes.EnumerableConfigurableValue);
-                    iframeWindow.FastAddValue((KeyString)"location", iframeLocation, JSPropertyAttributes.EnumerableConfigurableValue);
-                    return iframeWindow;
+                    return GetOrCreateSubWindow(element);
                 }, "get contentWindow"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -1489,7 +1474,7 @@ public sealed partial class DomBridge
                 {
                     element.Attributes["src"] = a.Length > 0 ? a[0].ToString() : string.Empty;
                     // Invalidate cached sub-document when src changes
-                    _subDocumentCache.Remove(element);
+                    InvalidateCachedSubDocument(element);
                     _onloadFired.Remove(element);
                     // Fire onload for the new resource
                     bridgeForSrc.FireSubDocumentOnload(element);
@@ -2069,7 +2054,7 @@ public sealed partial class DomBridge
                 {
                     element.Attributes["data"] = a.Length > 0 ? a[0].ToString() : string.Empty;
                     // Invalidate cached sub-document when data changes
-                    bridge._subDocumentCache.Remove(element);
+                    bridge.InvalidateCachedSubDocument(element);
                     return JSUndefined.Value;
                 }, "set data"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -3634,8 +3619,15 @@ public sealed partial class DomBridge
 
     // ── Phase 6: Sub-document cache ──────────────────────────────────────────
     private readonly Dictionary<DomElement, JSObject> _subDocumentCache = [];
+    private readonly Dictionary<DomElement, JSObject> _subWindowCache = [];
     private readonly HashSet<DomElement> _objectLoadFailures = [];
     private readonly HashSet<DomElement> _onloadFired = [];
+
+    private void InvalidateCachedSubDocument(DomElement containerElement)
+    {
+        _subDocumentCache.Remove(containerElement);
+        _subWindowCache.Remove(containerElement);
+    }
 
     /// <summary>
     /// Fires the onload event handler on an iframe or object element after its
@@ -3651,8 +3643,9 @@ public sealed partial class DomBridge
         var tag = element.TagName?.ToLowerInvariant();
         if (tag != "iframe" && tag != "object") return;
 
-        var resourceUrl = GetSubResourceUrl(element);
-        if (string.IsNullOrWhiteSpace(resourceUrl)) return;
+        var hasSrcDoc = tag == "iframe" && element.Attributes.ContainsKey("srcdoc");
+        var resourceUrl = hasSrcDoc ? "about:srcdoc" : GetSubResourceUrl(element);
+        if (string.IsNullOrWhiteSpace(resourceUrl) && !hasSrcDoc) return;
 
         // Ensure the sub-document is loaded (this triggers the fetch if needed)
         GetOrCreateSubDocument(element);
@@ -3662,12 +3655,10 @@ public sealed partial class DomBridge
         // Fire the onload handler
         try
         {
-            if (element.InlineEventHandlers.TryGetValue("load", out var handler) && handler is JSFunction fn)
-            {
-                var evt = new JSObject();
-                evt.FastAddValue((KeyString)"type", new JSString("load"), JSPropertyAttributes.EnumerableConfigurableValue);
-                fn.InvokeFunction(new Arguments(fn, evt));
-            }
+            var evt = new JSObject();
+            evt.FastAddValue((KeyString)"type", new JSString("load"), JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+            DispatchEventOnElement(element, evt);
         }
         catch (Exception ex)
         {
@@ -3733,40 +3724,183 @@ public sealed partial class DomBridge
             string.Equals(c.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
         if (docRoot == null)
         {
-            // Determine the resource URL for this container
-            var resourceUrl = GetSubResourceUrl(containerElement);
-            var (fetchedContent, contentType) = TryFetchSubResource(resourceUrl);
-
-            if (!string.IsNullOrEmpty(fetchedContent) &&
-                IsXmlContentType(contentType))
+            if (string.Equals(containerElement.TagName, "iframe", StringComparison.OrdinalIgnoreCase) &&
+                containerElement.Attributes.TryGetValue("srcdoc", out var srcDoc))
             {
-                // XML/SVG/XHTML content → parse with XML parser
-                docRoot = BuildSubDocumentFromXml(fetchedContent, contentType, containerElement);
-            }
-            else if (!string.IsNullOrEmpty(fetchedContent) &&
-                (contentType.Contains("html", StringComparison.OrdinalIgnoreCase) ||
-                 string.IsNullOrEmpty(contentType)))
-            {
-                // HTML content → parse with HTML parser
-                docRoot = BuildSubDocumentFromHtml(fetchedContent, containerElement);
-            }
-            else if (!string.IsNullOrEmpty(fetchedContent) &&
-                     contentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
-            {
-                // text/plain (or other text/* types) → document with pre-formatted text
-                docRoot = BuildSubDocumentWithText(fetchedContent, containerElement);
+                docRoot = BuildSubDocumentFromHtml(srcDoc, containerElement);
             }
             else
             {
-                // Default: create an empty sub-document structure
-                // (binary resources like image/png, fetch failures, about:blank, etc.)
-                docRoot = BuildEmptySubDocument(containerElement);
+                // Determine the resource URL for this container
+                var resourceUrl = GetSubResourceUrl(containerElement);
+                var (fetchedContent, contentType) = TryFetchSubResource(resourceUrl);
+
+                if (!string.IsNullOrEmpty(fetchedContent) &&
+                    IsXmlContentType(contentType))
+                {
+                    // XML/SVG/XHTML content → parse with XML parser
+                    docRoot = BuildSubDocumentFromXml(fetchedContent, contentType, containerElement);
+                }
+                else if (!string.IsNullOrEmpty(fetchedContent) &&
+                    (contentType.Contains("html", StringComparison.OrdinalIgnoreCase) ||
+                     string.IsNullOrEmpty(contentType)))
+                {
+                    // HTML content → parse with HTML parser
+                    docRoot = BuildSubDocumentFromHtml(fetchedContent, containerElement);
+                }
+                else if (!string.IsNullOrEmpty(fetchedContent) &&
+                         contentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
+                {
+                    // text/plain (or other text/* types) → document with pre-formatted text
+                    docRoot = BuildSubDocumentWithText(fetchedContent, containerElement);
+                }
+                else
+                {
+                    // Default: create an empty sub-document structure
+                    // (binary resources like image/png, fetch failures, about:blank, etc.)
+                    docRoot = BuildEmptySubDocument(containerElement);
+                }
             }
         }
 
         var doc = BuildSubDocument(docRoot);
         _subDocumentCache[containerElement] = doc;
         return doc;
+    }
+
+    private JSObject GetOrCreateSubWindow(DomElement containerElement)
+    {
+        if (_subWindowCache.TryGetValue(containerElement, out var cached))
+            return cached;
+
+        var subDocument = GetOrCreateSubDocument(containerElement);
+        var subWindow = new JSObject();
+        _subWindowCache[containerElement] = subWindow;
+
+        subWindow.FastAddProperty(
+            (KeyString)"document",
+            new JSFunction((in Arguments _) => GetOrCreateSubDocument(containerElement), "get document"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        var iframeLocation = new JSObject();
+        iframeLocation.FastAddValue(
+            (KeyString)"href",
+            new JSString(GetSubWindowLocationHref(containerElement)),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue(
+            (KeyString)"location",
+            iframeLocation,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        subWindow.FastAddProperty(
+            (KeyString)"scrollX",
+            new JSFunction((in Arguments _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get scrollX"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty(
+            (KeyString)"scrollY",
+            new JSFunction((in Arguments _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get scrollY"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty(
+            (KeyString)"pageXOffset",
+            new JSFunction((in Arguments _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get pageXOffset"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty(
+            (KeyString)"pageYOffset",
+            new JSFunction((in Arguments _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get pageYOffset"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        subWindow.FastAddValue(
+            (KeyString)"scroll",
+            new JSFunction((in Arguments a) =>
+            {
+                var (left, top) = GetScrollArguments(a);
+                SetSubWindowScrollOffsets(containerElement, left, top);
+                return JSUndefined.Value;
+            }, "scroll", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue(
+            (KeyString)"scrollTo",
+            new JSFunction((in Arguments a) =>
+            {
+                var (left, top) = GetScrollArguments(a);
+                SetSubWindowScrollOffsets(containerElement, left, top);
+                return JSUndefined.Value;
+            }, "scrollTo", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue(
+            (KeyString)"scrollBy",
+            new JSFunction((in Arguments a) =>
+            {
+                var (left, top) = GetScrollArguments(a);
+                SetSubWindowScrollOffsets(containerElement, left, top, relative: true);
+                return JSUndefined.Value;
+            }, "scrollBy", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        subWindow.FastAddValue(
+            (KeyString)"self",
+            subWindow,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue(
+            (KeyString)"window",
+            subWindow,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        if (_windowJSObject != null)
+        {
+            subWindow.FastAddValue(
+                (KeyString)"parent",
+                _windowJSObject,
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+
+        subDocument.FastAddValue(
+            (KeyString)"defaultView",
+            subWindow,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        return subWindow;
+    }
+
+    private string GetSubWindowLocationHref(DomElement containerElement)
+    {
+        if (string.Equals(containerElement.TagName, "iframe", StringComparison.OrdinalIgnoreCase) &&
+            containerElement.Attributes.ContainsKey("srcdoc"))
+        {
+            return "about:srcdoc";
+        }
+
+        var resourceUrl = GetSubResourceUrl(containerElement);
+        return !string.IsNullOrWhiteSpace(resourceUrl) ? resourceUrl : "about:blank";
+    }
+
+    private double GetSubWindowScrollOffset(DomElement containerElement, bool vertical)
+    {
+        var scrollingElement = GetSubDocumentScrollingElement(containerElement);
+        return scrollingElement == null ? 0 : GetElementScrollOffset(scrollingElement, vertical);
+    }
+
+    private void SetSubWindowScrollOffsets(DomElement containerElement, double? left = null, double? top = null, bool relative = false)
+    {
+        var scrollingElement = GetSubDocumentScrollingElement(containerElement);
+        if (scrollingElement == null)
+            return;
+
+        SetElementScrollOffsets(scrollingElement, left, top, relative: relative, clamp: false);
+    }
+
+    private static DomElement? GetSubDocumentScrollingElement(DomElement containerElement)
+    {
+        var docRoot = containerElement.Children.FirstOrDefault(c =>
+            string.Equals(c.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
+        if (docRoot == null)
+            return null;
+
+        return docRoot.Children.FirstOrDefault(c => !c.IsTextNode && !c.TagName.StartsWith("#"));
     }
 
     /// <summary>
@@ -4290,6 +4424,12 @@ public sealed partial class DomBridge
         doc.FastAddProperty(
             (KeyString)"documentElement",
             new JSFunction((in Arguments _) => ToJSObject(GetDocumentElement()), "get documentElement"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        doc.FastAddProperty(
+            (KeyString)"scrollingElement",
+            new JSFunction((in Arguments _) => ToJSObject(GetDocumentElement()), "get scrollingElement"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
