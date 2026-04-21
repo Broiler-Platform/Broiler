@@ -2638,17 +2638,21 @@ document.getElementById('out').appendChild(p);
     {
         var testDir = Path.Combine(_tempDir, "triage-report");
         var missingRefDir = Path.Combine(testDir, "css", "skip");
+        var secondaryMissingRefDir = Path.Combine(testDir, "css", "skip-secondary");
         var mediaDir = Path.Combine(testDir, "css", "media");
         var viewTransitionsDir = Path.Combine(testDir, "css", "css-view-transitions");
         var filterEffectsDir = Path.Combine(testDir, "css", "filter-effects");
         var calcSizeDir = Path.Combine(testDir, "css", "css-values", "calc-size");
         Directory.CreateDirectory(missingRefDir);
+        Directory.CreateDirectory(secondaryMissingRefDir);
         Directory.CreateDirectory(mediaDir);
         Directory.CreateDirectory(viewTransitionsDir);
         Directory.CreateDirectory(filterEffectsDir);
         Directory.CreateDirectory(calcSizeDir);
 
         File.WriteAllText(Path.Combine(missingRefDir, "missing-ref-case.html"), "<html><body>Missing ref</body></html>");
+        File.WriteAllText(Path.Combine(missingRefDir, "missing-ref-case-2.html"), "<html><body>Missing ref 2</body></html>");
+        File.WriteAllText(Path.Combine(secondaryMissingRefDir, "missing-ref-case-3.html"), "<html><body>Missing ref 3</body></html>");
         File.WriteAllText(Path.Combine(mediaDir, "media.html"),
             @"<!DOCTYPE html><html><body><video autoplay><source type=""video/mp4"" src=""support/video.mp4""></video></body></html>");
         File.WriteAllText(Path.Combine(viewTransitionsDir, "vt-gap.html"),
@@ -2705,6 +2709,7 @@ document.getElementById('out').appendChild(p);
         var triage = doc.RootElement.GetProperty("triage");
         Assert.True(triage.GetProperty("topSkippedDirectories").GetArrayLength() > 0);
         Assert.True(triage.GetProperty("skipReasons").GetArrayLength() > 0);
+        Assert.True(triage.GetProperty("topMissingReferenceDirectories").GetArrayLength() > 0);
 
         var reasons = triage.GetProperty("skipReasons")
             .EnumerateArray()
@@ -2721,6 +2726,32 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("MissingReferenceImage", resultReasons);
         Assert.Contains("UnsupportedMediaPlayback", resultReasons);
 
+        var missingReferenceBuckets = triage.GetProperty("topMissingReferenceDirectories")
+            .EnumerateArray()
+            .Select(el => new
+            {
+                Directory = el.GetProperty("directory").GetString(),
+                Count = el.GetProperty("count").GetInt32(),
+            })
+            .ToList();
+        Assert.Contains(missingReferenceBuckets, bucket => bucket.Directory == "css/skip" && bucket.Count == 2);
+        Assert.Contains(missingReferenceBuckets, bucket => bucket.Directory == "css/skip-secondary" && bucket.Count == 1);
+
+        var referenceCoverage = triage.GetProperty("referenceCoverage");
+        Assert.False(referenceCoverage.GetProperty("passRateComparable").GetBoolean());
+        Assert.Equal(3, referenceCoverage.GetProperty("missingReferenceSkipCount").GetInt32());
+
+        var priorityBuckets = referenceCoverage.GetProperty("priorityBuckets")
+            .EnumerateArray()
+            .Select(el => new
+            {
+                Directory = el.GetProperty("directory").GetString(),
+                Count = el.GetProperty("count").GetInt32(),
+            })
+            .ToList();
+        Assert.Contains(priorityBuckets, bucket => bucket.Directory == "css/skip" && bucket.Count == 2);
+        Assert.Contains(priorityBuckets, bucket => bucket.Directory == "css/skip-secondary" && bucket.Count == 1);
+
         var deferredBuckets = triage.GetProperty("deferredFeatureBuckets")
             .EnumerateArray()
             .Select(el => new
@@ -2735,6 +2766,13 @@ document.getElementById('out').appendChild(p);
 
         var markdown = File.ReadAllText(markdownPath);
         Assert.Contains("# WPT Triage Summary", markdown);
+        Assert.Contains("## Reference coverage priorities", markdown);
+        Assert.Contains("Missing-reference skips: 3", markdown);
+        Assert.Contains("Pass-rate comparison ready: No", markdown);
+        Assert.Contains("`css/skip` — 2 missing-reference skip(s)", markdown);
+        Assert.Contains("`css/skip-secondary` — 1 missing-reference skip(s)", markdown);
+        Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/skip\"", markdown);
+        Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/skip-secondary\"", markdown);
         Assert.Contains("## Deferred unsupported / MissingContent-dominant buckets", markdown);
         Assert.Contains("`css/css-view-transitions` — 1 failure(s) [ExplicitFeatureGap]", markdown);
         Assert.Contains("`css/filter-effects` — 1 failure(s) [ExplicitFeatureGap]", markdown);
@@ -2746,6 +2784,9 @@ document.getElementById('out').appendChild(p);
         Assert.DoesNotContain("./scripts/run-wpt-tests.sh --subset \"css/filter-effects\"", markdown);
 
         var output = consoleOutput.ToString();
+        Assert.Contains("Reference-generation priority buckets:", output);
+        Assert.Contains("Pass-rate comparison status:", output);
+        Assert.Contains("Remaining missing-reference skips: 3", output);
         Assert.Contains("Deferred feature-gap buckets:", output);
         Assert.Contains("css/css-view-transitions [ExplicitFeatureGap]", output);
         Assert.Contains("css/filter-effects [ExplicitFeatureGap]", output);
