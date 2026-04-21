@@ -3,7 +3,16 @@
 > **Status**: Active — created 2026-04-18  
 > **Scope**: Investigate the failures captured in `tests/wpt-results/` and define the smallest practical plan for reducing them over time.
 
-## Implementation update — 2026-04-18
+## Implementation updates
+
+### 2026-04-21
+
+- The latest `WPT Tests` workflow run (`run_number: 78`, completed 2026-04-21) still fails in the final check step because WPT regressions remain, but the runner now leaves behind enough structured data in `tests/wpt-results/` to plan follow-up work from the generated JSON and Markdown artifacts instead of the raw log alone.
+- The current backlog has shifted again: the largest failing directories are now `css/css-writing-modes`, `css/filter-effects`, `css/selectors`, `css/css-variables`, and `css/css-view-transitions`, while the largest missing-reference buckets are now `css/css-flexbox`, `css/css-ui/compute-kind-widget-generated`, `css/css-break`, `css/css-ui`, and `css/css-transforms`.
+- A new timeout-focused planning slice is now required in addition to the earlier rendering and near-pass buckets: the latest run recorded 9 deterministic 30-second timeouts across `css-grid`, `css-overflow/scroll-markers`, `css-shapes`, `css-tables`, and `css/css-variables/url-syntax-crash.html`.
+- Because the earlier roadmap items for crash handling, near-pass harvesting, unsupported-feature triage, and missing-reference accounting are already reflected in the runner/reporting layer, the next planning update should focus on the remaining non-deferred failures plus timeout ergonomics instead of repeating the now-closed `background-clip` / `background-size` work.
+
+### 2026-04-18
 
 - `Broiler.Wpt` now emits bucket summaries in console output, machine-readable skip reasons in `wpt-results.json`, and a triage-focused Markdown report via `--markdown-output`.
 - `scripts/run-wpt-tests.sh` and `.github/workflows/wpt-tests.yml` now standardize on `tests/wpt-results/`.
@@ -58,16 +67,16 @@
 
 ## 1. Current Snapshot
 
-This roadmap is based on the latest committed WPT artifacts in `tests/wpt-results/` and the latest `WPT Tests` workflow run (`run_number: 75`, completed 2026-04-18).
+This roadmap is based on the latest committed WPT artifacts in `tests/wpt-results/` and the latest `WPT Tests` workflow run (`run_number: 78`, completed 2026-04-21).
 
 ### 1.1 Result totals
 
-From `tests/wpt-results/wpt-summary.txt`:
+From `tests/wpt-results/wpt-results.json` / `tests/wpt-results/wpt-summary.txt`:
 
-- **Total**: 24,900
-- **Passed**: 2,389
-- **Failed**: 2,178
-- **Skipped**: 20,333
+- **Total**: 24,919
+- **Passed**: 2,261
+- **Failed**: 1,964
+- **Skipped**: 20,694
 
 ### 1.2 What failed in CI
 
@@ -75,17 +84,24 @@ The `WPT Tests` workflow is successfully producing the summary, root-cause analy
 
 ### 1.3 Failure category breakdown
 
-From `tests/wpt-results/wpt-root-cause-analysis.txt` and `tests/wpt-results/wpt-results.json`:
+From `tests/wpt-results/wpt-root-cause-analysis.txt`, `tests/wpt-results/wpt-triage-summary.md`, and `tests/wpt-results/wpt-results.json`:
 
-- **2,177 `PixelMismatch`** failures
-  - 998 **`MissingContent`**
-  - 905 **`MinorDiff`**
-  - 195 **`LayoutShift`**
-  - 68 **`ColorShift`**
+- **1,955 `PixelMismatch`** failures
+  - 902 **`MissingContent`**
+  - 822 **`MinorDiff`**
+  - 162 **`LayoutShift`**
+  - 58 **`ColorShift`**
   - 11 **`SubpixelAntiAliasing`**
-- **1 `RenderingError`** failure
-  - `css/css-backgrounds/background-clip-006.html`
-  - message: `Rendering failed: Object reference not set to an instance of an object.`
+- **9 `Timeout`** failures
+  - `css/css-grid/parsing/grid-template-columns-crash.html`
+  - `css/css-overflow/scroll-markers/column-scroll-marker-007.html`
+  - `css/css-overflow/scroll-markers/targeted-scroll-marker-selection-with-transition.tentative.html`
+  - `css/css-overflow/scroll-markers/targeted-scroll-marker-selection.tentative.html`
+  - `css/css-shapes/shape-outside/supported-shapes/circle/shape-outside-circle-030.html`
+  - `css/css-shapes/shape-outside/supported-shapes/circle/shape-outside-circle-031.html`
+  - `css/css-tables/height-distribution/percentage-sizing-of-table-cell-children.html`
+  - `css/css-tables/html5-table-formatting-3.html`
+  - `css/css-variables/url-syntax-crash.html`
 
 ---
 
@@ -97,14 +113,14 @@ The current failures are concentrated enough that the work should be done in buc
 
 | Bucket | Failed tests | Main symptom |
 |---|---:|---|
-| `css/selectors/invalidation` | 87 | Mostly `MinorDiff` / `LayoutShift` |
-| `css/css-writing-modes/forms` | 78 | Mostly `MinorDiff` / some `MissingContent` |
-| `css/css-viewport/zoom` | 74 | Mostly `MissingContent` |
-| `css/css-backgrounds/background-clip` | 45 | `MissingContent`, plus 1 hard rendering error |
-| `css/css-backgrounds/background-size` | 39 | Mostly `MinorDiff` / `ColorShift` |
-| `css/selectors/selectors-4` | 29 | Mostly `MinorDiff` |
-| `css/css-values/urls` | 22 | Mostly `MissingContent` |
-| `css/css-values/calc-size` | 20 | Mostly `MissingContent` |
+| `css/css-writing-modes` | 382 | Mostly `MissingContent`, with a still-meaningful `MinorDiff` tail |
+| `css/filter-effects` | 241 | Explicit deferred feature gap / unsupported rendering work |
+| `css/selectors` | 197 | Mostly `MissingContent`, with localized invalidation leftovers |
+| `css/css-variables` | 180 | Mixed pixel mismatches plus a reproducible timeout (`url-syntax-crash.html`) |
+| `css/css-view-transitions` | 130 | Explicit deferred feature gap / unsupported rendering work |
+| `css/motion` | 93 | Mostly `MissingContent` and already a deferred feature-gap candidate |
+| `css/cssom-view` | 86 | Smaller targeted follow-up bucket after the earlier zoom work |
+| `css/css-viewport` | 65 | Remaining zoom/viewport leftovers, mostly `MissingContent` |
 
 ### 2.2 Top skipped directories
 
@@ -112,14 +128,14 @@ The skip volume is even larger than the failure volume, so part of the roadmap m
 
 | Bucket | Skipped tests | Likely cause |
 |---|---:|---|
-| `css/css-ui/compute-kind-widget-generated` | 799 | No generated reference images |
-| `css/css-grid/grid-lanes` | 580 | No generated reference images |
-| `css/css-text/white-space` | 444 | No generated reference images |
-| `css/css-grid/alignment` | 414 | No generated reference images |
-| `css/css-text/i18n` | 354 | No generated reference images |
-| `css/css-break/flexbox` | 317 | No generated reference images |
-| `css/css-shapes/shape-outside` | 288 | No generated reference images |
-| `css/css-sizing/aspect-ratio` | 283 | No generated reference images |
+| `css/css-flexbox` | 1,038 | No generated reference images |
+| `css/css-ui/compute-kind-widget-generated` | 802 | No generated reference images |
+| `css/css-break` | 478 | No generated reference images |
+| `css/css-ui` | 471 | No generated reference images |
+| `css/css-transforms` | 451 | No generated reference images |
+| `css/css-grid` | 440 | No generated reference images outside the current timeout slice |
+| `css/css-text` | 431 | No generated reference images |
+| `css/css-overflow` | 241 | Mostly missing references plus the active timeout slice |
 
 ---
 
@@ -129,12 +145,11 @@ The skip volume is even larger than the failure volume, so part of the roadmap m
 
 These cluster heavily in:
 
-- `css/css-viewport/zoom`
-- `css/css-backgrounds/background-clip`
-- `css/selectors/invalidation`
-- `css/css-writing-modes/forms`
-- `css/css-values/urls`
-- `css/css-values/calc-size`
+- `css/css-writing-modes`
+- `css/selectors`
+- `css/css-variables`
+- `css/css-viewport`
+- `css/motion`
 - `css/css-view-transitions/nested`
 
 This pattern strongly suggests missing or incomplete support for one or more of:
@@ -148,22 +163,22 @@ This pattern strongly suggests missing or incomplete support for one or more of:
 
 ### 3.2 `MinorDiff` failures
 
-These are the best short-term opportunity for pass-rate improvement because they already render something close to the reference image. The biggest clusters are:
+These are still the best short-term opportunity for pass-rate improvement because they already render something close to the reference image. The biggest remaining clusters are:
 
-- `css/css-writing-modes/forms`
-- `css/selectors/invalidation`
-- `css/css-backgrounds/background-size`
-- `css/selectors/selectors-4`
+- `css/css-writing-modes`
+- `css/selectors`
+- `css/css-variables`
+- `css/cssom-view`
 
-These should be prioritized ahead of broad unsupported-feature suites because the fixes are more likely to be localized and testable.
+These should still be prioritized ahead of broad unsupported-feature suites because the fixes are more likely to be localized and testable.
 
-### 3.3 `LayoutShift` and 0% matches
+### 3.3 `LayoutShift`, 0% matches, and timeout-heavy slices
 
-The worst failures include several 0% matches in `css/css-values/*` (`calc-in-calc.html`, `calc-in-max.html`, media-query/calc variants, `vh-*` tests). Those deserve their own workstream because they point to systemic bugs in value resolution rather than paint-only differences.
+The worst failures still include 0% matches in `css/css-values/*` (notably `vh-calc-support-pct.html`) and a handful of deterministic 30-second timeouts in `css-grid`, `css-overflow/scroll-markers`, `css-shapes`, `css-tables`, and `css/css-variables`. Those deserve their own workstream because they point to execution-path or systemic value/layout bugs rather than paint-only differences.
 
-### 3.4 Single hard rendering error
+### 3.4 Deferred unsupported-feature buckets
 
-`css/css-backgrounds/background-clip-006.html` currently throws a null-reference exception. This should be fixed first because it is deterministic, localized, and likely blocks nearby tests from being debugged cleanly.
+`css/filter-effects`, `css/css-view-transitions`, and the largest `MissingContent`-dominant portions of `css/css-writing-modes`, `css/selectors`, and `css/motion` should remain explicitly deferred unless a PR is clearly scoped to feature support rather than a near-pass cleanup.
 
 ---
 
@@ -237,6 +252,17 @@ The current skip count is too large to ignore.
 
 **Current blocker:** the largest skipped buckets still need significant external Playwright reference-generation time against a WPT checkout, so the current repo-side implementation can only prioritize and track those suites until the generated images themselves are produced.
 
+## Phase 6 — Triage current non-deferred failures and timeout ergonomics
+
+The roadmap now needs a fresh post-Phase-5 slice for the failures still surfacing in the latest artifact set.
+
+- [ ] Open a focused `css/css-variables` workstream, because it is now one of the largest non-deferred failure buckets and also contains a reproducible timeout (`url-syntax-crash.html`).
+- [ ] Treat the 9 timeout cases as a single triage track with focused subset commands for `css/css-grid/parsing`, `css/css-overflow/scroll-markers`, `css/css-shapes/shape-outside`, `css/css-tables`, and `css/css-variables`.
+- [ ] Keep using the generated missing-reference priority list (`css/css-flexbox`, `css/css-ui/compute-kind-widget-generated`, `css/css-break`, `css/css-ui`, `css/css-transforms`) when reference generation time is available, rather than broad CSS reruns.
+- [ ] Re-classify remaining `css/css-writing-modes`, `css/selectors`, `css/cssom-view`, and `css/css-viewport` failures bucket-by-bucket into either small near-pass fixes or explicit deferred feature gaps before starting new full-subset campaigns.
+
+**Why this matters:** the roadmap already covers the earlier crash, near-pass, and reporting work; this phase keeps the planning document aligned with the failures still blocking the latest `WPT Tests` run.
+
 ---
 
 ## 5. Suggested Runner / CLI Improvements
@@ -278,16 +304,24 @@ Choose either `tests/wpt-results/` or `tests/wpt/results/` and use it consistent
 
 This is a small change, but it removes unnecessary ambiguity when people look for the latest reports.
 
+### 5.5 Surface timeout summaries as first-class triage output
+
+The latest run still required reading the raw job log to see the exact 9 timeout paths. Add a dedicated timeout section in the generated Markdown/console summary, plus suggested `--subset` commands for the affected directories.
+
+### 5.6 Support incremental reruns from the previous JSON report
+
+If the remaining buckets are too expensive to attack via repeated broad subset runs, add a runner/CLI mode that reruns only the previous failure or timeout set from `tests/wpt-results/wpt-results.json`. That would make timeout and bucket triage faster without waiting for another full CSS pass.
+
 ---
 
 ## 6. Recommended Execution Order for Follow-up PRs
 
-1. **Fix `background-clip-006.html` rendering exception**
-2. **Finish harvesting `background-clip` + `background-size` near-pass wins**
-3. **Tackle `selectors/invalidation` and `css-writing-modes/forms`**
-4. **Open a dedicated value-resolution track for `calc-*`, `vh-*`, and zoom**
-5. **Split unsupported feature suites (view transitions, larger filter-effects work) into separate backlog items**
-6. **Improve reference coverage for the largest skipped buckets**
+1. **Open a dedicated timeout triage track for the 9 deterministic 30-second timeouts**
+2. **Tackle `css/css-variables` as the largest current non-deferred failure bucket**
+3. **Re-triage the remaining `css/css-writing-modes`, `css/selectors`, `css/cssom-view`, and `css/css-viewport` leftovers into fix-vs-defer buckets**
+4. **Improve reference coverage for `css/css-flexbox`, `css/css-ui/compute-kind-widget-generated`, `css/css-break`, `css/css-ui`, and `css/css-transforms`**
+5. **Keep explicit unsupported suites (`css/css-view-transitions`, larger `filter-effects`, `css/motion`) as separate backlog items**
+6. **If direct fixes are too slow, prioritize timeout summaries and incremental rerun support in the runner/CLI**
 
 ---
 
@@ -306,8 +340,8 @@ For each bucket-specific PR:
 
 This roadmap should be considered successful when:
 
-- the hard rendering error is eliminated
-- the top near-pass buckets are materially reduced
+- the current timeout cases are either fixed, explicitly deferred, or trivially reproducible via focused subset commands
+- the top non-deferred failure buckets are materially reduced
 - value/layout bugs are split into explicit workstreams instead of mixed into paint-only failures
-- skip counts are tracked separately from renderer failures
-- the runner/CLI surfaces enough bucket-level information that new WPT failures can be triaged without custom one-off scripts
+- skip counts are tracked separately from renderer failures and pass-rate comparisons stay tied to consistent reference coverage
+- the runner/CLI surfaces enough bucket-level information that new WPT failures can be triaged without custom one-off scripts or raw-log scraping
