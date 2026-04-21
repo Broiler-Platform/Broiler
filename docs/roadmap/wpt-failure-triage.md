@@ -69,9 +69,11 @@
 
 This roadmap is based on the latest committed WPT artifacts in `tests/wpt-results/` and the latest `WPT Tests` workflow run (`run_number: 78`, completed 2026-04-21).
 
+For day-to-day triage, treat `tests/wpt-results/wpt-results.json` as the canonical source of totals, bucket rankings, skip reasons, and deferred-feature classification. Use `tests/wpt-results/wpt-root-cause-analysis.txt`, the workflow job log, and the generated Markdown summary artifact as convenience views when you need the raw timeout paths or a shareable human-readable summary.
+
 ### 1.1 Result totals
 
-From `tests/wpt-results/wpt-results.json` / `tests/wpt-results/wpt-summary.txt`:
+From `tests/wpt-results/wpt-results.json`:
 
 - **Total**: 24,919
 - **Passed**: 2,261
@@ -84,7 +86,7 @@ The `WPT Tests` workflow is successfully producing the summary, root-cause analy
 
 ### 1.3 Failure category breakdown
 
-From `tests/wpt-results/wpt-root-cause-analysis.txt`, `tests/wpt-results/wpt-triage-summary.md`, and `tests/wpt-results/wpt-results.json`:
+From `tests/wpt-results/wpt-root-cause-analysis.txt`, the latest `WPT Tests` workflow summary/artifacts, and `tests/wpt-results/wpt-results.json`:
 
 - **1,955 `PixelMismatch`** failures
   - 902 **`MissingContent`**
@@ -184,10 +186,34 @@ The worst failures still include 0% matches in `css/css-values/*` (notably `vh-c
 
 ## 4. Prioritized Remediation Plan
 
+### 4.1 Standard triage workflow for each follow-up issue or PR
+
+Use this same loop for every bucket so follow-up work stays reproducible:
+
+1. **Refresh the inputs**
+   - Read `tests/wpt-results/wpt-results.json` first.
+   - Confirm the latest `WPT Tests` run failed in the final **Check test result** step, not during artifact generation or setup.
+2. **Classify the bucket before rerunning anything**
+   - If the directory appears in `triage.deferredFeatureBuckets`, treat it as an explicit feature-gap/defer decision.
+   - If it appears in `triage.referenceCoverage.priorityBuckets`, spend the next cycle on reference generation instead of comparing pass rates.
+   - If the failure category is `Timeout`, keep it in the timeout-only workstream and rerun the smallest directory slice that reproduces it.
+   - Otherwise, treat it as a non-deferred renderer/layout bug and pick the narrowest failing directory or subdirectory from `triage.topFailingDirectories`.
+3. **Reproduce with a focused subset command**
+   - Use `./scripts/run-wpt-tests.sh --subset "<bucket>"`.
+   - Avoid broad `css` reruns unless you are refreshing the canonical artifact set on purpose.
+4. **Make the smallest change that moves the bucket**
+   - Prefer shared renderer/bridge fixes that retire a whole bucket.
+   - If shared runner/reporting logic changes, add or update focused tests in `src/Broiler.Wpt.Tests/`.
+5. **Validate against the same slice**
+   - Re-run the exact same `--subset` command.
+   - Re-check `wpt-results.json` to confirm the bucket count, timeout list, or skip reason distribution actually changed.
+6. **Only then update roadmap status**
+   - Mark a phase item complete only when the bucket is either fixed, intentionally deferred, or split into a narrower follow-up issue with a reproducible command.
+
 ## Phase 0 — Stabilize triage inputs
 
 - [x] Keep `tests/wpt-results/wpt-results.json` as the canonical input for grouping and prioritization.
-- [x] Standardize on a single results path name. Today the repository contains `tests/wpt-results/`, while the runner/workflow currently write to `tests/wpt/results`.
+- [x] Standardize on a single results path name (`tests/wpt-results/`) across the committed artifacts, runner, and workflow.
 - [ ] When investigating a bucket, always rerun via `--subset` instead of the full CSS corpus.
 
 **Exit criteria:** every follow-up issue/PR names a specific bucket and uses a reproducible subset command.
@@ -261,13 +287,21 @@ The roadmap now needs a fresh post-Phase-5 slice for the failures still surfacin
 - [ ] Keep using the generated missing-reference priority list (`css/css-flexbox`, `css/css-ui/compute-kind-widget-generated`, `css/css-break`, `css/css-ui`, `css/css-transforms`) when reference generation time is available, rather than broad CSS reruns.
 - [ ] Re-classify remaining `css/css-writing-modes`, `css/selectors`, `css/cssom-view`, and `css/css-viewport` failures bucket-by-bucket into either small near-pass fixes or explicit deferred feature gaps before starting new full-subset campaigns.
 
+**Timeout subset commands to keep handy:**
+
+- `./scripts/run-wpt-tests.sh --subset "css/css-grid/parsing"`
+- `./scripts/run-wpt-tests.sh --subset "css/css-overflow/scroll-markers"`
+- `./scripts/run-wpt-tests.sh --subset "css/css-shapes/shape-outside"`
+- `./scripts/run-wpt-tests.sh --subset "css/css-tables"`
+- `./scripts/run-wpt-tests.sh --subset "css/css-variables"`
+
 **Why this matters:** the roadmap already covers the earlier crash, near-pass, and reporting work; this phase keeps the planning document aligned with the failures still blocking the latest `WPT Tests` run.
 
 ---
 
 ## 5. Suggested Runner / CLI Improvements
 
-If direct test fixes remain too expensive, these are the highest-value tooling improvements.
+The first four items below are already implemented in the runner/reporting stack. Keep the remaining items as follow-up tooling work if direct test fixes remain too expensive.
 
 ### 5.1 Add bucket summaries directly to the runner output
 
@@ -280,6 +314,8 @@ Add a top-N summary for:
 
 This information already exists in `wpt-results.json`; surfacing it directly in the CLI would remove a lot of manual post-processing.
 
+**Status:** done in `Broiler.Wpt`; the current runner already emits top failing/skipped buckets, mismatch subcategories, and lowest-match tests into the JSON-backed triage output.
+
 ### 5.2 Emit a roadmap-friendly summary file
 
 Generate a small Markdown summary alongside the JSON report containing:
@@ -290,9 +326,13 @@ Generate a small Markdown summary alongside the JSON report containing:
 - non-pixel/rendering exceptions
 - suggested next subset commands
 
+**Status:** done; the workflow now publishes a Markdown triage summary alongside the JSON report.
+
 ### 5.3 Distinguish unsupported-feature skips from missing-reference skips
 
 Right now the largest skip buckets mostly read as “No reference image.” A separate machine-readable reason field would make backlog accounting much easier.
+
+**Status:** done; `wpt-results.json` now separates missing-reference skips from other skip reasons and ranks the highest-value missing-reference directories.
 
 ### 5.4 Standardize the output directory name
 
@@ -303,6 +343,8 @@ Choose either `tests/wpt-results/` or `tests/wpt/results/` and use it consistent
 - `.github/workflows/wpt-tests.yml`
 
 This is a small change, but it removes unnecessary ambiguity when people look for the latest reports.
+
+**Status:** done; the repo, script, and workflow all use `tests/wpt-results/`.
 
 ### 5.5 Surface timeout summaries as first-class triage output
 
