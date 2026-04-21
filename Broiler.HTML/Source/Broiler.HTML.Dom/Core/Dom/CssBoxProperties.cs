@@ -36,6 +36,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     private string _paddingRight = "0";
     private string _paddingTop = "0";
     private string _right = "auto";
+    private string _backgroundColor = "transparent";
     private string _backgroundImage = "none";
     private string _backgroundClip = "border-box";
     private string _textIndent = "0";
@@ -166,7 +167,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
     public string BorderBottomColor
     {
-        get { return _borderBottomColor; }
+        get { return ResolveCssVariables(_borderBottomColor); }
         set
         {
             _borderBottomColor = value;
@@ -176,7 +177,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
     public string BorderLeftColor
     {
-        get { return _borderLeftColor; }
+        get { return ResolveCssVariables(_borderLeftColor); }
         set
         {
             _borderLeftColor = value;
@@ -186,7 +187,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
     public string BorderRightColor
     {
-        get { return _borderRightColor; }
+        get { return ResolveCssVariables(_borderRightColor); }
         set
         {
             _borderRightColor = value;
@@ -196,7 +197,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
     public string BorderTopColor
     {
-        get { return _borderTopColor; }
+        get { return ResolveCssVariables(_borderTopColor); }
         set
         {
             _borderTopColor = value;
@@ -343,7 +344,15 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string Height { get; set; } = "auto";
     public string MaxHeight { get; set; } = "none";
     public string MinHeight { get; set; } = "0";
-    public string BackgroundColor { get; set; } = "transparent";
+    public string BackgroundColor
+    {
+        get => ResolveCssVariables(_backgroundColor);
+        set
+        {
+            _backgroundColor = value;
+            _actualBackgroundColor = System.Drawing.Color.Empty;
+        }
+    }
     public string BackgroundImage
     {
         get => ResolveCssVariables(_backgroundImage);
@@ -358,7 +367,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
     public string Color
     {
-        get { return _color; }
+        get { return ResolveCssVariables(_color); }
         set
         {
             _color = value;

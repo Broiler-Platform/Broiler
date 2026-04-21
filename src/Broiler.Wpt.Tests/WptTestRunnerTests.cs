@@ -342,6 +342,79 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssVariables_InheritedPaintValues_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    :root { --accent: rgb(0, 128, 0); }
+    .text {
+      color: var(--accent);
+      font: 32px/1 sans-serif;
+      margin: 12px;
+    }
+    .bg {
+      width: 120px;
+      height: 50px;
+      margin: 12px;
+      background: var(--accent);
+    }
+    .border {
+      width: 120px;
+      height: 50px;
+      margin: 12px;
+      border: 8px solid var(--accent);
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div class=""text"">green text</div>
+  <div class=""bg""></div>
+  <div class=""border""></div>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .text {
+      color: rgb(0, 128, 0);
+      font: 32px/1 sans-serif;
+      margin: 12px;
+    }
+    .bg {
+      width: 120px;
+      height: 50px;
+      margin: 12px;
+      background: rgb(0, 128, 0);
+    }
+    .border {
+      width: 120px;
+      height: 50px;
+      margin: 12px;
+      border: 8px solid rgb(0, 128, 0);
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div class=""text"">green text</div>
+  <div class=""bg""></div>
+  <div class=""border""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-inherited-paint-values", 320, 220);
+        Assert.True(result.Passed,
+            $"Inherited var() paint values should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>

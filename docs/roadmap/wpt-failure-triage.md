@@ -14,6 +14,7 @@
 - Phase 6 has started: crash-test script execution now batches CSS invalidation for bulk DOM mutations, which lets the focused `css/css-variables/url-syntax-crash.html` repro complete locally again and adds a dedicated `Broiler.Wpt.Tests` timeout guard rail for that path.
 - Phase 6 has widened again: same-block custom-property substitution now feeds parser-side and CSSOM-side shorthand expansion for representative `font`, `margin`, `border-left`, and `background` cases, with focused `Broiler.Cli.Tests` / `Broiler.Wpt.Tests` guard rails covering the `vars-font-shorthand`, `vars-background-shorthand`, and `variable-substitution-shorthands` follow-up slice locally.
 - Phase 6 has widened again: `getComputedStyle(element, pseudoElement)` now distinguishes element vs pseudo-element rule matching, accepts unresolved `var(...)` values in closed-keyword bridge declarations until the later substitution pass, and locally guards representative `::first-line` / `::first-letter` custom-property cases from the next `css/css-variables` pseudo-element slice.
+- Phase 6 has widened again: renderer-side inherited custom-property substitution now resolves representative text, background, and border paint values from ancestor-defined variables at used-value time, with a focused `Broiler.Wpt.Tests` guard rail advancing the remaining `variable-reference-*` / visited-context paint-color bucket.
 
 ### 2026-04-18
 
