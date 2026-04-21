@@ -3895,8 +3895,10 @@ public sealed partial class DomBridge
                 parentWindow,
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
-        if (_windowJSObject != null)
-            subWindow.FastAddValue((KeyString)"top", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue(
+            (KeyString)"top",
+            _windowJSObject ?? subWindow,
+            JSPropertyAttributes.EnumerableConfigurableValue);
 
         subDocument.FastAddValue(
             (KeyString)"defaultView",
