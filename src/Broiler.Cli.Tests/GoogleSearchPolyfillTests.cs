@@ -285,6 +285,46 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Element_Scroll_Ignores_Elements_Without_A_Scrolling_Box()
+    {
+        var result = ExecJs(@"
+            function makeContainer(overflow) {
+                var container = document.createElement('div');
+                container.style.width = '100px';
+                container.style.height = '100px';
+                if (overflow) {
+                    container.style.overflow = overflow;
+                }
+
+                var content = document.createElement('div');
+                content.style.width = '250px';
+                content.style.height = '250px';
+                container.appendChild(content);
+                document.body.appendChild(container);
+                return container;
+            }
+
+            var hidden = makeContainer('hidden');
+            hidden.scroll(40, 50);
+
+            var visible = makeContainer('visible');
+            visible.scroll(40, 50);
+
+            var implicitVisible = makeContainer('');
+            implicitVisible.scrollLeft = 40;
+            implicitVisible.scrollTop = 50;
+
+            document.getElementById('result').textContent = [
+                hidden.scrollLeft + ',' + hidden.scrollTop,
+                visible.scrollLeft + ',' + visible.scrollTop,
+                implicitVisible.scrollLeft + ',' + implicitVisible.scrollTop
+            ].join('|');
+        ");
+
+        Assert.Contains("40,50|0,0|0,0", result);
+    }
+
+    [Fact]
     public void Element_ClientMetrics_Ignore_Effective_Zoom()
     {
         var result = ExecJs(@"

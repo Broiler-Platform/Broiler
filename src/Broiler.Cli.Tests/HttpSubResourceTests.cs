@@ -35,6 +35,159 @@ document.getElementById('out').textContent = r.join('|');
     }
 
     [Fact]
+    public void Iframe_Srcdoc_DefaultView_And_WindowScroll_Use_Subdocument_Root()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<iframe id=""fr"" srcdoc='<!DOCTYPE html><html><body style=""margin:0""><div id=""target"" style=""width:2000px;height:1000px""></div></body></html>'></iframe>
+<div id=""out""></div>
+<script>
+var fr = document.getElementById('fr');
+var doc = fr.contentDocument;
+var win = fr.contentWindow;
+var scroller = doc.scrollingElement;
+win.scrollTo({ left: 40, top: 50 });
+win.scrollBy({ left: 10, top: 15 });
+document.getElementById('out').textContent = [
+  doc !== null,
+  doc.getElementById('target') !== null,
+  scroller === doc.documentElement,
+  doc.defaultView === win,
+  win.document === doc,
+  win.location.href,
+  win.scrollX + ',' + win.scrollY,
+  win.pageXOffset + ',' + win.pageYOffset,
+  scroller.scrollLeft + ',' + scroller.scrollTop
+].join('|');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|true|true|true|about:srcdoc|50,65|50,65|50,65", result);
+    }
+
+    [Fact]
+    public void Iframe_Srcdoc_Load_Event_Fires_After_Listener_Registration()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<iframe id=""fr"" srcdoc='<!DOCTYPE html><html><body><div id=""target""></div></body></html>'></iframe>
+<div id=""out""></div>
+<script>
+var fr = document.getElementById('fr');
+fr.addEventListener('load', function () {
+  var doc = fr.contentDocument;
+  document.getElementById('out').textContent = String(doc !== null && doc.getElementById('target') !== null);
+});
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true", result);
+    }
+
+    [Fact]
+    public void Iframe_Nested_Subdocument_Scripts_Resolve_Relative_Iframe_Sources()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"broiler-nested-iframe-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            File.WriteAllText(Path.Combine(tempRoot, "leaf.html"), """
+<!DOCTYPE html>
+<div id="leaf"></div>
+<script>
+document.getElementById('leaf').textContent = location.search || 'missing';
+</script>
+""");
+            File.WriteAllText(Path.Combine(tempRoot, "nested.html"), """
+<!DOCTYPE html>
+<iframe id="target"></iframe>
+<script>
+document.getElementById('target').src = 'leaf.html?scale=3';
+</script>
+""");
+
+            var html = """
+<!DOCTYPE html>
+<html><body>
+<iframe id="outer" src="nested.html"></iframe>
+<div id="out"></div>
+<script>
+window.onload = function () {
+  var outer = document.getElementById('outer');
+  var inner = outer.contentDocument.getElementById('target');
+  var leaf = inner.contentDocument.getElementById('leaf');
+  document.getElementById('out').textContent = [
+    inner.contentWindow.location.href,
+    inner.contentWindow.location.search,
+    leaf ? leaf.textContent : 'missing'
+  ].join('|');
+};
+</script>
+</body></html>
+""";
+
+            var result = CaptureService.ExecuteScriptsWithDom(
+                html,
+                "file:///test.html",
+                localResourceBasePath: tempRoot);
+
+            Assert.Contains("leaf.html?scale=3|?scale=3|?scale=3", result);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Iframe_Wpt_CrossOrigin_Template_Src_Loads_From_Local_Wpt_Root_But_Stays_CrossOrigin()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"broiler-wpt-cross-origin-{Guid.NewGuid():N}");
+        var wptRoot = Path.Combine(tempRoot, "tests", "wpt");
+        var zoomDir = Path.Combine(wptRoot, "css", "css-viewport", "zoom");
+        var resourceDir = Path.Combine(zoomDir, "resources");
+        Directory.CreateDirectory(resourceDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(resourceDir, "leaf.html"), """
+<!DOCTYPE html>
+<html><body><div id="leaf">loaded-cross-origin</div></body></html>
+""");
+
+            var pageUrl = new Uri(Path.Combine(zoomDir, "iframe-zoom.sub.html")).AbsoluteUri;
+            var html = """
+<!DOCTYPE html>
+<html><body>
+<iframe id="fr" src="http://{{hosts[alt][]}}:{{ports[http][0]}}/css/css-viewport/zoom/resources/leaf.html"></iframe>
+<div id="out"></div>
+<script>
+window.onload = function () {
+  var fr = document.getElementById('fr');
+  document.getElementById('out').textContent = String(fr.contentDocument === null);
+};
+</script>
+</body></html>
+""";
+
+            var result = CaptureService.ExecuteScriptsWithDom(html, pageUrl);
+
+            Assert.Contains(">true</div>", result);
+            Assert.Contains("loaded-cross-origin", result);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Iframe_NonHtml_Src_Gets_Minimal_Document()
     {
         var html = @"<!DOCTYPE html>

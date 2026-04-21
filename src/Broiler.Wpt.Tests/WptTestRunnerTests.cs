@@ -274,6 +274,193 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssVariables_BackgroundShorthands_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .box {
+      width: 50px;
+      height: 50px;
+      padding: 50px;
+      margin: 10px;
+      display: inline-block;
+      background: red;
+    }
+
+    #d1 {
+      --foo: green;
+      background: var(--foo);
+    }
+
+    #d2 {
+      --foo: green, green;
+      background: linear-gradient(var(--foo));
+    }
+
+    #d3 {
+      --foo: linear-gradient(green, green);
+      background: var(--foo);
+    }
+
+  </style>
+</head>
+<body>
+  <div id=""d1"" class=""box""></div>
+  <div id=""d2"" class=""box""></div>
+  <div id=""d3"" class=""box""></div>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .box {
+      width: 50px;
+      height: 50px;
+      padding: 50px;
+      margin: 10px;
+      display: inline-block;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+  <div class=""box""></div>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-background-shorthand", 480, 240);
+        Assert.True(result.Passed,
+            $"css-variables background shorthand should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssVariables_InheritedPaintValues_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    :root { --accent: rgb(0, 128, 0); }
+    .text {
+      color: var(--accent);
+      font: 32px/1 sans-serif;
+      margin: 12px;
+    }
+    .bg {
+      width: 120px;
+      height: 50px;
+      margin: 12px;
+      background: var(--accent);
+    }
+    .border {
+      width: 120px;
+      height: 50px;
+      margin: 12px;
+      border: 8px solid var(--accent);
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div class=""text"">green text</div>
+  <div class=""bg""></div>
+  <div class=""border""></div>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .text {
+      color: rgb(0, 128, 0);
+      font: 32px/1 sans-serif;
+      margin: 12px;
+    }
+    .bg {
+      width: 120px;
+      height: 50px;
+      margin: 12px;
+      background: rgb(0, 128, 0);
+    }
+    .border {
+      width: 120px;
+      height: 50px;
+      margin: 12px;
+      border: 8px solid rgb(0, 128, 0);
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div class=""text"">green text</div>
+  <div class=""bg""></div>
+  <div class=""border""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-inherited-paint-values", 320, 220);
+        Assert.True(result.Passed,
+            $"Inherited var() paint values should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssVariables_MissingClosingNestedFallback_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    #target {
+      width: 80px;
+      height: 80px;
+      margin: 40px;
+      background: white;
+      box-shadow: var(--outer, 90px 0 0 0 rgb(0, 128, 0), 0 90px 0 0 var(--inner, rgb(0, 255, 0))
+    }
+  </style>
+</head>
+<body>
+  <div id=""target""></div>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    #target {
+      width: 80px;
+      height: 80px;
+      margin: 40px;
+      background: white;
+      box-shadow: rgb(0, 128, 0) 90px 0 0 0, rgb(0, 255, 0) 0 90px 0 0;
+    }
+  </style>
+</head>
+<body>
+  <div id=""target""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-missing-closing-nested-fallback", 260, 260);
+        Assert.True(result.Passed,
+            $"Malformed nested var() fallbacks should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2343,6 +2530,48 @@ document.getElementById('out').appendChild(p);
         Assert.True(result.Passed);
     }
 
+    [Fact]
+    public void RunTestWithTimeout_UrlSyntaxCrash_Completes_Without_Timing_Out()
+    {
+        var testFile = Path.Combine(_tempDir, "url-syntax-crash.html");
+        File.WriteAllText(testFile, @"<!doctype html>
+<style>
+@property --my-url {
+  syntax: ""<url> | none"";
+  inherits: true;
+  initial-value: none;
+}
+:root {
+  --my-url: url(blah);
+}
+
+* {
+  --foo: var(--my-url);
+}
+</style>
+<body>
+<script>
+  for (let i = 0; i < 3000; ++i) {
+    document.body.appendChild(document.createElement(""span""));
+  }
+</script>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner();
+        var result = Program.RunTestWithTimeout(
+            runner,
+            testFile,
+            refDir,
+            _tempDir,
+            TimeSpan.FromSeconds(6));
+
+        Assert.True(result.Passed, result.Message);
+        Assert.Equal(FailureCategory.None, result.Category);
+        Assert.Contains("Crash test", result.Message);
+    }
+
     // ──────────── Failure categorization ─────────────────────────────
 
     [Fact]
@@ -4276,6 +4505,274 @@ document.getElementById('out').appendChild(p);
             verticalRtl!.DomProperties.TryGetValue("_scrollLeft", out var verticalLeftValue) && verticalLeftValue is double verticalLeft && verticalLeft == -150 &&
             verticalRtl.DomProperties.TryGetValue("_scrollTop", out var verticalTopValue) && verticalTopValue is double verticalTop && verticalTop == -300,
             $"Expected vertical rtl scroller left=-150 top=-300, got left={verticalRtl.DomProperties.GetValueOrDefault("_scrollLeft")}, top={verticalRtl.DomProperties.GetValueOrDefault("_scrollTop")}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ElementScroll_Ignores_Elements_Without_Scrolling_Boxes()
+    {
+        const string html = @"<!DOCTYPE html>
+<div id=""hidden"" style=""width:100px; height:100px; overflow:hidden;"">
+  <div style=""width:250px; height:250px;""></div>
+</div>
+<div id=""visible"" style=""width:100px; height:100px; overflow:visible;"">
+  <div style=""width:250px; height:250px;""></div>
+</div>
+<div id=""implicit"" style=""width:100px; height:100px;"">
+  <div style=""width:250px; height:250px;""></div>
+</div>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        ctx.Eval("""
+            var hidden = document.getElementById('hidden');
+            hidden.scroll(40, 50);
+            var visible = document.getElementById('visible');
+            visible.scroll(40, 50);
+            var implicit = document.getElementById('implicit');
+            implicit.scrollLeft = 40;
+            implicit.scrollTop = 50;
+            """);
+
+        Broiler.HtmlBridge.DomElement? hidden = null;
+        FindDomElement(bridge.DocumentElement, "hidden", ref hidden);
+        Assert.NotNull(hidden);
+        Assert.True(
+            hidden!.DomProperties.TryGetValue("_scrollLeft", out var hiddenLeftValue) && hiddenLeftValue is double hiddenLeft && hiddenLeft == 40 &&
+            hidden.DomProperties.TryGetValue("_scrollTop", out var hiddenTopValue) && hiddenTopValue is double hiddenTop && hiddenTop == 50,
+            $"Expected overflow:hidden element to scroll to 40,50 but got left={hidden.DomProperties.GetValueOrDefault("_scrollLeft")}, top={hidden.DomProperties.GetValueOrDefault("_scrollTop")}");
+
+        Broiler.HtmlBridge.DomElement? visible = null;
+        FindDomElement(bridge.DocumentElement, "visible", ref visible);
+        Assert.NotNull(visible);
+        Assert.True(
+            visible!.DomProperties.TryGetValue("_scrollLeft", out var visibleLeftValue) && visibleLeftValue is double visibleLeft && visibleLeft == 0 &&
+            visible.DomProperties.TryGetValue("_scrollTop", out var visibleTopValue) && visibleTopValue is double visibleTop && visibleTop == 0,
+            $"Expected overflow:visible element to stay at 0,0 but got left={visible.DomProperties.GetValueOrDefault("_scrollLeft")}, top={visible.DomProperties.GetValueOrDefault("_scrollTop")}");
+
+        Broiler.HtmlBridge.DomElement? implicitVisible = null;
+        FindDomElement(bridge.DocumentElement, "implicit", ref implicitVisible);
+        Assert.NotNull(implicitVisible);
+        Assert.True(
+            implicitVisible!.DomProperties.TryGetValue("_scrollLeft", out var implicitLeftValue) && implicitLeftValue is double implicitLeft && implicitLeft == 0 &&
+            implicitVisible.DomProperties.TryGetValue("_scrollTop", out var implicitTopValue) && implicitTopValue is double implicitTop && implicitTop == 0,
+            $"Expected default overflow element to stay at 0,0 but got left={implicitVisible.DomProperties.GetValueOrDefault("_scrollLeft")}, top={implicitVisible.DomProperties.GetValueOrDefault("_scrollTop")}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_IframeSubframeWindowScroll_Uses_SubdocumentRoot()
+    {
+        const string html = @"<!DOCTYPE html>
+<iframe id=""fr"" srcdoc='<!DOCTYPE html><html><body style=""margin:0""><div id=""target"" style=""width:2000px;height:1000px""></div></body></html>'></iframe>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                var doc = iframe.contentDocument;
+                var win = iframe.contentWindow;
+                var scroller = doc.scrollingElement;
+                win.scrollTo({ left: 40, top: 50 });
+                win.scrollBy({ left: 10, top: 15 });
+                return [
+                    doc !== null,
+                    doc.getElementById('target') !== null,
+                    scroller === doc.documentElement,
+                    doc.defaultView === win,
+                    win.document === doc,
+                    win.location.href,
+                    win.scrollX + ',' + win.scrollY,
+                    win.pageXOffset + ',' + win.pageYOffset,
+                    scroller.scrollLeft + ',' + scroller.scrollTop
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("true|true|true|true|true|about:srcdoc|50,65|50,65|50,65", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_IframeSrcdocLoadEvent_Fires_After_Listener_Registration()
+    {
+        const string html = @"<!DOCTYPE html>
+<iframe id=""fr"" srcdoc='<!DOCTYPE html><html><body><div id=""target""></div></body></html>'></iframe>
+<div id=""out""></div>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        ctx.Eval("""
+            var loaded = 'false';
+            var iframe = document.getElementById('fr');
+            iframe.addEventListener('load', function () {
+                var doc = iframe.contentDocument;
+                loaded = String(doc !== null && doc.getElementById('target') !== null);
+            });
+            """);
+
+        bridge.FireWindowLoadEvent();
+        var result = ctx.Eval("loaded");
+        Assert.Equal("true", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_NestedIframeScripts_Resolve_Relative_Sources_And_Location()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"broiler-wpt-nested-iframe-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            File.WriteAllText(Path.Combine(tempRoot, "leaf.html"), """
+<!DOCTYPE html>
+<div id="leaf"></div>
+<script>
+document.getElementById('leaf').textContent = location.search || 'missing';
+</script>
+""");
+            File.WriteAllText(Path.Combine(tempRoot, "nested.html"), """
+<!DOCTYPE html>
+<iframe id="target"></iframe>
+<script>
+document.getElementById('target').src = 'leaf.html?scale=3';
+</script>
+""");
+
+            const string html = """
+<!DOCTYPE html>
+<iframe id="outer" src="nested.html"></iframe>
+<div id="out"></div>
+""";
+
+            using var ctx = new Broiler.JavaScript.Engine.JSContext();
+            var bridge = new Broiler.HtmlBridge.DomBridge();
+            bridge.Attach(ctx, html, "file:///test.html");
+            bridge.SetLocalBasePath(tempRoot);
+            ctx.Eval("""
+                window.onload = function () {
+                    var outer = document.getElementById('outer');
+                    var inner = outer.contentDocument.getElementById('target');
+                    var leaf = inner.contentDocument.getElementById('leaf');
+                    document.getElementById('out').textContent = [
+                        inner.contentWindow.location.href,
+                        inner.contentWindow.location.search,
+                        leaf ? leaf.textContent : 'missing'
+                    ].join('|');
+                };
+                """);
+
+            bridge.FireWindowLoadEvent();
+            var result = ctx.Eval("document.getElementById('out').textContent");
+            Assert.Contains("leaf.html?scale=3|?scale=3|?scale=3", result.ToString());
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_CrossOriginIframeTemplate_Uses_LocalWptResource_And_MatchesReference()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"broiler-wpt-cross-origin-match-{Guid.NewGuid():N}");
+        var wptRoot = Path.Combine(tempRoot, "tests", "wpt");
+        var zoomDir = Path.Combine(wptRoot, "css", "css-viewport", "zoom");
+        var referenceDir = Path.Combine(wptRoot, "references", "css", "css-viewport", "zoom", "reference");
+        var resourceDir = Path.Combine(zoomDir, "resources");
+        Directory.CreateDirectory(zoomDir);
+        Directory.CreateDirectory(referenceDir);
+        Directory.CreateDirectory(resourceDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(resourceDir, "leaf.html"), """
+<!DOCTYPE html>
+<style>
+body {
+  background-color: aqua;
+  --target-width: 32px;
+  --target-height: 24px;
+  --scale: 1;
+  margin: calc(18px * var(--scale));
+}
+#target {
+  width: calc(var(--target-width) * var(--scale));
+  height: calc(var(--target-height) * var(--scale));
+  background-color: hotpink;
+}
+</style>
+
+<div id="target"></div>
+
+<script>
+let params = new URLSearchParams(location.search);
+if (params.has("scale")) {
+  document.body.style.setProperty("--scale", parseFloat(params.get("scale")));
+}
+</script>
+""");
+
+            var testFile = Path.Combine(zoomDir, "iframe-zoom.sub.html");
+            var refFile = Path.Combine(referenceDir, "iframe-zoom-ref.html");
+
+            File.WriteAllText(testFile, """
+<!DOCTYPE html>
+<style>
+body {
+  --iframe-width: 128px;
+  --iframe-height: 64px;
+}
+iframe {
+  border: none;
+  width: var(--iframe-width);
+  height: var(--iframe-height);
+}
+.zoom {
+  zoom: 2;
+}
+</style>
+
+<iframe id="baseline" src="resources/leaf.html"></iframe>
+<iframe id="zoom-same-origin" class="zoom" src="resources/leaf.html" scrolling="no"></iframe>
+<iframe id="zoom-cross-origin" class="zoom" src="http://{{hosts[alt][]}}:{{ports[http][0]}}/css/css-viewport/zoom/resources/leaf.html" scrolling="no"></iframe>
+""");
+
+            File.WriteAllText(refFile, """
+<!DOCTYPE html>
+<style>
+body {
+  --iframe-width: 128px;
+  --iframe-height: 64px;
+  --scale: 1;
+}
+iframe {
+  border: none;
+  width: calc(var(--iframe-width) * var(--scale));
+  height: calc(var(--iframe-height) * var(--scale));
+}
+.scale {
+  --scale: 2;
+}
+</style>
+
+<iframe id="baseline-ref" src="../resources/leaf.html"></iframe>
+<iframe id="zoom-same-origin-ref" class="scale" src="../resources/leaf.html?scale=2"></iframe>
+<iframe id="zoom-cross-origin-ref" class="scale" src="../resources/leaf.html?scale=2"></iframe>
+""");
+
+            var runner = new WptTestRunner();
+            var result = runner.RunMatchTest(testFile, refFile, wptRoot);
+
+            Assert.True(result.Passed,
+                $"Cross-origin templated iframe zoom should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
     }
 
     /// <summary>

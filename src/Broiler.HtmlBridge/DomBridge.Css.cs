@@ -16,6 +16,9 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
+    private int _styleInvalidationBatchDepth;
+    private HashSet<DomElement>? _pendingStyleInvalidationRoots;
+
     // ------------------------------------------------------------------
     //  CSS specificity (Level 3) and <style> / <link> cascading
     // ------------------------------------------------------------------
@@ -494,10 +497,43 @@ public sealed partial class DomBridge
     /// document scope after a selector-affecting mutation such as a class,
     /// attribute, or sibling structure change.
     /// </summary>
+    internal void BeginStyleInvalidationBatch()
+    {
+        _styleInvalidationBatchDepth++;
+    }
+
+    internal void EndStyleInvalidationBatch()
+    {
+        if (_styleInvalidationBatchDepth == 0)
+            return;
+
+        _styleInvalidationBatchDepth--;
+        if (_styleInvalidationBatchDepth == 0)
+            FlushPendingStyleInvalidations();
+    }
+
     internal void InvalidateStyleScope(DomElement anchor)
     {
         var docRoot = GetDocumentRootFor(anchor);
+        if (_styleInvalidationBatchDepth > 0)
+        {
+            _pendingStyleInvalidationRoots ??= [];
+            _pendingStyleInvalidationRoots.Add(docRoot);
+            return;
+        }
+
         InvalidateStyleScopeRecursive(docRoot);
+    }
+
+    private void FlushPendingStyleInvalidations()
+    {
+        if (_pendingStyleInvalidationRoots == null || _pendingStyleInvalidationRoots.Count == 0)
+            return;
+
+        foreach (var root in _pendingStyleInvalidationRoots)
+            InvalidateStyleScopeRecursive(root);
+
+        _pendingStyleInvalidationRoots.Clear();
     }
 
     private void InvalidateStyleScopeRecursive(DomElement element)
@@ -552,10 +588,11 @@ public sealed partial class DomBridge
         }
     }
 
-    private JSObject BuildComputedStyleObject(DomElement? element)
+    private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null)
     {
         var computed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var computedSpecificity = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        pseudoElement = NormalizePseudoElement(pseudoElement);
 
         if (element != null)
         {
@@ -619,11 +656,20 @@ public sealed partial class DomBridge
             // Inline styles (from the style="" attribute) override CSS rules.
             // We parse the attribute directly rather than using element.Style because
             // ApplyCascadedStyles() may have merged CSS rules into element.Style.
-            if (element.Attributes.TryGetValue("style", out var inlineStyleAttr) && !string.IsNullOrEmpty(inlineStyleAttr))
+            if (pseudoElement == null &&
+                element.Attributes.TryGetValue("style", out var inlineStyleAttr) &&
+                !string.IsNullOrEmpty(inlineStyleAttr))
             {
                 foreach (var kv in ParseStyle(inlineStyleAttr))
                     computed[kv.Key] = kv.Value;
             }
+
+            if (pseudoElement != null)
+            {
+                ApplyPseudoElementRules(element, pseudoElement, styleElements, computed, computedSpecificity, vpWidth, vpHeight);
+            }
+
+            ResolveKnownCustomProperties(computed);
 
             // Expand CSS shorthand properties into their individual longhands.
             // This ensures that querying e.g. marginTop works when only the
@@ -697,6 +743,84 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return obj;
+    }
+
+    private void ApplyPseudoElementRules(
+        DomElement element,
+        string pseudoElement,
+        List<DomElement> styleElements,
+        Dictionary<string, string> computed,
+        Dictionary<string, int> computedSpecificity,
+        int viewportWidth,
+        int viewportHeight)
+    {
+        foreach (var styleEl in styleElements)
+        {
+            var cssText = new StringBuilder();
+            foreach (var child in styleEl.Children)
+            {
+                if (child.IsTextNode && child.TextContent != null)
+                    cssText.Append(child.TextContent);
+            }
+
+            if (cssText.Length == 0 && styleEl.TextContent != null)
+                cssText.Append(styleEl.TextContent);
+
+            if (styleEl.DomProperties.TryGetValue("_insertedRules", out var insertedObj) &&
+                insertedObj is List<(int Index, string Rule)> insertedRules)
+            {
+                foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))
+                    cssText.Append(' ').Append(rule);
+            }
+
+            if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
+                cssText.Length == 0 &&
+                styleEl.Attributes.TryGetValue("href", out var href) &&
+                !string.IsNullOrEmpty(href))
+            {
+                if (styleEl.DomProperties.TryGetValue("_fetchedCss", out var cachedCss) && cachedCss is string cachedStr)
+                {
+                    cssText.Append(cachedStr);
+                }
+                else
+                {
+                    try
+                    {
+                        var fetchedCss = FetchExternalStylesheet(href);
+                        if (!string.IsNullOrEmpty(fetchedCss))
+                        {
+                            styleEl.DomProperties["_fetchedCss"] = fetchedCss;
+                            cssText.Append(fetchedCss);
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            ParseAndApplyCssRules(cssText.ToString(), element, computed, computedSpecificity, viewportWidth, viewportHeight, pseudoElement);
+        }
+    }
+
+    private static string? NormalizePseudoElement(string? pseudoElement)
+    {
+        if (string.IsNullOrWhiteSpace(pseudoElement))
+            return null;
+
+        pseudoElement = pseudoElement.Trim();
+        if (pseudoElement.Equals("::before", StringComparison.OrdinalIgnoreCase) ||
+            pseudoElement.Equals(":before", StringComparison.OrdinalIgnoreCase))
+            return "::before";
+        if (pseudoElement.Equals("::after", StringComparison.OrdinalIgnoreCase) ||
+            pseudoElement.Equals(":after", StringComparison.OrdinalIgnoreCase))
+            return "::after";
+        if (pseudoElement.Equals("::first-line", StringComparison.OrdinalIgnoreCase) ||
+            pseudoElement.Equals(":first-line", StringComparison.OrdinalIgnoreCase))
+            return "::first-line";
+        if (pseudoElement.Equals("::first-letter", StringComparison.OrdinalIgnoreCase) ||
+            pseudoElement.Equals(":first-letter", StringComparison.OrdinalIgnoreCase))
+            return "::first-letter";
+
+        return null;
     }
 
     private static void ApplyApproximateFormControlComputedSizes(
@@ -796,6 +920,149 @@ public sealed partial class DomBridge
     private static string FormatPx(double value) =>
         $"{Math.Round(value).ToString(System.Globalization.CultureInfo.InvariantCulture)}px";
 
+    private static void ResolveKnownCustomProperties(Dictionary<string, string> computed)
+    {
+        var keys = computed.Keys.ToList();
+        foreach (var key in keys)
+        {
+            if (key.StartsWith("--", StringComparison.Ordinal))
+                continue;
+
+            if (!computed.TryGetValue(key, out var value)
+                || string.IsNullOrEmpty(value)
+                || value.IndexOf("var(", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                continue;
+            }
+
+            computed[key] = ResolveKnownCustomProperties(value, computed);
+        }
+    }
+
+    private static string ResolveKnownCustomProperties(string value, Dictionary<string, string> computed, int depth = 0)
+    {
+        if (string.IsNullOrEmpty(value)
+            || depth >= 8
+            || value.IndexOf("var(", StringComparison.OrdinalIgnoreCase) < 0)
+        {
+            return value;
+        }
+
+        var sb = new StringBuilder(value.Length);
+        bool changed = false;
+        int position = 0;
+
+        while (position < value.Length)
+        {
+            int varIndex = value.IndexOf("var(", position, StringComparison.OrdinalIgnoreCase);
+            if (varIndex < 0)
+            {
+                sb.Append(value, position, value.Length - position);
+                break;
+            }
+
+            sb.Append(value, position, varIndex - position);
+
+            int openParenIndex = varIndex + 3;
+            int closeParenIndex = FindMatchingClosingParen(value, openParenIndex);
+            if (closeParenIndex < 0)
+            {
+                string inner = value[(openParenIndex + 1)..];
+                string recovered = ResolveVarFunction(inner, computed, depth + 1);
+                if (recovered == $"var({inner})")
+                {
+                    sb.Append(value, varIndex, value.Length - varIndex);
+                }
+                else
+                {
+                    sb.Append(recovered);
+                    changed = true;
+                }
+                break;
+            }
+
+            string varFunction = value.Substring(varIndex, closeParenIndex - varIndex + 1);
+            string replacement = ResolveVarFunction(
+                value.Substring(openParenIndex + 1, closeParenIndex - openParenIndex - 1),
+                computed,
+                depth + 1);
+
+            if (replacement == varFunction)
+            {
+                sb.Append(varFunction);
+            }
+            else
+            {
+                sb.Append(replacement);
+                changed = true;
+            }
+
+            position = closeParenIndex + 1;
+        }
+
+        return changed ? sb.ToString() : value;
+    }
+
+    private static string ResolveVarFunction(string inner, Dictionary<string, string> computed, int depth)
+    {
+        string propertyName = inner.Trim();
+        string fallback = string.Empty;
+        bool hasFallback = false;
+
+        int commaIndex = FindTopLevelChar(inner, ',');
+        if (commaIndex >= 0)
+        {
+            propertyName = inner[..commaIndex].Trim();
+            fallback = inner[(commaIndex + 1)..].Trim();
+            hasFallback = true;
+        }
+
+        if (!propertyName.StartsWith("--", StringComparison.Ordinal))
+            return $"var({inner})";
+
+        if (computed.TryGetValue(propertyName, out var propertyValue))
+            return ResolveKnownCustomProperties(propertyValue, computed, depth);
+
+        if (hasFallback)
+            return ResolveKnownCustomProperties(fallback, computed, depth);
+
+        return $"var({inner})";
+    }
+
+    private static int FindMatchingClosingParen(string value, int openParenIndex)
+    {
+        int depth = 0;
+        for (int i = openParenIndex; i < value.Length; i++)
+        {
+            if (value[i] == '(')
+                depth++;
+            else if (value[i] == ')')
+            {
+                depth--;
+                if (depth == 0)
+                    return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int FindTopLevelChar(string value, char target)
+    {
+        int depth = 0;
+        for (int i = 0; i < value.Length; i++)
+        {
+            if (value[i] == '(')
+                depth++;
+            else if (value[i] == ')')
+                depth--;
+            else if (value[i] == target && depth == 0)
+                return i;
+        }
+
+        return -1;
+    }
+
     /// <summary>
     /// Expands CSS shorthand properties into individual longhand properties.
     /// For example, <c>margin: 10px 5px</c> expands to <c>margin-top: 10px</c>,
@@ -804,6 +1071,9 @@ public sealed partial class DomBridge
     /// </summary>
     private static void ExpandCssShorthands(Dictionary<string, string> computed)
     {
+        if (computed.TryGetValue("font", out var fontVal))
+            ExpandFontShorthand(computed, fontVal);
+
         // Expand margin shorthand → margin-top, margin-right, margin-bottom, margin-left
         if (computed.TryGetValue("margin", out var marginVal))
             ExpandBoxShorthand(computed, marginVal, "margin-top", "margin-right", "margin-bottom", "margin-left");
@@ -827,6 +1097,15 @@ public sealed partial class DomBridge
         // Expand border shorthand (e.g. "2cm solid gray") → border-width, border-style, border-color
         if (computed.TryGetValue("border", out var borderVal))
             ExpandBorderShorthand(computed, borderVal);
+
+        if (computed.TryGetValue("border-left", out var borderLeftVal))
+            ExpandBorderSideShorthand(computed, borderLeftVal, "left");
+        if (computed.TryGetValue("border-top", out var borderTopVal))
+            ExpandBorderSideShorthand(computed, borderTopVal, "top");
+        if (computed.TryGetValue("border-right", out var borderRightVal))
+            ExpandBorderSideShorthand(computed, borderRightVal, "right");
+        if (computed.TryGetValue("border-bottom", out var borderBottomVal))
+            ExpandBorderSideShorthand(computed, borderBottomVal, "bottom");
 
         // Expand border-inline shorthand → border-left and border-right
         // CSS Logical Properties §5.1: border-inline applies to both
@@ -919,6 +1198,116 @@ public sealed partial class DomBridge
         if (computed.TryGetValue("background", out var bgVal))
             ExpandBackgroundShorthand(computed, bgVal);
     }
+
+    private static void ExpandFontShorthand(Dictionary<string, string> computed, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        if (value.Trim().Equals("inherit", StringComparison.OrdinalIgnoreCase))
+        {
+            computed["font-style"] = "inherit";
+            computed["font-variant"] = "inherit";
+            computed["font-weight"] = "inherit";
+            computed["font-size"] = "inherit";
+            computed["line-height"] = "inherit";
+            computed["font-family"] = "inherit";
+            return;
+        }
+
+        var tokens = SplitCssValues(value);
+        if (tokens.Length == 0)
+            return;
+
+        string fontStyle = "normal";
+        string fontVariant = "normal";
+        string fontWeight = "normal";
+        string? fontSize = null;
+        string? lineHeight = null;
+        int fontSizeIndex = -1;
+
+        for (int i = 0; i < tokens.Length; i++)
+        {
+            var token = tokens[i];
+            var lower = token.ToLowerInvariant();
+
+            if (TryParseFontSizeAndLineHeight(lower, token, out var parsedFontSize, out var parsedLineHeight))
+            {
+                fontSize = parsedFontSize;
+                lineHeight = parsedLineHeight;
+                fontSizeIndex = i;
+                break;
+            }
+
+            if (lower is "normal" or "italic" or "oblique")
+                fontStyle = lower;
+            else if (lower == "small-caps")
+                fontVariant = lower;
+            else if (lower is "bold" or "bolder" or "lighter" or "100" or "200" or "300" or "400" or "500" or "600" or "700" or "800" or "900")
+                fontWeight = lower;
+        }
+
+        if (fontSizeIndex < 0 || fontSizeIndex >= tokens.Length - 1 || string.IsNullOrWhiteSpace(fontSize))
+            return;
+
+        var fontFamily = string.Join(" ", tokens[(fontSizeIndex + 1)..]).Trim();
+        if (string.IsNullOrWhiteSpace(fontFamily))
+            return;
+
+        bool hasNonEmptyFamily = fontFamily
+            .Split(',', StringSplitOptions.TrimEntries)
+            .Any(part => !string.IsNullOrWhiteSpace(part.Trim('"', '\'', ' ')));
+        if (!hasNonEmptyFamily)
+            return;
+
+        computed["font-style"] = fontStyle;
+        computed["font-variant"] = fontVariant;
+        computed["font-weight"] = fontWeight;
+        computed["font-size"] = fontSize;
+        computed["line-height"] = !string.IsNullOrWhiteSpace(lineHeight) ? lineHeight : "normal";
+        computed["font-family"] = fontFamily;
+    }
+
+    private static bool TryParseFontSizeAndLineHeight(string lowerToken, string originalToken, out string fontSize, out string lineHeight)
+    {
+        fontSize = string.Empty;
+        lineHeight = string.Empty;
+
+        string sizeToken = lowerToken;
+        string? lineHeightToken = null;
+        int slashIndex = lowerToken.IndexOf('/', StringComparison.Ordinal);
+        if (slashIndex >= 0)
+        {
+            sizeToken = lowerToken[..slashIndex];
+            lineHeightToken = originalToken[(slashIndex + 1)..];
+        }
+
+        if (!IsFontSizeToken(sizeToken))
+            return false;
+
+        if (lineHeightToken != null)
+        {
+            var trimmedLineHeight = lineHeightToken.Trim();
+            if (!IsFontLineHeightToken(trimmedLineHeight))
+                return false;
+            lineHeight = trimmedLineHeight;
+        }
+
+        fontSize = originalToken;
+        if (slashIndex >= 0)
+            fontSize = originalToken[..slashIndex];
+
+        return true;
+    }
+
+    private static bool IsFontSizeToken(string token) =>
+        token is "xx-small" or "x-small" or "small" or "medium" or "large" or "x-large" or "xx-large" or "larger" or "smaller"
+        || IsLengthOrPercentage(token);
+
+    private static bool IsFontLineHeightToken(string token) =>
+        token.Equals("normal", StringComparison.OrdinalIgnoreCase)
+        || IsLengthOrPercentage(token)
+        || double.TryParse(token, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _);
 
     /// <summary>
     /// Expands a 1–4 value CSS box shorthand (margin, padding, border-width, etc.)
@@ -1355,7 +1744,7 @@ public sealed partial class DomBridge
     /// </summary>
     private void ParseAndApplyCssRules(string cssText, DomElement element,
         Dictionary<string, string> computed, Dictionary<string, int> computedSpecificity,
-        int viewportWidth = 0, int viewportHeight = 0)
+        int viewportWidth = 0, int viewportHeight = 0, string? pseudoElement = null)
     {
         int pos = 0;
         while (pos < cssText.Length)
@@ -1399,7 +1788,7 @@ public sealed partial class DomBridge
                     {
                         var innerCss = cssText[blockStart..pos];
                         if (EvaluateMediaQuery(mediaQuery, viewportWidth, viewportHeight))
-                            ParseAndApplyCssRules(innerCss, element, computed, computedSpecificity, viewportWidth, viewportHeight);
+                            ParseAndApplyCssRules(innerCss, element, computed, computedSpecificity, viewportWidth, viewportHeight, pseudoElement);
                     }
                     if (pos < cssText.Length) pos++; // skip '}'
                 }
@@ -1457,7 +1846,7 @@ public sealed partial class DomBridge
             foreach (var sel in selectors)
             {
                 var trimmed = sel.Trim();
-                if (MatchesSelector(element, trimmed))
+                if (SelectorMatchesComputedStyleTarget(element, trimmed, pseudoElement))
                 {
                     var spec = CalculateSpecificity(trimmed);
                     if (spec > bestSpecificity) bestSpecificity = spec;
@@ -1469,6 +1858,9 @@ public sealed partial class DomBridge
                 // Parse declarations — only overwrite if specificity >= current
                 foreach (var kv in ParseStyle(declarationsText))
                 {
+                    if (!IsPropertyAllowedForPseudoElement(pseudoElement, kv.Key))
+                        continue;
+
                     if (!computedSpecificity.TryGetValue(kv.Key, out var prevSpec) || bestSpecificity >= prevSpec)
                     {
                         computed[kv.Key] = kv.Value;
@@ -1478,6 +1870,79 @@ public sealed partial class DomBridge
             }
         }
     }
+
+    private static bool SelectorMatchesComputedStyleTarget(DomElement element, string selector, string? pseudoElement)
+    {
+        if (pseudoElement == null)
+            return !ContainsPseudoElementSelector(selector) && MatchesSelector(element, selector);
+
+        if (!TryStripPseudoElementSelector(selector, pseudoElement, out var baseSelector))
+            return false;
+
+        return MatchesSelector(element, baseSelector);
+    }
+
+    private static bool ContainsPseudoElementSelector(string selector)
+    {
+        if (selector.IndexOf("::", StringComparison.Ordinal) >= 0)
+            return true;
+
+        return selector.EndsWith(":before", StringComparison.OrdinalIgnoreCase)
+            || selector.EndsWith(":after", StringComparison.OrdinalIgnoreCase)
+            || selector.EndsWith(":first-line", StringComparison.OrdinalIgnoreCase)
+            || selector.EndsWith(":first-letter", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryStripPseudoElementSelector(string selector, string pseudoElement, out string baseSelector)
+    {
+        baseSelector = selector;
+        var normalized = pseudoElement[2..];
+        var doubleColonIndex = selector.LastIndexOf("::", StringComparison.Ordinal);
+        if (doubleColonIndex >= 0)
+        {
+            var suffix = selector[doubleColonIndex..];
+            if (!suffix.Equals(pseudoElement, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            baseSelector = selector[..doubleColonIndex].TrimEnd();
+            return baseSelector.Length > 0;
+        }
+
+        var singleColonSuffix = ":" + normalized;
+        if (!selector.EndsWith(singleColonSuffix, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        baseSelector = selector[..^singleColonSuffix.Length].TrimEnd();
+        return baseSelector.Length > 0;
+    }
+
+    private static bool IsPropertyAllowedForPseudoElement(string? pseudoElement, string propertyName)
+    {
+        if (pseudoElement == null)
+            return true;
+
+        return pseudoElement switch
+        {
+            "::first-line" or "::first-letter" => IsFirstLineOrLetterProperty(propertyName),
+            _ => true,
+        };
+    }
+
+    private static bool IsFirstLineOrLetterProperty(string propertyName) =>
+        propertyName.StartsWith("--", StringComparison.Ordinal)
+        || propertyName is "color"
+        or "background-color"
+        or "font"
+        or "font-family"
+        or "font-size"
+        or "font-style"
+        or "font-variant"
+        or "font-weight"
+        or "line-height"
+        or "letter-spacing"
+        or "word-spacing"
+        or "text-decoration"
+        or "text-transform";
 
     /// <summary>
     /// Splits a CSS selector string by commas, respecting parentheses.

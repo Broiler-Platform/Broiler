@@ -248,6 +248,7 @@ public sealed partial class DomBridge
     /// </summary>
     private static bool IsCrossOrigin(string targetUrl, string pageUrl)
     {
+        targetUrl = NormalizeWptPlaceholderUrl(targetUrl);
         if (string.IsNullOrWhiteSpace(targetUrl)) return false;
         // about:blank inherits the origin of the embedding document (always same-origin)
         if (string.Equals(targetUrl, "about:blank", StringComparison.OrdinalIgnoreCase)) return false;
@@ -263,6 +264,19 @@ public sealed partial class DomBridge
         return !string.Equals(targetUri.Scheme, pageUri.Scheme, StringComparison.OrdinalIgnoreCase) ||
                !string.Equals(targetUri.Host, pageUri.Host, StringComparison.OrdinalIgnoreCase) ||
                targetUri.Port != pageUri.Port;
+    }
+
+    private static string NormalizeWptPlaceholderUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return string.Empty;
+
+        return url
+            .Replace("{{hosts[alt][]}}", "www1.web-platform.test", StringComparison.Ordinal)
+            .Replace("{{hosts[www][]}}", "www.web-platform.test", StringComparison.Ordinal)
+            .Replace("{{hosts[][]}}", "web-platform.test", StringComparison.Ordinal)
+            .Replace("{{ports[http][0]}}", "8000", StringComparison.Ordinal)
+            .Replace("{{ports[https][0]}}", "8443", StringComparison.Ordinal);
     }
 
     /// <summary>

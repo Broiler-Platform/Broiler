@@ -545,7 +545,10 @@ internal sealed class WptTestRunner
         // Execute inline scripts via DomBridge.
         try
         {
-            html = ExecuteScriptsWithDom(html, new Uri(Path.GetFullPath(testPath)).AbsoluteUri);
+            html = ExecuteScriptsWithDom(
+                html,
+                new Uri(Path.GetFullPath(testPath)).AbsoluteUri,
+                batchStyleInvalidations: IsCrashTest(testPath));
         }
         catch (Exception ex)
         {
@@ -855,7 +858,7 @@ internal sealed class WptTestRunner
     /// Extracts and executes inline/external scripts via the DomBridge,
     /// returning the post-execution HTML with DOM mutations applied.
     /// </summary>
-    private static string ExecuteScriptsWithDom(string html, string url)
+    private static string ExecuteScriptsWithDom(string html, string url, bool batchStyleInvalidations = false)
     {
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
@@ -1014,36 +1017,47 @@ internal sealed class WptTestRunner
             }
         }
 
-        foreach (var script in scripts)
-        {
-            try
-            {
-                context.Eval(script);
-                DrainAsyncWork();
-            }
-            catch (Exception ex)
-            {
-                RenderLogger.LogError(LogCategory.JavaScript, "WptTestRunner.ExecuteScriptsWithDom",
-                    $"Script execution error: {ex.Message}", ex);
-            }
-        }
+        if (batchStyleInvalidations)
+            bridge.BeginStyleInvalidationBatch();
 
-        foreach (var script in deferredScripts)
+        try
         {
-            try
+            foreach (var script in scripts)
             {
-                context.Eval(script);
-                DrainAsyncWork();
+                try
+                {
+                    context.Eval(script);
+                    DrainAsyncWork();
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogError(LogCategory.JavaScript, "WptTestRunner.ExecuteScriptsWithDom",
+                        $"Script execution error: {ex.Message}", ex);
+                }
             }
-            catch (Exception ex)
-            {
-                RenderLogger.LogError(LogCategory.JavaScript, "WptTestRunner.ExecuteScriptsWithDom",
-                    $"Deferred script error: {ex.Message}", ex);
-            }
-        }
 
-        bridge.FireWindowLoadEvent();
-        DrainAsyncWork();
+            foreach (var script in deferredScripts)
+            {
+                try
+                {
+                    context.Eval(script);
+                    DrainAsyncWork();
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogError(LogCategory.JavaScript, "WptTestRunner.ExecuteScriptsWithDom",
+                        $"Deferred script error: {ex.Message}", ex);
+                }
+            }
+
+            bridge.FireWindowLoadEvent();
+            DrainAsyncWork();
+        }
+        finally
+        {
+            if (batchStyleInvalidations)
+                bridge.EndStyleInvalidationBatch();
+        }
 
         // Resolve CSS animation snapshots: for elements with animation + negative
         // delay, compute the animated property values at t=0 and write them as
