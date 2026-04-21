@@ -972,8 +972,8 @@ internal sealed class CssParser
         int commaIndex = FindTopLevelChar(inner, ',');
         if (commaIndex >= 0)
         {
-            propertyName = inner.Substring(0, commaIndex).Trim();
-            fallback = inner.Substring(commaIndex + 1).Trim();
+            propertyName = inner[..commaIndex].Trim();
+            fallback = inner[(commaIndex + 1)..].Trim();
             hasFallback = true;
         }
 

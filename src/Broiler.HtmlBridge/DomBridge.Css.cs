@@ -1158,8 +1158,10 @@ public sealed partial class DomBridge
         if (string.IsNullOrWhiteSpace(fontFamily))
             return;
 
-        var strippedFamily = fontFamily.Trim('"', '\'', ' ', ',');
-        if (string.IsNullOrWhiteSpace(strippedFamily))
+        bool hasNonEmptyFamily = fontFamily
+            .Split(',', StringSplitOptions.TrimEntries)
+            .Any(part => !string.IsNullOrWhiteSpace(part.Trim('"', '\'', ' ')));
+        if (!hasNonEmptyFamily)
             return;
 
         computed["font-style"] = fontStyle;
