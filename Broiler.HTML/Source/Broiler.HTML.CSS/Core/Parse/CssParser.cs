@@ -1014,7 +1014,7 @@ internal sealed class CssParser
         {
             if (value[i] == '(')
                 depth++;
-            else if (value[i] == ')' && depth > 0)
+            else if (value[i] == ')')
                 depth--;
             else if (value[i] == target && depth == 0)
                 return i;
