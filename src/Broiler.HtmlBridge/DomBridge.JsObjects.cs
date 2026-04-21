@@ -3982,6 +3982,7 @@ public sealed partial class DomBridge
 
     private string ResolveSubResourceUrl(string resourceUrl, string? baseUrl = null)
     {
+        resourceUrl = NormalizeWptPlaceholderUrl(resourceUrl);
         if (string.IsNullOrWhiteSpace(resourceUrl))
             return string.Empty;
 
@@ -3993,6 +3994,84 @@ public sealed partial class DomBridge
                Uri.TryCreate(baseUri, resourceUrl, out var resolved)
             ? resolved.AbsoluteUri
             : string.Empty;
+    }
+
+    private bool TryGetWptRootDirectory(out string wptRoot)
+    {
+        static string? FindWptRoot(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return null;
+
+            DirectoryInfo? current;
+            if (File.Exists(path))
+                current = new FileInfo(path).Directory;
+            else if (Directory.Exists(path))
+                current = new DirectoryInfo(path);
+            else
+                current = new FileInfo(path).Directory;
+
+            while (current != null)
+            {
+                if (string.Equals(current.Name, "wpt", StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(current.Parent?.Name, "tests", StringComparison.OrdinalIgnoreCase))
+                {
+                    return current.FullName;
+                }
+
+                current = current.Parent;
+            }
+
+            return null;
+        }
+
+        wptRoot = string.Empty;
+
+        var candidates = new List<string>();
+        if (!string.IsNullOrWhiteSpace(_localBasePath))
+            candidates.Add(_localBasePath);
+
+        if (Uri.TryCreate(_pageUrl, UriKind.Absolute, out var pageUri) &&
+            string.Equals(pageUri.Scheme, Uri.UriSchemeFile, StringComparison.OrdinalIgnoreCase))
+        {
+            candidates.Add(pageUri.LocalPath);
+        }
+
+        foreach (var candidate in candidates)
+        {
+            var root = FindWptRoot(candidate);
+            if (!string.IsNullOrWhiteSpace(root))
+            {
+                wptRoot = root;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private string? TryMapLocalWptHttpResource(string absoluteUrl)
+    {
+        if (!TryGetWptRootDirectory(out var wptRoot) ||
+            !Uri.TryCreate(absoluteUrl, UriKind.Absolute, out var resourceUri) ||
+            !(string.Equals(resourceUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
+              string.Equals(resourceUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
+        {
+            return null;
+        }
+
+        if (!string.Equals(resourceUri.Host, "web-platform.test", StringComparison.OrdinalIgnoreCase) &&
+            !resourceUri.Host.EndsWith(".web-platform.test", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var relativePath = resourceUri.AbsolutePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        if (string.IsNullOrWhiteSpace(relativePath))
+            return null;
+
+        var localPath = Path.Combine(wptRoot, relativePath);
+        return File.Exists(localPath) ? localPath : null;
     }
 
     private void ExecuteSubDocumentScripts(DomElement containerElement, string html)
@@ -4170,6 +4249,7 @@ public sealed partial class DomBridge
     /// </summary>
     private (string? content, string contentType) TryFetchSubResource(string resourceUrl, string? baseUrl = null)
     {
+        resourceUrl = NormalizeWptPlaceholderUrl(resourceUrl);
         if (string.IsNullOrWhiteSpace(resourceUrl))
             return (null, string.Empty);
 
@@ -4220,6 +4300,11 @@ public sealed partial class DomBridge
         if (resolvedUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
         {
             return TryReadFileResource(resolvedUrl, extensionMime);
+        }
+
+        if (TryMapLocalWptHttpResource(resolvedUrl) is { } localWptPath)
+        {
+            return TryReadFileResource(new Uri(localWptPath).AbsoluteUri, extensionMime);
         }
 
         // Only fetch HTTP/HTTPS URLs

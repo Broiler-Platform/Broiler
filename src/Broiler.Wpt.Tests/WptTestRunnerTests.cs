@@ -4673,6 +4673,108 @@ document.getElementById('target').src = 'leaf.html?scale=3';
         }
     }
 
+    [Fact]
+    public void Wpt_CssViewport_CrossOriginIframeTemplate_Uses_LocalWptResource_And_MatchesReference()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"broiler-wpt-cross-origin-match-{Guid.NewGuid():N}");
+        var wptRoot = Path.Combine(tempRoot, "tests", "wpt");
+        var zoomDir = Path.Combine(wptRoot, "css", "css-viewport", "zoom");
+        var referenceDir = Path.Combine(wptRoot, "references", "css", "css-viewport", "zoom", "reference");
+        var resourceDir = Path.Combine(zoomDir, "resources");
+        Directory.CreateDirectory(zoomDir);
+        Directory.CreateDirectory(referenceDir);
+        Directory.CreateDirectory(resourceDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(resourceDir, "leaf.html"), """
+<!DOCTYPE html>
+<style>
+body {
+  background-color: aqua;
+  --target-width: 32px;
+  --target-height: 24px;
+  --scale: 1;
+  margin: calc(18px * var(--scale));
+}
+#target {
+  width: calc(var(--target-width) * var(--scale));
+  height: calc(var(--target-height) * var(--scale));
+  background-color: hotpink;
+}
+</style>
+
+<div id="target"></div>
+
+<script>
+let params = new URLSearchParams(location.search);
+if (params.has("scale")) {
+  document.body.style.setProperty("--scale", parseFloat(params.get("scale")));
+}
+</script>
+""");
+
+            var testFile = Path.Combine(zoomDir, "iframe-zoom.sub.html");
+            var refFile = Path.Combine(referenceDir, "iframe-zoom-ref.html");
+
+            File.WriteAllText(testFile, """
+<!DOCTYPE html>
+<style>
+body {
+  --iframe-width: 128px;
+  --iframe-height: 64px;
+}
+iframe {
+  border: none;
+  width: var(--iframe-width);
+  height: var(--iframe-height);
+}
+.zoom {
+  zoom: 2;
+}
+</style>
+
+<iframe id="baseline" src="resources/leaf.html"></iframe>
+<iframe id="zoom-same-origin" class="zoom" src="resources/leaf.html" scrolling="no"></iframe>
+<iframe id="zoom-cross-origin" class="zoom" src="http://{{hosts[alt][]}}:{{ports[http][0]}}/css/css-viewport/zoom/resources/leaf.html" scrolling="no"></iframe>
+""");
+
+            File.WriteAllText(refFile, """
+<!DOCTYPE html>
+<style>
+body {
+  --iframe-width: 128px;
+  --iframe-height: 64px;
+  --scale: 1;
+}
+iframe {
+  border: none;
+  width: calc(var(--iframe-width) * var(--scale));
+  height: calc(var(--iframe-height) * var(--scale));
+}
+.scale {
+  --scale: 2;
+}
+</style>
+
+<iframe id="baseline-ref" src="../resources/leaf.html"></iframe>
+<iframe id="zoom-same-origin-ref" class="scale" src="../resources/leaf.html?scale=2"></iframe>
+<iframe id="zoom-cross-origin-ref" class="scale" src="../resources/leaf.html?scale=2"></iframe>
+""");
+
+            var runner = new WptTestRunner();
+            var result = runner.RunMatchTest(testFile, refFile, wptRoot);
+
+            Assert.True(result.Passed,
+                $"Cross-origin templated iframe zoom should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     /// <summary>
     /// Runs a css-anchor-position test against a Chromium reference PNG.
     /// </summary>

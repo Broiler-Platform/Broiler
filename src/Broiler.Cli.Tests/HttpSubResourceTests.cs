@@ -145,6 +145,49 @@ window.onload = function () {
     }
 
     [Fact]
+    public void Iframe_Wpt_CrossOrigin_Template_Src_Loads_From_Local_Wpt_Root_But_Stays_CrossOrigin()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"broiler-wpt-cross-origin-{Guid.NewGuid():N}");
+        var wptRoot = Path.Combine(tempRoot, "tests", "wpt");
+        var zoomDir = Path.Combine(wptRoot, "css", "css-viewport", "zoom");
+        var resourceDir = Path.Combine(zoomDir, "resources");
+        Directory.CreateDirectory(resourceDir);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(resourceDir, "leaf.html"), """
+<!DOCTYPE html>
+<html><body><div id="leaf">loaded-cross-origin</div></body></html>
+""");
+
+            var pageUrl = new Uri(Path.Combine(zoomDir, "iframe-zoom.sub.html")).AbsoluteUri;
+            var html = """
+<!DOCTYPE html>
+<html><body>
+<iframe id="fr" src="http://{{hosts[alt][]}}:{{ports[http][0]}}/css/css-viewport/zoom/resources/leaf.html"></iframe>
+<div id="out"></div>
+<script>
+window.onload = function () {
+  var fr = document.getElementById('fr');
+  document.getElementById('out').textContent = String(fr.contentDocument === null);
+};
+</script>
+</body></html>
+""";
+
+            var result = CaptureService.ExecuteScriptsWithDom(html, pageUrl);
+
+            Assert.Contains(">true</div>", result);
+            Assert.Contains("loaded-cross-origin", result);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Iframe_NonHtml_Src_Gets_Minimal_Document()
     {
         var html = @"<!DOCTYPE html>

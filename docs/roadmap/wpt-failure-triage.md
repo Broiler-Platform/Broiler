@@ -19,6 +19,7 @@
 - Phase 6 has widened again: element scroll APIs now ignore non-scroll-container elements with `overflow:visible` (explicit or implicit) while preserving `overflow:hidden` scrolling-box behavior, with focused CLI and WPT guard rails for the `dom-element-scroll.html` slice.
 - Phase 6 has widened again: iframe `srcdoc` subdocuments now expose `contentDocument.scrollingElement`, a cached same-origin `contentWindow`, and subframe window scroll proxies with `scrollX`/`scrollY`/`pageXOffset`/`pageYOffset`, with focused CLI and WPT guard rails for the `scroll-behavior-subframe-root.html` / `scroll-behavior-subframe-window.html` slice.
 - Phase 6 has widened again: fetched iframe subdocuments now run their own scripts in document context and resolve nested relative iframe sources against the containing subdocument URL, with focused CLI and WPT guard rails for the `iframe-zoom-nested.html` browsing-context slice.
+- Phase 6 has widened again: file-based WPT runs now normalize templated cross-origin iframe URLs and map `*.web-platform.test` resource paths back to the local `tests/wpt` tree for rendering while preserving cross-origin script fences, with focused CLI and WPT guard rails for the `iframe-zoom.sub.html` slice.
 
 ### 2026-04-18
 
