@@ -233,8 +233,12 @@ echo "--- Summary ---"
 if [[ -f "$LOGFILE" ]]; then
     PASSED="$(grep -c '^\[PASS\]' "$LOGFILE" || true)"
     FAILED="$(grep -c '^\[FAIL\]' "$LOGFILE" || true)"
-    # Extract skipped count from the Results line
-    SKIPPED="$(grep -oP '(?<=, )\d+(?= skipped)' "$LOGFILE" || true)"
+    # Extract skipped count from the final "Results:" line. Anchoring on
+    # "^Results: " avoids matching the periodic "[INFO] Completed ..."
+    # progress lines, which would otherwise emit one number per checkpoint
+    # and corrupt $SKIPPED (and the generated wpt-summary.txt) with
+    # hundreds of bare-number lines.
+    SKIPPED="$(grep -oP '^Results: \d+ passed, \d+ failed, \K\d+(?= skipped)' "$LOGFILE" | tail -n 1 || true)"
     PASSED="${PASSED:-0}"
     FAILED="${FAILED:-0}"
     SKIPPED="${SKIPPED:-0}"
