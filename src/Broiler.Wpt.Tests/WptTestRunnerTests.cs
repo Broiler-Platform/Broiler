@@ -19,6 +19,7 @@ public class WptTestRunnerTests : IDisposable
 
     public void Dispose()
     {
+        Program.ResetTestHooks();
         if (Directory.Exists(_tempDir))
             Directory.Delete(_tempDir, recursive: true);
     }
@@ -2043,6 +2044,117 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("[RUN ] (1/2) a.html", output);
         Assert.Contains("[RUN ] (2/2) b.html", output);
         Assert.Contains("[INFO] Completed 2/2 tests (0 passed, 0 failed, 2 skipped)", output);
+    }
+
+    [Fact]
+    public void RunTestWithTimeout_Returns_Timeout_Result_With_Diagnostics()
+    {
+        Program.RunTestExecutor = static (runner, testPath, referenceDir, wptPath) =>
+        {
+            Thread.Sleep(200);
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = true,
+            };
+        };
+
+        var runner = new WptTestRunner();
+        var result = Program.RunTestWithTimeout(
+            runner,
+            Path.Combine(_tempDir, "timeout.html"),
+            Path.Combine(_tempDir, "references"),
+            _tempDir,
+            TimeSpan.FromMilliseconds(50));
+
+        Assert.False(result.Passed);
+        Assert.Equal(FailureCategory.Timeout, result.Category);
+        Assert.Contains("Test timed out after 0.05", result.Message);
+        Assert.NotNull(result.StackTrace);
+        Assert.Contains("RunTest invocation stack", result.StackTrace);
+        Assert.Contains("Timeout detection stack", result.StackTrace);
+    }
+
+    [Fact]
+    public void Program_Records_Timeouts_In_Output_And_Summary()
+    {
+        var testDir = Path.Combine(_tempDir, "timeout-program");
+        Directory.CreateDirectory(testDir);
+        File.WriteAllText(Path.Combine(testDir, "slow.html"), "<html><body>Slow</body></html>");
+
+        Program.RunTestExecutor = static (runner, testPath, referenceDir, wptPath) =>
+        {
+            Thread.Sleep(200);
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = true,
+            };
+        };
+
+        var originalOut = Console.Out;
+        var originalError = Console.Error;
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        Console.SetOut(stdout);
+        Console.SetError(stderr);
+        try
+        {
+            var exitCode = Program.Main(["--wpt-dir", testDir, "--timeout", "0.05"]);
+
+            Assert.Equal(1, exitCode);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+            Console.SetError(originalError);
+        }
+
+        var output = stdout.ToString();
+        var errorOutput = stderr.ToString();
+
+        Assert.Contains("Timeout       : 0.05 second(s)", output);
+        Assert.Contains("[FAIL] [Timeout]", output);
+        Assert.Contains("Test timed out after 0.05 second(s)", output);
+        Assert.Contains("Results: 0 passed, 1 failed, 0 skipped", output);
+        Assert.Contains("Failed tests:", output);
+        Assert.Contains("slow.html", output);
+        Assert.Contains("[Timeout] — 1 failure(s)", output);
+        Assert.Contains("[TIMEOUT] Test timed out after 0.05 second(s)", errorOutput);
+        Assert.Contains("Timeout detection stack", errorOutput);
+    }
+
+    [Fact]
+    public void Program_Writes_Timeout_StackTrace_To_Json_Report()
+    {
+        var testDir = Path.Combine(_tempDir, "timeout-json");
+        Directory.CreateDirectory(testDir);
+        File.WriteAllText(Path.Combine(testDir, "slow.html"), "<html><body>Slow</body></html>");
+
+        Program.RunTestExecutor = static (runner, testPath, referenceDir, wptPath) =>
+        {
+            Thread.Sleep(200);
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = true,
+            };
+        };
+
+        var jsonPath = Path.Combine(_tempDir, "timeout-report.json");
+
+        Program.Main([
+            "--wpt-dir", testDir,
+            "--timeout", "0.05",
+            "--json-output", jsonPath,
+        ]);
+
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(jsonPath));
+        var result = doc.RootElement.GetProperty("results").EnumerateArray().Single();
+
+        Assert.Equal("Timeout", result.GetProperty("category").GetString());
+        Assert.Contains("Test timed out after 0.05 second(s)", result.GetProperty("message").GetString());
+        Assert.Contains("Timeout detection stack", result.GetProperty("stackTrace").GetString());
     }
 
     [Fact]
