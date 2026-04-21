@@ -2267,7 +2267,7 @@ public sealed partial class DomBridge
                 (KeyString)"scrollTop",
                 new JSFunction((in Arguments _) =>
                 {
-                    if (element.DomProperties.TryGetValue("_scrollTop", out var st) && st is double sv)
+                    if (bridgeForOffset.GetElementScrollOffset(element, vertical: true) is double sv)
                         return new JSNumber(sv);
                     return new JSNumber(0);
                 }, "get scrollTop"),
@@ -2282,7 +2282,7 @@ public sealed partial class DomBridge
                 (KeyString)"scrollLeft",
                 new JSFunction((in Arguments _) =>
                 {
-                    if (element.DomProperties.TryGetValue("_scrollLeft", out var sl) && sl is double sv)
+                    if (bridgeForOffset.GetElementScrollOffset(element, vertical: false) is double sv)
                         return new JSNumber(sv);
                     return new JSNumber(0);
                 }, "get scrollLeft"),
@@ -3104,13 +3104,29 @@ public sealed partial class DomBridge
         return value == null || value.IsUndefined || value.IsNull ? null : value.DoubleValue;
     }
 
+    private double GetElementScrollOffset(DomElement element, bool vertical)
+    {
+        if (!CanProgrammaticallyScroll(element, vertical))
+            return 0;
+
+        var propertyName = vertical ? "_scrollTop" : "_scrollLeft";
+        return element.DomProperties.TryGetValue(propertyName, out var offset) && offset is double scrollOffset
+            ? scrollOffset
+            : 0;
+    }
+
     private void SetElementScrollOffsets(DomElement element, double? left = null, double? top = null, bool relative = false, bool clamp = true)
     {
-        var currentLeft = element.DomProperties.TryGetValue("_scrollLeft", out var sl) && sl is double leftValue ? leftValue : 0;
-        var currentTop = element.DomProperties.TryGetValue("_scrollTop", out var st) && st is double topValue ? topValue : 0;
+        var currentLeft = GetElementScrollOffset(element, vertical: false);
+        var currentTop = GetElementScrollOffset(element, vertical: true);
 
         var nextLeft = left.HasValue ? (relative ? currentLeft + left.Value : left.Value) : currentLeft;
         var nextTop = top.HasValue ? (relative ? currentTop + top.Value : top.Value) : currentTop;
+
+        if (!CanProgrammaticallyScroll(element, vertical: false))
+            nextLeft = 0;
+        if (!CanProgrammaticallyScroll(element, vertical: true))
+            nextTop = 0;
 
         if (clamp)
         {
@@ -3121,6 +3137,31 @@ public sealed partial class DomBridge
 
         element.DomProperties["_scrollLeft"] = nextLeft;
         element.DomProperties["_scrollTop"] = nextTop;
+    }
+
+    private bool CanProgrammaticallyScroll(DomElement element, bool vertical)
+    {
+        if (ReferenceEquals(element, DocumentElement) ||
+            string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var props = GetComputedProps(element);
+        var axisValue = props.GetValueOrDefault(vertical ? "overflow-y" : "overflow-x");
+        if (string.IsNullOrWhiteSpace(axisValue))
+            axisValue = props.GetValueOrDefault("overflow");
+
+        return EnablesScrollingBox(axisValue);
+    }
+
+    private static bool EnablesScrollingBox(string? overflowValue)
+    {
+        if (string.IsNullOrWhiteSpace(overflowValue))
+            return false;
+
+        var value = overflowValue.Trim().ToLowerInvariant();
+        return value.Contains("hidden") || value.Contains("scroll") || value.Contains("auto") || value.Contains("clip");
     }
 
     private (double MinLeft, double MaxLeft, double MinTop, double MaxTop) GetScrollBounds(DomElement element)

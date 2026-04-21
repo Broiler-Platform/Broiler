@@ -16,6 +16,7 @@
 - Phase 6 has widened again: `getComputedStyle(element, pseudoElement)` now distinguishes element vs pseudo-element rule matching, accepts unresolved `var(...)` values in closed-keyword bridge declarations until the later substitution pass, and locally guards representative `::first-line` / `::first-letter` custom-property cases from the next `css/css-variables` pseudo-element slice.
 - Phase 6 has widened again: renderer-side inherited custom-property substitution now resolves representative text, background, and border paint values from ancestor-defined variables at used-value time, with a focused `Broiler.Wpt.Tests` guard rail advancing the remaining `variable-reference-*` / visited-context paint-color bucket.
 - Phase 6 has widened again: parser-side and bridge-side custom-property recovery now tolerate the unclosed nested fallback tail from `missing-closing-nested-fallback.html`, with focused CLI computed-style and WPT rendering guard rails for that malformed-but-recoverable substitution path.
+- Phase 6 has widened again: element scroll APIs now ignore non-scroll-container elements with `overflow:visible` (explicit or implicit) while preserving `overflow:hidden` scrolling-box behavior, with focused CLI and WPT guard rails for the `dom-element-scroll.html` slice.
 
 ### 2026-04-18
 

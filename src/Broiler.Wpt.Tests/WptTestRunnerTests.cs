@@ -4507,6 +4507,58 @@ document.getElementById('out').appendChild(p);
             $"Expected vertical rtl scroller left=-150 top=-300, got left={verticalRtl.DomProperties.GetValueOrDefault("_scrollLeft")}, top={verticalRtl.DomProperties.GetValueOrDefault("_scrollTop")}");
     }
 
+    [Fact]
+    public void Wpt_CssomView_ElementScroll_Ignores_Elements_Without_Scrolling_Boxes()
+    {
+        const string html = @"<!DOCTYPE html>
+<div id=""hidden"" style=""width:100px; height:100px; overflow:hidden;"">
+  <div style=""width:250px; height:250px;""></div>
+</div>
+<div id=""visible"" style=""width:100px; height:100px; overflow:visible;"">
+  <div style=""width:250px; height:250px;""></div>
+</div>
+<div id=""implicit"" style=""width:100px; height:100px;"">
+  <div style=""width:250px; height:250px;""></div>
+</div>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        ctx.Eval("""
+            var hidden = document.getElementById('hidden');
+            hidden.scroll(40, 50);
+            var visible = document.getElementById('visible');
+            visible.scroll(40, 50);
+            var implicit = document.getElementById('implicit');
+            implicit.scrollLeft = 40;
+            implicit.scrollTop = 50;
+            """);
+
+        Broiler.HtmlBridge.DomElement? hidden = null;
+        FindDomElement(bridge.DocumentElement, "hidden", ref hidden);
+        Assert.NotNull(hidden);
+        Assert.True(
+            hidden!.DomProperties.TryGetValue("_scrollLeft", out var hiddenLeftValue) && hiddenLeftValue is double hiddenLeft && hiddenLeft == 40 &&
+            hidden.DomProperties.TryGetValue("_scrollTop", out var hiddenTopValue) && hiddenTopValue is double hiddenTop && hiddenTop == 50,
+            $"Expected overflow:hidden element to scroll to 40,50 but got left={hidden.DomProperties.GetValueOrDefault("_scrollLeft")}, top={hidden.DomProperties.GetValueOrDefault("_scrollTop")}");
+
+        Broiler.HtmlBridge.DomElement? visible = null;
+        FindDomElement(bridge.DocumentElement, "visible", ref visible);
+        Assert.NotNull(visible);
+        Assert.True(
+            visible!.DomProperties.TryGetValue("_scrollLeft", out var visibleLeftValue) && visibleLeftValue is double visibleLeft && visibleLeft == 0 &&
+            visible.DomProperties.TryGetValue("_scrollTop", out var visibleTopValue) && visibleTopValue is double visibleTop && visibleTop == 0,
+            $"Expected overflow:visible element to stay at 0,0 but got left={visible.DomProperties.GetValueOrDefault("_scrollLeft")}, top={visible.DomProperties.GetValueOrDefault("_scrollTop")}");
+
+        Broiler.HtmlBridge.DomElement? implicitVisible = null;
+        FindDomElement(bridge.DocumentElement, "implicit", ref implicitVisible);
+        Assert.NotNull(implicitVisible);
+        Assert.True(
+            implicitVisible!.DomProperties.TryGetValue("_scrollLeft", out var implicitLeftValue) && implicitLeftValue is double implicitLeft && implicitLeft == 0 &&
+            implicitVisible.DomProperties.TryGetValue("_scrollTop", out var implicitTopValue) && implicitTopValue is double implicitTop && implicitTop == 0,
+            $"Expected default overflow element to stay at 0,0 but got left={implicitVisible.DomProperties.GetValueOrDefault("_scrollLeft")}, top={implicitVisible.DomProperties.GetValueOrDefault("_scrollTop")}");
+    }
+
     /// <summary>
     /// Runs a css-anchor-position test against a Chromium reference PNG.
     /// </summary>
