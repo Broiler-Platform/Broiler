@@ -24,6 +24,8 @@ internal enum FailureCategory
     ScriptError,
     /// <summary>The Broiler rendering pipeline threw an exception.</summary>
     RenderingError,
+    /// <summary>The test exceeded the configured execution timeout.</summary>
+    Timeout,
     /// <summary>The reference image could not be decoded.</summary>
     ReferenceDecodeError,
     /// <summary>Rendered output did not match the reference image.</summary>
@@ -104,6 +106,7 @@ internal sealed class WptTestResult
             ["matchPercent"] = MatchPercent,
             ["category"] = Category.ToString(),
             ["message"] = Message,
+            ["stackTrace"] = StackTrace,
         };
 
         if (MismatchDiagnostics is { } diag)

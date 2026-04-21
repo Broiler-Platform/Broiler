@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -14,6 +16,8 @@ using Broiler.HTML.Image;
 /// </summary>
 public class Program
 {
+    private const double DefaultRunTestTimeoutSeconds = 30;
+    private const string RunTestTimeoutEnvironmentVariable = "BROILER_WPT_TIMEOUT_SECONDS";
     private const int ProgressCheckpointInterval = 25;
     private const int TopBucketLimit = 5;
     private const int MissingContentDominantBucketMinimumFailures = 5;
@@ -24,6 +28,9 @@ public class Program
         "css/filter-effects",
     ];
 
+    internal static Func<WptTestRunner, string, string, string?, WptTestResult> RunTestExecutor
+        = static (runner, testPath, referenceDir, wptPath) => runner.RunTest(testPath, referenceDir, wptPath);
+
     public static int Main(string[] args)
     {
         string? wptPath = null;
@@ -31,6 +38,7 @@ public class Program
         string? jsonOutputPath = null;
         string? markdownOutputPath = null;
         string? subset = null;
+        double? timeoutSeconds = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -51,11 +59,21 @@ public class Program
                 case "--subset" when i + 1 < args.Length:
                     subset = args[++i];
                     break;
+                case "--timeout" when i + 1 < args.Length:
+                    if (!TryParsePositiveTimeoutSeconds(args[++i], out var parsedTimeoutSeconds))
+                    {
+                        Console.Error.WriteLine("Error: '--timeout' must be a positive number of seconds.");
+                        return 1;
+                    }
+
+                    timeoutSeconds = parsedTimeoutSeconds;
+                    break;
                 case "--wpt-dir":
                 case "--reference-dir":
                 case "--json-output":
                 case "--markdown-output":
                 case "--subset":
+                case "--timeout":
                     Console.Error.WriteLine($"Error: '{args[i]}' requires a value.");
                     PrintUsage();
                     return 1;
@@ -94,8 +112,15 @@ public class Program
         // Default reference directory to <wptPath>/references if not specified.
         referenceDir ??= Path.Combine(wptPath, "references");
 
+        if (!TryResolveRunTestTimeout(timeoutSeconds, out var runTestTimeout, out var timeoutError))
+        {
+            Console.Error.WriteLine(timeoutError);
+            return 1;
+        }
+
         Console.WriteLine($"WPT directory : {Path.GetFullPath(wptPath)}");
         Console.WriteLine($"Reference dir : {Path.GetFullPath(referenceDir)}");
+        Console.WriteLine($"Timeout       : {runTestTimeout.TotalSeconds:0.###} second(s)");
         if (!string.IsNullOrWhiteSpace(subset))
             Console.WriteLine($"Subset        : {subset}");
         Console.WriteLine();
@@ -123,7 +148,7 @@ public class Program
             var displayPath = Path.GetRelativePath(wptPath, testPath).Replace('\\', '/');
             //Console.WriteLine($"[RUN ] ({completed + 1}/{totalTests}) {displayPath}");
 
-            var result = runner.RunTest(testPath, referenceDir, wptPath);
+            var result = RunTestWithTimeout(runner, testPath, referenceDir, wptPath, runTestTimeout);
             allResults.Add(result);
             completed++;
 
@@ -255,6 +280,109 @@ public class Program
         }
 
         return failed > 0 ? 1 : 0;
+    }
+
+    internal static void ResetTestHooks()
+    {
+        RunTestExecutor = static (runner, testPath, referenceDir, wptPath) => runner.RunTest(testPath, referenceDir, wptPath);
+    }
+
+    internal static WptTestResult RunTestWithTimeout(
+        WptTestRunner runner,
+        string testPath,
+        string referenceDir,
+        string? wptPath,
+        TimeSpan timeout)
+    {
+        var invocationStackTrace = new StackTrace(skipFrames: 1, fNeedFileInfo: true).ToString();
+        int workerThreadId = -1;
+        var runTestTask = Task.Run(() =>
+        {
+            workerThreadId = Environment.CurrentManagedThreadId;
+            return RunTestExecutor(runner, testPath, referenceDir, wptPath);
+        });
+
+        try
+        {
+            return runTestTask.WaitAsync(timeout).GetAwaiter().GetResult();
+        }
+        catch (TimeoutException)
+        {
+            _ = runTestTask.ContinueWith(
+                static t => _ = t.Exception,
+                TaskContinuationOptions.OnlyOnFaulted);
+
+            var timeoutResult = CreateTimeoutResult(testPath, timeout, workerThreadId, invocationStackTrace);
+            Console.Error.WriteLine($"[TIMEOUT] {timeoutResult.Message}");
+            Console.Error.WriteLine(timeoutResult.StackTrace);
+            return timeoutResult;
+        }
+    }
+
+    private static bool TryResolveRunTestTimeout(
+        double? cliTimeoutSeconds,
+        out TimeSpan timeout,
+        out string? error)
+    {
+        timeout = TimeSpan.Zero;
+        error = null;
+
+        if (cliTimeoutSeconds.HasValue)
+        {
+            timeout = TimeSpan.FromSeconds(cliTimeoutSeconds.Value);
+            return true;
+        }
+
+        var envTimeout = Environment.GetEnvironmentVariable(RunTestTimeoutEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(envTimeout))
+        {
+            if (!TryParsePositiveTimeoutSeconds(envTimeout, out var parsedEnvTimeoutSeconds))
+            {
+                error = $"Error: '{RunTestTimeoutEnvironmentVariable}' must be a positive number of seconds.";
+                return false;
+            }
+
+            timeout = TimeSpan.FromSeconds(parsedEnvTimeoutSeconds);
+            return true;
+        }
+
+        timeout = TimeSpan.FromSeconds(DefaultRunTestTimeoutSeconds);
+        return true;
+    }
+
+    private static bool TryParsePositiveTimeoutSeconds(string value, out double timeoutSeconds)
+    {
+        return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out timeoutSeconds) &&
+               timeoutSeconds > 0;
+    }
+
+    private static WptTestResult CreateTimeoutResult(
+        string testPath,
+        TimeSpan timeout,
+        int workerThreadId,
+        string invocationStackTrace)
+    {
+        var message = $"Test timed out after {timeout.TotalSeconds:0.###} second(s): {testPath}";
+        var stackTrace = new StringBuilder()
+            .AppendLine("=== Timeout diagnostics ===")
+            .AppendLine(message)
+            .AppendLine($"Worker thread id: {(workerThreadId >= 0 ? workerThreadId : "unknown")}")
+            .AppendLine()
+            .AppendLine("RunTest invocation stack:")
+            .AppendLine(invocationStackTrace)
+            .AppendLine()
+            .AppendLine("Timeout detection stack:")
+            .AppendLine(Environment.StackTrace)
+            .ToString();
+
+        return new WptTestResult
+        {
+            TestPath = testPath,
+            Passed = false,
+            Message = message,
+            Category = FailureCategory.Timeout,
+            StackTrace = stackTrace,
+        };
     }
 
     /// <summary>
@@ -789,6 +917,8 @@ public class Program
         Console.WriteLine("  --subset <PATTERNS>        Semicolon-separated list of sub-path patterns to test.");
         Console.WriteLine("                             Supports * and ? wildcards (glob-style).");
         Console.WriteLine("                             Example: \"css/CSS2;css/css-*\"");
+        Console.WriteLine("  --timeout <SECS>           Per-test timeout in seconds (default: 30, env:");
+        Console.WriteLine($"                             {RunTestTimeoutEnvironmentVariable})");
         Console.WriteLine("  --json-output <PATH>       Write structured JSON report to the given path");
         Console.WriteLine("  --markdown-output <PATH>   Write triage-focused Markdown summary to the given path");
         Console.WriteLine("  --help                     Show this help message");
