@@ -588,10 +588,11 @@ public sealed partial class DomBridge
         }
     }
 
-    private JSObject BuildComputedStyleObject(DomElement? element)
+    private JSObject BuildComputedStyleObject(DomElement? element, string? pseudoElement = null)
     {
         var computed = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var computedSpecificity = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        pseudoElement = NormalizePseudoElement(pseudoElement);
 
         if (element != null)
         {
@@ -655,10 +656,17 @@ public sealed partial class DomBridge
             // Inline styles (from the style="" attribute) override CSS rules.
             // We parse the attribute directly rather than using element.Style because
             // ApplyCascadedStyles() may have merged CSS rules into element.Style.
-            if (element.Attributes.TryGetValue("style", out var inlineStyleAttr) && !string.IsNullOrEmpty(inlineStyleAttr))
+            if (pseudoElement == null &&
+                element.Attributes.TryGetValue("style", out var inlineStyleAttr) &&
+                !string.IsNullOrEmpty(inlineStyleAttr))
             {
                 foreach (var kv in ParseStyle(inlineStyleAttr))
                     computed[kv.Key] = kv.Value;
+            }
+
+            if (pseudoElement != null)
+            {
+                ApplyPseudoElementRules(element, pseudoElement, styleElements, computed, computedSpecificity, vpWidth, vpHeight);
             }
 
             ResolveKnownCustomProperties(computed);
@@ -735,6 +743,84 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return obj;
+    }
+
+    private void ApplyPseudoElementRules(
+        DomElement element,
+        string pseudoElement,
+        List<DomElement> styleElements,
+        Dictionary<string, string> computed,
+        Dictionary<string, int> computedSpecificity,
+        int viewportWidth,
+        int viewportHeight)
+    {
+        foreach (var styleEl in styleElements)
+        {
+            var cssText = new StringBuilder();
+            foreach (var child in styleEl.Children)
+            {
+                if (child.IsTextNode && child.TextContent != null)
+                    cssText.Append(child.TextContent);
+            }
+
+            if (cssText.Length == 0 && styleEl.TextContent != null)
+                cssText.Append(styleEl.TextContent);
+
+            if (styleEl.DomProperties.TryGetValue("_insertedRules", out var insertedObj) &&
+                insertedObj is List<(int Index, string Rule)> insertedRules)
+            {
+                foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))
+                    cssText.Append(' ').Append(rule);
+            }
+
+            if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
+                cssText.Length == 0 &&
+                styleEl.Attributes.TryGetValue("href", out var href) &&
+                !string.IsNullOrEmpty(href))
+            {
+                if (styleEl.DomProperties.TryGetValue("_fetchedCss", out var cachedCss) && cachedCss is string cachedStr)
+                {
+                    cssText.Append(cachedStr);
+                }
+                else
+                {
+                    try
+                    {
+                        var fetchedCss = FetchExternalStylesheet(href);
+                        if (!string.IsNullOrEmpty(fetchedCss))
+                        {
+                            styleEl.DomProperties["_fetchedCss"] = fetchedCss;
+                            cssText.Append(fetchedCss);
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            ParseAndApplyCssRules(cssText.ToString(), element, computed, computedSpecificity, viewportWidth, viewportHeight, pseudoElement);
+        }
+    }
+
+    private static string? NormalizePseudoElement(string? pseudoElement)
+    {
+        if (string.IsNullOrWhiteSpace(pseudoElement))
+            return null;
+
+        pseudoElement = pseudoElement.Trim();
+        if (pseudoElement.Equals("::before", StringComparison.OrdinalIgnoreCase) ||
+            pseudoElement.Equals(":before", StringComparison.OrdinalIgnoreCase))
+            return "::before";
+        if (pseudoElement.Equals("::after", StringComparison.OrdinalIgnoreCase) ||
+            pseudoElement.Equals(":after", StringComparison.OrdinalIgnoreCase))
+            return "::after";
+        if (pseudoElement.Equals("::first-line", StringComparison.OrdinalIgnoreCase) ||
+            pseudoElement.Equals(":first-line", StringComparison.OrdinalIgnoreCase))
+            return "::first-line";
+        if (pseudoElement.Equals("::first-letter", StringComparison.OrdinalIgnoreCase) ||
+            pseudoElement.Equals(":first-letter", StringComparison.OrdinalIgnoreCase))
+            return "::first-letter";
+
+        return null;
     }
 
     private static void ApplyApproximateFormControlComputedSizes(
@@ -1648,7 +1734,7 @@ public sealed partial class DomBridge
     /// </summary>
     private void ParseAndApplyCssRules(string cssText, DomElement element,
         Dictionary<string, string> computed, Dictionary<string, int> computedSpecificity,
-        int viewportWidth = 0, int viewportHeight = 0)
+        int viewportWidth = 0, int viewportHeight = 0, string? pseudoElement = null)
     {
         int pos = 0;
         while (pos < cssText.Length)
@@ -1692,7 +1778,7 @@ public sealed partial class DomBridge
                     {
                         var innerCss = cssText[blockStart..pos];
                         if (EvaluateMediaQuery(mediaQuery, viewportWidth, viewportHeight))
-                            ParseAndApplyCssRules(innerCss, element, computed, computedSpecificity, viewportWidth, viewportHeight);
+                            ParseAndApplyCssRules(innerCss, element, computed, computedSpecificity, viewportWidth, viewportHeight, pseudoElement);
                     }
                     if (pos < cssText.Length) pos++; // skip '}'
                 }
@@ -1750,7 +1836,7 @@ public sealed partial class DomBridge
             foreach (var sel in selectors)
             {
                 var trimmed = sel.Trim();
-                if (MatchesSelector(element, trimmed))
+                if (SelectorMatchesComputedStyleTarget(element, trimmed, pseudoElement))
                 {
                     var spec = CalculateSpecificity(trimmed);
                     if (spec > bestSpecificity) bestSpecificity = spec;
@@ -1762,6 +1848,9 @@ public sealed partial class DomBridge
                 // Parse declarations — only overwrite if specificity >= current
                 foreach (var kv in ParseStyle(declarationsText))
                 {
+                    if (!IsPropertyAllowedForPseudoElement(pseudoElement, kv.Key))
+                        continue;
+
                     if (!computedSpecificity.TryGetValue(kv.Key, out var prevSpec) || bestSpecificity >= prevSpec)
                     {
                         computed[kv.Key] = kv.Value;
@@ -1771,6 +1860,79 @@ public sealed partial class DomBridge
             }
         }
     }
+
+    private static bool SelectorMatchesComputedStyleTarget(DomElement element, string selector, string? pseudoElement)
+    {
+        if (pseudoElement == null)
+            return !ContainsPseudoElementSelector(selector) && MatchesSelector(element, selector);
+
+        if (!TryStripPseudoElementSelector(selector, pseudoElement, out var baseSelector))
+            return false;
+
+        return MatchesSelector(element, baseSelector);
+    }
+
+    private static bool ContainsPseudoElementSelector(string selector)
+    {
+        if (selector.IndexOf("::", StringComparison.Ordinal) >= 0)
+            return true;
+
+        return selector.EndsWith(":before", StringComparison.OrdinalIgnoreCase)
+            || selector.EndsWith(":after", StringComparison.OrdinalIgnoreCase)
+            || selector.EndsWith(":first-line", StringComparison.OrdinalIgnoreCase)
+            || selector.EndsWith(":first-letter", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryStripPseudoElementSelector(string selector, string pseudoElement, out string baseSelector)
+    {
+        baseSelector = selector;
+        var normalized = pseudoElement[2..];
+        var doubleColonIndex = selector.LastIndexOf("::", StringComparison.Ordinal);
+        if (doubleColonIndex >= 0)
+        {
+            var suffix = selector[doubleColonIndex..];
+            if (!suffix.Equals(pseudoElement, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            baseSelector = selector[..doubleColonIndex].TrimEnd();
+            return baseSelector.Length > 0;
+        }
+
+        var singleColonSuffix = ":" + normalized;
+        if (!selector.EndsWith(singleColonSuffix, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        baseSelector = selector[..^singleColonSuffix.Length].TrimEnd();
+        return baseSelector.Length > 0;
+    }
+
+    private static bool IsPropertyAllowedForPseudoElement(string? pseudoElement, string propertyName)
+    {
+        if (pseudoElement == null)
+            return true;
+
+        return pseudoElement switch
+        {
+            "::first-line" or "::first-letter" => IsFirstLineOrLetterProperty(propertyName),
+            _ => true,
+        };
+    }
+
+    private static bool IsFirstLineOrLetterProperty(string propertyName) =>
+        propertyName.StartsWith("--", StringComparison.Ordinal)
+        || propertyName is "color"
+        or "background-color"
+        or "font"
+        or "font-family"
+        or "font-size"
+        or "font-style"
+        or "font-variant"
+        or "font-weight"
+        or "line-height"
+        or "letter-spacing"
+        or "word-spacing"
+        or "text-decoration"
+        or "text-transform";
 
     /// <summary>
     /// Splits a CSS selector string by commas, respecting parentheses.

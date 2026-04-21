@@ -543,6 +543,11 @@ public sealed partial class DomBridge
         var v = value.ToLowerInvariant();
         if (v is "inherit" or "initial" or "unset" or "revert") return true;
 
+        // Custom-property references are validated after cascade, not during
+        // raw declaration parsing. Keep them so the later resolution step can
+        // substitute them into closed-keyword properties too.
+        if (v.IndexOf("var(", StringComparison.OrdinalIgnoreCase) >= 0) return true;
+
         switch (property.ToLowerInvariant())
         {
             case "white-space":
