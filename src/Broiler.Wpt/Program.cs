@@ -27,9 +27,15 @@ public class Program
         "css/css-view-transitions",
         "css/filter-effects",
     ];
+    private static readonly Func<WptTestRunner, string, string, string?, WptTestResult> DefaultRunTestExecutor
+        = static (runner, testPath, referenceDir, wptPath) => runner.RunTest(testPath, referenceDir, wptPath);
+    private static readonly AsyncLocal<Func<WptTestRunner, string, string, string?, WptTestResult>?> RunTestExecutorOverride = new();
 
     internal static Func<WptTestRunner, string, string, string?, WptTestResult> RunTestExecutor
-        = static (runner, testPath, referenceDir, wptPath) => runner.RunTest(testPath, referenceDir, wptPath);
+    {
+        get => RunTestExecutorOverride.Value ?? DefaultRunTestExecutor;
+        set => RunTestExecutorOverride.Value = value;
+    }
 
     public static int Main(string[] args)
     {
@@ -284,7 +290,7 @@ public class Program
 
     internal static void ResetTestHooks()
     {
-        RunTestExecutor = static (runner, testPath, referenceDir, wptPath) => runner.RunTest(testPath, referenceDir, wptPath);
+        RunTestExecutorOverride.Value = null;
     }
 
     internal static WptTestResult RunTestWithTimeout(
@@ -294,7 +300,6 @@ public class Program
         string? wptPath,
         TimeSpan timeout)
     {
-        var invocationStackTrace = new StackTrace(skipFrames: 1, fNeedFileInfo: true).ToString();
         int workerThreadId = -1;
         var runTestTask = Task.Run(() =>
         {
@@ -309,10 +314,12 @@ public class Program
         catch (TimeoutException)
         {
             _ = runTestTask.ContinueWith(
+                // Timed-out tasks can still fault later; observe their Exception
+                // so the process does not surface an unrelated unobserved-task crash.
                 static t => _ = t.Exception,
                 TaskContinuationOptions.OnlyOnFaulted);
 
-            var timeoutResult = CreateTimeoutResult(testPath, timeout, workerThreadId, invocationStackTrace);
+            var timeoutResult = CreateTimeoutResult(testPath, timeout, workerThreadId);
             Console.Error.WriteLine($"[TIMEOUT] {timeoutResult.Message}");
             Console.Error.WriteLine(timeoutResult.StackTrace);
             return timeoutResult;
@@ -359,10 +366,10 @@ public class Program
     private static WptTestResult CreateTimeoutResult(
         string testPath,
         TimeSpan timeout,
-        int workerThreadId,
-        string invocationStackTrace)
+        int workerThreadId)
     {
         var message = $"Test timed out after {timeout.TotalSeconds:0.###} second(s): {testPath}";
+        var invocationStackTrace = new StackTrace(skipFrames: 2, fNeedFileInfo: true).ToString();
         var stackTrace = new StringBuilder()
             .AppendLine("=== Timeout diagnostics ===")
             .AppendLine(message)
