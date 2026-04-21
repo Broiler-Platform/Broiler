@@ -16,6 +16,9 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
+    private int _styleInvalidationBatchDepth;
+    private HashSet<DomElement>? _pendingStyleInvalidationRoots;
+
     // ------------------------------------------------------------------
     //  CSS specificity (Level 3) and <style> / <link> cascading
     // ------------------------------------------------------------------
@@ -494,10 +497,43 @@ public sealed partial class DomBridge
     /// document scope after a selector-affecting mutation such as a class,
     /// attribute, or sibling structure change.
     /// </summary>
+    internal void BeginStyleInvalidationBatch()
+    {
+        _styleInvalidationBatchDepth++;
+    }
+
+    internal void EndStyleInvalidationBatch()
+    {
+        if (_styleInvalidationBatchDepth == 0)
+            return;
+
+        _styleInvalidationBatchDepth--;
+        if (_styleInvalidationBatchDepth == 0)
+            FlushPendingStyleInvalidations();
+    }
+
     internal void InvalidateStyleScope(DomElement anchor)
     {
         var docRoot = GetDocumentRootFor(anchor);
+        if (_styleInvalidationBatchDepth > 0)
+        {
+            _pendingStyleInvalidationRoots ??= [];
+            _pendingStyleInvalidationRoots.Add(docRoot);
+            return;
+        }
+
         InvalidateStyleScopeRecursive(docRoot);
+    }
+
+    private void FlushPendingStyleInvalidations()
+    {
+        if (_pendingStyleInvalidationRoots == null || _pendingStyleInvalidationRoots.Count == 0)
+            return;
+
+        foreach (var root in _pendingStyleInvalidationRoots)
+            InvalidateStyleScopeRecursive(root);
+
+        _pendingStyleInvalidationRoots.Clear();
     }
 
     private void InvalidateStyleScopeRecursive(DomElement element)

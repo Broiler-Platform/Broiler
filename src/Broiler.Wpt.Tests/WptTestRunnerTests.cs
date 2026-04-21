@@ -2343,6 +2343,48 @@ document.getElementById('out').appendChild(p);
         Assert.True(result.Passed);
     }
 
+    [Fact]
+    public void RunTestWithTimeout_UrlSyntaxCrash_Completes_Without_Timing_Out()
+    {
+        var testFile = Path.Combine(_tempDir, "url-syntax-crash.html");
+        File.WriteAllText(testFile, @"<!doctype html>
+<style>
+@property --my-url {
+  syntax: ""<url> | none"";
+  inherits: true;
+  initial-value: none;
+}
+:root {
+  --my-url: url(blah);
+}
+
+* {
+  --foo: var(--my-url);
+}
+</style>
+<body>
+<script>
+  for (let i = 0; i < 3000; ++i) {
+    document.body.appendChild(document.createElement(""span""));
+  }
+</script>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner();
+        var result = Program.RunTestWithTimeout(
+            runner,
+            testFile,
+            refDir,
+            _tempDir,
+            TimeSpan.FromSeconds(6));
+
+        Assert.True(result.Passed, result.Message);
+        Assert.Equal(FailureCategory.None, result.Category);
+        Assert.Contains("Crash test", result.Message);
+    }
+
     // ──────────── Failure categorization ─────────────────────────────
 
     [Fact]

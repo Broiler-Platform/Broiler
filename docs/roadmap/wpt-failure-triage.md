@@ -11,6 +11,7 @@
 - The current backlog has shifted again: the largest failing directories are now `css/css-writing-modes`, `css/filter-effects`, `css/selectors`, `css/css-variables`, and `css/css-view-transitions`, while the largest missing-reference buckets are now `css/css-flexbox`, `css/css-ui/compute-kind-widget-generated`, `css/css-break`, `css/css-ui`, and `css/css-transforms`.
 - A new timeout-focused planning slice is now required in addition to the earlier rendering and near-pass buckets: the latest run recorded 9 deterministic 30-second timeouts across `css-grid`, `css-overflow/scroll-markers`, `css-shapes`, `css-tables`, and `css/css-variables/url-syntax-crash.html`.
 - Because the earlier roadmap items for crash handling, near-pass harvesting, unsupported-feature triage, and missing-reference accounting are already reflected in the runner/reporting layer, the next planning update should focus on the remaining non-deferred failures plus timeout ergonomics instead of repeating the now-closed `background-clip` / `background-size` work.
+- Phase 6 has started: crash-test script execution now batches CSS invalidation for bulk DOM mutations, which lets the focused `css/css-variables/url-syntax-crash.html` repro complete locally again and adds a dedicated `Broiler.Wpt.Tests` timeout guard rail for that path.
 
 ### 2026-04-18
 
@@ -323,7 +324,7 @@ The current skip count is too large to ignore.
 
 The roadmap now needs a fresh post-Phase-5 slice for the failures still surfacing in the latest artifact set.
 
-- [ ] Open a focused `css/css-variables` workstream, because it is now one of the largest non-deferred failure buckets and also contains a reproducible timeout (`url-syntax-crash.html`).
+- [x] Open a focused `css/css-variables` workstream, because it is now one of the largest non-deferred failure buckets and also contains a reproducible timeout (`url-syntax-crash.html`).
 - [ ] Finish the most mature zoom/scroll follow-up buckets in `css/cssom-view` and `css/css-viewport/zoom` before opening broader new layout campaigns.
 - [ ] Re-open only the near-pass slices inside the broader deferred `css/css-writing-modes` and `css/selectors` parents (`forms`, `invalidation`, `selectors-4`) and keep the rest explicitly deferred.
 - [ ] Treat the 9 timeout cases as a single triage track with focused subset commands for `css/css-grid/parsing`, `css/css-overflow/scroll-markers`, `css/css-shapes/shape-outside`, `css/css-tables`, and `css/css-variables`.
