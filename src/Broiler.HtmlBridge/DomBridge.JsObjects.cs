@@ -3620,6 +3620,8 @@ public sealed partial class DomBridge
     // ── Phase 6: Sub-document cache ──────────────────────────────────────────
     private readonly Dictionary<DomElement, JSObject> _subDocumentCache = [];
     private readonly Dictionary<DomElement, JSObject> _subWindowCache = [];
+    private readonly Dictionary<DomElement, string> _subDocumentLocationCache = [];
+    private readonly Dictionary<DomElement, string> _subDocumentBaseUrlCache = [];
     private readonly HashSet<DomElement> _objectLoadFailures = [];
     private readonly HashSet<DomElement> _onloadFired = [];
 
@@ -3627,6 +3629,8 @@ public sealed partial class DomBridge
     {
         _subDocumentCache.Remove(containerElement);
         _subWindowCache.Remove(containerElement);
+        _subDocumentLocationCache.Remove(containerElement);
+        _subDocumentBaseUrlCache.Remove(containerElement);
     }
 
     /// <summary>
@@ -3699,7 +3703,7 @@ public sealed partial class DomBridge
         if (string.IsNullOrWhiteSpace(resourceUrl))
             return false; // No data attribute → empty sub-document, not a failure
 
-        var (_, contentType) = TryFetchSubResource(resourceUrl);
+        var (_, contentType) = TryFetchSubResource(resourceUrl, GetInheritedSubDocumentBaseUrl(objectElement));
         if (string.Equals(contentType, FetchFailedContentType, StringComparison.Ordinal))
         {
             _objectLoadFailures.Add(objectElement);
@@ -3720,6 +3724,8 @@ public sealed partial class DomBridge
         if (_subDocumentCache.TryGetValue(containerElement, out var cached))
             return cached;
 
+        var executeHtmlScripts = false;
+        string? htmlToExecute = null;
         var docRoot = containerElement.Children.FirstOrDefault(c =>
             string.Equals(c.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
         if (docRoot == null)
@@ -3727,13 +3733,24 @@ public sealed partial class DomBridge
             if (string.Equals(containerElement.TagName, "iframe", StringComparison.OrdinalIgnoreCase) &&
                 containerElement.Attributes.TryGetValue("srcdoc", out var srcDoc))
             {
+                _subDocumentLocationCache[containerElement] = "about:srcdoc";
+                _subDocumentBaseUrlCache[containerElement] = GetInheritedSubDocumentBaseUrl(containerElement);
                 docRoot = BuildSubDocumentFromHtml(srcDoc, containerElement);
+                htmlToExecute = srcDoc;
+                executeHtmlScripts = true;
             }
             else
             {
                 // Determine the resource URL for this container
                 var resourceUrl = GetSubResourceUrl(containerElement);
-                var (fetchedContent, contentType) = TryFetchSubResource(resourceUrl);
+                var resolvedUrl = ResolveSubResourceUrl(resourceUrl, GetInheritedSubDocumentBaseUrl(containerElement));
+                if (!string.IsNullOrWhiteSpace(resolvedUrl))
+                {
+                    _subDocumentLocationCache[containerElement] = resolvedUrl;
+                    _subDocumentBaseUrlCache[containerElement] = resolvedUrl;
+                }
+
+                var (fetchedContent, contentType) = TryFetchSubResource(resourceUrl, GetInheritedSubDocumentBaseUrl(containerElement));
 
                 if (!string.IsNullOrEmpty(fetchedContent) &&
                     IsXmlContentType(contentType))
@@ -3747,6 +3764,8 @@ public sealed partial class DomBridge
                 {
                     // HTML content → parse with HTML parser
                     docRoot = BuildSubDocumentFromHtml(fetchedContent, containerElement);
+                    htmlToExecute = fetchedContent;
+                    executeHtmlScripts = true;
                 }
                 else if (!string.IsNullOrEmpty(fetchedContent) &&
                          contentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
@@ -3765,6 +3784,8 @@ public sealed partial class DomBridge
 
         var doc = BuildSubDocument(docRoot);
         _subDocumentCache[containerElement] = doc;
+        if (executeHtmlScripts && !string.IsNullOrEmpty(htmlToExecute))
+            ExecuteSubDocumentScripts(containerElement, htmlToExecute);
         return doc;
     }
 
@@ -3783,11 +3804,27 @@ public sealed partial class DomBridge
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        var locationHref = GetSubWindowLocationHref(containerElement);
         var iframeLocation = new JSObject();
         iframeLocation.FastAddValue(
             (KeyString)"href",
-            new JSString(GetSubWindowLocationHref(containerElement)),
+            new JSString(locationHref),
             JSPropertyAttributes.EnumerableConfigurableValue);
+        if (Uri.TryCreate(locationHref, UriKind.Absolute, out var locationUri))
+        {
+            iframeLocation.FastAddValue((KeyString)"protocol", new JSString(locationUri.Scheme + ":"), JSPropertyAttributes.EnumerableConfigurableValue);
+            iframeLocation.FastAddValue((KeyString)"host", new JSString(locationUri.IsDefaultPort ? locationUri.Host : $"{locationUri.Host}:{locationUri.Port}"), JSPropertyAttributes.EnumerableConfigurableValue);
+            iframeLocation.FastAddValue((KeyString)"hostname", new JSString(locationUri.Host), JSPropertyAttributes.EnumerableConfigurableValue);
+            iframeLocation.FastAddValue((KeyString)"pathname", new JSString(locationUri.AbsolutePath), JSPropertyAttributes.EnumerableConfigurableValue);
+            iframeLocation.FastAddValue((KeyString)"search", new JSString(locationUri.Query), JSPropertyAttributes.EnumerableConfigurableValue);
+            iframeLocation.FastAddValue((KeyString)"hash", new JSString(locationUri.Fragment), JSPropertyAttributes.EnumerableConfigurableValue);
+            iframeLocation.FastAddValue((KeyString)"origin", new JSString($"{locationUri.Scheme}://{(locationUri.IsDefaultPort ? locationUri.Host : $"{locationUri.Host}:{locationUri.Port}")}"), JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+        else
+        {
+            iframeLocation.FastAddValue((KeyString)"search", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+            iframeLocation.FastAddValue((KeyString)"hash", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+        }
         subWindow.FastAddValue(
             (KeyString)"location",
             iframeLocation,
@@ -3850,13 +3887,16 @@ public sealed partial class DomBridge
             (KeyString)"window",
             subWindow,
             JSPropertyAttributes.EnumerableConfigurableValue);
-        if (_windowJSObject != null)
+        var parentWindow = GetParentWindowForSubDocument(containerElement);
+        if (parentWindow != null)
         {
             subWindow.FastAddValue(
                 (KeyString)"parent",
-                _windowJSObject,
+                parentWindow,
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
+        if (_windowJSObject != null)
+            subWindow.FastAddValue((KeyString)"top", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
 
         subDocument.FastAddValue(
             (KeyString)"defaultView",
@@ -3868,14 +3908,18 @@ public sealed partial class DomBridge
 
     private string GetSubWindowLocationHref(DomElement containerElement)
     {
-        if (string.Equals(containerElement.TagName, "iframe", StringComparison.OrdinalIgnoreCase) &&
-            containerElement.Attributes.ContainsKey("srcdoc"))
+        if (_subDocumentLocationCache.TryGetValue(containerElement, out var cachedLocation) &&
+            !string.IsNullOrWhiteSpace(cachedLocation))
         {
-            return "about:srcdoc";
+            return cachedLocation;
         }
 
-        var resourceUrl = GetSubResourceUrl(containerElement);
-        return !string.IsNullOrWhiteSpace(resourceUrl) ? resourceUrl : "about:blank";
+        if (string.Equals(containerElement.TagName, "iframe", StringComparison.OrdinalIgnoreCase) &&
+            containerElement.Attributes.ContainsKey("srcdoc"))
+            return "about:srcdoc";
+
+        var resolvedUrl = ResolveSubResourceUrl(GetSubResourceUrl(containerElement), GetInheritedSubDocumentBaseUrl(containerElement));
+        return !string.IsNullOrWhiteSpace(resolvedUrl) ? resolvedUrl : "about:blank";
     }
 
     private double GetSubWindowScrollOffset(DomElement containerElement, bool vertical)
@@ -3901,6 +3945,125 @@ public sealed partial class DomBridge
             return null;
 
         return docRoot.Children.FirstOrDefault(c => !c.IsTextNode && !c.TagName.StartsWith("#"));
+    }
+
+    private JSObject? GetParentWindowForSubDocument(DomElement containerElement)
+    {
+        var ownerDocRoot = containerElement.OwnerDocRoot;
+        if (ownerDocRoot?.Parent != null && !ownerDocRoot.Parent.TagName.StartsWith("#", StringComparison.Ordinal))
+            return GetOrCreateSubWindow(ownerDocRoot.Parent);
+
+        return _windowJSObject;
+    }
+
+    private string GetInheritedSubDocumentBaseUrl(DomElement containerElement)
+    {
+        var ownerDocRoot = containerElement.OwnerDocRoot;
+        if (ownerDocRoot?.Parent != null &&
+            !ownerDocRoot.Parent.TagName.StartsWith("#", StringComparison.Ordinal) &&
+            _subDocumentBaseUrlCache.TryGetValue(ownerDocRoot.Parent, out var parentBaseUrl) &&
+            !string.IsNullOrWhiteSpace(parentBaseUrl))
+        {
+            return parentBaseUrl;
+        }
+
+        return _pageUrl;
+    }
+
+    private string GetSubDocumentBaseUrl(DomElement containerElement)
+    {
+        return _subDocumentBaseUrlCache.TryGetValue(containerElement, out var baseUrl) &&
+               !string.IsNullOrWhiteSpace(baseUrl)
+            ? baseUrl
+            : GetInheritedSubDocumentBaseUrl(containerElement);
+    }
+
+    private string ResolveSubResourceUrl(string resourceUrl, string? baseUrl = null)
+    {
+        if (string.IsNullOrWhiteSpace(resourceUrl))
+            return string.Empty;
+
+        if (Uri.TryCreate(resourceUrl, UriKind.Absolute, out var absoluteUri))
+            return absoluteUri.AbsoluteUri;
+
+        var effectiveBaseUrl = string.IsNullOrWhiteSpace(baseUrl) ? _pageUrl : baseUrl;
+        return Uri.TryCreate(effectiveBaseUrl, UriKind.Absolute, out var baseUri) &&
+               Uri.TryCreate(baseUri, resourceUrl, out var resolved)
+            ? resolved.AbsoluteUri
+            : string.Empty;
+    }
+
+    private void ExecuteSubDocumentScripts(DomElement containerElement, string html)
+    {
+        if (_jsContext == null || string.IsNullOrWhiteSpace(html))
+            return;
+
+        var extraction = new ScriptExtractor().ExtractAll(html, GetSubDocumentBaseUrl(containerElement));
+        if (extraction.Scripts.Count == 0 && extraction.DeferredScripts.Count == 0)
+            return;
+
+        var subDocument = GetOrCreateSubDocument(containerElement);
+        var subWindow = GetOrCreateSubWindow(containerElement);
+        var location = subWindow[(KeyString)"location"];
+
+        JSValue? previousWindow = null;
+        JSValue? previousDocument = null;
+        JSValue? previousLocation = null;
+        JSValue? previousParent = null;
+        JSValue? previousSelf = null;
+        JSValue? previousTop = null;
+
+        try
+        {
+            previousWindow = _jsContext.Eval("typeof window === 'undefined' ? undefined : window");
+            previousDocument = _jsContext.Eval("typeof document === 'undefined' ? undefined : document");
+            previousLocation = _jsContext.Eval("typeof location === 'undefined' ? undefined : location");
+            previousParent = _jsContext.Eval("typeof parent === 'undefined' ? undefined : parent");
+            previousSelf = _jsContext.Eval("typeof self === 'undefined' ? undefined : self");
+            previousTop = _jsContext.Eval("typeof top === 'undefined' ? undefined : top");
+
+            _jsContext["window"] = subWindow;
+            _jsContext["document"] = subDocument;
+            _jsContext["location"] = location;
+            _jsContext["parent"] = GetParentWindowForSubDocument(containerElement) ?? JSUndefined.Value;
+            _jsContext["self"] = subWindow;
+            _jsContext["top"] = _windowJSObject ?? subWindow;
+
+            foreach (var script in extraction.Scripts)
+            {
+                try
+                {
+                    _jsContext.Eval(script);
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ExecuteSubDocumentScripts",
+                        $"Sub-document script error: {ex.Message}", ex);
+                }
+            }
+
+            foreach (var script in extraction.DeferredScripts)
+            {
+                try
+                {
+                    _jsContext.Eval(script);
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.ExecuteSubDocumentScripts",
+                        $"Sub-document deferred script error: {ex.Message}", ex);
+                }
+            }
+        }
+        finally
+        {
+            _jsContext["window"] = previousWindow ?? JSUndefined.Value;
+            _jsContext["document"] = previousDocument ?? JSUndefined.Value;
+            _jsContext["location"] = previousLocation ?? JSUndefined.Value;
+            _jsContext["parent"] = previousParent ?? JSUndefined.Value;
+            _jsContext["self"] = previousSelf ?? JSUndefined.Value;
+            _jsContext["top"] = previousTop ?? JSUndefined.Value;
+        }
     }
 
     /// <summary>
@@ -4003,7 +4166,7 @@ public sealed partial class DomBridge
     /// about:blank, empty URLs, or when the fetch fails.
     /// Supports <c>data:</c> URIs, <c>file://</c> URLs, and <c>http(s)://</c> URLs.
     /// </summary>
-    private (string? content, string contentType) TryFetchSubResource(string resourceUrl)
+    private (string? content, string contentType) TryFetchSubResource(string resourceUrl, string? baseUrl = null)
     {
         if (string.IsNullOrWhiteSpace(resourceUrl))
             return (null, string.Empty);
@@ -4041,7 +4204,7 @@ public sealed partial class DomBridge
         {
             resolvedUrl = resourceUrl;
         }
-        else if (Uri.TryCreate(_pageUrl, UriKind.Absolute, out var baseUri) &&
+        else if (Uri.TryCreate(string.IsNullOrWhiteSpace(baseUrl) ? _pageUrl : baseUrl, UriKind.Absolute, out var baseUri) &&
                  Uri.TryCreate(baseUri, resourceUrl, out var resolved))
         {
             resolvedUrl = resolved.AbsoluteUri;

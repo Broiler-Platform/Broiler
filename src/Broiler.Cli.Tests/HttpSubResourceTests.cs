@@ -89,6 +89,62 @@ fr.addEventListener('load', function () {
     }
 
     [Fact]
+    public void Iframe_Nested_Subdocument_Scripts_Resolve_Relative_Iframe_Sources()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"broiler-nested-iframe-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            File.WriteAllText(Path.Combine(tempRoot, "leaf.html"), """
+<!DOCTYPE html>
+<div id="leaf"></div>
+<script>
+document.getElementById('leaf').textContent = location.search || 'missing';
+</script>
+""");
+            File.WriteAllText(Path.Combine(tempRoot, "nested.html"), """
+<!DOCTYPE html>
+<iframe id="target"></iframe>
+<script>
+document.getElementById('target').src = 'leaf.html?scale=3';
+</script>
+""");
+
+            var html = """
+<!DOCTYPE html>
+<html><body>
+<iframe id="outer" src="nested.html"></iframe>
+<div id="out"></div>
+<script>
+window.onload = function () {
+  var outer = document.getElementById('outer');
+  var inner = outer.contentDocument.getElementById('target');
+  var leaf = inner.contentDocument.getElementById('leaf');
+  document.getElementById('out').textContent = [
+    inner.contentWindow.location.href,
+    inner.contentWindow.location.search,
+    leaf ? leaf.textContent : 'missing'
+  ].join('|');
+};
+</script>
+</body></html>
+""";
+
+            var result = CaptureService.ExecuteScriptsWithDom(
+                html,
+                "file:///test.html",
+                localResourceBasePath: tempRoot);
+
+            Assert.Contains("leaf.html?scale=3|?scale=3|?scale=3", result);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Iframe_NonHtml_Src_Gets_Minimal_Document()
     {
         var html = @"<!DOCTYPE html>

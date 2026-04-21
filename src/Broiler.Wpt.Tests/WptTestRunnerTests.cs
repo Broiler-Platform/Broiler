@@ -4617,6 +4617,62 @@ document.getElementById('out').appendChild(p);
         Assert.Equal("true", result.ToString());
     }
 
+    [Fact]
+    public void Wpt_CssViewport_NestedIframeScripts_Resolve_Relative_Sources_And_Location()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"broiler-wpt-nested-iframe-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            File.WriteAllText(Path.Combine(tempRoot, "leaf.html"), """
+<!DOCTYPE html>
+<div id="leaf"></div>
+<script>
+document.getElementById('leaf').textContent = location.search || 'missing';
+</script>
+""");
+            File.WriteAllText(Path.Combine(tempRoot, "nested.html"), """
+<!DOCTYPE html>
+<iframe id="target"></iframe>
+<script>
+document.getElementById('target').src = 'leaf.html?scale=3';
+</script>
+""");
+
+            const string html = """
+<!DOCTYPE html>
+<iframe id="outer" src="nested.html"></iframe>
+<div id="out"></div>
+""";
+
+            using var ctx = new Broiler.JavaScript.Engine.JSContext();
+            var bridge = new Broiler.HtmlBridge.DomBridge();
+            bridge.Attach(ctx, html, "file:///test.html");
+            bridge.SetLocalBasePath(tempRoot);
+            ctx.Eval("""
+                window.onload = function () {
+                    var outer = document.getElementById('outer');
+                    var inner = outer.contentDocument.getElementById('target');
+                    var leaf = inner.contentDocument.getElementById('leaf');
+                    document.getElementById('out').textContent = [
+                        inner.contentWindow.location.href,
+                        inner.contentWindow.location.search,
+                        leaf ? leaf.textContent : 'missing'
+                    ].join('|');
+                };
+                """);
+
+            bridge.FireWindowLoadEvent();
+            var result = ctx.Eval("document.getElementById('out').textContent");
+            Assert.Contains("leaf.html?scale=3|?scale=3|?scale=3", result.ToString());
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     /// <summary>
     /// Runs a css-anchor-position test against a Chromium reference PNG.
     /// </summary>
