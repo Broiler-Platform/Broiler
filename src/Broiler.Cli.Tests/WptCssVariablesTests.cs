@@ -144,4 +144,35 @@ document.getElementById('result').textContent = r.join(';');
         Assert.Contains("div3=rgb(0, 0, 0)|16px|900|static", result);
         Assert.Contains("div4=rgb(0, 0, 0)|16px|normal|static", result);
     }
+
+    [Fact]
+    public void VariableSubstitution_MissingClosingNestedFallback_ComputedStyle_Resolves()
+    {
+        var html = @"<!DOCTYPE html>
+<html>
+<head>
+<style>
+#target {
+  box-shadow: var(--token-outer, 10px 10px 10px 10px rgb(245, 245, 245), 0px 0px 4px 2px var(--token-inner, rgb(1, 255, 148))
+}
+</style>
+</head>
+<body>
+<div id=""target""></div>
+<div id=""result""></div>
+<script>
+var value = window.getComputedStyle(document.getElementById('target')).getPropertyValue('box-shadow') || '';
+document.getElementById('result').textContent =
+  value.indexOf('rgb(245, 245, 245) 10px 10px 10px 10px') >= 0 &&
+  value.indexOf('rgb(1, 255, 148) 0px 0px 4px 2px') >= 0
+    ? 'PASS'
+    : 'FAIL:' + value;
+</script>
+</body>
+</html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("PASS", result);
+    }
 }

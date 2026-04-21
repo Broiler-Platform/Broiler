@@ -937,7 +937,17 @@ internal sealed class CssParser
             int closeParenIndex = FindMatchingClosingParen(value, openParenIndex);
             if (closeParenIndex < 0)
             {
-                sb.Append(value, varIndex, value.Length - varIndex);
+                string inner = value[(openParenIndex + 1)..];
+                string recovered = ResolveVarFunction(inner, properties, depth + 1);
+                if (recovered == $"var({inner})")
+                {
+                    sb.Append(value, varIndex, value.Length - varIndex);
+                }
+                else
+                {
+                    sb.Append(recovered);
+                    changed = true;
+                }
                 break;
             }
 

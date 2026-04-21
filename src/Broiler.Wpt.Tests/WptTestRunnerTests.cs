@@ -415,6 +415,52 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssVariables_MissingClosingNestedFallback_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    #target {
+      width: 80px;
+      height: 80px;
+      margin: 40px;
+      background: white;
+      box-shadow: var(--outer, 90px 0 0 0 rgb(0, 128, 0), 0 90px 0 0 var(--inner, rgb(0, 255, 0))
+    }
+  </style>
+</head>
+<body>
+  <div id=""target""></div>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    #target {
+      width: 80px;
+      height: 80px;
+      margin: 40px;
+      background: white;
+      box-shadow: rgb(0, 128, 0) 90px 0 0 0, rgb(0, 255, 0) 0 90px 0 0;
+    }
+  </style>
+</head>
+<body>
+  <div id=""target""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-missing-closing-nested-fallback", 260, 260);
+        Assert.True(result.Passed,
+            $"Malformed nested var() fallbacks should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
