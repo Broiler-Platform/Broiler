@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using Broiler.JavaScript.Storage;
@@ -869,6 +870,7 @@ public sealed partial class DomBridge
                     case "reset":
                         logicalInlineSize = 72;
                         logicalBlockSize = 20;
+                        ApplyButtonLikeMultilineSizing(ref logicalInlineSize, ref logicalBlockSize, element.Attributes.GetValueOrDefault("value"));
                         break;
                     default:
                         logicalInlineSize = 173;
@@ -879,6 +881,7 @@ public sealed partial class DomBridge
             case "button":
                 logicalInlineSize = 72;
                 logicalBlockSize = 20;
+                ApplyButtonLikeMultilineSizing(ref logicalInlineSize, ref logicalBlockSize, GetElementRenderedText(element));
                 break;
             case "select":
                 logicalInlineSize = 60;
@@ -929,6 +932,55 @@ public sealed partial class DomBridge
     private static bool HasExplicitPhysicalOrLogicalSize(Dictionary<string, string> computed, string physicalProperty, string logicalProperty) =>
         HasExplicitSpecifiedSize(computed.GetValueOrDefault(physicalProperty)) ||
         HasExplicitSpecifiedSize(computed.GetValueOrDefault(logicalProperty));
+
+    private static void ApplyButtonLikeMultilineSizing(ref double logicalInlineSize, ref double logicalBlockSize, string? rawText)
+    {
+        int lineCount = CountRenderedLines(rawText);
+        if (lineCount <= 1)
+            return;
+
+        logicalBlockSize = 20 * lineCount;
+    }
+
+    private static int CountRenderedLines(string? rawText)
+    {
+        if (string.IsNullOrEmpty(rawText))
+            return 1;
+
+        return WebUtility.HtmlDecode(rawText)
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Split('\n')
+            .Length;
+    }
+
+    private static string GetElementRenderedText(DomElement element)
+    {
+        var builder = new StringBuilder();
+        AppendRenderedText(element, builder);
+        return builder.ToString();
+    }
+
+    private static void AppendRenderedText(DomElement element, StringBuilder builder)
+    {
+        foreach (var child in element.Children)
+        {
+            if (child.IsTextNode)
+            {
+                if (!string.IsNullOrEmpty(child.TextContent))
+                    builder.Append(child.TextContent);
+                continue;
+            }
+
+            if (string.Equals(child.TagName, "br", StringComparison.OrdinalIgnoreCase))
+            {
+                builder.Append('\n');
+                continue;
+            }
+
+            AppendRenderedText(child, builder);
+        }
+    }
 
     private static string ResolveLogicalPhysicalFallback(string currentPhysicalValue, string mappedLogicalValue) =>
         HasExplicitSpecifiedSize(mappedLogicalValue) ? mappedLogicalValue : currentPhysicalValue;

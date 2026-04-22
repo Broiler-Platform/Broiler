@@ -719,6 +719,73 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_WritingModes_ButtonNativeComputedStyle_MultilineSizing_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+<style>
+.probe {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+}
+#result {
+  width: 40px;
+  height: 40px;
+  background: red;
+}
+</style>
+</head>
+<body>
+<button class=""probe"" id=""horizontal-button"">line one</button>
+<button class=""probe"" id=""horizontal-button-multiline"">line one<br>line two</button>
+<input class=""probe"" type=""button"" id=""horizontal-input"" value=""line one"">
+<input class=""probe"" type=""button"" id=""horizontal-input-multiline"" value=""line one&#10;line two"">
+<button class=""probe"" id=""vertical-lr-button"" style=""writing-mode: vertical-lr"">line one</button>
+<button class=""probe"" id=""vertical-lr-button-multiline"" style=""writing-mode: vertical-lr"">line one<br>line two</button>
+<input class=""probe"" type=""button"" id=""vertical-rl-input"" style=""writing-mode: vertical-rl"" value=""line one"">
+<input class=""probe"" type=""button"" id=""vertical-rl-input-multiline"" style=""writing-mode: vertical-rl"" value=""line one&#10;line two"">
+<div id=""result""></div>
+<script>
+function style(id) {
+  return window.getComputedStyle(document.getElementById(id));
+}
+function horizontalPair(singleId, multiId) {
+  const single = style(singleId);
+  const multi = style(multiId);
+  return parseInt(single.width, 10) === parseInt(multi.width, 10) &&
+         parseInt(multi.height, 10) > parseInt(single.height, 10) &&
+         single.blockSize === single.height &&
+         single.inlineSize === single.width;
+}
+function verticalPair(singleId, multiId) {
+  const single = style(singleId);
+  const multi = style(multiId);
+  return parseInt(single.height, 10) === parseInt(multi.height, 10) &&
+         parseInt(multi.width, 10) > parseInt(single.width, 10) &&
+         single.blockSize === single.width &&
+         single.inlineSize === single.height;
+}
+var first = horizontalPair('horizontal-button', 'horizontal-button-multiline');
+var second = horizontalPair('horizontal-input', 'horizontal-input-multiline');
+var third = verticalPair('vertical-lr-button', 'vertical-lr-button-multiline');
+var fourth = verticalPair('vertical-rl-input', 'vertical-rl-input-multiline');
+var passed = first && second && third && fourth;
+document.getElementById('result').setAttribute('style', 'width:40px;height:40px;background:' + (passed ? 'green' : 'red'));
+</script>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html><body><div id=""result"" style=""width:40px;height:40px;background:green""></div></body></html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "writing-modes-button-native-computed-style", 60, 60);
+        Assert.True(result.Passed,
+            $"Button native computed-style multiline sizing should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>

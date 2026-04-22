@@ -295,4 +295,51 @@ document.getElementById('result').textContent = [
         Assert.Contains("v=16px|0|0|16px", result);
         Assert.Contains("s=16px|0|0|16px", result);
     }
+
+    [Fact]
+    public void ButtonLikeControls_MultilineComputedSizes_Follow_WritingMode()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<button id='button-h'>Line one</button>
+<button id='button-h-multi'>Line one<br>Line two</button>
+<input type='button' id='input-h' value='Line one'>
+<input type='button' id='input-h-multi' value='Line one&#10;Line two'>
+<button id='button-v' style='writing-mode: vertical-lr'>Line one</button>
+<button id='button-v-multi' style='writing-mode: vertical-lr'>Line one<br>Line two</button>
+<input type='button' id='input-v' style='writing-mode: vertical-rl' value='Line one'>
+<input type='button' id='input-v-multi' style='writing-mode: vertical-rl' value='Line one&#10;Line two'>
+<div id='result'></div>
+<script>
+function style(id) {
+  return window.getComputedStyle(document.getElementById(id));
+}
+function horizontalPair(singleId, multiId) {
+  const single = style(singleId);
+  const multi = style(multiId);
+  return parseInt(single.width, 10) === parseInt(multi.width, 10) &&
+         parseInt(multi.height, 10) > parseInt(single.height, 10) &&
+         single.blockSize === single.height &&
+         single.inlineSize === single.width;
+}
+function verticalPair(singleId, multiId) {
+  const single = style(singleId);
+  const multi = style(multiId);
+  return parseInt(single.height, 10) === parseInt(multi.height, 10) &&
+         parseInt(multi.width, 10) > parseInt(single.width, 10) &&
+         single.blockSize === single.width &&
+         single.inlineSize === single.height;
+}
+document.getElementById('result').textContent = [
+  horizontalPair('button-h', 'button-h-multi'),
+  horizontalPair('input-h', 'input-h-multi'),
+  verticalPair('button-v', 'button-v-multi'),
+  verticalPair('input-v', 'input-v-multi')
+].join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
 }

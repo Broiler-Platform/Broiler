@@ -2,6 +2,7 @@ using Broiler.JavaScript.BuiltIns.Null;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using Broiler.JavaScript.BuiltIns.Number;
@@ -500,7 +501,7 @@ public sealed partial class DomBridge
             // HTML parsing keeps the first attribute with a given name and
             // ignores later duplicates on the same start tag.
             if (!string.IsNullOrEmpty(name))
-                result.TryAdd(name, value);
+                result.TryAdd(name, WebUtility.HtmlDecode(value));
         }
         return result;
     }

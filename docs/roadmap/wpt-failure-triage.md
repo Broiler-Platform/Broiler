@@ -42,6 +42,7 @@
 - Phase 6 has widened again: fetched iframe subdocuments now run their own scripts in document context and resolve nested relative iframe sources against the containing subdocument URL, with focused CLI and WPT guard rails for the `iframe-zoom-nested.html` browsing-context slice.
 - Phase 6 has widened again: file-based WPT runs now normalize templated cross-origin iframe URLs and map `*.web-platform.test` resource paths back to the local `tests/wpt` tree for rendering while preserving cross-origin script fences, with focused CLI and WPT guard rails for the `iframe-zoom.sub.html` slice.
 - Phase 6 has widened again: bridge-side computed styles now inherit `writing-mode` into logical form-control size aliases, preserve explicit `inline-size`, and treat sideways modes as vertical for the focused `input[type=range]` zero-inline-size slice; renderer-side range defaults now drop the generic text-input minimum width/border/padding so the horizontal opening case no longer paints stray red, with focused CLI and WPT guard rails for that narrower `input-range-zero-inline-size.html` opening slice.
+- Phase 6 has widened again: bridge-side approximate button and `input[type=button|submit|reset]` computed sizing now expands the logical block axis for multiline labels while keeping the inline axis stable, so the native-appearance writing-mode slice grows in height for horizontal controls and width for vertical controls; focused CLI and WPT guard rails now cover the `button-appearance-native-computed-style.html` opening slice locally.
 
 ### 2026-04-18
 
