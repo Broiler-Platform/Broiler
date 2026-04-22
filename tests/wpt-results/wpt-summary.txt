@@ -1,9 +1,9 @@
 WPT Test Results Summary
 ========================
-Date     : 2026-04-21T11:42:50Z
+Date     : 2026-04-21T21:07:02Z
 Subset   : css
-Passed   : 2261
-Failed   : 1964
+Passed   : 2267
+Failed   : 1984
 Skipped  : 24
 49
 71
@@ -525,8 +525,8 @@ Skipped  : 24
 12017
 12042
 12067
-12088
-12112
+12089
+12113
 12136
 12161
 12186
@@ -545,9 +545,9 @@ Skipped  : 24
 12499
 12523
 12548
-12565
+12566
 12587
-12608
+12609
 12631
 12656
 12680
@@ -567,7 +567,7 @@ Skipped  : 24
 13021
 13046
 13069
-13091
+13092
 13116
 13141
 13166
@@ -634,7 +634,7 @@ Skipped  : 24
 14672
 14697
 14722
-14735
+14736
 14743
 14767
 14789
@@ -644,7 +644,7 @@ Skipped  : 24
 14887
 14912
 14935
-14958
+14959
 14978
 15003
 15028
@@ -661,7 +661,7 @@ Skipped  : 24
 15302
 15327
 15351
-15367
+15368
 15388
 15411
 15436
@@ -771,7 +771,7 @@ Skipped  : 24
 18001
 18025
 18045
-18069
+18070
 18094
 18118
 18143
@@ -828,7 +828,7 @@ Skipped  : 24
 19409
 19434
 19459
-19483
+19484
 19506
 19531
 19556
@@ -860,162 +860,163 @@ Skipped  : 24
 20190
 20213
 20238
+20240
+20240
+20240
+20240
 20241
 20244
 20245
-20247
-20252
+20245
+20245
+20246
+20250
+20250
+20250
+20253
+20254
+20256
 20257
 20259
-20266
+20260
+20264
+20264
 20267
-20274
+20269
+20269
+20271
+20271
+20271
+20272
+20272
+20272
+20272
+20272
+20272
+20273
+20273
+20275
+20275
+20275
+20275
+20275
+20275
+20275
 20276
+20277
+20278
+20278
+20278
+20278
+20278
+20278
+20278
+20278
+20278
+20278
+20278
+20278
 20279
 20279
-20281
-20283
-20284
-20286
-20286
-20289
-20289
-20291
-20291
-20294
-20294
-20295
-20295
-20295
-20296
-20296
-20296
-20296
-20298
-20298
-20298
-20298
-20298
-20298
-20298
-20300
-20300
-20300
-20300
-20300
-20300
-20300
-20300
-20300
-20302
-20303
-20303
-20303
-20303
-20303
-20303
-20303
-20303
-20303
-20304
-20304
-20313
-20338
-20361
-20373
-20392
-20416
-20440
-20462
-20484
-20509
-20532
-20556
-20579
-20604
-20627
-20652
-20670
-20692
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
-20694
+20279
+20287
+20312
+20335
+20348
+20366
+20390
+20414
+20437
+20458
+20483
+20506
+20531
+20553
+20578
+20601
+20626
+20645
+20666
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
+20669
 
 Failed tests:
   [PixelMismatch] [LayoutShift] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/vh-calc-support-pct.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-new-main-new-iframe.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-new-main-old-iframe.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-old-main-new-iframe.html
+  [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-old-main-old-iframe.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-old-main.html
+  [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-with-name-on-iframe.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-direct.tentative.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-nested-vt-names.tentative.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-nested.tentative.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-non-existent.tentative.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-self.tentative.html
-  [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/contain-direct.tentative.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/contain-nested.tentative.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/contain-on-self.tentative.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/custom-ident-implies-contain.html
@@ -1026,7 +1027,6 @@ Failed tests:
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/normal-goes-up.tentative.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/sibling-frames-transition.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/small-scale.html
-  [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/table-caption.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/cssimportrule-parent.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/CSSStyleSheet-constructable-insertRule-base-uri.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/HTMLLinkElement-disabled-001.html
@@ -1039,7 +1039,6 @@ Failed tests:
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/svg-filter-primitive-units-user-space.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/prefers-color-scheme-svg-image-normal-with-meta-dark.html
   [PixelMismatch] [LayoutShift] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selector-structural-pseudo-root.html
-  [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-with-name-on-iframe.html
   [PixelMismatch] [LayoutShift] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip-root.html
   [PixelMismatch] [LayoutShift] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/relative-units-001.html
   [PixelMismatch] [LayoutShift] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/relative-units-002.html
@@ -1047,7 +1046,6 @@ Failed tests:
   [PixelMismatch] [LayoutShift] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/relative-units-004.html
   [PixelMismatch] [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/nested-group-in-pseudo-basic.tentative.html
   [PixelMismatch] [MissingContent] (1.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/fixed-pos-filter-clip-002.html
-  [PixelMismatch] [MissingContent] (1.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-changes-overflow-left.html
   [PixelMismatch] [MissingContent] (7.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/fecolormatrix-negative.html
   [PixelMismatch] [LayoutShift] (11.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/is-pseudo-containing-sibling-relationship-in-has.html
   [PixelMismatch] [MissingContent] (15.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/CSS2/visudet/replaced-elements-all-auto.html
@@ -1056,6 +1054,7 @@ Failed tests:
   [PixelMismatch] [MissingContent] (16.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/CSS2/visudet/replaced-elements-min-height-40.html
   [PixelMismatch] [MissingContent] (16.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/CSS2/visudet/replaced-elements-min-width-80.html
   [PixelMismatch] [ColorShift] (24.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scrollIntoView-fixed.html
+  [PixelMismatch] [ColorShift] (30.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-css-wide-keywords.html
   [PixelMismatch] [MissingContent] (40.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-scaling-001.html
   [PixelMismatch] [MissingContent] (41.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-clip-rect-zoom.html
   [PixelMismatch] [MissingContent] (42.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/scroll-padding.html
@@ -1067,7 +1066,6 @@ Failed tests:
   [PixelMismatch] [MissingContent] (69.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/column.html
   [PixelMismatch] [MissingContent] (72.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/iframe-zoom-nested.html
   [PixelMismatch] [MissingContent] (74.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/of-type-selectors.xhtml
-  [PixelMismatch] [MissingContent] (74.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-old-main-old-iframe.html
   [PixelMismatch] [LayoutShift] (74.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/getComputedStyle-sticky-pos-percent.html
   [PixelMismatch] [MissingContent] (76.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-last-child-specificity-2.html
   [PixelMismatch] [MissingContent] (77.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/CSS2/linebox/vertical-align-negative-leading-001.html
@@ -1075,7 +1073,6 @@ Failed tests:
   [PixelMismatch] [MissingContent] (78.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/CSS2/other-formats/control-characters-001.html
   [PixelMismatch] [MissingContent] (79.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-containing-block.html
   [PixelMismatch] [MissingContent] (79.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/svg.html
-  [PixelMismatch] [MissingContent] (79.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/vars-font-shorthand-001.html
   [PixelMismatch] [MissingContent] (80.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/view-transition-types-matches.html
   [PixelMismatch] [LayoutShift] (80.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/has-with-nth-child.html
   [PixelMismatch] [MissingContent] (80.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-gutter-007.html
@@ -1103,6 +1100,7 @@ Failed tests:
   [PixelMismatch] [ColorShift] (84.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/background-image-blur-repaint.html
   [PixelMismatch] [SubpixelAntiAliasing] (84.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/dom-element-scroll.html
   [PixelMismatch] [MissingContent] (84.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-parent-shrink-to-fit-001.html
+  [PixelMismatch] [MissingContent] (84.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/fragmented-at-start-ignored.html
   [PixelMismatch] [MissingContent] (84.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-coord-box-004.html
   [PixelMismatch] [MissingContent] (84.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-string-001.html
   [PixelMismatch] [MissingContent] (84.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-string-002.html
@@ -1145,7 +1143,6 @@ Failed tests:
   [PixelMismatch] [MissingContent] (88.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filters-drop-shadow-003.html
   [PixelMismatch] [MissingContent] (88.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/available-size-022.html
   [PixelMismatch] [MissingContent] (88.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/available-size-023.html
-  [PixelMismatch] [LayoutShift] (88.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/massive-element-left-of-viewport-partially-onscreen-new.html
   [PixelMismatch] [LayoutShift] (88.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/massive-element-left-of-viewport-partially-onscreen-old.html
   [PixelMismatch] [LayoutShift] (88.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/massive-element-right-of-viewport-partially-onscreen-new.html
   [PixelMismatch] [LayoutShift] (88.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/massive-element-right-of-viewport-partially-onscreen-old.html
@@ -1186,14 +1183,14 @@ Failed tests:
   [PixelMismatch] [MissingContent] (90.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-align/abspos/align-self-default-overflow-vrl-rtl-vrl.html
   [PixelMismatch] [MissingContent] (90.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/content-with-clip.html
   [PixelMismatch] [MissingContent] (90.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/negativeMargins.html
-  [PixelMismatch] [ColorShift] (90.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-visited.html
+  [PixelMismatch] [MissingContent] (90.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/vars-font-shorthand-001.html
   [PixelMismatch] [MissingContent] (90.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/rotated-cat-off-top-edge.html
-  [PixelMismatch] [ColorShift] (90.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/vars-background-shorthand-001.html
   [PixelMismatch] [ColorShift] (90.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-boundary.html
   [PixelMismatch] [MissingContent] (91.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-orientation-mixed-vlr-100.html
   [PixelMismatch] [MissingContent] (91.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/logical-physical-mapping-001.html
   [PixelMismatch] [MissingContent] (91.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-orientation-upright-vrl-100.html
   [PixelMismatch] [MissingContent] (91.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/button-appearance-native-computed-style.html
+  [PixelMismatch] [MissingContent] (91.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-within-013.html
   [PixelMismatch] [MissingContent] (91.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-anchor-position/position-area-percents-001.html
   [PixelMismatch] [MissingContent] (91.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-border-area-corner-shape.html
   [PixelMismatch] [MissingContent] (91.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-value-digits2-003.html
@@ -1202,6 +1199,7 @@ Failed tests:
   [PixelMismatch] [MissingContent] (91.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-orientation-upright-vlr-100.html
   [PixelMismatch] [MissingContent] (92.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scrollWidthHeight-overflow-visible-margin-collapsing.html
   [PixelMismatch] [MissingContent] (92.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-last-child-of-style-sharing-2.html
+  [PixelMismatch] [MissingContent] (92.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-visited.html
   [PixelMismatch] [MissingContent] (92.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/inline-box-orthogonal-child-with-margins.html
   [PixelMismatch] [MissingContent] (92.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/fill-stroke/paint-order-001.html
   [PixelMismatch] [SubpixelAntiAliasing] (92.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/elementScroll.html
@@ -1213,6 +1211,7 @@ Failed tests:
   [PixelMismatch] [SubpixelAntiAliasing] (92.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scroll-behavior-smooth-positions.html
   [PixelMismatch] [LayoutShift] (92.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-inline-positioning.html
   [PixelMismatch] [MissingContent] (92.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/object-view-box-new-image.html
+  [PixelMismatch] [MissingContent] (92.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/object-view-box-old-image.html
   [PixelMismatch] [ColorShift] (92.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/scoped/auto-nesting.html
   [PixelMismatch] [MissingContent] (92.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-child-of-nesting.html
   [PixelMismatch] [MissingContent] (92.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-last-child-of-nesting.html
@@ -1258,6 +1257,7 @@ Failed tests:
   [PixelMismatch] [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-align/abspos/align-self-default-overflow-vrl-ltr-vrl.html
   [PixelMismatch] [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-align/abspos/justify-self-default-overflow-htb-rtl-htb.html
   [PixelMismatch] [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-align/abspos/justify-self-default-overflow-htb-rtl-vrl.html
+  [PixelMismatch] [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-multiple-appearance-native-horizontal.optional.html
   [PixelMismatch] [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-multiple-appearance-none-horizontal.optional.html
   [PixelMismatch] [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-multiple-appearance-native-vrl.optional.html
   [PixelMismatch] [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-multiple-appearance-none-vrl.optional.html
@@ -1280,7 +1280,6 @@ Failed tests:
   [PixelMismatch] [MissingContent] (94.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/text-stroke-width.html
   [PixelMismatch] [MissingContent] (94.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/ic-unit.html
   [PixelMismatch] [ColorShift] (94.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/elementsFromPoint-svg.html
-  [PixelMismatch] [LayoutShift] (94.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/backdrop-filter-while-promise-pending.html
   [PixelMismatch] [MissingContent] (94.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-padding-box_with_size.html
   [PixelMismatch] [MissingContent] (94.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/direction-upright-001.html
   [PixelMismatch] [MissingContent] (94.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-within-001.html
@@ -1395,6 +1394,7 @@ Failed tests:
   [PixelMismatch] [MissingContent] (95.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-within-shadow-006.html
   [PixelMismatch] [MissingContent] (95.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-parent-shrink-to-fit-001h.html
   [PixelMismatch] [MissingContent] (95.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-last-child-of-compound-selector.html
+  [PixelMismatch] [ColorShift] (95.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/reset-state-after-scrolled-view-transition.html
   [PixelMismatch] [MissingContent] (95.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/first-of-type.html
   [PixelMismatch] [SubpixelAntiAliasing] (95.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/kernel-unit-length-001.html
   [PixelMismatch] [SubpixelAntiAliasing] (95.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/kernel-unit-length-002.html
@@ -1407,6 +1407,7 @@ Failed tests:
   [PixelMismatch] [LayoutShift] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/sizing-orthogonal-percentage-margin-001.html
   [PixelMismatch] [LayoutShift] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/sizing-orthogonal-percentage-margin-002.html
   [PixelMismatch] [MissingContent] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/writing-mode-vlr-015-manual.html
+  [PixelMismatch] [LayoutShift] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/scoped/display-change-during-transition.html
   [PixelMismatch] [MissingContent] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-parent-shrink-to-fit-001c.html
   [PixelMismatch] [MissingContent] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-005.html
   [PixelMismatch] [MissingContent] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-parent-shrink-to-fit-001o.html
@@ -1463,10 +1464,12 @@ Failed tests:
   [PixelMismatch] [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-046.html
   [PixelMismatch] [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-053.html
   [PixelMismatch] [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-055.html
+  [PixelMismatch] [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-dynamic-change-001.html
   [PixelMismatch] [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-004.html
   [PixelMismatch] [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-isolate-004.html
   [PixelMismatch] [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/ch-units-vrl-001.html
   [PixelMismatch] [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/ch-units-vrl-002.html
+  [PixelMismatch] [LayoutShift] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/vars-background-shorthand-001.html
   [PixelMismatch] [MissingContent] (96.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-clip-rect.html
   [PixelMismatch] [MissingContent] (96.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-reference-filter.html
   [PixelMismatch] [MissingContent] (96.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-035.html
@@ -1544,7 +1547,6 @@ Failed tests:
   [PixelMismatch] [MissingContent] (97.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/fecomponenttransfer-display-p3.html
   [PixelMismatch] [LayoutShift] (97.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-multi-line.html
   [PixelMismatch] [LayoutShift] (97.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-region-html-content-viewport.tentative.html
-  [PixelMismatch] [MissingContent] (97.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-substitution-shorthands.html
   [PixelMismatch] [MissingContent] (97.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-011.html
   [PixelMismatch] [MissingContent] (97.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-script-focus-010.html
   [PixelMismatch] [MissingContent] (97.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-gen-con-001.html
@@ -1553,9 +1555,11 @@ Failed tests:
   [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-compression-005.html
   [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-script-focus-008.html
   [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-script-focus-008-b.html
+  [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/wide-keyword-fallback-001.html
   [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-plaintext-003.html
   [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-object-view-box-clip-path.html
   [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/old-content-object-view-box-clip-path.html
+  [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-substitution-shorthands.html
   [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-019.html
   [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-compression-002.html
   [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-compression-006a.html
@@ -1565,7 +1569,6 @@ Failed tests:
   [PixelMismatch] [LayoutShift] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-region-negative-positioned-child-001.html
   [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-shape-polygon-002.html
   [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/writing-mode-vrl-005-manual.html
-  [PixelMismatch] [ColorShift] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-36.html
   [PixelMismatch] [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/3d-transform-outgoing.html
   [PixelMismatch] [LayoutShift] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-nested-border-radius-clip.html
   [PixelMismatch] [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-anchor-position/anchor-position-top-layer-005.html
@@ -1573,7 +1576,6 @@ Failed tests:
   [PixelMismatch] [LayoutShift] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-anchor-position/position-try-002.html
   [PixelMismatch] [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/auto-name-from-id.html
   [PixelMismatch] [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/auto-name-get-animations.html
-  [PixelMismatch] [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/auto-name.html
   [PixelMismatch] [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/match-element-name.html
   [PixelMismatch] [LayoutShift] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/names-are-tree-scoped.html
   [PixelMismatch] [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/transformed-element-scroll-transform.html
@@ -1631,9 +1633,9 @@ Failed tests:
   [PixelMismatch] [LayoutShift] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/feComposite-intersection-feTile-input-svg.html
   [PixelMismatch] [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/feComposite-intersection-feTile-input.html
   [PixelMismatch] [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-plaintext-006.html
+  [PixelMismatch] [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/getComputedStyle-insets-relpos-inline.html
   [PixelMismatch] [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-compression-004.html
   [PixelMismatch] [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-script-focus-005.html
-  [PixelMismatch] [MissingContent] (97.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/getComputedStyle-insets-relpos-inline.html
   [PixelMismatch] [MissingContent] (97.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/border-spacing-without-border.html
   [PixelMismatch] [MissingContent] (97.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/dir-style-02b.html
   [PixelMismatch] [MissingContent] (97.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-script-focus-007.tentative.html
@@ -1687,7 +1689,6 @@ Failed tests:
   [PixelMismatch] [MissingContent] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-shape-inset-001.html
   [PixelMismatch] [LayoutShift] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-shape-rect-003.html
   [PixelMismatch] [MissingContent] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-shape-xywh-003.html
-  [PixelMismatch] [MissingContent] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-override-006.html
   [PixelMismatch] [MissingContent] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-edge-pixels-2.html
   [PixelMismatch] [MissingContent] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-006.html
   [PixelMismatch] [MissingContent] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-plaintext-006.html
@@ -1791,7 +1792,6 @@ Failed tests:
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/user-invalid.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/css-filters-animation-saturate.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/file-input-computed-style.html
-  [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/vh-update-and-transition-in-subframe.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-compression-001.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-override-011.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-override-011.html
@@ -1799,12 +1799,17 @@ Failed tests:
   [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/css-filters-animation-invert.html
   [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/css-filters-animation-opacity.html
   [PixelMismatch] [SubpixelAntiAliasing] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/pseudo-enabled-disabled.html
-  [PixelMismatch] [ColorShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/css-vars-custom-property-case-sensitive-001.html
-  [PixelMismatch] [ColorShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/css-vars-custom-property-inheritance.html
   [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/update-callback-called-once.html
   [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-will-change/will-change-will-change-1.html
   [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/float-in-htb-in-vrl.html
   [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-dynamic-size-001.html
+  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-001.html
+  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-002.html
+  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-003.html
+  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-004.html
+  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-005.html
+  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-006.html
+  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-007.html
   [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/aspect-ratio-002.html
   [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/device-aspect-ratio-004.html
   [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/device-aspect-ratio-006.html
@@ -1838,11 +1843,13 @@ Failed tests:
   [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/negated-last-of-type-invalidation.html
   [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/scope-without-scoping.html
   [PixelMismatch] [ColorShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/css-filters-animation-hue-rotate.html
+  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/abs-pos-vlr-border-001.html
   [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/abs-pos-vlr-padding-001.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-003.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-007.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/content-with-inline-child.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/lang-pseudo-class-in-has-multiple-document-elements.html
+  [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-image-cross-origin-anonymous-negative.sub.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-image-cross-origin-anonymous.sub.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-image-cross-origin-use-credentials-negative.sub.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-image-cross-origin-use-credentials.sub.html
@@ -1862,13 +1869,9 @@ Failed tests:
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/strict-origin-when-cross-origin/url-image-referrer-policy-same-origin.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/strict-origin/url-image-referrer-policy-cross-origin.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/strict-origin/url-image-referrer-policy-same-origin.html
-  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-001.html
-  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-002.html
-  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-003.html
-  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-004.html
-  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-005.html
-  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-006.html
-  [PixelMismatch] [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-007.html
+  [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/unsafe-url/url-image-referrer-policy-cross-origin.html
+  [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/unsafe-url/url-image-referrer-policy-external-stylesheet.html
+  [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/unsafe-url/url-image-referrer-policy-same-origin.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/min-width-tables-001.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/lang-pseudo-class-in-has-document-element.html
   [PixelMismatch] [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-text-decorations.html
@@ -1922,7 +1925,6 @@ Failed tests:
   [PixelMismatch] [MissingContent] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/manual/form-controls-vlr-003-manual.html
   [PixelMismatch] [LayoutShift] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/table-cell-002.html
   [PixelMismatch] [MissingContent] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/dir-style-04.html
-  [PixelMismatch] [MissingContent] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-guaranteed-invalid.html
   [PixelMismatch] [MissingContent] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/target-pseudo-in-has.html
   [PixelMismatch] [MissingContent] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-flex.html
   [PixelMismatch] [MissingContent] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/writing-mode-vrl-forms-004-manual.html
@@ -1944,6 +1946,7 @@ Failed tests:
   [PixelMismatch] [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-embed-011.html
   [PixelMismatch] [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-011.html
   [PixelMismatch] [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-normal-011.html
+  [PixelMismatch] [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/vh-update-and-transition-in-subframe.html
   [PixelMismatch] [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-054.html
   [PixelMismatch] [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/font-relative-units.html
   [PixelMismatch] [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-override-012.html
@@ -1970,6 +1973,7 @@ Failed tests:
   [PixelMismatch] [LayoutShift] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/old-content-is-inline.html
   [PixelMismatch] [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/alt-display-vertical-001-manual.html
   [PixelMismatch] [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/adjust-transform-with-scale.tentative.html
+  [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-guaranteed-invalid.html
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-child-of-no-space-after-of.html
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-last-child-of-no-space-after-of.html
   [PixelMismatch] [ColorShift] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filters-grayscale-001.html
@@ -1994,6 +1998,7 @@ Failed tests:
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-anchor-position/position-visibility-remove-anchors-visible.html
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-out-of-flow-child.html
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-svg-filter-cross-origin-anonymous-negative.sub.html
+  [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-svg-filter-cross-origin-anonymous.sub.html
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/auto-name-from-id-shadow.html
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/content-with-child-with-transparent-background.html
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/content-with-transparent-background.html
@@ -2002,7 +2007,6 @@ Failed tests:
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/scroller-child-abspos.html
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/bottom.html
   [PixelMismatch] [LayoutShift] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/flex-basis.html
-  [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/margin.html
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/right.html
   [PixelMismatch] [LayoutShift] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/webkit-flex-basis.html
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-will-change/will-change-fixedpos-cb-003.html
@@ -2057,7 +2061,6 @@ Failed tests:
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-ray-020.html
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-ray-021.html
   [PixelMismatch] [LayoutShift] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/dir-pseudo-update-document-element.html
-  [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/user-invalid-form-submission-invalidation.html
   [PixelMismatch] [LayoutShift] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-transform.html
   [PixelMismatch] [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/block-with-overflowing-text.html
   [PixelMismatch] [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/svg-aliasing-002.html
@@ -2073,8 +2076,8 @@ Failed tests:
   [PixelMismatch] [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/word-spacing-inherited-computed.html
   [PixelMismatch] [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/word-spacing.html
   [PixelMismatch] [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-002.html
-  [PixelMismatch] [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-isolate-002.html
   [PixelMismatch] [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/tooltip-display-vertical-001-manual.html
+  [PixelMismatch] [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/user-invalid-form-submission-invalidation.html
   [PixelMismatch] [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/tcy-white-space-processing-003.html
   [PixelMismatch] [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/dynamic-offset-vrl-rtl-001.html
   [PixelMismatch] [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/dynamic-offset-vrl-rtl-002.html
@@ -2087,11 +2090,12 @@ Failed tests:
   [PixelMismatch] [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-001.html
   [PixelMismatch] [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-isolate-001.html
   [PixelMismatch] [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/has-visited.html
+  [PixelMismatch] [LayoutShift] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/css-vars-custom-property-case-sensitive-001.html
   [PixelMismatch] [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-003.html
-  [PixelMismatch] [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-isolate-003.html
   [PixelMismatch] [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-appearance-native-computed-style.html
   [PixelMismatch] [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/table-cell-align-002.html
   [PixelMismatch] [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/table-cell-align-004.html
+  [PixelMismatch] [LayoutShift] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/css-vars-custom-property-inheritance.html
   [PixelMismatch] [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-all-002-manual.html
   [PixelMismatch] [ColorShift] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-002.html
   [PixelMismatch] [ColorShift] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-006.html
@@ -2107,7 +2111,6 @@ Failed tests:
   [PixelMismatch] [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-child-of-class.html
   [PixelMismatch] [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-child-of-ids.html
   [PixelMismatch] [ColorShift] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/navigation/resources/transition-to-prerender.html
-  [PixelMismatch] [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-within-013.html
   [PixelMismatch] [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-last-child-of-class.html
   [PixelMismatch] [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-last-child-of-ids.html
   [PixelMismatch] [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-child-of-has.html
@@ -2118,6 +2121,7 @@ Failed tests:
   [PixelMismatch] [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-last-child-of-in-is.html
   [PixelMismatch] [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-last-child-of-is.html
   [PixelMismatch] [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-inherit-all-001.html
+  [PixelMismatch] [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-external-font-face-01.html
   [PixelMismatch] [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/writing-mode-vrl-table-001-manual.html
   [PixelMismatch] [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-distance-001.html
   [PixelMismatch] [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-distance-002.html
@@ -2165,6 +2169,7 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-40.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-override-007.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/mongolian-span-001.html
+  [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-presentation-attribute.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/effect-reference-displacement-negative-scale-001.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/effect-reference-obb-dimensions.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/transition-in-empty-iframe.html
@@ -2172,9 +2177,9 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-override-007.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-cell-001.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/text-decoration-thickness.html
+  [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-over-transition.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-digits-001-manual.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-digits-002-manual.html
-  [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-over-transition.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/all-initial-csstext.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-child-of-classname-002.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-normal-003.html
@@ -2189,6 +2194,7 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-ellipsis.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-child-of-attribute.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-appearance-none-vertical-lr.optional.html
+  [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-appearance-none-vertical-rl.optional.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/writing-mode-vlr-001-manual.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-embed-001.html
   [PixelMismatch] [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-001.html
@@ -2264,6 +2270,7 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-plaintext-009.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-dynamic-001.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-scroll-vw-001.html
+  [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-scroll-vw-002.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-scroll-vw-003.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-007.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-plaintext-007.html
@@ -2271,10 +2278,6 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-embed-007.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-normal-007.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-unset-007.html
-  [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-15.html
-  [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-16.html
-  [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-17.html
-  [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-18.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/textarea-appearance-none-vrl.optional.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-orientation-020.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/textarea-appearance-native-vrl.optional.html
@@ -2302,6 +2305,7 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/color-input-appearance-none-horizontal.optional.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/textarea-appearance-none-horizontal.optional.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/progress-appearance-native-horizontal-rtl.optional.html
+  [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/textarea-appearance-native-horizontal.optional.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-break-inside-001a.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/color-input-appearance-native-horizontal.optional.html
   [PixelMismatch] [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-break-inside-001.html
@@ -2353,7 +2357,6 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selectors-4/details-open-pseudo-001.html
   [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selectors-4/details-open-pseudo-002.html
   [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/fractional-box-with-shadow-new.html
-  [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/fractional-box-with-shadow-old.html
   [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-svg-blur.html
   [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-object-view-box-overflow-clipped.html
   [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/elementFromPoint-list-001.html
@@ -2364,8 +2367,8 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/printing/zero-size-003-print.tentative.html
   [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/resources/nested-iframe.html
   [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/remove-hovered-element.html
+  [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-36.html
   [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-37.html
-  [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/group-children-sizing.html
   [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-bounding-client-rect.html
   [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-extreme-scale.html
   [PixelMismatch] [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-url-001.html
@@ -2414,11 +2417,11 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-repeating-radial-gradient.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/available-size-012.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-definition-border-shorthand-serialize.html
+  [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-substitution-shadow-properties.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/available-size-001.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-transition.sub.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/view-transition-name-is-backdrop-filter-root.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/mask-border-width.html
-  [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-substitution-shadow-properties.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/idlharness.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-conic-gradient.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-linear-gradient.html
@@ -2434,7 +2437,6 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-captures-spans.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selectors-4/details-open-pseudo-003.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-transitions-transition-property-all-before-value.html
-  [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-transitions-value-before-transition-property-all.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/astral-bidi/cypriot.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/progress-appearance-native-computed-style.optional.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-orientation-021.html
@@ -2452,11 +2454,12 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/button-appearance-none-vertical.optional.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/button-appearance-native-horizontal.optional.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/button-appearance-native-vertical.optional.html
+  [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-from-to.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-into-keyframe.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-within-keyframe-fallback.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-within-keyframe-multiple.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-within-keyframe.html
-  [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-from-to.html
+  [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-to-only.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/geometry/DOMMatrix-invert-non-invertible.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/fractional-translation-from-position.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/user-valid-user-invalid-multifield-inputs.tentative.html
@@ -2474,7 +2477,6 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scrollIntoView-inline-image.html
   [PixelMismatch] [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/relpos-inline-overflowing-block-vrl.html
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/capture-old-state-error-flag-cleanup.html
-  [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-38.html
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/caretRangeFromPoint-textarea-transform.tentative.html
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-url-010.html
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-url-011.html
@@ -2545,6 +2547,10 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/scoped/ancestor-display-change.html
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-ray-008.html
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-ray-009.html
+  [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-15.html
+  [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-16.html
+  [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-17.html
+  [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-18.html
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-into-keyframe-transform.html
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/printing/destination-backslash-crash-print.html
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/toplayer-transition-001.html
@@ -2560,6 +2566,7 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/dir-style-03a.html
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-align/blocks/align-content-block-001.html
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-inline-block-child.html
+  [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-refresh.html
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/i18n/lang-pseudo-class-empty-attribute.xhtml
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/geometry/DOMRect-001.html
   [PixelMismatch] [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filters-opacity.html
@@ -2610,7 +2617,6 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/snapshot-containing-block-static-iframe.html
   [PixelMismatch] [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/location-pseudo-classes-in-has.html
   [PixelMismatch] [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/zoom-iframe-dynamic.html
-  [PixelMismatch] [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-001.html
   [PixelMismatch] [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selector-read-write-type-change-001.html
   [PixelMismatch] [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selector-required-type-change-001.html
   [PixelMismatch] [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/dir-selector-change-001.html
@@ -2665,6 +2671,7 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/test_media_queries.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/selectorText-dynamic-001.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/sheet-going-away-001.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-60.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-anchor-position/position-area-anchor-partially-outside.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/relative-units-from-parent.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scrollintoview-containingblock-chain.html
@@ -2701,10 +2708,10 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/input-range-inline-size.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-zero-size.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/resources/variable-reference-refresh-iframe.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/insertRule-syntax-error-01.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/japanese-tag.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/old-content-element-writing-modes.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-created-element.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/insertRule-syntax-error-01.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/old-content-element-writing-modes.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-created-document.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selectors-attr-many-2.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/quirks-mode-import.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/adoptedstylesheets-modify-array-and-sheet.html
@@ -2723,25 +2730,67 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-32.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-33.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-34.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-35.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-016.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-14.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-53.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-54.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-55.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-15.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-01.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-02.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-03.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-04.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-05.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-06.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-09.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-10.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-11.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-13.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-19.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-20.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-22.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-23.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-35.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-40.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-42.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-49.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-invalid-recovery.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-01.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-05.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-07.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-08.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-16.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-18.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-20.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-22.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-30.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-31.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-20.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-52.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-58.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-12.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-24.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-29.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-38.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-39.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-45.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-47.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-06.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-10.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-11.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-13.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-14.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-17.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-01.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-02.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-03.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-04.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-05.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-06.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-07.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-08.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-09.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-10.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-11.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-12.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-13.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-14.html
@@ -2764,11 +2813,14 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-32.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-33.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-34.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-35.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-36.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-37.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-38.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-39.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-40.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-41.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-42.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-43.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-44.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-45.html
@@ -2792,74 +2844,42 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-65.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-66.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-67.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-01.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-02.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-03.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-04.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-05.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-06.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-07.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-08.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-09.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-10.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-11.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-12.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-19.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-20.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-21.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-22.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-25.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-26.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-29.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-30.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-31.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-32.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-33.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-34.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-35.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-36.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-38.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-39.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-40.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-37.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-41.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-43.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-44.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-45.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-46.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-47.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-48.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-49.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-50.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-51.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-52.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-53.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-54.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-55.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-56.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-57.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-58.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-59.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-external-declaration-01.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-external-reference-01.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-external-supports-01.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-01.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-02.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-03.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-04.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-05.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-06.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-09.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-11.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-13.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-14.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-15.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-16.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-19.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-20.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-21.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-22.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-23.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-24.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-25.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-26.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-27.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-28.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-29.html
-  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-31.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-39.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/elementFromPoint-dynamic-anon-box.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/CSS2/normal-flow/containing-block-percent-margin-top.html
@@ -2885,6 +2905,7 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-keyframes.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-media-queries.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-compute.html
+  [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-writing-mode.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/computed-style-002.html
   [PixelMismatch] [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-exponential-blowup.html
   [PixelMismatch] [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selectors-4/lang-002.html
@@ -2944,10 +2965,10 @@ Failed tests:
   [PixelMismatch] [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/is-nested.html
   [PixelMismatch] [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-root-properties-001.html
   [PixelMismatch] [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scrollWidthHeight-overflow-visible-negative-margins.html
+  [PixelMismatch] [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/table-caption.html
   [PixelMismatch] [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-014.html
   [PixelMismatch] [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-015.html
   [PixelMismatch] [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-object-fit-none.html
-  [PixelMismatch] [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/old-content-object-fit-none.html
   [PixelMismatch] [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/floating-first-letter-05d0.html
   [PixelMismatch] [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/floating-first-letter-feff.html
   [PixelMismatch] [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-in-focus-event-001.html
@@ -2967,4 +2988,3 @@ Failed tests:
   [Timeout] /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-shapes/shape-outside/supported-shapes/circle/shape-outside-circle-031.html
   [Timeout] /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-tables/height-distribution/percentage-sizing-of-table-cell-children.html
   [Timeout] /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-tables/html5-table-formatting-3.html
-  [Timeout] /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/url-syntax-crash.html

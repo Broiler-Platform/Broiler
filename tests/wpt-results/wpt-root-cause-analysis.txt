@@ -1,21 +1,22 @@
 WPT Root Cause Analysis
 =======================
-Date     : 2026-04-21T11:42:50Z
+Date     : 2026-04-21T21:07:02Z
 Subset   : css
 
-PixelMismatch: 1955 failure(s)
+PixelMismatch: 1976 failure(s)
   [LayoutShift] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/vh-calc-support-pct.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-new-main-new-iframe.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-new-main-old-iframe.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-old-main-new-iframe.html
+  [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-old-main-old-iframe.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-old-main.html
+  [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-with-name-on-iframe.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-direct.tentative.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-nested-vt-names.tentative.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-nested.tentative.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-non-existent.tentative.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-self.tentative.html
-  [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/contain-direct.tentative.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/contain-nested.tentative.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/contain-on-self.tentative.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/custom-ident-implies-contain.html
@@ -26,7 +27,6 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/normal-goes-up.tentative.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/sibling-frames-transition.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/small-scale.html
-  [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/table-caption.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/cssimportrule-parent.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/CSSStyleSheet-constructable-insertRule-base-uri.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/HTMLLinkElement-disabled-001.html
@@ -39,7 +39,6 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/svg-filter-primitive-units-user-space.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/prefers-color-scheme-svg-image-normal-with-meta-dark.html
   [LayoutShift] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selector-structural-pseudo-root.html
-  [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-with-name-on-iframe.html
   [LayoutShift] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip-root.html
   [LayoutShift] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/relative-units-001.html
   [LayoutShift] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/relative-units-002.html
@@ -47,7 +46,6 @@ PixelMismatch: 1955 failure(s)
   [LayoutShift] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/relative-units-004.html
   [MissingContent] (0.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/nested-group-in-pseudo-basic.tentative.html
   [MissingContent] (1.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/fixed-pos-filter-clip-002.html
-  [MissingContent] (1.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-changes-overflow-left.html
   [MissingContent] (7.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/fecolormatrix-negative.html
   [LayoutShift] (11.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/is-pseudo-containing-sibling-relationship-in-has.html
   [MissingContent] (15.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/CSS2/visudet/replaced-elements-all-auto.html
@@ -56,6 +54,7 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (16.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/CSS2/visudet/replaced-elements-min-height-40.html
   [MissingContent] (16.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/CSS2/visudet/replaced-elements-min-width-80.html
   [ColorShift] (24.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scrollIntoView-fixed.html
+  [ColorShift] (30.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-css-wide-keywords.html
   [MissingContent] (40.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-scaling-001.html
   [MissingContent] (41.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-clip-rect-zoom.html
   [MissingContent] (42.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/scroll-padding.html
@@ -67,7 +66,6 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (69.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/column.html
   [MissingContent] (72.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/iframe-zoom-nested.html
   [MissingContent] (74.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/of-type-selectors.xhtml
-  [MissingContent] (74.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-old-main-old-iframe.html
   [LayoutShift] (74.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/getComputedStyle-sticky-pos-percent.html
   [MissingContent] (76.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-last-child-specificity-2.html
   [MissingContent] (77.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/CSS2/linebox/vertical-align-negative-leading-001.html
@@ -75,7 +73,6 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (78.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/CSS2/other-formats/control-characters-001.html
   [MissingContent] (79.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-containing-block.html
   [MissingContent] (79.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/svg.html
-  [MissingContent] (79.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/vars-font-shorthand-001.html
   [MissingContent] (80.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/view-transition-types-matches.html
   [LayoutShift] (80.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/has-with-nth-child.html
   [MissingContent] (80.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-gutter-007.html
@@ -103,6 +100,7 @@ PixelMismatch: 1955 failure(s)
   [ColorShift] (84.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/background-image-blur-repaint.html
   [SubpixelAntiAliasing] (84.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/dom-element-scroll.html
   [MissingContent] (84.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-parent-shrink-to-fit-001.html
+  [MissingContent] (84.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/fragmented-at-start-ignored.html
   [MissingContent] (84.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-coord-box-004.html
   [MissingContent] (84.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-string-001.html
   [MissingContent] (84.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-string-002.html
@@ -145,7 +143,6 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (88.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filters-drop-shadow-003.html
   [MissingContent] (88.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/available-size-022.html
   [MissingContent] (88.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/available-size-023.html
-  [LayoutShift] (88.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/massive-element-left-of-viewport-partially-onscreen-new.html
   [LayoutShift] (88.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/massive-element-left-of-viewport-partially-onscreen-old.html
   [LayoutShift] (88.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/massive-element-right-of-viewport-partially-onscreen-new.html
   [LayoutShift] (88.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/massive-element-right-of-viewport-partially-onscreen-old.html
@@ -186,14 +183,14 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (90.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-align/abspos/align-self-default-overflow-vrl-rtl-vrl.html
   [MissingContent] (90.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/content-with-clip.html
   [MissingContent] (90.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/negativeMargins.html
-  [ColorShift] (90.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-visited.html
+  [MissingContent] (90.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/vars-font-shorthand-001.html
   [MissingContent] (90.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/rotated-cat-off-top-edge.html
-  [ColorShift] (90.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/vars-background-shorthand-001.html
   [ColorShift] (90.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-boundary.html
   [MissingContent] (91.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-orientation-mixed-vlr-100.html
   [MissingContent] (91.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/logical-physical-mapping-001.html
   [MissingContent] (91.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-orientation-upright-vrl-100.html
   [MissingContent] (91.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/button-appearance-native-computed-style.html
+  [MissingContent] (91.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-within-013.html
   [MissingContent] (91.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-anchor-position/position-area-percents-001.html
   [MissingContent] (91.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-border-area-corner-shape.html
   [MissingContent] (91.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-value-digits2-003.html
@@ -202,6 +199,7 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (91.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-orientation-upright-vlr-100.html
   [MissingContent] (92.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scrollWidthHeight-overflow-visible-margin-collapsing.html
   [MissingContent] (92.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-last-child-of-style-sharing-2.html
+  [MissingContent] (92.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-visited.html
   [MissingContent] (92.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/inline-box-orthogonal-child-with-margins.html
   [MissingContent] (92.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/fill-stroke/paint-order-001.html
   [SubpixelAntiAliasing] (92.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/elementScroll.html
@@ -213,6 +211,7 @@ PixelMismatch: 1955 failure(s)
   [SubpixelAntiAliasing] (92.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scroll-behavior-smooth-positions.html
   [LayoutShift] (92.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-inline-positioning.html
   [MissingContent] (92.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/object-view-box-new-image.html
+  [MissingContent] (92.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/object-view-box-old-image.html
   [ColorShift] (92.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/scoped/auto-nesting.html
   [MissingContent] (92.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-child-of-nesting.html
   [MissingContent] (92.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-last-child-of-nesting.html
@@ -258,6 +257,7 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-align/abspos/align-self-default-overflow-vrl-ltr-vrl.html
   [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-align/abspos/justify-self-default-overflow-htb-rtl-htb.html
   [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-align/abspos/justify-self-default-overflow-htb-rtl-vrl.html
+  [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-multiple-appearance-native-horizontal.optional.html
   [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-multiple-appearance-none-horizontal.optional.html
   [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-multiple-appearance-native-vrl.optional.html
   [MissingContent] (93.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-multiple-appearance-none-vrl.optional.html
@@ -280,7 +280,6 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (94.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/text-stroke-width.html
   [MissingContent] (94.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/ic-unit.html
   [ColorShift] (94.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/elementsFromPoint-svg.html
-  [LayoutShift] (94.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/backdrop-filter-while-promise-pending.html
   [MissingContent] (94.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-padding-box_with_size.html
   [MissingContent] (94.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/direction-upright-001.html
   [MissingContent] (94.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-within-001.html
@@ -395,6 +394,7 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (95.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-within-shadow-006.html
   [MissingContent] (95.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-parent-shrink-to-fit-001h.html
   [MissingContent] (95.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-last-child-of-compound-selector.html
+  [ColorShift] (95.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/reset-state-after-scrolled-view-transition.html
   [MissingContent] (95.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/first-of-type.html
   [SubpixelAntiAliasing] (95.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/kernel-unit-length-001.html
   [SubpixelAntiAliasing] (95.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/kernel-unit-length-002.html
@@ -407,6 +407,7 @@ PixelMismatch: 1955 failure(s)
   [LayoutShift] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/sizing-orthogonal-percentage-margin-001.html
   [LayoutShift] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/sizing-orthogonal-percentage-margin-002.html
   [MissingContent] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/writing-mode-vlr-015-manual.html
+  [LayoutShift] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/scoped/display-change-during-transition.html
   [MissingContent] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-parent-shrink-to-fit-001c.html
   [MissingContent] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-005.html
   [MissingContent] (96.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-parent-shrink-to-fit-001o.html
@@ -463,10 +464,12 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-046.html
   [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-053.html
   [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-055.html
+  [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-dynamic-change-001.html
   [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-004.html
   [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-isolate-004.html
   [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/ch-units-vrl-001.html
   [MissingContent] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/ch-units-vrl-002.html
+  [LayoutShift] (96.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/vars-background-shorthand-001.html
   [MissingContent] (96.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-clip-rect.html
   [MissingContent] (96.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-reference-filter.html
   [MissingContent] (96.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-035.html
@@ -544,7 +547,6 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (97.2%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/fecomponenttransfer-display-p3.html
   [LayoutShift] (97.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-multi-line.html
   [LayoutShift] (97.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-region-html-content-viewport.tentative.html
-  [MissingContent] (97.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-substitution-shorthands.html
   [MissingContent] (97.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-011.html
   [MissingContent] (97.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-script-focus-010.html
   [MissingContent] (97.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-gen-con-001.html
@@ -553,9 +555,11 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-compression-005.html
   [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-script-focus-008.html
   [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-script-focus-008-b.html
+  [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/wide-keyword-fallback-001.html
   [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-plaintext-003.html
   [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-object-view-box-clip-path.html
   [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/old-content-object-view-box-clip-path.html
+  [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-substitution-shorthands.html
   [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-019.html
   [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-compression-002.html
   [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-compression-006a.html
@@ -565,7 +569,6 @@ PixelMismatch: 1955 failure(s)
   [LayoutShift] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-region-negative-positioned-child-001.html
   [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-shape-polygon-002.html
   [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/writing-mode-vrl-005-manual.html
-  [ColorShift] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-36.html
   [MissingContent] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/3d-transform-outgoing.html
   [LayoutShift] (97.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-nested-border-radius-clip.html
   [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-anchor-position/anchor-position-top-layer-005.html
@@ -573,7 +576,6 @@ PixelMismatch: 1955 failure(s)
   [LayoutShift] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-anchor-position/position-try-002.html
   [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/auto-name-from-id.html
   [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/auto-name-get-animations.html
-  [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/auto-name.html
   [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/match-element-name.html
   [LayoutShift] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/names-are-tree-scoped.html
   [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/transformed-element-scroll-transform.html
@@ -631,9 +633,9 @@ PixelMismatch: 1955 failure(s)
   [LayoutShift] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/feComposite-intersection-feTile-input-svg.html
   [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/feComposite-intersection-feTile-input.html
   [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-plaintext-006.html
+  [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/getComputedStyle-insets-relpos-inline.html
   [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-compression-004.html
   [MissingContent] (97.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-script-focus-005.html
-  [MissingContent] (97.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/getComputedStyle-insets-relpos-inline.html
   [MissingContent] (97.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/border-spacing-without-border.html
   [MissingContent] (97.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/dir-style-02b.html
   [MissingContent] (97.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-script-focus-007.tentative.html
@@ -687,7 +689,6 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-shape-inset-001.html
   [LayoutShift] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-shape-rect-003.html
   [MissingContent] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-shape-xywh-003.html
-  [MissingContent] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-override-006.html
   [MissingContent] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-edge-pixels-2.html
   [MissingContent] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-006.html
   [MissingContent] (97.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-plaintext-006.html
@@ -791,7 +792,6 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/user-invalid.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/css-filters-animation-saturate.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/file-input-computed-style.html
-  [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/vh-update-and-transition-in-subframe.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-compression-001.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-override-011.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-override-011.html
@@ -799,12 +799,17 @@ PixelMismatch: 1955 failure(s)
   [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/css-filters-animation-invert.html
   [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/css-filters-animation-opacity.html
   [SubpixelAntiAliasing] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/pseudo-enabled-disabled.html
-  [ColorShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/css-vars-custom-property-case-sensitive-001.html
-  [ColorShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/css-vars-custom-property-inheritance.html
   [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/update-callback-called-once.html
   [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-will-change/will-change-will-change-1.html
   [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/float-in-htb-in-vrl.html
   [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-dynamic-size-001.html
+  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-001.html
+  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-002.html
+  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-003.html
+  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-004.html
+  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-005.html
+  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-006.html
+  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-007.html
   [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/aspect-ratio-002.html
   [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/device-aspect-ratio-004.html
   [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/device-aspect-ratio-006.html
@@ -838,11 +843,13 @@ PixelMismatch: 1955 failure(s)
   [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/negated-last-of-type-invalidation.html
   [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/scope-without-scoping.html
   [ColorShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/css-filters-animation-hue-rotate.html
+  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/abs-pos-vlr-border-001.html
   [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/abs-pos-vlr-padding-001.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-003.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-007.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/content-with-inline-child.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/lang-pseudo-class-in-has-multiple-document-elements.html
+  [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-image-cross-origin-anonymous-negative.sub.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-image-cross-origin-anonymous.sub.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-image-cross-origin-use-credentials-negative.sub.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-image-cross-origin-use-credentials.sub.html
@@ -862,13 +869,9 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/strict-origin-when-cross-origin/url-image-referrer-policy-same-origin.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/strict-origin/url-image-referrer-policy-cross-origin.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/strict-origin/url-image-referrer-policy-same-origin.html
-  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-001.html
-  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-002.html
-  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-003.html
-  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-004.html
-  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-005.html
-  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-006.html
-  [LayoutShift] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-007.html
+  [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/unsafe-url/url-image-referrer-policy-cross-origin.html
+  [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/unsafe-url/url-image-referrer-policy-external-stylesheet.html
+  [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/unsafe-url/url-image-referrer-policy-same-origin.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/min-width-tables-001.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/lang-pseudo-class-in-has-document-element.html
   [MissingContent] (98.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-text-decorations.html
@@ -922,7 +925,6 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/manual/form-controls-vlr-003-manual.html
   [LayoutShift] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/table-cell-002.html
   [MissingContent] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/dir-style-04.html
-  [MissingContent] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-guaranteed-invalid.html
   [MissingContent] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/target-pseudo-in-has.html
   [MissingContent] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-flex.html
   [MissingContent] (98.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/writing-mode-vrl-forms-004-manual.html
@@ -944,6 +946,7 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-embed-011.html
   [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-011.html
   [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-normal-011.html
+  [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/vh-update-and-transition-in-subframe.html
   [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-054.html
   [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/font-relative-units.html
   [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-override-012.html
@@ -970,6 +973,7 @@ PixelMismatch: 1955 failure(s)
   [LayoutShift] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/old-content-is-inline.html
   [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/alt-display-vertical-001-manual.html
   [MissingContent] (98.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/adjust-transform-with-scale.tentative.html
+  [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-guaranteed-invalid.html
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-child-of-no-space-after-of.html
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-last-child-of-no-space-after-of.html
   [ColorShift] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filters-grayscale-001.html
@@ -994,6 +998,7 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-anchor-position/position-visibility-remove-anchors-visible.html
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-out-of-flow-child.html
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-svg-filter-cross-origin-anonymous-negative.sub.html
+  [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-svg-filter-cross-origin-anonymous.sub.html
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/auto-name-from-id-shadow.html
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/content-with-child-with-transparent-background.html
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/content-with-transparent-background.html
@@ -1002,7 +1007,6 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/scroller-child-abspos.html
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/bottom.html
   [LayoutShift] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/flex-basis.html
-  [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/margin.html
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/right.html
   [LayoutShift] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/webkit-flex-basis.html
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-will-change/will-change-fixedpos-cb-003.html
@@ -1057,7 +1061,6 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-ray-020.html
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-ray-021.html
   [LayoutShift] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/dir-pseudo-update-document-element.html
-  [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/user-invalid-form-submission-invalidation.html
   [LayoutShift] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-transform.html
   [MissingContent] (98.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/block-with-overflowing-text.html
   [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/svg-aliasing-002.html
@@ -1073,8 +1076,8 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/word-spacing-inherited-computed.html
   [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/word-spacing.html
   [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-002.html
-  [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-isolate-002.html
   [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/tooltip-display-vertical-001-manual.html
+  [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/user-invalid-form-submission-invalidation.html
   [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/tcy-white-space-processing-003.html
   [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/dynamic-offset-vrl-rtl-001.html
   [MissingContent] (98.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/dynamic-offset-vrl-rtl-002.html
@@ -1087,11 +1090,12 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-001.html
   [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-isolate-001.html
   [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/has-visited.html
+  [LayoutShift] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/css-vars-custom-property-case-sensitive-001.html
   [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-003.html
-  [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-isolate-003.html
   [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-appearance-native-computed-style.html
   [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/table-cell-align-002.html
   [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/table-cell-align-004.html
+  [LayoutShift] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/css-vars-custom-property-inheritance.html
   [MissingContent] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-all-002-manual.html
   [ColorShift] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-002.html
   [ColorShift] (98.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-006.html
@@ -1107,7 +1111,6 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-child-of-class.html
   [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-child-of-ids.html
   [ColorShift] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/navigation/resources/transition-to-prerender.html
-  [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-within-013.html
   [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-last-child-of-class.html
   [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-last-child-of-ids.html
   [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-child-of-has.html
@@ -1118,6 +1121,7 @@ PixelMismatch: 1955 failure(s)
   [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-last-child-of-in-is.html
   [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-last-child-of-is.html
   [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-inherit-all-001.html
+  [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-external-font-face-01.html
   [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/writing-mode-vrl-table-001-manual.html
   [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-distance-001.html
   [MissingContent] (99.0%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-distance-002.html
@@ -1165,6 +1169,7 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-40.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-override-007.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/mongolian-span-001.html
+  [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-presentation-attribute.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/effect-reference-displacement-negative-scale-001.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/effect-reference-obb-dimensions.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/transition-in-empty-iframe.html
@@ -1172,9 +1177,9 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-override-007.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-cell-001.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/text-decoration-thickness.html
+  [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-over-transition.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-digits-001-manual.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-digits-002-manual.html
-  [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-over-transition.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/all-initial-csstext.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-child-of-classname-002.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-normal-003.html
@@ -1189,6 +1194,7 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-ellipsis.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-child-of-attribute.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-appearance-none-vertical-lr.optional.html
+  [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-appearance-none-vertical-rl.optional.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/writing-mode-vlr-001-manual.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-embed-001.html
   [MinorDiff] (99.1%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-001.html
@@ -1264,6 +1270,7 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-plaintext-009.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-dynamic-001.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-scroll-vw-001.html
+  [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-scroll-vw-002.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-scroll-vw-003.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-007.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-plaintext-007.html
@@ -1271,10 +1278,6 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-embed-007.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-normal-007.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-unset-007.html
-  [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-15.html
-  [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-16.html
-  [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-17.html
-  [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-18.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/textarea-appearance-none-vrl.optional.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-orientation-020.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/textarea-appearance-native-vrl.optional.html
@@ -1302,6 +1305,7 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/color-input-appearance-none-horizontal.optional.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/textarea-appearance-none-horizontal.optional.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/progress-appearance-native-horizontal-rtl.optional.html
+  [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/textarea-appearance-native-horizontal.optional.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-break-inside-001a.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/color-input-appearance-native-horizontal.optional.html
   [MinorDiff] (99.3%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-break-inside-001.html
@@ -1353,7 +1357,6 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selectors-4/details-open-pseudo-001.html
   [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selectors-4/details-open-pseudo-002.html
   [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/fractional-box-with-shadow-new.html
-  [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/fractional-box-with-shadow-old.html
   [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-svg-blur.html
   [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-object-view-box-overflow-clipped.html
   [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/elementFromPoint-list-001.html
@@ -1364,8 +1367,8 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/printing/zero-size-003-print.tentative.html
   [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/resources/nested-iframe.html
   [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/remove-hovered-element.html
+  [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-36.html
   [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-37.html
-  [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/group-children-sizing.html
   [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-bounding-client-rect.html
   [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-extreme-scale.html
   [MinorDiff] (99.4%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-url-001.html
@@ -1414,11 +1417,11 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-repeating-radial-gradient.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/available-size-012.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-definition-border-shorthand-serialize.html
+  [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-substitution-shadow-properties.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/available-size-001.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-transition.sub.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/view-transition-name-is-backdrop-filter-root.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/mask-border-width.html
-  [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-substitution-shadow-properties.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/idlharness.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-conic-gradient.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-linear-gradient.html
@@ -1434,7 +1437,6 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-captures-spans.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selectors-4/details-open-pseudo-003.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-transitions-transition-property-all-before-value.html
-  [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-transitions-value-before-transition-property-all.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/astral-bidi/cypriot.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/progress-appearance-native-computed-style.optional.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-orientation-021.html
@@ -1452,11 +1454,12 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/button-appearance-none-vertical.optional.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/button-appearance-native-horizontal.optional.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/button-appearance-native-vertical.optional.html
+  [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-from-to.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-into-keyframe.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-within-keyframe-fallback.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-within-keyframe-multiple.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-within-keyframe.html
-  [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-from-to.html
+  [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-to-only.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/geometry/DOMMatrix-invert-non-invertible.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/fractional-translation-from-position.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/user-valid-user-invalid-multifield-inputs.tentative.html
@@ -1474,7 +1477,6 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scrollIntoView-inline-image.html
   [MinorDiff] (99.5%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/relpos-inline-overflowing-block-vrl.html
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/capture-old-state-error-flag-cleanup.html
-  [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-38.html
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/caretRangeFromPoint-textarea-transform.tentative.html
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-url-010.html
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-url-011.html
@@ -1545,6 +1547,10 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/scoped/ancestor-display-change.html
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-ray-008.html
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-ray-009.html
+  [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-15.html
+  [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-16.html
+  [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-17.html
+  [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-18.html
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-into-keyframe-transform.html
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/printing/destination-backslash-crash-print.html
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/toplayer-transition-001.html
@@ -1560,6 +1566,7 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/dir-style-03a.html
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-align/blocks/align-content-block-001.html
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-inline-block-child.html
+  [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-refresh.html
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/i18n/lang-pseudo-class-empty-attribute.xhtml
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/geometry/DOMRect-001.html
   [MinorDiff] (99.6%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filters-opacity.html
@@ -1610,7 +1617,6 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/snapshot-containing-block-static-iframe.html
   [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/location-pseudo-classes-in-has.html
   [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/zoom-iframe-dynamic.html
-  [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-001.html
   [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selector-read-write-type-change-001.html
   [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selector-required-type-change-001.html
   [MinorDiff] (99.7%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/dir-selector-change-001.html
@@ -1665,6 +1671,7 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/test_media_queries.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/selectorText-dynamic-001.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/sheet-going-away-001.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-60.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-anchor-position/position-area-anchor-partially-outside.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/relative-units-from-parent.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scrollintoview-containingblock-chain.html
@@ -1701,10 +1708,10 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/input-range-inline-size.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-zero-size.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/resources/variable-reference-refresh-iframe.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/insertRule-syntax-error-01.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/japanese-tag.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/old-content-element-writing-modes.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-created-element.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/insertRule-syntax-error-01.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/old-content-element-writing-modes.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-created-document.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selectors-attr-many-2.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/quirks-mode-import.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/adoptedstylesheets-modify-array-and-sheet.html
@@ -1723,25 +1730,67 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-32.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-33.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-34.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-35.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-016.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-14.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-53.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-54.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-55.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-15.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-01.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-02.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-03.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-04.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-05.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-06.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-09.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-10.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-11.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-13.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-19.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-20.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-22.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-23.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-35.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-40.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-42.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-49.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-invalid-recovery.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-01.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-05.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-07.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-08.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-16.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-18.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-20.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-22.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-30.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-31.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-20.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-52.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-58.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-12.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-24.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-29.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-38.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-39.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-45.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-47.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-06.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-10.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-11.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-13.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-14.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-17.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-01.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-02.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-03.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-04.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-05.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-06.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-07.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-08.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-09.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-10.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-11.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-12.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-13.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-14.html
@@ -1764,11 +1813,14 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-32.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-33.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-34.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-35.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-36.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-37.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-38.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-39.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-40.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-41.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-42.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-43.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-44.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-45.html
@@ -1792,74 +1844,42 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-65.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-66.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-67.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-01.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-02.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-03.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-04.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-05.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-06.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-07.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-08.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-09.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-10.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-11.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-12.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-19.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-20.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-21.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-22.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-25.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-26.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-29.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-30.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-31.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-32.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-33.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-34.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-35.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-36.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-38.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-39.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-40.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-37.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-41.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-43.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-44.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-45.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-46.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-47.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-48.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-49.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-50.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-51.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-52.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-53.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-54.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-55.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-56.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-57.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-58.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-59.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-external-declaration-01.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-external-reference-01.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-external-supports-01.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-01.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-02.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-03.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-04.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-05.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-06.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-09.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-11.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-13.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-14.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-15.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-16.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-19.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-20.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-21.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-22.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-23.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-24.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-25.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-26.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-27.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-28.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-29.html
-  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-31.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-39.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/elementFromPoint-dynamic-anon-box.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/CSS2/normal-flow/containing-block-percent-margin-top.html
@@ -1885,6 +1905,7 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-keyframes.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-media-queries.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-compute.html
+  [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-writing-mode.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/computed-style-002.html
   [MinorDiff] (99.8%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-exponential-blowup.html
   [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selectors-4/lang-002.html
@@ -1944,10 +1965,10 @@ PixelMismatch: 1955 failure(s)
   [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/is-nested.html
   [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-root-properties-001.html
   [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scrollWidthHeight-overflow-visible-negative-margins.html
+  [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/table-caption.html
   [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-014.html
   [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-015.html
   [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-object-fit-none.html
-  [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/old-content-object-fit-none.html
   [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/floating-first-letter-05d0.html
   [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/floating-first-letter-feff.html
   [MinorDiff] (99.9%) /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-in-focus-event-001.html
@@ -1962,22 +1983,26 @@ PixelMismatch: 1955 failure(s)
 
 PixelMismatch Sub-Categories:
   SubpixelAntiAliasing: 11 failure(s)
-  ColorShift: 58 failure(s)
-  LayoutShift: 162 failure(s)
-  MissingContent: 902 failure(s)
-  MinorDiff: 822 failure(s)
+  ColorShift: 55 failure(s)
+  LayoutShift: 165 failure(s)
+  MissingContent: 906 failure(s)
+  MinorDiff: 839 failure(s)
 
 --- Detailed Root Cause Breakdown ---
 === Root Cause Analysis ===
-  [PixelMismatch] — 1955 failure(s)
-    [MissingContent] — 902 failure(s)
+  [PixelMismatch] — 1976 failure(s)
+    [MissingContent] — 906 failure(s)
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-new-main-new-iframe.html
         8968/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-new-main-old-iframe.html
         8968/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-old-main-new-iframe.html
         8968/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-old-main-old-iframe.html
+        8968/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-old-main.html
+        8968/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-with-name-on-iframe.html
         8968/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-direct.tentative.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
@@ -1990,8 +2015,6 @@ PixelMismatch Sub-Categories:
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-non-existent.tentative.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/compute-explicit-name-self.tentative.html
-        10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/contain-direct.tentative.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/contain-nested.tentative.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
@@ -2013,8 +2036,6 @@ PixelMismatch Sub-Categories:
         8960/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/small-scale.html
         8000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/table-caption.html
-        10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/cssimportrule-parent.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/CSSStyleSheet-constructable-insertRule-base-uri.html
@@ -2037,13 +2058,9 @@ PixelMismatch Sub-Categories:
         8800/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/prefers-color-scheme-svg-image-normal-with-meta-dark.html
         9744/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-with-name-on-iframe.html
-        8970/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/nested-group-in-pseudo-basic.tentative.html
         9813/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/fixed-pos-filter-clip-002.html
-        10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-changes-overflow-left.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/fecolormatrix-negative.html
         8092/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
@@ -2075,8 +2092,6 @@ PixelMismatch Sub-Categories:
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/of-type-selectors.xhtml
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-and-main-frame-transition-old-main-old-iframe.html
-        8960/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-last-child-specificity-2.html
         9467/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/CSS2/linebox/vertical-align-negative-leading-001.html
@@ -2089,8 +2104,6 @@ PixelMismatch Sub-Categories:
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/svg.html
         7500/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/vars-font-shorthand-001.html
-        8402/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/view-transition-types-matches.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-gutter-007.html
@@ -2137,6 +2150,8 @@ PixelMismatch Sub-Categories:
         7972/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-parent-shrink-to-fit-001.html
         9223/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/fragmented-at-start-ignored.html
+        7500/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-coord-box-004.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-string-001.html
@@ -2265,6 +2280,8 @@ PixelMismatch Sub-Categories:
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/negativeMargins.html
         9670/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/vars-font-shorthand-001.html
+        8887/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/rotated-cat-off-top-edge.html
         8611/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-orientation-mixed-vlr-100.html
@@ -2275,6 +2292,8 @@ PixelMismatch Sub-Categories:
         9646/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/button-appearance-native-computed-style.html
         5231/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-within-013.html
+        7903/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-anchor-position/position-area-percents-001.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-border-area-corner-shape.html
@@ -2291,6 +2310,8 @@ PixelMismatch Sub-Categories:
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-last-child-of-style-sharing-2.html
         7703/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-visited.html
+        7402/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/inline-box-orthogonal-child-with-margins.html
         9893/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/fill-stroke/paint-order-001.html
@@ -2302,6 +2323,8 @@ PixelMismatch Sub-Categories:
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-border-box_with_size.html
         6365/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/object-view-box-new-image.html
+        10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/object-view-box-old-image.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-child-of-nesting.html
         9744/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
@@ -2371,6 +2394,8 @@ PixelMismatch Sub-Categories:
         9620/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-align/abspos/justify-self-default-overflow-htb-rtl-vrl.html
         9620/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-multiple-appearance-native-horizontal.optional.html
+        8333/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-multiple-appearance-none-horizontal.optional.html
         8333/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-multiple-appearance-native-vrl.optional.html
@@ -2707,6 +2732,8 @@ PixelMismatch Sub-Categories:
         9900/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-055.html
         9900/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-dynamic-change-001.html
+        9900/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-004.html
         8554/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-isolate-004.html
@@ -2857,8 +2884,6 @@ PixelMismatch Sub-Categories:
         9234/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/fecomponenttransfer-display-p3.html
         6333/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-substitution-shorthands.html
-        10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-011.html
         6544/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-script-focus-010.html
@@ -2873,11 +2898,15 @@ PixelMismatch Sub-Categories:
         6453/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-script-focus-008-b.html
         6609/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/wide-keyword-fallback-001.html
+        10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-plaintext-003.html
         8523/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-object-view-box-clip-path.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/old-content-object-view-box-clip-path.html
+        10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-substitution-shorthands.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-019.html
         6488/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
@@ -2904,8 +2933,6 @@ PixelMismatch Sub-Categories:
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/auto-name-from-id.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/auto-name-get-animations.html
-        10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/auto-name.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/match-element-name.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
@@ -3001,12 +3028,12 @@ PixelMismatch Sub-Categories:
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-plaintext-006.html
         7624/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/getComputedStyle-insets-relpos-inline.html
+        6604/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-compression-004.html
         8095/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-script-focus-005.html
         6485/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/getComputedStyle-insets-relpos-inline.html
-        6604/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/border-spacing-without-border.html
         8424/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/dir-style-02b.html
@@ -3109,8 +3136,6 @@ PixelMismatch Sub-Categories:
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-shape-xywh-003.html
         7879/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-override-006.html
-        8562/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-edge-pixels-2.html
         9633/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-006.html
@@ -3293,8 +3318,6 @@ PixelMismatch Sub-Categories:
         8693/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/file-input-computed-style.html
         9877/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/vh-update-and-transition-in-subframe.html
-        9749/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-compression-001.html
         8472/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-override-011.html
@@ -3309,6 +3332,8 @@ PixelMismatch Sub-Categories:
         5625/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/lang-pseudo-class-in-has-multiple-document-elements.html
         8841/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-image-cross-origin-anonymous-negative.sub.html
+        8842/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-image-cross-origin-anonymous.sub.html
         8842/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-image-cross-origin-use-credentials-negative.sub.html
@@ -3346,6 +3371,12 @@ PixelMismatch Sub-Categories:
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/strict-origin/url-image-referrer-policy-cross-origin.html
         8842/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/strict-origin/url-image-referrer-policy-same-origin.html
+        8842/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/unsafe-url/url-image-referrer-policy-cross-origin.html
+        8842/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/unsafe-url/url-image-referrer-policy-external-stylesheet.html
+        8842/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/referrer-policy/unsafe-url/url-image-referrer-policy-same-origin.html
         8842/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/min-width-tables-001.html
         8842/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
@@ -3429,8 +3460,6 @@ PixelMismatch Sub-Categories:
         7826/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/dir-style-04.html
         7359/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-guaranteed-invalid.html
-        8339/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/target-pseudo-in-has.html
         6800/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-flex.html
@@ -3467,6 +3496,8 @@ PixelMismatch Sub-Categories:
         8745/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-normal-011.html
         8743/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/vh-update-and-transition-in-subframe.html
+        9749/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-body-054.html
         9661/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/font-relative-units.html
@@ -3507,6 +3538,8 @@ PixelMismatch Sub-Categories:
         9626/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/adjust-transform-with-scale.tentative.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-guaranteed-invalid.html
+        9289/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-child-of-no-space-after-of.html
         7024/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-last-child-of-no-space-after-of.html
@@ -3545,6 +3578,8 @@ PixelMismatch Sub-Categories:
         9826/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-svg-filter-cross-origin-anonymous-negative.sub.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/urls/cross-origin/url-svg-filter-cross-origin-anonymous.sub.html
+        10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/auto-name-from-id-shadow.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/content-with-child-with-transparent-background.html
@@ -3558,8 +3593,6 @@ PixelMismatch Sub-Categories:
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/scroller-child-abspos.html
         9200/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/bottom.html
-        10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/margin.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/explicit-inherit/right.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
@@ -3635,8 +3668,6 @@ PixelMismatch Sub-Categories:
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-ray-021.html
         10000/10000 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/user-invalid-form-submission-invalidation.html
-        8920/9943 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/block-with-overflowing-text.html
         7720/9880 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/svg-aliasing-002.html
@@ -3661,10 +3692,10 @@ PixelMismatch Sub-Categories:
         8325/9414 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-002.html
         8285/9369 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-isolate-002.html
-        8285/9369 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/tooltip-display-vertical-001-manual.html
         8924/9320 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/user-invalid-form-submission-invalidation.html
+        8105/9299 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/tcy-white-space-processing-003.html
         7910/9285 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/dynamic-offset-vrl-rtl-001.html
@@ -3684,8 +3715,6 @@ PixelMismatch Sub-Categories:
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/has-visited.html
         5601/8575 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-003.html
-        6943/8487 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-override-isolate-003.html
         6943/8487 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-appearance-native-computed-style.html
         8083/8484 sampled mismatches are background↔content transitions, indicating missing or extra elements.
@@ -3715,8 +3744,6 @@ PixelMismatch Sub-Categories:
         7621/8197 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-child-of-ids.html
         7621/8197 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-within-013.html
-        6096/8193 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-last-child-of-class.html
         7603/8188 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/nth-last-child-of-ids.html
@@ -3737,6 +3764,8 @@ PixelMismatch Sub-Categories:
         7567/8174 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-inherit-all-001.html
         5727/8144 sampled mismatches are background↔content transitions, indicating missing or extra elements.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-external-font-face-01.html
+        6636/8066 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/writing-mode-vrl-table-001-manual.html
         6861/8014 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-distance-001.html
@@ -3775,7 +3804,7 @@ PixelMismatch Sub-Categories:
         7788/7904 sampled mismatches are background↔content transitions, indicating missing or extra elements.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-override-009.html
         6709/7872 sampled mismatches are background↔content transitions, indicating missing or extra elements.
-    [MinorDiff] — 822 failure(s)
+    [MinorDiff] — 839 failure(s)
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/block-plaintext-001.html
         Near-match: only 7859 pixel(s) differ (1.00%), avg Δ 92.1.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-override-009.html
@@ -3832,6 +3861,8 @@ PixelMismatch Sub-Categories:
         Near-match: only 7334 pixel(s) differ (0.93%), avg Δ 98.7.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/mongolian-span-001.html
         Near-match: only 7208 pixel(s) differ (0.92%), avg Δ 143.2.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-presentation-attribute.html
+        Near-match: only 7200 pixel(s) differ (0.92%), avg Δ 119.3.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/effect-reference-displacement-negative-scale-001.html
         Near-match: only 7200 pixel(s) differ (0.92%), avg Δ 159.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/effect-reference-obb-dimensions.html
@@ -3846,12 +3877,12 @@ PixelMismatch Sub-Categories:
         Near-match: only 7130 pixel(s) differ (0.91%), avg Δ 82.0.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/text-decoration-thickness.html
         Near-match: only 7106 pixel(s) differ (0.90%), avg Δ 111.5.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-over-transition.html
+        Near-match: only 7093 pixel(s) differ (0.90%), avg Δ 73.8.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-digits-001-manual.html
         Near-match: only 7083 pixel(s) differ (0.90%), avg Δ 93.7.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-digits-002-manual.html
         Near-match: only 7083 pixel(s) differ (0.90%), avg Δ 93.7.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-over-transition.html
-        Near-match: only 7077 pixel(s) differ (0.90%), avg Δ 78.7.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/all-initial-csstext.html
         Near-match: only 7069 pixel(s) differ (0.90%), avg Δ 46.1.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-child-of-classname-002.html
@@ -3879,6 +3910,8 @@ PixelMismatch Sub-Categories:
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-child-of-attribute.html
         Near-match: only 6935 pixel(s) differ (0.88%), avg Δ 84.5.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-appearance-none-vertical-lr.optional.html
+        Near-match: only 6928 pixel(s) differ (0.88%), avg Δ 72.9.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/select-appearance-none-vertical-rl.optional.html
         Near-match: only 6928 pixel(s) differ (0.88%), avg Δ 72.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/writing-mode-vlr-001-manual.html
         Near-match: only 6872 pixel(s) differ (0.87%), avg Δ 84.1.
@@ -4030,6 +4063,8 @@ PixelMismatch Sub-Categories:
         Near-match: only 5676 pixel(s) differ (0.72%), avg Δ 72.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-scroll-vw-001.html
         Near-match: only 5676 pixel(s) differ (0.72%), avg Δ 72.2.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-scroll-vw-002.html
+        Near-match: only 5676 pixel(s) differ (0.72%), avg Δ 72.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-scroll-vw-003.html
         Near-match: only 5676 pixel(s) differ (0.72%), avg Δ 72.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-isolate-007.html
@@ -4044,14 +4079,6 @@ PixelMismatch Sub-Categories:
         Near-match: only 5631 pixel(s) differ (0.72%), avg Δ 90.8.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/bidi-unset-007.html
         Near-match: only 5631 pixel(s) differ (0.72%), avg Δ 90.8.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-15.html
-        Near-match: only 5622 pixel(s) differ (0.71%), avg Δ 173.1.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-16.html
-        Near-match: only 5622 pixel(s) differ (0.71%), avg Δ 173.1.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-17.html
-        Near-match: only 5622 pixel(s) differ (0.71%), avg Δ 173.1.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-18.html
-        Near-match: only 5622 pixel(s) differ (0.71%), avg Δ 173.1.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/textarea-appearance-none-vrl.optional.html
         Near-match: only 5572 pixel(s) differ (0.71%), avg Δ 84.0.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-orientation-020.html
@@ -4106,6 +4133,8 @@ PixelMismatch Sub-Categories:
         Near-match: only 5339 pixel(s) differ (0.68%), avg Δ 83.6.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/progress-appearance-native-horizontal-rtl.optional.html
         Near-match: only 5338 pixel(s) differ (0.68%), avg Δ 79.8.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/textarea-appearance-native-horizontal.optional.html
+        Near-match: only 5335 pixel(s) differ (0.68%), avg Δ 83.6.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/text-combine-upright-break-inside-001a.html
         Near-match: only 5332 pixel(s) differ (0.68%), avg Δ 82.8.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/color-input-appearance-native-horizontal.optional.html
@@ -4208,8 +4237,6 @@ PixelMismatch Sub-Categories:
         Near-match: only 4937 pixel(s) differ (0.63%), avg Δ 81.6.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/fractional-box-with-shadow-new.html
         Near-match: only 4935 pixel(s) differ (0.63%), avg Δ 158.1.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/fractional-box-with-shadow-old.html
-        Near-match: only 4935 pixel(s) differ (0.63%), avg Δ 158.1.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-svg-blur.html
         Near-match: only 4927 pixel(s) differ (0.63%), avg Δ 75.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-object-view-box-overflow-clipped.html
@@ -4230,10 +4257,10 @@ PixelMismatch Sub-Categories:
         Near-match: only 4608 pixel(s) differ (0.59%), avg Δ 135.0.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/remove-hovered-element.html
         Near-match: only 4584 pixel(s) differ (0.58%), avg Δ 76.9.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-36.html
+        Near-match: only 4560 pixel(s) differ (0.58%), avg Δ 85.4.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-37.html
         Near-match: only 4560 pixel(s) differ (0.58%), avg Δ 85.4.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/nested/group-children-sizing.html
-        Near-match: only 4509 pixel(s) differ (0.57%), avg Δ 127.6.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-bounding-client-rect.html
         Near-match: only 4500 pixel(s) differ (0.57%), avg Δ 88.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-extreme-scale.html
@@ -4330,6 +4357,8 @@ PixelMismatch Sub-Categories:
         Near-match: only 4037 pixel(s) differ (0.51%), avg Δ 99.6.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-definition-border-shorthand-serialize.html
         Near-match: only 4032 pixel(s) differ (0.51%), avg Δ 191.2.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-substitution-shadow-properties.html
+        Near-match: only 4029 pixel(s) differ (0.51%), avg Δ 86.1.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/available-size-001.html
         Near-match: only 4028 pixel(s) differ (0.51%), avg Δ 99.8.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/iframe-transition.sub.html
@@ -4338,8 +4367,6 @@ PixelMismatch Sub-Categories:
         Near-match: only 4000 pixel(s) differ (0.51%), avg Δ 191.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/mask-border-width.html
         Near-match: only 4000 pixel(s) differ (0.51%), avg Δ 127.5.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-substitution-shadow-properties.html
-        Near-match: only 3986 pixel(s) differ (0.51%), avg Δ 84.8.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/idlharness.html
         Near-match: only 3980 pixel(s) differ (0.51%), avg Δ 126.8.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-function/filter-function-conic-gradient.html
@@ -4369,9 +4396,7 @@ PixelMismatch Sub-Categories:
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selectors-4/details-open-pseudo-003.html
         Near-match: only 3882 pixel(s) differ (0.49%), avg Δ 76.5.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-transitions-transition-property-all-before-value.html
-        Near-match: only 3869 pixel(s) differ (0.49%), avg Δ 77.8.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-transitions-value-before-transition-property-all.html
-        Near-match: only 3869 pixel(s) differ (0.49%), avg Δ 77.8.
+        Near-match: only 3860 pixel(s) differ (0.49%), avg Δ 56.6.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/astral-bidi/cypriot.html
         Near-match: only 3842 pixel(s) differ (0.49%), avg Δ 86.0.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/progress-appearance-native-computed-style.optional.html
@@ -4381,7 +4406,7 @@ PixelMismatch Sub-Categories:
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-gutter-004.html
         Near-match: only 3822 pixel(s) differ (0.49%), avg Δ 99.1.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-pseudo-element.html
-        Near-match: only 3800 pixel(s) differ (0.48%), avg Δ 75.7.
+        Near-match: only 3804 pixel(s) differ (0.48%), avg Δ 71.5.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/available-size-006.html
         Near-match: only 3778 pixel(s) differ (0.48%), avg Δ 95.6.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/available-size-007.html
@@ -4406,6 +4431,8 @@ PixelMismatch Sub-Categories:
         Near-match: only 3765 pixel(s) differ (0.48%), avg Δ 77.7.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/forms/button-appearance-native-vertical.optional.html
         Near-match: only 3765 pixel(s) differ (0.48%), avg Δ 77.7.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-from-to.html
+        Near-match: only 3735 pixel(s) differ (0.47%), avg Δ 73.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-into-keyframe.html
         Near-match: only 3735 pixel(s) differ (0.47%), avg Δ 73.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-within-keyframe-fallback.html
@@ -4414,8 +4441,8 @@ PixelMismatch Sub-Categories:
         Near-match: only 3735 pixel(s) differ (0.47%), avg Δ 73.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-within-keyframe.html
         Near-match: only 3735 pixel(s) differ (0.47%), avg Δ 73.2.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-from-to.html
-        Near-match: only 3726 pixel(s) differ (0.47%), avg Δ 77.7.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-to-only.html
+        Near-match: only 3721 pixel(s) differ (0.47%), avg Δ 56.0.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/geometry/DOMMatrix-invert-non-invertible.html
         Near-match: only 3718 pixel(s) differ (0.47%), avg Δ 78.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/fractional-translation-from-position.html
@@ -4450,8 +4477,6 @@ PixelMismatch Sub-Categories:
         Near-match: only 3539 pixel(s) differ (0.45%), avg Δ 88.7.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/capture-old-state-error-flag-cleanup.html
         Near-match: only 3535 pixel(s) differ (0.45%), avg Δ 86.3.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-38.html
-        Near-match: only 3529 pixel(s) differ (0.45%), avg Δ 84.8.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/caretRangeFromPoint-textarea-transform.tentative.html
         Near-match: only 3519 pixel(s) differ (0.45%), avg Δ 98.6.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-url-010.html
@@ -4592,6 +4617,14 @@ PixelMismatch Sub-Categories:
         Near-match: only 3200 pixel(s) differ (0.41%), avg Δ 127.5.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/motion/offset-path-ray-009.html
         Near-match: only 3200 pixel(s) differ (0.41%), avg Δ 127.5.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-15.html
+        Near-match: only 3184 pixel(s) differ (0.40%), avg Δ 158.9.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-16.html
+        Near-match: only 3184 pixel(s) differ (0.40%), avg Δ 158.9.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-17.html
+        Near-match: only 3184 pixel(s) differ (0.40%), avg Δ 158.9.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-18.html
+        Near-match: only 3184 pixel(s) differ (0.40%), avg Δ 158.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-animation-substitute-into-keyframe-transform.html
         Near-match: only 3168 pixel(s) differ (0.40%), avg Δ 94.1.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/printing/destination-backslash-crash-print.html
@@ -4622,6 +4655,8 @@ PixelMismatch Sub-Categories:
         Near-match: only 3010 pixel(s) differ (0.38%), avg Δ 102.5.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-inline-block-child.html
         Near-match: only 3000 pixel(s) differ (0.38%), avg Δ 159.2.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-refresh.html
+        Near-match: only 2982 pixel(s) differ (0.38%), avg Δ 53.7.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/i18n/lang-pseudo-class-empty-attribute.xhtml
         Near-match: only 2935 pixel(s) differ (0.37%), avg Δ 82.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/geometry/DOMRect-001.html
@@ -4722,8 +4757,6 @@ PixelMismatch Sub-Categories:
         Near-match: only 2406 pixel(s) differ (0.31%), avg Δ 73.7.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/zoom-iframe-dynamic.html
         Near-match: only 2405 pixel(s) differ (0.31%), avg Δ 53.2.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/wm-propagation-001.html
-        Near-match: only 2392 pixel(s) differ (0.30%), avg Δ 79.0.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selector-read-write-type-change-001.html
         Near-match: only 2379 pixel(s) differ (0.30%), avg Δ 78.3.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selector-required-type-change-001.html
@@ -4832,6 +4865,8 @@ PixelMismatch Sub-Categories:
         Near-match: only 1820 pixel(s) differ (0.23%), avg Δ 29.3.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/invalidation/sheet-going-away-001.html
         Near-match: only 1820 pixel(s) differ (0.23%), avg Δ 29.3.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-60.html
+        Near-match: only 1809 pixel(s) differ (0.23%), avg Δ 83.0.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-anchor-position/position-area-anchor-partially-outside.html
         Near-match: only 1804 pixel(s) differ (0.23%), avg Δ 94.6.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-viewport/zoom/relative-units-from-parent.html
@@ -4853,7 +4888,7 @@ PixelMismatch Sub-Categories:
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selector-placeholder-shown-emptify-placeholder.html
         Near-match: only 1691 pixel(s) differ (0.22%), avg Δ 91.5.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-recalc-with-initial.html
-        Near-match: only 1685 pixel(s) differ (0.21%), avg Δ 78.7.
+        Near-match: only 1683 pixel(s) differ (0.21%), avg Δ 75.4.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/animating-new-content-subset.html
         Near-match: only 1644 pixel(s) differ (0.21%), avg Δ 23.3.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/animating-new-content.html
@@ -4904,13 +4939,13 @@ PixelMismatch Sub-Categories:
         Near-match: only 1475 pixel(s) differ (0.19%), avg Δ 94.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/resources/variable-reference-refresh-iframe.html
         Near-match: only 1468 pixel(s) differ (0.19%), avg Δ 72.8.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-created-element.html
+        Near-match: only 1468 pixel(s) differ (0.19%), avg Δ 73.1.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/insertRule-syntax-error-01.html
         Near-match: only 1468 pixel(s) differ (0.19%), avg Δ 74.0.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/japanese-tag.html
-        Near-match: only 1467 pixel(s) differ (0.19%), avg Δ 47.6.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/old-content-element-writing-modes.html
         Near-match: only 1467 pixel(s) differ (0.19%), avg Δ 47.6.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-created-element.html
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-created-document.html
         Near-match: only 1465 pixel(s) differ (0.19%), avg Δ 76.8.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selectors-attr-many-2.html
         Near-match: only 1463 pixel(s) differ (0.19%), avg Δ 82.2.
@@ -4948,13 +4983,77 @@ PixelMismatch Sub-Categories:
         Near-match: only 1329 pixel(s) differ (0.17%), avg Δ 66.3.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-34.html
         Near-match: only 1329 pixel(s) differ (0.17%), avg Δ 66.3.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-35.html
+        Near-match: only 1329 pixel(s) differ (0.17%), avg Δ 66.3.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-016.html
         Near-match: only 1327 pixel(s) differ (0.17%), avg Δ 61.1.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-14.html
+        Near-match: only 1325 pixel(s) differ (0.17%), avg Δ 71.6.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-53.html
+        Near-match: only 1325 pixel(s) differ (0.17%), avg Δ 71.6.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-54.html
+        Near-match: only 1325 pixel(s) differ (0.17%), avg Δ 71.6.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-55.html
+        Near-match: only 1325 pixel(s) differ (0.17%), avg Δ 71.6.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-15.html
+        Near-match: only 1325 pixel(s) differ (0.17%), avg Δ 71.6.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-01.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-02.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-03.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-04.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-05.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-06.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-09.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-10.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-11.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-13.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-19.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-20.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-22.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-23.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-35.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-40.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-42.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-49.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-invalid-recovery.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-01.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-05.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-07.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-08.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-16.html
         Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-18.html
         Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-20.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-22.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-30.html
+        Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-31.html
         Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-20.html
         Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
@@ -4962,11 +5061,35 @@ PixelMismatch Sub-Categories:
         Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-58.html
         Near-match: only 1324 pixel(s) differ (0.17%), avg Δ 74.4.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-12.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 69.1.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-24.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-29.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-38.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 69.1.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-39.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 69.1.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-45.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 69.1.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-47.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 69.1.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-06.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 69.1.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-10.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-11.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 69.1.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-13.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 69.1.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-14.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 69.1.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-17.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 69.1.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-01.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-02.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-03.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
@@ -4976,15 +5099,11 @@ PixelMismatch Sub-Categories:
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-06.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-07.html
-        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-08.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-09.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-10.html
-        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-11.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-12.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
@@ -5030,6 +5149,10 @@ PixelMismatch Sub-Categories:
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-34.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-35.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-36.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-37.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-38.html
@@ -5039,6 +5162,8 @@ PixelMismatch Sub-Categories:
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-40.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-41.html
+        Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-42.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-43.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
@@ -5086,61 +5211,21 @@ PixelMismatch Sub-Categories:
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-supports-67.html
         Near-match: only 1322 pixel(s) differ (0.17%), avg Δ 74.2.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-01.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-02.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-03.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-04.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-05.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-06.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-07.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-08.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-09.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-10.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-11.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-12.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-19.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-20.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-21.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-22.html
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-25.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-26.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-29.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-30.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-31.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-32.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-33.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-34.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-35.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-36.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-38.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-39.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-40.html
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-37.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-41.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
@@ -5148,15 +5233,9 @@ PixelMismatch Sub-Categories:
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-44.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-45.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-46.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-47.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-48.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-49.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-50.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
@@ -5164,13 +5243,11 @@ PixelMismatch Sub-Categories:
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-52.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-53.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-54.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-55.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-56.html
+        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-57.html
+        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-58.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-declaration-59.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
@@ -5180,47 +5257,31 @@ PixelMismatch Sub-Categories:
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-external-supports-01.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-01.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-02.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-03.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-04.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-05.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-06.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-09.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-11.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-13.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-14.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-15.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-16.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-19.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-20.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-21.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-22.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-23.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-24.html
+        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-25.html
+        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-26.html
+        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-27.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-28.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-29.html
-        Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-31.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-39.html
         Near-match: only 1321 pixel(s) differ (0.17%), avg Δ 77.9.
@@ -5271,6 +5332,8 @@ PixelMismatch Sub-Categories:
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-media-queries.html
         Near-match: only 1216 pixel(s) differ (0.15%), avg Δ 147.0.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-scrollbars-compute.html
+        Near-match: only 1216 pixel(s) differ (0.15%), avg Δ 147.0.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/viewport-units-writing-mode.html
         Near-match: only 1216 pixel(s) differ (0.15%), avg Δ 147.0.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/computed-style-002.html
         Near-match: only 1216 pixel(s) differ (0.15%), avg Δ 76.1.
@@ -5390,13 +5453,13 @@ PixelMismatch Sub-Categories:
         Near-match: only 860 pixel(s) differ (0.11%), avg Δ 75.6.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scrollWidthHeight-overflow-visible-negative-margins.html
         Near-match: only 850 pixel(s) differ (0.11%), avg Δ 159.2.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/table-caption.html
+        Near-match: only 847 pixel(s) differ (0.11%), avg Δ 98.6.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-014.html
         Near-match: only 846 pixel(s) differ (0.11%), avg Δ 91.3.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/focus-visible-015.html
         Near-match: only 842 pixel(s) differ (0.11%), avg Δ 79.8.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-object-fit-none.html
-        Near-match: only 840 pixel(s) differ (0.11%), avg Δ 73.2.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/old-content-object-fit-none.html
         Near-match: only 840 pixel(s) differ (0.11%), avg Δ 73.2.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/floating-first-letter-05d0.html
         Near-match: only 840 pixel(s) differ (0.11%), avg Δ 137.2.
@@ -5420,7 +5483,7 @@ PixelMismatch Sub-Categories:
         Near-match: only 806 pixel(s) differ (0.10%), avg Δ 59.7.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-will-change/will-change-abspos-cb-dynamic-001.html
         Near-match: only 800 pixel(s) differ (0.10%), avg Δ 86.2.
-    [LayoutShift] — 162 failure(s)
+    [LayoutShift] — 165 failure(s)
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-values/vh-calc-support-pct.html
         High avg channel delta (95.8) across 10 row(s) and 1024 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/selector-structural-pseudo-root.html
@@ -5449,8 +5512,6 @@ PixelMismatch Sub-Categories:
         High avg channel delta (95.1) across 100 row(s) and 100 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-backgrounds/background-clip/clip-text-multiline-background-image.html
         High avg channel delta (83.3) across 86 row(s) and 384 column(s); likely a layout or structural change.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/massive-element-left-of-viewport-partially-onscreen-new.html
-        High avg channel delta (108.8) across 11 row(s) and 912 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/massive-element-left-of-viewport-partially-onscreen-old.html
         High avg channel delta (108.8) across 11 row(s) and 912 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/massive-element-right-of-viewport-partially-onscreen-new.html
@@ -5483,8 +5544,6 @@ PixelMismatch Sub-Categories:
         High avg channel delta (95.8) across 11 row(s) and 976 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/scoped/rotation-on-scoped-element.html
         High avg channel delta (115.6) across 83 row(s) and 200 column(s); likely a layout or structural change.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/backdrop-filter-while-promise-pending.html
-        High avg channel delta (97.0) across 34 row(s) and 300 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom/shorthand-serialization.html
         High avg channel delta (94.2) across 23 row(s) and 1008 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filter-hue_rotate-002-test.html
@@ -5513,6 +5572,8 @@ PixelMismatch Sub-Categories:
         High avg channel delta (107.1) across 75 row(s) and 511 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/sizing-orthogonal-percentage-margin-002.html
         High avg channel delta (107.1) across 75 row(s) and 511 column(s); likely a layout or structural change.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/scoped/display-change-during-transition.html
+        High avg channel delta (115.4) across 43 row(s) and 250 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/filtered-inline-is-container.html
         High avg channel delta (111.4) across 100 row(s) and 200 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/new-content-has-scrollbars.html
@@ -5523,6 +5584,8 @@ PixelMismatch Sub-Categories:
         High avg channel delta (111.4) across 100 row(s) and 200 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/flexbox_align-items-stretch-writing-modes.html
         High avg channel delta (93.3) across 45 row(s) and 351 column(s); likely a layout or structural change.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/vars-background-shorthand-001.html
+        High avg channel delta (94.3) across 60 row(s) and 639 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/snapshot-containing-block-static.html
         High avg channel delta (115.0) across 10 row(s) and 1024 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/sizing-orthogonal-percentage-margin-007.html
@@ -5586,6 +5649,20 @@ PixelMismatch Sub-Categories:
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/float-in-htb-in-vrl.html
         High avg channel delta (93.8) across 86 row(s) and 347 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-dynamic-size-001.html
+        High avg channel delta (93.8) across 86 row(s) and 347 column(s); likely a layout or structural change.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-001.html
+        High avg channel delta (93.8) across 86 row(s) and 347 column(s); likely a layout or structural change.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-002.html
+        High avg channel delta (93.8) across 86 row(s) and 347 column(s); likely a layout or structural change.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-003.html
+        High avg channel delta (93.8) across 86 row(s) and 347 column(s); likely a layout or structural change.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-004.html
+        High avg channel delta (93.8) across 86 row(s) and 347 column(s); likely a layout or structural change.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-005.html
+        High avg channel delta (93.8) across 86 row(s) and 347 column(s); likely a layout or structural change.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-006.html
+        High avg channel delta (93.8) across 86 row(s) and 347 column(s); likely a layout or structural change.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-007.html
         High avg channel delta (93.8) across 86 row(s) and 347 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/mediaqueries/aspect-ratio-002.html
         High avg channel delta (93.8) across 86 row(s) and 347 column(s); likely a layout or structural change.
@@ -5651,22 +5728,10 @@ PixelMismatch Sub-Categories:
         High avg channel delta (93.8) across 86 row(s) and 347 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/scope-without-scoping.html
         High avg channel delta (93.8) across 86 row(s) and 347 column(s); likely a layout or structural change.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/abs-pos-vlr-border-001.html
+        High avg channel delta (82.9) across 180 row(s) and 120 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/abs-pos-vlr-padding-001.html
         High avg channel delta (82.9) across 180 row(s) and 120 column(s); likely a layout or structural change.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-001.html
-        High avg channel delta (105.4) across 86 row(s) and 347 column(s); likely a layout or structural change.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-002.html
-        High avg channel delta (105.4) across 86 row(s) and 347 column(s); likely a layout or structural change.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-003.html
-        High avg channel delta (105.4) across 86 row(s) and 347 column(s); likely a layout or structural change.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-004.html
-        High avg channel delta (105.4) across 86 row(s) and 347 column(s); likely a layout or structural change.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-005.html
-        High avg channel delta (105.4) across 86 row(s) and 347 column(s); likely a layout or structural change.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-006.html
-        High avg channel delta (105.4) across 86 row(s) and 347 column(s); likely a layout or structural change.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/orthogonal-root-resize-icb-007.html
-        High avg channel delta (105.4) across 86 row(s) and 347 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/svg-unknown-input-002.html
         High avg channel delta (92.8) across 88 row(s) and 335 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/abs-pos-border-offset-003.html
@@ -5743,11 +5808,17 @@ PixelMismatch Sub-Categories:
         High avg channel delta (110.5) across 216 row(s) and 389 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/selectors/nth-child-of-universal-selector.html
         High avg channel delta (88.6) across 73 row(s) and 347 column(s); likely a layout or structural change.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/css-vars-custom-property-case-sensitive-001.html
+        High avg channel delta (91.8) across 71 row(s) and 347 column(s); likely a layout or structural change.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/css-vars-custom-property-inheritance.html
+        High avg channel delta (92.6) across 70 row(s) and 347 column(s); likely a layout or structural change.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-writing-modes/float-vlr-014.html
         High avg channel delta (91.5) across 69 row(s) and 347 column(s); likely a layout or structural change.
-    [ColorShift] — 58 failure(s)
+    [ColorShift] — 55 failure(s)
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/scrollIntoView-fixed.html
         Moderate avg channel delta (26.8) across 20 row(s); likely a color or blending difference.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-css-wide-keywords.html
+        Moderate avg channel delta (71.7) across 24 row(s); likely a color or blending difference.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/background-image-blur-repaint.html
         Moderate avg channel delta (44.9) across 24 row(s); likely a color or blending difference.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-align/blocks/align-content-block-002.html
@@ -5774,10 +5845,6 @@ PixelMismatch Sub-Categories:
         Moderate avg channel delta (67.0) across 55 row(s); likely a color or blending difference.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-align/blocks/align-content-block-008.html
         Moderate avg channel delta (67.0) across 55 row(s); likely a color or blending difference.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-visited.html
-        Moderate avg channel delta (64.2) across 23 row(s); likely a color or blending difference.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/vars-background-shorthand-001.html
-        Moderate avg channel delta (67.2) across 32 row(s); likely a color or blending difference.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filter-boundary.html
         Moderate avg channel delta (26.3) across 23 row(s); likely a color or blending difference.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/scoped/auto-nesting.html
@@ -5808,12 +5875,12 @@ PixelMismatch Sub-Categories:
         Moderate avg channel delta (78.9) across 31 row(s); likely a color or blending difference.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/remove-filter-repaint.html
         Moderate avg channel delta (60.3) across 36 row(s); likely a color or blending difference.
+      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-view-transitions/reset-state-after-scrolled-view-transition.html
+        Moderate avg channel delta (34.2) across 10 row(s); likely a color or blending difference.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/backdrop-filters-blur-large.html
         Moderate avg channel delta (45.8) across 180 row(s); likely a color or blending difference.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/elementsFromPoint-simple.html
         Moderate avg channel delta (39.7) across 70 row(s); likely a color or blending difference.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/variable-reference-36.html
-        Moderate avg channel delta (39.0) across 10 row(s); likely a color or blending difference.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/css-backdrop-filters-animation-blur.html
         Moderate avg channel delta (42.4) across 85 row(s); likely a color or blending difference.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/svg-relative-urls-002.html
@@ -5828,10 +5895,6 @@ PixelMismatch Sub-Categories:
         Moderate avg channel delta (50.5) across 83 row(s); likely a color or blending difference.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/css-filters-animation-contrast.html
         Moderate avg channel delta (59.4) across 85 row(s); likely a color or blending difference.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/css-vars-custom-property-case-sensitive-001.html
-        Moderate avg channel delta (50.3) across 86 row(s); likely a color or blending difference.
-      • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/css-vars-custom-property-inheritance.html
-        Moderate avg channel delta (50.2) across 86 row(s); likely a color or blending difference.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/css-filters-animation-hue-rotate.html
         Moderate avg channel delta (65.0) across 86 row(s); likely a color or blending difference.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/css-filters-animation-grayscale.html
@@ -5885,7 +5948,7 @@ PixelMismatch Sub-Categories:
         Low avg channel delta (23.5); likely anti-aliasing or sub-pixel rendering differences.
       • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/cssom-view/elementsFromPoint-invalid-cases.html
         Low avg channel delta (13.0); likely anti-aliasing or sub-pixel rendering differences.
-  [Timeout] — 9 failure(s)
+  [Timeout] — 8 failure(s)
     • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-grid/parsing/grid-template-columns-crash.html
       Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-grid/parsing/grid-template-columns-crash.html
     • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-overflow/scroll-markers/column-scroll-marker-007.html
@@ -5902,16 +5965,14 @@ PixelMismatch Sub-Categories:
       Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-tables/height-distribution/percentage-sizing-of-table-cell-children.html
     • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-tables/html5-table-formatting-3.html
       Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-tables/html5-table-formatting-3.html
-    • /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/url-syntax-crash.html
-      Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/url-syntax-crash.html
 
 === Bucket Summary ===
 Top failing directories:
-  382  css/css-writing-modes
+  380  css/css-writing-modes
   241  css/filter-effects
+  198  css/css-variables
   197  css/selectors
-  180  css/css-variables
-  130  css/css-view-transitions
+  126  css/css-view-transitions
 Top skipped directories:
   1038  css/css-flexbox
   802  css/css-ui/compute-kind-widget-generated
@@ -5926,30 +5987,30 @@ Reference-generation priority buckets:
   451  css/css-transforms
 Pass-rate comparison status:
   Hold pass-rate comparisons until these buckets are rerun with generated references for the same subset.
-  Remaining missing-reference skips: 20686
+  Remaining missing-reference skips: 20661
 Deferred feature-gap buckets:
-  382  css/css-writing-modes [MissingContentDominant]
-        MissingContent share: 62.3 %
+  380  css/css-writing-modes [MissingContentDominant]
+        MissingContent share: 62.1 %
   255  css/filter-effects [ExplicitFeatureGap]
   197  css/selectors [MissingContentDominant]
         MissingContent share: 57.4 %
-  172  css/css-view-transitions [ExplicitFeatureGap]
+  167  css/css-view-transitions [ExplicitFeatureGap]
    93  css/motion [MissingContentDominant]
         MissingContent share: 76.3 %
 Mismatch sub-categories:
-  902  MissingContent
-  822  MinorDiff
-  162  LayoutShift
-   58  ColorShift
+  906  MissingContent
+  839  MinorDiff
+  165  LayoutShift
+   55  ColorShift
    11  SubpixelAntiAliasing
 Lowest-match failures:
     0.0%  css/css-values/vh-calc-support-pct.html
     0.0%  css/css-view-transitions/iframe-and-main-frame-transition-new-main-new-iframe.html
     0.0%  css/css-view-transitions/iframe-and-main-frame-transition-new-main-old-iframe.html
     0.0%  css/css-view-transitions/iframe-and-main-frame-transition-old-main-new-iframe.html
-    0.0%  css/css-view-transitions/iframe-and-main-frame-transition-old-main.html
+    0.0%  css/css-view-transitions/iframe-and-main-frame-transition-old-main-old-iframe.html
 Skip reasons:
-  20686  MissingReferenceImage
+  20661  MissingReferenceImage
     8  UnsupportedMediaPlayback
 
 JSON report written to: /home/runner/work/Broiler/Broiler/tests/wpt-results/wpt-results.json
