@@ -511,6 +511,44 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_SvgPresentationColors_RgbAndRgba_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    svg { display: block; }
+  </style>
+</head>
+<body>
+  <svg width=""32"" height=""32"" viewBox=""0 0 32 32"">
+    <rect x=""4"" y=""4"" width=""24"" height=""24"" fill=""rgb(0, 128, 0)"" stroke=""rgba(0, 0, 255, 1)"" stroke-width=""4"" />
+  </svg>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    svg { display: block; }
+  </style>
+</head>
+<body>
+  <svg width=""32"" height=""32"" viewBox=""0 0 32 32"">
+    <rect x=""4"" y=""4"" width=""24"" height=""24"" fill=""#008000"" stroke=""blue"" stroke-width=""4"" />
+  </svg>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "svg-rgb-rgba-presentation-colors", 40, 40);
+        Assert.True(result.Passed,
+            $"SVG rgb()/rgba() presentation colors should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
