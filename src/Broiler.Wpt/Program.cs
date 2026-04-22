@@ -406,10 +406,7 @@ public class Program
     {
         selectionKind = RerunSelectionKind.Failures;
         if (value.Equals("failures", StringComparison.OrdinalIgnoreCase))
-        {
-            selectionKind = RerunSelectionKind.Failures;
             return true;
-        }
 
         if (value.Equals("timeouts", StringComparison.OrdinalIgnoreCase))
         {
@@ -558,8 +555,7 @@ public class Program
         var missingReferenceSkips = GetSkippedResults(skippedResults, SkipReason.MissingReferenceImage);
         var deferredFeatureBuckets = GetDeferredFeatureBuckets(failures, wptPath);
         var referenceCoverageStatus = GetReferenceCoverageStatus(missingReferenceSkips, wptPath);
-        var timeoutFailures = GetTimeoutFailures(failures, wptPath);
-        var timeoutSubsetCommands = GetSubsetCommandBuckets(timeoutFailures.Select(failure => failure.Directory));
+        var timeoutSummary = GetTimeoutSummary(failures, wptPath);
 
         var report = new Dictionary<string, object?>
         {
@@ -614,10 +610,10 @@ public class Program
                     .Select(bucket => bucket.ToJsonObject())
                     .ToList(),
                 ["referenceCoverage"] = referenceCoverageStatus.ToJsonObject(),
-                ["timeoutFailures"] = timeoutFailures
+                ["timeoutFailures"] = timeoutSummary.Failures
                     .Select(failure => failure.ToJsonObject())
                     .ToList(),
-                ["timeoutSubsetCommands"] = timeoutSubsetCommands
+                ["timeoutSubsetCommands"] = timeoutSummary.SubsetCommands
                     .Select(bucket => new Dictionary<string, object?>
                     {
                         ["directory"] = bucket.Key,
@@ -658,8 +654,7 @@ public class Program
         var topSkippedDirectories = GetDirectoryBuckets(skippedResults, wptPath);
         var deferredFeatureBuckets = GetDeferredFeatureBuckets(failures, wptPath);
         var referenceCoverageStatus = GetReferenceCoverageStatus(missingReferenceSkips, wptPath);
-        var timeoutFailures = GetTimeoutFailures(failures, wptPath);
-        var timeoutSubsetCommands = GetSubsetCommandBuckets(timeoutFailures.Select(failure => failure.Directory));
+        var timeoutSummary = GetTimeoutSummary(failures, wptPath);
         var nonPixelFailures = failures
             .Where(r => r.Category != FailureCategory.PixelMismatch)
             .OrderBy(r => r.TestPath, StringComparer.Ordinal)
@@ -688,7 +683,7 @@ public class Program
         WriteBucketSection(writer, "Top skipped buckets", topSkippedDirectories);
         WriteReferenceCoverageSection(writer, referenceCoverageStatus);
         WriteDeferredFeatureBucketSection(writer, deferredFeatureBuckets);
-        WriteTimeoutSection(writer, timeoutFailures, timeoutSubsetCommands);
+        WriteTimeoutSection(writer, timeoutSummary.Failures, timeoutSummary.SubsetCommands);
         writer.WriteLine();
         writer.WriteLine("## Non-pixel / exception failures");
         writer.WriteLine();
@@ -850,17 +845,16 @@ public class Program
 
     private static void PrintTimeoutSummary(IEnumerable<WptTestResult> failures, string wptPath)
     {
-        var timeoutFailures = GetTimeoutFailures(failures, wptPath);
-        var timeoutSubsetCommands = GetSubsetCommandBuckets(timeoutFailures.Select(failure => failure.Directory));
+        var timeoutSummary = GetTimeoutSummary(failures, wptPath);
 
         Console.WriteLine("Timeout failures:");
-        if (timeoutFailures.Count == 0)
+        if (timeoutSummary.Failures.Count == 0)
         {
             Console.WriteLine("  (none)");
         }
         else
         {
-            foreach (var failure in timeoutFailures)
+            foreach (var failure in timeoutSummary.Failures)
             {
                 Console.WriteLine($"  • {failure.RelativePath}");
                 if (!string.IsNullOrWhiteSpace(failure.Message))
@@ -869,13 +863,13 @@ public class Program
         }
 
         Console.WriteLine("Timeout subset commands:");
-        if (timeoutSubsetCommands.Count == 0)
+        if (timeoutSummary.SubsetCommands.Count == 0)
         {
             Console.WriteLine("  (none)");
         }
         else
         {
-            foreach (var bucket in timeoutSubsetCommands)
+            foreach (var bucket in timeoutSummary.SubsetCommands)
                 Console.WriteLine($"  {bucket.Value,3}  {FormatSubsetCommand(bucket.Key)}");
         }
     }
@@ -908,6 +902,13 @@ public class Program
             })
             .OrderBy(result => result.RelativePath, StringComparer.Ordinal)
             .ToList();
+
+    private static TimeoutSummary GetTimeoutSummary(IEnumerable<WptTestResult> failures, string wptPath)
+    {
+        var timeoutFailures = GetTimeoutFailures(failures, wptPath);
+        var timeoutSubsetCommands = GetSubsetCommandBuckets(timeoutFailures.Select(failure => failure.Directory));
+        return new TimeoutSummary(timeoutFailures, timeoutSubsetCommands);
+    }
 
     private static List<KeyValuePair<string, int>> GetSubsetCommandBuckets(IEnumerable<string> directories) =>
         directories
@@ -1137,6 +1138,10 @@ public class Program
             ["message"] = Message,
         };
     }
+
+    private sealed record TimeoutSummary(
+        IReadOnlyCollection<TimeoutFailure> Failures,
+        IReadOnlyCollection<KeyValuePair<string, int>> SubsetCommands);
 
     private static void WriteTimeoutSection(
         StreamWriter writer,
