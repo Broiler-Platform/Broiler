@@ -672,6 +672,53 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_WritingModes_RangeInput_ZeroInlineSize_Horizontal_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    .wrapper {
+      display: flex;
+    }
+    .probe {
+      display: inline-flex;
+      background: red;
+    }
+    input[type=range] {
+      visibility: hidden;
+      inline-size: 0;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class=""wrapper""><span class=""probe""><input type=""range""></span></div>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    .wrapper {
+      display: flex;
+    }
+    input[type=range] {
+      visibility: hidden;
+      margin: 0;
+    }
+  </style>
+</head>
+<body><div class=""wrapper""><span></span><input type=""range""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "writing-modes-range-zero-inline-size-horizontal", 220, 80);
+        Assert.True(result.Passed,
+            $"Horizontal range input inline-size:0 should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>

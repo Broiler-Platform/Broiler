@@ -128,6 +128,7 @@ public sealed partial class DomBridge
         "visibility",
         "white-space",
         "word-spacing",
+        "writing-mode",
     };
 
     private sealed class CustomPropertyRegistration
@@ -672,6 +673,8 @@ public sealed partial class DomBridge
             // numeric weight from getComputedStyle().
             ResolveFontWeightKeywords(computed, element);
 
+            ApplyInheritedProperties(computed, element);
+
             // Populate CSS initial values for properties not set by any rule.
             // Real browsers return computed values for ALL CSS properties.
             foreach (var kv in CssInitialValues)
@@ -733,6 +736,25 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         return obj;
+    }
+
+    private void ApplyInheritedProperties(Dictionary<string, string> computed, DomElement element)
+    {
+        if (element.Parent == null)
+            return;
+
+        var parentProps = GetComputedProps(element.Parent);
+        foreach (var property in CssInheritedProperties)
+        {
+            if (computed.ContainsKey(property))
+                continue;
+
+            if (parentProps.TryGetValue(property, out var inheritedValue) &&
+                !string.IsNullOrWhiteSpace(inheritedValue))
+            {
+                computed[property] = inheritedValue;
+            }
+        }
     }
 
     private void ApplyPseudoElementRules(
@@ -822,8 +844,7 @@ public sealed partial class DomBridge
             return;
 
         string writingMode = computed.GetValueOrDefault("writing-mode") ?? "horizontal-tb";
-        bool vertical = string.Equals(writingMode, "vertical-rl", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(writingMode, "vertical-lr", StringComparison.OrdinalIgnoreCase);
+        bool vertical = IsVerticalWritingMode(writingMode);
 
         double logicalInlineSize = 60;
         double logicalBlockSize = 20;
@@ -877,34 +898,53 @@ public sealed partial class DomBridge
         double physicalWidth = vertical ? logicalBlockSize : logicalInlineSize;
         double physicalHeight = vertical ? logicalInlineSize : logicalBlockSize;
 
-        if (!HasExplicitPixelSize(computed, "width") && physicalWidth > 0)
+        if (!HasExplicitPhysicalOrLogicalSize(computed, "width", vertical ? "block-size" : "inline-size") && physicalWidth > 0)
             computed["width"] = FormatPx(physicalWidth);
-        if (!HasExplicitPixelSize(computed, "height") && physicalHeight > 0)
+        if (!HasExplicitPhysicalOrLogicalSize(computed, "height", vertical ? "inline-size" : "block-size") && physicalHeight > 0)
             computed["height"] = FormatPx(physicalHeight);
     }
 
     private static void ApplyLogicalSizeAliases(Dictionary<string, string> computed)
     {
         string writingMode = computed.GetValueOrDefault("writing-mode") ?? "horizontal-tb";
-        bool vertical = string.Equals(writingMode, "vertical-rl", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(writingMode, "vertical-lr", StringComparison.OrdinalIgnoreCase);
+        bool vertical = IsVerticalWritingMode(writingMode);
 
         string width = computed.GetValueOrDefault("width") ?? "auto";
         string height = computed.GetValueOrDefault("height") ?? "auto";
+        string inlineSize = computed.GetValueOrDefault("inline-size") ?? "auto";
+        string blockSize = computed.GetValueOrDefault("block-size") ?? "auto";
 
-        computed["block-size"] = vertical ? width : height;
-        computed["inline-size"] = vertical ? height : width;
+        if (!HasExplicitSpecifiedSize(width))
+            width = vertical
+                ? (HasExplicitSpecifiedSize(blockSize) ? blockSize : width)
+                : (HasExplicitSpecifiedSize(inlineSize) ? inlineSize : width);
+
+        if (!HasExplicitSpecifiedSize(height))
+            height = vertical
+                ? (HasExplicitSpecifiedSize(inlineSize) ? inlineSize : height)
+                : (HasExplicitSpecifiedSize(blockSize) ? blockSize : height);
+
+        computed["width"] = width;
+        computed["height"] = height;
+        computed["block-size"] = HasExplicitSpecifiedSize(blockSize) ? blockSize : (vertical ? width : height);
+        computed["inline-size"] = HasExplicitSpecifiedSize(inlineSize) ? inlineSize : (vertical ? height : width);
     }
 
-    private static bool HasExplicitPixelSize(Dictionary<string, string> computed, string property)
-    {
-        if (!computed.TryGetValue(property, out var value))
-            return false;
+    private static bool HasExplicitPhysicalOrLogicalSize(Dictionary<string, string> computed, string physicalProperty, string logicalProperty) =>
+        HasExplicitSpecifiedSize(computed.GetValueOrDefault(physicalProperty)) ||
+        HasExplicitSpecifiedSize(computed.GetValueOrDefault(logicalProperty));
 
+    private static bool IsVerticalWritingMode(string? writingMode)
+    {
+        var normalized = writingMode?.Trim().ToLowerInvariant();
+        return normalized is "vertical-rl" or "vertical-lr" or "sideways-rl" or "sideways-lr";
+    }
+
+    private static bool HasExplicitSpecifiedSize(string? value)
+    {
         value = value?.Trim() ?? string.Empty;
         return value.Length > 0 &&
-               !string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase) &&
-               TryParsePx(value).HasValue;
+               !string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase);
     }
 
     private string GetStyleElementCssText(DomElement styleEl)

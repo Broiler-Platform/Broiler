@@ -55,6 +55,7 @@ internal static class CssDefaults
         input[type=""checkbox""],
         input[type=""radio""] { min-width: 13px; width: 13px; height: 13px;
                           padding: 0; }
+        input[type=""range""] { min-width: 0; height: auto; padding: 0; border: none; }
         input[type=""submit""],
         input[type=""button""],
         input[type=""reset""] { min-width: 0; padding: 1px 6px;

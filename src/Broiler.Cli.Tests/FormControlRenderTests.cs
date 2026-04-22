@@ -261,4 +261,38 @@ document.getElementById('result').textContent = [
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true,true", result);
     }
+
+    [Fact]
+    public void RangeInput_InlineSizeZero_Uses_Final_WritingMode()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div><input type='range' id='range-h' style='inline-size:0; margin:0'></div>
+<div style='writing-mode: vertical-lr'><input type='range' id='range-v' style='inline-size:0; margin:0'></div>
+<div style='writing-mode: sideways-rl'><input type='range' id='range-s' style='inline-size:0; margin:0'></div>
+<div id='result'></div>
+<script>
+function summarize(id) {
+  const cs = window.getComputedStyle(document.getElementById(id));
+  return [
+    cs.getPropertyValue('width'),
+    cs.getPropertyValue('height'),
+    cs.getPropertyValue('inline-size'),
+    cs.getPropertyValue('block-size')
+  ].join('|');
+}
+document.getElementById('result').textContent = [
+  'h=' + summarize('range-h'),
+  'v=' + summarize('range-v'),
+  's=' + summarize('range-s')
+].join(';');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("h=0|16px|0|16px", result);
+        Assert.Contains("v=16px|0|0|16px", result);
+        Assert.Contains("s=16px|0|0|16px", result);
+    }
 }

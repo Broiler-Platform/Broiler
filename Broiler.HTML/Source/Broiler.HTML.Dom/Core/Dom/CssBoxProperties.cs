@@ -38,6 +38,11 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     private string _paddingRight = "0";
     private string _paddingTop = "0";
     private string _right = "auto";
+    private string _width = "auto";
+    private string _height = "auto";
+    private string _inlineSize = "auto";
+    private string _blockSize = "auto";
+    private string _writingMode = "horizontal-tb";
     private string _backgroundColor = "transparent";
     private string _backgroundImage = "none";
     private string _backgroundClip = "border-box";
@@ -342,12 +347,48 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         set { _bottom = value; }
     }
 
-    public string Width { get; set; } = "auto";
+    public string Width
+    {
+        get => ResolvePhysicalSize(_width, isWidth: true);
+        set
+        {
+            _width = value;
+            _actualWidth = double.NaN;
+        }
+    }
     public string MaxWidth { get; set; } = "none";
     public string MinWidth { get; set; } = "0";
-    public string Height { get; set; } = "auto";
+    public string Height
+    {
+        get => ResolvePhysicalSize(_height, isWidth: false);
+        set
+        {
+            _height = value;
+            _actualHeight = double.NaN;
+        }
+    }
     public string MaxHeight { get; set; } = "none";
     public string MinHeight { get; set; } = "0";
+    public string InlineSize
+    {
+        get => _inlineSize;
+        set
+        {
+            _inlineSize = value;
+            _actualWidth = double.NaN;
+            _actualHeight = double.NaN;
+        }
+    }
+    public string BlockSize
+    {
+        get => _blockSize;
+        set
+        {
+            _blockSize = value;
+            _actualWidth = double.NaN;
+            _actualHeight = double.NaN;
+        }
+    }
     public string BackgroundColor
     {
         get => ResolveCssVariables(_backgroundColor);
@@ -499,7 +540,16 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     public string AlignContent { get; set; } = "normal";
     public string JustifySelf { get; set; } = "auto";
     public string AlignSelf { get; set; } = "auto";
-    public string WritingMode { get; set; } = "horizontal-tb";
+    public string WritingMode
+    {
+        get => _writingMode;
+        set
+        {
+            _writingMode = value;
+            _actualWidth = double.NaN;
+            _actualHeight = double.NaN;
+        }
+    }
     public string ColumnCount { get; set; } = "auto";
     public string ColumnWidth { get; set; } = "auto";
     public string ColumnFill { get; set; } = "balance";
@@ -949,6 +999,29 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
             return _actualTextDecorationColor;
         }
+    }
+
+    private string ResolvePhysicalSize(string explicitPhysicalValue, bool isWidth)
+    {
+        if (HasExplicitSize(explicitPhysicalValue))
+            return explicitPhysicalValue;
+
+        bool vertical = IsVerticalWritingMode(WritingMode);
+        var logicalValue = isWidth
+            ? (vertical ? BlockSize : InlineSize)
+            : (vertical ? InlineSize : BlockSize);
+
+        return HasExplicitSize(logicalValue) ? logicalValue : explicitPhysicalValue;
+    }
+
+    private static bool HasExplicitSize(string? value) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        !value.Equals("auto", StringComparison.OrdinalIgnoreCase);
+
+    internal static bool IsVerticalWritingMode(string? writingMode)
+    {
+        var normalized = writingMode?.Trim().ToLowerInvariant();
+        return normalized is "vertical-rl" or "vertical-lr" or "sideways-rl" or "sideways-lr";
     }
 
     private double ParseCornerRadius(string radius)
@@ -1477,7 +1550,9 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         _cornerRadius = p._cornerRadius;
         Display = p.Display;
         Float = p.Float;
+        BlockSize = p.BlockSize;
         Height = p.Height;
+        InlineSize = p.InlineSize;
         MarginBottom = p.MarginBottom;
         MarginLeft = p.MarginLeft;
         MarginRight = p.MarginRight;
