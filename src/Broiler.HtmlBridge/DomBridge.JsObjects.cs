@@ -2349,8 +2349,8 @@ public sealed partial class DomBridge
                 (KeyString)"scrollIntoView",
                 new JSFunction((in Arguments a) =>
                 {
-                    var (_, _, behavior) = bridgeForOffset.GetScrollArguments(a);
-                    bridgeForOffset.ScrollElementIntoView(elForOffset, behavior);
+                    var options = bridgeForOffset.GetScrollIntoViewOptions(a);
+                    bridgeForOffset.ScrollElementIntoView(elForOffset, options.Block, options.Inline, options.Behavior);
                     return JSUndefined.Value;
                 }, "scrollIntoView", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -3055,7 +3055,11 @@ public sealed partial class DomBridge
              + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-bottom-width"), element);
     }
 
-    private void ScrollElementIntoView(DomElement element, string? behavior = null)
+    private void ScrollElementIntoView(
+        DomElement element,
+        string? block = null,
+        string? inline = null,
+        string? behavior = null)
     {
         var current = element;
         for (var i = 0; i < MaxScrollContinuationDepth && current != null; i++)
@@ -3070,12 +3074,8 @@ public sealed partial class DomBridge
                 continue;
             }
 
-            var scrollTop = ComputeOffsetWithinAncestor(element, scrollContainer, vertical: true)
-                - ResolveScrollIntoViewInset(element, "scroll-margin-top")
-                - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-top");
-            var scrollLeft = ComputeOffsetWithinAncestor(element, scrollContainer, vertical: false)
-                - ResolveScrollIntoViewInset(element, "scroll-margin-left")
-                - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-left");
+            var scrollTop = ResolveScrollIntoViewOffset(element, scrollContainer, vertical: true, alignment: block);
+            var scrollLeft = ResolveScrollIntoViewOffset(element, scrollContainer, vertical: false, alignment: inline);
 
             SetElementScrollOffsetsWithBehavior(scrollContainer, scrollLeft, scrollTop, clamp: false, behavior: behavior);
 
@@ -3085,6 +3085,33 @@ public sealed partial class DomBridge
 
             current = next;
         }
+    }
+
+    private (string Block, string Inline, string? Behavior) GetScrollIntoViewOptions(in Arguments args)
+    {
+        const string defaultBlock = "start";
+        const string defaultInline = "start";
+
+        if (args.Length == 0)
+            return (defaultBlock, defaultInline, null);
+
+        var first = args[0];
+        if (first is JSObject options)
+        {
+            return (
+                NormalizeScrollIntoViewAlignment(GetOptionalStringOption(options, "block"), defaultBlock),
+                NormalizeScrollIntoViewAlignment(GetOptionalStringOption(options, "inline"), defaultInline),
+                GetOptionalScrollBehavior(options));
+        }
+
+        if (first.IsBoolean)
+        {
+            return first.BooleanValue
+                ? (defaultBlock, defaultInline, null)
+                : ("end", defaultInline, null);
+        }
+
+        return (defaultBlock, defaultInline, null);
     }
 
     private (double? Left, double? Top, string? Behavior) GetScrollArguments(in Arguments args)
@@ -3117,6 +3144,27 @@ public sealed partial class DomBridge
 
         var behavior = value.ToString();
         return string.IsNullOrWhiteSpace(behavior) ? null : behavior;
+    }
+
+    private static string? GetOptionalStringOption(JSObject options, string propertyName)
+    {
+        var value = options[(KeyString)propertyName];
+        if (value == null || value.IsUndefined || value.IsNull)
+            return null;
+
+        var text = value.ToString();
+        return string.IsNullOrWhiteSpace(text) ? null : text;
+    }
+
+    private static string NormalizeScrollIntoViewAlignment(string? value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return fallback;
+
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized is "start" or "center" or "end" or "nearest"
+            ? normalized
+            : fallback;
     }
 
     private double GetElementScrollOffset(DomElement element, bool vertical)
@@ -3449,6 +3497,57 @@ public sealed partial class DomBridge
         }
 
         return offset;
+    }
+
+    private double ResolveScrollIntoViewOffset(
+        DomElement element,
+        DomElement scrollContainer,
+        bool vertical,
+        string? alignment)
+    {
+        var normalizedAlignment = NormalizeScrollIntoViewAlignment(alignment, "start");
+        var offset = ComputeOffsetWithinAncestor(element, scrollContainer, vertical);
+        var targetSize = vertical ? GetBorderBoxHeight(GetComputedProps(element), element) : GetBorderBoxWidth(GetComputedProps(element), element);
+        var marginStart = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-top" : "scroll-margin-left");
+        var marginEnd = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-bottom" : "scroll-margin-right");
+        var paddingStart = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-top" : "scroll-padding-left");
+        var paddingEnd = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-bottom" : "scroll-padding-right");
+        var viewportSize = vertical
+            ? GetClientHeightForDomElement(scrollContainer, IsDocumentElement(scrollContainer))
+            : GetClientWidthForDomElement(scrollContainer, IsDocumentElement(scrollContainer));
+        var currentScroll = GetElementScrollOffset(scrollContainer, vertical);
+
+        var startTarget = offset - marginStart - paddingStart;
+        var endTarget = offset + targetSize + marginEnd + paddingEnd - viewportSize;
+        if (normalizedAlignment == "start")
+            return startTarget;
+        if (normalizedAlignment == "end")
+            return endTarget;
+
+        var alignmentViewportSize = Math.Max(0, viewportSize - paddingStart - paddingEnd);
+        if (normalizedAlignment == "center")
+        {
+            var targetCenter = offset + ((targetSize + marginEnd - marginStart) / 2.0);
+            return targetCenter - paddingStart - (alignmentViewportSize / 2.0);
+        }
+
+        var visibleStart = currentScroll + paddingStart;
+        var visibleEnd = currentScroll + viewportSize - paddingEnd;
+        var targetStart = offset - marginStart;
+        var targetEnd = offset + targetSize + marginEnd;
+
+        if (targetStart >= visibleStart && targetEnd <= visibleEnd)
+            return currentScroll;
+
+        if (targetSize + marginStart + marginEnd > alignmentViewportSize)
+            return Math.Abs(startTarget - currentScroll) <= Math.Abs(endTarget - currentScroll) ? startTarget : endTarget;
+
+        if (targetStart < visibleStart)
+            return startTarget;
+        if (targetEnd > visibleEnd)
+            return endTarget;
+
+        return currentScroll;
     }
 
     private double ResolveScrollIntoViewInset(DomElement element, string propertyName)

@@ -1649,6 +1649,106 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssViewport_ZoomScrollIntoViewAlignmentOptions_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 140px;
+      height: 120px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 600px;
+      height: 600px;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      top: 240px;
+      left: 300px;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <div class=""container"" style=""zoom: 2;"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <script>
+    for (const match of document.querySelectorAll('.target')) {
+      match.scrollIntoView({ block: 'center', inline: 'end' });
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 140px;
+      height: 120px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 600px;
+      height: 600px;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      top: 240px;
+      left: 300px;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <div class=""container"" style=""zoom: 2;"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <script>
+    document.querySelectorAll('.container')[0].scrollTo(180, 190);
+    document.querySelectorAll('.container')[1].scrollTo(180, 190);
+  </script>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-into-view-alignment-options");
+        Assert.True(result.Passed,
+            $"zoom scrollIntoView alignment options should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollIntoView_DoesNotScrollRootForUnscrollableFixedContainers_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>

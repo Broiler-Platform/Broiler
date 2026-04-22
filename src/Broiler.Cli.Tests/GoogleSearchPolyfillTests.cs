@@ -984,6 +984,81 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
+    public void ScrollIntoView_Honors_Block_And_Inline_Options_In_Raw_Css_Pixels()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function buildContainer(zoom) {
+                var container = document.createElement('div');
+                container.style.position = 'relative';
+                container.style.width = '140px';
+                container.style.height = '120px';
+                container.style.overflow = 'auto';
+                if (zoom) {
+                    container.style.zoom = zoom;
+                }
+
+                var content = document.createElement('div');
+                content.style.width = '600px';
+                content.style.height = '600px';
+
+                var target = document.createElement('div');
+                target.style.position = 'absolute';
+                target.style.left = '300px';
+                target.style.top = '240px';
+                target.style.width = '20px';
+                target.style.height = '20px';
+
+                container.appendChild(content);
+                container.appendChild(target);
+                document.body.appendChild(container);
+                target.scrollIntoView({ block: 'center', inline: 'end' });
+                return container.scrollLeft + ',' + container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                buildContainer('1') + '|' + buildContainer('2');
+        ");
+
+        Assert.Contains("180,190|180,190", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Legacy_False_Aligns_To_Block_End()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var container = document.createElement('div');
+            container.style.position = 'relative';
+            container.style.width = '140px';
+            container.style.height = '120px';
+            container.style.overflow = 'auto';
+
+            var content = document.createElement('div');
+            content.style.width = '200px';
+            content.style.height = '600px';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.left = '20px';
+            target.style.top = '240px';
+            target.style.width = '20px';
+            target.style.height = '20px';
+
+            container.appendChild(content);
+            container.appendChild(target);
+            document.body.appendChild(container);
+            target.scrollIntoView(false);
+
+            document.getElementById('result').textContent =
+                container.scrollLeft + ',' + container.scrollTop;
+        ");
+
+        Assert.Contains("0,140", result);
+    }
+
+    [Fact]
     public void ScrollIntoView_Does_Not_Scroll_Root_For_Targets_Inside_Unscrollable_Fixed_Containers()
     {
         var result = ExecJs(@"
