@@ -4226,6 +4226,7 @@ document.getElementById('out').appendChild(p);
   <p class="sibling" id="toggler">Ignored</p>
   <p class="c">Odd; used to be green, should not be since no sibling</p>
   <p class="c">Even, so should not be green</p>
+  <!-- Intentional duplicate class attribute: HTML keeps the first one. -->
   <p class="c" class="sibling">Odd, but no sibling, so should not be green</p>
   <p class="c">Even, so should not be green</p>
   <p class="sibling">Ignored</p>
@@ -4282,6 +4283,7 @@ document.getElementById('out').appendChild(p);
   <p class="sibling" id="toggler">Ignored</p>
   <p class="c">Odd; used to be green, should not be since no sibling</p>
   <p class="c">Even, so should not be green</p>
+  <!-- Intentional duplicate class attribute: HTML keeps the first one. -->
   <p class="c" class="sibling">Odd, but no sibling, so should not be green</p>
   <p class="c">Even, so should not be green</p>
   <p class="sibling">Ignored</p>

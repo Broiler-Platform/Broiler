@@ -551,6 +551,7 @@ document.getElementById('result').textContent = r.join(',');
   <p class=""sibling"" id=""toggler"">Ignored</p>
   <p class=""c"" id=""first-c"">First .c</p>
   <p class=""c"">Second .c</p>
+  <!-- Intentional duplicate class attribute: HTML keeps the first one. -->
   <p class=""c"" class=""sibling"" id=""duplicate-class"">Third .c but not sibling</p>
   <p class=""c"">Fourth .c</p>
   <p class=""sibling"">Ignored</p>
@@ -577,6 +578,7 @@ document.getElementById('result').textContent = r.join(',');
     {
         var html = @"<!DOCTYPE html>
 <html><body>
+<!-- Intentional duplicate id attribute: HTML keeps the first one. -->
 <div id=""first"" id=""second"">target</div>
 <div id=""result""></div>
 <script>

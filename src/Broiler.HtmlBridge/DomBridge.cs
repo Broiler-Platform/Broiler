@@ -468,8 +468,8 @@ public sealed partial class DomBridge
 
             if (i >= attrs.Length || attrs[i] != '=')
             {
-                if (!string.IsNullOrEmpty(name) && !result.ContainsKey(name))
-                    result[name] = name;
+                if (!string.IsNullOrEmpty(name))
+                    result.TryAdd(name, name);
                 continue;
             }
             i++; // skip '='
@@ -494,8 +494,8 @@ public sealed partial class DomBridge
 
             // HTML parsing keeps the first attribute with a given name and
             // ignores later duplicates on the same start tag.
-            if (!string.IsNullOrEmpty(name) && !result.ContainsKey(name))
-                result[name] = value;
+            if (!string.IsNullOrEmpty(name))
+                result.TryAdd(name, value);
         }
         return result;
     }
