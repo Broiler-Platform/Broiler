@@ -181,7 +181,11 @@ internal static class SvgRenderer
                 && int.TryParse(parts[2].Trim(), out int b)
                 && float.TryParse(parts[3].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float a))
             {
-                return Color.FromArgb((int)(Math.Clamp(a, 0f, 1f) * 255), r, g, b);
+                return Color.FromArgb(
+                    (int)(Math.Clamp(a, 0f, 1f) * 255),
+                    Math.Clamp(r, 0, 255),
+                    Math.Clamp(g, 0, 255),
+                    Math.Clamp(b, 0, 255));
             }
         }
 
@@ -195,7 +199,11 @@ internal static class SvgRenderer
                 && int.TryParse(parts[1].Trim(), out int g)
                 && int.TryParse(parts[2].Trim(), out int b))
             {
-                return Color.FromArgb(255, r, g, b);
+                return Color.FromArgb(
+                    255,
+                    Math.Clamp(r, 0, 255),
+                    Math.Clamp(g, 0, 255),
+                    Math.Clamp(b, 0, 255));
             }
         }
 
