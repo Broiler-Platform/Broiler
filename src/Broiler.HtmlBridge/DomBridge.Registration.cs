@@ -1525,6 +1525,53 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments _) => new JSNumber(vpHeight), "get outerHeight"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty(
+            (KeyString)"scrollX",
+            new JSFunction((in Arguments _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: false)), "get scrollX"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty(
+            (KeyString)"scrollY",
+            new JSFunction((in Arguments _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: true)), "get scrollY"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty(
+            (KeyString)"pageXOffset",
+            new JSFunction((in Arguments _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: false)), "get pageXOffset"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty(
+            (KeyString)"pageYOffset",
+            new JSFunction((in Arguments _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: true)), "get pageYOffset"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddValue(
+            (KeyString)"scroll",
+            new JSFunction((in Arguments a) =>
+            {
+                var (left, top, behavior) = GetScrollArguments(a);
+                SetElementScrollOffsetsWithBehavior(DocumentElement, left, top, clamp: false, behavior: behavior);
+                return JSUndefined.Value;
+            }, "scroll", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue(
+            (KeyString)"scrollTo",
+            new JSFunction((in Arguments a) =>
+            {
+                var (left, top, behavior) = GetScrollArguments(a);
+                SetElementScrollOffsetsWithBehavior(DocumentElement, left, top, clamp: false, behavior: behavior);
+                return JSUndefined.Value;
+            }, "scrollTo", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue(
+            (KeyString)"scrollBy",
+            new JSFunction((in Arguments a) =>
+            {
+                var (left, top, behavior) = GetScrollArguments(a);
+                SetElementScrollOffsetsWithBehavior(DocumentElement, left, top, relative: true, clamp: false, behavior: behavior);
+                return JSUndefined.Value;
+            }, "scrollBy", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
         // window.screen — basic stub for screen dimensions
         var screenObj = new JSObject();
         screenObj.FastAddValue((KeyString)"width", new JSNumber(vpWidth), JSPropertyAttributes.EnumerableConfigurableValue);

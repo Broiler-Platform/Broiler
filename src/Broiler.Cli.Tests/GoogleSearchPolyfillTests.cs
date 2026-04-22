@@ -1059,13 +1059,43 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
+    public void Window_Scroll_APIs_Update_Root_Scroll_Offsets_And_VisualViewport()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.style.width = '2000px';
+            document.body.style.height = '4000px';
+            visualViewport.scale = 2;
+
+            var events = 0;
+            visualViewport.addEventListener('scroll', function() { events++; });
+            window.scrollTo({ left: 40, top: 1000 });
+            window.scrollBy({ left: 10, top: 15 });
+
+            document.getElementById('result').textContent = [
+                window.scrollX,
+                window.scrollY,
+                window.pageXOffset,
+                window.pageYOffset,
+                document.scrollingElement.scrollLeft,
+                document.scrollingElement.scrollTop,
+                visualViewport.pageLeft,
+                visualViewport.pageTop,
+                events
+            ].join('|');
+        ");
+
+        Assert.Contains("50|1015|50|1015|50|1015|50|1015|2", result);
+    }
+
+    [Fact]
     public void VisualViewport_ScrollIntoView_Fixed_Target_Uses_Visual_Page_Offset()
     {
         var result = ExecJs(@"
             document.body.style.margin = '0';
             document.body.style.height = '4000px';
-            document.documentElement.scroll(0, 1000);
             visualViewport.scale = 2;
+            window.scrollTo(0, 1000);
 
             var fixed = document.createElement('div');
             fixed.style.position = 'fixed';
@@ -1092,16 +1122,17 @@ document.getElementById('result').textContent =
             target.scrollIntoView({ behavior: 'instant' });
 
             document.getElementById('result').textContent = [
+                window.scrollY,
                 before,
                 visualViewport.pageTop,
-                document.documentElement.scrollTop,
+                window.pageYOffset,
                 fired,
                 visualViewport.scale,
                 visualViewport.height
             ].join('|');
         ");
 
-        Assert.Contains("1000|1384|1000|true|2|384", result);
+        Assert.Contains("1000|1000|1384|1000|true|2|384", result);
     }
 
     [Fact]

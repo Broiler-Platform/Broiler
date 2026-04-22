@@ -3223,6 +3223,9 @@ public sealed partial class DomBridge
         bool clamp = true,
         string? behavior = null)
     {
+        var trackVisualViewport = IsDocumentElement(element);
+        var previousVisualPageLeft = trackVisualViewport ? GetVisualViewportPageOffset(vertical: false) : 0;
+        var previousVisualPageTop = trackVisualViewport ? GetVisualViewportPageOffset(vertical: true) : 0;
         var (targetLeft, targetTop) = ResolveElementScrollOffsets(element, left, top, relative, clamp);
         var effectiveBehavior = ResolveScrollBehavior(element, behavior);
         CancelSmoothScroll(element);
@@ -3235,6 +3238,7 @@ public sealed partial class DomBridge
             // finishing on the next queued frame.
             element.DomProperties["_scrollLeft"] = currentLeft + ((targetLeft - currentLeft) / 2.0);
             element.DomProperties["_scrollTop"] = currentTop + ((targetTop - currentTop) / 2.0);
+            NotifyVisualViewportScrollIfNeeded(previousVisualPageLeft, previousVisualPageTop, trackVisualViewport);
 
             var token = ++_frameActionIdCounter;
             _smoothScrollTokens[element] = token;
@@ -3242,8 +3246,11 @@ public sealed partial class DomBridge
             {
                 if (_smoothScrollTokens.TryGetValue(element, out var activeToken) && activeToken == token)
                 {
+                    var queuedPreviousVisualPageLeft = trackVisualViewport ? GetVisualViewportPageOffset(vertical: false) : 0;
+                    var queuedPreviousVisualPageTop = trackVisualViewport ? GetVisualViewportPageOffset(vertical: true) : 0;
                     element.DomProperties["_scrollLeft"] = targetLeft;
                     element.DomProperties["_scrollTop"] = targetTop;
+                    NotifyVisualViewportScrollIfNeeded(queuedPreviousVisualPageLeft, queuedPreviousVisualPageTop, trackVisualViewport);
                     _smoothScrollTokens.Remove(element);
                 }
             });
@@ -3252,6 +3259,7 @@ public sealed partial class DomBridge
 
         element.DomProperties["_scrollLeft"] = targetLeft;
         element.DomProperties["_scrollTop"] = targetTop;
+        NotifyVisualViewportScrollIfNeeded(previousVisualPageLeft, previousVisualPageTop, trackVisualViewport);
     }
 
     private void QueueFrameAction(Action callback)
@@ -3405,6 +3413,18 @@ public sealed partial class DomBridge
     }
 
     private static bool AreClose(double left, double right) => Math.Abs(left - right) < 0.0001;
+
+    private void NotifyVisualViewportScrollIfNeeded(double previousPageLeft, double previousPageTop, bool trackVisualViewport)
+    {
+        if (!trackVisualViewport)
+            return;
+
+        if (!AreClose(previousPageLeft, GetVisualViewportPageOffset(vertical: false)) ||
+            !AreClose(previousPageTop, GetVisualViewportPageOffset(vertical: true)))
+        {
+            DispatchVisualViewportScrollEvent();
+        }
+    }
 
     private bool CanProgrammaticallyScroll(DomElement element, bool vertical)
     {

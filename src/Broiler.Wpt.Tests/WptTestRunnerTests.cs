@@ -5438,6 +5438,44 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssomView_WindowScrollApis_Use_RootScrollOffsets_And_Update_VisualViewport()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body style="margin:0;width:2000px;height:4000px;"></body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+
+        var result = ctx.Eval("""
+            (() => {
+                visualViewport.scale = 2;
+                var events = 0;
+                visualViewport.addEventListener('scroll', function () { events++; });
+                window.scrollTo({ left: 40, top: 1000 });
+                window.scrollBy({ left: 10, top: 15 });
+                return [
+                    window.scrollX,
+                    window.scrollY,
+                    window.pageXOffset,
+                    window.pageYOffset,
+                    document.scrollingElement.scrollLeft,
+                    document.scrollingElement.scrollTop,
+                    visualViewport.pageLeft,
+                    visualViewport.pageTop,
+                    events
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("50|1015|50|1015|50|1015|50|1015|2", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_VisualViewport_ScrollIntoView_FixedTarget_Adjusts_PageTop()
     {
         const string html = """
@@ -5458,16 +5496,17 @@ document.getElementById('out').appendChild(p);
 
         var result = ctx.Eval("""
             (() => {
-                document.documentElement.scroll(0, 1000);
                 visualViewport.scale = 2;
+                window.scrollTo(0, 1000);
                 var before = visualViewport.pageTop;
                 var fired = false;
                 visualViewport.addEventListener('scroll', function () { fired = true; });
                 document.getElementById('target').scrollIntoView({ behavior: 'instant' });
                 return [
+                    window.scrollY,
                     before,
                     visualViewport.pageTop,
-                    document.documentElement.scrollTop,
+                    window.pageYOffset,
                     fired,
                     visualViewport.scale,
                     visualViewport.height
@@ -5475,7 +5514,7 @@ document.getElementById('out').appendChild(p);
             })()
             """);
 
-        Assert.Equal("1000|1384|1000|true|2|384", result.ToString());
+        Assert.Equal("1000|1000|1384|1000|true|2|384", result.ToString());
     }
 
     [Fact]
