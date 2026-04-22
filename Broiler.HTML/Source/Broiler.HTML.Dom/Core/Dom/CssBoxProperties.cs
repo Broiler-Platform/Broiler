@@ -15,6 +15,8 @@ namespace Broiler.HTML.Dom.Core.Dom;
 
 internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderData
 {
+    internal const string InvalidCustomPropertySentinel = "\u0000";
+
     #region CSS Fields
 
     private string _borderTopWidth = "medium";
@@ -872,7 +874,12 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
                 {
                     var propertyName = match.Groups[1].Value;
                     if (TryGetCustomPropertyValue(propertyName, out var propertyValue))
+                    {
+                        if (propertyValue == InvalidCustomPropertySentinel)
+                            return match.Groups[2].Success ? match.Groups[2].Value.Trim() : string.Empty;
+
                         return propertyValue;
+                    }
 
                     return match.Groups[2].Success ? match.Groups[2].Value.Trim() : string.Empty;
                 },

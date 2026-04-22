@@ -462,6 +462,55 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssVariables_WideKeywords_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .box {
+      width: 60px;
+      height: 60px;
+      margin: 10px;
+      display: inline-block;
+      background: black;
+    }
+
+    #initial { background: var(--initial-token, hotpink); --initial-token: initial; }
+  </style>
+</head>
+<body>
+  <div id=""initial"" class=""box""></div>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .box {
+      width: 60px;
+      height: 60px;
+      margin: 10px;
+      display: inline-block;
+    }
+
+    #initial { background: hotpink; }
+  </style>
+</head>
+<body>
+  <div id=""initial"" class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-wide-keywords", 120, 100);
+        Assert.True(result.Passed,
+            $"css-variables wide keywords should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
