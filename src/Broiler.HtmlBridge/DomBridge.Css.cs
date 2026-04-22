@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -886,6 +887,7 @@ public sealed partial class DomBridge
             case "select":
                 logicalInlineSize = 60;
                 logicalBlockSize = 19;
+                ApplySelectListBoxSizing(ref logicalInlineSize, ref logicalBlockSize, element);
                 break;
             case "textarea":
                 logicalInlineSize = 170;
@@ -940,6 +942,33 @@ public sealed partial class DomBridge
             return;
 
         logicalBlockSize = 20 * lineCount;
+    }
+
+    private static void ApplySelectListBoxSizing(ref double logicalInlineSize, ref double logicalBlockSize, DomElement element)
+    {
+        int visibleRows = GetSelectVisibleRowCount(element);
+        if (visibleRows <= 1)
+            return;
+
+        const double rowBlockSize = 16;
+        const double chromeBlockSize = 4;
+        logicalInlineSize = Math.Max(logicalInlineSize, 72);
+        logicalBlockSize = (visibleRows * rowBlockSize) + chromeBlockSize;
+    }
+
+    private static bool IsSelectListBox(DomElement element) => GetSelectVisibleRowCount(element) > 1;
+
+    private static int GetSelectVisibleRowCount(DomElement element)
+    {
+        bool isMultiple = element.Attributes.ContainsKey("multiple");
+        if (element.Attributes.TryGetValue("size", out var rawSize) &&
+            int.TryParse(rawSize, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedSize) &&
+            parsedSize > 0)
+        {
+            return parsedSize;
+        }
+
+        return isMultiple ? 4 : 1;
     }
 
     private static int CountRenderedLines(string? rawText)

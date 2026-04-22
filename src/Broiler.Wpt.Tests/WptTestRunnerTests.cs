@@ -786,6 +786,94 @@ document.getElementById('result').setAttribute('style', 'width:40px;height:40px;
     }
 
     [Fact]
+    public void Wpt_WritingModes_SelectSizeScrollingAndSizing_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+<style>
+#listbox {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+}
+</style>
+</head>
+<body>
+<select id=""listbox"" size=""5""></select>
+<div id=""result"" style=""width:40px;height:40px;background:red""></div>
+<script>
+const select = document.getElementById('listbox');
+for (let i = 0; i < 100; i++) {
+  const option = document.createElement('option');
+  option.textContent = 'Option ' + (i + 1);
+  select.appendChild(option);
+}
+function checkMode(writingMode) {
+  select.style.writingMode = writingMode;
+  select.size = 5;
+  select.scrollTop = 0;
+  select.scrollLeft = 0;
+
+  const vertical = writingMode !== 'horizontal-tb';
+  const blockScrollProp = vertical ? 'scrollLeft' : 'scrollTop';
+  const inlineScrollProp = vertical ? 'scrollTop' : 'scrollLeft';
+  const clientBlock = vertical ? select.clientWidth : select.clientHeight;
+  const clientInline = vertical ? select.clientHeight : select.clientWidth;
+  const scrollBlock = vertical ? select.scrollWidth : select.scrollHeight;
+  const scrollInline = vertical ? select.scrollHeight : select.scrollWidth;
+  const reversed = writingMode.endsWith('-rl');
+
+  const baseBlock = clientBlock;
+  const baseInline = clientInline;
+  select.size = 10;
+  const largerBlock = vertical ? select.clientWidth : select.clientHeight;
+  const largerInline = vertical ? select.clientHeight : select.clientWidth;
+  select.size = 8;
+  const smallerBlock = vertical ? select.clientWidth : select.clientHeight;
+  const smallerInline = vertical ? select.clientHeight : select.clientWidth;
+  select.size = 5;
+
+  select[blockScrollProp] = 100;
+  const positive = select[blockScrollProp];
+  select[blockScrollProp] = -100;
+  const negative = select[blockScrollProp];
+  select[inlineScrollProp] = 100;
+  const inlinePositive = select[inlineScrollProp];
+  select[inlineScrollProp] = -100;
+  const inlineNegative = select[inlineScrollProp];
+
+  return scrollBlock > clientBlock &&
+         scrollInline === clientInline &&
+         largerBlock > baseBlock &&
+         largerInline === baseInline &&
+         smallerBlock < largerBlock &&
+         smallerInline === largerInline &&
+         (!reversed ? positive > 0 && negative === 0 : positive === 0 && negative < 0) &&
+         inlinePositive === 0 &&
+         inlineNegative === 0;
+}
+const passed = [
+  checkMode('horizontal-tb'),
+  checkMode('vertical-lr'),
+  checkMode('vertical-rl'),
+  checkMode('sideways-lr'),
+  checkMode('sideways-rl')
+].every(Boolean);
+document.getElementById('result').style.background = passed ? 'green' : 'red';
+</script>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html><body><div id=""result"" style=""width:40px;height:40px;background:green""></div></body></html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "writing-modes-select-size-scrolling", 60, 60);
+        Assert.True(result.Passed,
+            $"Select[size] scrolling and sizing should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>

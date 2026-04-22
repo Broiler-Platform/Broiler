@@ -1065,6 +1065,9 @@ public sealed partial class DomBridge
             }
         }
 
+        ApplyApproximateFormControlComputedSizes(props, element);
+        ApplyLogicalSizeAliases(props);
+
         return props;
     }
 

@@ -1982,6 +1982,33 @@ public sealed partial class DomBridge
                 }, "get selectedIndex"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            obj.FastAddProperty(
+                (KeyString)"size",
+                new JSFunction((in Arguments _) =>
+                {
+                    if (element.Attributes.TryGetValue("size", out var rawSize) &&
+                        int.TryParse(rawSize, out var parsedSize) &&
+                        parsedSize > 0)
+                    {
+                        return new JSNumber(parsedSize);
+                    }
+
+                    return new JSNumber(0);
+                }, "get size"),
+                new JSFunction((in Arguments a) =>
+                {
+                    if (a.Length == 0)
+                        return JSUndefined.Value;
+
+                    var size = (int)Math.Truncate(a[0].DoubleValue);
+                    if (size > 0)
+                        element.Attributes["size"] = size.ToString();
+                    else
+                        element.Attributes.Remove("size");
+                    return JSUndefined.Value;
+                }, "set size"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         // HTMLOptionElement interface
@@ -2772,6 +2799,9 @@ public sealed partial class DomBridge
         if (isRoot)
             return _viewportWidth;
 
+        if (TryGetSelectListBoxScrollExtent(element, verticalAxis: false, out var selectScrollWidth))
+            return selectScrollWidth;
+
         var props = GetComputedProps(element);
         var ownWidth = GetClientWidthForDomElement(element, isRoot: false);
         var ownZoom = GetUsedZoomForElement(element);
@@ -2792,6 +2822,9 @@ public sealed partial class DomBridge
     {
         if (isRoot)
             return _viewportHeight;
+
+        if (TryGetSelectListBoxScrollExtent(element, verticalAxis: true, out var selectScrollHeight))
+            return selectScrollHeight;
 
         var props = GetComputedProps(element);
         var ownHeight = GetClientHeightForDomElement(element, isRoot: false);
@@ -3434,6 +3467,9 @@ public sealed partial class DomBridge
             return CanProgrammaticallyScrollRoot(vertical);
         }
 
+        if (IsSelectListBox(element))
+            return CanProgrammaticallyScrollSelectListBox(element, vertical);
+
         var props = GetComputedProps(element);
         var axisValue = GetOverflowAxisValue(props, vertical);
 
@@ -3486,12 +3522,12 @@ public sealed partial class DomBridge
         var maxTop = Math.Max(0, GetScrollHeightForDomElement(element, isRoot) - GetClientHeightForDomElement(element, isRoot));
 
         var props = GetComputedProps(element);
-        var writingMode = props.GetValueOrDefault("writing-mode");
+        var writingMode = props.GetValueOrDefault("writing-mode")?.Trim().ToLowerInvariant();
         var direction = props.GetValueOrDefault("direction");
         var isRtl = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
-        var isVerticalRl = string.Equals(writingMode, "vertical-rl", StringComparison.OrdinalIgnoreCase);
-        var isVertical = isVerticalRl || string.Equals(writingMode, "vertical-lr", StringComparison.OrdinalIgnoreCase);
-        var usesNegativeLeft = isVerticalRl || (string.Equals(writingMode, "horizontal-tb", StringComparison.OrdinalIgnoreCase) && isRtl);
+        var isVertical = IsVerticalWritingMode(writingMode);
+        var usesNegativeLeft = (isVertical && writingMode?.EndsWith("-rl", StringComparison.Ordinal) == true)
+            || (string.Equals(writingMode, "horizontal-tb", StringComparison.OrdinalIgnoreCase) && isRtl);
         var usesNegativeTop = isVertical && isRtl;
 
         var minLeft = usesNegativeLeft ? -maxLeft : 0;
@@ -3499,6 +3535,62 @@ public sealed partial class DomBridge
         var minTop = usesNegativeTop ? -maxTop : 0;
         var boundedMaxTop = usesNegativeTop ? 0 : maxTop;
         return (minLeft, boundedMaxLeft, minTop, boundedMaxTop);
+    }
+
+    private bool CanProgrammaticallyScrollSelectListBox(DomElement element, bool vertical)
+    {
+        var props = GetComputedProps(element);
+        bool verticalWritingMode = IsVerticalWritingMode(props.GetValueOrDefault("writing-mode"));
+        bool blockAxisIsVertical = !verticalWritingMode;
+        if (vertical != blockAxisIsVertical)
+            return false;
+
+        double clientExtent = vertical ? GetClientHeightForDomElement(element, isRoot: false) : GetClientWidthForDomElement(element, isRoot: false);
+        double scrollExtent = vertical ? GetScrollHeightForDomElement(element, isRoot: false) : GetScrollWidthForDomElement(element, isRoot: false);
+        return scrollExtent > clientExtent + 0.5;
+    }
+
+    private bool TryGetSelectListBoxScrollExtent(DomElement element, bool verticalAxis, out double extent)
+    {
+        if (!IsSelectListBox(element))
+        {
+            extent = 0;
+            return false;
+        }
+
+        var props = GetComputedProps(element);
+        bool verticalWritingMode = IsVerticalWritingMode(props.GetValueOrDefault("writing-mode"));
+        int optionCount = Math.Max(1, CountSelectOptions(element));
+        double rowExtent = Math.Max(16, ResolveLineHeightForElement(element));
+        double clientInlineExtent = verticalWritingMode
+            ? GetClientHeightForDomElement(element, isRoot: false)
+            : GetClientWidthForDomElement(element, isRoot: false);
+        double clientBlockExtent = verticalWritingMode
+            ? GetClientWidthForDomElement(element, isRoot: false)
+            : GetClientHeightForDomElement(element, isRoot: false);
+        double totalBlockExtent = Math.Max(clientBlockExtent, optionCount * rowExtent);
+
+        extent = verticalAxis
+            ? (verticalWritingMode ? clientInlineExtent : totalBlockExtent)
+            : (verticalWritingMode ? totalBlockExtent : clientInlineExtent);
+        return true;
+    }
+
+    private static int CountSelectOptions(DomElement element)
+    {
+        int count = 0;
+        foreach (var child in element.Children.Where(c => !c.IsTextNode))
+        {
+            if (string.Equals(child.TagName, "option", StringComparison.OrdinalIgnoreCase))
+            {
+                count++;
+                continue;
+            }
+
+            count += CountSelectOptions(child);
+        }
+
+        return count;
     }
 
     private DomElement? FindScrollContainer(DomElement element)
