@@ -3393,8 +3393,7 @@ public sealed partial class DomBridge
         while (current.Parent != null && !ReferenceEquals(current.Parent, ancestor))
         {
             offset += ComputeOffsetWithinParent(current, vertical);
-            if (current.Parent != null)
-                offset -= GetElementScrollOffset(current.Parent, vertical);
+            offset -= GetElementScrollOffset(current.Parent, vertical);
             current = current.Parent;
         }
 
