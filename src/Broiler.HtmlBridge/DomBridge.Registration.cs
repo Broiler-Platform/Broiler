@@ -1536,6 +1536,68 @@ public sealed partial class DomBridge
         window.FastAddValue((KeyString)"screen", screenObj, JSPropertyAttributes.EnumerableConfigurableValue);
         context["screen"] = screenObj;
 
+        var visualViewport = new JSObject();
+        _visualViewportJSObject = visualViewport;
+        visualViewport.FastAddProperty(
+            (KeyString)"width",
+            new JSFunction((in Arguments _) => new JSNumber(GetVisualViewportWidth()), "get width"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddProperty(
+            (KeyString)"height",
+            new JSFunction((in Arguments _) => new JSNumber(GetVisualViewportHeight()), "get height"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddProperty(
+            (KeyString)"scale",
+            new JSFunction((in Arguments _) => new JSNumber(GetVisualViewportScale()), "get scale"),
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                    SetVisualViewportScale(a[0].DoubleValue);
+                return JSUndefined.Value;
+            }, "set scale"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddProperty(
+            (KeyString)"pageLeft",
+            new JSFunction((in Arguments _) => new JSNumber(GetVisualViewportPageOffset(vertical: false)), "get pageLeft"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddProperty(
+            (KeyString)"pageTop",
+            new JSFunction((in Arguments _) => new JSNumber(GetVisualViewportPageOffset(vertical: true)), "get pageTop"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddValue(
+            (KeyString)"addEventListener",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 1 &&
+                    a[0].ToString().Equals("scroll", StringComparison.OrdinalIgnoreCase) &&
+                    a[1] is JSFunction listener &&
+                    !_visualViewportScrollListeners.Contains(listener))
+                {
+                    _visualViewportScrollListeners.Add(listener);
+                }
+                return JSUndefined.Value;
+            }, "addEventListener", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        visualViewport.FastAddValue(
+            (KeyString)"removeEventListener",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 1 &&
+                    a[0].ToString().Equals("scroll", StringComparison.OrdinalIgnoreCase) &&
+                    a[1] is JSFunction listener)
+                {
+                    _visualViewportScrollListeners.Remove(listener);
+                }
+                return JSUndefined.Value;
+            }, "removeEventListener", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"visualViewport", visualViewport, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["visualViewport"] = visualViewport;
+
         // ---------------------------------------------------------------
         //  Google Search Compliance: Phase 2 (P1) — Content rendering
         // ---------------------------------------------------------------

@@ -3070,6 +3070,13 @@ public sealed partial class DomBridge
 
             if (IsDocumentElement(scrollContainer) && HasFixedPositionInDocument(current, scrollContainer))
             {
+                if (HasActiveVisualViewport())
+                {
+                    ScrollFixedElementIntoVisualViewport(element, scrollContainer, block, inline);
+                    current = GetOuterFrameElement(scrollContainer);
+                    continue;
+                }
+
                 current = GetOuterFrameElement(scrollContainer);
                 continue;
             }
@@ -3277,6 +3284,127 @@ public sealed partial class DomBridge
         var normalized = behavior.Trim().ToLowerInvariant();
         return normalized is "instant" or "smooth" ? normalized : "auto";
     }
+
+    private bool HasActiveVisualViewport() => GetVisualViewportScale() > 1.0001;
+
+    private double GetVisualViewportScale() => _visualViewportScale > 1 ? _visualViewportScale : 1;
+
+    private double GetVisualViewportWidth() => _viewportWidth / GetVisualViewportScale();
+
+    private double GetVisualViewportHeight() => _viewportHeight / GetVisualViewportScale();
+
+    private double GetVisualViewportPageOffset(bool vertical)
+    {
+        var layoutOffset = GetElementScrollOffset(DocumentElement, vertical);
+        return layoutOffset + GetVisualViewportExtraOffset(vertical);
+    }
+
+    private void SetVisualViewportScale(double scale)
+    {
+        _visualViewportScale = double.IsFinite(scale) && scale > 1 ? scale : 1;
+        ClampVisualViewportOffsets();
+    }
+
+    private void ScrollFixedElementIntoVisualViewport(
+        DomElement element,
+        DomElement scrollContainer,
+        string? block,
+        string? inline)
+    {
+        var targetTop = ResolveScrollIntoViewOffset(
+            element,
+            scrollContainer,
+            vertical: true,
+            alignment: block,
+            viewportSizeOverride: GetVisualViewportHeight(),
+            currentScrollOverride: GetVisualViewportPageOffset(vertical: true),
+            offsetOverride: GetElementScrollOffset(scrollContainer, vertical: true) +
+                ComputeOffsetWithinAncestor(element, scrollContainer, vertical: true));
+        var targetLeft = ResolveScrollIntoViewOffset(
+            element,
+            scrollContainer,
+            vertical: false,
+            alignment: inline,
+            viewportSizeOverride: GetVisualViewportWidth(),
+            currentScrollOverride: GetVisualViewportPageOffset(vertical: false),
+            offsetOverride: GetElementScrollOffset(scrollContainer, vertical: false) +
+                ComputeOffsetWithinAncestor(element, scrollContainer, vertical: false));
+        SetVisualViewportPageOffsets(left: targetLeft, top: targetTop);
+    }
+
+    private void SetVisualViewportPageOffsets(double? left = null, double? top = null)
+    {
+        var oldPageLeft = GetVisualViewportPageOffset(vertical: false);
+        var oldPageTop = GetVisualViewportPageOffset(vertical: true);
+        var layoutLeft = GetElementScrollOffset(DocumentElement, vertical: false);
+        var layoutTop = GetElementScrollOffset(DocumentElement, vertical: true);
+
+        if (left.HasValue)
+        {
+            _visualViewportPageLeftOffset = Math.Clamp(
+                left.Value - layoutLeft,
+                0,
+                GetVisualViewportMaxExtraOffset(vertical: false));
+        }
+
+        if (top.HasValue)
+        {
+            _visualViewportPageTopOffset = Math.Clamp(
+                top.Value - layoutTop,
+                0,
+                GetVisualViewportMaxExtraOffset(vertical: true));
+        }
+
+        if (!AreClose(oldPageLeft, GetVisualViewportPageOffset(vertical: false)) ||
+            !AreClose(oldPageTop, GetVisualViewportPageOffset(vertical: true)))
+        {
+            DispatchVisualViewportScrollEvent();
+        }
+    }
+
+    private void ClampVisualViewportOffsets()
+    {
+        _visualViewportPageLeftOffset = Math.Clamp(_visualViewportPageLeftOffset, 0, GetVisualViewportMaxExtraOffset(vertical: false));
+        _visualViewportPageTopOffset = Math.Clamp(_visualViewportPageTopOffset, 0, GetVisualViewportMaxExtraOffset(vertical: true));
+    }
+
+    private double GetVisualViewportExtraOffset(bool vertical) =>
+        vertical ? _visualViewportPageTopOffset : _visualViewportPageLeftOffset;
+
+    private double GetVisualViewportMaxExtraOffset(bool vertical)
+    {
+        if (!HasActiveVisualViewport())
+            return 0;
+
+        var layoutSize = vertical ? _viewportHeight : _viewportWidth;
+        var visualSize = vertical ? GetVisualViewportHeight() : GetVisualViewportWidth();
+        return Math.Max(0, layoutSize - visualSize);
+    }
+
+    private void DispatchVisualViewportScrollEvent()
+    {
+        if (_visualViewportJSObject == null || _visualViewportScrollListeners.Count == 0)
+            return;
+
+        var evt = new JSObject();
+        evt.FastAddValue((KeyString)"type", new JSString("scroll"), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"target", _visualViewportJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"currentTarget", _visualViewportJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
+
+        foreach (var listener in _visualViewportScrollListeners.ToList())
+        {
+            try
+            {
+                listener.InvokeFunction(new Arguments(listener, evt));
+            }
+            catch (Exception ex)
+            {
+                RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.visualViewport", $"Visual viewport listener error: {ex.Message}", ex);
+            }
+        }
+    }
+
+    private static bool AreClose(double left, double right) => Math.Abs(left - right) < 0.0001;
 
     private bool CanProgrammaticallyScroll(DomElement element, bool vertical)
     {
@@ -3503,19 +3631,22 @@ public sealed partial class DomBridge
         DomElement element,
         DomElement scrollContainer,
         bool vertical,
-        string? alignment)
+        string? alignment,
+        double? viewportSizeOverride = null,
+        double? currentScrollOverride = null,
+        double? offsetOverride = null)
     {
         var normalizedAlignment = NormalizeScrollIntoViewAlignment(alignment, "start");
-        var offset = ComputeOffsetWithinAncestor(element, scrollContainer, vertical);
+        var offset = offsetOverride ?? ComputeOffsetWithinAncestor(element, scrollContainer, vertical);
         var targetSize = vertical ? GetBorderBoxHeight(GetComputedProps(element), element) : GetBorderBoxWidth(GetComputedProps(element), element);
         var marginStart = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-top" : "scroll-margin-left");
         var marginEnd = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-bottom" : "scroll-margin-right");
         var paddingStart = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-top" : "scroll-padding-left");
         var paddingEnd = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-bottom" : "scroll-padding-right");
-        var viewportSize = vertical
+        var viewportSize = viewportSizeOverride ?? (vertical
             ? GetClientHeightForDomElement(scrollContainer, IsDocumentElement(scrollContainer))
-            : GetClientWidthForDomElement(scrollContainer, IsDocumentElement(scrollContainer));
-        var currentScroll = GetElementScrollOffset(scrollContainer, vertical);
+            : GetClientWidthForDomElement(scrollContainer, IsDocumentElement(scrollContainer)));
+        var currentScroll = currentScrollOverride ?? GetElementScrollOffset(scrollContainer, vertical);
 
         var startTarget = offset - marginStart - paddingStart;
         var endTarget = offset + targetSize + marginEnd + paddingEnd - viewportSize;

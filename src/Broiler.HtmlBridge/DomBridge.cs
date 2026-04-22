@@ -30,6 +30,7 @@ public sealed partial class DomBridge
     private readonly DomElement _documentNode = new("#document", null, null, string.Empty);
     private JSObject? _documentJSObject;
     private JSObject? _windowJSObject;
+    private JSObject? _visualViewportJSObject;
     private readonly Dictionary<DomElement, JSObject> _docRootToDocJSObject = [];
     private JSContext? _jsContext;
 
@@ -43,6 +44,10 @@ public sealed partial class DomBridge
     private int _frameActionIdCounter;
     private readonly Dictionary<int, Action> _frameActions = new();
     private readonly Dictionary<DomElement, int> _smoothScrollTokens = [];
+    private readonly List<JSFunction> _visualViewportScrollListeners = [];
+    private double _visualViewportScale = 1.0;
+    private double _visualViewportPageLeftOffset;
+    private double _visualViewportPageTopOffset;
 
     /// <summary>
     /// Index into <see cref="_elements"/> of the <c>&lt;script&gt;</c> element

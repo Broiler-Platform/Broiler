@@ -5438,6 +5438,47 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssomView_VisualViewport_ScrollIntoView_FixedTarget_Adjusts_PageTop()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body style="margin:0;height:4000px;">
+  <div id="fixed" style="position:fixed;bottom:0;left:0;width:100px;height:60px;overflow:auto;">
+    <div style="height:500px;"></div>
+    <input id="target" style="display:block;height:20px;">
+  </div>
+</body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+
+        var result = ctx.Eval("""
+            (() => {
+                document.documentElement.scroll(0, 1000);
+                visualViewport.scale = 2;
+                var before = visualViewport.pageTop;
+                var fired = false;
+                visualViewport.addEventListener('scroll', function () { fired = true; });
+                document.getElementById('target').scrollIntoView({ behavior: 'instant' });
+                return [
+                    before,
+                    visualViewport.pageTop,
+                    document.documentElement.scrollTop,
+                    fired,
+                    visualViewport.scale,
+                    visualViewport.height
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("1000|1384|1000|true|2|384", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_IframeSrcdocLoadEvent_Fires_After_Listener_Registration()
     {
         const string html = @"<!DOCTYPE html>

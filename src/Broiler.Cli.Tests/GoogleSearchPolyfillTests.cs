@@ -1059,6 +1059,52 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
+    public void VisualViewport_ScrollIntoView_Fixed_Target_Uses_Visual_Page_Offset()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.style.height = '4000px';
+            document.documentElement.scroll(0, 1000);
+            visualViewport.scale = 2;
+
+            var fixed = document.createElement('div');
+            fixed.style.position = 'fixed';
+            fixed.style.bottom = '0';
+            fixed.style.left = '0';
+            fixed.style.width = '100px';
+            fixed.style.height = '60px';
+            fixed.style.overflow = 'auto';
+
+            var spacer = document.createElement('div');
+            spacer.style.height = '500px';
+
+            var target = document.createElement('input');
+            target.style.display = 'block';
+            target.style.height = '20px';
+
+            fixed.appendChild(spacer);
+            fixed.appendChild(target);
+            document.body.appendChild(fixed);
+
+            var before = visualViewport.pageTop;
+            var fired = false;
+            visualViewport.addEventListener('scroll', function() { fired = true; });
+            target.scrollIntoView({ behavior: 'instant' });
+
+            document.getElementById('result').textContent = [
+                before,
+                visualViewport.pageTop,
+                document.documentElement.scrollTop,
+                fired,
+                visualViewport.scale,
+                visualViewport.height
+            ].join('|');
+        ");
+
+        Assert.Contains("1000|1384|1000|true|2|384", result);
+    }
+
+    [Fact]
     public void ScrollIntoView_Does_Not_Scroll_Root_For_Targets_Inside_Unscrollable_Fixed_Containers()
     {
         var result = ExecJs(@"
