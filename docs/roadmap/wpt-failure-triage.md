@@ -5,6 +5,10 @@
 
 ## Implementation updates
 
+### 2026-04-22
+
+- The runner/Markdown/JSON triage output now surfaces timeout failures as a first-class section with the complete timeout path list plus focused `--subset` commands for each affected directory, and `Broiler.Wpt.Tests` now guards that richer timeout summary so future WPT workflow investigations do not require raw-log scraping.
+
 ### 2026-04-21
 
 - The latest committed artifacts and the latest `WPT Tests` workflow run (`run_number: 79`, completed 2026-04-21) still fail only because WPT regressions remain; artifact generation itself is succeeding, and the runner leaves enough structured data in `tests/wpt-results/` to plan follow-up work from the JSON first and the Markdown/log views second.
@@ -509,6 +513,8 @@ This is a small change, but it removes unnecessary ambiguity when people look fo
 ### 5.5 Surface timeout summaries as first-class triage output
 
 The latest run still required reading `wpt-results.json`, `wpt-root-cause-analysis.txt`, or the raw job log to recover the full set of 8 timeout paths. Extend the generated Markdown/console summary so it shows the complete timeout list plus suggested `--subset` commands for the affected directories.
+
+**Status:** done; `Broiler.Wpt` now emits dedicated timeout sections in console, JSON, and Markdown output, including the full timeout path list and focused subset commands for each affected directory.
 
 ### 5.6 Support incremental reruns from the previous JSON report
 

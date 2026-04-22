@@ -2345,6 +2345,95 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Program_Surfaces_Full_Timeout_Triage_Summary_With_Subset_Commands()
+    {
+        var testDir = Path.Combine(_tempDir, "timeout-triage");
+        var timeoutPaths = new[]
+        {
+            Path.Combine(testDir, "css", "css-grid", "parsing", "grid-template-columns-crash.html"),
+            Path.Combine(testDir, "css", "css-overflow", "scroll-markers", "column-scroll-marker-007.html"),
+            Path.Combine(testDir, "css", "css-overflow", "scroll-markers", "targeted-scroll-marker-selection.tentative.html"),
+            Path.Combine(testDir, "css", "css-shapes", "shape-outside", "supported-shapes", "circle", "shape-outside-circle-030.html"),
+            Path.Combine(testDir, "css", "css-tables", "height-distribution", "percentage-sizing-of-table-cell-children.html"),
+            Path.Combine(testDir, "css", "css-tables", "html5-table-formatting-3.html"),
+        };
+
+        foreach (var timeoutPath in timeoutPaths)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(timeoutPath)!);
+            File.WriteAllText(timeoutPath, "<html><body>Timeout</body></html>");
+        }
+
+        Program.RunTestExecutor = static (runner, testPath, referenceDir, wptPath) => new WptTestResult
+        {
+            TestPath = testPath,
+            Passed = false,
+            Skipped = false,
+            Category = FailureCategory.Timeout,
+            Message = $"Test timed out after 30 second(s): {testPath}",
+        };
+
+        var jsonPath = Path.Combine(_tempDir, "timeout-triage.json");
+        var markdownPath = Path.Combine(_tempDir, "timeout-triage.md");
+        var originalOut = Console.Out;
+        var consoleOutput = new StringWriter();
+        Console.SetOut(consoleOutput);
+        try
+        {
+            Program.Main([
+                "--wpt-dir", testDir,
+                "--json-output", jsonPath,
+                "--markdown-output", markdownPath,
+            ]);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(jsonPath));
+        var triage = doc.RootElement.GetProperty("triage");
+        var timeoutFailures = triage.GetProperty("timeoutFailures").EnumerateArray().ToList();
+        Assert.Equal(6, timeoutFailures.Count);
+        Assert.Contains(timeoutFailures, failure => failure.GetProperty("testPath").GetString() == "css/css-grid/parsing/grid-template-columns-crash.html");
+        Assert.Contains(timeoutFailures, failure => failure.GetProperty("testPath").GetString() == "css/css-tables/html5-table-formatting-3.html");
+
+        var timeoutSubsetCommands = triage.GetProperty("timeoutSubsetCommands")
+            .EnumerateArray()
+            .Select(entry => new
+            {
+                Directory = entry.GetProperty("directory").GetString(),
+                Count = entry.GetProperty("count").GetInt32(),
+                Command = entry.GetProperty("command").GetString(),
+            })
+            .ToList();
+        Assert.Contains(timeoutSubsetCommands, entry =>
+            entry.Directory == "css/css-overflow/scroll-markers" &&
+            entry.Count == 2 &&
+            entry.Command == "./scripts/run-wpt-tests.sh --subset \"css/css-overflow/scroll-markers\"");
+        Assert.Contains(timeoutSubsetCommands, entry =>
+            entry.Directory == "css/css-tables" &&
+            entry.Count == 1 &&
+            entry.Command == "./scripts/run-wpt-tests.sh --subset \"css/css-tables\"");
+
+        var markdown = File.ReadAllText(markdownPath);
+        Assert.Contains("## Timeout failures", markdown);
+        Assert.Contains("`css/css-grid/parsing/grid-template-columns-crash.html`", markdown);
+        Assert.Contains("`css/css-tables/html5-table-formatting-3.html`", markdown);
+        Assert.Contains("### Suggested timeout subset commands", markdown);
+        Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/css-overflow/scroll-markers\"", markdown);
+        Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/css-tables/height-distribution\"", markdown);
+
+        var output = consoleOutput.ToString();
+        Assert.Contains("Timeout failures:", output);
+        Assert.Contains("css/css-grid/parsing/grid-template-columns-crash.html", output);
+        Assert.Contains("css/css-tables/html5-table-formatting-3.html", output);
+        Assert.Contains("Timeout subset commands:", output);
+        Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/css-overflow/scroll-markers\"", output);
+        Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/css-tables\"", output);
+    }
+
+    [Fact]
     public void Program_Returns_Error_When_No_Arguments()
     {
         var exitCode = Program.Main([]);
