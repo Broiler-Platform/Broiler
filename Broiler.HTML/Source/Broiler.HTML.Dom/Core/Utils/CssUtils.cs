@@ -559,6 +559,7 @@ internal static class CssUtils
             return;
         }
 
+        // Shorthand application resets omitted longhands back to their initial values.
         cssBox.TextDecoration = "none";
         cssBox.TextDecorationStyle = "solid";
         cssBox.TextDecorationColor = "currentcolor";
