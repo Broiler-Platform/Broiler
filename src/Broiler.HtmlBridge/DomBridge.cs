@@ -468,7 +468,7 @@ public sealed partial class DomBridge
 
             if (i >= attrs.Length || attrs[i] != '=')
             {
-                if (!string.IsNullOrEmpty(name))
+                if (!string.IsNullOrEmpty(name) && !result.ContainsKey(name))
                     result[name] = name;
                 continue;
             }
@@ -492,7 +492,9 @@ public sealed partial class DomBridge
                 value = attrs[valueStart..i];
             }
 
-            if (!string.IsNullOrEmpty(name))
+            // HTML parsing keeps the first attribute with a given name and
+            // ignores later duplicates on the same start tag.
+            if (!string.IsNullOrEmpty(name) && !result.ContainsKey(name))
                 result[name] = value;
         }
         return result;

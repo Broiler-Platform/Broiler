@@ -542,6 +542,56 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
+    [Fact]
+    public void Duplicate_Class_Attribute_First_Wins_During_Html_Parse()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div>
+  <p class=""sibling"" id=""toggler"">Ignored</p>
+  <p class=""c"" id=""first-c"">First .c</p>
+  <p class=""c"">Second .c</p>
+  <p class=""c"" class=""sibling"" id=""duplicate-class"">Third .c but not sibling</p>
+  <p class=""c"">Fourth .c</p>
+  <p class=""sibling"">Ignored</p>
+  <p class=""c"" id=""expected"">Expected green match</p>
+</div>
+<div id=""result""></div>
+<script>
+var r = [];
+var target = document.getElementById('duplicate-class');
+r.push(target.className);
+r.push(target.getAttribute('class'));
+r.push(document.querySelector('#duplicate-class.c') !== null);
+r.push(document.querySelector('#duplicate-class.sibling') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("c,c,true,true", result);
+    }
+
+    [Fact]
+    public void Duplicate_Id_Attribute_First_Wins_During_Html_Parse()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""first"" id=""second"">target</div>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(document.getElementById('first') !== null);
+r.push(document.getElementById('second') === null);
+r.push(document.querySelector('#first') !== null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
     // ──────── Attribute selectors: |=, ~=, ^=, $=, *= ────────────────────
 
     [Fact]

@@ -4208,6 +4208,118 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_SelectorsInvalidation_NthChildWhenSiblingChanges_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    .sibling + :nth-child(odd of .c) {
+      color: green;
+    }
+  </style>
+</head>
+<body>
+<div>
+  <p class="sibling" id="toggler">Ignored</p>
+  <p class="c">Odd; used to be green, should not be since no sibling</p>
+  <p class="c">Even, so should not be green</p>
+  <p class="c" class="sibling">Odd, but no sibling, so should not be green</p>
+  <p class="c">Even, so should not be green</p>
+  <p class="sibling">Ignored</p>
+  <p class="c">Odd, should be green</p>
+</div>
+<script>
+  document.documentElement.offsetTop;
+  toggler.classList.toggle("sibling");
+</script>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+</head>
+<body>
+<div>
+  <p>Ignored</p>
+  <p>Odd; used to be green, should not be since no sibling</p>
+  <p>Even, so should not be green</p>
+  <p>Odd, but no sibling, so should not be green</p>
+  <p>Even, so should not be green</p>
+  <p>Ignored</p>
+  <p style="color: green">Odd, should be green</p>
+</div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors-invalidation-nth-child-sibling-change", 460, 180);
+        Assert.True(result.Passed,
+            $"nth-child(... of .c) sibling-change invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_SelectorsInvalidation_NthLastChildWhenSiblingChanges_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    .sibling + :nth-last-child(odd of .c) {
+      color: green;
+    }
+  </style>
+</head>
+<body>
+<div>
+  <p class="sibling" id="toggler">Ignored</p>
+  <p class="c">Odd; used to be green, should not be since no sibling</p>
+  <p class="c">Even, so should not be green</p>
+  <p class="c" class="sibling">Odd, but no sibling, so should not be green</p>
+  <p class="c">Even, so should not be green</p>
+  <p class="sibling">Ignored</p>
+  <p class="c">Odd, should be green</p>
+</div>
+<script>
+  document.documentElement.offsetTop;
+  toggler.classList.toggle("sibling");
+</script>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+</head>
+<body>
+<div>
+  <p>Ignored</p>
+  <p>Odd; used to be green, should not be since no sibling</p>
+  <p>Even, so should not be green</p>
+  <p>Odd, but no sibling, so should not be green</p>
+  <p>Even, so should not be green</p>
+  <p>Ignored</p>
+  <p style="color: green">Odd, should be green</p>
+</div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors-invalidation-nth-last-child-sibling-change", 460, 180);
+        Assert.True(result.Passed,
+            $"nth-last-child(... of .c) sibling-change invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_AbsposInBlockInInlineInRelposInline_MatchesReference()
     {
         // CSS2 §10.1: Absolute positioning in inline contexts.

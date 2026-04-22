@@ -13,6 +13,7 @@
 - Subframe root/window scrolling now honors `scroll-behavior: smooth` plus `behavior: auto|instant|smooth` for `scrollIntoView()` and window/root scroll APIs by staging a deferred next-frame completion instead of jumping immediately, and focused `Broiler.Wpt.Tests` now guard the `scroll-behavior-subframe-root.html` / `scroll-behavior-subframe-window.html` follow-up slice without needing the whole harness file.
 - Root `scrollIntoView()` bubbling now respects hidden/clip viewport overflow, so zoomed inner scrollers no longer spuriously scroll the document when `html`/`body` disable viewport scrolling; focused zoom guards cover the `scroll-padding`, `scroll-margin`, and abspos `scrollIntoView()` follow-up slice.
 - Standalone universal selectors with structural pseudos/attributes now cascade after bare universal and tag rules, and closed `<details>` elements now hide non-`<summary>` children in the renderer path; focused `Broiler.Wpt.Tests` guard the remaining `selectors-4` `:lang(...)` / `details:open` near-pass slice locally.
+- Bridge-side HTML attribute parsing now keeps the first duplicate attribute instead of the last, which fixes the reopened `css/selectors/invalidation` `nth-child(... of .c)` / `nth-last-child(... of .c)` sibling-toggle slice and adds focused CLI/WPT coverage for those cases.
 
 ### 2026-04-21
 
