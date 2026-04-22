@@ -4093,6 +4093,121 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_Selectors4_LangStandalonePseudo_Overrides_ClassRule_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { width: 40px; height: 40px; background: red; }
+    :lang(fr) { background: green; }
+  </style>
+</head>
+<body>
+  <div class="test" lang="fr"></div>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { width: 40px; height: 40px; background: green; }
+  </style>
+</head>
+<body>
+  <div class="test" lang="fr"></div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors4-lang-standalone-pseudo", 80, 80);
+        Assert.True(result.Passed,
+            $":lang(...) standalone selectors should override same-specificity class rules when declared later. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Selectors4_DetailsOpenPseudo_And_ClosedContent_MatchReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html class="reftest-wait">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .group { float: left; width: 90px; margin-right: 12px; }
+    details { margin-left: 0; }
+    summary, p { display: block; width: 30px; height: 20px; margin: 0; }
+    summary { background: green; }
+    p { background: red; }
+    :open { margin-left: 40px; }
+  </style>
+  <script>
+    function run() {
+      document.getElementById('closed').open = false;
+      document.documentElement.classList.remove('reftest-wait');
+    }
+  </script>
+</head>
+<body onload="run()">
+  <div class="group">
+    <details open>
+      <summary></summary>
+      <p></p>
+    </details>
+  </div>
+  <div class="group">
+    <details id="closed" open>
+      <summary></summary>
+      <p></p>
+    </details>
+  </div>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .group { float: left; width: 90px; margin-right: 12px; }
+    summary, p { display: block; width: 30px; height: 20px; margin: 0; }
+    summary { background: green; }
+    p { background: red; }
+    .open-details { margin-left: 40px; }
+  </style>
+</head>
+<body>
+  <div class="group">
+    <details class="open-details" open>
+      <summary></summary>
+      <p></p>
+    </details>
+  </div>
+  <div class="group">
+    <details>
+      <summary></summary>
+    </details>
+  </div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors4-details-open-pseudo", 220, 80);
+        Assert.True(result.Passed,
+            $"details:open styling and closed details content should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_AbsposInBlockInInlineInRelposInline_MatchesReference()
     {
         // CSS2 §10.1: Absolute positioning in inline contexts.

@@ -91,15 +91,24 @@ internal sealed class DomParser
         if (box.HtmlTag != null)
         {
             // CSS2.1 §6.4.3 specificity: Apply rules in increasing specificity.
-            // Bare '*' = (0,0,0), tag = (0,0,1), '.class *' = (0,1,0), etc.
-            // Universal rules with ancestor/sibling selectors (e.g. '.intro *')
-            // have higher specificity than bare tag rules, so apply them after.
-            AssignCssBlocks(box, cssData, "*", qualifiedOnly: false);
+            // Bare '*' = (0,0,0), tag = (0,0,1), and standalone universal
+            // selectors with pseudo-classes / attributes (e.g. ':open',
+            // ':lang(fr)', '[hidden]') are class-level specificity and must not
+            // be lumped in with the bare universal pass.
+            AssignCssBlocks(box, cssData, "*", filter: static block =>
+                block.Selectors == null
+                && (block.AttributeConditions == null || block.AttributeConditions.Count == 0)
+                && block.PseudoClass == null);
             AssignCssBlocks(box, cssData, box.HtmlTag.Name);
             AssignCssBlocks(box, cssData, "*", qualifiedOnly: true);
 
             if (box.HtmlTag.HasAttribute("class"))
                 AssignClassCssBlocks(box, cssData);
+
+            AssignCssBlocks(box, cssData, "*", filter: static block =>
+                block.Selectors == null
+                && ((block.AttributeConditions != null && block.AttributeConditions.Count > 0)
+                    || block.PseudoClass != null));
 
             if (box.HtmlTag.HasAttribute("id"))
             {
@@ -249,11 +258,40 @@ internal sealed class DomParser
         foreach (var childBox in box.Boxes)
             CascadeApplyStyles(childBox, cssData, baseUrl);
 
+        if (box.HtmlTag != null)
+            ApplyClosedDetailsVisibility(box);
+
         // CSS2.1 §12.1: Generate ::before and ::after pseudo-element boxes
         // after child style cascading to avoid modifying the child list
         // during iteration.
         if (box.HtmlTag != null)
             ApplyPseudoElementBoxes(box, cssData, baseUrl);
+    }
+
+    private static void ApplyClosedDetailsVisibility(CssBox box)
+    {
+        // HTML §4.11.1: Closed <details> elements expose their first
+        // <summary> but keep the rest of the subtree hidden until the open
+        // attribute is present.
+        if (!box.HtmlTag.Name.Equals("details", StringComparison.OrdinalIgnoreCase) ||
+            box.HtmlTag.HasAttribute("open"))
+        {
+            return;
+        }
+
+        bool seenSummary = false;
+        foreach (var child in box.Boxes)
+        {
+            if (child.HtmlTag != null &&
+                child.HtmlTag.Name.Equals("summary", StringComparison.OrdinalIgnoreCase) &&
+                !seenSummary)
+            {
+                seenSummary = true;
+                continue;
+            }
+
+            child.Display = CssConstants.None;
+        }
     }
 
     private void SetTextSelectionStyle(HtmlContainerInt htmlContainer, CssData cssData)
@@ -321,7 +359,7 @@ internal sealed class DomParser
         }
     }
 
-    private static void AssignCssBlocks(CssBox box, CssData cssData, string className, bool? qualifiedOnly = null)
+    private static void AssignCssBlocks(CssBox box, CssData cssData, string className, bool? qualifiedOnly = null, Func<CssBlock, bool> filter = null)
     {
         var blocks = cssData.GetCssBlock(className);
         foreach (var block in blocks)
@@ -334,6 +372,9 @@ internal sealed class DomParser
                 if (qualifiedOnly.Value != hasSelectors)
                     continue;
             }
+
+            if (filter != null && !filter(block))
+                continue;
 
             if (IsBlockAssignableToBox(box, block))
                 AssignCssBlock(box, block);
