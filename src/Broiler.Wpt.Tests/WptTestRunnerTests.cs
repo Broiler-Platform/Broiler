@@ -416,6 +416,71 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssVariables_LogicalBorderPaintValues_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    :root { --accent: rgb(0, 128, 0); }
+    a { color: inherit; text-decoration: none; }
+    .box {
+      width: 80px;
+      height: 50px;
+      margin: 12px;
+      box-sizing: border-box;
+      display: block;
+    }
+    .logical-longhands {
+      border-style: solid;
+      border-width: medium;
+      border-inline-start-color: var(--accent);
+      border-inline-end-color: var(--accent);
+      border-block-start-color: var(--accent);
+      border-block-end-color: var(--accent);
+    }
+    .logical-shorthands {
+      border-inline: medium solid var(--accent);
+      border-block: medium solid var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <a href="""">
+    <div class=""box logical-longhands""></div>
+    <div class=""box logical-shorthands""></div>
+  </a>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .box {
+      width: 80px;
+      height: 50px;
+      margin: 12px;
+      box-sizing: border-box;
+      display: block;
+      border: medium solid rgb(0, 128, 0);
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-logical-border-paint-values", 140, 140);
+        Assert.True(result.Passed,
+            $"Logical border var() paint values should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssVariables_MissingClosingNestedFallback_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
