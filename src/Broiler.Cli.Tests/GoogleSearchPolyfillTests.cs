@@ -897,7 +897,50 @@ document.getElementById('result').textContent =
             document.getElementById('result').textContent =
                 buildContainer('1') + ',' + buildContainer('2');
         ");
-        Assert.Contains("950,950", result);
+        Assert.Contains("950,920", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Scales_Zoomed_Target_ScrollMargin_In_Scroller_Coordinates()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function buildTarget(useInheritedMargin) {
+                var container = document.createElement('div');
+                container.style.width = '200px';
+                container.style.height = '100px';
+                container.style.overflowX = 'hidden';
+                container.style.overflowY = 'scroll';
+                container.style.paddingTop = '40px';
+                container.style.paddingBottom = '40px';
+                if (useInheritedMargin) {
+                    container.style.scrollMarginTop = '20px';
+                }
+
+                var buffer = document.createElement('div');
+                buffer.style.height = '300px';
+                var target = document.createElement('div');
+                target.style.height = '10px';
+                target.style.width = '200px';
+                target.style.zoom = '2';
+                target.style.scrollMarginTop = useInheritedMargin ? 'inherit' : '20px';
+                var tail = document.createElement('div');
+                tail.style.height = '300px';
+
+                container.appendChild(buffer);
+                container.appendChild(target);
+                container.appendChild(tail);
+                document.body.appendChild(container);
+                target.scrollIntoView();
+                return container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                buildTarget(false) + ',' + buildTarget(true);
+        ");
+
+        Assert.Contains("300,300", result);
     }
 
     [Fact]

@@ -1438,7 +1438,7 @@ document.getElementById('out').appendChild(p);
   </div>
   <script>
     document.querySelectorAll('.container')[0].scrollTo(0, 320);
-    document.querySelectorAll('.container')[1].scrollTo(0, 320);
+    document.querySelectorAll('.container')[1].scrollTo(0, 300);
   </script>
 </body>
 </html>";
@@ -1446,6 +1446,118 @@ document.getElementById('out').appendChild(p);
         var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-margin");
         Assert.True(result.Passed,
             $"zoom scroll-margin should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomScrollMargin_ZoomedTargetCases_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .group {
+      display: inline-block;
+      border: solid black 1px;
+      padding: 10px;
+      margin-right: 12px;
+    }
+    .container {
+      display: inline-block;
+      width: 200px;
+      height: 100px;
+      overflow-x: hidden;
+      overflow-y: scroll;
+      padding: 40px 0;
+    }
+    .buffer {
+      background: lightblue;
+      height: 300px;
+      width: 200px;
+    }
+    .target {
+      background: black;
+      height: 10px;
+      width: 200px;
+    }
+  </style>
+</head>
+<body>
+  <div class=""group"">
+    <div class=""container"">
+      <div class=""buffer""></div>
+      <div class=""target"" style=""scroll-margin-top: 20px; zoom: 2;""></div>
+      <div class=""buffer""></div>
+    </div>
+    <div class=""container"" style=""scroll-margin-top: 20px;"">
+      <div class=""buffer""></div>
+      <div class=""target"" style=""scroll-margin-top: inherit; zoom: 2;""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <script>
+    for (const match of document.querySelectorAll('.target')) {
+      match.scrollIntoView();
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .group {
+      display: inline-block;
+      border: solid black 1px;
+      padding: 10px;
+      margin-right: 12px;
+    }
+    .container {
+      display: inline-block;
+      width: 200px;
+      height: 100px;
+      overflow-x: hidden;
+      overflow-y: scroll;
+      padding: 40px 0;
+    }
+    .buffer {
+      background: lightblue;
+      height: 300px;
+      width: 200px;
+    }
+    .target {
+      background: black;
+      height: 20px;
+      width: 400px;
+      scroll-margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+  <div class=""group"">
+    <div class=""container"">
+      <div class=""buffer""></div>
+      <div class=""target""></div>
+      <div class=""buffer""></div>
+    </div>
+    <div class=""container"">
+      <div class=""buffer""></div>
+      <div class=""target""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <script>
+    for (const match of document.querySelectorAll('.target')) {
+      match.scrollIntoView();
+    }
+  </script>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-margin-zoomed-targets");
+        Assert.True(result.Passed,
+            $"zoomed target scroll-margin should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]

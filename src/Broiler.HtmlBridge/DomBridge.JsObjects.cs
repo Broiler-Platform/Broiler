@@ -3659,10 +3659,12 @@ public sealed partial class DomBridge
         var normalizedAlignment = NormalizeScrollIntoViewAlignment(alignment, "start");
         var offset = offsetOverride ?? ComputeOffsetWithinAncestor(element, scrollContainer, vertical);
         var targetSize = vertical ? GetBorderBoxHeight(GetComputedProps(element), element) : GetBorderBoxWidth(GetComputedProps(element), element);
-        var marginStart = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-top" : "scroll-margin-left");
-        var marginEnd = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-bottom" : "scroll-margin-right");
-        var paddingStart = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-top" : "scroll-padding-left");
-        var paddingEnd = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-bottom" : "scroll-padding-right");
+        var (marginStart, marginStartOwner) = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-top" : "scroll-margin-left");
+        var (marginEnd, marginEndOwner) = ResolveScrollIntoViewInset(element, vertical ? "scroll-margin-bottom" : "scroll-margin-right");
+        var (paddingStart, _) = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-top" : "scroll-padding-left");
+        var (paddingEnd, _) = ResolveScrollIntoViewInset(scrollContainer, vertical ? "scroll-padding-bottom" : "scroll-padding-right");
+        marginStart = ConvertInsetToScrollContainerCoordinates(marginStart, marginStartOwner, scrollContainer);
+        marginEnd = ConvertInsetToScrollContainerCoordinates(marginEnd, marginEndOwner, scrollContainer);
         var viewportSize = viewportSizeOverride ?? (vertical
             ? GetClientHeightForDomElement(scrollContainer, IsDocumentElement(scrollContainer))
             : GetClientWidthForDomElement(scrollContainer, IsDocumentElement(scrollContainer)));
@@ -3701,14 +3703,30 @@ public sealed partial class DomBridge
         return currentScroll;
     }
 
-    private double ResolveScrollIntoViewInset(DomElement element, string propertyName)
+    private (double Value, DomElement Owner) ResolveScrollIntoViewInset(DomElement element, string propertyName)
     {
         var props = GetComputedProps(element);
         var value = props.GetValueOrDefault(propertyName);
         if (string.Equals(value, "inherit", StringComparison.OrdinalIgnoreCase) && element.Parent != null)
             return ResolveScrollIntoViewInset(element.Parent, propertyName);
 
-        return ParseCssLengthToPixelsWithViewport(value, element);
+        return (ParseCssLengthToPixelsWithViewport(value, element), element);
+    }
+
+    private double ConvertInsetToScrollContainerCoordinates(double inset, DomElement insetOwner, DomElement scrollContainer)
+    {
+        if (!double.IsFinite(inset) || AreClose(inset, 0))
+            return 0;
+
+        var ownerZoom = GetUsedZoomForElement(insetOwner);
+        var containerZoom = GetUsedZoomForElement(scrollContainer);
+        if (!double.IsFinite(ownerZoom) || ownerZoom <= 0 ||
+            !double.IsFinite(containerZoom) || containerZoom <= 0)
+        {
+            return inset;
+        }
+
+        return inset * (ownerZoom / containerZoom);
     }
 
     private double ResolvePositionedInset(DomElement element, bool vertical)
