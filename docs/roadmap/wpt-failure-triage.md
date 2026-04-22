@@ -14,6 +14,7 @@
 - Root `scrollIntoView()` bubbling now respects hidden/clip viewport overflow, so zoomed inner scrollers no longer spuriously scroll the document when `html`/`body` disable viewport scrolling; focused zoom guards cover the `scroll-padding`, `scroll-margin`, and abspos `scrollIntoView()` follow-up slice.
 - Standalone universal selectors with structural pseudos/attributes now cascade after bare universal and tag rules, and closed `<details>` elements now hide non-`<summary>` children in the renderer path; focused `Broiler.Wpt.Tests` guard the remaining `selectors-4` `:lang(...)` / `details:open` near-pass slice locally.
 - Bridge-side HTML attribute parsing now keeps the first duplicate attribute instead of the last, which fixes the reopened `css/selectors/invalidation` `nth-child(... of .c)` / `nth-last-child(... of .c)` sibling-toggle slice and adds focused CLI/WPT coverage for those cases.
+- Oversized `grid-template-columns` / `grid-template-rows` track lists now bail out early in the lightweight grid parser instead of splitting multi-megabyte crash-style inputs, which starts hardening the `css/css-grid/parsing/grid-template-columns-crash.html` timeout track and adds a focused `Broiler.Wpt.Tests` guard for the parser-side repro.
 
 ### 2026-04-21
 

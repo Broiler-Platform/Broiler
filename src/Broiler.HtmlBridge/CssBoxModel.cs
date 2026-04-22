@@ -47,6 +47,11 @@ public class GridTrackSize(float value, GridTrackUnit unit)
     public GridTrackUnit Unit { get; set; } = unit;
 }
 
+internal static class GridTrackParsingLimits
+{
+    internal const int MaxTrackListCharacters = 65536;
+}
+
 /// <summary>A rectangle defined by position and size.</summary>
 /// <remarks>Initializes a new <see cref="Rect"/>.</remarks>
 public struct Rect(float x, float y, float width, float height)
@@ -566,6 +571,13 @@ public class CssBoxModel
     {
         var tracks = new List<GridTrackSize>();
         if (string.IsNullOrWhiteSpace(value)) return tracks;
+
+        // Guard pathological crash tests that assign multi-megabyte track lists.
+        // This parser only supports the simple subset used by Broiler layout, so
+        // refusing absurd inputs keeps the runner responsive without affecting
+        // ordinary authored grids.
+        if (value.Length > GridTrackParsingLimits.MaxTrackListCharacters)
+            return tracks;
 
         foreach (string token in value.Split([' '], StringSplitOptions.RemoveEmptyEntries))
         {

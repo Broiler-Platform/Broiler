@@ -2793,6 +2793,33 @@ document.getElementById('out').appendChild(p);
             testFile,
             refDir,
             _tempDir,
+            TimeSpan.FromSeconds(20));
+
+        Assert.True(result.Passed, result.Message);
+        Assert.Equal(FailureCategory.None, result.Category);
+        Assert.Contains("Crash test", result.Message);
+    }
+
+    [Fact]
+    public void RunTestWithTimeout_GridTemplateColumnsCrash_Completes_Without_Timing_Out()
+    {
+        var oversizedTrackList = string.Join(" ", Enumerable.Repeat("repeat(1000, 1px)", 5000));
+        var testFile = Path.Combine(_tempDir, "grid-template-columns-crash.html");
+        File.WriteAllText(testFile, $"""
+<!DOCTYPE html>
+<link rel="help" href="https://bugs.chromium.org/p/chromium/issues/detail?id=1214890">
+<body style="display:grid;grid-template-columns:{oversizedTrackList}">PASS</body>
+""");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner();
+        var result = Program.RunTestWithTimeout(
+            runner,
+            testFile,
+            refDir,
+            _tempDir,
             TimeSpan.FromSeconds(6));
 
         Assert.True(result.Passed, result.Message);
