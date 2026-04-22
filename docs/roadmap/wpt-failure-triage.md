@@ -8,6 +8,7 @@
 ### 2026-04-22
 
 - The runner/Markdown/JSON triage output now surfaces timeout failures as a first-class section with the complete timeout path list plus focused `--subset` commands for each affected directory, and `Broiler.Wpt.Tests` now guards that richer timeout summary so future WPT workflow investigations do not require raw-log scraping.
+- `Broiler.Wpt` now supports incremental reruns from a previous JSON report via `--rerun-json`, including a `--rerun-kind timeouts` mode for timeout-only debugging, and the generated JSON report now includes relative test paths so reruns remain tied to the current WPT checkout instead of the original absolute machine path.
 
 ### 2026-04-21
 
@@ -519,6 +520,8 @@ The latest run still required reading `wpt-results.json`, `wpt-root-cause-analys
 ### 5.6 Support incremental reruns from the previous JSON report
 
 If the remaining buckets are too expensive to attack via repeated broad subset runs, add a runner/CLI mode that reruns only the previous failure or timeout set from `tests/wpt-results/wpt-results.json`. That would make timeout and bucket triage faster without waiting for another full CSS pass.
+
+**Status:** done; `Broiler.Wpt` now accepts `--rerun-json <PATH>` plus `--rerun-kind failures|timeouts`, filters the discovered test set against the previous JSON report, and writes relative test paths into new reports so follow-up reruns stay reproducible within the current checkout.
 
 ---
 

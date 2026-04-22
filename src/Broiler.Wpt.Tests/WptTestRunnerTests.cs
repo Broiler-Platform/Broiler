@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using Broiler.HTML.Image;
 
@@ -2434,6 +2435,144 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Program_RerunJson_Reruns_Previous_Failures_From_Generated_Report()
+    {
+        var testDir = Path.Combine(_tempDir, "rerun-failures");
+        var failedDir = Path.Combine(testDir, "css");
+        var passedDir = Path.Combine(testDir, "html");
+        Directory.CreateDirectory(failedDir);
+        Directory.CreateDirectory(passedDir);
+
+        var failedTest = Path.Combine(failedDir, "failed.html");
+        var passedTest = Path.Combine(passedDir, "passed.html");
+        File.WriteAllText(failedTest, "<html><body>Failed</body></html>");
+        File.WriteAllText(passedTest, "<html><body>Passed</body></html>");
+
+        var jsonPath = Path.Combine(_tempDir, "rerun-failures.json");
+        Program.RunTestExecutor = static (runner, testPath, referenceDir, wptPath) =>
+        {
+            if (Path.GetFileName(testPath).Equals("failed.html", StringComparison.Ordinal))
+            {
+                return new WptTestResult
+                {
+                    TestPath = testPath,
+                    Passed = false,
+                    Category = FailureCategory.Unknown,
+                    Message = "Synthetic failure",
+                };
+            }
+
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = true,
+            };
+        };
+
+        Program.Main([
+            "--wpt-dir", testDir,
+            "--json-output", jsonPath,
+        ]);
+
+        var rerunTests = new ConcurrentBag<string>();
+        Program.RunTestExecutor = (runner, testPath, referenceDir, wptPath) =>
+        {
+            rerunTests.Add(Path.GetRelativePath(testDir, testPath).Replace('\\', '/'));
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = true,
+            };
+        };
+
+        var originalOut = Console.Out;
+        var outputWriter = new StringWriter();
+        Console.SetOut(outputWriter);
+        try
+        {
+            var exitCode = Program.Main([
+                "--wpt-dir", testDir,
+                "--rerun-json", jsonPath,
+            ]);
+
+            Assert.Equal(0, exitCode);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        Assert.Equal(["css/failed.html"], rerunTests.OrderBy(path => path).ToArray());
+        var output = outputWriter.ToString();
+        Assert.Contains("Rerun JSON", output);
+        Assert.Contains("Rerun mode    : failures", output);
+        Assert.Contains("Discovered    : 1 test(s)", output);
+    }
+
+    [Fact]
+    public void Program_RerunJson_Timeouts_Only_Reruns_Previous_Timeouts()
+    {
+        var testDir = Path.Combine(_tempDir, "rerun-timeouts");
+        var timeoutDir = Path.Combine(testDir, "css", "timeouts");
+        var failureDir = Path.Combine(testDir, "css", "failures");
+        Directory.CreateDirectory(timeoutDir);
+        Directory.CreateDirectory(failureDir);
+
+        var timeoutTest = Path.Combine(timeoutDir, "timeout.html");
+        var failureTest = Path.Combine(failureDir, "failure.html");
+        File.WriteAllText(timeoutTest, "<html><body>Timeout</body></html>");
+        File.WriteAllText(failureTest, "<html><body>Failure</body></html>");
+
+        var jsonPath = Path.Combine(_tempDir, "rerun-timeouts.json");
+        Program.RunTestExecutor = static (runner, testPath, referenceDir, wptPath) =>
+        {
+            if (Path.GetFileName(testPath).Equals("timeout.html", StringComparison.Ordinal))
+            {
+                return new WptTestResult
+                {
+                    TestPath = testPath,
+                    Passed = false,
+                    Category = FailureCategory.Timeout,
+                    Message = "Synthetic timeout",
+                };
+            }
+
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = false,
+                Category = FailureCategory.Unknown,
+                Message = "Synthetic failure",
+            };
+        };
+
+        Program.Main([
+            "--wpt-dir", testDir,
+            "--json-output", jsonPath,
+        ]);
+
+        var rerunTests = new ConcurrentBag<string>();
+        Program.RunTestExecutor = (runner, testPath, referenceDir, wptPath) =>
+        {
+            rerunTests.Add(Path.GetRelativePath(testDir, testPath).Replace('\\', '/'));
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = true,
+            };
+        };
+
+        var exitCode = Program.Main([
+            "--wpt-dir", testDir,
+            "--rerun-json", jsonPath,
+            "--rerun-kind", "timeouts",
+        ]);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(["css/timeouts/timeout.html"], rerunTests.OrderBy(path => path).ToArray());
+    }
+
+    [Fact]
     public void Program_Returns_Error_When_No_Arguments()
     {
         var exitCode = Program.Main([]);
@@ -3155,6 +3294,13 @@ document.getElementById('out').appendChild(p);
             .ToList();
         Assert.Contains("MissingReferenceImage", resultReasons);
         Assert.Contains("UnsupportedMediaPlayback", resultReasons);
+
+        var relativeResultPaths = doc.RootElement.GetProperty("results")
+            .EnumerateArray()
+            .Select(el => el.GetProperty("relativeTestPath").GetString())
+            .ToList();
+        Assert.Contains("css/skip/missing-ref-case.html", relativeResultPaths);
+        Assert.Contains("css/media/media.html", relativeResultPaths);
 
         var missingReferenceBuckets = triage.GetProperty("topMissingReferenceDirectories")
             .EnumerateArray()

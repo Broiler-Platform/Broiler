@@ -95,7 +95,7 @@ internal sealed class WptTestResult
     /// <summary>
     /// Serialises this result to a JSON-friendly dictionary.
     /// </summary>
-    internal Dictionary<string, object?> ToJsonObject()
+    internal Dictionary<string, object?> ToJsonObject(string? wptPath = null)
     {
         var obj = new Dictionary<string, object?>
         {
@@ -108,6 +108,16 @@ internal sealed class WptTestResult
             ["message"] = Message,
             ["stackTrace"] = StackTrace,
         };
+
+        if (!string.IsNullOrWhiteSpace(wptPath))
+        {
+            var relativeTestPath = Path.GetRelativePath(wptPath, TestPath).Replace('\\', '/');
+            if (!relativeTestPath.StartsWith("../", StringComparison.Ordinal) &&
+                !relativeTestPath.Equals("..", StringComparison.Ordinal))
+            {
+                obj["relativeTestPath"] = relativeTestPath;
+            }
+        }
 
         if (MismatchDiagnostics is { } diag)
         {
