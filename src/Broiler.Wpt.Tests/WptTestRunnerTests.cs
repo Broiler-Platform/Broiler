@@ -4829,6 +4829,81 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssomView_ScrollIntoView_FixedIframeTarget_Scrolls_OuterWindow_Not_Subframe()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body style="margin:0; width:2000px; height:2000px;">
+  <iframe id="fr"
+          style="position:absolute; left:100px; top:300px; width:400px; height:300px;"
+          srcdoc='<!DOCTYPE html><html><body style="margin:0"><div id="container" style="position:fixed; bottom:10px; left:30px; width:150px; height:150px;"><div id="target" style="position:absolute; left:10px; top:20px; width:10px; height:10px;"></div></div></body></html>'></iframe>
+</body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = ctx.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                var target = iframe.contentDocument.getElementById('target');
+                target.scrollIntoView({ block: 'start', inline: 'start' });
+                return [
+                    document.documentElement.scrollLeft,
+                    document.documentElement.scrollTop,
+                    iframe.contentWindow.scrollX,
+                    iframe.contentWindow.scrollY
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("140|460|0|0", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollIntoView_ScrollableFixedIframeTarget_Scrolls_Container_And_OuterWindow()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body style="margin:0; width:2000px; height:2000px;">
+  <iframe id="fr"
+          style="position:absolute; left:100px; top:300px; width:400px; height:300px;"
+          srcdoc='<!DOCTYPE html><html><body style="margin:0"><div id="container" style="position:fixed; bottom:10px; left:30px; width:150px; height:150px; overflow:auto;"><div style="width:600px; height:600px;"></div><div id="target" style="position:absolute; left:200%; top:200%; width:10px; height:10px;"></div></div></body></html>'></iframe>
+</body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = ctx.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                var target = iframe.contentDocument.getElementById('target');
+                var container = iframe.contentDocument.getElementById('container');
+                target.scrollIntoView({ block: 'start', inline: 'start' });
+                return [
+                    document.documentElement.scrollLeft,
+                    document.documentElement.scrollTop,
+                    iframe.contentWindow.scrollX,
+                    iframe.contentWindow.scrollY,
+                    container.scrollLeft,
+                    container.scrollTop
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("130|440|0|0|300|300", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_IframeSrcdocLoadEvent_Fires_After_Listener_Registration()
     {
         const string html = @"<!DOCTYPE html>

@@ -3055,19 +3055,34 @@ public sealed partial class DomBridge
 
     private void ScrollElementIntoView(DomElement element)
     {
-        var scrollContainer = FindScrollContainer(element) ?? DocumentElement;
-        if (ReferenceEquals(scrollContainer, DocumentElement) && HasFixedPositionAncestorBefore(element, scrollContainer))
-            return;
+        var current = element;
+        for (var i = 0; i < 16 && current != null; i++)
+        {
+            var scrollContainer = FindScrollContainer(current) ?? GetOwningDocumentElement(current);
+            if (scrollContainer == null)
+                return;
 
-        var scrollTop = ComputeOffsetWithinAncestor(element, scrollContainer, vertical: true)
-            - ResolveScrollIntoViewInset(element, "scroll-margin-top")
-            - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-top");
-        var scrollLeft = ComputeOffsetWithinAncestor(element, scrollContainer, vertical: false)
-            - ResolveScrollIntoViewInset(element, "scroll-margin-left")
-            - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-left");
+            if (IsDocumentElement(scrollContainer) && HasFixedPositionInDocument(current, scrollContainer))
+            {
+                current = GetOuterFrameElement(scrollContainer);
+                continue;
+            }
 
-        scrollContainer.DomProperties["_scrollTop"] = Math.Max(0, scrollTop);
-        scrollContainer.DomProperties["_scrollLeft"] = Math.Max(0, scrollLeft);
+            var scrollTop = ComputeOffsetWithinAncestor(element, scrollContainer, vertical: true)
+                - ResolveScrollIntoViewInset(element, "scroll-margin-top")
+                - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-top");
+            var scrollLeft = ComputeOffsetWithinAncestor(element, scrollContainer, vertical: false)
+                - ResolveScrollIntoViewInset(element, "scroll-margin-left")
+                - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-left");
+
+            SetElementScrollOffsets(scrollContainer, scrollLeft, scrollTop, clamp: false);
+
+            var next = GetOuterScrollContinuationElement(scrollContainer);
+            if (next == null || ReferenceEquals(next, current))
+                return;
+
+            current = next;
+        }
     }
 
     private (double? Left, double? Top) GetScrollArguments(in Arguments args)
@@ -3174,14 +3189,18 @@ public sealed partial class DomBridge
 
     private DomElement? FindScrollContainer(DomElement element)
     {
+        var documentElement = GetOwningDocumentElement(element);
         for (var current = element.Parent; current != null; current = current.Parent)
         {
+            if (ReferenceEquals(current, documentElement))
+                return documentElement;
+
             var props = GetComputedProps(current);
             if (HasOverflowClipping(props))
                 return current;
         }
 
-        return DocumentElement;
+        return documentElement;
     }
 
     private bool HasFixedPositionAncestorBefore(DomElement element, DomElement ancestor)
@@ -3196,6 +3215,51 @@ public sealed partial class DomBridge
         return false;
     }
 
+    private static bool IsDocumentElement(DomElement element) =>
+        string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase);
+
+    private DomElement GetOwningDocumentElement(DomElement element)
+    {
+        for (var current = element; current != null; current = current.Parent!)
+        {
+            if (string.Equals(current.TagName, "html", StringComparison.OrdinalIgnoreCase))
+                return current;
+        }
+
+        return DocumentElement;
+    }
+
+    private bool HasFixedPositionInDocument(DomElement element, DomElement documentElement)
+    {
+        if (IsFixedPositionElement(element))
+            return true;
+
+        return HasFixedPositionAncestorBefore(element, documentElement);
+    }
+
+    private bool IsFixedPositionElement(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        return string.Equals(props.GetValueOrDefault("position"), "fixed", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static DomElement? GetOuterFrameElement(DomElement documentElement)
+    {
+        var docRoot = documentElement.Parent;
+        return docRoot != null &&
+               string.Equals(docRoot.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase)
+            ? docRoot.Parent
+            : null;
+    }
+
+    private DomElement? GetOuterScrollContinuationElement(DomElement scrollContainer)
+    {
+        if (IsDocumentElement(scrollContainer))
+            return GetOuterFrameElement(scrollContainer);
+
+        return scrollContainer;
+    }
+
     private double ComputeOffsetWithinAncestor(DomElement element, DomElement ancestor, bool vertical)
     {
         double offset = 0;
@@ -3204,6 +3268,7 @@ public sealed partial class DomBridge
         while (current.Parent != null && !ReferenceEquals(current.Parent, ancestor))
         {
             offset += ComputeOffsetWithinParent(current, vertical);
+            offset -= GetElementScrollOffset(current.Parent, vertical);
             current = current.Parent;
         }
 
@@ -3252,7 +3317,8 @@ public sealed partial class DomBridge
         }
 
         if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(position, "relative", StringComparison.OrdinalIgnoreCase))
+            string.Equals(position, "relative", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(position, "fixed", StringComparison.OrdinalIgnoreCase))
         {
             offset += ResolvePositionedInset(element, vertical);
         }
@@ -3276,11 +3342,25 @@ public sealed partial class DomBridge
             return 0;
 
         var props = GetComputedProps(element);
-        var value = props.GetValueOrDefault(vertical ? "top" : "left");
+        var primaryProperty = vertical ? "top" : "left";
+        var secondaryProperty = vertical ? "bottom" : "right";
+        var value = props.GetValueOrDefault(primaryProperty);
         if (string.IsNullOrWhiteSpace(value) ||
             string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase))
         {
-            return 0;
+            var fallback = props.GetValueOrDefault(secondaryProperty);
+            if (string.IsNullOrWhiteSpace(fallback) ||
+                string.Equals(fallback, "auto", StringComparison.OrdinalIgnoreCase))
+            {
+                return 0;
+            }
+
+            var reference = ResolveContainingBlockReferenceLength(element, vertical);
+            var borderBoxSize = vertical
+                ? GetBorderBoxHeight(props, element)
+                : GetBorderBoxWidth(props, element);
+            var fallbackPixels = ParseCssLengthToPixelsWithViewport(fallback, element, percentageBasis: reference);
+            return Math.Max(0, reference - borderBoxSize - fallbackPixels);
         }
 
         var normalized = value.Trim().ToLowerInvariant();
@@ -3549,12 +3629,32 @@ public sealed partial class DomBridge
             string.Equals(element.Parent.TagName, "html", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(element.Parent.TagName, "body", StringComparison.OrdinalIgnoreCase))
         {
-            return vertical ? _viewportHeight : _viewportWidth;
+            return GetViewportReferenceLength(element, vertical);
         }
 
         var parentRect = ComputeUnzoomedLayoutRect(element.Parent);
         var reference = vertical ? parentRect.Height : parentRect.Width;
-        return reference > 0 ? reference : (vertical ? _viewportHeight : _viewportWidth);
+        return reference > 0 ? reference : GetViewportReferenceLength(element, vertical);
+    }
+
+    private double GetViewportReferenceLength(DomElement? element, bool vertical)
+    {
+        if (element != null)
+        {
+            var documentElement = GetOwningDocumentElement(element);
+            var frameElement = GetOuterFrameElement(documentElement);
+            if (frameElement != null)
+            {
+                var frameProps = GetComputedProps(frameElement);
+                var frameLength = ParseCssLengthToPixelsWithViewport(
+                    frameProps.GetValueOrDefault(vertical ? "height" : "width"),
+                    frameElement);
+                if (frameLength > 0)
+                    return frameLength;
+            }
+        }
+
+        return vertical ? _viewportHeight : _viewportWidth;
     }
 
     private static bool HasExplicitBodyMargin(string? value)
