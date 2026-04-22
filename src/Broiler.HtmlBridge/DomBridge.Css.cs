@@ -915,14 +915,10 @@ public sealed partial class DomBridge
         string blockSize = computed.GetValueOrDefault("block-size") ?? "auto";
 
         if (!HasExplicitSpecifiedSize(width))
-            width = vertical
-                ? (HasExplicitSpecifiedSize(blockSize) ? blockSize : width)
-                : (HasExplicitSpecifiedSize(inlineSize) ? inlineSize : width);
+            width = ResolveLogicalPhysicalFallback(width, vertical ? blockSize : inlineSize);
 
         if (!HasExplicitSpecifiedSize(height))
-            height = vertical
-                ? (HasExplicitSpecifiedSize(inlineSize) ? inlineSize : height)
-                : (HasExplicitSpecifiedSize(blockSize) ? blockSize : height);
+            height = ResolveLogicalPhysicalFallback(height, vertical ? inlineSize : blockSize);
 
         computed["width"] = width;
         computed["height"] = height;
@@ -933,6 +929,9 @@ public sealed partial class DomBridge
     private static bool HasExplicitPhysicalOrLogicalSize(Dictionary<string, string> computed, string physicalProperty, string logicalProperty) =>
         HasExplicitSpecifiedSize(computed.GetValueOrDefault(physicalProperty)) ||
         HasExplicitSpecifiedSize(computed.GetValueOrDefault(logicalProperty));
+
+    private static string ResolveLogicalPhysicalFallback(string currentPhysicalValue, string mappedLogicalValue) =>
+        HasExplicitSpecifiedSize(mappedLogicalValue) ? mappedLogicalValue : currentPhysicalValue;
 
     private static bool IsVerticalWritingMode(string? writingMode)
     {

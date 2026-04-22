@@ -654,7 +654,7 @@ internal static class CssUtils
         {
             return writingMode switch
             {
-                "vertical-rl" or "vertical-lr" => startSide ? "top" : "bottom",
+                "vertical-rl" or "vertical-lr" or "sideways-rl" or "sideways-lr" => startSide ? "top" : "bottom",
                 _ => startSide
                     ? (direction == "rtl" ? "right" : "left")
                     : (direction == "rtl" ? "left" : "right"),
@@ -663,8 +663,8 @@ internal static class CssUtils
 
         return writingMode switch
         {
-            "vertical-rl" => startSide ? "right" : "left",
-            "vertical-lr" => startSide ? "left" : "right",
+            "vertical-rl" or "sideways-rl" => startSide ? "right" : "left",
+            "vertical-lr" or "sideways-lr" => startSide ? "left" : "right",
             _ => startSide ? "top" : "bottom",
         };
     }
