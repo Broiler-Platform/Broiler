@@ -1250,6 +1250,42 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
+    public void ScrollIntoView_Clamps_Fixed_Scrollers_To_Their_Scroll_Bounds()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.style.width = '2000px';
+            document.body.style.height = '2000px';
+
+            var container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.right = '10px';
+            container.style.bottom = '10px';
+            container.style.width = '150px';
+            container.style.height = '150px';
+            container.style.overflow = 'auto';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.left = '200%';
+            target.style.top = '200%';
+            target.style.width = '10px';
+            target.style.height = '10px';
+
+            container.appendChild(target);
+            document.body.appendChild(container);
+            target.scrollIntoView();
+
+            document.getElementById('result').textContent =
+                document.documentElement.scrollLeft + ',' + document.documentElement.scrollTop + '|' +
+                container.scrollLeft + ',' + container.scrollTop + '|' +
+                container.scrollWidth + ',' + container.clientWidth;
+        ");
+
+        Assert.Contains("0,0|160,160|310,150", result);
+    }
+
+    [Fact]
     public void ScrollIntoView_Does_Not_Scroll_Hidden_Root_For_Zoomed_Scrollers()
     {
         var result = ExecJs(@"

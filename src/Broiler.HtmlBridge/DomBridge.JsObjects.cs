@@ -3084,7 +3084,7 @@ public sealed partial class DomBridge
             var scrollTop = ResolveScrollIntoViewOffset(element, scrollContainer, vertical: true, alignment: block);
             var scrollLeft = ResolveScrollIntoViewOffset(element, scrollContainer, vertical: false, alignment: inline);
 
-            SetElementScrollOffsetsWithBehavior(scrollContainer, scrollLeft, scrollTop, clamp: false, behavior: behavior);
+            SetElementScrollOffsetsWithBehavior(scrollContainer, scrollLeft, scrollTop, clamp: true, behavior: behavior);
 
             var next = GetOuterScrollContinuationElement(scrollContainer);
             if (next == null || ReferenceEquals(next, current))
