@@ -3235,15 +3235,42 @@ public sealed partial class DomBridge
         if (ReferenceEquals(element, DocumentElement) ||
             string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase))
         {
-            return true;
+            return CanProgrammaticallyScrollRoot(vertical);
         }
 
         var props = GetComputedProps(element);
+        var axisValue = GetOverflowAxisValue(props, vertical);
+
+        return EnablesScrollingBox(axisValue);
+    }
+
+    private bool CanProgrammaticallyScrollRoot(bool vertical)
+    {
+        var htmlOverflow = GetOverflowAxisValue(GetComputedProps(DocumentElement), vertical);
+        var body = FindBodyElement();
+        var bodyOverflow = body != null ? GetOverflowAxisValue(GetComputedProps(body), vertical) : null;
+
+        if (DisablesRootScrolling(htmlOverflow) || DisablesRootScrolling(bodyOverflow))
+            return false;
+
+        return true;
+    }
+
+    private static string? GetOverflowAxisValue(Dictionary<string, string> props, bool vertical)
+    {
         var axisValue = props.GetValueOrDefault(vertical ? "overflow-y" : "overflow-x");
         if (string.IsNullOrWhiteSpace(axisValue))
             axisValue = props.GetValueOrDefault("overflow");
+        return axisValue;
+    }
 
-        return EnablesScrollingBox(axisValue);
+    private static bool DisablesRootScrolling(string? overflowValue)
+    {
+        if (string.IsNullOrWhiteSpace(overflowValue))
+            return false;
+
+        var normalized = overflowValue.Trim().ToLowerInvariant();
+        return normalized.Contains("hidden") || normalized.Contains("clip");
     }
 
     private static bool EnablesScrollingBox(string? overflowValue)
@@ -3286,6 +3313,9 @@ public sealed partial class DomBridge
             if (ReferenceEquals(current, documentElement))
                 return documentElement;
 
+            if (IsViewportBodyElement(current, documentElement))
+                continue;
+
             var props = GetComputedProps(current);
             if (HasOverflowClipping(props))
                 return current;
@@ -3308,6 +3338,10 @@ public sealed partial class DomBridge
 
     private static bool IsDocumentElement(DomElement element) =>
         string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsViewportBodyElement(DomElement element, DomElement documentElement) =>
+        string.Equals(element.TagName, "body", StringComparison.OrdinalIgnoreCase) &&
+        ReferenceEquals(element.Parent, documentElement);
 
     private DomElement GetOwningDocumentElement(DomElement element)
     {

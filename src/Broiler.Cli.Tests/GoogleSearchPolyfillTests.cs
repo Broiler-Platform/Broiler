@@ -1055,6 +1055,56 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
+    public void ScrollIntoView_Does_Not_Scroll_Hidden_Root_For_Zoomed_Scrollers()
+    {
+        var result = ExecJs(@"
+            document.documentElement.style.overflow = 'hidden';
+            document.body.style.margin = '0';
+            document.body.style.overflow = 'hidden';
+
+            function buildContainer(zoom) {
+                var container = document.createElement('div');
+                container.style.position = 'relative';
+                container.style.display = 'inline-block';
+                container.style.width = '120px';
+                container.style.height = '100px';
+                container.style.overflow = 'auto';
+                container.style.border = '1px solid black';
+                if (zoom) {
+                    container.style.zoom = zoom;
+                }
+
+                var content = document.createElement('div');
+                content.style.width = '600px';
+                content.style.height = '600px';
+
+                var target = document.createElement('div');
+                target.style.position = 'absolute';
+                target.style.left = '300px';
+                target.style.top = '240px';
+                target.style.width = '20px';
+                target.style.height = '20px';
+
+                container.appendChild(content);
+                container.appendChild(target);
+                document.body.appendChild(container);
+                target.scrollIntoView();
+                return [
+                    document.documentElement.scrollLeft,
+                    document.documentElement.scrollTop,
+                    container.scrollLeft,
+                    container.scrollTop
+                ].join(',');
+            }
+
+            document.getElementById('result').textContent =
+                buildContainer('1') + '|' + buildContainer('2');
+        ");
+
+        Assert.Contains("0,0,300,240|0,0,300,240", result);
+    }
+
+    [Fact]
     public void FontRelative_Ch_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
     {
         var result = ExecJs(@"
