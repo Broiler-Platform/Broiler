@@ -575,14 +575,11 @@ internal sealed class CssParser
         if (selector.Length > colonIdx + 1 && selector[colonIdx + 1] == ':')
             return selector;
 
-        // Extract the pseudo-class name (up to next whitespace/combinator/colon).
+        // Extract the pseudo-class name. Functional pseudo-classes like
+        // :lang("en-gb") may contain punctuation that must be preserved
+        // until the matching closing parenthesis.
         int nameStart = colonIdx + 1;
-        int nameEnd = nameStart;
-        while (nameEnd < selector.Length
-               && !char.IsWhiteSpace(selector[nameEnd])
-               && selector[nameEnd] != '>' && selector[nameEnd] != '+'
-               && selector[nameEnd] != ':')
-            nameEnd++;
+        int nameEnd = FindPseudoClassEnd(selector, nameStart);
 
         string pseudoName = selector.Substring(nameStart, nameEnd - nameStart);
 
@@ -616,6 +613,62 @@ internal sealed class CssParser
                 || (!after.Contains(' ') && !after.Contains('>') && !after.Contains('+'));
             return string.IsNullOrEmpty(after) ? before : before + " " + after;
         }
+    }
+
+    private static int FindPseudoClassEnd(string selector, int nameStart)
+    {
+        int nameEnd = nameStart;
+        int parenDepth = 0;
+        char quote = '\0';
+
+        while (nameEnd < selector.Length)
+        {
+            char ch = selector[nameEnd];
+            if (quote != '\0')
+            {
+                if (ch == quote)
+                    quote = '\0';
+
+                nameEnd++;
+                continue;
+            }
+
+            if (ch == '"' || ch == '\'')
+            {
+                quote = ch;
+                nameEnd++;
+                continue;
+            }
+
+            if (ch == '(')
+            {
+                parenDepth++;
+                nameEnd++;
+                continue;
+            }
+
+            if (ch == ')')
+            {
+                if (parenDepth > 0)
+                    parenDepth--;
+
+                nameEnd++;
+                if (parenDepth == 0)
+                    break;
+
+                continue;
+            }
+
+            if (parenDepth == 0 &&
+                (char.IsWhiteSpace(ch) || ch == '>' || ch == '+' || ch == ':'))
+            {
+                break;
+            }
+
+            nameEnd++;
+        }
+
+        return nameEnd;
     }
 
     /// <summary>

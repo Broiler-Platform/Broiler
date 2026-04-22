@@ -582,21 +582,134 @@ public sealed partial class DomBridge
 
     private static bool MatchesLang(DomElement el, string lang)
     {
-        lang = NormalizeLangPseudoArgument(lang);
-        if (string.IsNullOrWhiteSpace(lang))
+        if (!TryGetElementLanguage(el, out var elementLanguage))
             return false;
 
+        foreach (var range in SplitLangPseudoArguments(lang))
+        {
+            if (MatchesLanguageRange(elementLanguage, range))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryGetElementLanguage(DomElement el, out string language)
+    {
         var current = el;
         while (current != null)
         {
-            if (current.Attributes.TryGetValue("lang", out var val))
-            {
-                return string.Equals(val, lang, StringComparison.OrdinalIgnoreCase)
-                    || val.StartsWith(lang + "-", StringComparison.OrdinalIgnoreCase);
-            }
+            if (TryGetLanguageAttribute(current, out language))
+                return true;
+
             current = current.Parent;
         }
+
+        language = string.Empty;
         return false;
+    }
+
+    private static bool TryGetLanguageAttribute(DomElement el, out string language)
+    {
+        if (el.Attributes.TryGetValue("lang", out var langValue) &&
+            !string.IsNullOrWhiteSpace(langValue))
+        {
+            language = langValue.Trim();
+            return true;
+        }
+
+        if (el.Attributes.TryGetValue("xml:lang", out var xmlLangValue) &&
+            !string.IsNullOrWhiteSpace(xmlLangValue))
+        {
+            language = xmlLangValue.Trim();
+            return true;
+        }
+
+        language = string.Empty;
+        return false;
+    }
+
+    private static IEnumerable<string> SplitLangPseudoArguments(string lang)
+    {
+        foreach (var part in lang.Split(','))
+        {
+            var normalized = NormalizeLangPseudoArgument(part);
+            if (!string.IsNullOrWhiteSpace(normalized))
+                yield return normalized;
+        }
+    }
+
+    private static bool MatchesLanguageRange(string elementLanguage, string languageRange)
+    {
+        var tagSubtags = SplitLanguageSubtags(elementLanguage);
+        var rangeSubtags = SplitLanguageSubtags(languageRange);
+        if (tagSubtags.Length == 0 || rangeSubtags.Length == 0)
+            return false;
+
+        if (!rangeSubtags.Contains("*", StringComparer.Ordinal))
+            return MatchesLanguagePrefix(tagSubtags, rangeSubtags);
+
+        return MatchesExtendedLanguageRange(tagSubtags, rangeSubtags);
+    }
+
+    private static string[] SplitLanguageSubtags(string language) =>
+        language
+            .Split('-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(part => part.ToLowerInvariant())
+            .ToArray();
+
+    private static bool MatchesLanguagePrefix(string[] tagSubtags, string[] rangeSubtags)
+    {
+        if (rangeSubtags.Length > tagSubtags.Length)
+            return false;
+
+        for (int i = 0; i < rangeSubtags.Length; i++)
+        {
+            if (!string.Equals(tagSubtags[i], rangeSubtags[i], StringComparison.Ordinal))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool MatchesExtendedLanguageRange(string[] tagSubtags, string[] rangeSubtags)
+    {
+        int tagIndex = 0;
+        int rangeIndex = 0;
+
+        while (rangeIndex < rangeSubtags.Length)
+        {
+            var rangeSubtag = rangeSubtags[rangeIndex];
+            if (rangeSubtag == "*")
+            {
+                rangeIndex++;
+                if (rangeIndex >= rangeSubtags.Length)
+                    return true;
+
+                var nextRangeSubtag = rangeSubtags[rangeIndex];
+                while (tagIndex < tagSubtags.Length &&
+                       !string.Equals(tagSubtags[tagIndex], nextRangeSubtag, StringComparison.Ordinal))
+                {
+                    tagIndex++;
+                }
+
+                if (tagIndex >= tagSubtags.Length)
+                    return false;
+
+                continue;
+            }
+
+            if (tagIndex >= tagSubtags.Length ||
+                !string.Equals(tagSubtags[tagIndex], rangeSubtag, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            tagIndex++;
+            rangeIndex++;
+        }
+
+        return true;
     }
 
     private static string NormalizeLangPseudoArgument(string lang)

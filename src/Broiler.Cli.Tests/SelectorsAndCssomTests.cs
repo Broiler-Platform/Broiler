@@ -222,6 +222,44 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void Lang_Matches_Extended_Wildcard_Range()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div lang=""en-GB-oed""><span id=""target"">English</span></div>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(document.querySelector('#target:lang(""*-gb"")') !== null);
+r.push(document.querySelector('#target:lang(""*-fr"")') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Lang_Matches_XmlLang_Ancestor()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<svg xml:lang=""fr-CA""><text id=""target"">Bonjour</text></svg>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(document.querySelector('#target:lang(fr)') !== null);
+r.push(document.querySelector('#target:lang(en)') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
     public void Open_Matches_Details_With_Open_Attribute()
     {
         var html = @"<!DOCTYPE html>

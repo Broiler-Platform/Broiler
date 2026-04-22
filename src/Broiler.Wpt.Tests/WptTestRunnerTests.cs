@@ -4209,6 +4209,46 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_Selectors4_LangExtendedWildcard_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { width: 40px; height: 40px; background: red; }
+    .test:lang("*-gb") { background: green; }
+  </style>
+</head>
+<body>
+  <div lang="en-GB-oed"><div class="test"></div></div>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { width: 40px; height: 40px; background: green; }
+  </style>
+</head>
+<body>
+  <div lang="en-GB-oed"><div class="test"></div></div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors4-lang-extended-wildcard", 80, 80);
+        Assert.True(result.Passed,
+            $":lang() extended wildcard ranges should match nested content languages. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_Selectors4_DetailsOpenPseudo_And_ClosedContent_MatchReference()
     {
         var testHtml = """
