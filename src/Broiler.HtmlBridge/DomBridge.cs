@@ -40,6 +40,9 @@ public sealed partial class DomBridge
     private readonly HashSet<int> _clearedTimerIds = new();
     private int _rafIdCounter;
     private readonly Dictionary<int, JSFunction> _rafCallbacks = new();
+    private int _frameActionIdCounter;
+    private readonly Dictionary<int, Action> _frameActions = new();
+    private readonly Dictionary<DomElement, int> _smoothScrollTokens = [];
 
     /// <summary>
     /// Index into <see cref="_elements"/> of the <c>&lt;script&gt;</c> element
@@ -196,7 +199,7 @@ public sealed partial class DomBridge
     /// waiting to execute.
     /// </summary>
     public bool HasPendingTimers =>
-        _timeoutCallbacks.Count > 0 || _intervalCallbacks.Count > 0 || _rafCallbacks.Count > 0;
+        _timeoutCallbacks.Count > 0 || _intervalCallbacks.Count > 0 || _rafCallbacks.Count > 0 || _frameActions.Count > 0;
 
     /// <summary>
     /// Executes one batch of pending timer and animation-frame callbacks.
@@ -231,7 +234,10 @@ public sealed partial class DomBridge
             rafSnapshot.Add((kv.Key, kv.Value));
         _rafCallbacks.Clear();
 
-        if (pending.Count == 0 && intervalSnapshot.Count == 0 && rafSnapshot.Count == 0)
+        var frameActionSnapshot = _frameActions.Values.ToList();
+        _frameActions.Clear();
+
+        if (pending.Count == 0 && intervalSnapshot.Count == 0 && rafSnapshot.Count == 0 && frameActionSnapshot.Count == 0)
             return false;
 
         // Execute timeout callbacks
@@ -255,6 +261,12 @@ public sealed partial class DomBridge
         {
             try { fn.InvokeFunction(new Arguments(JSUndefined.Value, new JSNumber(0))); }
             catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"rAF callback error: {ex.Message}", ex); }
+        }
+
+        foreach (var action in frameActionSnapshot)
+        {
+            try { action(); }
+            catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FlushTimerStep", $"frame action error: {ex.Message}", ex); }
         }
 
         return true;

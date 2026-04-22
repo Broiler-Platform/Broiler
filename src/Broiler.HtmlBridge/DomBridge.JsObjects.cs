@@ -22,6 +22,7 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
     private const double DefaultBodyMarginPixels = 8;
+    private const int MaxScrollContinuationDepth = 16;
 
     private readonly Dictionary<DomElement, JSObject> _jsObjectCache = [];
     /// <summary>Counter for tracking top-layer insertion order via showModal().</summary>
@@ -2259,7 +2260,7 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments a) =>
                 {
                     if (a.Length > 0)
-                        bridgeForOffset.SetElementScrollOffsets(element, top: a[0].DoubleValue);
+                        bridgeForOffset.SetElementScrollOffsetsWithBehavior(element, top: a[0].DoubleValue);
                     return JSUndefined.Value;
                 }, "set scrollTop"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -2274,7 +2275,7 @@ public sealed partial class DomBridge
                 new JSFunction((in Arguments a) =>
                 {
                     if (a.Length > 0)
-                        bridgeForOffset.SetElementScrollOffsets(element, left: a[0].DoubleValue);
+                        bridgeForOffset.SetElementScrollOffsetsWithBehavior(element, left: a[0].DoubleValue);
                     return JSUndefined.Value;
                 }, "set scrollLeft"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -2346,9 +2347,10 @@ public sealed partial class DomBridge
 
             obj.FastAddValue(
                 (KeyString)"scrollIntoView",
-                new JSFunction((in Arguments _) =>
+                new JSFunction((in Arguments a) =>
                 {
-                    bridgeForOffset.ScrollElementIntoView(elForOffset);
+                    var (_, _, behavior) = bridgeForOffset.GetScrollArguments(a);
+                    bridgeForOffset.ScrollElementIntoView(elForOffset, behavior);
                     return JSUndefined.Value;
                 }, "scrollIntoView", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -2356,8 +2358,8 @@ public sealed partial class DomBridge
                 (KeyString)"scroll",
                 new JSFunction((in Arguments a) =>
                 {
-                    var (left, top) = bridgeForOffset.GetScrollArguments(a);
-                    bridgeForOffset.SetElementScrollOffsets(element, left, top, clamp: false);
+                    var (left, top, behavior) = bridgeForOffset.GetScrollArguments(a);
+                    bridgeForOffset.SetElementScrollOffsetsWithBehavior(element, left, top, clamp: false, behavior: behavior);
                     return JSUndefined.Value;
                 }, "scroll", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -2365,8 +2367,8 @@ public sealed partial class DomBridge
                 (KeyString)"scrollTo",
                 new JSFunction((in Arguments a) =>
                 {
-                    var (left, top) = bridgeForOffset.GetScrollArguments(a);
-                    bridgeForOffset.SetElementScrollOffsets(element, left, top, clamp: false);
+                    var (left, top, behavior) = bridgeForOffset.GetScrollArguments(a);
+                    bridgeForOffset.SetElementScrollOffsetsWithBehavior(element, left, top, clamp: false, behavior: behavior);
                     return JSUndefined.Value;
                 }, "scrollTo", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -2374,8 +2376,8 @@ public sealed partial class DomBridge
                 (KeyString)"scrollBy",
                 new JSFunction((in Arguments a) =>
                 {
-                    var (left, top) = bridgeForOffset.GetScrollArguments(a);
-                    bridgeForOffset.SetElementScrollOffsets(element, left, top, relative: true, clamp: false);
+                    var (left, top, behavior) = bridgeForOffset.GetScrollArguments(a);
+                    bridgeForOffset.SetElementScrollOffsetsWithBehavior(element, left, top, relative: true, clamp: false, behavior: behavior);
                     return JSUndefined.Value;
                 }, "scrollBy", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -3053,10 +3055,10 @@ public sealed partial class DomBridge
              + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("border-bottom-width"), element);
     }
 
-    private void ScrollElementIntoView(DomElement element)
+    private void ScrollElementIntoView(DomElement element, string? behavior = null)
     {
         var current = element;
-        for (var i = 0; i < 16 && current != null; i++)
+        for (var i = 0; i < MaxScrollContinuationDepth && current != null; i++)
         {
             var scrollContainer = FindScrollContainer(current) ?? GetOwningDocumentElement(current);
             if (scrollContainer == null)
@@ -3075,7 +3077,7 @@ public sealed partial class DomBridge
                 - ResolveScrollIntoViewInset(element, "scroll-margin-left")
                 - ResolveScrollIntoViewInset(scrollContainer, "scroll-padding-left");
 
-            SetElementScrollOffsets(scrollContainer, scrollLeft, scrollTop, clamp: false);
+            SetElementScrollOffsetsWithBehavior(scrollContainer, scrollLeft, scrollTop, clamp: false, behavior: behavior);
 
             var next = GetOuterScrollContinuationElement(scrollContainer);
             if (next == null || ReferenceEquals(next, current))
@@ -3085,23 +3087,36 @@ public sealed partial class DomBridge
         }
     }
 
-    private (double? Left, double? Top) GetScrollArguments(in Arguments args)
+    private (double? Left, double? Top, string? Behavior) GetScrollArguments(in Arguments args)
     {
         if (args.Length == 0)
-            return (null, null);
+            return (null, null, null);
 
         if (args[0] is JSObject options)
         {
-            return (GetOptionalScrollCoordinate(options, "left"), GetOptionalScrollCoordinate(options, "top"));
+            return (
+                GetOptionalScrollCoordinate(options, "left"),
+                GetOptionalScrollCoordinate(options, "top"),
+                GetOptionalScrollBehavior(options));
         }
 
-        return (args.Length > 0 ? args[0].DoubleValue : null, args.Length > 1 ? args[1].DoubleValue : null);
+        return (args.Length > 0 ? args[0].DoubleValue : null, args.Length > 1 ? args[1].DoubleValue : null, null);
     }
 
     private static double? GetOptionalScrollCoordinate(JSObject options, string propertyName)
     {
         var value = options[(KeyString)propertyName];
         return value == null || value.IsUndefined || value.IsNull ? null : value.DoubleValue;
+    }
+
+    private static string? GetOptionalScrollBehavior(JSObject options)
+    {
+        var value = options[(KeyString)"behavior"];
+        if (value == null || value.IsUndefined || value.IsNull)
+            return null;
+
+        var behavior = value.ToString();
+        return string.IsNullOrWhiteSpace(behavior) ? null : behavior;
     }
 
     private double GetElementScrollOffset(DomElement element, bool vertical)
@@ -3116,6 +3131,13 @@ public sealed partial class DomBridge
     }
 
     private void SetElementScrollOffsets(DomElement element, double? left = null, double? top = null, bool relative = false, bool clamp = true)
+    {
+        var (nextLeft, nextTop) = ResolveElementScrollOffsets(element, left, top, relative, clamp);
+        element.DomProperties["_scrollLeft"] = nextLeft;
+        element.DomProperties["_scrollTop"] = nextTop;
+    }
+
+    private (double Left, double Top) ResolveElementScrollOffsets(DomElement element, double? left = null, double? top = null, bool relative = false, bool clamp = true)
     {
         var currentLeft = GetElementScrollOffset(element, vertical: false);
         var currentTop = GetElementScrollOffset(element, vertical: true);
@@ -3135,8 +3157,77 @@ public sealed partial class DomBridge
             nextTop = Math.Clamp(nextTop, minTop, maxTop);
         }
 
-        element.DomProperties["_scrollLeft"] = nextLeft;
-        element.DomProperties["_scrollTop"] = nextTop;
+        return (nextLeft, nextTop);
+    }
+
+    private void SetElementScrollOffsetsWithBehavior(
+        DomElement element,
+        double? left = null,
+        double? top = null,
+        bool relative = false,
+        bool clamp = true,
+        string? behavior = null)
+    {
+        var (targetLeft, targetTop) = ResolveElementScrollOffsets(element, left, top, relative, clamp);
+        var effectiveBehavior = ResolveScrollBehavior(element, behavior);
+        CancelSmoothScroll(element);
+
+        if (string.Equals(effectiveBehavior, "smooth", StringComparison.OrdinalIgnoreCase))
+        {
+            var currentLeft = GetElementScrollOffset(element, vertical: false);
+            var currentTop = GetElementScrollOffset(element, vertical: true);
+            // Approximate smooth scrolling with a visible intermediate frame before
+            // finishing on the next queued frame.
+            element.DomProperties["_scrollLeft"] = currentLeft + ((targetLeft - currentLeft) / 2.0);
+            element.DomProperties["_scrollTop"] = currentTop + ((targetTop - currentTop) / 2.0);
+
+            var token = ++_frameActionIdCounter;
+            _smoothScrollTokens[element] = token;
+            QueueFrameAction(() =>
+            {
+                if (_smoothScrollTokens.TryGetValue(element, out var activeToken) && activeToken == token)
+                {
+                    element.DomProperties["_scrollLeft"] = targetLeft;
+                    element.DomProperties["_scrollTop"] = targetTop;
+                    _smoothScrollTokens.Remove(element);
+                }
+            });
+            return;
+        }
+
+        element.DomProperties["_scrollLeft"] = targetLeft;
+        element.DomProperties["_scrollTop"] = targetTop;
+    }
+
+    private void QueueFrameAction(Action callback)
+    {
+        _frameActions[++_frameActionIdCounter] = callback;
+    }
+
+    private void CancelSmoothScroll(DomElement element)
+    {
+        _smoothScrollTokens.Remove(element);
+    }
+
+    private string ResolveScrollBehavior(DomElement element, string? requestedBehavior)
+    {
+        var normalizedRequested = NormalizeScrollBehavior(requestedBehavior);
+        if (normalizedRequested == "instant" || normalizedRequested == "smooth")
+            return normalizedRequested;
+
+        var props = GetComputedProps(element);
+        return NormalizeScrollBehavior(props.GetValueOrDefault("scroll-behavior")) == "smooth"
+            ? "smooth"
+            : "instant";
+    }
+
+    private static string NormalizeScrollBehavior(string? behavior)
+    {
+        if (string.IsNullOrWhiteSpace(behavior))
+            return "auto";
+
+        var normalized = behavior.Trim().ToLowerInvariant();
+        return normalized is "instant" or "smooth" ? normalized : "auto";
     }
 
     private bool CanProgrammaticallyScroll(DomElement element, bool vertical)
@@ -3268,7 +3359,8 @@ public sealed partial class DomBridge
         while (current.Parent != null && !ReferenceEquals(current.Parent, ancestor))
         {
             offset += ComputeOffsetWithinParent(current, vertical);
-            offset -= GetElementScrollOffset(current.Parent, vertical);
+            if (current.Parent != null)
+                offset -= GetElementScrollOffset(current.Parent, vertical);
             current = current.Parent;
         }
 
@@ -3955,8 +4047,8 @@ public sealed partial class DomBridge
             (KeyString)"scroll",
             new JSFunction((in Arguments a) =>
             {
-                var (left, top) = GetScrollArguments(a);
-                SetSubWindowScrollOffsets(containerElement, left, top);
+                var (left, top, behavior) = GetScrollArguments(a);
+                SetSubWindowScrollOffsets(containerElement, left, top, behavior: behavior);
                 return JSUndefined.Value;
             }, "scroll", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -3964,8 +4056,8 @@ public sealed partial class DomBridge
             (KeyString)"scrollTo",
             new JSFunction((in Arguments a) =>
             {
-                var (left, top) = GetScrollArguments(a);
-                SetSubWindowScrollOffsets(containerElement, left, top);
+                var (left, top, behavior) = GetScrollArguments(a);
+                SetSubWindowScrollOffsets(containerElement, left, top, behavior: behavior);
                 return JSUndefined.Value;
             }, "scrollTo", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -3973,8 +4065,8 @@ public sealed partial class DomBridge
             (KeyString)"scrollBy",
             new JSFunction((in Arguments a) =>
             {
-                var (left, top) = GetScrollArguments(a);
-                SetSubWindowScrollOffsets(containerElement, left, top, relative: true);
+                var (left, top, behavior) = GetScrollArguments(a);
+                SetSubWindowScrollOffsets(containerElement, left, top, relative: true, behavior: behavior);
                 return JSUndefined.Value;
             }, "scrollBy", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
@@ -4030,13 +4122,13 @@ public sealed partial class DomBridge
         return scrollingElement == null ? 0 : GetElementScrollOffset(scrollingElement, vertical);
     }
 
-    private void SetSubWindowScrollOffsets(DomElement containerElement, double? left = null, double? top = null, bool relative = false)
+    private void SetSubWindowScrollOffsets(DomElement containerElement, double? left = null, double? top = null, bool relative = false, string? behavior = null)
     {
         var scrollingElement = GetSubDocumentScrollingElement(containerElement);
         if (scrollingElement == null)
             return;
 
-        SetElementScrollOffsets(scrollingElement, left, top, relative: relative, clamp: false);
+        SetElementScrollOffsetsWithBehavior(scrollingElement, left, top, relative: relative, clamp: false, behavior: behavior);
     }
 
     private static DomElement? GetSubDocumentScrollingElement(DomElement containerElement)

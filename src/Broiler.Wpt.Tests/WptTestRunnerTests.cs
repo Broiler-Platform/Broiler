@@ -4904,6 +4904,95 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssomView_SubframeRootScrollIntoView_Uses_SmoothScrollBehavior()
+    {
+        const string html = """
+<!DOCTYPE html>
+<iframe id="fr" width="400" height="200" srcdoc='<!DOCTYPE html><html><head><style>body{margin:0}.smoothBehavior{scroll-behavior:smooth}</style></head><body><div style="width:2000px;height:1000px"><span style="display:inline-block;width:500px;height:250px"></span><span id="target" style="display:inline-block;vertical-align:-15px;width:10px;height:15px"></span></div></body></html>'></iframe>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var beforeFlush = ctx.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                var doc = iframe.contentDocument;
+                doc.documentElement.className = 'smoothBehavior';
+                doc.getElementById('target').scrollIntoView({ behavior: 'auto' });
+                var scrollingElement = doc.scrollingElement;
+                return [
+                    scrollingElement.scrollLeft,
+                    scrollingElement.scrollTop,
+                    scrollingElement.scrollLeft < 500,
+                    scrollingElement.scrollTop < 250
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("250|125|true|true", beforeFlush.ToString());
+
+        bridge.FlushTimerStep();
+        var afterFlush = ctx.Eval("""
+            (() => {
+                var scrollingElement = document.getElementById('fr').contentDocument.scrollingElement;
+                return [scrollingElement.scrollLeft, scrollingElement.scrollTop].join('|');
+            })()
+            """);
+
+        Assert.Equal("500|250", afterFlush.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_SubframeWindowScrollTo_Honors_Smooth_And_Instant_Behavior()
+    {
+        const string html = """
+<!DOCTYPE html>
+<iframe id="fr" width="400" height="200" srcdoc='<!DOCTYPE html><html><head><style>body{margin:0}.smoothBehavior{scroll-behavior:smooth}</style></head><body><div style="width:2000px;height:1000px"></div></body></html>'></iframe>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var smoothBeforeFlush = ctx.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                var win = iframe.contentWindow;
+                iframe.contentDocument.documentElement.className = 'smoothBehavior';
+                win.scrollTo({ left: 500, top: 250, behavior: 'auto' });
+                return [win.scrollX, win.scrollY, win.scrollX < 500, win.scrollY < 250].join('|');
+            })()
+            """);
+
+        Assert.Equal("250|125|true|true", smoothBeforeFlush.ToString());
+
+        bridge.FlushTimerStep();
+        var smoothAfterFlush = ctx.Eval("""
+            (() => {
+                var win = document.getElementById('fr').contentWindow;
+                return [win.scrollX, win.scrollY].join('|');
+            })()
+            """);
+
+        Assert.Equal("500|250", smoothAfterFlush.ToString());
+
+        var instantResult = ctx.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                var win = iframe.contentWindow;
+                win.scrollTo({ left: 0, top: 0, behavior: 'instant' });
+                return [win.scrollX, win.scrollY].join('|');
+            })()
+            """);
+
+        Assert.Equal("0|0", instantResult.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_IframeSrcdocLoadEvent_Fires_After_Listener_Registration()
     {
         const string html = @"<!DOCTYPE html>
