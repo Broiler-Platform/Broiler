@@ -1189,6 +1189,7 @@ internal static class PaintWalker
         // Check text-decoration on the fragment itself and on its inline children.
         // In the box tree, text-decoration may be on the block or on anonymous inline children.
         string decoration = fragment.Style.TextDecoration;
+        var decorationStyleSource = fragment.Style;
 
         // If the block fragment doesn't have decoration, check children and inlines.
         // First child with a decoration wins (consistent with old CssBox.PaintDecoration
@@ -1201,6 +1202,7 @@ internal static class PaintWalker
                 if (!string.IsNullOrEmpty(child.Style.TextDecoration) && child.Style.TextDecoration != "none")
                 {
                     decoration = child.Style.TextDecoration;
+                    decorationStyleSource = child.Style;
                     break;
                 }
             }
@@ -1211,7 +1213,7 @@ internal static class PaintWalker
 
         // CSS Backgrounds Level 4: background-clip: text — text-decoration
         // uses the composited color so decorations also show the background.
-        Color decoColor = fragment.Style.ActualColor;
+        Color decoColor = decorationStyleSource.ActualTextDecorationColor;
         if (bgClipTextColor.HasValue)
             decoColor = CompositeTextColor(bgClipTextColor.Value, decoColor);
 

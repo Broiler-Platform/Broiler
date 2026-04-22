@@ -481,6 +481,64 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssVariables_TextDecorationPaintValues_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    :root { --accent: rgb(0, 128, 0); }
+    a { color: black; }
+    .box {
+      margin: 12px;
+      font: 20px/1 sans-serif;
+      width: 220px;
+    }
+    .longhand {
+      text-decoration-line: underline;
+      text-decoration-style: solid;
+      text-decoration-color: var(--accent);
+    }
+    .shorthand {
+      text-decoration: solid underline var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <a href="""">
+    <div class=""box longhand"">Underline should be green</div>
+    <div class=""box shorthand"">Underline should be green</div>
+  </a>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .box {
+      margin: 12px;
+      font: 20px/1 sans-serif;
+      width: 220px;
+      color: black;
+      text-decoration: solid underline rgb(0, 128, 0);
+    }
+  </style>
+</head>
+<body>
+  <div class=""box"">Underline should be green</div>
+  <div class=""box"">Underline should be green</div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-text-decoration-paint-values", 260, 90);
+        Assert.True(result.Passed,
+            $"Text decoration var() paint values should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssVariables_MissingClosingNestedFallback_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>

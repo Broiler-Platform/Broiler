@@ -91,6 +91,9 @@ internal static class CssUtils
             "text-indent" => cssBox.TextIndent,
             "text-align" => cssBox.TextAlign,
             "text-decoration" => cssBox.TextDecoration,
+            "text-decoration-line" => cssBox.TextDecoration,
+            "text-decoration-style" => cssBox.TextDecorationStyle,
+            "text-decoration-color" => cssBox.TextDecorationColor,
             "white-space" => cssBox.WhiteSpace,
             "word-break" => cssBox.WordBreak,
             "visibility" => cssBox.Visibility,
@@ -445,7 +448,16 @@ internal static class CssUtils
                 cssBox.TextAlign = value;
                 break;
             case "text-decoration":
+                ApplyTextDecorationShorthand(cssBox, value);
+                break;
+            case "text-decoration-line":
                 cssBox.TextDecoration = value;
+                break;
+            case "text-decoration-style":
+                cssBox.TextDecorationStyle = value;
+                break;
+            case "text-decoration-color":
+                cssBox.TextDecorationColor = value;
                 break;
             case "white-space":
                 cssBox.WhiteSpace = value;
@@ -537,6 +549,42 @@ internal static class CssUtils
             SetLogicalBorderComponent(cssBox, inlineAxis, startSide: true, "color", color);
             SetLogicalBorderComponent(cssBox, inlineAxis, startSide: false, "color", color);
         }
+    }
+
+    private static void ApplyTextDecorationShorthand(CssBox cssBox, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            cssBox.TextDecoration = string.Empty;
+            return;
+        }
+
+        cssBox.TextDecoration = "none";
+        cssBox.TextDecorationStyle = "solid";
+        cssBox.TextDecorationColor = "currentcolor";
+
+        var parts = value.Trim().Split([' '], StringSplitOptions.RemoveEmptyEntries);
+        string? line = null;
+
+        foreach (var part in parts)
+        {
+            var lower = part.ToLowerInvariant();
+            if (lower is "underline" or "overline" or "line-through" or "none")
+            {
+                line = part;
+            }
+            else if (lower is "solid" or "double" or "dotted" or "dashed" or "wavy")
+            {
+                cssBox.TextDecorationStyle = part;
+            }
+            else
+            {
+                cssBox.TextDecorationColor = part;
+            }
+        }
+
+        if (line != null)
+            cssBox.TextDecoration = line;
     }
 
     private static void SetLogicalBorderComponent(

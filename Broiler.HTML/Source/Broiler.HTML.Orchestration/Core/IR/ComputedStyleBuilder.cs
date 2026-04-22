@@ -75,6 +75,8 @@ internal static class ComputedStyleBuilder
             FontWeight = box.FontWeight,
             TextAlign = box.TextAlign,
             TextDecoration = box.TextDecoration,
+            TextDecorationStyle = box.TextDecorationStyle,
+            ActualTextDecorationColor = box.ActualTextDecorationColor,
             WhiteSpace = box.WhiteSpace,
             WordBreak = box.WordBreak,
             VerticalAlign = box.VerticalAlign,

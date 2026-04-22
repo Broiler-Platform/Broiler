@@ -42,6 +42,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     private string _backgroundImage = "none";
     private string _backgroundClip = "border-box";
     private string _textIndent = "0";
+    private string _textDecorationColor = "currentcolor";
     private string _top = "auto";
     private string _wordSpacing = "normal";
 
@@ -87,6 +88,7 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
     private Color _actualBorderLeftColor = System.Drawing.Color.Empty;
     private Color _actualBorderBottomColor = System.Drawing.Color.Empty;
     private Color _actualBorderRightColor = System.Drawing.Color.Empty;
+    private Color _actualTextDecorationColor = System.Drawing.Color.Empty;
     private Color _actualBackgroundColor = System.Drawing.Color.Empty;
     private RFont _actualFont;
 
@@ -435,6 +437,16 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
 
     public string TextAlign { get; set; } = string.Empty;
     public string TextDecoration { get; set; } = string.Empty;
+    public string TextDecorationStyle { get; set; } = "solid";
+    public string TextDecorationColor
+    {
+        get => _textDecorationColor;
+        set
+        {
+            _textDecorationColor = value;
+            _actualTextDecorationColor = System.Drawing.Color.Empty;
+        }
+    }
     public string WhiteSpace { get; set; } = "normal";
     public string Visibility { get; set; } = "visible";
 
@@ -919,6 +931,23 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
                 _actualBorderRightColor = GetActualColor(BorderRightColor);
 
             return _actualBorderRightColor;
+        }
+    }
+
+    public Color ActualTextDecorationColor
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(TextDecorationColor) ||
+                TextDecorationColor.Equals("currentcolor", StringComparison.OrdinalIgnoreCase))
+            {
+                return ActualColor;
+            }
+
+            if (_actualTextDecorationColor.IsEmpty)
+                _actualTextDecorationColor = GetActualColor(TextDecorationColor);
+
+            return _actualTextDecorationColor;
         }
     }
 
@@ -1462,6 +1491,8 @@ internal abstract class CssBoxProperties : IBorderRenderData, IBackgroundRenderD
         _paddingTop = p._paddingTop;
         _right = p._right;
         TextDecoration = p.TextDecoration;
+        TextDecorationStyle = p.TextDecorationStyle;
+        TextDecorationColor = p.TextDecorationColor;
         _top = p._top;
         Position = p.Position;
         VerticalAlign = p.VerticalAlign;
