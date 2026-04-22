@@ -1525,6 +1525,53 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments _) => new JSNumber(vpHeight), "get outerHeight"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty(
+            (KeyString)"scrollX",
+            new JSFunction((in Arguments _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: false)), "get scrollX"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty(
+            (KeyString)"scrollY",
+            new JSFunction((in Arguments _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: true)), "get scrollY"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty(
+            (KeyString)"pageXOffset",
+            new JSFunction((in Arguments _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: false)), "get pageXOffset"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty(
+            (KeyString)"pageYOffset",
+            new JSFunction((in Arguments _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: true)), "get pageYOffset"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddValue(
+            (KeyString)"scroll",
+            new JSFunction((in Arguments a) =>
+            {
+                var (left, top, behavior) = GetScrollArguments(a);
+                SetElementScrollOffsetsWithBehavior(DocumentElement, left, top, clamp: false, behavior: behavior);
+                return JSUndefined.Value;
+            }, "scroll", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue(
+            (KeyString)"scrollTo",
+            new JSFunction((in Arguments a) =>
+            {
+                var (left, top, behavior) = GetScrollArguments(a);
+                SetElementScrollOffsetsWithBehavior(DocumentElement, left, top, clamp: false, behavior: behavior);
+                return JSUndefined.Value;
+            }, "scrollTo", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue(
+            (KeyString)"scrollBy",
+            new JSFunction((in Arguments a) =>
+            {
+                var (left, top, behavior) = GetScrollArguments(a);
+                SetElementScrollOffsetsWithBehavior(DocumentElement, left, top, relative: true, clamp: false, behavior: behavior);
+                return JSUndefined.Value;
+            }, "scrollBy", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
         // window.screen — basic stub for screen dimensions
         var screenObj = new JSObject();
         screenObj.FastAddValue((KeyString)"width", new JSNumber(vpWidth), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1535,6 +1582,68 @@ public sealed partial class DomBridge
         screenObj.FastAddValue((KeyString)"pixelDepth", new JSNumber(24), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"screen", screenObj, JSPropertyAttributes.EnumerableConfigurableValue);
         context["screen"] = screenObj;
+
+        var visualViewport = new JSObject();
+        _visualViewportJSObject = visualViewport;
+        visualViewport.FastAddProperty(
+            (KeyString)"width",
+            new JSFunction((in Arguments _) => new JSNumber(GetVisualViewportWidth()), "get width"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddProperty(
+            (KeyString)"height",
+            new JSFunction((in Arguments _) => new JSNumber(GetVisualViewportHeight()), "get height"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddProperty(
+            (KeyString)"scale",
+            new JSFunction((in Arguments _) => new JSNumber(GetVisualViewportScale()), "get scale"),
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 0)
+                    SetVisualViewportScale(a[0].DoubleValue);
+                return JSUndefined.Value;
+            }, "set scale"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddProperty(
+            (KeyString)"pageLeft",
+            new JSFunction((in Arguments _) => new JSNumber(GetVisualViewportPageOffset(vertical: false)), "get pageLeft"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddProperty(
+            (KeyString)"pageTop",
+            new JSFunction((in Arguments _) => new JSNumber(GetVisualViewportPageOffset(vertical: true)), "get pageTop"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        visualViewport.FastAddValue(
+            (KeyString)"addEventListener",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 1 &&
+                    a[0].ToString().Equals("scroll", StringComparison.OrdinalIgnoreCase) &&
+                    a[1] is JSFunction listener &&
+                    !_visualViewportScrollListeners.Contains(listener))
+                {
+                    _visualViewportScrollListeners.Add(listener);
+                }
+                return JSUndefined.Value;
+            }, "addEventListener", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        visualViewport.FastAddValue(
+            (KeyString)"removeEventListener",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length > 1 &&
+                    a[0].ToString().Equals("scroll", StringComparison.OrdinalIgnoreCase) &&
+                    a[1] is JSFunction listener)
+                {
+                    _visualViewportScrollListeners.Remove(listener);
+                }
+                return JSUndefined.Value;
+            }, "removeEventListener", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"visualViewport", visualViewport, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["visualViewport"] = visualViewport;
 
         // ---------------------------------------------------------------
         //  Google Search Compliance: Phase 2 (P1) — Content rendering

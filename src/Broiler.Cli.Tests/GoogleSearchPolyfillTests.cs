@@ -897,7 +897,50 @@ document.getElementById('result').textContent =
             document.getElementById('result').textContent =
                 buildContainer('1') + ',' + buildContainer('2');
         ");
-        Assert.Contains("950,950", result);
+        Assert.Contains("950,920", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Scales_Zoomed_Target_ScrollMargin_In_Scroller_Coordinates()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function buildTarget(useInheritedMargin) {
+                var container = document.createElement('div');
+                container.style.width = '200px';
+                container.style.height = '100px';
+                container.style.overflowX = 'hidden';
+                container.style.overflowY = 'scroll';
+                container.style.paddingTop = '40px';
+                container.style.paddingBottom = '40px';
+                if (useInheritedMargin) {
+                    container.style.scrollMarginTop = '20px';
+                }
+
+                var buffer = document.createElement('div');
+                buffer.style.height = '300px';
+                var target = document.createElement('div');
+                target.style.height = '10px';
+                target.style.width = '200px';
+                target.style.zoom = '2';
+                target.style.scrollMarginTop = useInheritedMargin ? 'inherit' : '20px';
+                var tail = document.createElement('div');
+                tail.style.height = '300px';
+
+                container.appendChild(buffer);
+                container.appendChild(target);
+                container.appendChild(tail);
+                document.body.appendChild(container);
+                target.scrollIntoView();
+                return container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                buildTarget(false) + ',' + buildTarget(true);
+        ");
+
+        Assert.Contains("300,300", result);
     }
 
     [Fact]
@@ -984,6 +1027,158 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
+    public void ScrollIntoView_Honors_Block_And_Inline_Options_In_Raw_Css_Pixels()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function buildContainer(zoom) {
+                var container = document.createElement('div');
+                container.style.position = 'relative';
+                container.style.width = '140px';
+                container.style.height = '120px';
+                container.style.overflow = 'auto';
+                if (zoom) {
+                    container.style.zoom = zoom;
+                }
+
+                var content = document.createElement('div');
+                content.style.width = '600px';
+                content.style.height = '600px';
+
+                var target = document.createElement('div');
+                target.style.position = 'absolute';
+                target.style.left = '300px';
+                target.style.top = '240px';
+                target.style.width = '20px';
+                target.style.height = '20px';
+
+                container.appendChild(content);
+                container.appendChild(target);
+                document.body.appendChild(container);
+                target.scrollIntoView({ block: 'center', inline: 'end' });
+                return container.scrollLeft + ',' + container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                buildContainer('1') + '|' + buildContainer('2');
+        ");
+
+        Assert.Contains("180,190|180,190", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Legacy_False_Aligns_To_Block_End()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var container = document.createElement('div');
+            container.style.position = 'relative';
+            container.style.width = '140px';
+            container.style.height = '120px';
+            container.style.overflow = 'auto';
+
+            var content = document.createElement('div');
+            content.style.width = '200px';
+            content.style.height = '600px';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.left = '20px';
+            target.style.top = '240px';
+            target.style.width = '20px';
+            target.style.height = '20px';
+
+            container.appendChild(content);
+            container.appendChild(target);
+            document.body.appendChild(container);
+            target.scrollIntoView(false);
+
+            document.getElementById('result').textContent =
+                container.scrollLeft + ',' + container.scrollTop;
+        ");
+
+        Assert.Contains("0,140", result);
+    }
+
+    [Fact]
+    public void Window_Scroll_APIs_Update_Root_Scroll_Offsets_And_VisualViewport()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.style.width = '2000px';
+            document.body.style.height = '4000px';
+            visualViewport.scale = 2;
+
+            var events = 0;
+            visualViewport.addEventListener('scroll', function() { events++; });
+            window.scrollTo({ left: 40, top: 1000 });
+            window.scrollBy({ left: 10, top: 15 });
+
+            document.getElementById('result').textContent = [
+                window.scrollX,
+                window.scrollY,
+                window.pageXOffset,
+                window.pageYOffset,
+                document.scrollingElement.scrollLeft,
+                document.scrollingElement.scrollTop,
+                visualViewport.pageLeft,
+                visualViewport.pageTop,
+                events
+            ].join('|');
+        ");
+
+        Assert.Contains("50|1015|50|1015|50|1015|50|1015|2", result);
+    }
+
+    [Fact]
+    public void VisualViewport_ScrollIntoView_Fixed_Target_Uses_Visual_Page_Offset()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.style.height = '4000px';
+            visualViewport.scale = 2;
+            window.scrollTo(0, 1000);
+
+            var fixed = document.createElement('div');
+            fixed.style.position = 'fixed';
+            fixed.style.bottom = '0';
+            fixed.style.left = '0';
+            fixed.style.width = '100px';
+            fixed.style.height = '60px';
+            fixed.style.overflow = 'auto';
+
+            var spacer = document.createElement('div');
+            spacer.style.height = '500px';
+
+            var target = document.createElement('input');
+            target.style.display = 'block';
+            target.style.height = '20px';
+
+            fixed.appendChild(spacer);
+            fixed.appendChild(target);
+            document.body.appendChild(fixed);
+
+            var before = visualViewport.pageTop;
+            var fired = false;
+            visualViewport.addEventListener('scroll', function() { fired = true; });
+            target.scrollIntoView({ behavior: 'instant' });
+
+            document.getElementById('result').textContent = [
+                window.scrollY,
+                before,
+                visualViewport.pageTop,
+                window.pageYOffset,
+                fired,
+                visualViewport.scale,
+                visualViewport.height
+            ].join('|');
+        ");
+
+        Assert.Contains("1000|1000|1384|1000|true|2|384", result);
+    }
+
+    [Fact]
     public void ScrollIntoView_Does_Not_Scroll_Root_For_Targets_Inside_Unscrollable_Fixed_Containers()
     {
         var result = ExecJs(@"
@@ -1052,6 +1247,92 @@ document.getElementById('result').textContent =
                 container.scrollLeft + ',' + container.scrollTop;
         ");
         Assert.Contains("0,0|300,300", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Clamps_Fixed_Scrollers_To_Their_Scroll_Bounds()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.style.width = '2000px';
+            document.body.style.height = '2000px';
+
+            var container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.right = '10px';
+            container.style.bottom = '10px';
+            container.style.width = '150px';
+            container.style.height = '150px';
+            container.style.overflow = 'auto';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.left = '200%';
+            target.style.top = '200%';
+            target.style.width = '10px';
+            target.style.height = '10px';
+
+            container.appendChild(target);
+            document.body.appendChild(container);
+            target.scrollIntoView();
+
+            document.getElementById('result').textContent =
+                document.documentElement.scrollLeft + ',' + document.documentElement.scrollTop + '|' +
+                container.scrollLeft + ',' + container.scrollTop + '|' +
+                container.scrollWidth + ',' + container.clientWidth;
+        ");
+
+        Assert.Contains("0,0|160,160|310,150", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Does_Not_Scroll_Hidden_Root_For_Zoomed_Scrollers()
+    {
+        var result = ExecJs(@"
+            document.documentElement.style.overflow = 'hidden';
+            document.body.style.margin = '0';
+            document.body.style.overflow = 'hidden';
+
+            function buildContainer(zoom) {
+                var container = document.createElement('div');
+                container.style.position = 'relative';
+                container.style.display = 'inline-block';
+                container.style.width = '120px';
+                container.style.height = '100px';
+                container.style.overflow = 'auto';
+                container.style.border = '1px solid black';
+                if (zoom) {
+                    container.style.zoom = zoom;
+                }
+
+                var content = document.createElement('div');
+                content.style.width = '600px';
+                content.style.height = '600px';
+
+                var target = document.createElement('div');
+                target.style.position = 'absolute';
+                target.style.left = '300px';
+                target.style.top = '240px';
+                target.style.width = '20px';
+                target.style.height = '20px';
+
+                container.appendChild(content);
+                container.appendChild(target);
+                document.body.appendChild(container);
+                target.scrollIntoView();
+                return [
+                    document.documentElement.scrollLeft,
+                    document.documentElement.scrollTop,
+                    container.scrollLeft,
+                    container.scrollTop
+                ].join(',');
+            }
+
+            document.getElementById('result').textContent =
+                buildContainer('1') + '|' + buildContainer('2');
+        ");
+
+        Assert.Contains("0,0,300,240|0,0,300,240", result);
     }
 
     [Fact]

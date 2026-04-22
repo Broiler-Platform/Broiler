@@ -110,6 +110,33 @@ public sealed partial class DomBridge
         ["zoom"] = "1",
     };
 
+    private static readonly HashSet<string> CssInheritedProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "color",
+        "cursor",
+        "font-family",
+        "font-size",
+        "font-style",
+        "font-variant",
+        "font-weight",
+        "letter-spacing",
+        "line-height",
+        "text-align",
+        "text-indent",
+        "text-shadow",
+        "text-transform",
+        "visibility",
+        "white-space",
+        "word-spacing",
+    };
+
+    private sealed class CustomPropertyRegistration
+    {
+        public bool Inherits { get; init; } = true;
+
+        public string? InitialValue { get; init; }
+    }
+
     private static readonly Regex StyleTagPattern = new(
         @"<style[^>]*>(?<content>[\s\S]*?)</style>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -602,55 +629,16 @@ public sealed partial class DomBridge
             var docRoot = GetDocumentRootFor(element);
             var styleElements = new List<DomElement>();
             CollectStyleElementsInTree(docRoot, styleElements);
+            var customPropertyRegistrations = new Dictionary<string, CustomPropertyRegistration>(StringComparer.OrdinalIgnoreCase);
 
             // Determine viewport dimensions for media query evaluation
             var (vpWidth, vpHeight) = GetViewportForDocRoot(docRoot);
 
             foreach (var styleEl in styleElements)
             {
-                var cssText = new StringBuilder();
-                foreach (var child in styleEl.Children)
-                {
-                    if (child.IsTextNode && child.TextContent != null)
-                        cssText.Append(child.TextContent);
-                }
-                // Also check direct TextContent (set via JS textContent setter)
-                if (cssText.Length == 0 && styleEl.TextContent != null)
-                    cssText.Append(styleEl.TextContent);
-
-                // Include rules added via insertRule() (stored in DomProperties)
-                if (styleEl.DomProperties.TryGetValue("_insertedRules", out var insertedObj) &&
-                    insertedObj is List<(int Index, string Rule)> insertedRules)
-                {
-                    foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))
-                        cssText.Append(' ').Append(rule);
-                }
-
-                // For <link rel="stylesheet"> elements, fetch external CSS content
-                if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
-                    cssText.Length == 0 &&
-                    styleEl.Attributes.TryGetValue("href", out var href) && !string.IsNullOrEmpty(href))
-                {
-                    if (styleEl.DomProperties.TryGetValue("_fetchedCss", out var cachedCss) && cachedCss is string cachedStr)
-                    {
-                        cssText.Append(cachedStr);
-                    }
-                    else
-                    {
-                        try
-                        {
-                            var fetchedCss = FetchExternalStylesheet(href);
-                            if (!string.IsNullOrEmpty(fetchedCss))
-                            {
-                                styleEl.DomProperties["_fetchedCss"] = fetchedCss;
-                                cssText.Append(fetchedCss);
-                            }
-                        }
-                        catch { /* ignore fetch failures */ }
-                    }
-                }
-
-                ParseAndApplyCssRules(cssText.ToString(), element, computed, computedSpecificity, vpWidth, vpHeight);
+                var cssText = GetStyleElementCssText(styleEl);
+                CollectCustomPropertyRegistrations(cssText, customPropertyRegistrations);
+                ParseAndApplyCssRules(cssText, element, computed, computedSpecificity, vpWidth, vpHeight);
             }
 
             // Inline styles (from the style="" attribute) override CSS rules.
@@ -669,7 +657,9 @@ public sealed partial class DomBridge
                 ApplyPseudoElementRules(element, pseudoElement, styleElements, computed, computedSpecificity, vpWidth, vpHeight);
             }
 
+            MergeResolvedCustomProperties(computed, element, styleElements, customPropertyRegistrations, vpWidth, vpHeight);
             ResolveKnownCustomProperties(computed);
+            ResolveCssWideKeywordProperties(computed, element);
 
             // Expand CSS shorthand properties into their individual longhands.
             // This ensures that querying e.g. marginTop works when only the
@@ -917,6 +907,263 @@ public sealed partial class DomBridge
                TryParsePx(value).HasValue;
     }
 
+    private string GetStyleElementCssText(DomElement styleEl)
+    {
+        var cssText = new StringBuilder();
+        foreach (var child in styleEl.Children)
+        {
+            if (child.IsTextNode && child.TextContent != null)
+                cssText.Append(child.TextContent);
+        }
+
+        if (cssText.Length == 0 && styleEl.TextContent != null)
+            cssText.Append(styleEl.TextContent);
+
+        if (styleEl.DomProperties.TryGetValue("_insertedRules", out var insertedObj) &&
+            insertedObj is List<(int Index, string Rule)> insertedRules)
+        {
+            foreach (var (_, rule) in insertedRules.OrderBy(r => r.Index))
+                cssText.Append(' ').Append(rule);
+        }
+
+        if (string.Equals(styleEl.TagName, "link", StringComparison.OrdinalIgnoreCase) &&
+            cssText.Length == 0 &&
+            styleEl.Attributes.TryGetValue("href", out var href) &&
+            !string.IsNullOrEmpty(href))
+        {
+            if (styleEl.DomProperties.TryGetValue("_fetchedCss", out var cachedCss) && cachedCss is string cachedStr)
+            {
+                cssText.Append(cachedStr);
+            }
+            else
+            {
+                try
+                {
+                    var fetchedCss = FetchExternalStylesheet(href);
+                    if (!string.IsNullOrEmpty(fetchedCss))
+                    {
+                        styleEl.DomProperties["_fetchedCss"] = fetchedCss;
+                        cssText.Append(fetchedCss);
+                    }
+                }
+                catch
+                {
+                    // Ignore stylesheet fetch failures in computed-style building.
+                }
+            }
+        }
+
+        return cssText.ToString();
+    }
+
+    private static void CollectCustomPropertyRegistrations(
+        string cssText,
+        Dictionary<string, CustomPropertyRegistration> registrations)
+    {
+        int pos = 0;
+        while (pos < cssText.Length)
+        {
+            int propertyIndex = cssText.IndexOf("@property", pos, StringComparison.OrdinalIgnoreCase);
+            if (propertyIndex < 0)
+                break;
+
+            int nameStart = propertyIndex + "@property".Length;
+            while (nameStart < cssText.Length && char.IsWhiteSpace(cssText[nameStart]))
+                nameStart++;
+
+            if (nameStart >= cssText.Length || cssText[nameStart] != '-' || nameStart + 1 >= cssText.Length || cssText[nameStart + 1] != '-')
+            {
+                pos = propertyIndex + "@property".Length;
+                continue;
+            }
+
+            int nameEnd = nameStart + 2;
+            while (nameEnd < cssText.Length && (char.IsLetterOrDigit(cssText[nameEnd]) || cssText[nameEnd] is '-' or '_'))
+                nameEnd++;
+
+            var propertyName = cssText[nameStart..nameEnd];
+            int braceStart = cssText.IndexOf('{', nameEnd);
+            if (braceStart < 0)
+                break;
+
+            int depth = 1;
+            int contentStart = braceStart + 1;
+            int cursor = contentStart;
+            while (cursor < cssText.Length && depth > 0)
+            {
+                if (cssText[cursor] == '{')
+                    depth++;
+                else if (cssText[cursor] == '}')
+                    depth--;
+
+                cursor++;
+            }
+
+            if (depth != 0)
+                break;
+
+            var body = cssText[contentStart..(cursor - 1)];
+            var descriptors = ParseStyle(body);
+            if (descriptors.Count > 0)
+            {
+                registrations[propertyName] = new CustomPropertyRegistration
+                {
+                    Inherits = !descriptors.TryGetValue("inherits", out var inheritsValue)
+                        || !string.Equals(inheritsValue, "false", StringComparison.OrdinalIgnoreCase),
+                    InitialValue = descriptors.GetValueOrDefault("initial-value"),
+                };
+            }
+
+            pos = cursor;
+        }
+    }
+
+    private void MergeResolvedCustomProperties(
+        Dictionary<string, string> computed,
+        DomElement element,
+        List<DomElement> styleElements,
+        Dictionary<string, CustomPropertyRegistration> registrations,
+        int vpWidth,
+        int vpHeight)
+    {
+        var explicitCustomProperties = computed
+            .Where(kv => kv.Key.StartsWith("--", StringComparison.Ordinal))
+            .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+        var parentResolved = element.Parent != null
+            ? BuildResolvedCustomPropertyMap(element.Parent, styleElements, registrations, vpWidth, vpHeight)
+            : null;
+        var resolved = BuildResolvedCustomPropertyMap(element, styleElements, registrations, vpWidth, vpHeight);
+
+        foreach (var kv in explicitCustomProperties)
+            resolved[kv.Key] = kv.Value;
+
+        ResolveCssWideKeywordCustomProperties(resolved, parentResolved, registrations);
+        foreach (var (propertyName, registration) in registrations)
+        {
+            if (resolved.ContainsKey(propertyName))
+                continue;
+
+            if (registration.Inherits &&
+                parentResolved != null &&
+                parentResolved.TryGetValue(propertyName, out var inheritedValue))
+            {
+                resolved[propertyName] = inheritedValue;
+            }
+            else if (!string.IsNullOrWhiteSpace(registration.InitialValue))
+            {
+                resolved[propertyName] = registration.InitialValue!;
+            }
+        }
+
+        var customKeys = computed.Keys
+            .Where(key => key.StartsWith("--", StringComparison.Ordinal))
+            .ToList();
+        foreach (var key in customKeys)
+            computed.Remove(key);
+
+        foreach (var kv in resolved)
+            computed[kv.Key] = kv.Value;
+    }
+
+    private Dictionary<string, string> BuildResolvedCustomPropertyMap(
+        DomElement? element,
+        List<DomElement> styleElements,
+        Dictionary<string, CustomPropertyRegistration> registrations,
+        int vpWidth,
+        int vpHeight)
+    {
+        var resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string>? parentResolved = null;
+        if (element?.Parent != null)
+        {
+            parentResolved = BuildResolvedCustomPropertyMap(element.Parent, styleElements, registrations, vpWidth, vpHeight);
+            foreach (var kv in parentResolved)
+            {
+                if (!registrations.TryGetValue(kv.Key, out var registration) || registration.Inherits)
+                    resolved[kv.Key] = kv.Value;
+            }
+        }
+
+        if (element == null)
+            return resolved;
+
+        var local = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var localSpecificity = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var styleEl in styleElements)
+            ParseAndApplyCssRules(GetStyleElementCssText(styleEl), element, local, localSpecificity, vpWidth, vpHeight);
+
+        if (element.Attributes.TryGetValue("style", out var inlineStyleAttr) && !string.IsNullOrEmpty(inlineStyleAttr))
+        {
+            foreach (var kv in ParseStyle(inlineStyleAttr))
+                local[kv.Key] = kv.Value;
+        }
+
+        foreach (var kv in local)
+        {
+            if (kv.Key.StartsWith("--", StringComparison.Ordinal))
+                resolved[kv.Key] = kv.Value;
+        }
+
+        ResolveCssWideKeywordCustomProperties(resolved, parentResolved, registrations);
+
+        foreach (var (propertyName, registration) in registrations)
+        {
+            if (resolved.ContainsKey(propertyName))
+                continue;
+
+            if (registration.Inherits &&
+                parentResolved != null &&
+                parentResolved.TryGetValue(propertyName, out var inheritedValue))
+            {
+                resolved[propertyName] = inheritedValue;
+            }
+            else if (!string.IsNullOrWhiteSpace(registration.InitialValue))
+            {
+                resolved[propertyName] = registration.InitialValue!;
+            }
+        }
+
+        return resolved;
+    }
+
+    private static void ResolveCssWideKeywordCustomProperties(
+        Dictionary<string, string> resolved,
+        Dictionary<string, string>? parentResolved,
+        Dictionary<string, CustomPropertyRegistration> registrations)
+    {
+        foreach (var key in resolved.Keys.Where(k => k.StartsWith("--", StringComparison.Ordinal)).ToList())
+        {
+            var value = resolved[key]?.Trim();
+            if (string.IsNullOrEmpty(value))
+                continue;
+
+            var lower = value.ToLowerInvariant();
+            if (lower is not ("initial" or "inherit" or "unset" or "revert"))
+                continue;
+
+            registrations.TryGetValue(key, out var registration);
+            string? parentValue = null;
+            parentResolved?.TryGetValue(key, out parentValue);
+
+            string? replacement = lower switch
+            {
+                "initial" => registration?.InitialValue,
+                "inherit" => parentValue ?? registration?.InitialValue,
+                "unset" or "revert" => registration == null
+                    ? parentValue
+                    : registration.Inherits
+                        ? parentValue ?? registration.InitialValue
+                        : registration.InitialValue,
+                _ => value,
+            };
+
+            if (string.IsNullOrWhiteSpace(replacement))
+                resolved.Remove(key);
+            else
+                resolved[key] = replacement;
+        }
+    }
+
     private static string FormatPx(double value) =>
         $"{Math.Round(value).ToString(System.Globalization.CultureInfo.InvariantCulture)}px";
 
@@ -1028,6 +1275,45 @@ public sealed partial class DomBridge
 
         return $"var({inner})";
     }
+
+    private void ResolveCssWideKeywordProperties(Dictionary<string, string> computed, DomElement element)
+    {
+        Dictionary<string, string>? parentProps = element.Parent != null ? GetComputedProps(element.Parent) : null;
+        foreach (var key in computed.Keys.ToList())
+        {
+            if (key.StartsWith("--", StringComparison.Ordinal) ||
+                !computed.TryGetValue(key, out var value) ||
+                string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            var lower = value.Trim().ToLowerInvariant();
+            if (lower is not ("initial" or "inherit" or "unset" or "revert"))
+                continue;
+
+            string? replacement = lower switch
+            {
+                "inherit" => parentProps != null && parentProps.TryGetValue(key, out var inheritedValue)
+                    ? inheritedValue
+                    : CssInitialValues.GetValueOrDefault(key),
+                "unset" or "revert" => IsInheritedCssProperty(key)
+                    ? parentProps != null && parentProps.TryGetValue(key, out var inheritedUnsetValue)
+                        ? inheritedUnsetValue
+                        : CssInitialValues.GetValueOrDefault(key)
+                    : CssInitialValues.GetValueOrDefault(key),
+                _ => CssInitialValues.GetValueOrDefault(key),
+            };
+
+            if (string.IsNullOrWhiteSpace(replacement))
+                computed.Remove(key);
+            else
+                computed[key] = replacement;
+        }
+    }
+
+    private static bool IsInheritedCssProperty(string property) =>
+        CssInheritedProperties.Contains(property);
 
     private static int FindMatchingClosingParen(string value, int openParenIndex)
     {

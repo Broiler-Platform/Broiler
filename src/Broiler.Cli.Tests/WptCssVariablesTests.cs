@@ -175,4 +175,85 @@ document.getElementById('result').textContent =
 
         Assert.Contains("PASS", result);
     }
+
+    [Fact]
+    public void VariableSubstitution_CssWideKeywords_On_CustomProperties_Resolve()
+    {
+        var html = @"<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body {
+    --shared-token: lightgreen;
+    --registered-inherits: tomato;
+    --registered-no-inherit: tomato;
+  }
+
+  @property --registered-inherits {
+    syntax: '<color>';
+    initial-value: orange;
+    inherits: true;
+  }
+
+  @property --registered-no-inherit {
+    syntax: '<color>';
+    initial-value: lightgreen;
+    inherits: false;
+  }
+
+  #initial { background: var(--initial-token, hotpink); --initial-token: initial; }
+  #inherit { background: var(--shared-token, hotpink); --shared-token: inherit; }
+  #unset { background: var(--shared-token, hotpink); --shared-token: unset; }
+  #revert { background: var(--shared-token, hotpink); --shared-token: revert; }
+  #registeredInitial { background: var(--registered-no-inherit); --registered-no-inherit: initial; }
+  #registeredInherit { background: var(--registered-inherits); --registered-inherits: inherit; }
+</style>
+</head>
+<body>
+  <div id=""initial""></div>
+  <div id=""inherit""></div>
+  <div id=""unset""></div>
+  <div id=""revert""></div>
+  <div id=""registeredInitial""></div>
+  <div id=""registeredInherit""></div>
+  <div id=""fallbackInitial""></div>
+  <div id=""result""></div>
+<script>
+function colorMatches(actual) {
+  var expected = Array.prototype.slice.call(arguments, 1);
+  actual = (actual || '').trim();
+  return expected.indexOf(actual) >= 0;
+}
+
+var checks = [];
+checks.push(colorMatches(getComputedStyle(document.getElementById('initial')).getPropertyValue('background-color'), 'hotpink', 'rgb(255, 105, 180)'));
+checks.push(colorMatches(getComputedStyle(document.getElementById('inherit')).getPropertyValue('background-color'), 'lightgreen', 'rgb(144, 238, 144)'));
+checks.push(colorMatches(getComputedStyle(document.getElementById('unset')).getPropertyValue('background-color'), 'lightgreen', 'rgb(144, 238, 144)'));
+checks.push(colorMatches(getComputedStyle(document.getElementById('revert')).getPropertyValue('background-color'), 'lightgreen', 'rgb(144, 238, 144)'));
+checks.push(colorMatches(getComputedStyle(document.getElementById('registeredInitial')).getPropertyValue('background-color'), 'lightgreen', 'rgb(144, 238, 144)'));
+checks.push(colorMatches(getComputedStyle(document.getElementById('registeredInherit')).getPropertyValue('background-color'), 'tomato', 'rgb(255, 99, 71)'));
+
+var outer = document.createElement('div');
+outer.style.color = 'transparent';
+outer.style.border = '10px solid';
+var inner = document.createElement('div');
+inner.id = 'fallbackInitial';
+inner.style.color = 'var(--unknown, initial)';
+inner.style.borderWidth = '10px';
+inner.style.borderStyle = 'var(--unknown, inherit)';
+outer.appendChild(inner);
+document.body.appendChild(outer);
+
+var initialStyle = getComputedStyle(inner);
+checks.push(colorMatches(initialStyle.getPropertyValue('color'), 'rgb(0, 0, 0)') &&
+            (initialStyle.getPropertyValue('border-top-style') || '').trim() === 'solid');
+document.getElementById('result').textContent = checks.every(Boolean) ? 'PASS' : 'FAIL';
+</script>
+</body>
+</html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("PASS", result);
+    }
 }

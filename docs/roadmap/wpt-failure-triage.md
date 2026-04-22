@@ -5,6 +5,18 @@
 
 ## Implementation updates
 
+### 2026-04-22
+
+- The runner/Markdown/JSON triage output now surfaces timeout failures as a first-class section with the complete timeout path list plus focused `--subset` commands for each affected directory, and `Broiler.Wpt.Tests` now guards that richer timeout summary so future WPT workflow investigations do not require raw-log scraping.
+- `Broiler.Wpt` now supports incremental reruns from a previous JSON report via `--rerun-json`, including a `--rerun-kind timeouts` mode for timeout-only debugging, and the generated JSON report now includes relative test paths so reruns remain tied to the current WPT checkout instead of the original absolute machine path.
+- `scrollIntoView()` now treats fixed-position iframe descendants as fixed only within their own browsing context: it skips same-document root scrolling for subframe-fixed targets, still bubbles to outer browsing-context scrollers, resolves fixed `bottom` / `right` insets against the subframe viewport, and subtracts already-applied intermediate scroll offsets when continuing to outer ancestors. Focused `Broiler.Wpt.Tests` guard rails now cover the `scrollIntoView-fixed.html` Box B / Box D iframe cases.
+- `scrollIntoView()` now clamps fixed scroller offsets to the container’s actual scroll bounds instead of overshooting absolute-positioned targets past the available scroll range, and focused CLI/WPT guards now cover the unclipped `scrollIntoView-fixed.html` Box C follow-up slice locally.
+- Subframe root/window scrolling now honors `scroll-behavior: smooth` plus `behavior: auto|instant|smooth` for `scrollIntoView()` and window/root scroll APIs by staging a deferred next-frame completion instead of jumping immediately, and focused `Broiler.Wpt.Tests` now guard the `scroll-behavior-subframe-root.html` / `scroll-behavior-subframe-window.html` follow-up slice without needing the whole harness file.
+- Root `scrollIntoView()` bubbling now respects hidden/clip viewport overflow, so zoomed inner scrollers no longer spuriously scroll the document when `html`/`body` disable viewport scrolling; focused zoom guards cover the `scroll-padding`, `scroll-margin`, and abspos `scrollIntoView()` follow-up slice.
+- Standalone universal selectors with structural pseudos/attributes now cascade after bare universal and tag rules, and closed `<details>` elements now hide non-`<summary>` children in the renderer path; focused `Broiler.Wpt.Tests` guard the remaining `selectors-4` `:lang(...)` / `details:open` near-pass slice locally.
+- Bridge-side HTML attribute parsing now keeps the first duplicate attribute instead of the last, which fixes the reopened `css/selectors/invalidation` `nth-child(... of .c)` / `nth-last-child(... of .c)` sibling-toggle slice and adds focused CLI/WPT coverage for those cases.
+- Oversized `grid-template-columns` / `grid-template-rows` track lists now bail out early in the lightweight grid parser instead of splitting multi-megabyte crash-style inputs, which starts hardening the `css/css-grid/parsing/grid-template-columns-crash.html` timeout track and adds a focused `Broiler.Wpt.Tests` guard for the parser-side repro.
+
 ### 2026-04-21
 
 - The latest committed artifacts and the latest `WPT Tests` workflow run (`run_number: 79`, completed 2026-04-21) still fail only because WPT regressions remain; artifact generation itself is succeeding, and the runner leaves enough structured data in `tests/wpt-results/` to plan follow-up work from the JSON first and the Markdown/log views second.
@@ -16,6 +28,12 @@
 - Phase 6 has widened again: `getComputedStyle(element, pseudoElement)` now distinguishes element vs pseudo-element rule matching, accepts unresolved `var(...)` values in closed-keyword bridge declarations until the later substitution pass, and locally guards representative `::first-line` / `::first-letter` custom-property cases from the next `css/css-variables` pseudo-element slice.
 - Phase 6 has widened again: renderer-side inherited custom-property substitution now resolves representative text, background, and border paint values from ancestor-defined variables at used-value time, with a focused `Broiler.Wpt.Tests` guard rail advancing the remaining `variable-reference-*` / visited-context paint-color bucket.
 - Phase 6 has widened again: parser-side and bridge-side custom-property recovery now tolerate the unclosed nested fallback tail from `missing-closing-nested-fallback.html`, with focused CLI computed-style and WPT rendering guard rails for that malformed-but-recoverable substitution path.
+- Phase 6 has widened again: bridge-side computed styles now resolve CSS-wide keywords on unregistered and minimally registered custom properties, while renderer-side custom-property lookup treats `initial` as guaranteed-invalid and lets `inherit` / `unset` / `revert` fall through to ancestor-defined variables; focused CLI/WPT guards now cover the `variable-css-wide-keywords.html` opening slice plus `wide-keyword-fallback-001.html` style fallback behavior locally.
+- Phase 6 has widened again: bridge-side and renderer-side selector matching now understand the remaining `:lang(...)` Selectors 4 forms needed for quoted wildcard ranges and ancestor `xml:lang` inheritance, while the stylesheet parser preserves functional `:lang(...)` pseudos as a single token during structural-pseudo extraction; focused CLI/WPT guards now cover the `lang-*` wildcard slice locally.
+- Phase 6 has widened again: `scrollIntoView()` now honors the next alignment-options slice for `block:center`, `inline:end`, and legacy `false` block-end behavior in raw CSS pixels (including zoomed scrollers), with focused CLI and WPT guard rails covering that follow-up `scrollIntoView*` bucket locally.
+- Phase 6 has widened again: top-level `visualViewport` now exposes the minimal `scale` / `width` / `height` / `pageTop` / `pageLeft` model needed for representative cssom-view coverage, and `scrollIntoView()` now adjusts the visual viewport for fixed-position top-level targets under nonzero root scroll instead of only bailing out; focused CLI and WPT guard rails cover that visual fixed-target follow-up slice locally.
+- Phase 6 has widened again: top-level `window.scroll()` / `scrollTo()` / `scrollBy()` plus `scrollX` / `scrollY` / `pageXOffset` / `pageYOffset` now proxy the root scrolling element and keep `visualViewport.pageTop` / `pageLeft` plus `scroll` listeners in sync with root scrolling, with focused CLI and WPT guard rails covering that representative root-scroll follow-up slice locally.
+- Phase 6 has widened again: `scrollIntoView()` now converts zoomed target `scroll-margin-*` lengths into the scroller’s coordinate space instead of treating them as unzoomed raw lengths, with focused CLI and WPT guard rails covering the remaining `css/css-viewport/zoom/scroll-margin.html` zoomed-target slice locally.
 - Phase 6 has widened again: element scroll APIs now ignore non-scroll-container elements with `overflow:visible` (explicit or implicit) while preserving `overflow:hidden` scrolling-box behavior, with focused CLI and WPT guard rails for the `dom-element-scroll.html` slice.
 - Phase 6 has widened again: iframe `srcdoc` subdocuments now expose `contentDocument.scrollingElement`, a cached same-origin `contentWindow`, and subframe window scroll proxies with `scrollX`/`scrollY`/`pageXOffset`/`pageYOffset`, with focused CLI and WPT guard rails for the `scroll-behavior-subframe-root.html` / `scroll-behavior-subframe-window.html` slice.
 - Phase 6 has widened again: fetched iframe subdocuments now run their own scripts in document context and resolve nested relative iframe sources against the containing subdocument URL, with focused CLI and WPT guard rails for the `iframe-zoom-nested.html` browsing-context slice.
@@ -510,9 +528,13 @@ This is a small change, but it removes unnecessary ambiguity when people look fo
 
 The latest run still required reading `wpt-results.json`, `wpt-root-cause-analysis.txt`, or the raw job log to recover the full set of 8 timeout paths. Extend the generated Markdown/console summary so it shows the complete timeout list plus suggested `--subset` commands for the affected directories.
 
+**Status:** done; `Broiler.Wpt` now emits dedicated timeout sections in console, JSON, and Markdown output, including the full timeout path list and focused subset commands for each affected directory.
+
 ### 5.6 Support incremental reruns from the previous JSON report
 
 If the remaining buckets are too expensive to attack via repeated broad subset runs, add a runner/CLI mode that reruns only the previous failure or timeout set from `tests/wpt-results/wpt-results.json`. That would make timeout and bucket triage faster without waiting for another full CSS pass.
+
+**Status:** done; `Broiler.Wpt` now accepts `--rerun-json <PATH>` plus `--rerun-kind failures|timeouts`, filters the discovered test set against the previous JSON report, and writes relative test paths into new reports so follow-up reruns stay reproducible within the current checkout.
 
 ---
 

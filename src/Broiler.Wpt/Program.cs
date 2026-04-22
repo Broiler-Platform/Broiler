@@ -16,6 +16,12 @@ using Broiler.HTML.Image;
 /// </summary>
 public class Program
 {
+    private enum RerunSelectionKind
+    {
+        Failures,
+        Timeouts,
+    }
+
     private const double DefaultRunTestTimeoutSeconds = 30;
     private const string RunTestTimeoutEnvironmentVariable = "BROILER_WPT_TIMEOUT_SECONDS";
     private const int ProgressCheckpointInterval = 25;
@@ -44,6 +50,8 @@ public class Program
         string? jsonOutputPath = null;
         string? markdownOutputPath = null;
         string? subset = null;
+        string? rerunJsonPath = null;
+        RerunSelectionKind rerunSelectionKind = RerunSelectionKind.Failures;
         double? timeoutSeconds = null;
 
         for (int i = 0; i < args.Length; i++)
@@ -65,6 +73,17 @@ public class Program
                 case "--subset" when i + 1 < args.Length:
                     subset = args[++i];
                     break;
+                case "--rerun-json" when i + 1 < args.Length:
+                    rerunJsonPath = args[++i];
+                    break;
+                case "--rerun-kind" when i + 1 < args.Length:
+                    if (!TryParseRerunSelectionKind(args[++i], out rerunSelectionKind))
+                    {
+                        Console.Error.WriteLine("Error: '--rerun-kind' must be 'failures' or 'timeouts'.");
+                        return 1;
+                    }
+
+                    break;
                 case "--timeout" when i + 1 < args.Length:
                     if (!TryParsePositiveTimeoutSeconds(args[++i], out var parsedTimeoutSeconds))
                     {
@@ -79,6 +98,8 @@ public class Program
                 case "--json-output":
                 case "--markdown-output":
                 case "--subset":
+                case "--rerun-json":
+                case "--rerun-kind":
                 case "--timeout":
                     Console.Error.WriteLine($"Error: '{args[i]}' requires a value.");
                     PrintUsage();
@@ -129,11 +150,29 @@ public class Program
         Console.WriteLine($"Timeout       : {runTestTimeout.TotalSeconds:0.###} second(s)");
         if (!string.IsNullOrWhiteSpace(subset))
             Console.WriteLine($"Subset        : {subset}");
+        if (!string.IsNullOrWhiteSpace(rerunJsonPath))
+        {
+            Console.WriteLine($"Rerun JSON    : {Path.GetFullPath(rerunJsonPath)}");
+            Console.WriteLine($"Rerun mode    : {rerunSelectionKind.ToString().ToLowerInvariant()}");
+        }
         Console.WriteLine();
 
         var runner = new WptTestRunner();
         var subsetPatterns = WptTestRunner.ParseSubsetPatterns(subset ?? "");
         var discoveredTests = WptTestRunner.DiscoverTests(wptPath, subsetPatterns).ToList();
+        if (!string.IsNullOrWhiteSpace(rerunJsonPath))
+        {
+            if (!TryLoadRerunSelection(rerunJsonPath, wptPath, rerunSelectionKind, out var rerunTests, out var rerunError))
+            {
+                Console.Error.WriteLine(rerunError);
+                return 1;
+            }
+
+            discoveredTests = discoveredTests
+                .Where(testPath => rerunTests.Contains(Path.GetFullPath(testPath)))
+                .ToList();
+        }
+
         int totalTests = discoveredTests.Count;
         int passed = 0, failed = 0, skipped = 0;
         var failures = new List<WptTestResult>();
@@ -363,6 +402,109 @@ public class Program
                timeoutSeconds > 0;
     }
 
+    private static bool TryParseRerunSelectionKind(string value, out RerunSelectionKind selectionKind)
+    {
+        selectionKind = RerunSelectionKind.Failures;
+        if (value.Equals("failures", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (value.Equals("timeouts", StringComparison.OrdinalIgnoreCase))
+        {
+            selectionKind = RerunSelectionKind.Timeouts;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryLoadRerunSelection(
+        string rerunJsonPath,
+        string wptPath,
+        RerunSelectionKind selectionKind,
+        out HashSet<string> rerunTests,
+        out string? error)
+    {
+        rerunTests = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        error = null;
+
+        if (!File.Exists(rerunJsonPath))
+        {
+            error = $"Error: Rerun report not found: {rerunJsonPath}";
+            return false;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(rerunJsonPath));
+            if (!document.RootElement.TryGetProperty("results", out var results) ||
+                results.ValueKind != JsonValueKind.Array)
+            {
+                error = $"Error: Rerun report '{rerunJsonPath}' does not contain a top-level 'results' array.";
+                return false;
+            }
+
+            foreach (var result in results.EnumerateArray())
+            {
+                if (!ShouldRerunResult(result, selectionKind))
+                    continue;
+
+                if (TryResolveRerunTestPath(result, wptPath, out var rerunTestPath))
+                    rerunTests.Add(rerunTestPath);
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = $"Error: Failed to read rerun report '{rerunJsonPath}': {ex.Message}";
+            return false;
+        }
+    }
+
+    private static bool ShouldRerunResult(JsonElement result, RerunSelectionKind selectionKind)
+    {
+        if (selectionKind == RerunSelectionKind.Timeouts)
+        {
+            return result.TryGetProperty("category", out var category) &&
+                   string.Equals(category.GetString(), FailureCategory.Timeout.ToString(), StringComparison.Ordinal);
+        }
+
+        return result.TryGetProperty("passed", out var passed) &&
+               result.TryGetProperty("skipped", out var skipped) &&
+               passed.ValueKind is JsonValueKind.True or JsonValueKind.False &&
+               skipped.ValueKind is JsonValueKind.True or JsonValueKind.False &&
+               !passed.GetBoolean() &&
+               !skipped.GetBoolean();
+    }
+
+    private static bool TryResolveRerunTestPath(JsonElement result, string wptPath, out string rerunTestPath)
+    {
+        rerunTestPath = string.Empty;
+
+        if (result.TryGetProperty("relativeTestPath", out var relativeTestPathProperty) &&
+            relativeTestPathProperty.ValueKind == JsonValueKind.String &&
+            !string.IsNullOrWhiteSpace(relativeTestPathProperty.GetString()))
+        {
+            rerunTestPath = Path.GetFullPath(Path.Combine(
+                wptPath,
+                relativeTestPathProperty.GetString()!.Replace('/', Path.DirectorySeparatorChar)));
+            return true;
+        }
+
+        if (!result.TryGetProperty("testPath", out var testPathProperty) ||
+            testPathProperty.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(testPathProperty.GetString()))
+        {
+            return false;
+        }
+
+        var rawPath = testPathProperty.GetString()!;
+        rerunTestPath = Path.IsPathRooted(rawPath)
+            ? Path.GetFullPath(rawPath)
+            : Path.GetFullPath(Path.Combine(wptPath, rawPath.Replace('/', Path.DirectorySeparatorChar)));
+        return true;
+    }
+
     private static WptTestResult CreateTimeoutResult(
         string testPath,
         TimeSpan timeout,
@@ -413,6 +555,7 @@ public class Program
         var missingReferenceSkips = GetSkippedResults(skippedResults, SkipReason.MissingReferenceImage);
         var deferredFeatureBuckets = GetDeferredFeatureBuckets(failures, wptPath);
         var referenceCoverageStatus = GetReferenceCoverageStatus(missingReferenceSkips, wptPath);
+        var timeoutSummary = GetTimeoutSummary(failures, wptPath);
 
         var report = new Dictionary<string, object?>
         {
@@ -467,8 +610,19 @@ public class Program
                     .Select(bucket => bucket.ToJsonObject())
                     .ToList(),
                 ["referenceCoverage"] = referenceCoverageStatus.ToJsonObject(),
+                ["timeoutFailures"] = timeoutSummary.Failures
+                    .Select(failure => failure.ToJsonObject())
+                    .ToList(),
+                ["timeoutSubsetCommands"] = timeoutSummary.SubsetCommands
+                    .Select(bucket => new Dictionary<string, object?>
+                    {
+                        ["directory"] = bucket.Key,
+                        ["count"] = bucket.Value,
+                        ["command"] = FormatSubsetCommand(bucket.Key),
+                    })
+                    .ToList(),
             },
-            ["results"] = allResults.Select(r => r.ToJsonObject()).ToList(),
+            ["results"] = allResults.Select(r => r.ToJsonObject(wptPath)).ToList(),
         };
 
         var options = new JsonSerializerOptions
@@ -500,6 +654,7 @@ public class Program
         var topSkippedDirectories = GetDirectoryBuckets(skippedResults, wptPath);
         var deferredFeatureBuckets = GetDeferredFeatureBuckets(failures, wptPath);
         var referenceCoverageStatus = GetReferenceCoverageStatus(missingReferenceSkips, wptPath);
+        var timeoutSummary = GetTimeoutSummary(failures, wptPath);
         var nonPixelFailures = failures
             .Where(r => r.Category != FailureCategory.PixelMismatch)
             .OrderBy(r => r.TestPath, StringComparer.Ordinal)
@@ -528,6 +683,7 @@ public class Program
         WriteBucketSection(writer, "Top skipped buckets", topSkippedDirectories);
         WriteReferenceCoverageSection(writer, referenceCoverageStatus);
         WriteDeferredFeatureBucketSection(writer, deferredFeatureBuckets);
+        WriteTimeoutSection(writer, timeoutSummary.Failures, timeoutSummary.SubsetCommands);
         writer.WriteLine();
         writer.WriteLine("## Non-pixel / exception failures");
         writer.WriteLine();
@@ -574,6 +730,7 @@ public class Program
         PrintDirectoryBuckets("Top skipped directories", skippedResults, wptPath);
         PrintReferenceCoverageSummary(skippedResults, wptPath);
         PrintDeferredFeatureBuckets(failures, wptPath);
+        PrintTimeoutSummary(failures, wptPath);
 
         Console.WriteLine("Mismatch sub-categories:");
         var subCategories = failures
@@ -686,6 +843,37 @@ public class Program
         }
     }
 
+    private static void PrintTimeoutSummary(IEnumerable<WptTestResult> failures, string wptPath)
+    {
+        var timeoutSummary = GetTimeoutSummary(failures, wptPath);
+
+        Console.WriteLine("Timeout failures:");
+        if (timeoutSummary.Failures.Count == 0)
+        {
+            Console.WriteLine("  (none)");
+        }
+        else
+        {
+            foreach (var failure in timeoutSummary.Failures)
+            {
+                Console.WriteLine($"  • {failure.RelativePath}");
+                if (!string.IsNullOrWhiteSpace(failure.Message))
+                    Console.WriteLine($"    {failure.Message}");
+            }
+        }
+
+        Console.WriteLine("Timeout subset commands:");
+        if (timeoutSummary.SubsetCommands.Count == 0)
+        {
+            Console.WriteLine("  (none)");
+        }
+        else
+        {
+            foreach (var bucket in timeoutSummary.SubsetCommands)
+                Console.WriteLine($"  {bucket.Value,3}  {FormatSubsetCommand(bucket.Key)}");
+        }
+    }
+
     private static List<KeyValuePair<string, int>> GetDirectoryBuckets(IEnumerable<WptTestResult> results, string wptPath) =>
         results
             .GroupBy(result => GetBucketDirectory(result.TestPath, wptPath))
@@ -703,6 +891,35 @@ public class Program
                 ["count"] = bucket.Value,
             })
             .ToList();
+
+    private static List<TimeoutFailure> GetTimeoutFailures(IEnumerable<WptTestResult> failures, string wptPath) =>
+        failures
+            .Where(result => result.Category == FailureCategory.Timeout)
+            .Select(result =>
+            {
+                var relativePath = Path.GetRelativePath(wptPath, result.TestPath).Replace('\\', '/');
+                return new TimeoutFailure(relativePath, GetBucketDirectory(result.TestPath, wptPath), result.Message);
+            })
+            .OrderBy(result => result.RelativePath, StringComparer.Ordinal)
+            .ToList();
+
+    private static TimeoutSummary GetTimeoutSummary(IEnumerable<WptTestResult> failures, string wptPath)
+    {
+        var timeoutFailures = GetTimeoutFailures(failures, wptPath);
+        var timeoutSubsetCommands = GetSubsetCommandBuckets(timeoutFailures.Select(failure => failure.Directory));
+        return new TimeoutSummary(timeoutFailures, timeoutSubsetCommands);
+    }
+
+    private static List<KeyValuePair<string, int>> GetSubsetCommandBuckets(IEnumerable<string> directories) =>
+        directories
+            .GroupBy(directory => directory, StringComparer.Ordinal)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => new KeyValuePair<string, int>(group.Key, group.Count()))
+            .ToList();
+
+    private static string FormatSubsetCommand(string directory) =>
+        $"./scripts/run-wpt-tests.sh --subset \"{directory}\"";
 
     private static List<WptTestResult> GetSkippedResults(
         IEnumerable<WptTestResult> skippedResults,
@@ -909,6 +1126,58 @@ public class Program
         };
     }
 
+    private sealed record TimeoutFailure(
+        string RelativePath,
+        string Directory,
+        string? Message)
+    {
+        public Dictionary<string, object?> ToJsonObject() => new()
+        {
+            ["testPath"] = RelativePath,
+            ["directory"] = Directory,
+            ["message"] = Message,
+        };
+    }
+
+    private sealed record TimeoutSummary(
+        IReadOnlyCollection<TimeoutFailure> Failures,
+        IReadOnlyCollection<KeyValuePair<string, int>> SubsetCommands);
+
+    private static void WriteTimeoutSection(
+        StreamWriter writer,
+        IReadOnlyCollection<TimeoutFailure> timeoutFailures,
+        IReadOnlyCollection<KeyValuePair<string, int>> timeoutSubsetCommands)
+    {
+        writer.WriteLine();
+        writer.WriteLine("## Timeout failures");
+        writer.WriteLine();
+        if (timeoutFailures.Count == 0)
+        {
+            writer.WriteLine("- None");
+        }
+        else
+        {
+            foreach (var failure in timeoutFailures)
+            {
+                writer.WriteLine($"- `{failure.RelativePath}`");
+                if (!string.IsNullOrWhiteSpace(failure.Message))
+                    writer.WriteLine($"  - {failure.Message}");
+            }
+        }
+
+        writer.WriteLine();
+        writer.WriteLine("### Suggested timeout subset commands");
+        writer.WriteLine();
+        if (timeoutSubsetCommands.Count == 0)
+        {
+            writer.WriteLine("- None");
+            return;
+        }
+
+        foreach (var bucket in timeoutSubsetCommands)
+            writer.WriteLine($"- `{FormatSubsetCommand(bucket.Key)}` ({bucket.Value} timeout(s))");
+    }
+
     private static void PrintUsage()
     {
         Console.WriteLine("Usage: Broiler.Wpt <wpt-directory> [OPTIONS]");
@@ -924,6 +1193,8 @@ public class Program
         Console.WriteLine("  --subset <PATTERNS>        Semicolon-separated list of sub-path patterns to test.");
         Console.WriteLine("                             Supports * and ? wildcards (glob-style).");
         Console.WriteLine("                             Example: \"css/CSS2;css/css-*\"");
+        Console.WriteLine("  --rerun-json <PATH>        Rerun only the previous failure/timeout set from a JSON report");
+        Console.WriteLine("  --rerun-kind <KIND>        Filter reruns to 'failures' (default) or 'timeouts'");
         Console.WriteLine("  --timeout <SECS>           Per-test timeout in seconds (default: 30, env:");
         Console.WriteLine($"                             {RunTestTimeoutEnvironmentVariable})");
         Console.WriteLine("  --json-output <PATH>       Write structured JSON report to the given path");

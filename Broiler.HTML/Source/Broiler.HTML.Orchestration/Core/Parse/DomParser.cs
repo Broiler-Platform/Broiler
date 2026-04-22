@@ -1,6 +1,7 @@
 using System.Drawing;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Broiler.HTML.Core.Core.Entities;
 using Broiler.HTML.Core.Core.IR;
 using Broiler.HTML.Core.Core;
@@ -91,15 +92,24 @@ internal sealed class DomParser
         if (box.HtmlTag != null)
         {
             // CSS2.1 §6.4.3 specificity: Apply rules in increasing specificity.
-            // Bare '*' = (0,0,0), tag = (0,0,1), '.class *' = (0,1,0), etc.
-            // Universal rules with ancestor/sibling selectors (e.g. '.intro *')
-            // have higher specificity than bare tag rules, so apply them after.
-            AssignCssBlocks(box, cssData, "*", qualifiedOnly: false);
+            // Bare '*' = (0,0,0), tag = (0,0,1), and standalone universal
+            // selectors with pseudo-classes / attributes (e.g. ':open',
+            // ':lang(fr)', '[hidden]') are class-level specificity and must not
+            // be lumped in with the bare universal pass.
+            AssignCssBlocks(box, cssData, "*", filter: static block =>
+                block.Selectors == null
+                && (block.AttributeConditions == null || block.AttributeConditions.Count == 0)
+                && block.PseudoClass == null);
             AssignCssBlocks(box, cssData, box.HtmlTag.Name);
             AssignCssBlocks(box, cssData, "*", qualifiedOnly: true);
 
             if (box.HtmlTag.HasAttribute("class"))
                 AssignClassCssBlocks(box, cssData);
+
+            AssignCssBlocks(box, cssData, "*", filter: static block =>
+                block.Selectors == null
+                && ((block.AttributeConditions != null && block.AttributeConditions.Count > 0)
+                    || block.PseudoClass != null));
 
             if (box.HtmlTag.HasAttribute("id"))
             {
@@ -249,11 +259,40 @@ internal sealed class DomParser
         foreach (var childBox in box.Boxes)
             CascadeApplyStyles(childBox, cssData, baseUrl);
 
+        if (box.HtmlTag != null)
+            ApplyClosedDetailsVisibility(box);
+
         // CSS2.1 §12.1: Generate ::before and ::after pseudo-element boxes
         // after child style cascading to avoid modifying the child list
         // during iteration.
         if (box.HtmlTag != null)
             ApplyPseudoElementBoxes(box, cssData, baseUrl);
+    }
+
+    private static void ApplyClosedDetailsVisibility(CssBox box)
+    {
+        // HTML §4.11.1: Closed <details> elements expose their first
+        // <summary> but keep the rest of the subtree hidden until the open
+        // attribute is present.
+        if (!box.HtmlTag.Name.Equals("details", StringComparison.OrdinalIgnoreCase) ||
+            box.HtmlTag.HasAttribute("open"))
+        {
+            return;
+        }
+
+        bool seenSummary = false;
+        foreach (var child in box.Boxes)
+        {
+            if (child.HtmlTag != null &&
+                child.HtmlTag.Name.Equals("summary", StringComparison.OrdinalIgnoreCase) &&
+                !seenSummary)
+            {
+                seenSummary = true;
+                continue;
+            }
+
+            child.Display = CssConstants.None;
+        }
     }
 
     private void SetTextSelectionStyle(HtmlContainerInt htmlContainer, CssData cssData)
@@ -321,7 +360,7 @@ internal sealed class DomParser
         }
     }
 
-    private static void AssignCssBlocks(CssBox box, CssData cssData, string className, bool? qualifiedOnly = null)
+    private static void AssignCssBlocks(CssBox box, CssData cssData, string className, bool? qualifiedOnly = null, Func<CssBlock, bool> filter = null)
     {
         var blocks = cssData.GetCssBlock(className);
         foreach (var block in blocks)
@@ -334,6 +373,9 @@ internal sealed class DomParser
                 if (qualifiedOnly.Value != hasSelectors)
                     continue;
             }
+
+            if (filter != null && !filter(block))
+                continue;
 
             if (IsBlockAssignableToBox(box, block))
                 AssignCssBlock(box, block);
@@ -668,26 +710,13 @@ internal sealed class DomParser
     /// </summary>
     private static bool MatchesLangPseudoClass(CssBox box, string lang)
     {
-        lang = NormalizeLangPseudoArgument(lang);
-        if (string.IsNullOrWhiteSpace(lang))
+        if (!TryGetElementLanguage(box, out var elementLanguage))
             return false;
 
-        for (var current = box; current != null; current = current.ParentBox)
-        {
-            if (current.HtmlTag == null) continue;
-            var attrLang = current.HtmlTag.TryGetAttribute("lang")
-                        ?? current.HtmlTag.TryGetAttribute("xml:lang");
-            if (attrLang != null)
-            {
-                // CSS2.1: match if the attribute value equals the argument
-                // or begins with it followed by a hyphen.
-                if (attrLang.Equals(lang, StringComparison.OrdinalIgnoreCase))
-                    return true;
-                if (attrLang.StartsWith(lang + "-", StringComparison.OrdinalIgnoreCase))
-                    return true;
-                return false;  // Found a lang attribute but it doesn't match.
-            }
-        }
+        foreach (var range in SplitLangPseudoArguments(lang))
+            if (MatchesLanguageRange(elementLanguage, range))
+                return true;
+
         return false;
     }
 
@@ -703,6 +732,111 @@ internal sealed class DomParser
         }
 
         return lang;
+    }
+
+    private static bool TryGetElementLanguage(CssBox box, out string language)
+    {
+        for (var current = box; current != null; current = current.ParentBox)
+        {
+            if (current.HtmlTag == null)
+                continue;
+
+            var attrLang = current.HtmlTag.TryGetAttribute("lang")
+                        ?? current.HtmlTag.TryGetAttribute("xml:lang");
+            if (!string.IsNullOrWhiteSpace(attrLang))
+            {
+                language = attrLang.Trim();
+                return true;
+            }
+        }
+
+        language = string.Empty;
+        return false;
+    }
+
+    private static IEnumerable<string> SplitLangPseudoArguments(string lang)
+    {
+        foreach (var part in lang.Split(','))
+        {
+            var normalized = NormalizeLangPseudoArgument(part);
+            if (!string.IsNullOrWhiteSpace(normalized))
+                yield return normalized;
+        }
+    }
+
+    private static bool MatchesLanguageRange(string elementLanguage, string languageRange)
+    {
+        var tagSubtags = SplitLanguageSubtags(elementLanguage);
+        var rangeSubtags = SplitLanguageSubtags(languageRange);
+        if (tagSubtags.Length == 0 || rangeSubtags.Length == 0)
+            return false;
+
+        if (!rangeSubtags.Contains("*", StringComparer.Ordinal))
+            return MatchesLanguagePrefix(tagSubtags, rangeSubtags);
+
+        return MatchesExtendedLanguageRange(tagSubtags, rangeSubtags);
+    }
+
+    private static string[] SplitLanguageSubtags(string language)
+    {
+        return language
+            .Split(['-'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(part => part.ToLowerInvariant())
+            .ToArray();
+    }
+
+    private static bool MatchesLanguagePrefix(string[] tagSubtags, string[] rangeSubtags)
+    {
+        if (rangeSubtags.Length > tagSubtags.Length)
+            return false;
+
+        for (int i = 0; i < rangeSubtags.Length; i++)
+        {
+            if (!string.Equals(tagSubtags[i], rangeSubtags[i], StringComparison.Ordinal))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool MatchesExtendedLanguageRange(string[] tagSubtags, string[] rangeSubtags)
+    {
+        int tagIndex = 0;
+        int rangeIndex = 0;
+
+        while (rangeIndex < rangeSubtags.Length)
+        {
+            var rangeSubtag = rangeSubtags[rangeIndex];
+            if (rangeSubtag == "*")
+            {
+                rangeIndex++;
+                if (rangeIndex >= rangeSubtags.Length)
+                    return true;
+
+                var nextRangeSubtag = rangeSubtags[rangeIndex];
+                while (tagIndex < tagSubtags.Length &&
+                       !string.Equals(tagSubtags[tagIndex], nextRangeSubtag, StringComparison.Ordinal))
+                {
+                    tagIndex++;
+                }
+
+                if (tagIndex >= tagSubtags.Length)
+                    return false;
+
+                continue;
+            }
+
+            if (tagIndex >= tagSubtags.Length ||
+                !string.Equals(tagSubtags[tagIndex], rangeSubtag, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            tagIndex++;
+            rangeIndex++;
+        }
+
+        return true;
     }
 
     private static bool MatchesOpenPseudoClass(CssBox box)

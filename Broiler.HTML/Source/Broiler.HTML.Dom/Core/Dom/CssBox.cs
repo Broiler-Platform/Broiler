@@ -124,6 +124,21 @@ internal class CssBox : CssBoxProperties, IDisposable
         if (string.IsNullOrEmpty(propertyName))
             return;
 
+        var trimmed = value?.Trim();
+        if (string.Equals(trimmed, "initial", StringComparison.OrdinalIgnoreCase))
+        {
+            CustomProperties[propertyName] = InvalidCustomPropertySentinel;
+            return;
+        }
+
+        if (string.Equals(trimmed, "inherit", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "unset", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(trimmed, "revert", StringComparison.OrdinalIgnoreCase))
+        {
+            CustomProperties.Remove(propertyName);
+            return;
+        }
+
         CustomProperties[propertyName] = value;
     }
 

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using Broiler.HTML.Image;
 
@@ -458,6 +459,55 @@ document.getElementById('out').appendChild(p);
         var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-missing-closing-nested-fallback", 260, 260);
         Assert.True(result.Passed,
             $"Malformed nested var() fallbacks should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssVariables_WideKeywords_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .box {
+      width: 60px;
+      height: 60px;
+      margin: 10px;
+      display: inline-block;
+      background: black;
+    }
+
+    #initial { background: var(--initial-token, hotpink); --initial-token: initial; }
+  </style>
+</head>
+<body>
+  <div id=""initial"" class=""box""></div>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .box {
+      width: 60px;
+      height: 60px;
+      margin: 10px;
+      display: inline-block;
+    }
+
+    #initial { background: hotpink; }
+  </style>
+</head>
+<body>
+  <div id=""initial"" class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-wide-keywords", 120, 100);
+        Assert.True(result.Passed,
+            $"css-variables wide keywords should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
@@ -1388,7 +1438,7 @@ document.getElementById('out').appendChild(p);
   </div>
   <script>
     document.querySelectorAll('.container')[0].scrollTo(0, 320);
-    document.querySelectorAll('.container')[1].scrollTo(0, 320);
+    document.querySelectorAll('.container')[1].scrollTo(0, 300);
   </script>
 </body>
 </html>";
@@ -1396,6 +1446,118 @@ document.getElementById('out').appendChild(p);
         var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-margin");
         Assert.True(result.Passed,
             $"zoom scroll-margin should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomScrollMargin_ZoomedTargetCases_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .group {
+      display: inline-block;
+      border: solid black 1px;
+      padding: 10px;
+      margin-right: 12px;
+    }
+    .container {
+      display: inline-block;
+      width: 200px;
+      height: 100px;
+      overflow-x: hidden;
+      overflow-y: scroll;
+      padding: 40px 0;
+    }
+    .buffer {
+      background: lightblue;
+      height: 300px;
+      width: 200px;
+    }
+    .target {
+      background: black;
+      height: 10px;
+      width: 200px;
+    }
+  </style>
+</head>
+<body>
+  <div class=""group"">
+    <div class=""container"">
+      <div class=""buffer""></div>
+      <div class=""target"" style=""scroll-margin-top: 20px; zoom: 2;""></div>
+      <div class=""buffer""></div>
+    </div>
+    <div class=""container"" style=""scroll-margin-top: 20px;"">
+      <div class=""buffer""></div>
+      <div class=""target"" style=""scroll-margin-top: inherit; zoom: 2;""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <script>
+    for (const match of document.querySelectorAll('.target')) {
+      match.scrollIntoView();
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .group {
+      display: inline-block;
+      border: solid black 1px;
+      padding: 10px;
+      margin-right: 12px;
+    }
+    .container {
+      display: inline-block;
+      width: 200px;
+      height: 100px;
+      overflow-x: hidden;
+      overflow-y: scroll;
+      padding: 40px 0;
+    }
+    .buffer {
+      background: lightblue;
+      height: 300px;
+      width: 200px;
+    }
+    .target {
+      background: black;
+      height: 20px;
+      width: 400px;
+      scroll-margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+  <div class=""group"">
+    <div class=""container"">
+      <div class=""buffer""></div>
+      <div class=""target""></div>
+      <div class=""buffer""></div>
+    </div>
+    <div class=""container"">
+      <div class=""buffer""></div>
+      <div class=""target""></div>
+      <div class=""buffer""></div>
+    </div>
+  </div>
+  <script>
+    for (const match of document.querySelectorAll('.target')) {
+      match.scrollIntoView();
+    }
+  </script>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-margin-zoomed-targets");
+        Assert.True(result.Passed,
+            $"zoomed target scroll-margin should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
@@ -1599,6 +1761,106 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssViewport_ZoomScrollIntoViewAlignmentOptions_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 140px;
+      height: 120px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 600px;
+      height: 600px;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      top: 240px;
+      left: 300px;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <div class=""container"" style=""zoom: 2;"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <script>
+    for (const match of document.querySelectorAll('.target')) {
+      match.scrollIntoView({ block: 'center', inline: 'end' });
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 140px;
+      height: 120px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 600px;
+      height: 600px;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      top: 240px;
+      left: 300px;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <div class=""container"" style=""zoom: 2;"">
+    <div class=""content""></div>
+    <div class=""target""></div>
+  </div>
+  <script>
+    document.querySelectorAll('.container')[0].scrollTo(180, 190);
+    document.querySelectorAll('.container')[1].scrollTo(180, 190);
+  </script>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-into-view-alignment-options");
+        Assert.True(result.Passed,
+            $"zoom scrollIntoView alignment options should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollIntoView_DoesNotScrollRootForUnscrollableFixedContainers_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1720,6 +1982,67 @@ document.getElementById('out').appendChild(p);
         var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-scroller");
         Assert.True(result.Passed,
             $"scrollIntoView in a fixed scroller should scroll that scroller without scrolling the root. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollIntoView_Clamps_FixedScroller_To_ScrollBounds_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; }
+    body { width: 2000px; height: 2000px; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    var container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.right = '10px';
+    container.style.bottom = '10px';
+    container.style.width = '150px';
+    container.style.height = '150px';
+    container.style.overflow = 'auto';
+
+    var target = document.createElement('div');
+    target.style.position = 'absolute';
+    target.style.left = '200%';
+    target.style.top = '200%';
+    target.style.width = '10px';
+    target.style.height = '10px';
+
+    container.appendChild(target);
+    document.body.appendChild(container);
+    target.scrollIntoView();
+
+    if (document.documentElement.scrollLeft === 0 &&
+        document.documentElement.scrollTop === 0 &&
+        container.scrollLeft === 160 &&
+        container.scrollTop === 160) {
+      document.getElementById('pass').style.background = 'green';
+    }
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-scroller-clamped");
+        Assert.True(result.Passed,
+            $"scrollIntoView in a fixed scroller should clamp to the scrollable range. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
@@ -2345,6 +2668,233 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Program_Surfaces_Full_Timeout_Triage_Summary_With_Subset_Commands()
+    {
+        var testDir = Path.Combine(_tempDir, "timeout-triage");
+        var timeoutPaths = new[]
+        {
+            Path.Combine(testDir, "css", "css-grid", "parsing", "grid-template-columns-crash.html"),
+            Path.Combine(testDir, "css", "css-overflow", "scroll-markers", "column-scroll-marker-007.html"),
+            Path.Combine(testDir, "css", "css-overflow", "scroll-markers", "targeted-scroll-marker-selection.tentative.html"),
+            Path.Combine(testDir, "css", "css-shapes", "shape-outside", "supported-shapes", "circle", "shape-outside-circle-030.html"),
+            Path.Combine(testDir, "css", "css-tables", "height-distribution", "percentage-sizing-of-table-cell-children.html"),
+            Path.Combine(testDir, "css", "css-tables", "html5-table-formatting-3.html"),
+        };
+
+        foreach (var timeoutPath in timeoutPaths)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(timeoutPath)!);
+            File.WriteAllText(timeoutPath, "<html><body>Timeout</body></html>");
+        }
+
+        Program.RunTestExecutor = static (runner, testPath, referenceDir, wptPath) => new WptTestResult
+        {
+            TestPath = testPath,
+            Passed = false,
+            Skipped = false,
+            Category = FailureCategory.Timeout,
+            Message = $"Test timed out after 30 second(s): {testPath}",
+        };
+
+        var jsonPath = Path.Combine(_tempDir, "timeout-triage.json");
+        var markdownPath = Path.Combine(_tempDir, "timeout-triage.md");
+        var originalOut = Console.Out;
+        var consoleOutput = new StringWriter();
+        Console.SetOut(consoleOutput);
+        try
+        {
+            Program.Main([
+                "--wpt-dir", testDir,
+                "--json-output", jsonPath,
+                "--markdown-output", markdownPath,
+            ]);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(jsonPath));
+        var triage = doc.RootElement.GetProperty("triage");
+        var timeoutFailures = triage.GetProperty("timeoutFailures").EnumerateArray().ToList();
+        Assert.Equal(6, timeoutFailures.Count);
+        Assert.Contains(timeoutFailures, failure => failure.GetProperty("testPath").GetString() == "css/css-grid/parsing/grid-template-columns-crash.html");
+        Assert.Contains(timeoutFailures, failure => failure.GetProperty("testPath").GetString() == "css/css-tables/html5-table-formatting-3.html");
+
+        var timeoutSubsetCommands = triage.GetProperty("timeoutSubsetCommands")
+            .EnumerateArray()
+            .Select(entry => new
+            {
+                Directory = entry.GetProperty("directory").GetString(),
+                Count = entry.GetProperty("count").GetInt32(),
+                Command = entry.GetProperty("command").GetString(),
+            })
+            .ToList();
+        Assert.Contains(timeoutSubsetCommands, entry =>
+            entry.Directory == "css/css-overflow/scroll-markers" &&
+            entry.Count == 2 &&
+            entry.Command == "./scripts/run-wpt-tests.sh --subset \"css/css-overflow/scroll-markers\"");
+        Assert.Contains(timeoutSubsetCommands, entry =>
+            entry.Directory == "css/css-tables" &&
+            entry.Count == 1 &&
+            entry.Command == "./scripts/run-wpt-tests.sh --subset \"css/css-tables\"");
+
+        var markdown = File.ReadAllText(markdownPath);
+        Assert.Contains("## Timeout failures", markdown);
+        Assert.Contains("`css/css-grid/parsing/grid-template-columns-crash.html`", markdown);
+        Assert.Contains("`css/css-tables/html5-table-formatting-3.html`", markdown);
+        Assert.Contains("### Suggested timeout subset commands", markdown);
+        Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/css-overflow/scroll-markers\"", markdown);
+        Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/css-tables/height-distribution\"", markdown);
+
+        var output = consoleOutput.ToString();
+        Assert.Contains("Timeout failures:", output);
+        Assert.Contains("css/css-grid/parsing/grid-template-columns-crash.html", output);
+        Assert.Contains("css/css-tables/html5-table-formatting-3.html", output);
+        Assert.Contains("Timeout subset commands:", output);
+        Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/css-overflow/scroll-markers\"", output);
+        Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/css-tables\"", output);
+    }
+
+    [Fact]
+    public void Program_RerunJson_Reruns_Previous_Failures_From_Generated_Report()
+    {
+        var testDir = Path.Combine(_tempDir, "rerun-failures");
+        var failedDir = Path.Combine(testDir, "css");
+        var passedDir = Path.Combine(testDir, "html");
+        Directory.CreateDirectory(failedDir);
+        Directory.CreateDirectory(passedDir);
+
+        var failedTest = Path.Combine(failedDir, "failed.html");
+        var passedTest = Path.Combine(passedDir, "passed.html");
+        File.WriteAllText(failedTest, "<html><body>Failed</body></html>");
+        File.WriteAllText(passedTest, "<html><body>Passed</body></html>");
+
+        var jsonPath = Path.Combine(_tempDir, "rerun-failures.json");
+        Program.RunTestExecutor = static (runner, testPath, referenceDir, wptPath) =>
+        {
+            if (Path.GetFileName(testPath).Equals("failed.html", StringComparison.Ordinal))
+            {
+                return new WptTestResult
+                {
+                    TestPath = testPath,
+                    Passed = false,
+                    Category = FailureCategory.Unknown,
+                    Message = "Synthetic failure",
+                };
+            }
+
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = true,
+            };
+        };
+
+        Program.Main([
+            "--wpt-dir", testDir,
+            "--json-output", jsonPath,
+        ]);
+
+        var rerunTests = new ConcurrentBag<string>();
+        Program.RunTestExecutor = (runner, testPath, referenceDir, wptPath) =>
+        {
+            rerunTests.Add(Path.GetRelativePath(testDir, testPath).Replace('\\', '/'));
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = true,
+            };
+        };
+
+        var originalOut = Console.Out;
+        var outputWriter = new StringWriter();
+        Console.SetOut(outputWriter);
+        try
+        {
+            var exitCode = Program.Main([
+                "--wpt-dir", testDir,
+                "--rerun-json", jsonPath,
+            ]);
+
+            Assert.Equal(0, exitCode);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        Assert.Equal(["css/failed.html"], rerunTests.OrderBy(path => path).ToArray());
+        var output = outputWriter.ToString();
+        Assert.Contains("Rerun JSON", output);
+        Assert.Contains("Rerun mode    : failures", output);
+        Assert.Contains("Discovered    : 1 test(s)", output);
+    }
+
+    [Fact]
+    public void Program_RerunJson_Timeouts_Only_Reruns_Previous_Timeouts()
+    {
+        var testDir = Path.Combine(_tempDir, "rerun-timeouts");
+        var timeoutDir = Path.Combine(testDir, "css", "timeouts");
+        var failureDir = Path.Combine(testDir, "css", "failures");
+        Directory.CreateDirectory(timeoutDir);
+        Directory.CreateDirectory(failureDir);
+
+        var timeoutTest = Path.Combine(timeoutDir, "timeout.html");
+        var failureTest = Path.Combine(failureDir, "failure.html");
+        File.WriteAllText(timeoutTest, "<html><body>Timeout</body></html>");
+        File.WriteAllText(failureTest, "<html><body>Failure</body></html>");
+
+        var jsonPath = Path.Combine(_tempDir, "rerun-timeouts.json");
+        Program.RunTestExecutor = static (runner, testPath, referenceDir, wptPath) =>
+        {
+            if (Path.GetFileName(testPath).Equals("timeout.html", StringComparison.Ordinal))
+            {
+                return new WptTestResult
+                {
+                    TestPath = testPath,
+                    Passed = false,
+                    Category = FailureCategory.Timeout,
+                    Message = "Synthetic timeout",
+                };
+            }
+
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = false,
+                Category = FailureCategory.Unknown,
+                Message = "Synthetic failure",
+            };
+        };
+
+        Program.Main([
+            "--wpt-dir", testDir,
+            "--json-output", jsonPath,
+        ]);
+
+        var rerunTests = new ConcurrentBag<string>();
+        Program.RunTestExecutor = (runner, testPath, referenceDir, wptPath) =>
+        {
+            rerunTests.Add(Path.GetRelativePath(testDir, testPath).Replace('\\', '/'));
+            return new WptTestResult
+            {
+                TestPath = testPath,
+                Passed = true,
+            };
+        };
+
+        var exitCode = Program.Main([
+            "--wpt-dir", testDir,
+            "--rerun-json", jsonPath,
+            "--rerun-kind", "timeouts",
+        ]);
+
+        Assert.Equal(0, exitCode);
+        Assert.Equal(["css/timeouts/timeout.html"], rerunTests.OrderBy(path => path).ToArray());
+    }
+
+    [Fact]
     public void Program_Returns_Error_When_No_Arguments()
     {
         var exitCode = Program.Main([]);
@@ -2555,6 +3105,33 @@ document.getElementById('out').appendChild(p);
     document.body.appendChild(document.createElement(""span""));
   }
 </script>");
+
+        var refDir = Path.Combine(_tempDir, "references");
+        Directory.CreateDirectory(refDir);
+
+        var runner = new WptTestRunner();
+        var result = Program.RunTestWithTimeout(
+            runner,
+            testFile,
+            refDir,
+            _tempDir,
+            TimeSpan.FromSeconds(20));
+
+        Assert.True(result.Passed, result.Message);
+        Assert.Equal(FailureCategory.None, result.Category);
+        Assert.Contains("Crash test", result.Message);
+    }
+
+    [Fact]
+    public void RunTestWithTimeout_GridTemplateColumnsCrash_Completes_Without_Timing_Out()
+    {
+        var oversizedTrackList = string.Join(" ", Enumerable.Repeat("repeat(1000, 1px)", 5000));
+        var testFile = Path.Combine(_tempDir, "grid-template-columns-crash.html");
+        File.WriteAllText(testFile, $"""
+<!DOCTYPE html>
+<link rel="help" href="https://bugs.chromium.org/p/chromium/issues/detail?id=1214890">
+<body style="display:grid;grid-template-columns:{oversizedTrackList}">PASS</body>
+""");
 
         var refDir = Path.Combine(_tempDir, "references");
         Directory.CreateDirectory(refDir);
@@ -3066,6 +3643,13 @@ document.getElementById('out').appendChild(p);
             .ToList();
         Assert.Contains("MissingReferenceImage", resultReasons);
         Assert.Contains("UnsupportedMediaPlayback", resultReasons);
+
+        var relativeResultPaths = doc.RootElement.GetProperty("results")
+            .EnumerateArray()
+            .Select(el => el.GetProperty("relativeTestPath").GetString())
+            .ToList();
+        Assert.Contains("css/skip/missing-ref-case.html", relativeResultPaths);
+        Assert.Contains("css/media/media.html", relativeResultPaths);
 
         var missingReferenceBuckets = triage.GetProperty("topMissingReferenceDirectories")
             .EnumerateArray()
@@ -3858,6 +4442,275 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_Selectors4_LangStandalonePseudo_Overrides_ClassRule_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { width: 40px; height: 40px; background: red; }
+    :lang(fr) { background: green; }
+  </style>
+</head>
+<body>
+  <div class="test" lang="fr"></div>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { width: 40px; height: 40px; background: green; }
+  </style>
+</head>
+<body>
+  <div class="test" lang="fr"></div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors4-lang-standalone-pseudo", 80, 80);
+        Assert.True(result.Passed,
+            $":lang(...) standalone selectors should override same-specificity class rules when declared later. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Selectors4_LangExtendedWildcard_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { width: 40px; height: 40px; background: red; }
+    .test:lang("*-gb") { background: green; }
+  </style>
+</head>
+<body>
+  <div lang="en-GB-oed"><div class="test"></div></div>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { width: 40px; height: 40px; background: green; }
+  </style>
+</head>
+<body>
+  <div lang="en-GB-oed"><div class="test"></div></div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors4-lang-extended-wildcard", 80, 80);
+        Assert.True(result.Passed,
+            $":lang() extended wildcard ranges should match nested content languages. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Selectors4_DetailsOpenPseudo_And_ClosedContent_MatchReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html class="reftest-wait">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .group { float: left; width: 90px; margin-right: 12px; }
+    details { margin-left: 0; }
+    summary, p { display: block; width: 30px; height: 20px; margin: 0; }
+    summary { background: green; }
+    p { background: red; }
+    :open { margin-left: 40px; }
+  </style>
+  <script>
+    function run() {
+      document.getElementById('closed').open = false;
+      document.documentElement.classList.remove('reftest-wait');
+    }
+  </script>
+</head>
+<body onload="run()">
+  <div class="group">
+    <details open>
+      <summary></summary>
+      <p></p>
+    </details>
+  </div>
+  <div class="group">
+    <details id="closed" open>
+      <summary></summary>
+      <p></p>
+    </details>
+  </div>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .group { float: left; width: 90px; margin-right: 12px; }
+    summary, p { display: block; width: 30px; height: 20px; margin: 0; }
+    summary { background: green; }
+    p { background: red; }
+    .open-details { margin-left: 40px; }
+  </style>
+</head>
+<body>
+  <div class="group">
+    <details class="open-details" open>
+      <summary></summary>
+      <p></p>
+    </details>
+  </div>
+  <div class="group">
+    <details>
+      <summary></summary>
+    </details>
+  </div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors4-details-open-pseudo", 220, 80);
+        Assert.True(result.Passed,
+            $"details:open styling and closed details content should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_SelectorsInvalidation_NthChildWhenSiblingChanges_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    .sibling + :nth-child(odd of .c) {
+      color: green;
+    }
+  </style>
+</head>
+<body>
+<div>
+  <p class="sibling" id="toggler">Ignored</p>
+  <p class="c">Odd; used to be green, should not be since no sibling</p>
+  <p class="c">Even, so should not be green</p>
+  <!-- Intentional duplicate class attribute: HTML keeps the first one. -->
+  <p class="c" class="sibling">Odd, but no sibling, so should not be green</p>
+  <p class="c">Even, so should not be green</p>
+  <p class="sibling">Ignored</p>
+  <p class="c">Odd, should be green</p>
+</div>
+<script>
+  document.documentElement.offsetTop;
+  toggler.classList.toggle("sibling");
+</script>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+</head>
+<body>
+<div>
+  <p>Ignored</p>
+  <p>Odd; used to be green, should not be since no sibling</p>
+  <p>Even, so should not be green</p>
+  <p>Odd, but no sibling, so should not be green</p>
+  <p>Even, so should not be green</p>
+  <p>Ignored</p>
+  <p style="color: green">Odd, should be green</p>
+</div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors-invalidation-nth-child-sibling-change", 460, 180);
+        Assert.True(result.Passed,
+            $"nth-child(... of .c) sibling-change invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_SelectorsInvalidation_NthLastChildWhenSiblingChanges_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    .sibling + :nth-last-child(odd of .c) {
+      color: green;
+    }
+  </style>
+</head>
+<body>
+<div>
+  <p class="sibling" id="toggler">Ignored</p>
+  <p class="c">Odd; used to be green, should not be since no sibling</p>
+  <p class="c">Even, so should not be green</p>
+  <!-- Intentional duplicate class attribute: HTML keeps the first one. -->
+  <p class="c" class="sibling">Odd, but no sibling, so should not be green</p>
+  <p class="c">Even, so should not be green</p>
+  <p class="sibling">Ignored</p>
+  <p class="c">Odd, should be green</p>
+</div>
+<script>
+  document.documentElement.offsetTop;
+  toggler.classList.toggle("sibling");
+</script>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+</head>
+<body>
+<div>
+  <p>Ignored</p>
+  <p>Odd; used to be green, should not be since no sibling</p>
+  <p>Even, so should not be green</p>
+  <p>Odd, but no sibling, so should not be green</p>
+  <p>Even, so should not be green</p>
+  <p>Ignored</p>
+  <p style="color: green">Odd, should be green</p>
+</div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors-invalidation-nth-last-child-sibling-change", 460, 180);
+        Assert.True(result.Passed,
+            $"nth-last-child(... of .c) sibling-change invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_AbsposInBlockInInlineInRelposInline_MatchesReference()
     {
         // CSS2 §10.1: Absolute positioning in inline contexts.
@@ -4591,6 +5444,250 @@ document.getElementById('out').appendChild(p);
             """);
 
         Assert.Equal("true|true|true|true|true|about:srcdoc|50,65|50,65|50,65", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollIntoView_FixedIframeTarget_Scrolls_OuterWindow_Not_Subframe()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body style="margin:0; width:2000px; height:2000px;">
+  <iframe id="fr"
+          style="position:absolute; left:100px; top:300px; width:400px; height:300px;"
+          srcdoc='<!DOCTYPE html><html><body style="margin:0"><div id="container" style="position:fixed; bottom:10px; left:30px; width:150px; height:150px;"><div id="target" style="position:absolute; left:10px; top:20px; width:10px; height:10px;"></div></div></body></html>'></iframe>
+</body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = ctx.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                var target = iframe.contentDocument.getElementById('target');
+                target.scrollIntoView({ block: 'start', inline: 'start' });
+                return [
+                    document.documentElement.scrollLeft,
+                    document.documentElement.scrollTop,
+                    iframe.contentWindow.scrollX,
+                    iframe.contentWindow.scrollY
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("140|460|0|0", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollIntoView_ScrollableFixedIframeTarget_Scrolls_Container_And_OuterWindow()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body style="margin:0; width:2000px; height:2000px;">
+  <iframe id="fr"
+          style="position:absolute; left:100px; top:300px; width:400px; height:300px;"
+          srcdoc='<!DOCTYPE html><html><body style="margin:0"><div id="container" style="position:fixed; bottom:10px; left:30px; width:150px; height:150px; overflow:auto;"><div style="width:600px; height:600px;"></div><div id="target" style="position:absolute; left:200%; top:200%; width:10px; height:10px;"></div></div></body></html>'></iframe>
+</body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = ctx.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                var target = iframe.contentDocument.getElementById('target');
+                var container = iframe.contentDocument.getElementById('container');
+                target.scrollIntoView({ block: 'start', inline: 'start' });
+                return [
+                    document.documentElement.scrollLeft,
+                    document.documentElement.scrollTop,
+                    iframe.contentWindow.scrollX,
+                    iframe.contentWindow.scrollY,
+                    container.scrollLeft,
+                    container.scrollTop
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("130|440|0|0|300|300", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_SubframeRootScrollIntoView_Uses_SmoothScrollBehavior()
+    {
+        const string html = """
+<!DOCTYPE html>
+<iframe id="fr" width="400" height="200" srcdoc='<!DOCTYPE html><html><head><style>body{margin:0}.smoothBehavior{scroll-behavior:smooth}</style></head><body><div style="width:2000px;height:1000px"><span style="display:inline-block;width:500px;height:250px"></span><span id="target" style="display:inline-block;vertical-align:-15px;width:10px;height:15px"></span></div></body></html>'></iframe>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var beforeFlush = ctx.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                var doc = iframe.contentDocument;
+                doc.documentElement.className = 'smoothBehavior';
+                doc.getElementById('target').scrollIntoView({ behavior: 'auto' });
+                var scrollingElement = doc.scrollingElement;
+                return [
+                    scrollingElement.scrollLeft,
+                    scrollingElement.scrollTop,
+                    scrollingElement.scrollLeft < 500,
+                    scrollingElement.scrollTop < 250
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("250|125|true|true", beforeFlush.ToString());
+
+        bridge.FlushTimerStep();
+        var afterFlush = ctx.Eval("""
+            (() => {
+                var scrollingElement = document.getElementById('fr').contentDocument.scrollingElement;
+                return [scrollingElement.scrollLeft, scrollingElement.scrollTop].join('|');
+            })()
+            """);
+
+        Assert.Equal("500|250", afterFlush.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_SubframeWindowScrollTo_Honors_Smooth_And_Instant_Behavior()
+    {
+        const string html = """
+<!DOCTYPE html>
+<iframe id="fr" width="400" height="200" srcdoc='<!DOCTYPE html><html><head><style>body{margin:0}.smoothBehavior{scroll-behavior:smooth}</style></head><body><div style="width:2000px;height:1000px"></div></body></html>'></iframe>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var smoothBeforeFlush = ctx.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                var win = iframe.contentWindow;
+                iframe.contentDocument.documentElement.className = 'smoothBehavior';
+                win.scrollTo({ left: 500, top: 250, behavior: 'auto' });
+                return [win.scrollX, win.scrollY, win.scrollX < 500, win.scrollY < 250].join('|');
+            })()
+            """);
+
+        Assert.Equal("250|125|true|true", smoothBeforeFlush.ToString());
+
+        bridge.FlushTimerStep();
+        var smoothAfterFlush = ctx.Eval("""
+            (() => {
+                var win = document.getElementById('fr').contentWindow;
+                return [win.scrollX, win.scrollY].join('|');
+            })()
+            """);
+
+        Assert.Equal("500|250", smoothAfterFlush.ToString());
+
+        var instantResult = ctx.Eval("""
+            (() => {
+                var iframe = document.getElementById('fr');
+                var win = iframe.contentWindow;
+                win.scrollTo({ left: 0, top: 0, behavior: 'instant' });
+                return [win.scrollX, win.scrollY].join('|');
+            })()
+            """);
+
+        Assert.Equal("0|0", instantResult.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_WindowScrollApis_Use_RootScrollOffsets_And_Update_VisualViewport()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body style="margin:0;width:2000px;height:4000px;"></body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+
+        var result = ctx.Eval("""
+            (() => {
+                visualViewport.scale = 2;
+                var events = 0;
+                visualViewport.addEventListener('scroll', function () { events++; });
+                window.scrollTo({ left: 40, top: 1000 });
+                window.scrollBy({ left: 10, top: 15 });
+                return [
+                    window.scrollX,
+                    window.scrollY,
+                    window.pageXOffset,
+                    window.pageYOffset,
+                    document.scrollingElement.scrollLeft,
+                    document.scrollingElement.scrollTop,
+                    visualViewport.pageLeft,
+                    visualViewport.pageTop,
+                    events
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("50|1015|50|1015|50|1015|50|1015|2", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_VisualViewport_ScrollIntoView_FixedTarget_Adjusts_PageTop()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body style="margin:0;height:4000px;">
+  <div id="fixed" style="position:fixed;bottom:0;left:0;width:100px;height:60px;overflow:auto;">
+    <div style="height:500px;"></div>
+    <input id="target" style="display:block;height:20px;">
+  </div>
+</body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+
+        var result = ctx.Eval("""
+            (() => {
+                visualViewport.scale = 2;
+                window.scrollTo(0, 1000);
+                var before = visualViewport.pageTop;
+                var fired = false;
+                visualViewport.addEventListener('scroll', function () { fired = true; });
+                document.getElementById('target').scrollIntoView({ behavior: 'instant' });
+                return [
+                    window.scrollY,
+                    before,
+                    visualViewport.pageTop,
+                    window.pageYOffset,
+                    fired,
+                    visualViewport.scale,
+                    visualViewport.height
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("1000|1000|1384|1000|true|2|384", result.ToString());
     }
 
     [Fact]

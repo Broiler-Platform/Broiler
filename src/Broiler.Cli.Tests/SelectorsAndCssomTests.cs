@@ -222,6 +222,44 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void Lang_Matches_Extended_Wildcard_Range()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div lang=""en-GB-oed""><span id=""target"">English</span></div>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(document.querySelector('#target:lang(""*-gb"")') !== null);
+r.push(document.querySelector('#target:lang(""*-fr"")') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
+    public void Lang_Matches_XmlLang_Ancestor()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<svg xml:lang=""fr-CA""><text id=""target"">Bonjour</text></svg>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(document.querySelector('#target:lang(fr)') !== null);
+r.push(document.querySelector('#target:lang(en)') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true", result);
+    }
+
+    [Fact]
     public void Open_Matches_Details_With_Open_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -540,6 +578,58 @@ document.getElementById('result').textContent = r.join(',');
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void Duplicate_Class_Attribute_First_Wins_During_Html_Parse()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div>
+  <p class=""sibling"" id=""toggler"">Ignored</p>
+  <p class=""c"" id=""first-c"">First .c</p>
+  <p class=""c"">Second .c</p>
+  <!-- Intentional duplicate class attribute: HTML keeps the first one. -->
+  <p class=""c"" class=""sibling"" id=""duplicate-class"">Third .c but not sibling</p>
+  <p class=""c"">Fourth .c</p>
+  <p class=""sibling"">Ignored</p>
+  <p class=""c"" id=""expected"">Expected green match</p>
+</div>
+<div id=""result""></div>
+<script>
+var r = [];
+var target = document.getElementById('duplicate-class');
+r.push(target.className);
+r.push(target.getAttribute('class'));
+r.push(document.querySelector('#duplicate-class.c') !== null);
+r.push(document.querySelector('#duplicate-class.sibling') === null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("c,c,true,true", result);
+    }
+
+    [Fact]
+    public void Duplicate_Id_Attribute_First_Wins_During_Html_Parse()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<!-- Intentional duplicate id attribute: HTML keeps the first one. -->
+<div id=""first"" id=""second"">target</div>
+<div id=""result""></div>
+<script>
+var r = [];
+r.push(document.getElementById('first') !== null);
+r.push(document.getElementById('second') === null);
+r.push(document.querySelector('#first') !== null);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
     }
 
     // ──────── Attribute selectors: |=, ~=, ^=, $=, *= ────────────────────
