@@ -305,6 +305,45 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Document_HitTesting_Uses_Svg_Viewports_And_Rect_Geometry()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var svgNs = 'http://www.w3.org/2000/svg';
+            var svg = document.createElementNS(svgNs, 'svg');
+            svg.id = 'svgRoot';
+            svg.setAttribute('width', '180');
+            svg.setAttribute('height', '140');
+            var rect = document.createElementNS(svgNs, 'rect');
+            rect.id = 'svgRect';
+            rect.setAttribute('x', '50');
+            rect.setAttribute('y', '50');
+            rect.setAttribute('width', '60');
+            rect.setAttribute('height', '60');
+            rect.setAttribute('fill', '#0086B2');
+            svg.appendChild(rect);
+            document.body.insertBefore(svg, document.getElementById('result'));
+
+            var svg = document.getElementById('svgRoot');
+            var svgRect = svg.getBoundingClientRect();
+            var rootHit = document.elementFromPoint(Math.round(svgRect.left + svgRect.width / 2), 10);
+            var rectHit = document.elementFromPoint(90, 70);
+            var rectHits = document.elementsFromPoint(90, 70);
+
+            document.getElementById('result').textContent = [
+                svgRect.width,
+                svgRect.height,
+                rootHit && (rootHit.id || rootHit.tagName),
+                rectHit && (rectHit.id || rectHit.tagName),
+                rectHits[0] && (rectHits[0].id || rectHits[0].tagName),
+                rectHits[1] && (rectHits[1].id || rectHits[1].tagName)
+            ].join('|');
+        ");
+
+        Assert.Contains("180|140|svgRoot|svgRect|svgRect|svgRoot", result);
+    }
+
+    [Fact]
     public void Element_ScrollTo_Updates_ScrollOffsets()
     {
         var result = ExecJs(@"

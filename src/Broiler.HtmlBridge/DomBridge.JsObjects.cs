@@ -2667,7 +2667,11 @@ public sealed partial class DomBridge
 
         var props = GetComputedProps(element);
         var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element, percentageBasis: containingBlockWidth)
+        var width = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("width"), element, percentageBasis: containingBlockWidth);
+        if (width <= 0)
+            width = ResolveSvgGeometryLength(element, "width", vertical: false, containingBlockWidth);
+
+        return width
              + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-left"), element, percentageBasis: containingBlockWidth)
              + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-right"), element, percentageBasis: containingBlockWidth);
     }
@@ -2680,7 +2684,11 @@ public sealed partial class DomBridge
         var props = GetComputedProps(element);
         var containingBlockWidth = ResolveContainingBlockReferenceLength(element, vertical: false);
         var containingBlockHeight = ResolveContainingBlockReferenceLength(element, vertical: true);
-        return ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element, percentageBasis: containingBlockHeight)
+        var height = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("height"), element, percentageBasis: containingBlockHeight);
+        if (height <= 0)
+            height = ResolveSvgGeometryLength(element, "height", vertical: true, containingBlockHeight);
+
+        return height
              + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-top"), element, percentageBasis: containingBlockWidth)
              + ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("padding-bottom"), element, percentageBasis: containingBlockWidth);
     }
@@ -2961,6 +2969,20 @@ public sealed partial class DomBridge
         var top = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("top"), element, percentageBasis: containingBlockHeight);
         var left = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("left"), element, percentageBasis: containingBlockWidth);
         var position = props.GetValueOrDefault("position");
+        var isSvgGeometryElement = IsSvgGeometryElement(element);
+
+        if (width <= 0)
+            width = ResolveSvgGeometryLength(element, "width", vertical: false, containingBlockWidth);
+        if (height <= 0)
+            height = ResolveSvgGeometryLength(element, "height", vertical: true, containingBlockHeight);
+        if (isSvgGeometryElement)
+        {
+            top = ResolveSvgGeometryLength(element, "y", vertical: true, containingBlockHeight);
+            left = ResolveSvgGeometryLength(element, "x", vertical: false, containingBlockWidth);
+            position = "absolute";
+            marginTop = 0;
+            marginLeft = 0;
+        }
 
         if (element.Parent == null || string.Equals(element.TagName, "html", StringComparison.OrdinalIgnoreCase))
             return (0, 0, width, height);
@@ -2984,7 +3006,7 @@ public sealed partial class DomBridge
         var baseTop = parentRect.Top + parentBorderTop + parentPaddingTop;
         var baseLeft = parentRect.Left + parentBorderLeft + parentPaddingLeft;
 
-        if (!string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase) && !IsSvgGeometryContainer(element.Parent))
         {
             foreach (var sibling in element.Parent.Children)
             {
@@ -3018,6 +3040,54 @@ public sealed partial class DomBridge
         }
 
         return (resolvedLeft, resolvedTop, width, height);
+    }
+
+    private static bool IsSvgGeometryContainer(DomElement? element) =>
+        element != null && IsSvgElement(element);
+
+    private static bool IsSvgGeometryElement(DomElement element)
+    {
+        if (!IsSvgElement(element))
+            return false;
+
+        var tag = element.TagName;
+        return string.Equals(tag, "svg", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "svg:svg", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "rect", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "svg:rect", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsSvgElement(DomElement element) =>
+        string.Equals(element.NamespaceURI, "http://www.w3.org/2000/svg", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(element.TagName, "svg", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(element.TagName, "svg:svg", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(element.TagName, "rect", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(element.TagName, "svg:rect", StringComparison.OrdinalIgnoreCase);
+
+    private double ResolveSvgGeometryLength(DomElement element, string attributeName, bool vertical, double percentageBasis)
+    {
+        if (!IsSvgElement(element) || !element.Attributes.TryGetValue(attributeName, out var rawValue))
+            return 0;
+
+        var parsed = ParseCssLengthToPixelsWithViewport(rawValue, element, percentageBasis: percentageBasis);
+        if (parsed > 0 || string.Equals(rawValue?.Trim(), "0", StringComparison.Ordinal))
+            return parsed;
+
+        if ((string.Equals(attributeName, "width", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(attributeName, "height", StringComparison.OrdinalIgnoreCase)) &&
+            element.Attributes.TryGetValue("viewBox", out var viewBox) &&
+            !string.IsNullOrWhiteSpace(viewBox))
+        {
+            var parts = viewBox.Split(new[] { ' ', ',', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 4 &&
+                double.TryParse(parts[vertical ? 3 : 2], System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var viewBoxLength))
+            {
+                return viewBoxLength;
+            }
+        }
+
+        return 0;
     }
 
     private double GetUsedZoomForElement(DomElement element)
