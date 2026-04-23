@@ -3065,6 +3065,129 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_Harness_PromiseTest_Callbacks_Run_After_Load()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <script src=""/resources/testharness.js""></script>
+  <script src=""/resources/testharnessreport.js""></script>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    promise_test(() => Promise.resolve().then(() => {
+      document.getElementById('pass').style.background = 'green';
+    }), 'promise_test should mutate the DOM');
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-promise-test-runs-after-load");
+        Assert.True(result.Passed,
+            $"promise_test callbacks should run after load in the WPT harness stub. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Harness_CustomElements_Can_Upgrade_Parsed_ShadowTree_Nodes()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <script src=""/resources/testharness.js""></script>
+  <script src=""/resources/testharnessreport.js""></script>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: red; }
+    .scroller { overflow: scroll; height: 150px; }
+    .target { height: 1000px; }
+    .spacer { height: 1000px; }
+  </style>
+  <script>
+    var closedShadowRoot = null;
+    class BaseComponent extends HTMLElement {
+      constructor(mode = 'open') {
+        super();
+        const shadowRoot = this.attachShadow({ mode });
+        shadowRoot.innerHTML = '<div><div class=""shadow-scroller"" style=""overflow:scroll;height:50px""><slot></slot></div></div>';
+        if (mode === 'closed') {
+          closedShadowRoot = shadowRoot;
+        }
+      }
+    }
+    class HiddenComponent extends BaseComponent {
+      constructor() { super('closed'); }
+    }
+    class OpenComponent extends BaseComponent {
+      constructor() { super('open'); }
+    }
+    customElements.define('hidden-component', HiddenComponent);
+    customElements.define('open-component', OpenComponent);
+  </script>
+</head>
+<body>
+  <div id=""pass""></div>
+  <div id=""outerScroller"" class=""scroller"">
+    <div class=""spacer"">
+      <hidden-component id=""shadowComponent"">
+        <div><div id=""closedInnerElement"" class=""target""></div></div>
+      </hidden-component>
+      <open-component id=""openShadowComponent"">
+        <div><div id=""openInnerElement"" class=""target""></div></div>
+      </open-component>
+    </div>
+  </div>
+  <script>
+    test(() => {
+      var outerScroller = document.getElementById('outerScroller');
+      var ok =
+        document.getElementById('closedInnerElement').scrollParent() === outerScroller &&
+        document.getElementById('openInnerElement').scrollParent() === outerScroller &&
+        closedShadowRoot.querySelector('div').scrollParent() === outerScroller &&
+        document.getElementById('openShadowComponent').shadowRoot.querySelector('div').scrollParent() === outerScroller;
+
+      if (ok) {
+        document.getElementById('pass').style.background = 'green';
+      }
+    }, 'custom element upgrades should preserve shadow-tree scrollParent checks');
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-custom-elements-upgrade");
+        Assert.True(result.Passed,
+            $"customElements.define should upgrade parsed nodes for shadow-tree harness checks. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_ChUnit_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>

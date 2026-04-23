@@ -187,6 +187,8 @@ internal sealed class WptTestRunner
     /// </summary>
     private const string TestharnessStubs = @"
 (function() {
+  var __broilerPromiseTests = [];
+  var __broilerWindowLoaded = false;
   if (typeof test === 'undefined') {
     window.test = function(func, name) { try { func(); } catch(e) {} };
   }
@@ -198,10 +200,37 @@ internal sealed class WptTestRunner
     };
   }
   if (typeof promise_test === 'undefined') {
-    // Real testharness.js defers promise_test execution until after
-    // page load. Reference screenshots capture the pre-test DOM, so
-    // we must NOT invoke the callback synchronously here.
-    window.promise_test = function(func, name) {};
+    function __broilerRunPromiseTest(func) {
+      try {
+        var result = func();
+        if (result && typeof result.then === 'function') {
+          result.then(function(){}, function(){});
+        }
+      } catch (e) {}
+    }
+
+    // Real testharness.js defers promise_test execution until after page load.
+    // Queue callbacks here so load-driven harness pages can still mutate the
+    // DOM before Broiler serializes the final result.
+    window.promise_test = function(func, name) {
+      if (typeof func !== 'function') {
+        return;
+      }
+
+      if (__broilerWindowLoaded) {
+        __broilerRunPromiseTest(func);
+        return;
+      }
+
+      __broilerPromiseTests.push(func);
+    };
+
+    window.addEventListener('load', function() {
+      __broilerWindowLoaded = true;
+      while (__broilerPromiseTests.length) {
+        __broilerRunPromiseTest(__broilerPromiseTests.shift());
+      }
+    });
   }
   if (typeof assert_equals === 'undefined') {
     window.assert_equals = function(a, b, msg) {};
@@ -217,6 +246,12 @@ internal sealed class WptTestRunner
   }
   if (typeof assert_approx_equals === 'undefined') {
     window.assert_approx_equals = function(a, b, eps, msg) {};
+  }
+  if (typeof assert_less_than === 'undefined') {
+    window.assert_less_than = function(a, b, msg) {};
+  }
+  if (typeof assert_greater_than === 'undefined') {
+    window.assert_greater_than = function(a, b, msg) {};
   }
   if (typeof setup === 'undefined') {
     window.setup = function(obj) {};
@@ -240,6 +275,10 @@ internal sealed class WptTestRunner
     /// </summary>
     private const string BrowserApiStubs = @"
 (function() {
+  var __broilerCustomElementRegistry = Object.create(null);
+  var __broilerCurrentCustomElementName = null;
+  var __broilerNativeCreateElement = document.createElement.bind(document);
+
   // Always override requestAnimationFrame with a synchronous stub.
   // DomBridge registers a native async rAF that queues callbacks into
   // _rafCallbacks for later execution via FlushTimerStep().  However,
@@ -260,6 +299,83 @@ internal sealed class WptTestRunner
   if (typeof waitForAtLeastOneFrame === 'undefined') {
     window.waitForAtLeastOneFrame = function() {
       return Promise.resolve();
+    };
+  }
+  if (typeof HTMLElement === 'undefined') {
+    window.HTMLElement = function HTMLElement() {
+      return __broilerNativeCreateElement(__broilerCurrentCustomElementName || 'div');
+    };
+  }
+  if (typeof customElements === 'undefined') {
+    function __broilerUpgradeElement(tagName, ctor, sourceElement) {
+      __broilerCurrentCustomElementName = tagName;
+      var upgraded = null;
+      try {
+        upgraded = new ctor();
+      } catch (e) {
+        upgraded = null;
+      }
+      __broilerCurrentCustomElementName = null;
+
+      if (!upgraded) {
+        return sourceElement;
+      }
+
+      if (sourceElement && upgraded !== sourceElement) {
+        if (sourceElement.attributes) {
+          for (var i = 0; i < sourceElement.attributes.length; i++) {
+            var attr = sourceElement.attributes[i];
+            upgraded.setAttribute(attr.name, attr.value);
+          }
+        }
+
+        while (sourceElement.firstChild) {
+          upgraded.appendChild(sourceElement.firstChild);
+        }
+
+        if (sourceElement.parentNode) {
+          sourceElement.parentNode.replaceChild(upgraded, sourceElement);
+        }
+
+        if (sourceElement.id && window[sourceElement.id] === sourceElement) {
+          window[sourceElement.id] = upgraded;
+        }
+      }
+
+      upgraded.__broilerCustomElementTagName = tagName;
+      return upgraded;
+    }
+
+    document.createElement = function(name) {
+      var tagName = String(name || '').toLowerCase();
+      if (__broilerCurrentCustomElementName === tagName) {
+        return __broilerNativeCreateElement(tagName);
+      }
+
+      var ctor = __broilerCustomElementRegistry[tagName];
+      if (!ctor) {
+        return __broilerNativeCreateElement(tagName);
+      }
+
+      return __broilerUpgradeElement(tagName, ctor, null);
+    };
+
+    window.customElements = {
+      define: function(name, ctor) {
+        var tagName = String(name || '').toLowerCase();
+        __broilerCustomElementRegistry[tagName] = ctor;
+
+        var existing = document.querySelectorAll(tagName);
+        for (var i = 0; i < existing.length; i++) {
+          __broilerUpgradeElement(tagName, ctor, existing[i]);
+        }
+      },
+      get: function(name) {
+        return __broilerCustomElementRegistry[String(name || '').toLowerCase()];
+      },
+      whenDefined: function(name) {
+        return Promise.resolve(__broilerCustomElementRegistry[String(name || '').toLowerCase()]);
+      }
     };
   }
 })();
