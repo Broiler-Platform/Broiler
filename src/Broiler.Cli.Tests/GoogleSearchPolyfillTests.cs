@@ -2392,15 +2392,20 @@ document.getElementById('result').textContent =
                 document.body.style.margin = '0';
 
                 function createCase(display, writingMode, tagName) {
+                    return createConfiguredCase(display, writingMode, tagName, '2px 10px', 'border-box', 10, 2) &&
+                           createConfiguredCase(display, writingMode, tagName, '7px 4px', 'content-box', 4, 7);
+                }
+
+                function createConfiguredCase(display, writingMode, tagName, padding, boxSizing, expectedLeft, expectedTop) {
                     var container = document.createElement('div');
                     container.style.position = 'relative';
                     container.style.font = '20px/1 monospace';
                     container.style.width = '150px';
                     container.style.height = '100px';
-                    container.style.padding = '2px 10px';
+                    container.style.padding = padding;
                     container.style.borderStyle = 'solid';
                     container.style.borderWidth = '3px 6px';
-                    container.style.boxSizing = 'border-box';
+                    container.style.boxSizing = boxSizing;
                     container.style.display = display;
                     container.style.writingMode = writingMode;
 
@@ -2408,7 +2413,7 @@ document.getElementById('result').textContent =
                     target.textContent = 'x';
                     container.appendChild(target);
                     document.body.appendChild(container);
-                    return target.offsetLeft === 10 && target.offsetTop === 2;
+                    return target.offsetLeft === expectedLeft && target.offsetTop === expectedTop;
                 }
 
                 var displays = ['block', 'inline-block', 'grid', 'inline-grid', 'flex', 'inline-flex', 'flow-root'];

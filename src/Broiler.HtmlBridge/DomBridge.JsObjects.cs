@@ -3262,15 +3262,16 @@ public sealed partial class DomBridge
 
     private double ComputeOffsetWithinParentForOffset(DomElement element, bool vertical)
     {
-        if (element.Parent == null)
+        var parent = element.Parent;
+        if (parent == null)
             return 0;
 
         var props = GetComputedProps(element);
         var position = props.GetValueOrDefault("position");
         var margin = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), element);
         var positional = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "top" : "left"), element);
-        var parentProps = GetComputedProps(element.Parent);
-        var parentPadding = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault(vertical ? "padding-top" : "padding-left"), element.Parent);
+        var parentProps = GetComputedProps(parent);
+        var parentPadding = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault(vertical ? "padding-top" : "padding-left"), parent);
 
         if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase))
             return margin + positional;
@@ -3278,7 +3279,7 @@ public sealed partial class DomBridge
         double offset = parentPadding;
         if (vertical)
         {
-            foreach (var sibling in element.Parent.Children)
+            foreach (var sibling in parent.Children)
             {
                 if (ReferenceEquals(sibling, element))
                     break;
