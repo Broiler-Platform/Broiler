@@ -1001,6 +1001,51 @@ input {
             $"{inputType} baseline alignment in {writingMode} should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
+    [Theory]
+    [InlineData("horizontal-tb", "ltr", "meter-native-horizontal")]
+    [InlineData("horizontal-tb", "rtl", "meter-native-horizontal-rtl")]
+    [InlineData("vertical-rl", "ltr", "meter-native-vertical")]
+    [InlineData("vertical-rl", "rtl", "meter-native-vertical-rtl")]
+    public void Wpt_WritingModes_MeterNativeAppearance_Fallback_MatchReference(
+        string writingMode,
+        string direction,
+        string namePrefix)
+    {
+        var reverseInline = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
+        var vertical = writingMode.StartsWith("vertical", StringComparison.OrdinalIgnoreCase) ||
+                       writingMode.StartsWith("sideways", StringComparison.OrdinalIgnoreCase);
+        var fillPositionStyle = vertical
+            ? reverseInline ? "left:0;right:0;bottom:0;height:84px;" : "left:0;right:0;top:0;height:84px;"
+            : reverseInline ? "top:0;bottom:0;right:0;width:84px;" : "top:0;bottom:0;left:0;width:84px;";
+        var hostSizeStyle = vertical ? "width:16px;height:120px;" : "width:120px;height:16px;";
+
+        var testHtml = $$"""
+<!DOCTYPE html>
+<html>
+<body>
+  <p>The meter element below should match the correct writing mode.</p>
+  <meter value="70" min="0" max="100" style="writing-mode: {{writingMode}}; direction: {{direction}};"></meter>
+</body>
+</html>
+""";
+
+        var referenceHtml = $$"""
+<!DOCTYPE html>
+<html>
+<body>
+  <p>The meter element below should match the correct writing mode.</p>
+  <div style="display:inline-block;box-sizing:border-box;position:relative;overflow:hidden;padding:0;border:1px solid #767676;background-color:#e6e6e6;vertical-align:middle;{{hostSizeStyle}}">
+    <div style="position:absolute;background-color:#4caf50;{{fillPositionStyle}}"></div>
+  </div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, namePrefix, 320, 120);
+        Assert.True(result.Passed,
+            $"meter fallback appearance should match reference for {writingMode}/{direction}. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
     [Fact]
     public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
     {
