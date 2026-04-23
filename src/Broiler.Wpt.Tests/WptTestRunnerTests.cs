@@ -922,6 +922,85 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
             $"Select[size] scrolling and sizing should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
+    [Theory]
+    [InlineData("checkbox", "vertical-lr")]
+    [InlineData("checkbox", "vertical-rl")]
+    [InlineData("radio", "vertical-lr")]
+    [InlineData("radio", "vertical-rl")]
+    public void Wpt_WritingModes_NativeCheckableControls_VerticalBaseline_MatchReference(
+        string inputType,
+        string writingMode)
+    {
+        var controlLabel = inputType == "radio" ? "radio button" : "checkbox";
+        var testHtml = $$"""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+label {
+    color: red;
+    background-color: red;
+    margin-top: -30px;
+}
+</style>
+</head>
+<body>
+<p>The {{controlLabel}} should be center-aligned with the label text since it is non-alphabetic.</p>
+<div style="writing-mode: {{writingMode}}">
+    <input type="{{inputType}}" id="primary" checked>
+    <label for="primary">こんにちわ</label>
+</div>
+
+<br>
+
+<p>The {{controlLabel}} should be left-aligned with the label text since it has text-orientation sideways.</p>
+<div style="writing-mode: {{writingMode}}; text-orientation: sideways;">
+  <input type="{{inputType}}" id="sideways" checked>
+  <label for="sideways">Baseline</label>
+</div>
+</body>
+</html>
+""";
+
+        var referenceHtml = $$"""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+label {
+    color: red;
+    background-color: red;
+    margin-top: -30px;
+}
+
+input {
+    visibility: hidden;
+}
+</style>
+</head>
+<body>
+<p>The {{controlLabel}} should be center-aligned with the label text since it is non-alphabetic.</p>
+<div style="writing-mode: {{writingMode}}">
+    <input type="{{inputType}}" id="primary" checked>
+    <label for="primary">こんにちわ</label>
+</div>
+
+<br>
+
+<p>The {{controlLabel}} should be left-aligned with the label text since it has text-orientation sideways.</p>
+<div style="writing-mode: {{writingMode}}; text-orientation: sideways;">
+  <input type="{{inputType}}" id="sideways" checked>
+  <label for="sideways">Baseline</label>
+</div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, $"writing-modes-{inputType}-{writingMode}-baseline", 640, 520);
+        Assert.True(result.Passed,
+            $"{inputType} baseline alignment in {writingMode} should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
     [Fact]
     public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
     {
