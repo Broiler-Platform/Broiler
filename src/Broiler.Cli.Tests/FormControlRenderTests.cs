@@ -483,4 +483,49 @@ document.getElementById('result').textContent = [
                 Assert.True(bounds.minX < 40, "Horizontal LTR meter fill should anchor toward the left edge.");
         }
     }
+
+    [Theory]
+    [InlineData("horizontal-tb", "", "width:72px", "height:68px", "top:1px", "right:1px", "background-color:#f0f0f0")]
+    [InlineData("horizontal-tb", "appearance:none", "width:72px", "height:68px", "top:1px", null, "background-color:#ffffff")]
+    [InlineData("vertical-lr", "", "width:68px", "height:72px", "left:1px", "bottom:1px", "background-color:#f0f0f0")]
+    [InlineData("vertical-rl", "", "width:68px", "height:72px", "right:1px", "top:1px", "background-color:#f0f0f0")]
+    [InlineData("vertical-lr", "appearance:none", "width:68px", "height:72px", "left:1px", null, "background-color:#ffffff")]
+    [InlineData("vertical-rl", "appearance:none", "width:68px", "height:72px", "right:1px", null, "background-color:#ffffff")]
+    public void Serialized_SelectMultiple_Fallback_Follows_WritingMode_And_Appearance(
+        string writingMode,
+        string extraStyle,
+        string expectedWidth,
+        string expectedHeight,
+        string expectedTrackAnchor,
+        string? expectedChromeAnchor,
+        string expectedBackground)
+    {
+        var style = string.IsNullOrWhiteSpace(extraStyle)
+            ? $"writing-mode:{writingMode}"
+            : $"writing-mode:{writingMode}; {extraStyle}";
+        var html = $@"<!DOCTYPE html>
+<html><body>
+<select multiple style='{style}'>
+  <option>Option 1</option>
+  <option>Option 2</option>
+  <option>Option 3</option>
+  <option>Option 4</option>
+  <option>Option 5</option>
+</select>
+</body></html>";
+
+        var processed = HtmlPostProcessor.Process(html);
+
+        Assert.Contains(expectedWidth, processed);
+        Assert.Contains(expectedHeight, processed);
+        Assert.Contains(expectedTrackAnchor, processed);
+        Assert.Contains(expectedBackground, processed);
+        if (expectedChromeAnchor == null)
+            Assert.DoesNotContain("background-color:#dcdcdc", processed);
+        else
+        {
+            Assert.Contains("background-color:#dcdcdc", processed);
+            Assert.Contains(expectedChromeAnchor, processed);
+        }
+    }
 }

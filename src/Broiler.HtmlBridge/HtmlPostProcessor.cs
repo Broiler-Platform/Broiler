@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Broiler.HtmlBridge;
@@ -11,6 +12,10 @@ namespace Broiler.HtmlBridge;
 internal static class HtmlPostProcessor
 {
     private const double DefaultProgressLikeTrackLengthPx = 120;
+    private const int DefaultSelectMultipleVisibleTracks = 4;
+    private const int SelectMultipleTrackThicknessPx = 16;
+    private const int SelectMultipleInlineExtentPx = 72;
+    private const int SelectMultipleChromeThicknessPx = 10;
 
     /// <summary>
     /// Matches all <c>&lt;script …&gt;…&lt;/script&gt;</c> blocks.
@@ -50,6 +55,14 @@ internal static class HtmlPostProcessor
     /// </summary>
     private static readonly Regex ProgressLikePattern = new(
         @"<(?<tag>progress|meter)(?<attrs>[^>]*)>[\s\S]*?</\k<tag>>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Matches multi-select listboxes so they can be rewritten into simple
+    /// static placeholders that preserve writing-mode differences.
+    /// </summary>
+    private static readonly Regex SelectMultiplePattern = new(
+        @"<select(?<attrs>[^>]*\bmultiple\b[^>]*)>(?<content>[\s\S]*?)</select>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
@@ -172,6 +185,7 @@ internal static class HtmlPostProcessor
         // StripObjectContent() directly; the default pipeline preserves them.
         html = ReplaceVideoWithPlaceholder(html);
         html = ReplaceProgressLikeWithPlaceholder(html);
+        html = ReplaceSelectMultipleWithPlaceholder(html);
         html = StripHiddenTestArtifacts(html);
         html = RewriteRootSelector(html);
         return html;
@@ -300,6 +314,66 @@ internal static class HtmlPostProcessor
             var hostStyle = string.Join("; ", hostStyles);
             var fillStyle = string.Join("; ", fillStyles);
             return $"<{tag}{attrsWithoutStyle} style=\"{hostStyle}\"><div style=\"{fillStyle}\"></div></{tag}>";
+        });
+    }
+
+    internal static string ReplaceSelectMultipleWithPlaceholder(string html)
+    {
+        return SelectMultiplePattern.Replace(html, m =>
+        {
+            var attrs = m.Groups["attrs"].Value;
+            var styleMatch = StyleAttributePattern.Match(attrs);
+            var existingStyle = styleMatch.Success ? styleMatch.Groups["value"].Value : string.Empty;
+
+            var writingMode = GetInlineStyleValue(existingStyle, "writing-mode") ?? "horizontal-tb";
+            var appearance = GetInlineStyleValue(existingStyle, "appearance") ?? "auto";
+            var vertical = writingMode.StartsWith("vertical", StringComparison.OrdinalIgnoreCase) ||
+                           writingMode.StartsWith("sideways", StringComparison.OrdinalIgnoreCase);
+            var reverseBlock = writingMode.EndsWith("-rl", StringComparison.OrdinalIgnoreCase);
+            var nativeAppearance = !string.Equals(appearance, "none", StringComparison.OrdinalIgnoreCase);
+
+            var visibleTracks = (int)Math.Clamp(
+                ReadNumericAttribute(attrs, "size", DefaultSelectMultipleVisibleTracks),
+                2,
+                8);
+
+            var blockExtent = (visibleTracks * SelectMultipleTrackThicknessPx) + 4;
+            var hostWidth = vertical ? blockExtent : SelectMultipleInlineExtentPx;
+            var hostHeight = vertical ? SelectMultipleInlineExtentPx : blockExtent;
+            var contentWidth = vertical
+                ? visibleTracks * SelectMultipleTrackThicknessPx
+                : SelectMultipleInlineExtentPx - (nativeAppearance ? SelectMultipleChromeThicknessPx : 2);
+            var contentHeight = vertical
+                ? SelectMultipleInlineExtentPx - (nativeAppearance ? SelectMultipleChromeThicknessPx : 2)
+                : visibleTracks * SelectMultipleTrackThicknessPx;
+
+            var hostStyles = new List<string>
+            {
+                "display:inline-block",
+                "position:relative",
+                "box-sizing:border-box",
+                "overflow:hidden",
+                "vertical-align:middle",
+                "font:13px sans-serif",
+                $"width:{hostWidth}px",
+                $"height:{hostHeight}px",
+                nativeAppearance ? "border:1px solid #767676" : "border:1px solid #9a9a9a",
+                nativeAppearance ? "background-color:#f0f0f0" : "background-color:#ffffff"
+            };
+
+            var sb = new StringBuilder();
+            sb.Append("<div style=\"").Append(string.Join("; ", hostStyles)).Append("\">");
+
+            if (vertical)
+                AppendVerticalSelectMultipleTracks(sb, visibleTracks, contentHeight, reverseBlock);
+            else
+                AppendHorizontalSelectMultipleTracks(sb, visibleTracks, contentWidth);
+
+            if (nativeAppearance)
+                AppendSelectMultipleChrome(sb, vertical, reverseBlock, hostWidth, hostHeight);
+
+            sb.Append("</div>");
+            return sb.ToString();
         });
     }
 
@@ -464,6 +538,77 @@ internal static class HtmlPostProcessor
         }
 
         return null;
+    }
+
+    private static void AppendHorizontalSelectMultipleTracks(StringBuilder sb, int visibleTracks, int contentWidth)
+    {
+        var trackWidth = Math.Max(contentWidth, 8);
+        for (var i = 0; i < visibleTracks; i++)
+        {
+            var top = 1 + (i * SelectMultipleTrackThicknessPx);
+            var background = i == 0 ? "#3875d7" : (i % 2 == 0 ? "#ffffff" : "#f7f7f7");
+            sb.Append("<div style=\"position:absolute;left:1px;top:")
+                .Append(top)
+                .Append("px;width:")
+                .Append(trackWidth)
+                .Append("px;height:")
+                .Append(SelectMultipleTrackThicknessPx)
+                .Append("px;background-color:")
+                .Append(background)
+                .Append(";border-bottom:1px solid #d0d0d0\"></div>");
+        }
+    }
+
+    private static void AppendVerticalSelectMultipleTracks(
+        StringBuilder sb,
+        int visibleTracks,
+        int contentHeight,
+        bool reverseBlock)
+    {
+        var trackHeight = Math.Max(contentHeight, 8);
+        for (var i = 0; i < visibleTracks; i++)
+        {
+            var offset = 1 + (i * SelectMultipleTrackThicknessPx);
+            var background = i == 0 ? "#3875d7" : (i % 2 == 0 ? "#ffffff" : "#f7f7f7");
+            sb.Append("<div style=\"position:absolute;top:1px;")
+                .Append(reverseBlock ? "right:" : "left:")
+                .Append(offset)
+                .Append("px;width:")
+                .Append(SelectMultipleTrackThicknessPx)
+                .Append("px;height:")
+                .Append(trackHeight)
+                .Append("px;background-color:")
+                .Append(background)
+                .Append(";border-")
+                .Append(reverseBlock ? "left" : "right")
+                .Append(":1px solid #d0d0d0\"></div>");
+        }
+    }
+
+    private static void AppendSelectMultipleChrome(
+        StringBuilder sb,
+        bool vertical,
+        bool reverseBlock,
+        int hostWidth,
+        int hostHeight)
+    {
+        if (vertical)
+        {
+            sb.Append("<div style=\"position:absolute;left:1px;")
+                .Append(reverseBlock ? "top:1px;" : "bottom:1px;")
+                .Append("width:")
+                .Append(hostWidth - 2)
+                .Append("px;height:")
+                .Append(SelectMultipleChromeThicknessPx - 2)
+                .Append("px;background-color:#dcdcdc;border-top:1px solid #b8b8b8\"></div>");
+            return;
+        }
+
+        sb.Append("<div style=\"position:absolute;top:1px;right:1px;width:")
+            .Append(SelectMultipleChromeThicknessPx - 2)
+            .Append("px;height:")
+            .Append(hostHeight - 2)
+            .Append("px;background-color:#dcdcdc;border-left:1px solid #b8b8b8\"></div>");
     }
 
     private static double ResolveProgressLikeValueRatio(string attrs, string tag)

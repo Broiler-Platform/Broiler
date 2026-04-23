@@ -923,6 +923,64 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Theory]
+    [InlineData("horizontal-tb", false, "writing-modes-select-multiple-native-horizontal")]
+    [InlineData("horizontal-tb", true, "writing-modes-select-multiple-none-horizontal")]
+    [InlineData("vertical-lr", false, "writing-modes-select-multiple-native-vlr")]
+    [InlineData("vertical-lr", true, "writing-modes-select-multiple-none-vlr")]
+    [InlineData("vertical-rl", false, "writing-modes-select-multiple-native-vrl")]
+    [InlineData("vertical-rl", true, "writing-modes-select-multiple-none-vrl")]
+    public void Wpt_WritingModes_SelectMultiple_Fallback_MatchReference(
+        string writingMode,
+        bool appearanceNone,
+        string namePrefix)
+    {
+        var style = appearanceNone
+            ? $@"writing-mode: {writingMode}; appearance: none"
+            : $@"writing-mode: {writingMode}";
+        var testHtml = $$"""
+<!DOCTYPE html>
+<html>
+<body>
+  <p>The select below should match the correct writing mode.</p>
+  <select multiple style="{{style}}">
+    <option>Option 1</option>
+    <option>Option 2</option>
+    <option>Option 3</option>
+    <option>Option 4</option>
+    <option>Option 5</option>
+    <option>Option 6</option>
+  </select>
+</body>
+</html>
+""";
+
+        var vertical = writingMode.StartsWith("vertical", StringComparison.OrdinalIgnoreCase) ||
+                       writingMode.StartsWith("sideways", StringComparison.OrdinalIgnoreCase);
+        var reverseBlock = writingMode.EndsWith("-rl", StringComparison.OrdinalIgnoreCase);
+        var nativeAppearance = !appearanceNone;
+        var hostWidth = vertical ? 68 : 72;
+        var hostHeight = vertical ? 72 : 68;
+        var hostBackground = nativeAppearance ? "#f0f0f0" : "#ffffff";
+        var hostBorder = nativeAppearance ? "#767676" : "#9a9a9a";
+        var referenceHtml = $$"""
+<!DOCTYPE html>
+<html>
+<body>
+  <p>The select below should match the correct writing mode.</p>
+  <div style="display:inline-block;position:relative;box-sizing:border-box;overflow:hidden;vertical-align:middle;font:13px sans-serif;width:{{hostWidth}}px;height:{{hostHeight}}px;border:1px solid {{hostBorder}};background-color:{{hostBackground}}">
+    {{BuildSelectMultipleReferenceTracks(vertical, reverseBlock, nativeAppearance)}}
+    {{(nativeAppearance ? BuildSelectMultipleReferenceChrome(vertical, reverseBlock, hostWidth, hostHeight) : string.Empty)}}
+  </div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, namePrefix, 240, 120);
+        Assert.True(result.Passed,
+            $"select[multiple] fallback should match reference for {writingMode} appearance-none={appearanceNone}. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Theory]
     [InlineData("checkbox", "vertical-lr")]
     [InlineData("checkbox", "vertical-rl")]
     [InlineData("radio", "vertical-lr")]
@@ -999,6 +1057,50 @@ input {
         var result = RunTempMatchTest(testHtml, referenceHtml, $"writing-modes-{inputType}-{writingMode}-baseline", 640, 520);
         Assert.True(result.Passed,
             $"{inputType} baseline alignment in {writingMode} should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    private static string BuildSelectMultipleReferenceTracks(bool vertical, bool reverseBlock, bool nativeAppearance)
+    {
+        var sb = new System.Text.StringBuilder();
+        var horizontalTrackWidth = nativeAppearance ? 62 : 70;
+        for (var i = 0; i < 4; i++)
+        {
+            var background = i == 0 ? "#3875d7" : (i % 2 == 0 ? "#ffffff" : "#f7f7f7");
+            var offset = 1 + (i * 16);
+            if (vertical)
+            {
+                sb.Append("<div style=\"position:absolute;top:1px;")
+                    .Append(reverseBlock ? "right:" : "left:")
+                    .Append(offset)
+                    .Append("px;width:16px;height:70px;background-color:")
+                    .Append(background)
+                    .Append(";border-")
+                    .Append(reverseBlock ? "left" : "right")
+                    .Append(":1px solid #d0d0d0\"></div>");
+            }
+            else
+            {
+                sb.Append("<div style=\"position:absolute;left:1px;top:")
+                    .Append(offset)
+                    .Append("px;width:")
+                    .Append(horizontalTrackWidth)
+                    .Append("px;height:16px;background-color:")
+                    .Append(background)
+                    .Append(";border-bottom:1px solid #d0d0d0\"></div>");
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private static string BuildSelectMultipleReferenceChrome(bool vertical, bool reverseBlock, int hostWidth, int hostHeight)
+    {
+        if (vertical)
+        {
+            return $"""<div style="position:absolute;left:1px;{(reverseBlock ? "top:1px;" : "bottom:1px;")}width:{hostWidth - 2}px;height:8px;background-color:#dcdcdc;border-top:1px solid #b8b8b8"></div>""";
+        }
+
+        return $"""<div style="position:absolute;top:1px;right:1px;width:8px;height:{hostHeight - 2}px;background-color:#dcdcdc;border-left:1px solid #b8b8b8"></div>""";
     }
 
     [Theory]
