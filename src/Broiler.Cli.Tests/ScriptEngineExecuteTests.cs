@@ -601,6 +601,59 @@ document.write('<p id=""injected"">written</p>');
     }
 
     [Fact]
+    public void DomBridge_SerializeToHtml_Scales_Zoomed_ScrollPadding_And_ScrollMargin_Properties()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  .zoomed-padding {
+    width: 120px;
+    height: 100px;
+    overflow: hidden;
+    border: 1px solid black;
+    scroll-padding-top: inherit;
+    zoom: 2;
+  }
+  .zoomed-margin-inherit {
+    width: 200px;
+    height: 10px;
+    scroll-margin-top: inherit;
+    zoom: 2;
+  }
+  .zoomed-margin-explicit {
+    width: 200px;
+    height: 10px;
+    scroll-margin-top: 20px;
+    zoom: 2;
+  }
+</style>
+</head>
+<body>
+  <div style="scroll-padding-top:20px; display:contents">
+    <div id="padding" class="zoomed-padding"></div>
+  </div>
+  <div style="scroll-margin-top:20px; display:contents">
+    <div id="margin-inherit" class="zoomed-margin-inherit"></div>
+  </div>
+  <div id="margin-explicit" class="zoomed-margin-explicit"></div>
+</body>
+</html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.Contains("id=\"padding\" class=\"zoomed-padding\" style=\"width: 240px; height: 200px; scroll-padding-top: 40px; border-top-width: 2px; border-right-width: 2px; border-bottom-width: 2px; border-left-width: 2px\"", result);
+        Assert.Contains("id=\"margin-inherit\" class=\"zoomed-margin-inherit\" style=\"width: 400px; height: 20px; scroll-margin-top: 40px\"", result);
+        Assert.Contains("id=\"margin-explicit\" class=\"zoomed-margin-explicit\" style=\"width: 400px; height: 20px; scroll-margin-top: 40px\"", result);
+    }
+
+    [Fact]
     public void DomBridge_SerializeToHtml_Updates_Iframe_SrcDoc_After_Subdocument_Mutation()
     {
         const string html = """

@@ -1101,6 +1101,57 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssViewport_ZoomScrollInsetSerialization_Scales_Explicit_And_Inherited_Values()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .zoomed-padding {
+      width: 120px;
+      height: 100px;
+      overflow: hidden;
+      border: 1px solid black;
+      scroll-padding-top: inherit;
+      zoom: 2;
+    }
+    .zoomed-margin-inherit {
+      width: 200px;
+      height: 10px;
+      scroll-margin-top: inherit;
+      zoom: 2;
+    }
+    .zoomed-margin-explicit {
+      width: 200px;
+      height: 10px;
+      scroll-margin-top: 20px;
+      zoom: 2;
+    }
+  </style>
+</head>
+<body>
+  <div style=""scroll-padding-top:20px; display:contents"">
+    <div class=""zoomed-padding""></div>
+  </div>
+  <div style=""scroll-margin-top:20px; display:contents"">
+    <div class=""zoomed-margin-inherit""></div>
+  </div>
+  <div class=""zoomed-margin-explicit""></div>
+</body>
+</html>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, testHtml, "file:///test.html");
+        var serialized = bridge.SerializeToHtml();
+
+        Assert.Contains("class=\"zoomed-padding\" style=\"width: 240px; height: 200px; scroll-padding-top: 40px; border-top-width: 2px; border-right-width: 2px; border-bottom-width: 2px; border-left-width: 2px\"", serialized);
+        Assert.Contains("class=\"zoomed-margin-inherit\" style=\"width: 400px; height: 20px; scroll-margin-top: 40px\"", serialized);
+        Assert.Contains("class=\"zoomed-margin-explicit\" style=\"width: 400px; height: 20px; scroll-margin-top: 40px\"", serialized);
+    }
+
+    [Fact]
     public void Wpt_CssomView_IframeSrcDocSerialization_Preserves_Subdocument_ScrollMutations()
     {
         const string html = """

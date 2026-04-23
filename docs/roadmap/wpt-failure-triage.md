@@ -14,6 +14,7 @@
 - Phase 6 has widened again: element scroll changes now dispatch minimal `scroll` / `scrollend` events, so overflow-hidden smooth scrolling can be interrupted by handler-driven `scrollTop` updates without the queued completion frame restoring the original target; focused CLI and WPT guards cover the `interrupt-hidden-smooth-scroll.html` follow-up slice.
 - Phase 6 has widened again: zoom serialization now scales the explicit-inherit `border-radius`, `outline-*`, and multi-column sizing properties that the renderer consumes after bridge execution, with focused CLI and WPT guards covering the `css/css-viewport/zoom/explicit-inherit/{border-radius,outline,column}.html` follow-up slice.
 - Phase 6 has widened again: iframe `srcdoc` serialization now rewrites same-origin subdocuments from their mutated DOM state instead of leaving stale original `srcdoc` markup and discarded fallback children, with focused CLI and WPT guards covering iframe-driven scroll/fixed follow-up cases.
+- Phase 6 has widened again: zoom serialization now also scales scroll-padding and scroll-margin longhands for zoom-removed scrollers and targets, including explicit and inherited values, with focused CLI and WPT guards covering the remaining `css/css-viewport/zoom/{scroll-padding,scroll-margin}.html` follow-up slice.
 
 ### 2026-04-22
 

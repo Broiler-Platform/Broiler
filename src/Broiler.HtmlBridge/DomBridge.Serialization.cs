@@ -102,6 +102,8 @@ public sealed partial class DomBridge
         "top", "right", "bottom", "left",
         "margin-top", "margin-right", "margin-bottom", "margin-left",
         "padding-top", "padding-right", "padding-bottom", "padding-left",
+        "scroll-margin-top", "scroll-margin-right", "scroll-margin-bottom", "scroll-margin-left",
+        "scroll-padding-top", "scroll-padding-right", "scroll-padding-bottom", "scroll-padding-left",
         "border-top-width", "border-right-width", "border-bottom-width", "border-left-width",
         "font-size", "line-height", "letter-spacing", "word-spacing", "text-indent",
         "border-radius", "border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius",
