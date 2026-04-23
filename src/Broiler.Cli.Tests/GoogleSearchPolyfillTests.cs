@@ -426,6 +426,114 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Document_HitTesting_Uses_Svg_Groups_Images_ForeignObject_And_Translate()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var svgNs = 'http://www.w3.org/2000/svg';
+            var svg = document.createElementNS(svgNs, 'svg');
+            svg.id = 'svgRoot';
+            svg.setAttribute('width', '300');
+            svg.setAttribute('height', '300');
+
+            var middleG1 = document.createElementNS(svgNs, 'g');
+            middleG1.id = 'middleG1';
+            var middleG2 = document.createElementNS(svgNs, 'g');
+            middleG2.id = 'middleG2';
+            var middleRect1 = document.createElementNS(svgNs, 'rect');
+            middleRect1.id = 'middleRect1';
+            middleRect1.setAttribute('x', '105');
+            middleRect1.setAttribute('y', '105');
+            middleRect1.setAttribute('width', '90');
+            middleRect1.setAttribute('height', '90');
+            var middleRect2 = document.createElementNS(svgNs, 'rect');
+            middleRect2.id = 'middleRect2';
+            middleRect2.setAttribute('x', '110');
+            middleRect2.setAttribute('y', '110');
+            middleRect2.setAttribute('width', '80');
+            middleRect2.setAttribute('height', '80');
+            middleG2.appendChild(middleRect1);
+            middleG2.appendChild(middleRect2);
+            middleG1.appendChild(middleG2);
+            svg.appendChild(middleG1);
+
+            var imageGroup = document.createElementNS(svgNs, 'g');
+            imageGroup.id = 'imageGroup';
+            var image1 = document.createElementNS(svgNs, 'image');
+            image1.id = 'image1';
+            image1.setAttribute('x', '5');
+            image1.setAttribute('y', '205');
+            image1.setAttribute('width', '90');
+            image1.setAttribute('height', '90');
+            image1.setAttributeNS('http://www.w3.org/1999/xlink', 'href', 'data:image/gif;base64,R0lGODlhAQABAAAAACw=');
+            var image2 = document.createElementNS(svgNs, 'image');
+            image2.id = 'image2';
+            image2.setAttribute('x', '10');
+            image2.setAttribute('y', '210');
+            image2.setAttribute('width', '80');
+            image2.setAttribute('height', '80');
+            image2.setAttributeNS('http://www.w3.org/1999/xlink', 'href', 'data:image/gif;base64,R0lGODlhAQABAAAAACw=');
+            imageGroup.appendChild(image1);
+            imageGroup.appendChild(image2);
+            svg.appendChild(imageGroup);
+
+            var fo = document.createElementNS(svgNs, 'foreignObject');
+            fo.id = 'fo';
+            fo.setAttribute('x', '210');
+            fo.setAttribute('y', '110');
+            fo.setAttribute('width', '80');
+            fo.setAttribute('height', '80');
+            var foDiv = document.createElement('div');
+            foDiv.id = 'foDiv';
+            foDiv.style.width = '80px';
+            foDiv.style.height = '80px';
+            fo.appendChild(foDiv);
+            svg.appendChild(fo);
+
+            var translatedOuter = document.createElementNS(svgNs, 'g');
+            translatedOuter.id = 'translatedOuter';
+            translatedOuter.setAttribute('transform', 'translate(200, 200)');
+            var translatedInner = document.createElementNS(svgNs, 'g');
+            translatedInner.id = 'translatedInner';
+            translatedInner.setAttribute('transform', 'translate(5, 5)');
+            var translatedRect1 = document.createElementNS(svgNs, 'rect');
+            translatedRect1.id = 'translatedRect1';
+            translatedRect1.setAttribute('x', '0');
+            translatedRect1.setAttribute('y', '0');
+            translatedRect1.setAttribute('width', '90');
+            translatedRect1.setAttribute('height', '90');
+            var translatedRect2 = document.createElementNS(svgNs, 'rect');
+            translatedRect2.id = 'translatedRect2';
+            translatedRect2.setAttribute('x', '5');
+            translatedRect2.setAttribute('y', '5');
+            translatedRect2.setAttribute('width', '80');
+            translatedRect2.setAttribute('height', '80');
+            translatedInner.appendChild(translatedRect1);
+            translatedInner.appendChild(translatedRect2);
+            translatedOuter.appendChild(translatedInner);
+            svg.appendChild(translatedOuter);
+
+            document.body.insertBefore(svg, document.getElementById('result'));
+
+            var middleHits = document.elementsFromPoint(125, 125);
+            var imageHits = document.elementsFromPoint(50, 250);
+            var foreignObjectHits = document.elementsFromPoint(250, 150);
+            var translatedHits = document.elementsFromPoint(250, 250);
+
+            document.getElementById('result').textContent = [
+                middleHits.slice(0, 5).map((node) => node.id || node.tagName).join(','),
+                imageHits.slice(0, 4).map((node) => node.id || node.tagName).join(','),
+                foreignObjectHits.slice(0, 3).map((node) => node.id || node.tagName).join(','),
+                translatedHits.slice(0, 5).map((node) => node.id || node.tagName).join(',')
+            ].join('|');
+        ");
+
+        Assert.Contains(
+            "middleRect2,middleRect1,middleG2,middleG1,svgRoot|image2,image1,imageGroup,svgRoot|foDiv,fo,svgRoot|translatedRect2,translatedRect1,translatedInner,translatedOuter,svgRoot",
+            result);
+    }
+
+    [Fact]
     public void Element_ScrollTo_Updates_ScrollOffsets()
     {
         var result = ExecJs(@"

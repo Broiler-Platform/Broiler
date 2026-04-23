@@ -7106,6 +7106,57 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Uses_Svg_Groups_Images_ForeignObject_And_Translate()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <svg id=""svgRoot"" xmlns=""http://www.w3.org/2000/svg"" width=""300"" height=""300"">
+    <g id=""middleG1"">
+      <g id=""middleG2"">
+        <rect id=""middleRect1"" x=""105"" y=""105"" width=""90"" height=""90""></rect>
+        <rect id=""middleRect2"" x=""110"" y=""110"" width=""80"" height=""80""></rect>
+      </g>
+    </g>
+    <g id=""imageGroup"">
+      <image id=""image1"" x=""5"" y=""205"" width=""90"" height=""90"" href=""data:image/gif;base64,R0lGODlhAQABAAAAACw=""></image>
+      <image id=""image2"" x=""10"" y=""210"" width=""80"" height=""80"" href=""data:image/gif;base64,R0lGODlhAQABAAAAACw=""></image>
+    </g>
+    <foreignObject id=""fo"" x=""210"" y=""110"" width=""80"" height=""80"">
+      <div id=""foDiv"" xmlns=""http://www.w3.org/1999/xhtml"" style=""width:80px;height:80px""></div>
+    </foreignObject>
+    <g id=""translatedOuter"" transform=""translate(200, 200)"">
+      <g id=""translatedInner"" transform=""translate(5, 5)"">
+        <rect id=""translatedRect1"" x=""0"" y=""0"" width=""90"" height=""90""></rect>
+        <rect id=""translatedRect2"" x=""5"" y=""5"" width=""80"" height=""80""></rect>
+      </g>
+    </g>
+  </svg>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var middleHits = document.elementsFromPoint(125, 125);
+                var imageHits = document.elementsFromPoint(50, 250);
+                var foreignObjectHits = document.elementsFromPoint(250, 150);
+                var translatedHits = document.elementsFromPoint(250, 250);
+                return [
+                    middleHits.slice(0, 5).map((node) => node.id || node.tagName).join(','),
+                    imageHits.slice(0, 4).map((node) => node.id || node.tagName).join(','),
+                    foreignObjectHits.slice(0, 3).map((node) => node.id || node.tagName).join(','),
+                    translatedHits.slice(0, 5).map((node) => node.id || node.tagName).join(',')
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal(
+            "middleRect2,middleRect1,middleG2,middleG1,svgRoot|image2,image1,imageGroup,svgRoot|foDiv,fo,svgRoot|translatedRect2,translatedRect1,translatedInner,translatedOuter,svgRoot",
+            result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped()
     {
         const string html = @"<!DOCTYPE html>

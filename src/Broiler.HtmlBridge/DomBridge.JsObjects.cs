@@ -3434,6 +3434,10 @@ public sealed partial class DomBridge
             resolvedLeft += left;
         }
 
+        var (translateX, translateY) = GetTransformTranslate(element);
+        resolvedTop += translateY;
+        resolvedLeft += translateX;
+
         return (resolvedLeft, resolvedTop, width, height);
     }
 
@@ -3455,7 +3459,11 @@ public sealed partial class DomBridge
     {
         var tag = element.TagName;
         return string.Equals(tag, "rect", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(tag, "svg:rect", StringComparison.OrdinalIgnoreCase);
+               string.Equals(tag, "svg:rect", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "image", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "svg:image", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "foreignobject", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "svg:foreignobject", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsSvgViewportElement(DomElement element)
@@ -3522,8 +3530,7 @@ public sealed partial class DomBridge
 
     private double GetTransformScale(DomElement element)
     {
-        var props = GetComputedProps(element);
-        var transform = props.GetValueOrDefault("transform");
+        var transform = GetElementTransformValue(element);
         if (string.IsNullOrWhiteSpace(transform))
             return 1;
 
@@ -3536,6 +3543,99 @@ public sealed partial class DomBridge
         }
 
         return 1;
+    }
+
+    private (double X, double Y) GetTransformTranslate(DomElement element)
+    {
+        var transform = GetElementTransformValue(element);
+        if (string.IsNullOrWhiteSpace(transform))
+            return (0, 0);
+
+        double translateX = 0;
+        double translateY = 0;
+        foreach (Match match in Regex.Matches(
+                     transform,
+                     @"translate\(\s*(?<x>[-+]?[0-9]*\.?[0-9]+)(?:[,\s]+(?<y>[-+]?[0-9]*\.?[0-9]+))?\s*\)",
+                     RegexOptions.IgnoreCase))
+        {
+            if (double.TryParse(match.Groups["x"].Value, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsedX))
+            {
+                translateX += parsedX;
+            }
+
+            if (match.Groups["y"].Success &&
+                double.TryParse(match.Groups["y"].Value, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsedY))
+            {
+                translateY += parsedY;
+            }
+        }
+
+        return (translateX, translateY);
+    }
+
+    private string? GetElementTransformValue(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        var transform = props.GetValueOrDefault("transform");
+        if (!string.IsNullOrWhiteSpace(transform) &&
+            !string.Equals(transform.Trim(), "none", StringComparison.OrdinalIgnoreCase))
+        {
+            return transform;
+        }
+
+        return element.Attributes.TryGetValue("transform", out var attributeTransform)
+            ? attributeTransform
+            : null;
+    }
+
+    private static bool IsSvgGroupElement(DomElement element)
+    {
+        var tag = element.TagName;
+        return string.Equals(tag, "g", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "svg:g", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool TryGetSvgChildrenUnionRect(
+        DomElement element,
+        out (double Left, double Top, double Width, double Height) rect)
+    {
+        var found = false;
+        var minLeft = 0d;
+        var minTop = 0d;
+        var maxRight = 0d;
+        var maxBottom = 0d;
+
+        foreach (var child in element.Children)
+        {
+            if (child.IsTextNode || child.TagName.StartsWith("#", StringComparison.Ordinal))
+                continue;
+
+            var childRect = GetHitTestRectForElement(child);
+            if (childRect.Width <= 0 || childRect.Height <= 0)
+                continue;
+
+            if (!found)
+            {
+                found = true;
+                minLeft = childRect.Left;
+                minTop = childRect.Top;
+                maxRight = childRect.Left + childRect.Width;
+                maxBottom = childRect.Top + childRect.Height;
+                continue;
+            }
+
+            minLeft = Math.Min(minLeft, childRect.Left);
+            minTop = Math.Min(minTop, childRect.Top);
+            maxRight = Math.Max(maxRight, childRect.Left + childRect.Width);
+            maxBottom = Math.Max(maxBottom, childRect.Top + childRect.Height);
+        }
+
+        rect = found
+            ? (minLeft, minTop, Math.Max(0, maxRight - minLeft), Math.Max(0, maxBottom - minTop))
+            : (0, 0, 0, 0);
+        return found;
     }
 
     private double GetBorderBoxWidth(Dictionary<string, string> props, DomElement? element = null)
@@ -6736,6 +6836,12 @@ public sealed partial class DomBridge
     {
         if (IsDocumentElement(element))
             return GetBoundingClientRectForDomElement(element, isRoot: true);
+
+        if (IsSvgGroupElement(element) &&
+            TryGetSvgChildrenUnionRect(element, out var svgGroupRect))
+        {
+            return svgGroupRect;
+        }
 
         var rect = GetBoundingClientRectForDomElement(element, isRoot: false);
         var documentElement = GetOwningDocumentElement(element);
