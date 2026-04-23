@@ -592,6 +592,13 @@ document.getElementById('out').appendChild(p);
 <head>
   <style>
     html, body { margin: 0; padding: 0; background: white; }
+    body {
+      --is-initial: initial;
+      --should-not-inherit: tomato;
+      --should-inherit: lightgreen;
+      --registered-should-not-inherit: tomato;
+      --registered-inherits-should-inherit: lightgreen;
+    }
     .box {
       width: 60px;
       height: 60px;
@@ -599,12 +606,42 @@ document.getElementById('out').appendChild(p);
       display: inline-block;
       background: black;
     }
+    @property --registered-should-not-inherit {
+      syntax: '<color>';
+      initial-value: lightgreen;
+      inherits: false;
+    }
+    @property --registered-inherits-should-inherit {
+      syntax: '<color>';
+      initial-value: tomato;
+      inherits: true;
+    }
 
     #initial { background: var(--initial-token, hotpink); --initial-token: initial; }
+    #fallbackInitial {
+      background: var(--should-not-inherit, lightgreen);
+      --should-not-inherit: var(--is-initial, initial);
+    }
+    #fallbackInherit {
+      background: var(--should-inherit, tomato);
+      --should-inherit: var(--is-initial, inherit);
+    }
+    #registeredFallbackUnset {
+      background: var(--registered-should-not-inherit);
+      --registered-should-not-inherit: var(--is-initial, unset);
+    }
+    #registeredFallbackRevert {
+      background: var(--registered-inherits-should-inherit);
+      --registered-inherits-should-inherit: var(--is-initial, revert);
+    }
   </style>
 </head>
 <body>
   <div id=""initial"" class=""box""></div>
+  <div id=""fallbackInitial"" class=""box""></div>
+  <div id=""fallbackInherit"" class=""box""></div>
+  <div id=""registeredFallbackUnset"" class=""box""></div>
+  <div id=""registeredFallbackRevert"" class=""box""></div>
 </body>
 </html>";
 
@@ -618,6 +655,7 @@ document.getElementById('out').appendChild(p);
       height: 60px;
       margin: 10px;
       display: inline-block;
+      background: lightgreen;
     }
 
     #initial { background: hotpink; }
@@ -625,10 +663,14 @@ document.getElementById('out').appendChild(p);
 </head>
 <body>
   <div id=""initial"" class=""box""></div>
+  <div id=""fallbackInitial"" class=""box""></div>
+  <div id=""fallbackInherit"" class=""box""></div>
+  <div id=""registeredFallbackUnset"" class=""box""></div>
+  <div id=""registeredFallbackRevert"" class=""box""></div>
 </body>
 </html>";
 
-        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-wide-keywords", 120, 100);
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-wide-keywords", 380, 100);
         Assert.True(result.Passed,
             $"css-variables wide keywords should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }

@@ -1157,23 +1157,7 @@ public sealed partial class DomBridge
         foreach (var kv in explicitCustomProperties)
             resolved[kv.Key] = kv.Value;
 
-        ResolveCssWideKeywordCustomProperties(resolved, parentResolved, registrations);
-        foreach (var (propertyName, registration) in registrations)
-        {
-            if (resolved.ContainsKey(propertyName))
-                continue;
-
-            if (registration.Inherits &&
-                parentResolved != null &&
-                parentResolved.TryGetValue(propertyName, out var inheritedValue))
-            {
-                resolved[propertyName] = inheritedValue;
-            }
-            else if (!string.IsNullOrWhiteSpace(registration.InitialValue))
-            {
-                resolved[propertyName] = registration.InitialValue!;
-            }
-        }
+        FinalizeResolvedCustomProperties(resolved, parentResolved, registrations);
 
         var customKeys = computed.Keys
             .Where(key => key.StartsWith("--", StringComparison.Ordinal))
@@ -1224,8 +1208,48 @@ public sealed partial class DomBridge
                 resolved[kv.Key] = kv.Value;
         }
 
-        ResolveCssWideKeywordCustomProperties(resolved, parentResolved, registrations);
+        FinalizeResolvedCustomProperties(resolved, parentResolved, registrations);
 
+        return resolved;
+    }
+
+    private static void FinalizeResolvedCustomProperties(
+        Dictionary<string, string> resolved,
+        Dictionary<string, string>? parentResolved,
+        Dictionary<string, CustomPropertyRegistration> registrations)
+    {
+        for (var pass = 0; pass < 4; pass++)
+        {
+            var changed = false;
+            foreach (var key in resolved.Keys.Where(k => k.StartsWith("--", StringComparison.Ordinal)).ToList())
+            {
+                if (!resolved.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))
+                    continue;
+
+                var normalized = ResolveKnownCustomProperties(value, resolved);
+                if (string.Equals(normalized, value, StringComparison.Ordinal))
+                    continue;
+
+                resolved[key] = normalized;
+                changed = true;
+            }
+
+            if (ResolveCssWideKeywordCustomProperties(resolved, parentResolved, registrations))
+                changed = true;
+            if (ApplyRegisteredCustomPropertyDefaults(resolved, parentResolved, registrations))
+                changed = true;
+
+            if (!changed)
+                break;
+        }
+    }
+
+    private static bool ApplyRegisteredCustomPropertyDefaults(
+        Dictionary<string, string> resolved,
+        Dictionary<string, string>? parentResolved,
+        Dictionary<string, CustomPropertyRegistration> registrations)
+    {
+        var changed = false;
         foreach (var (propertyName, registration) in registrations)
         {
             if (resolved.ContainsKey(propertyName))
@@ -1236,21 +1260,24 @@ public sealed partial class DomBridge
                 parentResolved.TryGetValue(propertyName, out var inheritedValue))
             {
                 resolved[propertyName] = inheritedValue;
+                changed = true;
             }
             else if (!string.IsNullOrWhiteSpace(registration.InitialValue))
             {
                 resolved[propertyName] = registration.InitialValue!;
+                changed = true;
             }
         }
 
-        return resolved;
+        return changed;
     }
 
-    private static void ResolveCssWideKeywordCustomProperties(
+    private static bool ResolveCssWideKeywordCustomProperties(
         Dictionary<string, string> resolved,
         Dictionary<string, string>? parentResolved,
         Dictionary<string, CustomPropertyRegistration> registrations)
     {
+        var changed = false;
         foreach (var key in resolved.Keys.Where(k => k.StartsWith("--", StringComparison.Ordinal)).ToList())
         {
             var value = resolved[key]?.Trim();
@@ -1278,10 +1305,22 @@ public sealed partial class DomBridge
             };
 
             if (string.IsNullOrWhiteSpace(replacement))
+            {
                 resolved.Remove(key);
-            else
+                changed = true;
+            }
+            else if (!string.Equals(resolved[key], replacement, StringComparison.Ordinal))
+            {
                 resolved[key] = replacement;
+                changed = true;
+            }
+            else
+            {
+                resolved[key] = replacement;
+            }
         }
+
+        return changed;
     }
 
     private static string FormatPx(double value) =>
