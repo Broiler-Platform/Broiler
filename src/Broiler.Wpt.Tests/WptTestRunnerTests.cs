@@ -7075,6 +7075,73 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssomView_VisualScrollIntoView_002_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <meta name=""viewport"" content=""width=device-width,initial-scale=1"">
+  <style>
+    html { height: 10000px; }
+    body { margin: 0; padding: 0; }
+    #fixed {
+      position: fixed;
+      bottom: 0;
+      height: 50vh;
+      width: 100vw;
+      overflow: scroll;
+      background-color: gray;
+    }
+    input { height: 20px; }
+  </style>
+</head>
+<body>
+  <div id=""fixed"">
+    <div style=""height: calc(80vh - 40px)""></div>
+    <input type=""text"" id=""name"">
+  </div>
+  <script>
+    visualViewport.scale = 2;
+    window.scrollTo(0, 1000);
+    document.querySelector('#name').scrollIntoView({ behavior: 'instant' });
+  </script>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: gray;
+    }
+    .viewport {
+      width: 100vw;
+      height: 100vh;
+      background: gray;
+    }
+    input {
+      display: block;
+      height: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class=""viewport"">
+    <input type=""text"" id=""name"">
+  </div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "visual-scroll-into-view-002", 1024, 768);
+        Assert.True(result.Passed,
+            $"visual scrollIntoView fixed target should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssomView_IframeSrcdocLoadEvent_Fires_After_Listener_Registration()
     {
         const string html = @"<!DOCTYPE html>

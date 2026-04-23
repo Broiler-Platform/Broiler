@@ -762,6 +762,56 @@ document.write('<p id=""injected"">written</p>');
         Assert.DoesNotContain("&gt;&lt;html&gt;&lt;head&gt;", result);
     }
 
+    [Fact]
+    public void DomBridge_SerializeToHtml_Persists_VisualViewport_Zoom_And_PageOffset_For_Fixed_ScrollIntoView()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    html { height: 10000px; }
+    body { margin: 0; padding: 0; }
+    #fixed {
+      position: fixed;
+      bottom: 0;
+      height: 50vh;
+      width: 100vw;
+      overflow: scroll;
+      background-color: gray;
+    }
+    input { height: 20px; }
+  </style>
+</head>
+<body>
+  <div id="fixed">
+    <div style="height: calc(80vh - 40px)"></div>
+    <input type="text" id="name">
+  </div>
+</body>
+</html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+
+        context.Eval("""
+            visualViewport.scale = 2;
+            window.scrollTo(0, 1000);
+            document.getElementById('name').scrollIntoView({ behavior: 'instant' });
+            """);
+        bridge.ResolveAnchorPositions();
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.Contains("<html style=\"height: 20000px\"", result);
+        Assert.Contains("id=\"fixed\" style=\"position: fixed; bottom: 0px; height: 768px; width: 2048px; overflow: scroll; background-color: gray\"", result);
+        Assert.Contains("style=\"position: relative; top: -2768px", result);
+        Assert.Contains("style=\"position: relative; top: -1151.2px", result);
+    }
+
     // ---------------------------------------------------------------
     //  InteractiveSession
     // ---------------------------------------------------------------
