@@ -291,6 +291,45 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Document_HitTesting_Tracks_AutoSized_Ancestors_With_Negative_Margins()
+    {
+        var result = ExecJs(@"
+            document.body.innerHTML = '<div id=""outer"" style=""background:yellow""><div id=""inner"" style=""width:100px;height:100px;margin-bottom:-100px;background:lime;""></div>Hello</div>';
+            var outer = document.getElementById('outer');
+            var rect = outer.getBoundingClientRect();
+            var hits = document.elementsFromPoint(rect.left + 1, rect.top + 1);
+            document.getElementById('result').textContent = [
+                document.elementFromPoint(rect.left + 1, rect.top + 1).id,
+                Array.prototype.map.call(hits, function (node) { return node.id || node.tagName; }).join('>')
+            ].join('|');
+        ");
+
+        Assert.Contains("outer|inner>outer>BODY>HTML", result);
+    }
+
+    [Fact]
+    public void AutoSized_ScrollMetrics_Ignore_MarginOnly_NonOverflow_Cases()
+    {
+        var result = ExecJs(@"
+            document.body.innerHTML = '<style>#target div{height:20px;min-width:20px;background:green;margin:20px 10px;}</style><div id=""target""><div><div></div></div><div></div><div></div><div></div></div>';
+            var target = document.getElementById('target');
+            var cases = [
+                ['visible', 'block', '0', '0'],
+                ['hidden', 'flow-root', '2px', '3px solid']
+            ];
+            document.getElementById('result').textContent = cases.map(function (entry) {
+                target.style.overflow = entry[0];
+                target.style.display = entry[1];
+                target.style.padding = entry[2];
+                target.style.border = entry[3];
+                return String(target.scrollHeight === target.clientHeight && target.scrollWidth === target.clientWidth);
+            }).join('|');
+        ");
+
+        Assert.Contains("true|true", result);
+    }
+
+    [Fact]
     public void Document_HitTesting_Returns_Null_For_Documents_Without_A_Viewport()
     {
         var result = ExecJs(@"

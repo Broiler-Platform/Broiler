@@ -6427,6 +6427,78 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssomView_NegativeMargins_HitTesting_Returns_Inner_Then_AutoSized_Outer()
+    {
+        const string html = @"<!DOCTYPE html>
+<body>
+  <div id=""outer"" style=""background:yellow"">
+    <div id=""inner"" style=""width:100px; height:100px; margin-bottom:-100px; background:lime;""></div>
+    Hello
+  </div>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+        var result = ctx.Eval("""
+            (() => {
+                var outer = document.getElementById('outer');
+                var rect = outer.getBoundingClientRect();
+                var hits = document.elementsFromPoint(rect.left + 1, rect.top + 1);
+                return [
+                    document.elementFromPoint(rect.left + 1, rect.top + 1).id,
+                    Array.prototype.map.call(hits, function (node) { return node.id || node.tagName; }).join('>')
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("outer|inner>outer>BODY>HTML", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_AutoSized_ScrollMetrics_Do_Not_Report_MarginOnly_Overflow()
+    {
+        const string html = @"<!DOCTYPE html>
+<style>
+  #target div {
+    height: 20px;
+    min-width: 20px;
+    background: green;
+    margin: 20px 10px;
+  }
+</style>
+<div id=""target"">
+  <div><div></div></div>
+  <div></div>
+  <div></div>
+  <div></div>
+</div>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var target = document.getElementById('target');
+                var cases = [
+                    ['visible', 'block', '0', '0'],
+                    ['clip', 'grid', '2px', '3px solid']
+                ];
+                return cases.map(function (entry) {
+                    target.style.overflow = entry[0];
+                    target.style.display = entry[1];
+                    target.style.padding = entry[2];
+                    target.style.border = entry[3];
+                    return String(target.scrollHeight === target.clientHeight && target.scrollWidth === target.clientWidth);
+                }).join('|');
+            })()
+            """);
+
+        Assert.Equal("true|true", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_CreateHtmlDocument_Has_No_HitTesting_Viewport()
     {
         using var ctx = new Broiler.JavaScript.Engine.JSContext();
