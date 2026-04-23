@@ -6970,6 +6970,9 @@ public sealed partial class DomBridge
         if (!IsElementRenderedForHitTesting(element))
             return false;
 
+        if (IsTableStructuralHitTestOnlyElement(element))
+            return false;
+
         var props = GetComputedProps(element);
         if (string.Equals(props.GetValueOrDefault("pointer-events"), "none", StringComparison.OrdinalIgnoreCase))
             return false;
@@ -6986,6 +6989,12 @@ public sealed partial class DomBridge
     {
         if (IsDocumentElement(element))
             return GetBoundingClientRectForDomElement(element, isRoot: true);
+
+        if (IsTableCellElement(element) &&
+            TryGetSimpleTableCellHitTestRect(element, out var tableCellRect))
+        {
+            return tableCellRect;
+        }
 
         if (IsSvgGroupElement(element) &&
             TryGetSvgChildrenUnionRect(element, out var svgGroupRect))
@@ -7009,6 +7018,115 @@ public sealed partial class DomBridge
             rect.Top,
             Math.Max(rect.Width, GetScrollWidthForDomElement(element, isRoot: false)),
             Math.Max(rect.Height, GetScrollHeightForDomElement(element, isRoot: false)));
+    }
+
+    private static bool IsTableCellElement(DomElement element)
+    {
+        var tag = element.TagName;
+        return string.Equals(tag, "td", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "th", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsTableStructuralHitTestOnlyElement(DomElement element)
+    {
+        var tag = element.TagName;
+        return string.Equals(tag, "tr", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "thead", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "tbody", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "tfoot", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "colgroup", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "col", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool TryGetSimpleTableCellHitTestRect(
+        DomElement element,
+        out (double Left, double Top, double Width, double Height) rect)
+    {
+        rect = default;
+        var row = element.Parent;
+        if (row == null || !string.Equals(row.TagName, "tr", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var table = row.Parent;
+        if (table != null &&
+            (string.Equals(table.TagName, "thead", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(table.TagName, "tbody", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(table.TagName, "tfoot", StringComparison.OrdinalIgnoreCase)))
+        {
+            table = table.Parent;
+        }
+
+        if (table == null || !string.Equals(table.TagName, "table", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var rows = CollectTableRows(table);
+        var rowIndex = rows.FindIndex(candidate => ReferenceEquals(candidate, row));
+        if (rowIndex < 0)
+            return false;
+
+        var cells = row.Children
+            .Where(child => !child.IsTextNode && IsTableCellElement(child))
+            .ToList();
+        var cellIndex = cells.FindIndex(candidate => ReferenceEquals(candidate, element));
+        if (cellIndex < 0)
+            return false;
+
+        var columnCount = rows
+            .Select(candidate => candidate.Children.Count(child => !child.IsTextNode && IsTableCellElement(child)))
+            .DefaultIfEmpty(0)
+            .Max();
+        if (columnCount <= 0 || rows.Count <= 0)
+            return false;
+
+        var tableRect = GetBoundingClientRectForDomElement(table, isRoot: false);
+        if (tableRect.Width <= 0 || tableRect.Height <= 0)
+            return false;
+
+        var (spacingX, spacingY) = GetEffectiveTableBorderSpacing(table);
+        var cellWidth = Math.Max(0, (tableRect.Width - (columnCount + 1) * spacingX) / columnCount);
+        var cellHeight = Math.Max(0, (tableRect.Height - (rows.Count + 1) * spacingY) / rows.Count);
+        if (cellWidth <= 0 || cellHeight <= 0)
+            return false;
+
+        var tableProps = GetComputedProps(table);
+        var isVertical = IsVerticalWritingMode(tableProps.GetValueOrDefault("writing-mode"));
+        var isRtl = string.Equals(tableProps.GetValueOrDefault("direction"), "rtl", StringComparison.OrdinalIgnoreCase);
+        var visualCellIndex = isRtl ? Math.Max(0, columnCount - 1 - cellIndex) : cellIndex;
+
+        rect = !isVertical
+            ? (
+                tableRect.Left + spacingX + visualCellIndex * (cellWidth + spacingX),
+                tableRect.Top + spacingY + rowIndex * (cellHeight + spacingY),
+                cellWidth,
+                cellHeight)
+            : (
+                tableRect.Left + spacingX + rowIndex * (cellWidth + spacingX),
+                tableRect.Top + spacingY + visualCellIndex * (cellHeight + spacingY),
+                cellWidth,
+                cellHeight);
+        return true;
+    }
+
+    private (double Horizontal, double Vertical) GetEffectiveTableBorderSpacing(DomElement table)
+    {
+        var rawValue = GetComputedProps(table).GetValueOrDefault("border-spacing");
+        if (string.IsNullOrWhiteSpace(rawValue))
+            return (2, 2);
+
+        var parts = rawValue
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+            return (2, 2);
+
+        var horizontal = ParseCssLengthToPixelsWithViewport(parts[0], table);
+        var vertical = parts.Length > 1
+            ? ParseCssLengthToPixelsWithViewport(parts[1], table)
+            : horizontal;
+
+        if (horizontal <= 0 && vertical <= 0)
+            return (2, 2);
+
+        return (horizontal, vertical);
     }
 
     private bool IsElementRenderedForHitTesting(DomElement element)

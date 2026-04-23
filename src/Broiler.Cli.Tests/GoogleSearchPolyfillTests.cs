@@ -617,6 +617,60 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Document_HitTesting_Uses_Table_Cell_Layout_For_Rtl_And_Vertical_Writing_Modes()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var sandbox = document.createElement('div');
+            sandbox.id = 'sandbox';
+            var table = document.createElement('table');
+            table.id = 'testtable';
+            table.style.margin = '100px';
+            table.style.width = '200px';
+            table.style.height = '200px';
+
+            for (var rowIndex = 1; rowIndex <= 4; rowIndex++) {
+                var row = document.createElement('tr');
+                row.id = 'tr' + rowIndex;
+                for (var cellIndex = 1; cellIndex <= 4; cellIndex++) {
+                    var cell = document.createElement('td');
+                    cell.id = 'td' + rowIndex + cellIndex;
+                    row.appendChild(cell);
+                }
+                table.appendChild(row);
+            }
+
+            sandbox.appendChild(table);
+            document.body.insertBefore(sandbox, document.getElementById('result'));
+
+            function summarize(x, y, count) {
+                return document.elementsFromPoint(x, y).slice(0, count).map((node) => node.id || node.tagName).join(',');
+            }
+
+            var initialCell = summarize(125, 125, 5);
+            var initialGap = summarize(199, 199, 4);
+            table.className = 'rtl';
+            table.style.direction = 'rtl';
+            var rtlCell = summarize(125, 125, 1);
+            table.className = 'tblr';
+            table.style.writingMode = 'vertical-lr';
+            table.style.direction = 'ltr';
+            var verticalBottomLeft = summarize(125, 275, 1);
+            var verticalTopRight = summarize(275, 125, 1);
+
+            document.getElementById('result').textContent = [
+                initialCell,
+                initialGap,
+                rtlCell,
+                verticalBottomLeft,
+                verticalTopRight
+            ].join('|');
+        ");
+
+        Assert.Contains("td11,testtable,sandbox,BODY,HTML|testtable,sandbox,BODY,HTML|td14|td14|td41", result);
+    }
+
+    [Fact]
     public void Element_ScrollTo_Updates_ScrollOffsets()
     {
         var result = ExecJs(@"

@@ -7196,6 +7196,54 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Uses_Table_Cell_Layout_For_Rtl_And_Vertical_Writing_Modes()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0;padding:0"">
+  <div id=""sandbox"">
+    <table id=""testtable"" style=""margin:100px;width:200px;height:200px"">
+      <tr id=""tr1""><td id=""td11""></td><td id=""td12""></td><td id=""td13""></td><td id=""td14""></td></tr>
+      <tr id=""tr2""><td id=""td21""></td><td id=""td22""></td><td id=""td23""></td><td id=""td24""></td></tr>
+      <tr id=""tr3""><td id=""td31""></td><td id=""td32""></td><td id=""td33""></td><td id=""td34""></td></tr>
+      <tr id=""tr4""><td id=""td41""></td><td id=""td42""></td><td id=""td43""></td><td id=""td44""></td></tr>
+    </table>
+  </div>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                function summarize(x, y, count) {
+                    return document.elementsFromPoint(x, y).slice(0, count).map((node) => node.id || node.tagName).join(',');
+                }
+
+                var table = document.getElementById('testtable');
+                var initialCell = summarize(125, 125, 5);
+                var initialGap = summarize(199, 199, 4);
+                table.className = 'rtl';
+                table.style.direction = 'rtl';
+                var rtlCell = summarize(125, 125, 1);
+                table.className = 'tblr';
+                table.style.direction = 'ltr';
+                table.style.writingMode = 'vertical-lr';
+                var verticalBottomLeft = summarize(125, 275, 1);
+                var verticalTopRight = summarize(275, 125, 1);
+                return [
+                    initialCell,
+                    initialGap,
+                    rtlCell,
+                    verticalBottomLeft,
+                    verticalTopRight
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("td11,testtable,sandbox,BODY,HTML|testtable,sandbox,BODY,HTML|td14|td14|td41", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped()
     {
         const string html = @"<!DOCTYPE html>
