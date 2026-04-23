@@ -708,6 +708,24 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Document_HitTesting_Excludes_Rounded_Corners_From_Fieldset_Hits()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.innerHTML = '<div style=""position:absolute;width:200px;height:200px;right:0;top:0""><div id=""fieldsetDiv"" style=""position:absolute;top:0;left:0;width:60px;height:60px;background:rebeccapurple""></div><fieldset id=""fieldset"" style=""position:absolute;top:100px;left:100px;width:60px;height:60px;border-radius:100px""><span style=""position:absolute;top:-100px;left:-100px;width:1px;height:1px""></span></fieldset></div><pre id=""result""></pre>';
+            var fieldsetDivRect = document.getElementById('fieldsetDiv').getBoundingClientRect();
+            var fieldsetRect = document.getElementById('fieldset').getBoundingClientRect();
+            document.getElementById('result').textContent = [
+                document.elementFromPoint(fieldsetDivRect.left + fieldsetDivRect.width / 2, fieldsetDivRect.top + fieldsetDivRect.height / 2).id,
+                document.elementFromPoint(fieldsetRect.left + fieldsetRect.width / 2, fieldsetRect.top + fieldsetRect.height / 2).id,
+                document.elementFromPoint(fieldsetRect.left + 5, fieldsetRect.top + 5).id || 'other'
+            ].join('|');
+        ");
+
+        Assert.Contains("fieldsetDiv|fieldset|other", result);
+    }
+
+    [Fact]
     public void Element_ScrollTo_Updates_ScrollOffsets()
     {
         var result = ExecJs(@"

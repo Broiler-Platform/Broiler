@@ -6984,6 +6984,9 @@ public sealed partial class DomBridge
         if (rect.Width <= 0 || rect.Height <= 0)
             return false;
 
+        if (!IsPointInsideRoundedHitRect(element, rect, x, y))
+            return false;
+
         return x >= rect.Left && x < rect.Left + rect.Width &&
                y >= rect.Top && y < rect.Top + rect.Height;
     }
@@ -7221,6 +7224,69 @@ public sealed partial class DomBridge
             "poly" or "polygon" => coords.Count >= 6 && IsPointInsidePolygonArea(coords, x, y),
             _ => coords.Count >= 4 && IsPointInsideRectArea(coords, x, y)
         };
+    }
+
+    private bool IsPointInsideRoundedHitRect(
+        DomElement element,
+        (double Left, double Top, double Width, double Height) rect,
+        double x,
+        double y)
+    {
+        var radius = GetUniformHitTestBorderRadius(element, rect.Width, rect.Height);
+        if (radius <= 0)
+            return true;
+
+        var rx = Math.Min(radius, rect.Width / 2);
+        var ry = Math.Min(radius, rect.Height / 2);
+        if (rx <= 0 || ry <= 0)
+            return true;
+
+        var localX = x - rect.Left;
+        var localY = y - rect.Top;
+        if (localX < 0 || localY < 0 || localX >= rect.Width || localY >= rect.Height)
+            return false;
+
+        return !IsPointInsideRoundedCorner(localX, localY, rx, ry, rect.Width, rect.Height, top: true, left: true) &&
+               !IsPointInsideRoundedCorner(localX, localY, rx, ry, rect.Width, rect.Height, top: true, left: false) &&
+               !IsPointInsideRoundedCorner(localX, localY, rx, ry, rect.Width, rect.Height, top: false, left: true) &&
+               !IsPointInsideRoundedCorner(localX, localY, rx, ry, rect.Width, rect.Height, top: false, left: false);
+    }
+
+    private bool IsPointInsideRoundedCorner(
+        double localX,
+        double localY,
+        double rx,
+        double ry,
+        double width,
+        double height,
+        bool top,
+        bool left)
+    {
+        var cornerLeft = left ? 0 : width - rx;
+        var cornerTop = top ? 0 : height - ry;
+        if (localX < cornerLeft || localX >= cornerLeft + rx || localY < cornerTop || localY >= cornerTop + ry)
+            return false;
+
+        var centerX = left ? rx : width - rx;
+        var centerY = top ? ry : height - ry;
+        var normalizedX = (localX - centerX) / rx;
+        var normalizedY = (localY - centerY) / ry;
+        return normalizedX * normalizedX + normalizedY * normalizedY > 1;
+    }
+
+    private double GetUniformHitTestBorderRadius(DomElement element, double width, double height)
+    {
+        var rawRadius = GetComputedProps(element).GetValueOrDefault("border-radius");
+        if (string.IsNullOrWhiteSpace(rawRadius) || string.Equals(rawRadius, "0", StringComparison.Ordinal))
+            return 0;
+
+        var firstToken = rawRadius
+            .Split([' ', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(firstToken))
+            return 0;
+
+        return ParseCssLengthToPixelsWithViewport(firstToken, element, percentageBasis: Math.Min(width, height));
     }
 
     private static List<double> ParseAreaCoords(string? rawCoords)
