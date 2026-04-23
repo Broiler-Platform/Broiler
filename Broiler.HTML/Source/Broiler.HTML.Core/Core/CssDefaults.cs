@@ -119,7 +119,7 @@ internal static class CssDefaults
         main, figure,
         figcaption,
         details         { display: block }
-        summary         { display: list-item }
+        summary         { display: list-item; list-style-type: none }
 
         /* HTML5 text-level elements – inline by default */
         mark            { background-color: yellow; color: black }

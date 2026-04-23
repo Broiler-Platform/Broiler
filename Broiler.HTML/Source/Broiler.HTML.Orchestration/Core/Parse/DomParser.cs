@@ -262,6 +262,9 @@ internal sealed class DomParser
         if (box.HtmlTag != null)
             ApplyClosedDetailsVisibility(box);
 
+        if (box.HtmlTag != null)
+            ApplySummaryDisclosureMarker(box, baseUrl);
+
         // CSS2.1 §12.1: Generate ::before and ::after pseudo-element boxes
         // after child style cascading to avoid modifying the child list
         // during iteration.
@@ -293,6 +296,32 @@ internal sealed class DomParser
 
             child.Display = CssConstants.None;
         }
+    }
+
+    private static void ApplySummaryDisclosureMarker(CssBox box, Uri baseUrl)
+    {
+        if (!box.HtmlTag.Name.Equals("summary", StringComparison.OrdinalIgnoreCase) ||
+            box.ParentBox?.HtmlTag == null ||
+            !box.ParentBox.HtmlTag.Name.Equals("details", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (box.Boxes.Count > 0 &&
+            box.Boxes[0].HtmlTag == null &&
+            box.Boxes[0].Text.Length > 0 &&
+            (box.Boxes[0].Text.Span.SequenceEqual("▸ ".AsSpan()) ||
+             box.Boxes[0].Text.Span.SequenceEqual("▾ ".AsSpan())))
+        {
+            return;
+        }
+
+        var markerText = box.ParentBox.HtmlTag.HasAttribute("open") ? "▾ " : "▸ ";
+        var markerBox = box.Boxes.Count > 0
+            ? CssBoxHelper.CreateBox(box, baseUrl, before: box.Boxes[0])
+            : CssBoxHelper.CreateBox(box, baseUrl);
+        markerBox.Display = CssConstants.Inline;
+        markerBox.Text = markerText.AsMemory();
     }
 
     private void SetTextSelectionStyle(HtmlContainerInt htmlContainer, CssData cssData)

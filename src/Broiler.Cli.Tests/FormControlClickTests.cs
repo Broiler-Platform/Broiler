@@ -75,6 +75,22 @@ public class FormControlClickTests
         return null;
     }
 
+    private static string CollectRenderedText(CssBox box)
+    {
+        var buffer = new System.Text.StringBuilder();
+        AppendRenderedText(box, buffer);
+        return buffer.ToString();
+    }
+
+    private static void AppendRenderedText(CssBox box, System.Text.StringBuilder buffer)
+    {
+        if (box.Text.Length > 0)
+            buffer.Append(box.Text.ToString());
+
+        foreach (var child in box.Boxes)
+            AppendRenderedText(child, buffer);
+    }
+
     [Fact]
     public void InputSubmit_IsClickable()
     {
@@ -163,5 +179,39 @@ public class FormControlClickTests
         var foundBox = DomUtils.GetLinkBox(root, clickPoint);
         Assert.NotNull(foundBox);
         Assert.True(foundBox.IsClickable);
+    }
+
+    [Fact]
+    public void Summary_In_Open_Details_Has_Open_Disclosure_Marker()
+    {
+        var root = GetLayoutRoot("""
+<html><body>
+  <details open>
+    <summary>Summary</summary>
+    <p>Details</p>
+  </details>
+</body></html>
+""", 600, 160);
+
+        var summaryBox = FindBoxByTag(root, "summary");
+        Assert.NotNull(summaryBox);
+        Assert.StartsWith("▾ ", CollectRenderedText(summaryBox));
+    }
+
+    [Fact]
+    public void Summary_In_Closed_Details_Has_Closed_Disclosure_Marker()
+    {
+        var root = GetLayoutRoot("""
+<html><body>
+  <details>
+    <summary>Summary</summary>
+    <p>Details</p>
+  </details>
+</body></html>
+""", 600, 160);
+
+        var summaryBox = FindBoxByTag(root, "summary");
+        Assert.NotNull(summaryBox);
+        Assert.StartsWith("▸ ", CollectRenderedText(summaryBox));
     }
 }
