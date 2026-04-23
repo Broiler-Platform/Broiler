@@ -671,6 +671,43 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Document_HitTesting_Uses_Image_Map_Areas_Before_Associated_Images()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var image = document.createElement('img');
+            image.id = 'dinos';
+            image.setAttribute('usemap', '#dinos_map');
+            image.setAttribute('width', '364');
+            image.setAttribute('height', '40');
+            image.style.display = 'block';
+            image.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+
+            var map = document.createElement('map');
+            map.id = 'dinos_map';
+            map.name = 'dinos_map';
+            var area = document.createElement('area');
+            area.id = 'rectG';
+            area.shape = 'rect';
+            area.coords = '0,0,90,100';
+            area.href = '#';
+            map.appendChild(area);
+
+            document.body.insertBefore(image, document.getElementById('result'));
+            document.body.insertBefore(map, document.getElementById('result'));
+
+            var rect = image.getBoundingClientRect();
+            document.getElementById('result').textContent = [
+                document.elementFromPoint(rect.left + 45, rect.top + 20).id,
+                document.elementsFromPoint(rect.left + 45, rect.top + 20).slice(0, 4).map((node) => node.id || node.tagName).join(','),
+                document.elementFromPoint(rect.left + 92, rect.top + 2).id
+            ].join('|');
+        ");
+
+        Assert.Contains("rectG|rectG,dinos,BODY,HTML|dinos", result);
+    }
+
+    [Fact]
     public void Element_ScrollTo_Updates_ScrollOffsets()
     {
         var result = ExecJs(@"

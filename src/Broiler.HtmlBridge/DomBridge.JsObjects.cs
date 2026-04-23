@@ -6970,6 +6970,9 @@ public sealed partial class DomBridge
         if (!IsElementRenderedForHitTesting(element))
             return false;
 
+        if (IsAreaElement(element))
+            return IsImageMapAreaHit(element, x, y);
+
         if (IsTableStructuralHitTestOnlyElement(element))
             return false;
 
@@ -7026,6 +7029,9 @@ public sealed partial class DomBridge
         return string.Equals(tag, "td", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(tag, "th", StringComparison.OrdinalIgnoreCase);
     }
+
+    private static bool IsAreaElement(DomElement element) =>
+        string.Equals(element.TagName, "area", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsTableStructuralHitTestOnlyElement(DomElement element)
     {
@@ -7127,6 +7133,161 @@ public sealed partial class DomBridge
             return (2, 2);
 
         return (horizontal, vertical);
+    }
+
+    private bool IsImageMapAreaHit(DomElement area, double x, double y)
+    {
+        var image = FindAssociatedImageMapImage(area);
+        if (image == null)
+            return false;
+
+        var imageRect = GetBoundingClientRectForDomElement(image, isRoot: false);
+        if (imageRect.Width <= 0 || imageRect.Height <= 0)
+            return false;
+
+        var localX = x - imageRect.Left;
+        var localY = y - imageRect.Top;
+        if (localX < 0 || localY < 0 || localX >= imageRect.Width || localY >= imageRect.Height)
+            return false;
+
+        var coordinateScale = GetImageMapCoordinateScale(image, imageRect);
+        var scaledX = coordinateScale.ScaleX > 0 ? localX / coordinateScale.ScaleX : localX;
+        var scaledY = coordinateScale.ScaleY > 0 ? localY / coordinateScale.ScaleY : localY;
+        return IsPointInsideAreaShape(area, scaledX, scaledY);
+    }
+
+    private DomElement? FindAssociatedImageMapImage(DomElement area)
+    {
+        var map = area.Parent;
+        if (map == null || !string.Equals(map.TagName, "map", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var mapName = map.Attributes.GetValueOrDefault("name");
+        if (string.IsNullOrWhiteSpace(mapName))
+            mapName = map.Attributes.GetValueOrDefault("id");
+        if (string.IsNullOrWhiteSpace(mapName))
+            return null;
+
+        var expectedUseMap = "#" + mapName.Trim();
+        foreach (var candidate in EnumerateDomDescendants(GetOwningDocumentElement(area)))
+        {
+            if (!string.Equals(candidate.TagName, "img", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var useMap = candidate.Attributes.GetValueOrDefault("usemap")?.Trim();
+            if (string.Equals(useMap, expectedUseMap, StringComparison.OrdinalIgnoreCase))
+                return candidate;
+        }
+
+        return null;
+    }
+
+    private IEnumerable<DomElement> EnumerateDomDescendants(DomElement root)
+    {
+        foreach (var child in root.Children)
+        {
+            if (child.IsTextNode || child.TagName.StartsWith("#", StringComparison.Ordinal))
+                continue;
+
+            yield return child;
+            foreach (var descendant in EnumerateDomDescendants(child))
+                yield return descendant;
+        }
+    }
+
+    private (double ScaleX, double ScaleY) GetImageMapCoordinateScale(
+        DomElement image,
+        (double Left, double Top, double Width, double Height) imageRect)
+    {
+        var widthBasis = ParsePositiveDouble(image.Attributes.GetValueOrDefault("width"));
+        var heightBasis = ParsePositiveDouble(image.Attributes.GetValueOrDefault("height"));
+
+        return (
+            widthBasis > 0 ? imageRect.Width / widthBasis : 1,
+            heightBasis > 0 ? imageRect.Height / heightBasis : 1);
+    }
+
+    private bool IsPointInsideAreaShape(DomElement area, double x, double y)
+    {
+        var shape = area.Attributes.GetValueOrDefault("shape")?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(shape))
+            shape = "rect";
+
+        var coords = ParseAreaCoords(area.Attributes.GetValueOrDefault("coords"));
+        return shape switch
+        {
+            "default" => true,
+            "circle" => coords.Count >= 3 && IsPointInsideCircleArea(coords, x, y),
+            "poly" or "polygon" => coords.Count >= 6 && IsPointInsidePolygonArea(coords, x, y),
+            _ => coords.Count >= 4 && IsPointInsideRectArea(coords, x, y)
+        };
+    }
+
+    private static List<double> ParseAreaCoords(string? rawCoords)
+    {
+        if (string.IsNullOrWhiteSpace(rawCoords))
+            return [];
+
+        return rawCoords
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(ParsePositiveOrNegativeDouble)
+            .ToList();
+    }
+
+    private static bool IsPointInsideRectArea(IReadOnlyList<double> coords, double x, double y)
+    {
+        var left = Math.Min(coords[0], coords[2]);
+        var right = Math.Max(coords[0], coords[2]);
+        var top = Math.Min(coords[1], coords[3]);
+        var bottom = Math.Max(coords[1], coords[3]);
+        return x >= left && x <= right && y >= top && y <= bottom;
+    }
+
+    private static bool IsPointInsideCircleArea(IReadOnlyList<double> coords, double x, double y)
+    {
+        var dx = x - coords[0];
+        var dy = y - coords[1];
+        return dx * dx + dy * dy <= coords[2] * coords[2];
+    }
+
+    private static bool IsPointInsidePolygonArea(IReadOnlyList<double> coords, double x, double y)
+    {
+        var inside = false;
+        var pointCount = coords.Count / 2;
+        for (int i = 0, j = pointCount - 1; i < pointCount; j = i++)
+        {
+            var xi = coords[i * 2];
+            var yi = coords[i * 2 + 1];
+            var xj = coords[j * 2];
+            var yj = coords[j * 2 + 1];
+
+            var intersects = ((yi > y) != (yj > y)) &&
+                             (x < (xj - xi) * (y - yi) / ((yj - yi) == 0 ? double.Epsilon : (yj - yi)) + xi);
+            if (intersects)
+                inside = !inside;
+        }
+
+        return inside;
+    }
+
+    private static double ParsePositiveDouble(string? rawValue)
+    {
+        var parsed = ParsePositiveOrNegativeDouble(rawValue);
+        return parsed > 0 ? parsed : 0;
+    }
+
+    private static double ParsePositiveOrNegativeDouble(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+            return 0;
+
+        return double.TryParse(
+            rawValue.Trim(),
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var parsed)
+            ? parsed
+            : 0;
     }
 
     private bool IsElementRenderedForHitTesting(DomElement element)

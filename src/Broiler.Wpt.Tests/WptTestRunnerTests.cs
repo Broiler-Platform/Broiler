@@ -7244,6 +7244,34 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Uses_Image_Map_Areas_Before_Associated_Images()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <img id=""dinos"" src=""data:image/gif;base64,R0lGODlhAQABAAAAACw="" usemap=""#dinos_map"" width=""364"" height=""40"" style=""display:block"">
+  <map id=""dinos_map"" name=""dinos_map"">
+    <area id=""rectG"" shape=""rect"" coords=""0,0,90,100"" href=""#"">
+  </map>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var rect = document.getElementById('dinos').getBoundingClientRect();
+                return [
+                    document.elementFromPoint(rect.left + 45, rect.top + 20).id,
+                    document.elementsFromPoint(rect.left + 45, rect.top + 20).slice(0, 4).map((node) => node.id || node.tagName).join(','),
+                    document.elementFromPoint(rect.left + 92, rect.top + 2).id
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("rectG|rectG,dinos,BODY,HTML|dinos", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped()
     {
         const string html = @"<!DOCTYPE html>
