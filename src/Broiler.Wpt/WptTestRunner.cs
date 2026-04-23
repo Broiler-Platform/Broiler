@@ -319,9 +319,8 @@ internal sealed class WptTestRunner
   }
   __broilerEnsureAnimate(document.documentElement);
   __broilerEnsureAnimate(document.body);
-  if (typeof test_driver === 'undefined') {
-    window.test_driver = {};
-  }
+  var test_driver = window.test_driver || {};
+  window.test_driver = test_driver;
   if (typeof test_driver.Actions === 'undefined') {
     function Actions() {
       this._pointers = Object.create(null);

@@ -2906,20 +2906,30 @@ public sealed partial class DomBridge
 
     private double ResolveContentBoxExtent(DomElement element, bool vertical)
     {
-        var props = GetComputedProps(element);
-        var percentageBasis = ResolveContainingBlockReferenceLength(element, vertical);
-        var specified = ParseCssLengthToPixelsWithViewport(
-            props.GetValueOrDefault(vertical ? "height" : "width"),
-            element,
-            percentageBasis: percentageBasis);
-        if (specified > 0)
-            return specified;
+        if (!_contentExtentInProgress.Add((element, vertical)))
+            return 0;
 
-        var svgLength = ResolveSvgGeometryLength(element, vertical ? "height" : "width", vertical, percentageBasis);
-        if (svgLength > 0)
-            return svgLength;
+        try
+        {
+            var props = GetComputedProps(element);
+            var percentageBasis = ResolveContainingBlockReferenceLength(element, vertical);
+            var specified = ParseCssLengthToPixelsWithViewport(
+                props.GetValueOrDefault(vertical ? "height" : "width"),
+                element,
+                percentageBasis: percentageBasis);
+            if (specified > 0)
+                return specified;
 
-        return EstimateAutoContentExtent(element, vertical, new HashSet<DomElement>());
+            var svgLength = ResolveSvgGeometryLength(element, vertical ? "height" : "width", vertical, percentageBasis);
+            if (svgLength > 0)
+                return svgLength;
+
+            return EstimateAutoContentExtent(element, vertical, new HashSet<DomElement>());
+        }
+        finally
+        {
+            _contentExtentInProgress.Remove((element, vertical));
+        }
     }
 
     private double ResolveBorderBoxExtent(DomElement element, bool vertical)

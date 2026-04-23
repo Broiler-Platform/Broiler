@@ -21,6 +21,8 @@ public sealed partial class DomBridge
     private const int MaxCustomPropertyResolutionPasses = 4;
     private int _styleInvalidationBatchDepth;
     private HashSet<DomElement>? _pendingStyleInvalidationRoots;
+    private readonly Dictionary<DomElement, Dictionary<string, string>> _computedPropsInProgress = [];
+    private readonly HashSet<(DomElement Element, bool Vertical)> _contentExtentInProgress = [];
 
     // ------------------------------------------------------------------
     //  CSS specificity (Level 3) and <style> / <link> cascading

@@ -1059,45 +1059,56 @@ public sealed partial class DomBridge
     /// </summary>
     private Dictionary<string, string> GetComputedProps(DomElement element)
     {
+        if (_computedPropsInProgress.TryGetValue(element, out var inProgress))
+            return inProgress;
+
         var props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (sel, _, decls) in CssRules)
+        _computedPropsInProgress[element] = props;
+        try
         {
-            if (MatchesSelector(element, sel))
-                foreach (var kv in decls)
-                    props[kv.Key] = kv.Value;
-        }
-        foreach (var kv in element.Style)
-            props[kv.Key] = kv.Value;
-
-        ExpandCssShorthands(props);
-        ResolveLengthAttrFunctions(props, element);
-        ResolveExplicitInheritedValues(props, element);
-
-        // Expand the inset shorthand → top, right, bottom, left so that
-        // downstream code (ComputeElementBox, TryApplyFallback, etc.) can
-        // read the individual inset properties directly.
-        if (props.TryGetValue("inset", out var insetVal2))
-        {
-            var parts = insetVal2.Split(new[] { ' ', '\t' },
-                StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length > 0)
+            foreach (var (sel, _, decls) in CssRules)
             {
-                string iTop = parts[0];
-                string iRight = parts.Length > 1 ? parts[1] : iTop;
-                string iBottom = parts.Length > 2 ? parts[2] : iTop;
-                string iLeft = parts.Length > 3 ? parts[3] : iRight;
-
-                if (!props.ContainsKey("top")) props["top"] = iTop;
-                if (!props.ContainsKey("right")) props["right"] = iRight;
-                if (!props.ContainsKey("bottom")) props["bottom"] = iBottom;
-                if (!props.ContainsKey("left")) props["left"] = iLeft;
+                if (MatchesSelector(element, sel))
+                    foreach (var kv in decls)
+                        props[kv.Key] = kv.Value;
             }
+            foreach (var kv in element.Style)
+                props[kv.Key] = kv.Value;
+
+            ExpandCssShorthands(props);
+            ResolveLengthAttrFunctions(props, element);
+            ResolveExplicitInheritedValues(props, element);
+
+            // Expand the inset shorthand → top, right, bottom, left so that
+            // downstream code (ComputeElementBox, TryApplyFallback, etc.) can
+            // read the individual inset properties directly.
+            if (props.TryGetValue("inset", out var insetVal2))
+            {
+                var parts = insetVal2.Split(new[] { ' ', '\t' },
+                    StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length > 0)
+                {
+                    string iTop = parts[0];
+                    string iRight = parts.Length > 1 ? parts[1] : iTop;
+                    string iBottom = parts.Length > 2 ? parts[2] : iTop;
+                    string iLeft = parts.Length > 3 ? parts[3] : iRight;
+
+                    if (!props.ContainsKey("top")) props["top"] = iTop;
+                    if (!props.ContainsKey("right")) props["right"] = iRight;
+                    if (!props.ContainsKey("bottom")) props["bottom"] = iBottom;
+                    if (!props.ContainsKey("left")) props["left"] = iLeft;
+                }
+            }
+
+            ApplyApproximateFormControlComputedSizes(props, element);
+            ApplyLogicalSizeAliases(props);
+
+            return props;
         }
-
-        ApplyApproximateFormControlComputedSizes(props, element);
-        ApplyLogicalSizeAliases(props);
-
-        return props;
+        finally
+        {
+            _computedPropsInProgress.Remove(element);
+        }
     }
 
     private void ResolveExplicitInheritedValues(Dictionary<string, string> props, DomElement element)
