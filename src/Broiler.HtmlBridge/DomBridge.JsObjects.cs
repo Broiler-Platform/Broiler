@@ -5840,6 +5840,7 @@ public sealed partial class DomBridge
                     ValidateQualifiedName(qName, ns, _jsContext!);
 
                 var subDocRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+                subDocRoot.DomProperties["_hasViewport"] = false;
                 _elements.Add(subDocRoot);
 
                 if (doctypeArg is JSObject dtObj)
@@ -5878,6 +5879,7 @@ public sealed partial class DomBridge
                 var subTitle = a.Length > 0 && !a[0].IsNull && !a[0].IsUndefined ? a[0].ToString() : null;
 
                 var subDocRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+                subDocRoot.DomProperties["_hasViewport"] = false;
                 _elements.Add(subDocRoot);
 
                 var dt = new DomElement("#doctype", null, null, string.Empty);
@@ -6032,6 +6034,9 @@ public sealed partial class DomBridge
         if (documentElement == null)
             return Array.Empty<DomElement>();
 
+        if (!DocumentHasViewport(documentElement))
+            return Array.Empty<DomElement>();
+
         var viewportWidth = GetViewportReferenceLength(documentElement, vertical: false);
         var viewportHeight = GetViewportReferenceLength(documentElement, vertical: true);
         if (viewportWidth <= 0 || viewportHeight <= 0 || x < 0 || y < 0 || x >= viewportWidth || y >= viewportHeight)
@@ -6064,12 +6069,29 @@ public sealed partial class DomBridge
         if (string.Equals(props.GetValueOrDefault("pointer-events"), "none", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        var rect = GetBoundingClientRectForDomElement(element, IsViewportElementForMetrics(element));
+        var rect = GetHitTestRectForElement(element);
         if (rect.Width <= 0 || rect.Height <= 0)
             return false;
 
         return x >= rect.Left && x < rect.Left + rect.Width &&
                y >= rect.Top && y < rect.Top + rect.Height;
+    }
+
+    private (double Left, double Top, double Width, double Height) GetHitTestRectForElement(DomElement element)
+    {
+        if (IsDocumentElement(element))
+            return GetBoundingClientRectForDomElement(element, isRoot: true);
+
+        var rect = GetBoundingClientRectForDomElement(element, isRoot: false);
+        var documentElement = GetOwningDocumentElement(element);
+        if (!IsViewportBodyElement(element, documentElement))
+            return rect;
+
+        return (
+            rect.Left,
+            rect.Top,
+            Math.Max(rect.Width, GetScrollWidthForDomElement(element, isRoot: false)),
+            Math.Max(rect.Height, GetScrollHeightForDomElement(element, isRoot: false)));
     }
 
     private bool IsElementRenderedForHitTesting(DomElement element)
@@ -6096,6 +6118,17 @@ public sealed partial class DomBridge
         }
 
         return true;
+    }
+
+    private static bool DocumentHasViewport(DomElement documentElement)
+    {
+        var docRoot = documentElement.OwnerDocRoot;
+        if (docRoot == null)
+            return true;
+
+        return !docRoot.DomProperties.TryGetValue("_hasViewport", out var value) ||
+               value is not bool hasViewport ||
+               hasViewport;
     }
 
     /// <summary>Collects all elements matching a tag name in a sub-tree.</summary>

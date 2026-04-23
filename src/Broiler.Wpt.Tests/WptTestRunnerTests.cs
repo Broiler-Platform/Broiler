@@ -5744,6 +5744,52 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssomView_IframeDocumentHitTesting_Uses_Html_When_Body_Does_Not_Cover_Point()
+    {
+        const string html = @"<!DOCTYPE html>
+<body>
+  <iframe id=""fr"" width="""" height="""" srcdoc='<!DOCTYPE html><html><body><div style=""height:20px""></div></body></html>'></iframe>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+        var result = ctx.Eval("""
+            (() => {
+                var doc = document.getElementById('fr').contentDocument;
+                var hits = doc.elementsFromPoint(0, 100);
+                return [
+                    hits.length,
+                    hits[0] && (hits[0].id || hits[0].tagName),
+                    hits[1] || null
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("1|HTML|", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_CreateHtmlDocument_Has_No_HitTesting_Viewport()
+    {
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, "<!DOCTYPE html><body></body>", "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var doc = document.implementation.createHTMLDocument('foo');
+                return [
+                    doc.elementFromPoint(0, 0) === null,
+                    doc.elementsFromPoint(0, 0).length
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("true|0", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped()
     {
         const string html = @"<!DOCTYPE html>

@@ -269,6 +269,42 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Document_HitTesting_Uses_Html_But_Not_Body_For_Iframe_Viewport_Fallback()
+    {
+        var result = ExecJs(@"
+            var iframe = document.createElement('iframe');
+            iframe.width = '';
+            iframe.height = '';
+            iframe.srcdoc = '<!DOCTYPE html><html><body><div style=""height:20px""></div></body></html>';
+            document.body.appendChild(iframe);
+
+            var doc = iframe.contentDocument;
+            var hits = doc.elementsFromPoint(0, 100);
+            document.getElementById('result').textContent = [
+                hits.length,
+                hits[0] && (hits[0].id || hits[0].tagName),
+                hits[1] || null
+            ].join('|');
+        ");
+
+        Assert.Contains("1|HTML|", result);
+    }
+
+    [Fact]
+    public void Document_HitTesting_Returns_Null_For_Documents_Without_A_Viewport()
+    {
+        var result = ExecJs(@"
+            var doc = document.implementation.createHTMLDocument('foo');
+            document.getElementById('result').textContent = [
+                doc.elementFromPoint(0, 0) === null,
+                doc.elementsFromPoint(0, 0).length
+            ].join('|');
+        ");
+
+        Assert.Contains("true|0", result);
+    }
+
+    [Fact]
     public void Element_ScrollTo_Updates_ScrollOffsets()
     {
         var result = ExecJs(@"

@@ -821,6 +821,7 @@ public sealed partial class DomBridge
 
                 // Build a new document root
                 var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+                docRoot.DomProperties["_hasViewport"] = false;
                 _elements.Add(docRoot);
 
                 // Append doctype if provided
@@ -865,6 +866,7 @@ public sealed partial class DomBridge
 
                 // Build a new HTML document root with html/head/body
                 var docRoot = new DomElement("#subdoc-root", null, null, string.Empty);
+                docRoot.DomProperties["_hasViewport"] = false;
                 _elements.Add(docRoot);
 
                 // Add DOCTYPE
