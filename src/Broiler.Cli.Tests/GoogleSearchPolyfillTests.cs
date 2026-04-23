@@ -550,6 +550,48 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Element_ScrollParent_Crosses_Open_And_Closed_Shadow_Roots()
+    {
+        var result = ExecJs(@"
+            function append(tag, parent, id, style) {
+                var el = document.createElement(tag);
+                if (id) el.id = id;
+                if (style) el.style.cssText = style;
+                parent.appendChild(el);
+                return el;
+            }
+
+            var outerScroller = append('div', document.body, 'outerScroller', 'overflow:scroll; height:150px;');
+            var spacer = append('div', outerScroller, null, 'height:1000px;');
+
+            var closedHost = append('div', spacer, 'closedHost');
+            var closedWrapper = append('div', closedHost);
+            var closedInner = append('div', closedWrapper, 'closedInner', 'height:1000px;');
+            var closedShadowRoot = closedHost.attachShadow({ mode: 'closed' });
+            var closedShadowOuter = append('div', closedShadowRoot, 'closedShadowOuter');
+            var closedShadowScroller = append('div', closedShadowOuter, null, 'overflow:scroll; height:50px;');
+
+            var openHost = append('div', spacer, 'openHost');
+            var openWrapper = append('div', openHost);
+            var openInner = append('div', openWrapper, 'openInner', 'height:1000px;');
+            var openShadowRoot = openHost.attachShadow({ mode: 'open' });
+            var openShadowOuter = append('div', openShadowRoot, 'openShadowOuter');
+            var openShadowScroller = append('div', openShadowOuter, null, 'overflow:scroll; height:50px;');
+
+            document.getElementById('result').textContent = [
+                closedInner.scrollParent().id,
+                openInner.scrollParent().id,
+                closedShadowRoot.querySelector('#closedShadowOuter').scrollParent().id,
+                openHost.shadowRoot.querySelector('#openShadowOuter').scrollParent().id,
+                closedHost.shadowRoot === null,
+                openHost.shadowRoot === openShadowRoot
+            ].join('|');
+        ");
+
+        Assert.Contains("outerScroller|outerScroller|outerScroller|outerScroller|true|true", result);
+    }
+
+    [Fact]
     public void Element_ClientMetrics_Ignore_Effective_Zoom()
     {
         var result = ExecJs(@"

@@ -6000,6 +6000,55 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssomView_ScrollParent_Crosses_Open_And_Closed_Shadow_Roots()
+    {
+        const string html = @"<!DOCTYPE html><body></body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                function append(tag, parent, id, style) {
+                    var el = document.createElement(tag);
+                    if (id) el.id = id;
+                    if (style) el.style.cssText = style;
+                    parent.appendChild(el);
+                    return el;
+                }
+
+                var outerScroller = append('div', document.body, 'outerScroller', 'overflow:scroll; height:150px;');
+                var spacer = append('div', outerScroller, null, 'height:1000px;');
+
+                var closedHost = append('div', spacer, 'closedHost');
+                var closedWrapper = append('div', closedHost);
+                var closedInner = append('div', closedWrapper, 'closedInner', 'height:1000px;');
+                var closedShadowRoot = closedHost.attachShadow({ mode: 'closed' });
+                var closedShadowOuter = append('div', closedShadowRoot, 'closedShadowOuter');
+                append('div', closedShadowOuter, null, 'overflow:scroll; height:50px;');
+
+                var openHost = append('div', spacer, 'openHost');
+                var openWrapper = append('div', openHost);
+                var openInner = append('div', openWrapper, 'openInner', 'height:1000px;');
+                var openShadowRoot = openHost.attachShadow({ mode: 'open' });
+                var openShadowOuter = append('div', openShadowRoot, 'openShadowOuter');
+                append('div', openShadowOuter, null, 'overflow:scroll; height:50px;');
+
+                return [
+                    closedInner.scrollParent().id,
+                    openInner.scrollParent().id,
+                    closedShadowRoot.querySelector('#closedShadowOuter').scrollParent().id,
+                    openHost.shadowRoot.querySelector('#openShadowOuter').scrollParent().id,
+                    closedHost.shadowRoot === null,
+                    openHost.shadowRoot === openShadowRoot
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("outerScroller|outerScroller|outerScroller|outerScroller|true|true", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_IframeSubframeWindowScroll_Uses_SubdocumentRoot()
     {
         const string html = @"<!DOCTYPE html>

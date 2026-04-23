@@ -109,6 +109,23 @@ public sealed partial class DomBridge
             }, "set innerHTML"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        obj.FastAddProperty(
+            (KeyString)"shadowRoot",
+            new JSFunction((in Arguments _) =>
+            {
+                if (!TryGetShadowRoot(element, out var shadowRoot))
+                    return JSNull.Value;
+
+                var mode = element.DomProperties.TryGetValue("_shadowRootMode", out var rawMode)
+                    ? rawMode as string
+                    : null;
+                return string.Equals(mode, "open", StringComparison.OrdinalIgnoreCase)
+                    ? ToJSObject(shadowRoot)
+                    : JSNull.Value;
+            }, "get shadowRoot"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // textContent (read/write)
         obj.FastAddProperty(
             (KeyString)"textContent",
@@ -869,6 +886,40 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // -- DOM manipulation methods --
+
+        obj.FastAddValue(
+            (KeyString)"attachShadow",
+            new JSFunction((in Arguments a) =>
+            {
+                if (TryGetShadowRoot(element, out _))
+                    ThrowDOMException(_jsContext!, "Shadow root already attached.", "NotSupportedError");
+
+                var mode = "open";
+                if (a.Length > 0 && a[0] is JSObject options)
+                {
+                    var modeValue = options[(KeyString)"mode"];
+                    if (modeValue != null && !modeValue.IsUndefined && !modeValue.IsNull)
+                    {
+                        mode = modeValue.ToString();
+                    }
+                }
+
+                mode = string.Equals(mode, "closed", StringComparison.OrdinalIgnoreCase)
+                    ? "closed"
+                    : "open";
+
+                var shadowRoot = new DomElement("#shadow-root", null, null, string.Empty);
+                shadowRoot.Parent = element;
+                shadowRoot.OwnerDocRoot = element.OwnerDocRoot;
+                shadowRoot.DomProperties["_host"] = element;
+                shadowRoot.DomProperties["_shadowRootMode"] = mode;
+
+                element.DomProperties["_shadowRoot"] = shadowRoot;
+                element.DomProperties["_shadowRootMode"] = mode;
+                _elements.Add(shadowRoot);
+                return ToJSObject(shadowRoot);
+            }, "attachShadow", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
 
         // appendChild(child)
         var bridgeForAppend = this;
@@ -2668,6 +2719,19 @@ public sealed partial class DomBridge
         return obj;
     }
 
+    private static bool TryGetShadowRoot(DomElement element, out DomElement shadowRoot)
+    {
+        if (element.DomProperties.TryGetValue("_shadowRoot", out var rawShadowRoot) &&
+            rawShadowRoot is DomElement root)
+        {
+            shadowRoot = root;
+            return true;
+        }
+
+        shadowRoot = null!;
+        return false;
+    }
+
     private double GetClientWidthForDomElement(DomElement element, bool isRoot)
     {
         if (isRoot)
@@ -2903,6 +2967,9 @@ public sealed partial class DomBridge
     private bool HasAssociatedLayoutBox(DomElement element)
     {
         if (element.IsTextNode)
+            return false;
+
+        if (element.TagName.StartsWith("#", StringComparison.Ordinal))
             return false;
 
         var display = GetComputedProps(element).GetValueOrDefault("display")?.Trim().ToLowerInvariant();
