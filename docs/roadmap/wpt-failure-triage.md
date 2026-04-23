@@ -18,6 +18,7 @@
 - Phase 6 has widened again: `scrollIntoView()` now defaults omitted and boolean-overload inline alignment to `nearest` instead of forcing `start`, so already-visible inline axes stay put while block scrolling still occurs; focused CLI and WPT guards cover the remaining default-alignment cssom-view slice.
 - Phase 6 has widened again: custom-property resolution now reapplies CSS-wide keyword semantics after nested `var()` substitution for registered and unregistered custom properties, with focused CLI and WPT guards covering the broader `variable-css-wide-keywords.html` fallback slice.
 - Phase 6 has widened again: zoom serialization now scales the focused SVG viewport/geometry follow-up slice, including numeric SVG coordinates, selected font-relative SVG lengths, path data, and stroke widths, with focused CLI and WPT guards for `css/css-viewport/zoom/{svg,svg-font-relative-units}.html`.
+- Phase 6 has widened again: renderer-side pseudo-element generation now treats `content: url(...)` as image content instead of literal text, so the focused `css/css-viewport/zoom/zoom-pseudo-image.html` pseudo-image slice can reuse the same image-loading path as normal replaced content with focused CLI and WPT guards.
 
 ### 2026-04-22
 

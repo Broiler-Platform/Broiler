@@ -1018,6 +1018,45 @@ public class Acid2ImageComparisonTests
             "render CSS borders (triangle shapes via border trick).");
     }
 
+    [Fact]
+    public void CssPseudoElement_ContentUrl_Renders_Image_Content()
+    {
+        const string html = """
+<!doctype html>
+<meta charset=utf-8>
+<style>
+.icon {
+  width: 200px;
+  height: 200px;
+  background-color: blue;
+}
+
+.icon::before {
+  display: block;
+  content: url(/images/green.png);
+  width: 100px;
+  height: 100px;
+  background-color: purple;
+}
+</style>
+<div class="icon"></div>
+""";
+
+        using var bitmap = HtmlRender.RenderToImage(html, 220, 220);
+
+        var wrapperPixel = bitmap.GetPixel(10, 10);
+        Assert.True(wrapperPixel.Blue > 120 && wrapperPixel.Red > 120,
+            $"Expected purple pseudo-element wrapper, got ({wrapperPixel.Red},{wrapperPixel.Green},{wrapperPixel.Blue})");
+
+        var imagePixel = bitmap.GetPixel(40, 40);
+        Assert.True(imagePixel.Green > 100 && imagePixel.Red < 120 && imagePixel.Blue < 120,
+            $"Expected green pseudo-element image content, got ({imagePixel.Red},{imagePixel.Green},{imagePixel.Blue})");
+
+        var outsidePixel = bitmap.GetPixel(150, 150);
+        Assert.True(outsidePixel.Blue > 150 && outsidePixel.Red < 80,
+            $"Expected blue outer icon background outside pseudo-content, got ({outsidePixel.Red},{outsidePixel.Green},{outsidePixel.Blue})");
+    }
+
     // ──────── P1: §2.5 — Shrink-to-fit width for abs-pos ────────
 
     /// <summary>

@@ -1011,10 +1011,44 @@ internal sealed class DomParser
             CssUtils.SetPropertyValue(pseudoBox, prop.Key, value);
         }
 
+        if (TryExtractPseudoElementImageUrl(contentValue, out var imageUrl))
+        {
+            var imageTag = new HtmlTag(
+                HtmlConstants.Img,
+                true,
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["src"] = imageUrl
+                });
+            _ = new CssBoxImage(pseudoBox, imageTag, baseUrl);
+            return;
+        }
+
         // Set text content (strip surrounding quotes from CSS content value).
         var text = contentValue.Trim('\'', '"');
         if (text.Length > 0)
             pseudoBox.Text = text.AsMemory();
+    }
+
+    private static bool TryExtractPseudoElementImageUrl(string contentValue, out string imageUrl)
+    {
+        imageUrl = string.Empty;
+        if (string.IsNullOrWhiteSpace(contentValue))
+            return false;
+
+        var trimmed = contentValue.Trim();
+        if (!trimmed.StartsWith("url(", StringComparison.OrdinalIgnoreCase) || !trimmed.EndsWith(")"))
+            return false;
+
+        imageUrl = trimmed[4..^1].Trim();
+        if (imageUrl.Length >= 2 &&
+            ((imageUrl[0] == '\'' && imageUrl[^1] == '\'') ||
+             (imageUrl[0] == '"' && imageUrl[^1] == '"')))
+        {
+            imageUrl = imageUrl[1..^1];
+        }
+
+        return imageUrl.Length > 0;
     }
 
     private static bool IsStyleOnElementAllowed(CssBox box, string key, string value)
