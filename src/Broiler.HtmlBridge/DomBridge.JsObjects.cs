@@ -5613,6 +5613,25 @@ public sealed partial class DomBridge
             }, "querySelectorAll", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        doc.FastAddValue(
+            (KeyString)"elementFromPoint",
+            new JSFunction((in Arguments a) =>
+            {
+                var hit = HitTestDocumentPoint(docRoot, GetCoordinateArgument(a, 0), GetCoordinateArgument(a, 1))
+                    .FirstOrDefault();
+                return hit != null ? ToJSObject(hit) : JSNull.Value;
+            }, "elementFromPoint", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        doc.FastAddValue(
+            (KeyString)"elementsFromPoint",
+            new JSFunction((in Arguments a) =>
+            {
+                var hits = HitTestDocumentPoint(docRoot, GetCoordinateArgument(a, 0), GetCoordinateArgument(a, 1));
+                return new JSArray(hits.Select(ToJSObject).ToArray());
+            }, "elementsFromPoint", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // document.open()
         doc.FastAddValue(
             (KeyString)"open",
@@ -5995,6 +6014,88 @@ public sealed partial class DomBridge
             if (found != null) return found;
         }
         return null;
+    }
+
+    private static double GetCoordinateArgument(in Arguments args, int index) =>
+        args.Length > index && !args[index].IsNull && !args[index].IsUndefined
+            ? args[index].DoubleValue
+            : double.NaN;
+
+    private IReadOnlyList<DomElement> HitTestDocumentPoint(DomElement docRoot, double x, double y)
+    {
+        if (!double.IsFinite(x) || !double.IsFinite(y))
+            return Array.Empty<DomElement>();
+
+        var documentElement = IsDocumentElement(docRoot)
+            ? docRoot
+            : docRoot.Children.FirstOrDefault(c => !c.IsTextNode && !c.TagName.StartsWith("#"));
+        if (documentElement == null)
+            return Array.Empty<DomElement>();
+
+        var viewportWidth = GetViewportReferenceLength(documentElement, vertical: false);
+        var viewportHeight = GetViewportReferenceLength(documentElement, vertical: true);
+        if (viewportWidth <= 0 || viewportHeight <= 0 || x < 0 || y < 0 || x >= viewportWidth || y >= viewportHeight)
+            return Array.Empty<DomElement>();
+
+        var hits = new List<DomElement>();
+        CollectHitTestMatches(documentElement, x, y, hits);
+        return hits;
+    }
+
+    private void CollectHitTestMatches(DomElement element, double x, double y, List<DomElement> hits)
+    {
+        for (var i = element.Children.Count - 1; i >= 0; i--)
+        {
+            var child = element.Children[i];
+            if (!child.IsTextNode && !child.TagName.StartsWith("#", StringComparison.Ordinal))
+                CollectHitTestMatches(child, x, y, hits);
+        }
+
+        if (IsElementHitTestCandidate(element, x, y))
+            hits.Add(element);
+    }
+
+    private bool IsElementHitTestCandidate(DomElement element, double x, double y)
+    {
+        if (!IsElementRenderedForHitTesting(element))
+            return false;
+
+        var props = GetComputedProps(element);
+        if (string.Equals(props.GetValueOrDefault("pointer-events"), "none", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var rect = GetBoundingClientRectForDomElement(element, IsViewportElementForMetrics(element));
+        if (rect.Width <= 0 || rect.Height <= 0)
+            return false;
+
+        return x >= rect.Left && x < rect.Left + rect.Width &&
+               y >= rect.Top && y < rect.Top + rect.Height;
+    }
+
+    private bool IsElementRenderedForHitTesting(DomElement element)
+    {
+        for (var current = element; current != null; current = current.Parent)
+        {
+            if (current.IsTextNode)
+                return false;
+
+            if (current.TagName.StartsWith("#", StringComparison.Ordinal))
+                continue;
+
+            var props = GetComputedProps(current);
+            var display = props.GetValueOrDefault("display");
+            if (string.Equals(display, "none", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var visibility = props.GetValueOrDefault("visibility");
+            if (string.Equals(visibility, "hidden", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(visibility, "collapse", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>Collects all elements matching a tag name in a sub-tree.</summary>

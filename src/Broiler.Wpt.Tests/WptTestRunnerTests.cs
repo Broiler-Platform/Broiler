@@ -5684,6 +5684,66 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Skips_PointerEvents_None()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <div id=""yellow"" style=""width:60px; height:60px;""></div>
+  <div id=""overlay"" style=""position:absolute; left:0; top:0; width:60px; height:60px; pointer-events:none;""></div>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var hit = document.elementFromPoint(10, 10);
+                return [
+                    hit && hit.id,
+                    document.elementFromPoint(-1, -1) === null
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("yellow|true", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ElementsFromPoint_Return_Target_Ancestors_And_Subframe_Hits()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <div id=""target"" style=""width:40px; height:40px;""></div>
+  <iframe id=""fr"" width=""120"" height=""80"" srcdoc='<!DOCTYPE html><html><body style=""margin:0""><div id=""inner"" style=""width:40px;height:40px""></div></body></html>'></iframe>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+        var result = ctx.Eval("""
+            (() => {
+                var nodes = document.elementsFromPoint(10, 10);
+                var parts = [];
+                for (var i = 0; i < nodes.length; i++) {
+                    parts.push(nodes[i].id || nodes[i].tagName);
+                }
+                var outerHits = parts.join('>');
+                var doc = document.getElementById('fr').contentDocument;
+                var innerHit = doc.elementFromPoint(10, 10);
+                var innerMiss = doc.elementsFromPoint(130, 10).length;
+                return [
+                    outerHits,
+                    innerHit && (innerHit.id || innerHit.tagName),
+                    innerMiss
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("target>BODY>HTML|inner|0", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped()
     {
         const string html = @"<!DOCTYPE html>

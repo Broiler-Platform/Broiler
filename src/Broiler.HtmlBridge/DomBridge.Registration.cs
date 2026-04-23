@@ -179,6 +179,25 @@ public sealed partial class DomBridge
             }, "querySelectorAll", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        document.FastAddValue(
+            (KeyString)"elementFromPoint",
+            new JSFunction((in Arguments a) =>
+            {
+                var hit = HitTestDocumentPoint(DocumentElement, GetCoordinateArgument(a, 0), GetCoordinateArgument(a, 1))
+                    .FirstOrDefault();
+                return hit != null ? ToJSObject(hit) : JSNull.Value;
+            }, "elementFromPoint", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        document.FastAddValue(
+            (KeyString)"elementsFromPoint",
+            new JSFunction((in Arguments a) =>
+            {
+                var hits = HitTestDocumentPoint(DocumentElement, GetCoordinateArgument(a, 0), GetCoordinateArgument(a, 1));
+                return new JSArray(hits.Select(ToJSObject).ToArray());
+            }, "elementsFromPoint", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // document.getAnimations() — minimal Web Animations API support used by WPT.
         document.FastAddValue(
             (KeyString)"getAnimations",

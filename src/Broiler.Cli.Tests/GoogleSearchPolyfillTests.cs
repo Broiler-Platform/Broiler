@@ -209,6 +209,66 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Document_ElementFromPoint_Uses_Hit_Test_Order_And_Skips_PointerEvents_None()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            var purple = document.createElement('div');
+            purple.id = 'purple';
+            purple.style.width = '60px';
+            purple.style.height = '60px';
+            document.body.appendChild(purple);
+
+            var yellow = document.createElement('div');
+            yellow.id = 'yellow';
+            yellow.style.width = '60px';
+            yellow.style.height = '60px';
+            document.body.appendChild(yellow);
+
+            var overlay = document.createElement('div');
+            overlay.id = 'overlay';
+            overlay.style.position = 'absolute';
+            overlay.style.left = '0';
+            overlay.style.top = '60px';
+            overlay.style.width = '60px';
+            overlay.style.height = '60px';
+            overlay.style.pointerEvents = 'none';
+            document.body.appendChild(overlay);
+
+            document.getElementById('result').textContent = [
+                document.elementFromPoint(10, 10).id,
+                document.elementFromPoint(10, 70).id,
+                document.elementFromPoint(-1, -1) === null
+            ].join('|');
+        ");
+
+        Assert.Contains("purple|yellow|true", result);
+    }
+
+    [Fact]
+    public void Document_ElementsFromPoint_Returns_Target_Then_Ancestors_And_Viewport_Bounds()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            var target = document.createElement('div');
+            target.id = 'target';
+            target.style.width = '40px';
+            target.style.height = '40px';
+            document.body.appendChild(target);
+
+            document.getElementById('result').textContent = [
+                document.elementsFromPoint(10, 10)[0].id,
+                document.elementsFromPoint(-1, -1).length,
+                document.elementsFromPoint(1100, 10).length
+            ].join('|');
+        ");
+
+        Assert.Contains("target|0|0", result);
+    }
+
+    [Fact]
     public void Element_ScrollTo_Updates_ScrollOffsets()
     {
         var result = ExecJs(@"
