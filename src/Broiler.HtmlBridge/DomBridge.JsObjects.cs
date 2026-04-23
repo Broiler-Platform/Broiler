@@ -7002,6 +7002,9 @@ public sealed partial class DomBridge
             return tableCellRect;
         }
 
+        if (TryGetListItemMarkerHitTestRect(element, out var listItemRect))
+            return listItemRect;
+
         if (IsSvgGroupElement(element) &&
             TryGetSvgChildrenUnionRect(element, out var svgGroupRect))
         {
@@ -7035,6 +7038,71 @@ public sealed partial class DomBridge
 
     private static bool IsAreaElement(DomElement element) =>
         string.Equals(element.TagName, "area", StringComparison.OrdinalIgnoreCase);
+
+    private bool TryGetListItemMarkerHitTestRect(
+        DomElement element,
+        out (double Left, double Top, double Width, double Height) rect)
+    {
+        rect = default;
+        var props = GetComputedProps(element);
+        if (!IsOutsideListItemMarkerCandidate(element, props))
+            return false;
+
+        var baseRect = GetBoundingClientRectForDomElement(element, isRoot: false);
+        if (baseRect.Width <= 0 || baseRect.Height <= 0)
+            return false;
+
+        var markerExtent = EstimateOutsideListMarkerExtent(element, props);
+        if (markerExtent <= 0)
+            return false;
+
+        var isVertical = IsVerticalWritingMode(props.GetValueOrDefault("writing-mode"));
+        if (isVertical)
+        {
+            rect = (baseRect.Left, baseRect.Top - markerExtent, baseRect.Width, baseRect.Height + markerExtent);
+            return true;
+        }
+
+        var isRtl = string.Equals(props.GetValueOrDefault("direction"), "rtl", StringComparison.OrdinalIgnoreCase);
+        rect = isRtl
+            ? (baseRect.Left, baseRect.Top, baseRect.Width + markerExtent, baseRect.Height)
+            : (baseRect.Left - markerExtent, baseRect.Top, baseRect.Width + markerExtent, baseRect.Height);
+        return true;
+    }
+
+    private static bool IsOutsideListItemMarkerCandidate(
+        DomElement element,
+        IReadOnlyDictionary<string, string> props)
+    {
+        var isListItem = string.Equals(element.TagName, "li", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(props.GetValueOrDefault("display"), "list-item", StringComparison.OrdinalIgnoreCase);
+        if (!isListItem)
+            return false;
+
+        if (string.Equals(props.GetValueOrDefault("list-style-position"), "inside", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var listStyleType = props.GetValueOrDefault("list-style-type");
+        var listStyleImage = props.GetValueOrDefault("list-style-image");
+        return !string.Equals(listStyleType, "none", StringComparison.OrdinalIgnoreCase) ||
+               (!string.IsNullOrWhiteSpace(listStyleImage) &&
+                !string.Equals(listStyleImage, "none", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private double EstimateOutsideListMarkerExtent(DomElement element, IReadOnlyDictionary<string, string> props)
+    {
+        var fontSize = Math.Max(8, ResolveFontSizeForElement(element));
+        var listStyleType = props.GetValueOrDefault("list-style-type");
+        var listStyleImage = props.GetValueOrDefault("list-style-image");
+        var markerCore = !string.IsNullOrWhiteSpace(listStyleImage) &&
+                         !string.Equals(listStyleImage, "none", StringComparison.OrdinalIgnoreCase)
+            ? Math.Max(16, fontSize)
+            : string.Equals(listStyleType, "decimal", StringComparison.OrdinalIgnoreCase)
+                ? fontSize * 2
+                : fontSize;
+
+        return Math.Min(40, markerCore + 8);
+    }
 
     private static bool IsTableStructuralHitTestOnlyElement(DomElement element)
     {

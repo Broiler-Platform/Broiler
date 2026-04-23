@@ -726,6 +726,37 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Document_HitTesting_Extends_List_Items_To_Outside_Markers()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.innerHTML = '<ul style=""font-size:10px;margin:40px 0 0 40px""><li id=""outsideText"">Outside 1</li><li id=""outsideImage"" style=""list-style-image:url(data:image/gif;base64,R0lGODlhAQABAAAAACw=)"">Outside 2</li></ul><ul style=""font-size:10px;margin:20px 0 0 40px;list-style-position:inside""><li id=""insideText"">Inside 1</li></ul><pre id=""result""></pre>';
+
+            function findOutsideMarkerHit(id) {
+                var li = document.getElementById(id);
+                var bounds = li.getBoundingClientRect();
+                var y = (bounds.top + bounds.bottom) / 2;
+                for (var x = bounds.left - 40; x < bounds.left; x++) {
+                    var hit = document.elementFromPoint(x, y);
+                    if (hit === li)
+                        return x;
+                }
+
+                return null;
+            }
+
+            var insideBounds = document.getElementById('insideText').getBoundingClientRect();
+            document.getElementById('result').textContent = [
+                findOutsideMarkerHit('outsideText') !== null ? 'outsideText' : 'miss',
+                findOutsideMarkerHit('outsideImage') !== null ? 'outsideImage' : 'miss',
+                document.elementFromPoint(insideBounds.left + 1, (insideBounds.top + insideBounds.bottom) / 2).id
+            ].join('|');
+        ");
+
+        Assert.Contains("outsideText|outsideImage|insideText", result);
+    }
+
+    [Fact]
     public void Element_ScrollTo_Updates_ScrollOffsets()
     {
         var result = ExecJs(@"

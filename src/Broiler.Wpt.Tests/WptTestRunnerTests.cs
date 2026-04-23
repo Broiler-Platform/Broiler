@@ -7303,6 +7303,50 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Extends_List_Items_To_Outside_Markers()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <ul style=""font-size:10px;margin:40px 0 0 40px"">
+    <li id=""outsideText"">Outside 1</li>
+    <li id=""outsideImage"" style=""list-style-image:url(data:image/gif;base64,R0lGODlhAQABAAAAACw=)"">Outside 2</li>
+  </ul>
+  <ul style=""font-size:10px;margin:20px 0 0 40px;list-style-position:inside"">
+    <li id=""insideText"">Inside 1</li>
+  </ul>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                function findOutsideMarkerHit(id) {
+                    var li = document.getElementById(id);
+                    var bounds = li.getBoundingClientRect();
+                    var y = (bounds.top + bounds.bottom) / 2;
+                    for (var x = bounds.left - 40; x < bounds.left; x++) {
+                        var hit = document.elementFromPoint(x, y);
+                        if (hit === li)
+                            return x;
+                    }
+
+                    return null;
+                }
+
+                var insideBounds = document.getElementById('insideText').getBoundingClientRect();
+                return [
+                    findOutsideMarkerHit('outsideText') !== null ? 'outsideText' : 'miss',
+                    findOutsideMarkerHit('outsideImage') !== null ? 'outsideImage' : 'miss',
+                    document.elementFromPoint(insideBounds.left + 1, (insideBounds.top + insideBounds.bottom) / 2).id
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("outsideText|outsideImage|insideText", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped()
     {
         const string html = @"<!DOCTYPE html>
