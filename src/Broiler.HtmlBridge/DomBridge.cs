@@ -1,7 +1,11 @@
 using Broiler.JavaScript.BuiltIns.Null;
+using Broiler.JavaScript.BuiltIns.Boolean;
+using Broiler.JavaScript.BuiltIns.Array;
+using Broiler.JavaScript.BuiltIns.String;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using Broiler.JavaScript.BuiltIns.Number;
@@ -22,7 +26,8 @@ public sealed partial class DomBridge
     private const int FetchTimeoutSeconds = 30;
     private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(FetchTimeoutSeconds) };
     private static readonly string[] InlineEventNames = ["click", "load", "change", "input", "submit", "mousedown",
-        "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error"];
+        "mouseup", "mouseover", "mouseout", "keydown", "keyup", "keypress", "focus", "blur", "error", "scroll",
+        "scrollend"];
     private readonly List<DomElement> _elements = [];
     private readonly List<(JSFunction Callback, DomElement Target, MutationObserverOptions Options)> _mutationObservers = [];
     private readonly List<WeakReference<RangeState>> _activeRanges = [];
@@ -45,6 +50,8 @@ public sealed partial class DomBridge
     private readonly Dictionary<int, Action> _frameActions = new();
     private readonly Dictionary<DomElement, int> _smoothScrollTokens = [];
     private readonly List<JSFunction> _visualViewportScrollListeners = [];
+    private readonly Dictionary<string, List<(JSValue Listener, bool Capture)>> _windowEventListeners =
+        new(StringComparer.OrdinalIgnoreCase);
     private double _visualViewportScale = 1.0;
     private double _visualViewportPageLeftOffset;
     private double _visualViewportPageTopOffset;
@@ -290,6 +297,8 @@ public sealed partial class DomBridge
     {
         if (_jsContext == null) return;
 
+        _jsContext["frames"] = BuildWindowFramesArray();
+
         var htmlEl = _elements.FirstOrDefault(e =>
             string.Equals(e.TagName, "html", StringComparison.OrdinalIgnoreCase));
         if (htmlEl != null)
@@ -312,6 +321,16 @@ public sealed partial class DomBridge
         {
             RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireWindowLoadEvent",
                 $"Error firing window.onload: {ex.Message}", ex);
+        }
+
+        try
+        {
+            DispatchWindowEvent("load");
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireWindowLoadEvent",
+                $"Error firing window load listeners: {ex.Message}", ex);
         }
 
         // 2. Fire <body onload="…"> attribute handler and any load event
@@ -346,6 +365,88 @@ public sealed partial class DomBridge
                 RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireWindowLoadEvent",
                     $"Error firing window load event: {ex.Message}", ex);
             }
+        }
+    }
+
+    private JSValue DispatchWindowEvent(string eventType, bool bubbles = false)
+    {
+        var evt = new JSObject();
+        evt.FastAddValue((KeyString)"type", new JSString(eventType), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"bubbles", bubbles ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        return DispatchWindowEvent(evt);
+    }
+
+    private JSValue DispatchWindowEvent(JSObject evt)
+    {
+        if (_jsContext == null || _windowJSObject == null)
+            return JSBoolean.True;
+
+        var eventType = evt[(KeyString)"type"]?.ToString() ?? "unknown";
+        evt.FastAddValue((KeyString)"target", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"currentTarget", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"eventPhase", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+
+        var prevented = false;
+        evt.FastAddValue((KeyString)"stopPropagation",
+            new JSFunction((in Arguments _) => JSUndefined.Value, "stopPropagation", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"stopImmediatePropagation",
+            new JSFunction((in Arguments _) => JSUndefined.Value, "stopImmediatePropagation", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"preventDefault",
+            new JSFunction((in Arguments _) =>
+            {
+                prevented = true;
+                evt[(KeyString)"defaultPrevented"] = JSBoolean.True;
+                return JSUndefined.Value;
+            }, "preventDefault", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        if (_windowEventListeners.TryGetValue(eventType, out var listeners))
+        {
+            foreach (var (listener, _) in listeners.ToList())
+            {
+                if (listener is not JSFunction fn)
+                    continue;
+
+                try
+                {
+                    fn.InvokeFunction(new Arguments(fn, evt));
+                }
+                catch (Exception ex)
+                {
+                    RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.window.dispatchEvent", $"Window event listener error: {ex.Message}", ex);
+                }
+            }
+        }
+
+        return prevented ? JSBoolean.False : JSBoolean.True;
+    }
+
+    private JSArray BuildWindowFramesArray()
+    {
+        var frames = new List<JSValue>();
+        CollectWindowFrames(DocumentElement, frames);
+        return new JSArray(frames.ToArray());
+    }
+
+    private void CollectWindowFrames(DomElement element, List<JSValue> frames)
+    {
+        foreach (var child in element.Children)
+        {
+            if (child.IsTextNode)
+                continue;
+
+            if (string.Equals(child.TagName, "iframe", StringComparison.OrdinalIgnoreCase))
+            {
+                var src = child.Attributes.TryGetValue("src", out var srcValue) ? srcValue : string.Empty;
+                if (!IsCrossOrigin(src, _pageUrl))
+                    frames.Add(GetOrCreateSubWindow(child));
+            }
+
+            if (!string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))
+                CollectWindowFrames(child, frames);
         }
     }
 
@@ -500,7 +601,7 @@ public sealed partial class DomBridge
             // HTML parsing keeps the first attribute with a given name and
             // ignores later duplicates on the same start tag.
             if (!string.IsNullOrEmpty(name))
-                result.TryAdd(name, value);
+                result.TryAdd(name, WebUtility.HtmlDecode(value));
         }
         return result;
     }

@@ -65,9 +65,11 @@ internal static class CssUtils
             "left" => cssBox.Left,
             "top" => cssBox.Top,
             "width" => cssBox.Width,
+            "inline-size" => cssBox.InlineSize,
             "max-width" => cssBox.MaxWidth,
             "min-width" => cssBox.MinWidth,
             "height" => cssBox.Height,
+            "block-size" => cssBox.BlockSize,
             "max-height" => cssBox.MaxHeight,
             "min-height" => cssBox.MinHeight,
             "background-color" => cssBox.BackgroundColor,
@@ -91,6 +93,9 @@ internal static class CssUtils
             "text-indent" => cssBox.TextIndent,
             "text-align" => cssBox.TextAlign,
             "text-decoration" => cssBox.TextDecoration,
+            "text-decoration-line" => cssBox.TextDecoration,
+            "text-decoration-style" => cssBox.TextDecorationStyle,
+            "text-decoration-color" => cssBox.TextDecorationColor,
             "white-space" => cssBox.WhiteSpace,
             "word-break" => cssBox.WordBreak,
             "visibility" => cssBox.Visibility,
@@ -273,6 +278,48 @@ internal static class CssUtils
                         cssBox.ColumnWidth = part;
                 }
                 break;
+            case "border-inline":
+                ApplyLogicalBorderShorthand(cssBox, value, inlineAxis: true);
+                break;
+            case "border-block":
+                ApplyLogicalBorderShorthand(cssBox, value, inlineAxis: false);
+                break;
+            case "border-inline-start-color":
+                SetLogicalBorderComponent(cssBox, inlineAxis: true, startSide: true, component: "color", value);
+                break;
+            case "border-inline-end-color":
+                SetLogicalBorderComponent(cssBox, inlineAxis: true, startSide: false, component: "color", value);
+                break;
+            case "border-block-start-color":
+                SetLogicalBorderComponent(cssBox, inlineAxis: false, startSide: true, component: "color", value);
+                break;
+            case "border-block-end-color":
+                SetLogicalBorderComponent(cssBox, inlineAxis: false, startSide: false, component: "color", value);
+                break;
+            case "border-inline-start-style":
+                SetLogicalBorderComponent(cssBox, inlineAxis: true, startSide: true, component: "style", value);
+                break;
+            case "border-inline-end-style":
+                SetLogicalBorderComponent(cssBox, inlineAxis: true, startSide: false, component: "style", value);
+                break;
+            case "border-block-start-style":
+                SetLogicalBorderComponent(cssBox, inlineAxis: false, startSide: true, component: "style", value);
+                break;
+            case "border-block-end-style":
+                SetLogicalBorderComponent(cssBox, inlineAxis: false, startSide: false, component: "style", value);
+                break;
+            case "border-inline-start-width":
+                SetLogicalBorderComponent(cssBox, inlineAxis: true, startSide: true, component: "width", value);
+                break;
+            case "border-inline-end-width":
+                SetLogicalBorderComponent(cssBox, inlineAxis: true, startSide: false, component: "width", value);
+                break;
+            case "border-block-start-width":
+                SetLogicalBorderComponent(cssBox, inlineAxis: false, startSide: true, component: "width", value);
+                break;
+            case "border-block-end-width":
+                SetLogicalBorderComponent(cssBox, inlineAxis: false, startSide: false, component: "width", value);
+                break;
             case "corner-nw-radius":
                 cssBox.CornerNwRadius = value;
                 break;
@@ -327,6 +374,9 @@ internal static class CssUtils
             case "width":
                 cssBox.Width = value;
                 break;
+            case "inline-size":
+                cssBox.InlineSize = value;
+                break;
             case "max-width":
                 cssBox.MaxWidth = value;
                 break;
@@ -335,6 +385,9 @@ internal static class CssUtils
                 break;
             case "height":
                 cssBox.Height = value;
+                break;
+            case "block-size":
+                cssBox.BlockSize = value;
                 break;
             case "max-height":
                 cssBox.MaxHeight = value;
@@ -403,7 +456,16 @@ internal static class CssUtils
                 cssBox.TextAlign = value;
                 break;
             case "text-decoration":
+                ApplyTextDecorationShorthand(cssBox, value);
+                break;
+            case "text-decoration-line":
                 cssBox.TextDecoration = value;
+                break;
+            case "text-decoration-style":
+                cssBox.TextDecorationStyle = value;
+                break;
+            case "text-decoration-color":
+                cssBox.TextDecorationColor = value;
                 break;
             case "white-space":
                 cssBox.WhiteSpace = value;
@@ -451,6 +513,160 @@ internal static class CssUtils
                 cssBox.ZIndex = value;
                 break;
         }
+    }
+
+    private static void ApplyLogicalBorderShorthand(CssBox cssBox, string value, bool inlineAxis)
+    {
+        var parts = value.Trim().Split([' '], StringSplitOptions.RemoveEmptyEntries);
+        string? width = null;
+        string? style = null;
+        string? color = null;
+
+        foreach (var part in parts)
+        {
+            var lower = part.ToLowerInvariant();
+            if (lower is "none" or "hidden" or "dotted" or "dashed" or "solid"
+                or "double" or "groove" or "ridge" or "inset" or "outset")
+            {
+                style ??= part;
+            }
+            else if (lower is "thin" or "medium" or "thick" || CssValueParser.IsValidLength(part))
+            {
+                width ??= part;
+            }
+            else
+            {
+                color ??= part;
+            }
+        }
+
+        if (width != null)
+        {
+            SetLogicalBorderComponent(cssBox, inlineAxis, startSide: true, "width", width);
+            SetLogicalBorderComponent(cssBox, inlineAxis, startSide: false, "width", width);
+        }
+
+        if (style != null)
+        {
+            SetLogicalBorderComponent(cssBox, inlineAxis, startSide: true, "style", style);
+            SetLogicalBorderComponent(cssBox, inlineAxis, startSide: false, "style", style);
+        }
+
+        if (color != null)
+        {
+            SetLogicalBorderComponent(cssBox, inlineAxis, startSide: true, "color", color);
+            SetLogicalBorderComponent(cssBox, inlineAxis, startSide: false, "color", color);
+        }
+    }
+
+    private static void ApplyTextDecorationShorthand(CssBox cssBox, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            cssBox.TextDecoration = string.Empty;
+            return;
+        }
+
+        // Shorthand application resets omitted longhands back to their initial values.
+        cssBox.TextDecoration = "none";
+        cssBox.TextDecorationStyle = "solid";
+        cssBox.TextDecorationColor = "currentcolor";
+
+        var parts = value.Trim().Split([' '], StringSplitOptions.RemoveEmptyEntries);
+        string? line = null;
+
+        foreach (var part in parts)
+        {
+            var lower = part.ToLowerInvariant();
+            if (lower is "underline" or "overline" or "line-through" or "none")
+            {
+                line = part;
+            }
+            else if (lower is "solid" or "double" or "dotted" or "dashed" or "wavy")
+            {
+                cssBox.TextDecorationStyle = part;
+            }
+            else
+            {
+                cssBox.TextDecorationColor = part;
+            }
+        }
+
+        if (line != null)
+            cssBox.TextDecoration = line;
+    }
+
+    private static void SetLogicalBorderComponent(
+        CssBox cssBox,
+        bool inlineAxis,
+        bool startSide,
+        string component,
+        string value)
+    {
+        var side = ResolveLogicalBorderSide(cssBox, inlineAxis, startSide);
+        switch (side, component)
+        {
+            case ("top", "color"):
+                cssBox.BorderTopColor = value;
+                break;
+            case ("right", "color"):
+                cssBox.BorderRightColor = value;
+                break;
+            case ("bottom", "color"):
+                cssBox.BorderBottomColor = value;
+                break;
+            case ("left", "color"):
+                cssBox.BorderLeftColor = value;
+                break;
+            case ("top", "style"):
+                cssBox.BorderTopStyle = value;
+                break;
+            case ("right", "style"):
+                cssBox.BorderRightStyle = value;
+                break;
+            case ("bottom", "style"):
+                cssBox.BorderBottomStyle = value;
+                break;
+            case ("left", "style"):
+                cssBox.BorderLeftStyle = value;
+                break;
+            case ("top", "width"):
+                cssBox.BorderTopWidth = value;
+                break;
+            case ("right", "width"):
+                cssBox.BorderRightWidth = value;
+                break;
+            case ("bottom", "width"):
+                cssBox.BorderBottomWidth = value;
+                break;
+            case ("left", "width"):
+                cssBox.BorderLeftWidth = value;
+                break;
+        }
+    }
+
+    private static string ResolveLogicalBorderSide(CssBox cssBox, bool inlineAxis, bool startSide)
+    {
+        var writingMode = cssBox.WritingMode?.ToLowerInvariant() ?? "horizontal-tb";
+        var direction = cssBox.Direction?.ToLowerInvariant() ?? "ltr";
+
+        if (inlineAxis)
+        {
+            return writingMode switch
+            {
+                "vertical-rl" or "vertical-lr" or "sideways-rl" or "sideways-lr" => startSide ? "top" : "bottom",
+                _ => startSide
+                    ? (direction == "rtl" ? "right" : "left")
+                    : (direction == "rtl" ? "left" : "right"),
+            };
+        }
+
+        return writingMode switch
+        {
+            "vertical-rl" or "sideways-rl" => startSide ? "right" : "left",
+            "vertical-lr" or "sideways-lr" => startSide ? "left" : "right",
+            _ => startSide ? "top" : "bottom",
+        };
     }
 
     private static string ResolveLengthAttrFunctions(CssBox cssBox, string value)

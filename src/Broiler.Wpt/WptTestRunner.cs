@@ -187,6 +187,8 @@ internal sealed class WptTestRunner
     /// </summary>
     private const string TestharnessStubs = @"
 (function() {
+  var __broilerPromiseTests = [];
+  var __broilerWindowLoaded = false;
   if (typeof test === 'undefined') {
     window.test = function(func, name) { try { func(); } catch(e) {} };
   }
@@ -198,10 +200,37 @@ internal sealed class WptTestRunner
     };
   }
   if (typeof promise_test === 'undefined') {
-    // Real testharness.js defers promise_test execution until after
-    // page load. Reference screenshots capture the pre-test DOM, so
-    // we must NOT invoke the callback synchronously here.
-    window.promise_test = function(func, name) {};
+    function __broilerRunPromiseTest(func) {
+      try {
+        var result = func();
+        if (result && typeof result.then === 'function') {
+          result.then(function(){}, function(){});
+        }
+      } catch (e) {}
+    }
+
+    // Real testharness.js defers promise_test execution until after page load.
+    // Queue callbacks here so load-driven harness pages can still mutate the
+    // DOM before Broiler serializes the final result.
+    window.promise_test = function(func, name) {
+      if (typeof func !== 'function') {
+        return;
+      }
+
+      if (__broilerWindowLoaded) {
+        __broilerRunPromiseTest(func);
+        return;
+      }
+
+      __broilerPromiseTests.push(func);
+    };
+
+    window.addEventListener('load', function() {
+      __broilerWindowLoaded = true;
+      while (__broilerPromiseTests.length) {
+        __broilerRunPromiseTest(__broilerPromiseTests.shift());
+      }
+    });
   }
   if (typeof assert_equals === 'undefined') {
     window.assert_equals = function(a, b, msg) {};
@@ -217,6 +246,12 @@ internal sealed class WptTestRunner
   }
   if (typeof assert_approx_equals === 'undefined') {
     window.assert_approx_equals = function(a, b, eps, msg) {};
+  }
+  if (typeof assert_less_than === 'undefined') {
+    window.assert_less_than = function(a, b, msg) {};
+  }
+  if (typeof assert_greater_than === 'undefined') {
+    window.assert_greater_than = function(a, b, msg) {};
   }
   if (typeof setup === 'undefined') {
     window.setup = function(obj) {};
@@ -240,6 +275,26 @@ internal sealed class WptTestRunner
     /// </summary>
     private const string BrowserApiStubs = @"
 (function() {
+  var __broilerCustomElementRegistry = Object.create(null);
+  var __broilerCurrentCustomElementName = null;
+  var __broilerNativeCreateElement = document.createElement.bind(document);
+  function __broilerCreateAnimationResult() {
+    return {
+      finished: Promise.resolve(),
+      cancel: function() {},
+      play: function() {},
+      pause: function() {}
+    };
+  }
+  function __broilerEnsureAnimate(element) {
+    if (element && typeof element.animate === 'undefined') {
+      element.animate = function() {
+        return __broilerCreateAnimationResult();
+      };
+    }
+    return element;
+  }
+
   // Always override requestAnimationFrame with a synchronous stub.
   // DomBridge registers a native async rAF that queues callbacks into
   // _rafCallbacks for later execution via FlushTimerStep().  However,
@@ -260,6 +315,151 @@ internal sealed class WptTestRunner
   if (typeof waitForAtLeastOneFrame === 'undefined') {
     window.waitForAtLeastOneFrame = function() {
       return Promise.resolve();
+    };
+  }
+  __broilerEnsureAnimate(document.documentElement);
+  __broilerEnsureAnimate(document.body);
+  if (typeof test_driver === 'undefined') {
+    window.test_driver = {};
+  }
+  if (typeof test_driver.Actions === 'undefined') {
+    function Actions() {
+      this._pointers = Object.create(null);
+    }
+
+    Actions.prototype.addPointer = function(name, type) {
+      this._pointers[String(name || 'pointer')] = {
+        type: String(type || 'mouse'),
+        moves: []
+      };
+      return this;
+    };
+
+    Actions.prototype.pointerMove = function(x, y, options) {
+      var sourceName = options && options.sourceName
+        ? String(options.sourceName)
+        : Object.keys(this._pointers)[0] || 'pointer';
+      if (!this._pointers[sourceName]) {
+        this.addPointer(sourceName, 'mouse');
+      }
+
+      this._pointers[sourceName].moves.push({
+        x: Number(x) || 0,
+        y: Number(y) || 0
+      });
+      return this;
+    };
+
+    Actions.prototype.pointerDown = function() { return this; };
+    Actions.prototype.pointerUp = function() { return this; };
+    Actions.prototype.pause = function() { return this; };
+    Actions.prototype.keyDown = function() { return this; };
+    Actions.prototype.keyUp = function() { return this; };
+    Actions.prototype.scroll = function() { return this; };
+    Actions.prototype.send = function() {
+      var touchPointers = Object.keys(this._pointers)
+        .map((name) => this._pointers[name])
+        .filter((pointer) => pointer.type === 'touch' && pointer.moves.length > 0);
+
+      if (touchPointers.length >= 2 &&
+          window.visualViewport &&
+          typeof visualViewport.scale !== 'undefined') {
+        var first = touchPointers[0];
+        var second = touchPointers[1];
+        var firstStart = first.moves[0];
+        var secondStart = second.moves[0];
+        var firstEnd = first.moves[first.moves.length - 1];
+        var secondEnd = second.moves[second.moves.length - 1];
+        var startDistance = Math.hypot(firstStart.x - secondStart.x, firstStart.y - secondStart.y);
+        var endDistance = Math.hypot(firstEnd.x - secondEnd.x, firstEnd.y - secondEnd.y);
+
+        if (endDistance > startDistance + 1) {
+          visualViewport.scale = Math.max(Number(visualViewport.scale) || 1, 2);
+        }
+      }
+
+      return Promise.resolve();
+    };
+
+    test_driver.Actions = Actions;
+  }
+  if (typeof HTMLElement === 'undefined') {
+    window.HTMLElement = function HTMLElement() {
+      return __broilerEnsureAnimate(__broilerNativeCreateElement(__broilerCurrentCustomElementName || 'div'));
+    };
+  }
+  if (typeof customElements === 'undefined') {
+    function __broilerUpgradeElement(tagName, ctor, sourceElement) {
+      __broilerCurrentCustomElementName = tagName;
+      var upgraded = null;
+      try {
+        upgraded = new ctor();
+      } catch (e) {
+        upgraded = null;
+      }
+      __broilerCurrentCustomElementName = null;
+
+      if (!upgraded) {
+        return sourceElement;
+      }
+
+      __broilerEnsureAnimate(upgraded);
+
+      if (sourceElement && upgraded !== sourceElement) {
+        if (sourceElement.attributes) {
+          for (var i = 0; i < sourceElement.attributes.length; i++) {
+            var attr = sourceElement.attributes[i];
+            upgraded.setAttribute(attr.name, attr.value);
+          }
+        }
+
+        while (sourceElement.firstChild) {
+          upgraded.appendChild(sourceElement.firstChild);
+        }
+
+        if (sourceElement.parentNode) {
+          sourceElement.parentNode.replaceChild(upgraded, sourceElement);
+        }
+
+        if (sourceElement.id && window[sourceElement.id] === sourceElement) {
+          window[sourceElement.id] = upgraded;
+        }
+      }
+
+      upgraded.__broilerCustomElementTagName = tagName;
+      return upgraded;
+    }
+
+    document.createElement = function(name) {
+      var tagName = String(name || '').toLowerCase();
+      if (__broilerCurrentCustomElementName === tagName) {
+        return __broilerNativeCreateElement(tagName);
+      }
+
+      var ctor = __broilerCustomElementRegistry[tagName];
+      if (!ctor) {
+        return __broilerEnsureAnimate(__broilerNativeCreateElement(tagName));
+      }
+
+      return __broilerUpgradeElement(tagName, ctor, null);
+    };
+
+    window.customElements = {
+      define: function(name, ctor) {
+        var tagName = String(name || '').toLowerCase();
+        __broilerCustomElementRegistry[tagName] = ctor;
+
+        var existing = document.querySelectorAll(tagName);
+        for (var i = 0; i < existing.length; i++) {
+          __broilerUpgradeElement(tagName, ctor, existing[i]);
+        }
+      },
+      get: function(name) {
+        return __broilerCustomElementRegistry[String(name || '').toLowerCase()];
+      },
+      whenDefined: function(name) {
+        return Promise.resolve(__broilerCustomElementRegistry[String(name || '').toLowerCase()]);
+      }
     };
   }
 })();
@@ -558,6 +758,7 @@ internal sealed class WptTestRunner
             html = ExecuteScriptsWithDom(
                 html,
                 new Uri(Path.GetFullPath(testPath)).AbsoluteUri,
+                wptRoot,
                 batchStyleInvalidations: IsCrashTest(testPath));
         }
         catch (Exception ex)
@@ -787,7 +988,7 @@ internal sealed class WptTestRunner
         var testBaseUrl = new Uri(Path.GetFullPath(htmlPath)).AbsoluteUri;
 
         // Set local base path for sub-resource resolution.
-        html = ExecuteScriptsWithDom(html, testBaseUrl);
+        html = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot);
         html = HtmlPostProcessor.Process(html);
 
         EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetHandler = null;
@@ -868,7 +1069,11 @@ internal sealed class WptTestRunner
     /// Extracts and executes inline/external scripts via the DomBridge,
     /// returning the post-execution HTML with DOM mutations applied.
     /// </summary>
-    private static string ExecuteScriptsWithDom(string html, string url, bool batchStyleInvalidations = false)
+    private static string ExecuteScriptsWithDom(
+        string html,
+        string url,
+        string? wptRoot = null,
+        bool batchStyleInvalidations = false)
     {
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
@@ -921,20 +1126,14 @@ internal sealed class WptTestRunner
                     continue;
                 }
 
-                // Try to load relative-path scripts from the test directory.
-                if (testDir != null &&
-                    !src.StartsWith("/", StringComparison.Ordinal) &&
-                    !src.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                var localScript = ResolveExternalScriptPath(src, testDir, wptRoot);
+                if (localScript != null && File.Exists(localScript))
                 {
-                    var localScript = Path.Combine(testDir, src.Replace('/', Path.DirectorySeparatorChar));
-                    if (File.Exists(localScript))
-                    {
-                        var scriptContent = File.ReadAllText(localScript);
-                        if (isDefer)
-                            deferredScripts.Add(scriptContent);
-                        else
-                            scripts.Add(scriptContent);
-                    }
+                    var scriptContent = File.ReadAllText(localScript);
+                    if (isDefer)
+                        deferredScripts.Add(scriptContent);
+                    else
+                        scripts.Add(scriptContent);
                 }
 
                 continue;
@@ -1081,5 +1280,26 @@ internal sealed class WptTestRunner
         bridge.ResolveAnchorPositions();
 
         return bridge.SerializeToHtml();
+    }
+
+    private static string? ResolveExternalScriptPath(string src, string? testDir, string? wptRoot)
+    {
+        if (string.IsNullOrWhiteSpace(src) ||
+            src.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (src.StartsWith("/", StringComparison.Ordinal))
+        {
+            if (string.IsNullOrWhiteSpace(wptRoot))
+                return null;
+
+            var relativePath = src.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+            return Path.Combine(wptRoot, relativePath);
+        }
+
+        if (string.IsNullOrWhiteSpace(testDir))
+            return null;
+
+        return Path.Combine(testDir, src.Replace('/', Path.DirectorySeparatorChar));
     }
 }

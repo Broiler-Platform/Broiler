@@ -54,6 +54,59 @@ function run() {
     }
 
     [Fact]
+    public void DomBridge_FireWindowLoadEvent_Triggers_Window_Load_Listeners_And_Honors_Removal()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body><div id="out"></div></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+
+        context.Eval("""
+            var calls = [];
+            function removed() { calls.push('removed'); }
+            window.addEventListener('load', function () {
+                calls.push('kept');
+                document.getElementById('out').textContent = calls.join('|');
+            });
+            window.addEventListener('load', removed);
+            window.removeEventListener('load', removed);
+            """);
+
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("document.getElementById('out').textContent");
+        Assert.Equal("kept", result.ToString());
+    }
+
+    [Fact]
+    public void DomBridge_WindowFrames_Expose_SameOrigin_Iframe_Windows()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body><iframe id="frame" srcdoc="<!DOCTYPE html><html><body>ok</body></html>"></iframe></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            [
+                frames.length,
+                frames[0] === document.getElementById('frame').contentWindow,
+                frames[0].document === document.getElementById('frame').contentDocument
+            ].join('|')
+            """);
+
+        Assert.Equal("1|true|true", result.ToString());
+    }
+
+    [Fact]
     public void DomBridge_FlushTimers_Executes_SetTimeout_Chains()
     {
         // Acid3 chains tests via setTimeout. ScriptEngine now calls
@@ -540,6 +593,283 @@ document.write('<p id=""injected"">written</p>');
         Assert.False(bridge.FlushTimerStep());
     }
 
+    [Fact]
+    public void DomBridge_SerializeToHtml_Scales_ExplicitInherited_Zoom_Properties()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  .zoomed-radius {
+    width: 100px;
+    height: 100px;
+    border: 5px solid black;
+    border-radius: inherit;
+    zoom: 2;
+  }
+  .zoomed-outline {
+    width: 50px;
+    height: 50px;
+    margin: 50px;
+    outline-width: inherit;
+    outline-offset: inherit;
+    outline-style: solid;
+    outline-color: black;
+    zoom: 2;
+  }
+  .zoomed-columns {
+    width: 300px;
+    height: 200px;
+    column-width: inherit;
+    column-height: inherit;
+    column-gap: inherit;
+    zoom: 2;
+  }
+</style>
+</head>
+<body>
+  <div style="border-radius:20px; display:contents">
+    <div id="radius" class="zoomed-radius"></div>
+  </div>
+  <div style="outline-width:10px; outline-offset:5px; display:contents">
+    <div id="outline" class="zoomed-outline"></div>
+  </div>
+  <div style="column-width:40px; column-height:150px; column-gap:10px; display:contents">
+    <div id="columns" class="zoomed-columns"></div>
+  </div>
+</body>
+</html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.Contains("id=\"radius\" class=\"zoomed-radius\" style=\"width: 200px; height: 200px; border-top-width: 10px; border-right-width: 10px; border-bottom-width: 10px; border-left-width: 10px; border-radius: 40px\"", result);
+        Assert.Contains("id=\"outline\" class=\"zoomed-outline\" style=\"width: 100px; height: 100px; margin-top: 100px; margin-right: 100px; margin-bottom: 100px; margin-left: 100px; outline-width: 20px; outline-offset: 10px\"", result);
+        Assert.Contains("id=\"columns\" class=\"zoomed-columns\" style=\"width: 600px; height: 400px; column-width: 80px; column-height: 300px; column-gap: 20px\"", result);
+    }
+
+    [Fact]
+    public void DomBridge_SerializeToHtml_Scales_Zoomed_ScrollPadding_And_ScrollMargin_Properties()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  .zoomed-padding {
+    width: 120px;
+    height: 100px;
+    overflow: hidden;
+    border: 1px solid black;
+    scroll-padding-top: inherit;
+    zoom: 2;
+  }
+  .zoomed-margin-inherit {
+    width: 200px;
+    height: 10px;
+    scroll-margin-top: inherit;
+    zoom: 2;
+  }
+  .zoomed-margin-explicit {
+    width: 200px;
+    height: 10px;
+    scroll-margin-top: 20px;
+    zoom: 2;
+  }
+</style>
+</head>
+<body>
+  <div style="scroll-padding-top:20px; display:contents">
+    <div id="padding" class="zoomed-padding"></div>
+  </div>
+  <div style="scroll-margin-top:20px; display:contents">
+    <div id="margin-inherit" class="zoomed-margin-inherit"></div>
+  </div>
+  <div id="margin-explicit" class="zoomed-margin-explicit"></div>
+</body>
+</html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.Contains("id=\"padding\" class=\"zoomed-padding\" style=\"width: 240px; height: 200px; scroll-padding-top: 40px; border-top-width: 2px; border-right-width: 2px; border-bottom-width: 2px; border-left-width: 2px\"", result);
+        Assert.Contains("id=\"margin-inherit\" class=\"zoomed-margin-inherit\" style=\"width: 400px; height: 20px; scroll-margin-top: 40px\"", result);
+        Assert.Contains("id=\"margin-explicit\" class=\"zoomed-margin-explicit\" style=\"width: 400px; height: 20px; scroll-margin-top: 40px\"", result);
+    }
+
+    [Fact]
+    public void DomBridge_SerializeToHtml_Scales_Zoomed_Svg_Geometry_And_FontRelative_Lengths()
+    {
+        const string html = """
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  :root { font-size: 10px; zoom: 2; }
+  body { margin: 0 }
+  .container { font-size: 20px; }
+  .child { zoom: 2; }
+  line {
+    stroke-width: 2px;
+    stroke: lime;
+  }
+  svg {
+    background-color: black;
+  }
+</style>
+<div class="container">
+  <div class="child">
+    <svg id="icon" width="100" height="100">
+      <defs>
+        <path id="p" d="M80,60H25"></path>
+      </defs>
+      <rect id="box" width="10rem" height="100" fill="blue"></rect>
+      <line id="em-line" y1="10" y2="10" x1="0" x2="1em"></line>
+      <line id="rem-line" y1="20" y2="20" x1="0" x2="1rem"></line>
+      <line id="vw-line" y1="30" y2="30" x1="0" x2="1vw"></line>
+      <polygon id="poly" points="0,50 50,50 50,60 0,60"></polygon>
+      <text id="label" x="80" y="60" style="font-size:10px">X</text>
+    </svg>
+  </div>
+</div>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.Contains("id=\"icon\" width=\"400\" height=\"400\"", result);
+        Assert.Contains("id=\"box\" width=\"20rem\" height=\"400\"", result);
+        Assert.Contains("id=\"em-line\" y1=\"40\" y2=\"40\" x1=\"0\" x2=\"2em\" style=\"stroke-width: 8px\"", result);
+        Assert.Contains("id=\"rem-line\" y1=\"80\" y2=\"80\" x1=\"0\" x2=\"2rem\" style=\"stroke-width: 8px\"", result);
+        Assert.Contains("id=\"vw-line\" y1=\"120\" y2=\"120\" x1=\"0\" x2=\"4vw\" style=\"stroke-width: 8px\"", result);
+        Assert.Contains("id=\"poly\" points=\"0,200 200,200 200,240 0,240\"", result);
+        Assert.Contains("id=\"p\" d=\"M320,240H100\"", result);
+        Assert.Contains("id=\"label\" x=\"320\" y=\"240\" style=\"font-size: 40px\"", result);
+    }
+
+    [Fact]
+    public void DomBridge_SerializeToHtml_Updates_Iframe_SrcDoc_After_Subdocument_Mutation()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body>
+  <iframe id="frame" srcdoc="<!DOCTYPE html><html><body><div id='value'>old</div></body></html>"></iframe>
+</body>
+</html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        context.Eval("""
+            document.getElementById('frame').contentDocument.getElementById('value').textContent = 'new';
+            """);
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.Contains("srcdoc=\"&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;div id=&quot;value&quot;&gt;new&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;\"", result);
+        Assert.DoesNotContain("</html></iframe>", result);
+        Assert.DoesNotContain(">old<", result);
+    }
+
+    [Fact]
+    public void DomBridge_SerializeToHtml_Preserves_Mutated_Iframe_Scroll_State_In_SrcDoc()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body>
+  <iframe id="frame" srcdoc="<!DOCTYPE html><html><body><div id='scroller' style='width:100px;height:60px;overflow:hidden'><div style='height:200px'></div><div id='target' style='height:20px'></div></div></body></html>"></iframe>
+</body>
+</html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        context.Eval("""
+            var doc = document.getElementById('frame').contentDocument;
+            doc.getElementById('target').scrollIntoView();
+            """);
+        bridge.ResolveAnchorPositions();
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.Contains("srcdoc=\"&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;div id=&quot;scroller&quot; style=&quot;width: 100px; height: 60px; overflow: hidden&quot;&gt;&lt;div style=&quot;position: relative; top: -160px&quot;&gt;", result);
+        Assert.DoesNotContain("&gt;&lt;html&gt;&lt;head&gt;", result);
+    }
+
+    [Fact]
+    public void DomBridge_SerializeToHtml_Persists_VisualViewport_Zoom_And_PageOffset_For_Fixed_ScrollIntoView()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    html { height: 10000px; }
+    body { margin: 0; padding: 0; }
+    #fixed {
+      position: fixed;
+      bottom: 0;
+      height: 50vh;
+      width: 100vw;
+      overflow: scroll;
+      background-color: gray;
+    }
+    input { height: 20px; }
+  </style>
+</head>
+<body>
+  <div id="fixed">
+    <div style="height: calc(80vh - 40px)"></div>
+    <input type="text" id="name">
+  </div>
+</body>
+</html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+
+        context.Eval("""
+            visualViewport.scale = 2;
+            window.scrollTo(0, 1000);
+            document.getElementById('name').scrollIntoView({ behavior: 'instant' });
+            """);
+        bridge.ResolveAnchorPositions();
+
+        var result = bridge.SerializeToHtml();
+
+        // Pinch-zoom scale 2 doubles the 10000px root height and the fixed
+        // element's 50vh/100vw box from 384x1024 to 768x2048.
+        Assert.Contains("<html style=\"height: 20000px\"", result);
+        Assert.Contains("id=\"fixed\" style=\"position: fixed; bottom: 0px; height: 768px; width: 2048px; overflow: scroll; background-color: gray\"", result);
+        // The visual viewport pans to pageTop=1384, so root scroll simulation
+        // serializes as -1384*2=-2768px and the fixed scroller keeps the
+        // target aligned by scaling its own 575.6px-ish internal scroll offset.
+        Assert.Contains("style=\"position: relative; top: -2768px", result);
+        Assert.Contains("style=\"position: relative; top: -1151.2px", result);
+    }
+
     // ---------------------------------------------------------------
     //  InteractiveSession
     // ---------------------------------------------------------------
@@ -667,4 +997,3 @@ document.write('<p id=""injected"">written</p>');
         session.Dispose();
     }
 }
-

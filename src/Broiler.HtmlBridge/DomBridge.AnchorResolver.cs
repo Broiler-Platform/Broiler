@@ -111,9 +111,28 @@ public sealed partial class DomBridge
         //    misinterpret them.
         NeutralizeStyleElementsForAnchorRules(DocumentElement);
 
+        // 7a. Persist active visual-viewport pinch-zoom state into the DOM so
+        //     the static renderer can reproduce zoomed fixed-position pages.
+        ApplyVisualViewportSerializationState();
+
         // 8. Apply scroll simulation: shift content in scroll containers
         //    where JavaScript set scrollTop/scrollLeft to match Chromium output.
         ApplyScrollSimulation(DocumentElement);
+    }
+
+    private void ApplyVisualViewportSerializationState()
+    {
+        if (!HasActiveVisualViewport())
+            return;
+
+        var scale = GetVisualViewportScale();
+        if (!double.IsFinite(scale) || scale <= 1.0001)
+            return;
+
+        var combinedZoom = GetUsedZoomForElement(DocumentElement) * scale;
+        DocumentElement.Style["zoom"] = combinedZoom.ToString("0.###", CultureInfo.InvariantCulture);
+        DocumentElement.DomProperties["_scrollLeft"] = GetVisualViewportPageOffset(vertical: false);
+        DocumentElement.DomProperties["_scrollTop"] = GetVisualViewportPageOffset(vertical: true);
     }
 
     // -----------------------------------------------------------------
@@ -273,6 +292,13 @@ public sealed partial class DomBridge
             if (el.DomProperties.TryGetValue("_scrollLeft", out var sl) && sl is double slv)
                 scrollLeft = slv;
 
+            var scrollScale = GetScrollSimulationScaleFactor();
+            if (!AreClose(scrollScale, 1))
+            {
+                scrollTop *= scrollScale;
+                scrollLeft *= scrollScale;
+            }
+
             if (scrollTop != 0 || scrollLeft != 0)
             {
                 // Only apply to elements that clip overflow, or to the
@@ -396,6 +422,9 @@ public sealed partial class DomBridge
             }
         }
     }
+
+    private double GetScrollSimulationScaleFactor() =>
+        HasActiveVisualViewport() ? GetVisualViewportScale() : 1;
 
     private static bool HasOverflowClipping(Dictionary<string, string> props)
     {
@@ -1064,6 +1093,9 @@ public sealed partial class DomBridge
                 if (!props.ContainsKey("left")) props["left"] = iLeft;
             }
         }
+
+        ApplyApproximateFormControlComputedSizes(props, element);
+        ApplyLogicalSizeAliases(props);
 
         return props;
     }

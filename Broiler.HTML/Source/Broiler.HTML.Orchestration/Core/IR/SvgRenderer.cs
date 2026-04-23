@@ -170,6 +170,43 @@ internal static class SvgRenderer
         if (!attrs.TryGetValue(name, out var val) || string.IsNullOrEmpty(val) || val == "none")
             return Color.Empty;
 
+        // rgba(r, g, b, a)
+        if (val.StartsWith("rgba(", StringComparison.OrdinalIgnoreCase) && val.EndsWith(")"))
+        {
+            string inner = val.Substring(5, val.Length - 6);
+            var parts = inner.Split(',');
+            if (parts.Length == 4
+                && int.TryParse(parts[0].Trim(), out int r)
+                && int.TryParse(parts[1].Trim(), out int g)
+                && int.TryParse(parts[2].Trim(), out int b)
+                && float.TryParse(parts[3].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out float a))
+            {
+                return Color.FromArgb(
+                    (int)(Math.Clamp(a, 0f, 1f) * 255),
+                    Math.Clamp(r, 0, 255),
+                    Math.Clamp(g, 0, 255),
+                    Math.Clamp(b, 0, 255));
+            }
+        }
+
+        // rgb(r, g, b)
+        if (val.StartsWith("rgb(", StringComparison.OrdinalIgnoreCase) && val.EndsWith(")"))
+        {
+            string inner = val.Substring(4, val.Length - 5);
+            var parts = inner.Split(',');
+            if (parts.Length == 3
+                && int.TryParse(parts[0].Trim(), out int r)
+                && int.TryParse(parts[1].Trim(), out int g)
+                && int.TryParse(parts[2].Trim(), out int b))
+            {
+                return Color.FromArgb(
+                    255,
+                    Math.Clamp(r, 0, 255),
+                    Math.Clamp(g, 0, 255),
+                    Math.Clamp(b, 0, 255));
+            }
+        }
+
         // Handle hex colors
         if (val.StartsWith('#'))
         {

@@ -209,6 +209,554 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Document_ElementFromPoint_Uses_Hit_Test_Order_And_Skips_PointerEvents_None()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            var purple = document.createElement('div');
+            purple.id = 'purple';
+            purple.style.width = '60px';
+            purple.style.height = '60px';
+            document.body.appendChild(purple);
+
+            var yellow = document.createElement('div');
+            yellow.id = 'yellow';
+            yellow.style.width = '60px';
+            yellow.style.height = '60px';
+            document.body.appendChild(yellow);
+
+            var overlay = document.createElement('div');
+            overlay.id = 'overlay';
+            overlay.style.position = 'absolute';
+            overlay.style.left = '0';
+            overlay.style.top = '60px';
+            overlay.style.width = '60px';
+            overlay.style.height = '60px';
+            overlay.style.pointerEvents = 'none';
+            document.body.appendChild(overlay);
+
+            document.getElementById('result').textContent = [
+                document.elementFromPoint(10, 10).id,
+                document.elementFromPoint(10, 70).id,
+                document.elementFromPoint(-1, -1) === null
+            ].join('|');
+        ");
+
+        Assert.Contains("purple|yellow|true", result);
+    }
+
+    [Fact]
+    public void Document_ElementsFromPoint_Returns_Target_Then_Ancestors_And_Viewport_Bounds()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            var target = document.createElement('div');
+            target.id = 'target';
+            target.style.width = '40px';
+            target.style.height = '40px';
+            document.body.appendChild(target);
+
+            document.getElementById('result').textContent = [
+                document.elementsFromPoint(10, 10)[0].id,
+                document.elementsFromPoint(-1, -1).length,
+                document.elementsFromPoint(1100, 10).length
+            ].join('|');
+        ");
+
+        Assert.Contains("target|0|0", result);
+    }
+
+    [Fact]
+    public void Document_HitTesting_Uses_Html_But_Not_Body_For_Iframe_Viewport_Fallback()
+    {
+        var result = ExecJs(@"
+            var iframe = document.createElement('iframe');
+            iframe.width = '';
+            iframe.height = '';
+            iframe.srcdoc = '<!DOCTYPE html><html><body><div style=""height:20px""></div></body></html>';
+            document.body.appendChild(iframe);
+
+            var doc = iframe.contentDocument;
+            var hits = doc.elementsFromPoint(0, 100);
+            document.getElementById('result').textContent = [
+                hits.length,
+                hits[0] && (hits[0].id || hits[0].tagName),
+                hits[1] || null
+            ].join('|');
+        ");
+
+        Assert.Contains("1|HTML|", result);
+    }
+
+    [Fact]
+    public void Document_HitTesting_Tracks_AutoSized_Ancestors_With_Negative_Margins()
+    {
+        var result = ExecJs(@"
+            document.body.innerHTML = '<div id=""outer"" style=""background:yellow""><div id=""inner"" style=""width:100px;height:100px;margin-bottom:-100px;background:lime;""></div>Hello</div>';
+            var outer = document.getElementById('outer');
+            var rect = outer.getBoundingClientRect();
+            var hits = document.elementsFromPoint(rect.left + 1, rect.top + 1);
+            document.getElementById('result').textContent = [
+                document.elementFromPoint(rect.left + 1, rect.top + 1).id,
+                Array.prototype.map.call(hits, function (node) { return node.id || node.tagName; }).join('>')
+            ].join('|');
+        ");
+
+        Assert.Contains("outer|inner>outer>BODY>HTML", result);
+    }
+
+    [Fact]
+    public void AutoSized_ScrollMetrics_Ignore_MarginOnly_NonOverflow_Cases()
+    {
+        var result = ExecJs(@"
+            document.body.innerHTML = '<style>#target div{height:20px;min-width:20px;background:green;margin:20px 10px;}</style><div id=""target""><div><div></div></div><div></div><div></div><div></div></div>';
+            var target = document.getElementById('target');
+            var cases = [
+                ['visible', 'block', '0', '0'],
+                ['hidden', 'flow-root', '2px', '3px solid']
+            ];
+            document.getElementById('result').textContent = cases.map(function (entry) {
+                target.style.overflow = entry[0];
+                target.style.display = entry[1];
+                target.style.padding = entry[2];
+                target.style.border = entry[3];
+                return String(target.scrollHeight === target.clientHeight && target.scrollWidth === target.clientWidth);
+            }).join('|');
+        ");
+
+        Assert.Contains("true|true", result);
+    }
+
+    [Fact]
+    public void Document_HitTesting_Returns_Null_For_Documents_Without_A_Viewport()
+    {
+        var result = ExecJs(@"
+            var doc = document.implementation.createHTMLDocument('foo');
+            document.getElementById('result').textContent = [
+                doc.elementFromPoint(0, 0) === null,
+                doc.elementsFromPoint(0, 0).length
+            ].join('|');
+        ");
+
+        Assert.Contains("true|0", result);
+    }
+
+    [Fact]
+    public void Document_HitTesting_Uses_Svg_Viewports_And_Rect_Geometry()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var svgNs = 'http://www.w3.org/2000/svg';
+            var svg = document.createElementNS(svgNs, 'svg');
+            svg.id = 'svgRoot';
+            svg.setAttribute('width', '180');
+            svg.setAttribute('height', '140');
+            var rect = document.createElementNS(svgNs, 'rect');
+            rect.id = 'svgRect';
+            rect.setAttribute('x', '50');
+            rect.setAttribute('y', '50');
+            rect.setAttribute('width', '60');
+            rect.setAttribute('height', '60');
+            rect.setAttribute('fill', '#0086B2');
+            svg.appendChild(rect);
+            document.body.insertBefore(svg, document.getElementById('result'));
+
+            var svg = document.getElementById('svgRoot');
+            var svgRect = svg.getBoundingClientRect();
+            var rootHit = document.elementFromPoint(Math.round(svgRect.left + svgRect.width / 2), 10);
+            var rectHit = document.elementFromPoint(90, 70);
+            var rectHits = document.elementsFromPoint(90, 70);
+
+            document.getElementById('result').textContent = [
+                svgRect.width,
+                svgRect.height,
+                rootHit && (rootHit.id || rootHit.tagName),
+                rectHit && (rectHit.id || rectHit.tagName),
+                rectHits[0] && (rectHits[0].id || rectHits[0].tagName),
+                rectHits[1] && (rectHits[1].id || rectHits[1].tagName)
+            ].join('|');
+        ");
+
+        Assert.Contains("180|140|svgRoot|svgRect|svgRect|svgRoot", result);
+    }
+
+    [Fact]
+    public void Document_HitTesting_Keeps_Inline_Svg_Roots_In_Normal_Flow()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var svgNs = 'http://www.w3.org/2000/svg';
+
+            var first = document.createElementNS(svgNs, 'svg');
+            first.id = 'firstSvg';
+            first.setAttribute('width', '180');
+            first.setAttribute('height', '98');
+            document.body.insertBefore(first, document.getElementById('result'));
+
+            var second = document.createElementNS(svgNs, 'svg');
+            second.id = 'secondSvg';
+            second.setAttribute('width', '180');
+            second.setAttribute('height', '140');
+            var rect = document.createElementNS(svgNs, 'rect');
+            rect.id = 'secondRect';
+            rect.setAttribute('x', '50');
+            rect.setAttribute('y', '50');
+            rect.setAttribute('width', '60');
+            rect.setAttribute('height', '60');
+            second.appendChild(rect);
+            document.body.insertBefore(second, document.getElementById('result'));
+
+            var firstRect = first.getBoundingClientRect();
+            var secondRect = second.getBoundingClientRect();
+            var hit = document.elementFromPoint(80, 160);
+            var hits = document.elementsFromPoint(80, 160);
+
+            document.getElementById('result').textContent = [
+                firstRect.top,
+                secondRect.top,
+                hit && (hit.id || hit.tagName),
+                hits[0] && (hits[0].id || hits[0].tagName),
+                hits[1] && (hits[1].id || hits[1].tagName)
+            ].join('|');
+        ");
+
+        Assert.Contains("0|98|secondRect|secondRect|secondSvg", result);
+    }
+
+    [Fact]
+    public void Document_HitTesting_Uses_Svg_Groups_Images_ForeignObject_And_Translate()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var svgNs = 'http://www.w3.org/2000/svg';
+            var svg = document.createElementNS(svgNs, 'svg');
+            svg.id = 'svgRoot';
+            svg.setAttribute('width', '300');
+            svg.setAttribute('height', '300');
+
+            var middleG1 = document.createElementNS(svgNs, 'g');
+            middleG1.id = 'middleG1';
+            var middleG2 = document.createElementNS(svgNs, 'g');
+            middleG2.id = 'middleG2';
+            var middleRect1 = document.createElementNS(svgNs, 'rect');
+            middleRect1.id = 'middleRect1';
+            middleRect1.setAttribute('x', '105');
+            middleRect1.setAttribute('y', '105');
+            middleRect1.setAttribute('width', '90');
+            middleRect1.setAttribute('height', '90');
+            var middleRect2 = document.createElementNS(svgNs, 'rect');
+            middleRect2.id = 'middleRect2';
+            middleRect2.setAttribute('x', '110');
+            middleRect2.setAttribute('y', '110');
+            middleRect2.setAttribute('width', '80');
+            middleRect2.setAttribute('height', '80');
+            middleG2.appendChild(middleRect1);
+            middleG2.appendChild(middleRect2);
+            middleG1.appendChild(middleG2);
+            svg.appendChild(middleG1);
+
+            var imageGroup = document.createElementNS(svgNs, 'g');
+            imageGroup.id = 'imageGroup';
+            var image1 = document.createElementNS(svgNs, 'image');
+            image1.id = 'image1';
+            image1.setAttribute('x', '5');
+            image1.setAttribute('y', '205');
+            image1.setAttribute('width', '90');
+            image1.setAttribute('height', '90');
+            image1.setAttributeNS('http://www.w3.org/1999/xlink', 'href', 'data:image/gif;base64,R0lGODlhAQABAAAAACw=');
+            var image2 = document.createElementNS(svgNs, 'image');
+            image2.id = 'image2';
+            image2.setAttribute('x', '10');
+            image2.setAttribute('y', '210');
+            image2.setAttribute('width', '80');
+            image2.setAttribute('height', '80');
+            image2.setAttributeNS('http://www.w3.org/1999/xlink', 'href', 'data:image/gif;base64,R0lGODlhAQABAAAAACw=');
+            imageGroup.appendChild(image1);
+            imageGroup.appendChild(image2);
+            svg.appendChild(imageGroup);
+
+            var fo = document.createElementNS(svgNs, 'foreignObject');
+            fo.id = 'fo';
+            fo.setAttribute('x', '210');
+            fo.setAttribute('y', '110');
+            fo.setAttribute('width', '80');
+            fo.setAttribute('height', '80');
+            var foDiv = document.createElement('div');
+            foDiv.id = 'foDiv';
+            foDiv.style.width = '80px';
+            foDiv.style.height = '80px';
+            fo.appendChild(foDiv);
+            svg.appendChild(fo);
+
+            var translatedOuter = document.createElementNS(svgNs, 'g');
+            translatedOuter.id = 'translatedOuter';
+            translatedOuter.setAttribute('transform', 'translate(200, 200)');
+            var translatedInner = document.createElementNS(svgNs, 'g');
+            translatedInner.id = 'translatedInner';
+            translatedInner.setAttribute('transform', 'translate(5, 5)');
+            var translatedRect1 = document.createElementNS(svgNs, 'rect');
+            translatedRect1.id = 'translatedRect1';
+            translatedRect1.setAttribute('x', '0');
+            translatedRect1.setAttribute('y', '0');
+            translatedRect1.setAttribute('width', '90');
+            translatedRect1.setAttribute('height', '90');
+            var translatedRect2 = document.createElementNS(svgNs, 'rect');
+            translatedRect2.id = 'translatedRect2';
+            translatedRect2.setAttribute('x', '5');
+            translatedRect2.setAttribute('y', '5');
+            translatedRect2.setAttribute('width', '80');
+            translatedRect2.setAttribute('height', '80');
+            translatedInner.appendChild(translatedRect1);
+            translatedInner.appendChild(translatedRect2);
+            translatedOuter.appendChild(translatedInner);
+            svg.appendChild(translatedOuter);
+
+            document.body.insertBefore(svg, document.getElementById('result'));
+
+            var middleHits = document.elementsFromPoint(125, 125);
+            var imageHits = document.elementsFromPoint(50, 250);
+            var foreignObjectHits = document.elementsFromPoint(250, 150);
+            var translatedHits = document.elementsFromPoint(250, 250);
+
+            document.getElementById('result').textContent = [
+                middleHits.slice(0, 5).map((node) => node.id || node.tagName).join(','),
+                imageHits.slice(0, 4).map((node) => node.id || node.tagName).join(','),
+                foreignObjectHits.slice(0, 3).map((node) => node.id || node.tagName).join(','),
+                translatedHits.slice(0, 5).map((node) => node.id || node.tagName).join(',')
+            ].join('|');
+        ");
+
+        Assert.Contains(
+            "middleRect2,middleRect1,middleG2,middleG1,svgRoot|image2,image1,imageGroup,svgRoot|foDiv,fo,svgRoot|translatedRect2,translatedRect1,translatedInner,translatedOuter,svgRoot",
+            result);
+    }
+
+    [Fact]
+    public void Document_HitTesting_Uses_Svg_Text_Tspan_And_TextPath_Content()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var svgNs = 'http://www.w3.org/2000/svg';
+            var xlinkNs = 'http://www.w3.org/1999/xlink';
+            var svg = document.createElementNS(svgNs, 'svg');
+            svg.id = 'svgRoot';
+            svg.setAttribute('width', '300');
+            svg.setAttribute('height', '300');
+            svg.style.margin = '100px';
+            svg.style.display = 'block';
+
+            var defs = document.createElementNS(svgNs, 'defs');
+            var path = document.createElementNS(svgNs, 'path');
+            path.id = 'path';
+            path.setAttribute('d', 'M10,170h1000');
+            defs.appendChild(path);
+            svg.appendChild(defs);
+
+            var text1 = document.createElementNS(svgNs, 'text');
+            text1.id = 'text1';
+            text1.setAttribute('x', '10');
+            text1.setAttribute('y', '50');
+            text1.setAttribute('font-size', '50');
+            text1.textContent = 'Some text';
+            svg.appendChild(text1);
+
+            var text2 = document.createElementNS(svgNs, 'text');
+            text2.id = 'text2';
+            text2.setAttribute('x', '10');
+            text2.setAttribute('y', '110');
+            text2.setAttribute('font-size', '50');
+            var tspan1 = document.createElementNS(svgNs, 'tspan');
+            tspan1.id = 'tspan1';
+            tspan1.textContent = 'Some text';
+            text2.appendChild(tspan1);
+            svg.appendChild(text2);
+
+            var text3 = document.createElementNS(svgNs, 'text');
+            text3.id = 'text3';
+            text3.setAttribute('font-size', '50');
+            var textPath = document.createElementNS(svgNs, 'textPath');
+            textPath.id = 'textpath1';
+            textPath.setAttributeNS(xlinkNs, 'xlink:href', '#path');
+            textPath.textContent = 'Some text';
+            text3.appendChild(textPath);
+            svg.appendChild(text3);
+
+            var text4 = document.createElementNS(svgNs, 'text');
+            text4.id = 'text4';
+            text4.setAttribute('x', '10');
+            text4.setAttribute('y', '230');
+            text4.setAttribute('font-size', '50');
+            text4.appendChild(document.createTextNode('Text under'));
+            var tspan2 = document.createElementNS(svgNs, 'tspan');
+            tspan2.id = 'tspan2';
+            tspan2.setAttribute('x', '10');
+            tspan2.textContent = 'Text over';
+            text4.appendChild(tspan2);
+            svg.appendChild(text4);
+
+            document.body.insertBefore(svg, document.getElementById('result'));
+
+            var firstHits = document.elementsFromPoint(125, 125);
+            var secondHits = document.elementsFromPoint(125, 185);
+            var thirdHits = document.elementsFromPoint(125, 245);
+            var fourthHits = document.elementsFromPoint(125, 305);
+
+            document.getElementById('result').textContent = [
+                firstHits[0] && (firstHits[0].id || firstHits[0].tagName),
+                firstHits[1] && (firstHits[1].id || firstHits[1].tagName),
+                secondHits[0] && (secondHits[0].id || secondHits[0].tagName),
+                thirdHits[0] && (thirdHits[0].id || thirdHits[0].tagName),
+                fourthHits[0] && (fourthHits[0].id || fourthHits[0].tagName),
+                fourthHits[1] && (fourthHits[1].id || fourthHits[1].tagName)
+            ].join('|');
+        ");
+
+        Assert.Contains("text1|svgRoot|tspan1|textpath1|tspan2|text4", result);
+    }
+
+    [Fact]
+    public void Document_HitTesting_Uses_Table_Cell_Layout_For_Rtl_And_Vertical_Writing_Modes()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var sandbox = document.createElement('div');
+            sandbox.id = 'sandbox';
+            var table = document.createElement('table');
+            table.id = 'testtable';
+            table.style.margin = '100px';
+            table.style.width = '200px';
+            table.style.height = '200px';
+
+            for (var rowIndex = 1; rowIndex <= 4; rowIndex++) {
+                var row = document.createElement('tr');
+                row.id = 'tr' + rowIndex;
+                for (var cellIndex = 1; cellIndex <= 4; cellIndex++) {
+                    var cell = document.createElement('td');
+                    cell.id = 'td' + rowIndex + cellIndex;
+                    row.appendChild(cell);
+                }
+                table.appendChild(row);
+            }
+
+            sandbox.appendChild(table);
+            document.body.insertBefore(sandbox, document.getElementById('result'));
+
+            function summarize(x, y, count) {
+                return document.elementsFromPoint(x, y).slice(0, count).map((node) => node.id || node.tagName).join(',');
+            }
+
+            var initialCell = summarize(125, 125, 5);
+            var initialGap = summarize(199, 199, 4);
+            table.className = 'rtl';
+            table.style.direction = 'rtl';
+            var rtlCell = summarize(125, 125, 1);
+            table.className = 'tblr';
+            table.style.writingMode = 'vertical-lr';
+            table.style.direction = 'ltr';
+            var verticalBottomLeft = summarize(125, 275, 1);
+            var verticalTopRight = summarize(275, 125, 1);
+
+            document.getElementById('result').textContent = [
+                initialCell,
+                initialGap,
+                rtlCell,
+                verticalBottomLeft,
+                verticalTopRight
+            ].join('|');
+        ");
+
+        Assert.Contains("td11,testtable,sandbox,BODY,HTML|testtable,sandbox,BODY,HTML|td14|td14|td41", result);
+    }
+
+    [Fact]
+    public void Document_HitTesting_Uses_Image_Map_Areas_Before_Associated_Images()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var image = document.createElement('img');
+            image.id = 'dinos';
+            image.setAttribute('usemap', '#dinos_map');
+            image.setAttribute('width', '364');
+            image.setAttribute('height', '40');
+            image.style.display = 'block';
+            image.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+
+            var map = document.createElement('map');
+            map.id = 'dinos_map';
+            map.name = 'dinos_map';
+            var area = document.createElement('area');
+            area.id = 'rectG';
+            area.shape = 'rect';
+            area.coords = '0,0,90,100';
+            area.href = '#';
+            map.appendChild(area);
+
+            document.body.insertBefore(image, document.getElementById('result'));
+            document.body.insertBefore(map, document.getElementById('result'));
+
+            var rect = image.getBoundingClientRect();
+            document.getElementById('result').textContent = [
+                document.elementFromPoint(rect.left + 45, rect.top + 20).id,
+                document.elementsFromPoint(rect.left + 45, rect.top + 20).slice(0, 4).map((node) => node.id || node.tagName).join(','),
+                document.elementFromPoint(rect.left + 92, rect.top + 2).id
+            ].join('|');
+        ");
+
+        Assert.Contains("rectG|rectG,dinos,BODY,HTML|dinos", result);
+    }
+
+    [Fact]
+    public void Document_HitTesting_Excludes_Rounded_Corners_From_Fieldset_Hits()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.innerHTML = '<div style=""position:absolute;width:200px;height:200px;right:0;top:0""><div id=""fieldsetDiv"" style=""position:absolute;top:0;left:0;width:60px;height:60px;background:rebeccapurple""></div><fieldset id=""fieldset"" style=""position:absolute;top:100px;left:100px;width:60px;height:60px;border-radius:100px""><span style=""position:absolute;top:-100px;left:-100px;width:1px;height:1px""></span></fieldset></div><pre id=""result""></pre>';
+            var fieldsetDivRect = document.getElementById('fieldsetDiv').getBoundingClientRect();
+            var fieldsetRect = document.getElementById('fieldset').getBoundingClientRect();
+            document.getElementById('result').textContent = [
+                document.elementFromPoint(fieldsetDivRect.left + fieldsetDivRect.width / 2, fieldsetDivRect.top + fieldsetDivRect.height / 2).id,
+                document.elementFromPoint(fieldsetRect.left + fieldsetRect.width / 2, fieldsetRect.top + fieldsetRect.height / 2).id,
+                document.elementFromPoint(fieldsetRect.left + 5, fieldsetRect.top + 5).id || 'other'
+            ].join('|');
+        ");
+
+        Assert.Contains("fieldsetDiv|fieldset|other", result);
+    }
+
+    [Fact]
+    public void Document_HitTesting_Extends_List_Items_To_Outside_Markers()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            document.body.innerHTML = '<ul style=""font-size:10px;margin:40px 0 0 40px""><li id=""outsideText"">Outside 1</li><li id=""outsideImage"" style=""list-style-image:url(data:image/gif;base64,R0lGODlhAQABAAAAACw=)"">Outside 2</li></ul><ul style=""font-size:10px;margin:20px 0 0 40px;list-style-position:inside""><li id=""insideText"">Inside 1</li></ul><pre id=""result""></pre>';
+
+            function findOutsideMarkerHit(id) {
+                var li = document.getElementById(id);
+                var bounds = li.getBoundingClientRect();
+                var y = (bounds.top + bounds.bottom) / 2;
+                for (var x = bounds.left - 40; x < bounds.left; x++) {
+                    var hit = document.elementFromPoint(x, y);
+                    if (hit === li)
+                        return x;
+                }
+
+                return null;
+            }
+
+            var insideBounds = document.getElementById('insideText').getBoundingClientRect();
+            document.getElementById('result').textContent = [
+                findOutsideMarkerHit('outsideText') !== null ? 'outsideText' : 'miss',
+                findOutsideMarkerHit('outsideImage') !== null ? 'outsideImage' : 'miss',
+                document.elementFromPoint(insideBounds.left + 1, (insideBounds.top + insideBounds.bottom) / 2).id
+            ].join('|');
+        ");
+
+        Assert.Contains("outsideText|outsideImage|insideText", result);
+    }
+
+    [Fact]
     public void Element_ScrollTo_Updates_ScrollOffsets()
     {
         var result = ExecJs(@"
@@ -322,6 +870,95 @@ public class GoogleSearchPolyfillTests
         ");
 
         Assert.Contains("40,50|0,0|0,0", result);
+    }
+
+    [Fact]
+    public void Element_ScrollParent_Finds_Nearest_Relevant_Scroll_Container()
+    {
+        var result = ExecJs(@"
+            function append(tag, parent, id, style) {
+                var el = document.createElement(tag);
+                if (id) el.id = id;
+                if (style) el.style.cssText = style;
+                parent.appendChild(el);
+                return el;
+            }
+
+            var childOfRoot = append('div', document.body, 'childOfRoot');
+            var scroller3 = append('div', document.body, 'scroller3', 'overflow:scroll; height:100px;');
+            var fixedToRoot = append('div', scroller3, 'fixedToRoot', 'position:fixed;');
+            var transformed = append('div', scroller3, null, 'transform:scale(1);');
+            var scroller2 = append('div', transformed, 'scroller2', 'overflow:scroll; height:100px;');
+            var relpos = append('div', scroller2, null, 'position:relative;');
+            var scroller1 = append('div', relpos, 'scroller1', 'overflow:scroll; height:100px;');
+            var wrapper = append('div', scroller1);
+            var normalChild = append('div', wrapper, 'normalChild');
+            var noBox = append('div', wrapper, 'noBox', 'display:none;');
+            var absPosChild = append('div', wrapper, 'absPosChild', 'position:absolute;');
+            var fixedPosChild = append('div', wrapper, 'fixedPosChild', 'position:fixed;');
+            var hidden = append('div', scroller1, 'hidden', 'overflow:hidden;');
+            var childOfHidden = append('div', hidden, 'childOfHidden');
+            var contents = append('div', scroller1, null, 'display:contents;');
+            var childOfDisplayContents = append('div', contents, 'childOfDisplayContents');
+
+            document.getElementById('result').textContent = [
+                normalChild.scrollParent().id,
+                childOfHidden.scrollParent().id,
+                noBox.scrollParent() === null,
+                absPosChild.scrollParent().id,
+                fixedPosChild.scrollParent().id,
+                fixedToRoot.scrollParent() === null,
+                childOfRoot.scrollParent() === document.scrollingElement,
+                childOfDisplayContents.scrollParent().id,
+                document.body.scrollParent() === document.scrollingElement,
+                document.documentElement.scrollParent() === null,
+                document.scrollingElement.scrollParent() === null
+            ].join('|');
+        ");
+
+        Assert.Contains("scroller1|hidden|true|scroller2|scroller3|true|true|scroller1|true|true|true", result);
+    }
+
+    [Fact]
+    public void Element_ScrollParent_Crosses_Open_And_Closed_Shadow_Roots()
+    {
+        var result = ExecJs(@"
+            function append(tag, parent, id, style) {
+                var el = document.createElement(tag);
+                if (id) el.id = id;
+                if (style) el.style.cssText = style;
+                parent.appendChild(el);
+                return el;
+            }
+
+            var outerScroller = append('div', document.body, 'outerScroller', 'overflow:scroll; height:150px;');
+            var spacer = append('div', outerScroller, null, 'height:1000px;');
+
+            var closedHost = append('div', spacer, 'closedHost');
+            var closedWrapper = append('div', closedHost);
+            var closedInner = append('div', closedWrapper, 'closedInner', 'height:1000px;');
+            var closedShadowRoot = closedHost.attachShadow({ mode: 'closed' });
+            var closedShadowOuter = append('div', closedShadowRoot, 'closedShadowOuter');
+            var closedShadowScroller = append('div', closedShadowOuter, null, 'overflow:scroll; height:50px;');
+
+            var openHost = append('div', spacer, 'openHost');
+            var openWrapper = append('div', openHost);
+            var openInner = append('div', openWrapper, 'openInner', 'height:1000px;');
+            var openShadowRoot = openHost.attachShadow({ mode: 'open' });
+            var openShadowOuter = append('div', openShadowRoot, 'openShadowOuter');
+            var openShadowScroller = append('div', openShadowOuter, null, 'overflow:scroll; height:50px;');
+
+            document.getElementById('result').textContent = [
+                closedInner.scrollParent().id,
+                openInner.scrollParent().id,
+                closedShadowRoot.querySelector('#closedShadowOuter').scrollParent().id,
+                openHost.shadowRoot.querySelector('#openShadowOuter').scrollParent().id,
+                closedHost.shadowRoot === null,
+                openHost.shadowRoot === openShadowRoot
+            ].join('|');
+        ");
+
+        Assert.Contains("outerScroller|outerScroller|outerScroller|outerScroller|true|true", result);
     }
 
     [Fact]
@@ -973,7 +1610,7 @@ document.getElementById('result').textContent =
                 container.appendChild(content);
                 container.appendChild(target);
                 document.body.appendChild(container);
-                target.scrollIntoView();
+                target.scrollIntoView({ block: 'start', inline: 'start' });
                 return container.scrollLeft + ',' + container.scrollTop;
             }
 
@@ -1013,7 +1650,7 @@ document.getElementById('result').textContent =
                 container.appendChild(content);
                 container.appendChild(target);
                 document.body.appendChild(container);
-                target.scrollIntoView();
+                target.scrollIntoView({ block: 'start', inline: 'start' });
                 return container.scrollLeft + ',' + container.scrollTop;
             }
 
@@ -1099,6 +1736,55 @@ document.getElementById('result').textContent =
         ");
 
         Assert.Contains("0,140", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Defaults_To_InlineNearest_For_Omitted_Options_And_Boolean_Overloads()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            var container = document.createElement('div');
+            container.style.position = 'relative';
+            container.style.width = '120px';
+            container.style.height = '100px';
+            container.style.overflow = 'auto';
+
+            var content = document.createElement('div');
+            content.style.width = '400px';
+            content.style.height = '400px';
+            content.style.position = 'relative';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.left = '60px';
+            target.style.top = '300px';
+            target.style.width = '20px';
+            target.style.height = '20px';
+
+            container.appendChild(content);
+            container.appendChild(target);
+            document.body.appendChild(container);
+
+            function run(mode) {
+                container.scrollLeft = 40;
+                container.scrollTop = 0;
+                if (mode === 'default') {
+                    target.scrollIntoView();
+                } else if (mode === 'true') {
+                    target.scrollIntoView(true);
+                } else {
+                    target.scrollIntoView(false);
+                }
+
+                return container.scrollLeft + ',' + container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                run('default') + '|' + run('true') + '|' + run('false');
+        ");
+
+        Assert.Contains("40,300|40,300|40,220", result);
     }
 
     [Fact]
@@ -1240,7 +1926,7 @@ document.getElementById('result').textContent =
             container.appendChild(filler);
             container.appendChild(target);
             document.body.appendChild(container);
-            target.scrollIntoView();
+            target.scrollIntoView({ block: 'start', inline: 'start' });
 
             document.getElementById('result').textContent =
                 document.documentElement.scrollLeft + ',' + document.documentElement.scrollTop + '|' +
@@ -1333,6 +2019,140 @@ document.getElementById('result').textContent =
         ");
 
         Assert.Contains("0,0,300,240|0,0,300,240", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Treats_Assigned_Slot_As_Scroll_Container()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            var host = document.createElement('div');
+            var spacer = document.createElement('div');
+            spacer.style.height = '200px';
+            var target = document.createElement('div');
+            target.style.height = '100px';
+            target.style.width = '100px';
+
+            host.appendChild(spacer);
+            host.appendChild(target);
+            document.body.appendChild(host);
+
+            var shadow = host.attachShadow({ mode: 'open' });
+            var slot = document.createElement('slot');
+            slot.style.display = 'block';
+            slot.style.overflow = 'hidden';
+            slot.style.width = '100px';
+            slot.style.height = '100px';
+            shadow.appendChild(slot);
+
+            target.scrollIntoView();
+
+            document.getElementById('result').textContent = [
+                slot.scrollTop,
+                slot.scrollHeight,
+                slot.clientHeight,
+                host.scrollTop
+            ].join('|');
+        ");
+
+        Assert.Contains("200|300|100|0", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Maps_Block_And_Inline_Axes_For_WritingModes()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function measure(writingMode, direction, options) {
+                var scroller = document.createElement('div');
+                scroller.style.overflow = 'scroll';
+                scroller.style.width = '300px';
+                scroller.style.height = '300px';
+                scroller.style.position = 'relative';
+                if (writingMode) {
+                    scroller.style.writingMode = writingMode;
+                }
+                if (direction) {
+                    scroller.style.direction = direction;
+                }
+
+                var content = document.createElement('div');
+                content.style.width = '600px';
+                content.style.height = '600px';
+
+                var target = document.createElement('div');
+                target.style.position = 'absolute';
+                target.style.left = '200px';
+                target.style.top = '200px';
+                target.style.width = '200px';
+                target.style.height = '200px';
+
+                scroller.appendChild(content);
+                scroller.appendChild(target);
+                document.body.appendChild(scroller);
+                target.scrollIntoView(options);
+                return scroller.scrollLeft + ',' + scroller.scrollTop;
+            }
+
+            document.getElementById('result').textContent = [
+                measure('horizontal-tb', 'rtl', { block: 'start', inline: 'start' }),
+                measure('vertical-rl', 'ltr', { block: 'center', inline: 'end' }),
+                measure('sideways-rl', 'rtl', { block: 'end', inline: 'center' })
+            ].join('|');
+        ");
+
+        Assert.Contains("-200,200|-150,100|-100,-150", result);
+    }
+
+    [Fact]
+    public void SmoothScroll_On_OverflowHidden_Element_Can_Be_Interrupted_By_Scroll_Handler()
+    {
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(ctx, "<!DOCTYPE html><html><body></body></html>", "file:///test.html");
+
+        var result = ctx.Eval("""
+            (() => {
+                var scroller = document.createElement('div');
+                scroller.style.overflowY = 'hidden';
+                scroller.style.width = '100px';
+                scroller.style.height = '100px';
+                scroller.style.scrollBehavior = 'smooth';
+
+                function block() {
+                    var d = document.createElement('div');
+                    d.style.width = '100px';
+                    d.style.height = '100px';
+                    return d;
+                }
+
+                scroller.appendChild(block());
+                scroller.appendChild(block());
+                scroller.appendChild(block());
+                document.body.appendChild(scroller);
+
+                var interrupted = 0;
+                var scrollEvents = 0;
+                var scrollEnds = 0;
+                scroller.onscroll = function () {
+                    scrollEvents++;
+                    if (scroller.scrollTop > 1 && scroller.scrollTop < 200) {
+                        scroller.scrollTop = 1;
+                        interrupted++;
+                    }
+                };
+                scroller.onscrollend = function () {
+                    scrollEnds++;
+                };
+
+                scroller.scrollTop = 200;
+                return [scroller.scrollTop, interrupted, scrollEvents, scrollEnds].join('|');
+            })()
+            """);
+
+        Assert.Equal("1|1|2|1", result.ToString());
     }
 
     [Fact]

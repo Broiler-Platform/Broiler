@@ -44,6 +44,13 @@ public class WptTestRunnerTests : IDisposable
         return runner.RunMatchTest(testFile, refFile, _tempDir);
     }
 
+    private void WriteTempSupportFile(string relativePath, string content)
+    {
+        var fullPath = Path.Combine(_tempDir, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        File.WriteAllText(fullPath, content);
+    }
+
     private static void CreateSolidReferencePng(string path, SkiaSharp.SKColor color)
     {
         using var bitmap = new SkiaSharp.SKBitmap(
@@ -416,6 +423,129 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssVariables_LogicalBorderPaintValues_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    :root { --accent: rgb(0, 128, 0); }
+    a { color: inherit; text-decoration: none; }
+    .box {
+      width: 80px;
+      height: 50px;
+      margin: 12px;
+      box-sizing: border-box;
+      display: block;
+    }
+    .logical-longhands {
+      border-style: solid;
+      border-width: medium;
+      border-inline-start-color: var(--accent);
+      border-inline-end-color: var(--accent);
+      border-block-start-color: var(--accent);
+      border-block-end-color: var(--accent);
+    }
+    .logical-shorthands {
+      border-inline: medium solid var(--accent);
+      border-block: medium solid var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <a href="""">
+    <div class=""box logical-longhands""></div>
+    <div class=""box logical-shorthands""></div>
+  </a>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .box {
+      width: 80px;
+      height: 50px;
+      margin: 12px;
+      box-sizing: border-box;
+      display: block;
+      border: medium solid rgb(0, 128, 0);
+    }
+  </style>
+</head>
+<body>
+  <div class=""box""></div>
+  <div class=""box""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-logical-border-paint-values", 140, 140);
+        Assert.True(result.Passed,
+            $"Logical border var() paint values should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssVariables_TextDecorationPaintValues_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    :root { --accent: rgb(0, 128, 0); }
+    a { color: black; }
+    .box {
+      margin: 12px;
+      font: 20px/1 sans-serif;
+      width: 220px;
+    }
+    .longhand {
+      text-decoration-line: underline;
+      text-decoration-style: solid;
+      text-decoration-color: var(--accent);
+    }
+    .shorthand {
+      text-decoration: solid underline var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <a href="""">
+    <div class=""box longhand"">Underline should be green</div>
+    <div class=""box shorthand"">Underline should be green</div>
+  </a>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    .box {
+      margin: 12px;
+      font: 20px/1 sans-serif;
+      width: 220px;
+      color: black;
+      text-decoration: solid underline rgb(0, 128, 0);
+    }
+  </style>
+</head>
+<body>
+  <div class=""box"">Underline should be green</div>
+  <div class=""box"">Underline should be green</div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-text-decoration-paint-values", 260, 90);
+        Assert.True(result.Passed,
+            $"Text decoration var() paint values should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssVariables_MissingClosingNestedFallback_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -469,6 +599,13 @@ document.getElementById('out').appendChild(p);
 <head>
   <style>
     html, body { margin: 0; padding: 0; background: white; }
+    body {
+      --is-initial: initial;
+      --should-not-inherit: tomato;
+      --should-inherit: lightgreen;
+      --registered-should-not-inherit: tomato;
+      --registered-inherits-should-inherit: lightgreen;
+    }
     .box {
       width: 60px;
       height: 60px;
@@ -476,12 +613,42 @@ document.getElementById('out').appendChild(p);
       display: inline-block;
       background: black;
     }
+    @property --registered-should-not-inherit {
+      syntax: '<color>';
+      initial-value: lightgreen;
+      inherits: false;
+    }
+    @property --registered-inherits-should-inherit {
+      syntax: '<color>';
+      initial-value: tomato;
+      inherits: true;
+    }
 
     #initial { background: var(--initial-token, hotpink); --initial-token: initial; }
+    #fallbackInitial {
+      background: var(--should-not-inherit, lightgreen);
+      --should-not-inherit: var(--is-initial, initial);
+    }
+    #fallbackInherit {
+      background: var(--should-inherit, tomato);
+      --should-inherit: var(--is-initial, inherit);
+    }
+    #registeredFallbackUnset {
+      background: var(--registered-should-not-inherit);
+      --registered-should-not-inherit: var(--is-initial, unset);
+    }
+    #registeredFallbackRevert {
+      background: var(--registered-inherits-should-inherit);
+      --registered-inherits-should-inherit: var(--is-initial, revert);
+    }
   </style>
 </head>
 <body>
   <div id=""initial"" class=""box""></div>
+  <div id=""fallbackInitial"" class=""box""></div>
+  <div id=""fallbackInherit"" class=""box""></div>
+  <div id=""registeredFallbackUnset"" class=""box""></div>
+  <div id=""registeredFallbackRevert"" class=""box""></div>
 </body>
 </html>";
 
@@ -495,6 +662,7 @@ document.getElementById('out').appendChild(p);
       height: 60px;
       margin: 10px;
       display: inline-block;
+      background: lightgreen;
     }
 
     #initial { background: hotpink; }
@@ -502,12 +670,256 @@ document.getElementById('out').appendChild(p);
 </head>
 <body>
   <div id=""initial"" class=""box""></div>
+  <div id=""fallbackInitial"" class=""box""></div>
+  <div id=""fallbackInherit"" class=""box""></div>
+  <div id=""registeredFallbackUnset"" class=""box""></div>
+  <div id=""registeredFallbackRevert"" class=""box""></div>
 </body>
 </html>";
 
-        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-wide-keywords", 120, 100);
+        var result = RunTempMatchTest(testHtml, referenceHtml, "css-variables-wide-keywords", 380, 100);
         Assert.True(result.Passed,
             $"css-variables wide keywords should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_SvgPresentationColors_RgbAndRgba_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    svg { display: block; }
+  </style>
+</head>
+<body>
+  <svg width=""32"" height=""32"" viewBox=""0 0 32 32"">
+    <rect x=""4"" y=""4"" width=""24"" height=""24"" fill=""rgb(0, 128, 0)"" stroke=""rgba(0, 0, 255, 1)"" stroke-width=""4"" />
+  </svg>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; }
+    svg { display: block; }
+  </style>
+</head>
+<body>
+  <svg width=""32"" height=""32"" viewBox=""0 0 32 32"">
+    <rect x=""4"" y=""4"" width=""24"" height=""24"" fill=""#008000"" stroke=""blue"" stroke-width=""4"" />
+  </svg>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "svg-rgb-rgba-presentation-colors", 40, 40);
+        Assert.True(result.Passed,
+            $"SVG rgb()/rgba() presentation colors should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_WritingModes_RangeInput_ZeroInlineSize_Horizontal_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    .wrapper {
+      display: flex;
+    }
+    .probe {
+      display: inline-flex;
+      background: red;
+    }
+    input[type=range] {
+      visibility: hidden;
+      inline-size: 0;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class=""wrapper""><span class=""probe""><input type=""range""></span></div>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    .wrapper {
+      display: flex;
+    }
+    input[type=range] {
+      visibility: hidden;
+      margin: 0;
+    }
+  </style>
+</head>
+<body><div class=""wrapper""><span></span><input type=""range""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "writing-modes-range-zero-inline-size-horizontal", 220, 80);
+        Assert.True(result.Passed,
+            $"Horizontal range input inline-size:0 should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_WritingModes_ButtonNativeComputedStyle_MultilineSizing_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+<style>
+.probe {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+}
+#result {
+  width: 40px;
+  height: 40px;
+  background: red;
+}
+</style>
+</head>
+<body>
+<button class=""probe"" id=""horizontal-button"">line one</button>
+<button class=""probe"" id=""horizontal-button-multiline"">line one<br>line two</button>
+<input class=""probe"" type=""button"" id=""horizontal-input"" value=""line one"">
+<input class=""probe"" type=""button"" id=""horizontal-input-multiline"" value=""line one&#10;line two"">
+<button class=""probe"" id=""vertical-lr-button"" style=""writing-mode: vertical-lr"">line one</button>
+<button class=""probe"" id=""vertical-lr-button-multiline"" style=""writing-mode: vertical-lr"">line one<br>line two</button>
+<input class=""probe"" type=""button"" id=""vertical-rl-input"" style=""writing-mode: vertical-rl"" value=""line one"">
+<input class=""probe"" type=""button"" id=""vertical-rl-input-multiline"" style=""writing-mode: vertical-rl"" value=""line one&#10;line two"">
+<div id=""result""></div>
+<script>
+function style(id) {
+  return window.getComputedStyle(document.getElementById(id));
+}
+function horizontalPair(singleId, multiId) {
+  const single = style(singleId);
+  const multi = style(multiId);
+  return parseInt(single.width, 10) === parseInt(multi.width, 10) &&
+         parseInt(multi.height, 10) > parseInt(single.height, 10) &&
+         single.blockSize === single.height &&
+         single.inlineSize === single.width;
+}
+function verticalPair(singleId, multiId) {
+  const single = style(singleId);
+  const multi = style(multiId);
+  return parseInt(single.height, 10) === parseInt(multi.height, 10) &&
+         parseInt(multi.width, 10) > parseInt(single.width, 10) &&
+         single.blockSize === single.width &&
+         single.inlineSize === single.height;
+}
+var first = horizontalPair('horizontal-button', 'horizontal-button-multiline');
+var second = horizontalPair('horizontal-input', 'horizontal-input-multiline');
+var third = verticalPair('vertical-lr-button', 'vertical-lr-button-multiline');
+var fourth = verticalPair('vertical-rl-input', 'vertical-rl-input-multiline');
+var passed = first && second && third && fourth;
+document.getElementById('result').setAttribute('style', 'width:40px;height:40px;background:' + (passed ? 'green' : 'red'));
+</script>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html><body><div id=""result"" style=""width:40px;height:40px;background:green""></div></body></html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "writing-modes-button-native-computed-style", 60, 60);
+        Assert.True(result.Passed,
+            $"Button native computed-style multiline sizing should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_WritingModes_SelectSizeScrollingAndSizing_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+<style>
+#listbox {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+}
+</style>
+</head>
+<body>
+<select id=""listbox"" size=""5""></select>
+<div id=""result"" style=""width:40px;height:40px;background:red""></div>
+<script>
+const select = document.getElementById('listbox');
+for (let i = 0; i < 100; i++) {
+  const option = document.createElement('option');
+  option.textContent = 'Option ' + (i + 1);
+  select.appendChild(option);
+}
+function checkMode(writingMode) {
+  select.style.writingMode = writingMode;
+  select.size = 5;
+  select.scrollTop = 0;
+  select.scrollLeft = 0;
+
+  const vertical = writingMode !== 'horizontal-tb';
+  const blockScrollProp = vertical ? 'scrollLeft' : 'scrollTop';
+  const inlineScrollProp = vertical ? 'scrollTop' : 'scrollLeft';
+  const clientBlock = vertical ? select.clientWidth : select.clientHeight;
+  const clientInline = vertical ? select.clientHeight : select.clientWidth;
+  const scrollBlock = vertical ? select.scrollWidth : select.scrollHeight;
+  const scrollInline = vertical ? select.scrollHeight : select.scrollWidth;
+  const reversed = writingMode.endsWith('-rl');
+
+  const baseBlock = clientBlock;
+  const baseInline = clientInline;
+  select.size = 10;
+  const largerBlock = vertical ? select.clientWidth : select.clientHeight;
+  const largerInline = vertical ? select.clientHeight : select.clientWidth;
+  select.size = 8;
+  const smallerBlock = vertical ? select.clientWidth : select.clientHeight;
+  const smallerInline = vertical ? select.clientHeight : select.clientWidth;
+  select.size = 5;
+
+  select[blockScrollProp] = 100;
+  const positive = select[blockScrollProp];
+  select[blockScrollProp] = -100;
+  const negative = select[blockScrollProp];
+  select[inlineScrollProp] = 100;
+  const inlinePositive = select[inlineScrollProp];
+  select[inlineScrollProp] = -100;
+  const inlineNegative = select[inlineScrollProp];
+
+  return scrollBlock > clientBlock &&
+         scrollInline === clientInline &&
+         largerBlock > baseBlock &&
+         largerInline === baseInline &&
+         smallerBlock < largerBlock &&
+         smallerInline === largerInline &&
+         (!reversed ? positive > 0 && negative === 0 : positive === 0 && negative < 0) &&
+         inlinePositive === 0 &&
+         inlineNegative === 0;
+}
+const passed = [
+  checkMode('horizontal-tb'),
+  checkMode('vertical-lr'),
+  checkMode('vertical-rl'),
+  checkMode('sideways-lr'),
+  checkMode('sideways-rl')
+].every(Boolean);
+document.getElementById('result').style.background = passed ? 'green' : 'red';
+</script>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html><body><div id=""result"" style=""width:40px;height:40px;background:green""></div></body></html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "writing-modes-select-size-scrolling", 60, 60);
+        Assert.True(result.Passed,
+            $"Select[size] scrolling and sizing should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
@@ -621,6 +1033,198 @@ document.getElementById('out').appendChild(p);
         var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-inherited");
         Assert.True(result.Passed,
             $"zoom inheritance should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomExplicitInheritedBorderRadius_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .zoomed {
+      background: green;
+      width: 100px;
+      height: 100px;
+      border: 5px solid black;
+      border-radius: inherit;
+      zoom: 2;
+    }
+  </style>
+</head>
+<body>
+  <div style=""border-radius:20px; display:contents"">
+    <div class=""zoomed""></div>
+  </div>
+</body>
+</html>";
+        using var radiusContext = new Broiler.JavaScript.Engine.JSContext();
+        var radiusBridge = new Broiler.HtmlBridge.DomBridge();
+        radiusBridge.Attach(radiusContext, testHtml, "file:///test.html");
+        var serialized = radiusBridge.SerializeToHtml();
+
+        Assert.Contains("class=\"zoomed\" style=\"width: 200px; height: 200px; border-top-width: 10px; border-right-width: 10px; border-bottom-width: 10px; border-left-width: 10px; border-radius: 40px\"", serialized);
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomExplicitInheritedOutline_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .zoomed {
+      background: green;
+      width: 50px;
+      height: 50px;
+      margin: 50px;
+      outline-width: inherit;
+      outline-offset: inherit;
+      outline-style: solid;
+      outline-color: black;
+      zoom: 2;
+    }
+  </style>
+</head>
+<body>
+  <div style=""outline-width:10px; outline-offset:5px; display:contents"">
+    <div class=""zoomed""></div>
+  </div>
+</body>
+</html>";
+        using var outlineContext = new Broiler.JavaScript.Engine.JSContext();
+        var outlineBridge = new Broiler.HtmlBridge.DomBridge();
+        outlineBridge.Attach(outlineContext, testHtml, "file:///test.html");
+        var serialized = outlineBridge.SerializeToHtml();
+
+        Assert.Contains("class=\"zoomed\" style=\"width: 100px; height: 100px; margin-top: 100px; margin-right: 100px; margin-bottom: 100px; margin-left: 100px; outline-width: 20px; outline-offset: 10px\"", serialized);
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomExplicitInheritedColumns_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .zoomed {
+      background: skyblue;
+      width: 300px;
+      height: 200px;
+      column-width: inherit;
+      column-height: inherit;
+      column-gap: inherit;
+      zoom: 2;
+    }
+    .inner { background: coral; height: 40px; }
+  </style>
+</head>
+<body>
+  <div style=""column-width:40px; column-height:150px; column-gap:10px; display:contents"">
+    <div class=""zoomed"">
+      <div class=""inner"">1</div>
+      <div class=""inner"">2</div>
+      <div class=""inner"">3</div>
+      <div class=""inner"">4</div>
+      <div class=""inner"">5</div>
+      <div class=""inner"">6</div>
+      <div class=""inner"">7</div>
+      <div class=""inner"">8</div>
+      <div class=""inner"">9</div>
+      <div class=""inner"">10</div>
+      <div class=""inner"">11</div>
+      <div class=""inner"">12</div>
+    </div>
+  </div>
+</body>
+</html>";
+        using var columnContext = new Broiler.JavaScript.Engine.JSContext();
+        var columnBridge = new Broiler.HtmlBridge.DomBridge();
+        columnBridge.Attach(columnContext, testHtml, "file:///test.html");
+        var serialized = columnBridge.SerializeToHtml();
+
+        Assert.Contains("class=\"zoomed\" style=\"width: 600px; height: 400px; column-width: 80px; column-height: 300px; column-gap: 20px\"", serialized);
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomScrollInsetSerialization_Scales_Explicit_And_Inherited_Values()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .zoomed-padding {
+      width: 120px;
+      height: 100px;
+      overflow: hidden;
+      border: 1px solid black;
+      scroll-padding-top: inherit;
+      zoom: 2;
+    }
+    .zoomed-margin-inherit {
+      width: 200px;
+      height: 10px;
+      scroll-margin-top: inherit;
+      zoom: 2;
+    }
+    .zoomed-margin-explicit {
+      width: 200px;
+      height: 10px;
+      scroll-margin-top: 20px;
+      zoom: 2;
+    }
+  </style>
+</head>
+<body>
+  <div style=""scroll-padding-top:20px; display:contents"">
+    <div class=""zoomed-padding""></div>
+  </div>
+  <div style=""scroll-margin-top:20px; display:contents"">
+    <div class=""zoomed-margin-inherit""></div>
+  </div>
+  <div class=""zoomed-margin-explicit""></div>
+</body>
+</html>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, testHtml, "file:///test.html");
+        var serialized = bridge.SerializeToHtml();
+
+        Assert.Contains("class=\"zoomed-padding\" style=\"width: 240px; height: 200px; scroll-padding-top: 40px; border-top-width: 2px; border-right-width: 2px; border-bottom-width: 2px; border-left-width: 2px\"", serialized);
+        Assert.Contains("class=\"zoomed-margin-inherit\" style=\"width: 400px; height: 20px; scroll-margin-top: 40px\"", serialized);
+        Assert.Contains("class=\"zoomed-margin-explicit\" style=\"width: 400px; height: 20px; scroll-margin-top: 40px\"", serialized);
+    }
+
+    [Fact]
+    public void Wpt_CssomView_IframeSrcDocSerialization_Preserves_Subdocument_ScrollMutations()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body>
+  <iframe id="frame" srcdoc="<!DOCTYPE html><html><body><div id='scroller' style='width:100px;height:60px;overflow:hidden'><div style='height:200px'></div><div id='target' style='height:20px;background:black'></div></div></body></html>"></iframe>
+</body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+        ctx.Eval("""
+            var doc = document.getElementById('frame').contentDocument;
+            doc.getElementById('target').scrollIntoView();
+            """);
+        bridge.ResolveAnchorPositions();
+        var serialized = bridge.SerializeToHtml();
+
+        Assert.Contains("srcdoc=\"&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;div id=&quot;scroller&quot; style=&quot;width: 100px; height: 60px; overflow: hidden&quot;&gt;&lt;div style=&quot;position: relative; top: -160px&quot;&gt;", serialized);
+        Assert.DoesNotContain("&gt;&lt;html&gt;&lt;head&gt;", serialized);
     }
 
     [Fact]
@@ -1310,7 +1914,7 @@ document.getElementById('out').appendChild(p);
   </div>
   <script>
     for (const match of document.querySelectorAll('.target')) {
-      match.scrollIntoView();
+      match.scrollIntoView({ block: 'start', inline: 'start' });
     }
   </script>
 </body>
@@ -1397,7 +2001,7 @@ document.getElementById('out').appendChild(p);
   </div>
   <script>
     for (const match of document.querySelectorAll('.target')) {
-      match.scrollIntoView();
+      match.scrollIntoView({ block: 'start', inline: 'start' });
     }
   </script>
 </body>
@@ -1497,7 +2101,7 @@ document.getElementById('out').appendChild(p);
   </div>
   <script>
     for (const match of document.querySelectorAll('.target')) {
-      match.scrollIntoView();
+      match.scrollIntoView({ block: 'start', inline: 'start' });
     }
   </script>
 </body>
@@ -1549,7 +2153,7 @@ document.getElementById('out').appendChild(p);
   </div>
   <script>
     for (const match of document.querySelectorAll('.target')) {
-      match.scrollIntoView();
+      match.scrollIntoView({ block: 'start', inline: 'start' });
     }
   </script>
 </body>
@@ -1558,6 +2162,255 @@ document.getElementById('out').appendChild(p);
         var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-scroll-margin-zoomed-targets");
         Assert.True(result.Passed,
             $"zoomed target scroll-margin should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomSvg_MatchesReference()
+    {
+        var testHtml = @"<!doctype html>
+<meta charset=""utf-8"">
+<style>
+  :root {
+    font-size: 10px;
+    zoom: 2;
+  }
+  body { margin: 0 }
+  .container {
+    font-size: 20px;
+  }
+  .child {
+    zoom: 2;
+  }
+  line {
+    stroke-width: 10px;
+    stroke: lime;
+  }
+  polygon, polyline, text {
+    fill: lime;
+  }
+  text {
+    font: 10px/1 Ahem;
+  }
+  svg {
+    background-color: red;
+  }
+</style>
+<div class=""container"">
+  <div class=""child"">
+    <svg width=""100"" height=""100"">
+    <defs>
+      <path id=""p"" d=""M80,60H25""></path>
+    </defs>
+      <rect width=""10rem"" height=""100"" fill=""blue""></rect>
+      <line y1=""0""  y2=""0""  x1=""0"" x2=""50""></line>
+      <line y1=""10"" y2=""10"" x1=""0"" x2=""2.5em""></line>
+      <line y1=""20"" y2=""20"" x1=""0"" x2=""5rem""></line>
+      <line y1=""30"" y2=""30"" x1=""0"" x2=""50%""></line>
+      <line y1=""40"" y2=""40"" x1=""0"" x2=""1vw""></line>
+      <polygon points=""0,50 50,50 50,60 0,60""></polygon>
+      <polyline points=""0,60 50,60 50,70 0,70""></polyline>
+      <text x=""80"" y=""60"">X</text>
+      <text><textPath href=""#p"">X</textPath></text>
+    </svg>
+  </div>
+</div>";
+
+        var referenceHtml = @"<!doctype html>
+<style>
+  body { margin: 0 }
+  :root {
+    font-size: 10px;
+  }
+  .container {
+    font-size: 20px;
+  }
+  line {
+    stroke-width: 40px;
+    stroke: lime;
+  }
+  polygon, polyline, text {
+    fill: lime;
+  }
+  text {
+    font: 40px/1 Ahem;
+  }
+  svg {
+    background-color: red;
+  }
+</style>
+<div class=""container"">
+  <svg width=""400"" height=""400"">
+    <defs>
+      <path id=""p"" d=""M320,240H100""></path>
+    </defs>
+    <rect width=""400"" height=""400"" fill=""blue""></rect>
+    <line y1=""0""   y2=""0""   x1=""0"" x2=""200""></line>
+    <line y1=""40""  y2=""40""  x1=""0"" x2=""10em""></line>
+    <line y1=""80""  y2=""80""  x1=""0"" x2=""20rem""></line>
+    <line y1=""120"" y2=""120"" x1=""0"" x2=""50%""></line>
+    <line y1=""160"" y2=""160"" x1=""0"" x2=""4vw""></line>
+    <polygon points=""0,200 200,200 200,240 0,240""></polygon>
+    <polyline points=""0,240 200,240 200,280 0,280""></polyline>
+    <text x=""320"" y=""240"">X</text>
+    <text><textPath href=""#p"">X</textPath></text>
+  </svg>
+</div>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-svg", 410, 410);
+        Assert.True(result.Passed,
+            $"zoom svg should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomSvg_FontRelativeUnits_MatchReference()
+    {
+        var testHtml = @"<!doctype html>
+<meta charset=""utf-8"">
+<style>
+  :root {
+    font: 10px/1 Ahem;
+    zoom: 2;
+  }
+  body { margin: 0 }
+  .container {
+    font-size: 20px;
+  }
+  .child {
+    zoom: 2;
+  }
+  line {
+    stroke-width: 2px;
+    stroke: lime;
+  }
+  svg {
+    background-color: black;
+  }
+</style>
+<div class=""container"">
+  <div class=""child"">
+    <svg width=""100"" height=""100"">
+      <line y1=""10"" y2=""10"" x1=""0"" x2=""1em""></line>
+      <line y1=""15"" y2=""15"" x1=""0"" x2=""1ex""></line>
+      <line y1=""20"" y2=""20"" x1=""0"" x2=""1cap""></line>
+      <line y1=""25"" y2=""25"" x1=""0"" x2=""1ch""></line>
+      <line y1=""30"" y2=""30"" x1=""0"" x2=""1ic""></line>
+      <line y1=""35"" y2=""35"" x1=""0"" x2=""1lh""></line>
+      <line y1=""60"" y2=""60"" x1=""0"" x2=""1rem""></line>
+      <line y1=""65"" y2=""65"" x1=""0"" x2=""1rex""></line>
+      <line y1=""70"" y2=""70"" x1=""0"" x2=""1rcap""></line>
+      <line y1=""75"" y2=""75"" x1=""0"" x2=""1rch""></line>
+      <line y1=""80"" y2=""80"" x1=""0"" x2=""1ric""></line>
+      <line y1=""85"" y2=""85"" x1=""0"" x2=""1rlh""></line>
+    </svg>
+  </div>
+</div>";
+
+        var referenceHtml = @"<!doctype html>
+<style>
+  :root {
+    font: 10px/1 Ahem;
+  }
+  body { margin: 0 }
+  .container {
+    font-size: 20px;
+  }
+  line {
+    stroke-width: 8px;
+    stroke: lime;
+  }
+  svg {
+    background-color: black;
+  }
+</style>
+<div class=""container"">
+  <svg width=""400"" height=""400"">
+    <line y1=""40""  y2=""40""  x1=""0"" x2=""80""></line>
+    <line y1=""60""  y2=""60""  x1=""0"" x2=""64""></line>
+    <line y1=""80""  y2=""80""  x1=""0"" x2=""64""></line>
+    <line y1=""100"" y2=""100"" x1=""0"" x2=""80""></line>
+    <line y1=""120"" y2=""120"" x1=""0"" x2=""80""></line>
+    <line y1=""140"" y2=""140"" x1=""0"" x2=""80""></line>
+    <line y1=""240"" y2=""240"" x1=""0"" x2=""40""></line>
+    <line y1=""260"" y2=""260"" x1=""0"" x2=""32""></line>
+    <line y1=""280"" y2=""280"" x1=""0"" x2=""32""></line>
+    <line y1=""300"" y2=""300"" x1=""0"" x2=""40""></line>
+    <line y1=""320"" y2=""320"" x1=""0"" x2=""40""></line>
+    <line y1=""340"" y2=""340"" x1=""0"" x2=""40""></line>
+  </svg>
+</div>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-svg-font-relative-units", 410, 410);
+        Assert.True(result.Passed,
+            $"zoom svg font-relative units should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomPseudoImage_MatchesReference()
+    {
+        var testHtml = @"<!doctype html>
+<meta charset=utf-8>
+<style>
+.icon {
+  width: 200px;
+  height: 200px;
+  background-color: blue;
+  margin-right: 5px;
+  display: inline-block;
+  vertical-align: top;
+}
+
+.icon::before {
+  display: block;
+  content: url(/images/green.png);
+  width: 100px;
+  height: 100px;
+  background-color: purple;
+}
+
+.zoom {
+  zoom: 2;
+}
+</style>
+<div class=""icon""></div>
+<div class=""icon zoom""></div>";
+
+        var referenceHtml = @"<!doctype html>
+<meta charset=utf-8>
+<style>
+.icon {
+  width: 200px;
+  height: 200px;
+  background-color: blue;
+  margin-right: 5px;
+  display: inline-block;
+  vertical-align: top;
+}
+
+.img-wrapper {
+  display: block;
+  width: 100px;
+  height: 100px;
+  background-color: purple;
+}
+
+.zoom {
+  zoom: 2;
+}
+</style>
+<div class=""icon"">
+  <div class=""img-wrapper"">
+    <img src=""/images/green.png"">
+  </div>
+</div>
+<div class=""icon zoom"">
+  <div class=""img-wrapper"">
+    <img src=""/images/green.png"">
+  </div>
+</div>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-pseudo-image", 420, 220);
+        Assert.True(result.Passed,
+            $"zoom pseudo-image should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
@@ -1861,6 +2714,116 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssomView_ScrollIntoView_DefaultInlineNearest_Leaves_Visible_InlineAxis_Unchanged()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 400px;
+      height: 400px;
+      position: relative;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      left: 60px;
+      top: 300px;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content"">
+      <div class=""target""></div>
+    </div>
+  </div>
+  <div class=""container"">
+    <div class=""content"">
+      <div class=""target""></div>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll('.container').forEach(container => {
+      container.scrollLeft = 40;
+      container.scrollTop = 0;
+    });
+    document.querySelectorAll('.target')[0].scrollIntoView();
+    document.querySelectorAll('.target')[1].scrollIntoView(true);
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 400px;
+      height: 400px;
+      position: relative;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      left: 60px;
+      top: 300px;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content"">
+      <div class=""target""></div>
+    </div>
+  </div>
+  <div class=""container"">
+    <div class=""content"">
+      <div class=""target""></div>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll('.container').forEach(container => {
+      container.scrollTo(40, 300);
+    });
+  </script>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-default-inline-nearest", 280, 130);
+        Assert.True(result.Passed,
+            $"Default scrollIntoView inline alignment should behave like nearest when the inline axis is already visible. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollIntoView_DoesNotScrollRootForUnscrollableFixedContainers_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1955,7 +2918,7 @@ document.getElementById('out').appendChild(p);
     container.appendChild(filler);
     container.appendChild(target);
     document.body.appendChild(container);
-    target.scrollIntoView();
+    target.scrollIntoView({ block: 'start', inline: 'start' });
 
     if (document.documentElement.scrollLeft === 0 &&
         document.documentElement.scrollTop === 0 &&
@@ -2043,6 +3006,583 @@ document.getElementById('out').appendChild(p);
         var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-scroller-clamped");
         Assert.True(result.Passed,
             $"scrollIntoView in a fixed scroller should clamp to the scrollable range. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_WindowLoadListener_Can_Run_HarnessStyle_FixedScroller_Checks()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; }
+    body { width: 2000px; height: 2000px; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    window.addEventListener('load', function () {
+      var container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.right = '10px';
+      container.style.bottom = '10px';
+      container.style.width = '150px';
+      container.style.height = '150px';
+      container.style.overflow = 'auto';
+
+      var target = document.createElement('div');
+      target.style.position = 'absolute';
+      target.style.left = '200%';
+      target.style.top = '200%';
+      target.style.width = '10px';
+      target.style.height = '10px';
+
+      container.appendChild(target);
+      document.body.appendChild(container);
+      target.scrollIntoView();
+
+      if (document.documentElement.scrollLeft === 0 &&
+          document.documentElement.scrollTop === 0 &&
+          container.scrollLeft === 160 &&
+          container.scrollTop === 160) {
+        document.getElementById('pass').style.background = 'green';
+      }
+    });
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-window-load-listener");
+        Assert.True(result.Passed,
+            $"window.addEventListener('load', …) should drive harness-style fixed-scroller checks. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Harness_PromiseTest_Callbacks_Run_After_Load()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <script src=""/resources/testharness.js""></script>
+  <script src=""/resources/testharnessreport.js""></script>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    promise_test(() => Promise.resolve().then(() => {
+      document.getElementById('pass').style.background = 'green';
+    }), 'promise_test should mutate the DOM');
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-promise-test-runs-after-load");
+        Assert.True(result.Passed,
+            $"promise_test callbacks should run after load in the WPT harness stub. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Harness_CustomElements_Can_Upgrade_Parsed_ShadowTree_Nodes()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <script src=""/resources/testharness.js""></script>
+  <script src=""/resources/testharnessreport.js""></script>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: red; }
+    .scroller { overflow: scroll; height: 150px; }
+    .target { height: 1000px; }
+    .spacer { height: 1000px; }
+  </style>
+  <script>
+    var closedShadowRoot = null;
+    class BaseComponent extends HTMLElement {
+      constructor(mode = 'open') {
+        super();
+        const shadowRoot = this.attachShadow({ mode });
+        shadowRoot.innerHTML = '<div><div class=""shadow-scroller"" style=""overflow:scroll;height:50px""><slot></slot></div></div>';
+        if (mode === 'closed') {
+          closedShadowRoot = shadowRoot;
+        }
+      }
+    }
+    class HiddenComponent extends BaseComponent {
+      constructor() { super('closed'); }
+    }
+    class OpenComponent extends BaseComponent {
+      constructor() { super('open'); }
+    }
+    customElements.define('hidden-component', HiddenComponent);
+    customElements.define('open-component', OpenComponent);
+  </script>
+</head>
+<body>
+  <div id=""pass""></div>
+  <div id=""outerScroller"" class=""scroller"">
+    <div class=""spacer"">
+      <hidden-component id=""shadowComponent"">
+        <div><div id=""closedInnerElement"" class=""target""></div></div>
+      </hidden-component>
+      <open-component id=""openShadowComponent"">
+        <div><div id=""openInnerElement"" class=""target""></div></div>
+      </open-component>
+    </div>
+  </div>
+  <script>
+    test(() => {
+      var outerScroller = document.getElementById('outerScroller');
+      var ok =
+        document.getElementById('closedInnerElement').scrollParent() === outerScroller &&
+        document.getElementById('openInnerElement').scrollParent() === outerScroller &&
+        closedShadowRoot.querySelector('div').scrollParent() === outerScroller &&
+        document.getElementById('openShadowComponent').shadowRoot.querySelector('div').scrollParent() === outerScroller;
+
+      if (ok) {
+        document.getElementById('pass').style.background = 'green';
+      }
+    }, 'custom element upgrades should preserve shadow-tree scrollParent checks');
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-custom-elements-upgrade");
+        Assert.True(result.Passed,
+            $"customElements.define should upgrade parsed nodes for shadow-tree harness checks. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Harness_TestDriver_Actions_Can_Drive_VisualViewport_PinchZoom_Flow()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <meta name=""viewport"" content=""width=device-width,initial-scale=1"">
+  <script src=""/resources/testharness.js""></script>
+  <script src=""/resources/testharnessreport.js""></script>
+  <style>
+    html { height: 10000px; }
+    body { margin: 0; padding: 0; background: red; }
+    #pass { width: 100px; height: 100px; background: red; }
+    #fixed {
+      position: fixed;
+      bottom: 0;
+      height: 50vh;
+      width: 100vw;
+      overflow: scroll;
+      background-color: gray;
+    }
+    input { height: 20px; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <div id=""fixed"">
+    <div style=""height: calc(80vh - 40px)""></div>
+    <input type=""text"" id=""name"">
+  </div>
+  <script>
+    async function pinch_zoom_action(targetWindow = window) {
+      await new test_driver.Actions()
+        .addPointer('finger1', 'touch')
+        .addPointer('finger2', 'touch')
+        .pointerMove(parseInt(targetWindow.innerWidth / 2),
+                     parseInt(targetWindow.innerHeight / 2),
+                     {origin: 'viewport', sourceName: 'finger1'})
+        .pointerMove(parseInt(targetWindow.innerWidth / 2),
+                     parseInt(targetWindow.innerHeight / 2),
+                     {origin: 'viewport', sourceName: 'finger2'})
+        .pointerDown({sourceName: 'finger1'})
+        .pointerDown({sourceName: 'finger2'})
+        .pointerMove(parseInt(targetWindow.innerWidth / 3),
+                     parseInt(targetWindow.innerHeight / 3),
+                     {origin: 'viewport', sourceName: 'finger1'})
+        .pointerMove(parseInt(targetWindow.innerWidth / 3 * 2),
+                     parseInt(targetWindow.innerHeight / 3 * 2),
+                     {origin: 'viewport', sourceName: 'finger2'})
+        .pointerUp({sourceName: 'finger1'})
+        .pointerUp({sourceName: 'finger2'})
+        .send();
+    }
+
+    async function waitForCompositorReady() {
+      const animation = document.body.animate({ opacity: [0, 1] }, { duration: 1 });
+      await animation.finished;
+    }
+
+    promise_test(async () => {
+      await waitForCompositorReady();
+      await pinch_zoom_action();
+
+      window.scrollTo(0, 1000);
+      const expectedPageTop = visualViewport.pageTop;
+      let visualViewportScrolled = false;
+      visualViewport.addEventListener('scroll', () => { visualViewportScrolled = true; }, { once: true });
+
+      document.getElementById('name').scrollIntoView({ behavior: 'instant' });
+
+      assert_greater_than(visualViewport.scale, 1);
+      assert_true(visualViewportScrolled);
+      assert_greater_than(visualViewport.pageTop, expectedPageTop);
+      document.getElementById('pass').style.background = 'green';
+    }, 'test_driver.Actions pinch zoom should unblock visual viewport scrollIntoView harness pages');
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-testdriver-pinch-zoom");
+        Assert.True(result.Passed,
+            $"test_driver.Actions pinch-zoom support should drive visual viewport harness checks. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Harness_RootRelative_ScrollSupport_Scripts_Enable_SubframeRoot_ScrollBehavior_Page()
+    {
+        WriteTempSupportFile("dom/events/scrolling/scroll_support.js", """
+function waitForScrollEnd() {
+  return new Promise((resolve) => {
+    setTimeout(() => setTimeout(resolve, 0), 0);
+  });
+}
+
+function waitForCompositorReady() {
+  return Promise.resolve();
+}
+""");
+        WriteTempSupportFile("support/scroll-behavior.js", """
+function resetScroll(scrollingElement) {
+  scrollingElement.scrollLeft = 0;
+  scrollingElement.scrollTop = 0;
+  scrollingElement.scroll({ left: 0, top: 0, behavior: "instant" });
+}
+
+function setScrollBehavior(styledElement, className) {
+  styledElement.classList.remove("autoBehavior", "smoothBehavior");
+  styledElement.classList.add(className);
+}
+
+function scrollNode(scrollingElement, scrollFunction, behavior, elementToRevealLeft, elementToRevealTop) {
+  var args = {};
+  if (behavior)
+    args.behavior = behavior;
+  if (scrollFunction === "scrollIntoView") {
+    args.inline = "start";
+    args.block = "start";
+    elementToReveal.scrollIntoView(args);
+    return;
+  }
+  args.left = elementToRevealLeft;
+  args.top = elementToRevealTop;
+  scrollingElement[scrollFunction](args);
+}
+""");
+
+        var testHtml = @"<!DOCTYPE html>
+<title>subframe root scroll-behavior harness</title>
+<script src=""/resources/testharness.js""></script>
+<script src=""/resources/testharnessreport.js""></script>
+<script src=""/dom/events/scrolling/scroll_support.js""></script>
+<script src=""support/scroll-behavior.js""></script>
+<style>
+  html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+  #pass { width: 100px; height: 100px; background: red; }
+</style>
+<div id=""pass""></div>
+<iframe id=""iframeNode"" width=""400px"" height=""200px"" srcdoc=""<!DOCTYPE html><html><style>body{margin:0}.autoBehavior{scroll-behavior:auto}.smoothBehavior{scroll-behavior:smooth}</style><body><div style='width:2000px;height:1000px'><span style='display:inline-block;width:500px;height:250px'></span><span id='elementToReveal' style='display:inline-block;vertical-align:-15px;width:10px;height:15px;background:black'></span></div></body></html>""></iframe>
+<script>
+  var iframeLoadTest = async_test('iframe loaded');
+  iframeNode.addEventListener('load', iframeLoadTest.step_func_done(() => {
+    promise_test(async () => {
+      await waitForCompositorReady();
+      var scrollingElement = iframeNode.contentDocument.scrollingElement;
+      var styledElement = iframeNode.contentDocument.documentElement;
+      resetScroll(scrollingElement);
+      setScrollBehavior(styledElement, 'smoothBehavior');
+      scrollNode(scrollingElement, 'scrollIntoView', 'auto', 500, 250);
+      if (!(scrollingElement.scrollLeft < 500 && scrollingElement.scrollTop < 250))
+        return;
+
+      return waitForScrollEnd(scrollingElement).then(() => {
+        if (scrollingElement.scrollLeft === 500 &&
+            scrollingElement.scrollTop === 250) {
+          document.getElementById('pass').style.background = 'green';
+        }
+      });
+    }, 'subframe root smooth scroll harness');
+  }));
+</script>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body><div id=""pass""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-subframe-root-scroll-behavior");
+        Assert.True(result.Passed,
+            $"Root-relative scrolling support scripts should let the subframe-root harness page complete. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Harness_RootRelative_ScrollSupport_Scripts_Enable_SubframeWindow_ScrollBehavior_Page()
+    {
+        WriteTempSupportFile("dom/events/scrolling/scroll_support.js", """
+function waitForScrollEnd() {
+  return new Promise((resolve) => {
+    setTimeout(() => setTimeout(resolve, 0), 0);
+  });
+}
+
+function waitForCompositorReady() {
+  return Promise.resolve();
+}
+""");
+        WriteTempSupportFile("support/scroll-behavior.js", """
+function resetScrollForWindow(scrollingWindow) {
+  scrollingWindow.document.scrollingElement.scrollLeft = 0;
+  scrollingWindow.document.scrollingElement.scrollTop = 0;
+  scrollingWindow.scroll({ left: 0, top: 0, behavior: "instant" });
+}
+
+function setScrollBehavior(styledElement, className) {
+  styledElement.classList.remove("autoBehavior", "smoothBehavior");
+  styledElement.classList.add(className);
+}
+
+function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToRevealLeft, elementToRevealTop) {
+  var args = { left: elementToRevealLeft, top: elementToRevealTop };
+  if (behavior)
+    args.behavior = behavior;
+  scrollingWindow[scrollFunction](args);
+}
+""");
+
+        var testHtml = @"<!DOCTYPE html>
+<title>subframe window scroll-behavior harness</title>
+<script src=""/resources/testharness.js""></script>
+<script src=""/resources/testharnessreport.js""></script>
+<script src=""/dom/events/scrolling/scroll_support.js""></script>
+<script src=""support/scroll-behavior.js""></script>
+<style>
+  html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+  #pass { width: 100px; height: 100px; background: red; }
+</style>
+<div id=""pass""></div>
+<iframe id=""iframeNode"" width=""400px"" height=""200px"" srcdoc=""<!DOCTYPE html><html><style>body{margin:0}.autoBehavior{scroll-behavior:auto}.smoothBehavior{scroll-behavior:smooth}</style><body><div style='width:2000px;height:1000px;background:black'></div></body></html>""></iframe>
+<script>
+  var iframeLoadTest = async_test('iframe loaded');
+  iframeNode.addEventListener('load', iframeLoadTest.step_func_done(() => {
+    promise_test(async () => {
+      await waitForCompositorReady();
+      var scrollingWindow = iframeNode.contentWindow;
+      var styledElement = iframeNode.contentDocument.documentElement;
+      resetScrollForWindow(scrollingWindow);
+      setScrollBehavior(styledElement, 'smoothBehavior');
+      scrollWindow(scrollingWindow, 'scrollTo', 'auto', 500, 250);
+      if (!(scrollingWindow.scrollX < 500 && scrollingWindow.scrollY < 250))
+        return;
+
+      return waitForScrollEnd(scrollingWindow.document.scrollingElement).then(() => {
+        if (scrollingWindow.scrollX === 500 &&
+            scrollingWindow.scrollY === 250) {
+          document.getElementById('pass').style.background = 'green';
+        }
+      });
+    }, 'subframe window smooth scroll harness');
+  }));
+</script>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body><div id=""pass""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-subframe-window-scroll-behavior");
+        Assert.True(result.Passed,
+            $"Root-relative scrolling support scripts should let the subframe-window harness page complete. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollIntoView_Fixed_FullHarness_Page_Matches_Reference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <script src=""/resources/testharness.js""></script>
+  <script src=""/resources/testharnessreport.js""></script>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    body {
+      width: 1000vw;
+      height: 1000vh;
+      background: repeating-linear-gradient(45deg, #A2CFD9, #A2CFD9 100px, #C3F3FF 100px, #C3F3FF 200px);
+    }
+    #pass { width: 100px; height: 100px; background: red; position: absolute; top: 0; left: 0; }
+    .fixedContainer {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      width: 150px;
+      height: 150px;
+      background-color: coral;
+    }
+    .fixedContainer.scrollable {
+      overflow: auto;
+      left: unset;
+      right: 10px;
+    }
+    .target {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: blue;
+      left: 50%;
+      top: 50%;
+    }
+    .scrollable .target {
+      left: 200%;
+      top: 200%;
+    }
+    iframe {
+      width: 96vw;
+      height: 300px;
+      position: absolute;
+      left: 2vw;
+      top: 100px;
+    }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <iframe></iframe>
+  <div class=""fixedContainer""><div class=""target""></div></div>
+  <div class=""fixedContainer scrollable""><div class=""target""></div></div>
+  <script>
+    function reset() {
+      [document, frames[0].document].forEach((doc) => {
+        doc.scrollingElement.scrollLeft = 0;
+        doc.scrollingElement.scrollTop = 0;
+        doc.querySelectorAll('.fixedContainer').forEach((e) => {
+          e.scrollLeft = 0;
+          e.scrollTop = 0;
+        });
+      });
+    }
+
+    const iframe = document.querySelector('iframe');
+    iframe.style.left = '100px';
+    iframe.style.top = '300px';
+    iframe.style.width = '400px';
+    iframe.style.height = '300px';
+    iframe.srcdoc = `<!DOCTYPE html><style>body{margin:0}.fixedContainer{position:fixed;bottom:10px;left:30px;width:150px;height:150px;background-color:coral}.fixedContainer.scrollable{overflow:auto}.target{position:absolute;width:10px;height:10px;background-color:blue;left:10px;top:20px}.scrollable .target{left:200%;top:200%}</style><div class=""fixedContainer""><div class=""target""></div></div><div class=""fixedContainer scrollable""><div style=""width:600px;height:600px""></div><div class=""target""></div></div>`;
+
+    window.addEventListener('load', function () {
+      reset();
+      var fixedTarget = frames[0].document.querySelector('.fixedContainer:not(.scrollable) .target');
+      fixedTarget.scrollIntoView({ block: 'start', inline: 'start' });
+      var fixedOk =
+        window.scrollX === 140 &&
+        window.scrollY === 460 &&
+        frames[0].scrollX === 0 &&
+        frames[0].scrollY === 0;
+
+      reset();
+      var scrollableContainer = frames[0].document.querySelector('.fixedContainer.scrollable');
+      var scrollableTarget = scrollableContainer.querySelector('.target');
+      scrollableTarget.scrollIntoView({ block: 'start', inline: 'start' });
+      var scrollableOk =
+        window.scrollX === 130 &&
+        window.scrollY === 440 &&
+        frames[0].scrollX === 0 &&
+        frames[0].scrollY === 0 &&
+        scrollableContainer.scrollLeft === 300 &&
+        scrollableContainer.scrollTop === 300;
+
+      if (fixedOk && scrollableOk) {
+        document.getElementById('pass').style.background = 'green';
+      }
+    });
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body><div id=""pass""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-full-harness");
+        Assert.True(result.Passed,
+            $"Full harness-style fixed-position iframe follow-up should match the reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
@@ -5321,6 +6861,492 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Skips_PointerEvents_None()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <div id=""yellow"" style=""width:60px; height:60px;""></div>
+  <div id=""overlay"" style=""position:absolute; left:0; top:0; width:60px; height:60px; pointer-events:none;""></div>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var hit = document.elementFromPoint(10, 10);
+                return [
+                    hit && hit.id,
+                    document.elementFromPoint(-1, -1) === null
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("yellow|true", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ElementsFromPoint_Return_Target_Ancestors_And_Subframe_Hits()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <div id=""target"" style=""width:40px; height:40px;""></div>
+  <iframe id=""fr"" width=""120"" height=""80"" srcdoc='<!DOCTYPE html><html><body style=""margin:0""><div id=""inner"" style=""width:40px;height:40px""></div></body></html>'></iframe>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+        var result = ctx.Eval("""
+            (() => {
+                var nodes = document.elementsFromPoint(10, 10);
+                var parts = [];
+                for (var i = 0; i < nodes.length; i++) {
+                    parts.push(nodes[i].id || nodes[i].tagName);
+                }
+                var outerHits = parts.join('>');
+                var doc = document.getElementById('fr').contentDocument;
+                var innerHit = doc.elementFromPoint(10, 10);
+                var innerMiss = doc.elementsFromPoint(130, 10).length;
+                return [
+                    outerHits,
+                    innerHit && (innerHit.id || innerHit.tagName),
+                    innerMiss
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("target>BODY>HTML|inner|0", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_IframeDocumentHitTesting_Uses_Html_When_Body_Does_Not_Cover_Point()
+    {
+        const string html = @"<!DOCTYPE html>
+<body>
+  <iframe id=""fr"" width="""" height="""" srcdoc='<!DOCTYPE html><html><body><div style=""height:20px""></div></body></html>'></iframe>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+        var result = ctx.Eval("""
+            (() => {
+                var doc = document.getElementById('fr').contentDocument;
+                var hits = doc.elementsFromPoint(0, 100);
+                return [
+                    hits.length,
+                    hits[0] && (hits[0].id || hits[0].tagName),
+                    hits[1] || null
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("1|HTML|", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_NegativeMargins_HitTesting_Returns_Inner_Then_AutoSized_Outer()
+    {
+        const string html = @"<!DOCTYPE html>
+<body>
+  <div id=""outer"" style=""background:yellow"">
+    <div id=""inner"" style=""width:100px; height:100px; margin-bottom:-100px; background:lime;""></div>
+    Hello
+  </div>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+        var result = ctx.Eval("""
+            (() => {
+                var outer = document.getElementById('outer');
+                var rect = outer.getBoundingClientRect();
+                var hits = document.elementsFromPoint(rect.left + 1, rect.top + 1);
+                return [
+                    document.elementFromPoint(rect.left + 1, rect.top + 1).id,
+                    Array.prototype.map.call(hits, function (node) { return node.id || node.tagName; }).join('>')
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("outer|inner>outer>BODY>HTML", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_AutoSized_ScrollMetrics_Do_Not_Report_MarginOnly_Overflow()
+    {
+        const string html = @"<!DOCTYPE html>
+<style>
+  #target div {
+    height: 20px;
+    min-width: 20px;
+    background: green;
+    margin: 20px 10px;
+  }
+</style>
+<div id=""target"">
+  <div><div></div></div>
+  <div></div>
+  <div></div>
+  <div></div>
+</div>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var target = document.getElementById('target');
+                var cases = [
+                    ['visible', 'block', '0', '0'],
+                    ['clip', 'grid', '2px', '3px solid']
+                ];
+                return cases.map(function (entry) {
+                    target.style.overflow = entry[0];
+                    target.style.display = entry[1];
+                    target.style.padding = entry[2];
+                    target.style.border = entry[3];
+                    return String(target.scrollHeight === target.clientHeight && target.scrollWidth === target.clientWidth);
+                }).join('|');
+            })()
+            """);
+
+        Assert.Equal("true|true", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_CreateHtmlDocument_Has_No_HitTesting_Viewport()
+    {
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, "<!DOCTYPE html><body></body>", "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var doc = document.implementation.createHTMLDocument('foo');
+                return [
+                    doc.elementFromPoint(0, 0) === null,
+                    doc.elementsFromPoint(0, 0).length
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("true|0", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Uses_Svg_Viewport_And_Rect_Geometry()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <svg id=""svgRoot"" xmlns=""http://www.w3.org/2000/svg"" width=""180"" height=""140"">
+    <rect id=""svgRect"" x=""50"" y=""50"" width=""60"" height=""60"" fill=""#0086B2""></rect>
+  </svg>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var svg = document.getElementById('svgRoot');
+                var svgRect = svg.getBoundingClientRect();
+                var rootHit = document.elementFromPoint(Math.round(svgRect.left + svgRect.width / 2), 10);
+                var rectHit = document.elementFromPoint(90, 70);
+                var hits = document.elementsFromPoint(90, 70);
+                return [
+                    svgRect.width,
+                    svgRect.height,
+                    rootHit && (rootHit.id || rootHit.tagName),
+                    rectHit && (rectHit.id || rectHit.tagName),
+                    hits[0] && (hits[0].id || hits[0].tagName),
+                    hits[1] && (hits[1].id || hits[1].tagName)
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("180|140|svgRoot|svgRect|svgRect|svgRoot", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Keeps_Inline_Svg_Roots_In_Normal_Flow()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <svg id=""firstSvg"" xmlns=""http://www.w3.org/2000/svg"" width=""180"" height=""98""></svg>
+  <svg id=""secondSvg"" xmlns=""http://www.w3.org/2000/svg"" width=""180"" height=""140"">
+    <rect id=""secondRect"" x=""50"" y=""50"" width=""60"" height=""60""></rect>
+  </svg>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var firstRect = document.getElementById('firstSvg').getBoundingClientRect();
+                var secondRect = document.getElementById('secondSvg').getBoundingClientRect();
+                var hit = document.elementFromPoint(80, 160);
+                var hits = document.elementsFromPoint(80, 160);
+                return [
+                    firstRect.top,
+                    secondRect.top,
+                    hit && (hit.id || hit.tagName),
+                    hits[0] && (hits[0].id || hits[0].tagName),
+                    hits[1] && (hits[1].id || hits[1].tagName)
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("0|98|secondRect|secondRect|secondSvg", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Uses_Svg_Groups_Images_ForeignObject_And_Translate()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <svg id=""svgRoot"" xmlns=""http://www.w3.org/2000/svg"" width=""300"" height=""300"">
+    <g id=""middleG1"">
+      <g id=""middleG2"">
+        <rect id=""middleRect1"" x=""105"" y=""105"" width=""90"" height=""90""></rect>
+        <rect id=""middleRect2"" x=""110"" y=""110"" width=""80"" height=""80""></rect>
+      </g>
+    </g>
+    <g id=""imageGroup"">
+      <image id=""image1"" x=""5"" y=""205"" width=""90"" height=""90"" href=""data:image/gif;base64,R0lGODlhAQABAAAAACw=""></image>
+      <image id=""image2"" x=""10"" y=""210"" width=""80"" height=""80"" href=""data:image/gif;base64,R0lGODlhAQABAAAAACw=""></image>
+    </g>
+    <foreignObject id=""fo"" x=""210"" y=""110"" width=""80"" height=""80"">
+      <div id=""foDiv"" xmlns=""http://www.w3.org/1999/xhtml"" style=""width:80px;height:80px""></div>
+    </foreignObject>
+    <g id=""translatedOuter"" transform=""translate(200, 200)"">
+      <g id=""translatedInner"" transform=""translate(5, 5)"">
+        <rect id=""translatedRect1"" x=""0"" y=""0"" width=""90"" height=""90""></rect>
+        <rect id=""translatedRect2"" x=""5"" y=""5"" width=""80"" height=""80""></rect>
+      </g>
+    </g>
+  </svg>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var middleHits = document.elementsFromPoint(125, 125);
+                var imageHits = document.elementsFromPoint(50, 250);
+                var foreignObjectHits = document.elementsFromPoint(250, 150);
+                var translatedHits = document.elementsFromPoint(250, 250);
+                return [
+                    middleHits.slice(0, 5).map((node) => node.id || node.tagName).join(','),
+                    imageHits.slice(0, 4).map((node) => node.id || node.tagName).join(','),
+                    foreignObjectHits.slice(0, 3).map((node) => node.id || node.tagName).join(','),
+                    translatedHits.slice(0, 5).map((node) => node.id || node.tagName).join(',')
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal(
+            "middleRect2,middleRect1,middleG2,middleG1,svgRoot|image2,image1,imageGroup,svgRoot|foDiv,fo,svgRoot|translatedRect2,translatedRect1,translatedInner,translatedOuter,svgRoot",
+            result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Uses_Svg_Text_Tspan_And_TextPath_Content()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <svg id=""svgRoot"" xmlns=""http://www.w3.org/2000/svg"" xmlns:xlink=""http://www.w3.org/1999/xlink"" width=""300"" height=""300"" style=""margin:100px;display:block"">
+    <defs>
+      <path id=""path"" d=""M10,170h1000""></path>
+    </defs>
+    <text id=""text1"" x=""10"" y=""50"" font-size=""50"">Some text</text>
+    <text id=""text2"" x=""10"" y=""110"" font-size=""50""><tspan id=""tspan1"">Some text</tspan></text>
+    <text id=""text3"" font-size=""50""><textPath id=""textpath1"" xlink:href=""#path"">Some text</textPath></text>
+    <text id=""text4"" x=""10"" y=""230"" font-size=""50"">Text under<tspan id=""tspan2"" x=""10"">Text over</tspan></text>
+  </svg>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var firstHits = document.elementsFromPoint(125, 125);
+                var secondHits = document.elementsFromPoint(125, 185);
+                var thirdHits = document.elementsFromPoint(125, 245);
+                var fourthHits = document.elementsFromPoint(125, 305);
+                return [
+                    firstHits[0] && (firstHits[0].id || firstHits[0].tagName),
+                    firstHits[1] && (firstHits[1].id || firstHits[1].tagName),
+                    secondHits[0] && (secondHits[0].id || secondHits[0].tagName),
+                    thirdHits[0] && (thirdHits[0].id || thirdHits[0].tagName),
+                    fourthHits[0] && (fourthHits[0].id || fourthHits[0].tagName),
+                    fourthHits[1] && (fourthHits[1].id || fourthHits[1].tagName)
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("text1|svgRoot|tspan1|textpath1|tspan2|text4", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Uses_Table_Cell_Layout_For_Rtl_And_Vertical_Writing_Modes()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0;padding:0"">
+  <div id=""sandbox"">
+    <table id=""testtable"" style=""margin:100px;width:200px;height:200px"">
+      <tr id=""tr1""><td id=""td11""></td><td id=""td12""></td><td id=""td13""></td><td id=""td14""></td></tr>
+      <tr id=""tr2""><td id=""td21""></td><td id=""td22""></td><td id=""td23""></td><td id=""td24""></td></tr>
+      <tr id=""tr3""><td id=""td31""></td><td id=""td32""></td><td id=""td33""></td><td id=""td34""></td></tr>
+      <tr id=""tr4""><td id=""td41""></td><td id=""td42""></td><td id=""td43""></td><td id=""td44""></td></tr>
+    </table>
+  </div>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                function summarize(x, y, count) {
+                    return document.elementsFromPoint(x, y).slice(0, count).map((node) => node.id || node.tagName).join(',');
+                }
+
+                var table = document.getElementById('testtable');
+                var initialCell = summarize(125, 125, 5);
+                var initialGap = summarize(199, 199, 4);
+                table.className = 'rtl';
+                table.style.direction = 'rtl';
+                var rtlCell = summarize(125, 125, 1);
+                table.className = 'tblr';
+                table.style.direction = 'ltr';
+                table.style.writingMode = 'vertical-lr';
+                var verticalBottomLeft = summarize(125, 275, 1);
+                var verticalTopRight = summarize(275, 125, 1);
+                return [
+                    initialCell,
+                    initialGap,
+                    rtlCell,
+                    verticalBottomLeft,
+                    verticalTopRight
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("td11,testtable,sandbox,BODY,HTML|testtable,sandbox,BODY,HTML|td14|td14|td41", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Uses_Image_Map_Areas_Before_Associated_Images()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <img id=""dinos"" src=""data:image/gif;base64,R0lGODlhAQABAAAAACw="" usemap=""#dinos_map"" width=""364"" height=""40"" style=""display:block"">
+  <map id=""dinos_map"" name=""dinos_map"">
+    <area id=""rectG"" shape=""rect"" coords=""0,0,90,100"" href=""#"">
+  </map>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var rect = document.getElementById('dinos').getBoundingClientRect();
+                return [
+                    document.elementFromPoint(rect.left + 45, rect.top + 20).id,
+                    document.elementsFromPoint(rect.left + 45, rect.top + 20).slice(0, 4).map((node) => node.id || node.tagName).join(','),
+                    document.elementFromPoint(rect.left + 92, rect.top + 2).id
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("rectG|rectG,dinos,BODY,HTML|dinos", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Excludes_Rounded_Fieldset_Corners()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <div style=""position:absolute;width:200px;height:200px;right:0;top:0"">
+    <div id=""fieldsetDiv"" style=""position:absolute;top:0;left:0;width:60px;height:60px;background:rebeccapurple""></div>
+    <fieldset id=""fieldset"" style=""position:absolute;top:100px;left:100px;width:60px;height:60px;border-radius:100px"">
+      <span style=""position:absolute;top:-100px;left:-100px;width:1px;height:1px""></span>
+    </fieldset>
+  </div>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var fieldsetDivRect = document.getElementById('fieldsetDiv').getBoundingClientRect();
+                var fieldsetRect = document.getElementById('fieldset').getBoundingClientRect();
+                return [
+                    document.elementFromPoint(fieldsetDivRect.left + fieldsetDivRect.width / 2, fieldsetDivRect.top + fieldsetDivRect.height / 2).id,
+                    document.elementFromPoint(fieldsetRect.left + fieldsetRect.width / 2, fieldsetRect.top + fieldsetRect.height / 2).id,
+                    (document.elementFromPoint(fieldsetRect.left + 5, fieldsetRect.top + 5) || {}).id || 'other'
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("fieldsetDiv|fieldset|other", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Extends_List_Items_To_Outside_Markers()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <ul style=""font-size:10px;margin:40px 0 0 40px"">
+    <li id=""outsideText"">Outside 1</li>
+    <li id=""outsideImage"" style=""list-style-image:url(data:image/gif;base64,R0lGODlhAQABAAAAACw=)"">Outside 2</li>
+  </ul>
+  <ul style=""font-size:10px;margin:20px 0 0 40px;list-style-position:inside"">
+    <li id=""insideText"">Inside 1</li>
+  </ul>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                function findOutsideMarkerHit(id) {
+                    var li = document.getElementById(id);
+                    var bounds = li.getBoundingClientRect();
+                    var y = (bounds.top + bounds.bottom) / 2;
+                    for (var x = bounds.left - 40; x < bounds.left; x++) {
+                        var hit = document.elementFromPoint(x, y);
+                        if (hit === li)
+                            return x;
+                    }
+
+                    return null;
+                }
+
+                var insideBounds = document.getElementById('insideText').getBoundingClientRect();
+                return [
+                    findOutsideMarkerHit('outsideText') !== null ? 'outsideText' : 'miss',
+                    findOutsideMarkerHit('outsideImage') !== null ? 'outsideImage' : 'miss',
+                    document.elementFromPoint(insideBounds.left + 1, (insideBounds.top + insideBounds.bottom) / 2).id
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("outsideText|outsideImage|insideText", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped()
     {
         const string html = @"<!DOCTYPE html>
@@ -5413,6 +7439,106 @@ document.getElementById('out').appendChild(p);
     }
 
     [Fact]
+    public void Wpt_CssomView_ScrollParent_Finds_Nearest_Relevant_Scroll_Container()
+    {
+        const string html = @"<!DOCTYPE html>
+<div id=""childOfRoot""></div>
+<div id=""scroller3"" style=""overflow:scroll; height:100px;"">
+  <div id=""fixedToRoot"" style=""position:fixed;""></div>
+  <div style=""transform:scale(1);"">
+    <div id=""scroller2"" style=""overflow:scroll; height:100px;"">
+      <div style=""position:relative;"">
+        <div id=""scroller1"" style=""overflow:scroll; height:100px;"">
+          <div>
+            <div id=""normalChild""></div>
+            <div id=""noBox"" style=""display:none;""></div>
+            <div id=""absPosChild"" style=""position:absolute;""></div>
+            <div id=""fixedPosChild"" style=""position:fixed;""></div>
+          </div>
+          <div id=""hidden"" style=""overflow:hidden;"">
+            <div id=""childOfHidden""></div>
+          </div>
+          <div style=""display:contents"">
+            <div id=""childOfDisplayContents""></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => [
+                document.getElementById('normalChild').scrollParent().id,
+                document.getElementById('childOfHidden').scrollParent().id,
+                document.getElementById('noBox').scrollParent() === null,
+                document.getElementById('absPosChild').scrollParent().id,
+                document.getElementById('fixedPosChild').scrollParent().id,
+                document.getElementById('fixedToRoot').scrollParent() === null,
+                document.getElementById('childOfRoot').scrollParent() === document.scrollingElement,
+                document.getElementById('childOfDisplayContents').scrollParent().id,
+                document.body.scrollParent() === document.scrollingElement,
+                document.documentElement.scrollParent() === null,
+                document.scrollingElement.scrollParent() === null
+            ].join('|'))()
+            """);
+
+        Assert.Equal("scroller1|hidden|true|scroller2|scroller3|true|true|scroller1|true|true|true", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollParent_Crosses_Open_And_Closed_Shadow_Roots()
+    {
+        const string html = @"<!DOCTYPE html><body></body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                function append(tag, parent, id, style) {
+                    var el = document.createElement(tag);
+                    if (id) el.id = id;
+                    if (style) el.style.cssText = style;
+                    parent.appendChild(el);
+                    return el;
+                }
+
+                var outerScroller = append('div', document.body, 'outerScroller', 'overflow:scroll; height:150px;');
+                var spacer = append('div', outerScroller, null, 'height:1000px;');
+
+                var closedHost = append('div', spacer, 'closedHost');
+                var closedWrapper = append('div', closedHost);
+                var closedInner = append('div', closedWrapper, 'closedInner', 'height:1000px;');
+                var closedShadowRoot = closedHost.attachShadow({ mode: 'closed' });
+                var closedShadowOuter = append('div', closedShadowRoot, 'closedShadowOuter');
+                append('div', closedShadowOuter, null, 'overflow:scroll; height:50px;');
+
+                var openHost = append('div', spacer, 'openHost');
+                var openWrapper = append('div', openHost);
+                var openInner = append('div', openWrapper, 'openInner', 'height:1000px;');
+                var openShadowRoot = openHost.attachShadow({ mode: 'open' });
+                var openShadowOuter = append('div', openShadowRoot, 'openShadowOuter');
+                append('div', openShadowOuter, null, 'overflow:scroll; height:50px;');
+
+                return [
+                    closedInner.scrollParent().id,
+                    openInner.scrollParent().id,
+                    closedShadowRoot.querySelector('#closedShadowOuter').scrollParent().id,
+                    openHost.shadowRoot.querySelector('#openShadowOuter').scrollParent().id,
+                    closedHost.shadowRoot === null,
+                    openHost.shadowRoot === openShadowRoot
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("outerScroller|outerScroller|outerScroller|outerScroller|true|true", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_IframeSubframeWindowScroll_Uses_SubdocumentRoot()
     {
         const string html = @"<!DOCTYPE html>
@@ -5444,6 +7570,55 @@ document.getElementById('out').appendChild(p);
             """);
 
         Assert.Equal("true|true|true|true|true|about:srcdoc|50,65|50,65|50,65", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScriptAssignedIframeSrcdoc_Allows_FramesDocument_FixedTarget_Scroll_Match()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; }
+    body { width: 2000px; height: 2000px; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <iframe id=""fr"" style=""position:absolute; left:100px; top:300px; width:400px; height:300px;""></iframe>
+  <script>
+    var iframe = document.getElementById('fr');
+    iframe.srcdoc = '<!DOCTYPE html><html><body style=""margin:0""><div id=""container"" style=""position:fixed; bottom:10px; left:30px; width:150px; height:150px;""><div id=""target"" style=""position:absolute; left:10px; top:20px; width:10px; height:10px;""></div></div></body></html>';
+    window.addEventListener('load', function () {
+      var target = frames[0].document.getElementById('target');
+      target.scrollIntoView({ block: 'start', inline: 'start' });
+      if (document.documentElement.scrollLeft === 140 &&
+          document.documentElement.scrollTop === 460 &&
+          frames[0].scrollX === 0 &&
+          frames[0].scrollY === 0) {
+        document.getElementById('pass').style.background = 'green';
+      }
+    });
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-scripted-srcdoc");
+        Assert.True(result.Passed,
+            $"script-assigned iframe.srcdoc should populate frames[0].document for fixed-target scrollIntoView harness checks. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]
@@ -5561,6 +7736,161 @@ document.getElementById('out').appendChild(p);
             """);
 
         Assert.Equal("500|250", afterFlush.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollIntoView_Treats_Assigned_Slot_As_Scroll_Container()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body style="margin:0;"></body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+
+        var result = ctx.Eval("""
+            (() => {
+                var host = document.createElement('div');
+                var spacer = document.createElement('div');
+                spacer.style.height = '200px';
+                var target = document.createElement('div');
+                target.style.height = '100px';
+                target.style.width = '100px';
+
+                host.appendChild(spacer);
+                host.appendChild(target);
+                document.body.appendChild(host);
+
+                var shadow = host.attachShadow({ mode: 'open' });
+                var slot = document.createElement('slot');
+                slot.style.display = 'block';
+                slot.style.overflow = 'hidden';
+                slot.style.width = '100px';
+                slot.style.height = '100px';
+                shadow.appendChild(slot);
+
+                target.scrollIntoView();
+
+                return [
+                    slot.scrollTop,
+                    slot.scrollHeight,
+                    slot.clientHeight,
+                    host.scrollTop
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("200|300|100|0", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollIntoView_Maps_WritingMode_Block_And_Inline_Axes()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body style="margin:0;"></body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+
+        var result = ctx.Eval("""
+            (() => {
+                function measure(writingMode, direction, options) {
+                    var scroller = document.createElement('div');
+                    scroller.style.overflow = 'scroll';
+                    scroller.style.width = '300px';
+                    scroller.style.height = '300px';
+                    scroller.style.position = 'relative';
+                    scroller.style.writingMode = writingMode;
+                    scroller.style.direction = direction;
+
+                    var content = document.createElement('div');
+                    content.style.width = '600px';
+                    content.style.height = '600px';
+
+                    var target = document.createElement('div');
+                    target.style.position = 'absolute';
+                    target.style.left = '200px';
+                    target.style.top = '200px';
+                    target.style.width = '200px';
+                    target.style.height = '200px';
+
+                    scroller.appendChild(content);
+                    scroller.appendChild(target);
+                    document.body.appendChild(scroller);
+                    target.scrollIntoView(options);
+                    return scroller.scrollLeft + ',' + scroller.scrollTop;
+                }
+
+                return [
+                    measure('horizontal-tb', 'rtl', { block: 'start', inline: 'start' }),
+                    measure('vertical-rl', 'ltr', { block: 'center', inline: 'end' }),
+                    measure('sideways-rl', 'rtl', { block: 'end', inline: 'center' })
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("-200,200|-150,100|-100,-150", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_SmoothScroll_On_OverflowHidden_Element_Can_Be_Interrupted()
+    {
+        const string html = """
+<!DOCTYPE html>
+<div id="scroller" style="overflow-y:hidden;width:100px;height:100px;scroll-behavior:smooth;">
+  <div style="width:100px;height:100px;"></div>
+  <div style="width:100px;height:100px;"></div>
+  <div style="width:100px;height:100px;"></div>
+</div>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+
+        var beforeFlush = ctx.Eval("""
+            (() => {
+                var scroller = document.getElementById('scroller');
+                var interrupted = 0;
+                var scrollEvents = 0;
+                var scrollEnds = 0;
+
+                scroller.onscroll = function () {
+                    scrollEvents++;
+                    if (scroller.scrollTop > 1 && scroller.scrollTop < 200) {
+                        scroller.scrollTop = 1;
+                        interrupted++;
+                    }
+                };
+                scroller.onscrollend = function () {
+                    scrollEnds++;
+                };
+
+                scroller.scrollTop = 200;
+                return [scroller.scrollTop, interrupted, scrollEvents, scrollEnds].join('|');
+            })()
+            """);
+
+        Assert.Equal("1|1|2|1", beforeFlush.ToString());
+
+        bridge.FlushTimerStep();
+        var afterFlush = ctx.Eval("""
+            (() => {
+                var scroller = document.getElementById('scroller');
+                return [scroller.scrollTop].join('|');
+            })()
+            """);
+
+        Assert.Equal("1", afterFlush.ToString());
     }
 
     [Fact]
@@ -5688,6 +8018,73 @@ document.getElementById('out').appendChild(p);
             """);
 
         Assert.Equal("1000|1000|1384|1000|true|2|384", result.ToString());
+    }
+
+    [Fact]
+    public void Wpt_CssomView_VisualScrollIntoView_002_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <meta name=""viewport"" content=""width=device-width,initial-scale=1"">
+  <style>
+    html { height: 10000px; }
+    body { margin: 0; padding: 0; }
+    #fixed {
+      position: fixed;
+      bottom: 0;
+      height: 50vh;
+      width: 100vw;
+      overflow: scroll;
+      background-color: gray;
+    }
+    input { height: 20px; }
+  </style>
+</head>
+<body>
+  <div id=""fixed"">
+    <div style=""height: calc(80vh - 40px)""></div>
+    <input type=""text"" id=""name"">
+  </div>
+  <script>
+    visualViewport.scale = 2;
+    window.scrollTo(0, 1000);
+    document.querySelector('#name').scrollIntoView({ behavior: 'instant' });
+  </script>
+</body>
+</html>";
+
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: gray;
+    }
+    .viewport {
+      width: 100vw;
+      height: 100vh;
+      background: gray;
+    }
+    input {
+      display: block;
+      height: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class=""viewport"">
+    <input type=""text"" id=""name"">
+  </div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "visual-scroll-into-view-002", 1024, 768);
+        Assert.True(result.Passed,
+            $"visual scrollIntoView fixed target should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]

@@ -65,6 +65,8 @@ public sealed class ComputedStyle
     public string FontWeight { get; init; } = "normal";
     public string TextAlign { get; init; } = string.Empty;
     public string TextDecoration { get; init; } = string.Empty;
+    public string TextDecorationStyle { get; init; } = "solid";
+    public Color ActualTextDecorationColor { get; init; }
     public string WhiteSpace { get; init; } = "normal";
     public string WordBreak { get; init; } = "normal";
     public string VerticalAlign { get; init; } = "baseline";

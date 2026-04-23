@@ -256,4 +256,87 @@ document.getElementById('result').textContent = checks.every(Boolean) ? 'PASS' :
 
         Assert.Contains("PASS", result);
     }
+
+    [Fact]
+    public void VariableSubstitution_CssWideKeywords_After_Nested_Var_Substitution_Resolve()
+    {
+        var html = @"<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body {
+    --is-initial: initial;
+    --should-not-inherit: tomato;
+    --should-inherit: lightgreen;
+    --registered-should-not-inherit: tomato;
+    --registered-inherits-should-inherit: lightgreen;
+  }
+
+  @property --registered-should-not-inherit {
+    syntax: '<color>';
+    initial-value: lightgreen;
+    inherits: false;
+  }
+
+  @property --registered-inherits-should-inherit {
+    syntax: '<color>';
+    initial-value: tomato;
+    inherits: true;
+  }
+
+  #fallbackInitial {
+    background: var(--should-not-inherit, lightgreen);
+    --should-not-inherit: var(--is-initial, initial);
+  }
+
+  #fallbackInherit {
+    background: var(--should-inherit, tomato);
+    --should-inherit: var(--is-initial, inherit);
+  }
+
+  #fallbackUnset {
+    background: var(--should-inherit, tomato);
+    --should-inherit: var(--is-initial, unset);
+  }
+
+  #registeredFallbackUnset {
+    background: var(--registered-should-not-inherit);
+    --registered-should-not-inherit: var(--is-initial, unset);
+  }
+
+  #registeredFallbackRevert {
+    background: var(--registered-inherits-should-inherit);
+    --registered-inherits-should-inherit: var(--is-initial, revert);
+  }
+</style>
+</head>
+<body>
+  <div id=""fallbackInitial""></div>
+  <div id=""fallbackInherit""></div>
+  <div id=""fallbackUnset""></div>
+  <div id=""registeredFallbackUnset""></div>
+  <div id=""registeredFallbackRevert""></div>
+  <div id=""result""></div>
+<script>
+function colorMatches(actual) {
+  var expected = Array.prototype.slice.call(arguments, 1);
+  actual = (actual || '').trim();
+  return expected.indexOf(actual) >= 0;
+}
+
+var checks = [];
+checks.push(colorMatches(getComputedStyle(document.getElementById('fallbackInitial')).getPropertyValue('background-color'), 'lightgreen', 'rgb(144, 238, 144)'));
+checks.push(colorMatches(getComputedStyle(document.getElementById('fallbackInherit')).getPropertyValue('background-color'), 'lightgreen', 'rgb(144, 238, 144)'));
+checks.push(colorMatches(getComputedStyle(document.getElementById('fallbackUnset')).getPropertyValue('background-color'), 'lightgreen', 'rgb(144, 238, 144)'));
+checks.push(colorMatches(getComputedStyle(document.getElementById('registeredFallbackUnset')).getPropertyValue('background-color'), 'lightgreen', 'rgb(144, 238, 144)'));
+checks.push(colorMatches(getComputedStyle(document.getElementById('registeredFallbackRevert')).getPropertyValue('background-color'), 'lightgreen', 'rgb(144, 238, 144)'));
+document.getElementById('result').textContent = checks.every(Boolean) ? 'PASS' : 'FAIL';
+</script>
+</body>
+</html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("PASS", result);
+    }
 }

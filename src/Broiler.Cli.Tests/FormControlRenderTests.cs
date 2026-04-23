@@ -261,4 +261,157 @@ document.getElementById('result').textContent = [
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
         Assert.Contains("true,true", result);
     }
+
+    [Fact]
+    public void RangeInput_InlineSizeZero_Uses_Final_WritingMode()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div><input type='range' id='range-h' style='inline-size:0; margin:0'></div>
+<div style='writing-mode: vertical-lr'><input type='range' id='range-v' style='inline-size:0; margin:0'></div>
+<div style='writing-mode: sideways-rl'><input type='range' id='range-s' style='inline-size:0; margin:0'></div>
+<div id='result'></div>
+<script>
+function summarize(id) {
+  const cs = window.getComputedStyle(document.getElementById(id));
+  return [
+    cs.getPropertyValue('width'),
+    cs.getPropertyValue('height'),
+    cs.getPropertyValue('inline-size'),
+    cs.getPropertyValue('block-size')
+  ].join('|');
+}
+document.getElementById('result').textContent = [
+  'h=' + summarize('range-h'),
+  'v=' + summarize('range-v'),
+  's=' + summarize('range-s')
+].join(';');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("h=0|16px|0|16px", result);
+        Assert.Contains("v=16px|0|0|16px", result);
+        Assert.Contains("s=16px|0|0|16px", result);
+    }
+
+    [Fact]
+    public void ButtonLikeControls_MultilineComputedSizes_Follow_WritingMode()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<button id='button-h'>Line one</button>
+<button id='button-h-multi'>Line one<br>Line two</button>
+<input type='button' id='input-h' value='Line one'>
+<input type='button' id='input-h-multi' value='Line one&#10;Line two'>
+<button id='button-v' style='writing-mode: vertical-lr'>Line one</button>
+<button id='button-v-multi' style='writing-mode: vertical-lr'>Line one<br>Line two</button>
+<input type='button' id='input-v' style='writing-mode: vertical-rl' value='Line one'>
+<input type='button' id='input-v-multi' style='writing-mode: vertical-rl' value='Line one&#10;Line two'>
+<div id='result'></div>
+<script>
+function style(id) {
+  return window.getComputedStyle(document.getElementById(id));
+}
+function horizontalPair(singleId, multiId) {
+  const single = style(singleId);
+  const multi = style(multiId);
+  return parseInt(single.width, 10) === parseInt(multi.width, 10) &&
+         parseInt(multi.height, 10) > parseInt(single.height, 10) &&
+         single.blockSize === single.height &&
+         single.inlineSize === single.width;
+}
+function verticalPair(singleId, multiId) {
+  const single = style(singleId);
+  const multi = style(multiId);
+  return parseInt(single.height, 10) === parseInt(multi.height, 10) &&
+         parseInt(multi.width, 10) > parseInt(single.width, 10) &&
+         single.blockSize === single.width &&
+         single.inlineSize === single.height;
+}
+document.getElementById('result').textContent = [
+  horizontalPair('button-h', 'button-h-multi'),
+  horizontalPair('input-h', 'input-h-multi'),
+  verticalPair('button-v', 'button-v-multi'),
+  verticalPair('input-v', 'input-v-multi')
+].join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true", result);
+    }
+
+    [Fact]
+    public void SelectListBox_SizingAndScrolling_Follow_WritingMode()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<select id='listbox' size='5'></select>
+<div id='result'></div>
+<script>
+const select = document.getElementById('listbox');
+for (let i = 0; i < 100; i++) {
+  const option = document.createElement('option');
+  option.textContent = 'Option ' + (i + 1);
+  select.appendChild(option);
+}
+function checkMode(writingMode) {
+  select.style.writingMode = writingMode;
+  select.size = 5;
+  select.scrollTop = 0;
+  select.scrollLeft = 0;
+
+  const vertical = writingMode !== 'horizontal-tb';
+  const blockScrollProp = vertical ? 'scrollLeft' : 'scrollTop';
+  const inlineScrollProp = vertical ? 'scrollTop' : 'scrollLeft';
+  const clientBlock = vertical ? select.clientWidth : select.clientHeight;
+  const clientInline = vertical ? select.clientHeight : select.clientWidth;
+  const scrollBlock = vertical ? select.scrollWidth : select.scrollHeight;
+  const scrollInline = vertical ? select.scrollHeight : select.scrollWidth;
+  const reversed = writingMode.endsWith('-rl');
+
+  const baseBlock = clientBlock;
+  const baseInline = clientInline;
+  select.size = 10;
+  const largerBlock = vertical ? select.clientWidth : select.clientHeight;
+  const largerInline = vertical ? select.clientHeight : select.clientWidth;
+  select.size = 8;
+  const smallerBlock = vertical ? select.clientWidth : select.clientHeight;
+  const smallerInline = vertical ? select.clientHeight : select.clientWidth;
+  select.size = 5;
+
+  select[blockScrollProp] = 100;
+  const positive = select[blockScrollProp];
+  select[blockScrollProp] = -100;
+  const negative = select[blockScrollProp];
+  select[inlineScrollProp] = 100;
+  const inlinePositive = select[inlineScrollProp];
+  select[inlineScrollProp] = -100;
+  const inlineNegative = select[inlineScrollProp];
+
+  return scrollBlock > clientBlock &&
+         scrollInline === clientInline &&
+         largerBlock > baseBlock &&
+         largerInline === baseInline &&
+         smallerBlock < largerBlock &&
+         smallerInline === largerInline &&
+         (!reversed ? positive > 0 && negative === 0 : positive === 0 && negative < 0) &&
+         inlinePositive === 0 &&
+         inlineNegative === 0;
+}
+document.getElementById('result').textContent = [
+  checkMode('horizontal-tb'),
+  checkMode('vertical-lr'),
+  checkMode('vertical-rl'),
+  checkMode('sideways-lr'),
+  checkMode('sideways-rl')
+].join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true", result);
+    }
 }
