@@ -948,7 +948,7 @@ label {
 <p>The {{controlLabel}} should be center-aligned with the label text since it is non-alphabetic.</p>
 <div style="writing-mode: {{writingMode}}">
     <input type="{{inputType}}" id="primary" checked>
-    <label for="primary">こんにちわ</label>
+    <label for="primary">こんにちは</label>
 </div>
 
 <br>
@@ -982,7 +982,7 @@ input {
 <p>The {{controlLabel}} should be center-aligned with the label text since it is non-alphabetic.</p>
 <div style="writing-mode: {{writingMode}}">
     <input type="{{inputType}}" id="primary" checked>
-    <label for="primary">こんにちわ</label>
+    <label for="primary">こんにちは</label>
 </div>
 
 <br>
