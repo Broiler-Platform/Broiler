@@ -31,6 +31,12 @@ public class FormControlRenderTests
         return count;
     }
 
+    /// <summary>
+    /// Finds the bounds of the green-ish fallback fill region used by the
+    /// progress/meter placeholder assertions.  The returned tuple contains the
+    /// min/max coordinates and total matching pixel count for pixels whose
+    /// green channel dominates while red/blue stay comparatively low.
+    /// </summary>
     private static (int minX, int maxX, int minY, int maxY, int count) FindFillBounds(SKBitmap bmp)
     {
         int minX = bmp.Width;

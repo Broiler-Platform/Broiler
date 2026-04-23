@@ -11,10 +11,29 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 internal static class HtmlPostProcessor
 {
+    /// <summary>
+    /// Default rendered track length for progress-like native fallbacks.
+    /// </summary>
     private const double DefaultProgressLikeTrackLengthPx = 120;
+
+    /// <summary>
+    /// Default number of visible option tracks for a plain <c>select[multiple]</c>.
+    /// </summary>
     private const int DefaultSelectMultipleVisibleTracks = 4;
+
+    /// <summary>
+    /// Thickness in pixels of one visible listbox option track in the fallback.
+    /// </summary>
     private const int SelectMultipleTrackThicknessPx = 16;
+
+    /// <summary>
+    /// Inline-axis extent in pixels used for the simple listbox placeholder.
+    /// </summary>
     private const int SelectMultipleInlineExtentPx = 72;
+
+    /// <summary>
+    /// Thickness in pixels of the simple native-chrome gutter for listboxes.
+    /// </summary>
     private const int SelectMultipleChromeThicknessPx = 10;
 
     /// <summary>
