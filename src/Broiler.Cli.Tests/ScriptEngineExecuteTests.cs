@@ -806,8 +806,13 @@ document.write('<p id=""injected"">written</p>');
 
         var result = bridge.SerializeToHtml();
 
+        // Pinch-zoom scale 2 doubles the 10000px root height and the fixed
+        // element's 50vh/100vw box from 384x1024 to 768x2048.
         Assert.Contains("<html style=\"height: 20000px\"", result);
         Assert.Contains("id=\"fixed\" style=\"position: fixed; bottom: 0px; height: 768px; width: 2048px; overflow: scroll; background-color: gray\"", result);
+        // The visual viewport pans to pageTop=1384, so root scroll simulation
+        // serializes as -1384*2=-2768px and the fixed scroller keeps the
+        // target aligned by scaling its own 575.6px-ish internal scroll offset.
         Assert.Contains("style=\"position: relative; top: -2768px", result);
         Assert.Contains("style=\"position: relative; top: -1151.2px", result);
     }
