@@ -9,6 +9,7 @@
 
 - Phase 6 has widened again: `HTMLElement.scrollParent()` now returns the nearest relevant scroll container for standard DOM cases, including `overflow:hidden`, `display:none`, `display:contents`, absolute/fixed positioning, and root/body/null edge cases, with focused CLI and WPT guards for the new scroll-parent foundation.
 - Phase 6 has widened again: minimal `attachShadow()` / `shadowRoot` support now lets `scrollParent()` walk across open and closed shadow-root boundaries for focused cssom-view cases, with CLI and WPT guards for the shadow-tree follow-up slice.
+- Phase 6 has widened again: `scrollIntoView()` now treats an assigned default `<slot>` as a potential scroll container in focused shadow-DOM cases, and slot scroll metrics/offsets now account for projected light-DOM content with focused CLI and WPT guards for the slot-container follow-up slice.
 
 ### 2026-04-22
 

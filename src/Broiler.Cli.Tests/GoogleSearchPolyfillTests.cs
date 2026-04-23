@@ -1603,6 +1603,44 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
+    public void ScrollIntoView_Treats_Assigned_Slot_As_Scroll_Container()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            var host = document.createElement('div');
+            var spacer = document.createElement('div');
+            spacer.style.height = '200px';
+            var target = document.createElement('div');
+            target.style.height = '100px';
+            target.style.width = '100px';
+
+            host.appendChild(spacer);
+            host.appendChild(target);
+            document.body.appendChild(host);
+
+            var shadow = host.attachShadow({ mode: 'open' });
+            var slot = document.createElement('slot');
+            slot.style.display = 'block';
+            slot.style.overflow = 'hidden';
+            slot.style.width = '100px';
+            slot.style.height = '100px';
+            shadow.appendChild(slot);
+
+            target.scrollIntoView();
+
+            document.getElementById('result').textContent = [
+                slot.scrollTop,
+                slot.scrollHeight,
+                slot.clientHeight,
+                host.scrollTop
+            ].join('|');
+        ");
+
+        Assert.Contains("200|300|100|0", result);
+    }
+
+    [Fact]
     public void FontRelative_Ch_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
     {
         var result = ExecJs(@"

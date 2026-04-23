@@ -6200,6 +6200,55 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssomView_ScrollIntoView_Treats_Assigned_Slot_As_Scroll_Container()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body style="margin:0;"></body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+
+        var result = ctx.Eval("""
+            (() => {
+                var host = document.createElement('div');
+                var spacer = document.createElement('div');
+                spacer.style.height = '200px';
+                var target = document.createElement('div');
+                target.style.height = '100px';
+                target.style.width = '100px';
+
+                host.appendChild(spacer);
+                host.appendChild(target);
+                document.body.appendChild(host);
+
+                var shadow = host.attachShadow({ mode: 'open' });
+                var slot = document.createElement('slot');
+                slot.style.display = 'block';
+                slot.style.overflow = 'hidden';
+                slot.style.width = '100px';
+                slot.style.height = '100px';
+                shadow.appendChild(slot);
+
+                target.scrollIntoView();
+
+                return [
+                    slot.scrollTop,
+                    slot.scrollHeight,
+                    slot.clientHeight,
+                    host.scrollTop
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("200|300|100|0", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_SubframeWindowScrollTo_Honors_Smooth_And_Instant_Behavior()
     {
         const string html = """

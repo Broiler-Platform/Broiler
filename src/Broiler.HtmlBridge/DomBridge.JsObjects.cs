@@ -2731,6 +2731,81 @@ public sealed partial class DomBridge
         return null;
     }
 
+    private static DomElement? GetShadowHost(DomElement? shadowRoot)
+    {
+        if (shadowRoot != null &&
+            string.Equals(shadowRoot.TagName, "#shadow-root", StringComparison.Ordinal) &&
+            shadowRoot.DomProperties.TryGetValue("_host", out var rawHost) &&
+            rawHost is DomElement host)
+        {
+            return host;
+        }
+
+        return null;
+    }
+
+    private static DomElement? FindContainingShadowRoot(DomElement? element)
+    {
+        for (var current = element; current != null; current = current.Parent)
+        {
+            if (string.Equals(current.TagName, "#shadow-root", StringComparison.Ordinal))
+                return current;
+        }
+
+        return null;
+    }
+
+    private DomElement? GetSlotHost(DomElement slot) => GetShadowHost(FindContainingShadowRoot(slot));
+
+    private static bool SlotAcceptsNode(DomElement slot, DomElement node)
+    {
+        var slotName = slot.Attributes.GetValueOrDefault("name");
+        var nodeSlot = node.Attributes.GetValueOrDefault("slot");
+        return string.IsNullOrEmpty(slotName)
+            ? string.IsNullOrEmpty(nodeSlot)
+            : string.Equals(slotName, nodeSlot, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private DomElement? FindAssignedSlot(DomElement root, DomElement node)
+    {
+        foreach (var child in root.Children)
+        {
+            if (child.IsTextNode)
+                continue;
+
+            if (string.Equals(child.TagName, "slot", StringComparison.OrdinalIgnoreCase) &&
+                SlotAcceptsNode(child, node))
+            {
+                return child;
+            }
+
+            var nested = FindAssignedSlot(child, node);
+            if (nested != null)
+                return nested;
+        }
+
+        return null;
+    }
+
+    private DomElement? GetAssignedSlot(DomElement element)
+    {
+        if (element.IsTextNode || element.Parent == null)
+            return null;
+
+        var shadowRoot = GetShadowRoot(element.Parent);
+        return shadowRoot != null ? FindAssignedSlot(shadowRoot, element) : null;
+    }
+
+    private DomElement? GetScrollTraversalParent(DomElement element)
+    {
+        var assignedSlot = GetAssignedSlot(element);
+        if (assignedSlot != null)
+            return assignedSlot;
+
+        var parent = element.Parent;
+        return GetShadowHost(parent) ?? parent;
+    }
+
     private double GetClientWidthForDomElement(DomElement element, bool isRoot)
     {
         if (isRoot)
@@ -3030,6 +3105,23 @@ public sealed partial class DomBridge
 
         if (current.Parent != null && ReferenceEquals(current.Parent, ancestor))
             offset += ComputeOffsetWithinParentForOffset(current, vertical);
+
+        return offset;
+    }
+
+    private double ComputeOffsetWithinActualAncestor(DomElement element, DomElement ancestor, bool vertical)
+    {
+        double offset = 0;
+        var current = element;
+
+        while (current.Parent != null && !ReferenceEquals(current.Parent, ancestor))
+        {
+            offset += ComputeOffsetWithinParent(current, vertical);
+            current = current.Parent;
+        }
+
+        if (current.Parent != null && ReferenceEquals(current.Parent, ancestor))
+            offset += ComputeOffsetWithinParent(current, vertical);
 
         return offset;
     }
@@ -3842,13 +3934,10 @@ public sealed partial class DomBridge
         return count;
     }
 
-    private static IEnumerable<DomElement> EnumerateRenderedDescendants(DomElement element)
+    private IEnumerable<DomElement> EnumerateRenderedDescendants(DomElement element)
     {
-        foreach (var child in element.Children)
+        foreach (var child in EnumerateRenderedChildren(element))
         {
-            if (child.IsTextNode)
-                continue;
-
             yield return child;
 
             foreach (var descendant in EnumerateRenderedDescendants(child))
@@ -3856,10 +3945,34 @@ public sealed partial class DomBridge
         }
     }
 
+    private IEnumerable<DomElement> EnumerateRenderedChildren(DomElement element)
+    {
+        if (string.Equals(element.TagName, "slot", StringComparison.OrdinalIgnoreCase))
+        {
+            var host = GetSlotHost(element);
+            if (host == null)
+                yield break;
+
+            foreach (var child in host.Children)
+            {
+                if (!child.IsTextNode && SlotAcceptsNode(element, child))
+                    yield return child;
+            }
+
+            yield break;
+        }
+
+        foreach (var child in element.Children)
+        {
+            if (!child.IsTextNode)
+                yield return child;
+        }
+    }
+
     private DomElement? FindScrollContainer(DomElement element)
     {
         var documentElement = GetOwningDocumentElement(element);
-        for (var current = element.Parent; current != null; current = current.Parent)
+        for (var current = GetScrollTraversalParent(element); current != null; current = GetScrollTraversalParent(current))
         {
             if (ReferenceEquals(current, documentElement))
                 return documentElement;
@@ -3877,7 +3990,9 @@ public sealed partial class DomBridge
 
     private bool HasFixedPositionAncestorBefore(DomElement element, DomElement ancestor)
     {
-        for (var current = element.Parent; current != null && !ReferenceEquals(current, ancestor); current = current.Parent)
+        for (var current = GetScrollTraversalParent(element);
+             current != null && !ReferenceEquals(current, ancestor);
+             current = GetScrollTraversalParent(current))
         {
             var props = GetComputedProps(current);
             if (string.Equals(props.GetValueOrDefault("position"), "fixed", StringComparison.OrdinalIgnoreCase))
@@ -3947,17 +4062,41 @@ public sealed partial class DomBridge
         double offset = 0;
         var current = element;
 
-        while (current.Parent != null && !ReferenceEquals(current.Parent, ancestor))
+        while (true)
         {
-            offset += ComputeOffsetWithinParent(current, vertical);
-            offset -= GetElementScrollOffset(current.Parent, vertical);
-            current = current.Parent;
+            var parent = GetScrollTraversalParent(current);
+            if (parent == null || ReferenceEquals(parent, ancestor))
+                break;
+
+            offset += ComputeOffsetWithinScrollTraversalParent(current, parent, vertical);
+            offset -= GetElementScrollOffset(parent, vertical);
+            current = parent;
         }
 
-        if (current.Parent != null && ReferenceEquals(current.Parent, ancestor))
-            offset += ComputeOffsetWithinParent(current, vertical);
+        var directParent = GetScrollTraversalParent(current);
+        if (directParent != null && ReferenceEquals(directParent, ancestor))
+            offset += ComputeOffsetWithinScrollTraversalParent(current, directParent, vertical);
 
         return offset;
+    }
+
+    private double ComputeOffsetWithinScrollTraversalParent(DomElement element, DomElement parent, bool vertical)
+    {
+        var assignedSlot = GetAssignedSlot(element);
+        if (assignedSlot != null && ReferenceEquals(assignedSlot, parent))
+        {
+            var host = element.Parent;
+            if (host == null)
+                return 0;
+
+            var slotProps = GetComputedProps(parent);
+            var slotPadding = ParseCssLengthToPixelsWithViewport(
+                slotProps.GetValueOrDefault(vertical ? "padding-top" : "padding-left"),
+                parent);
+            return slotPadding + ComputeOffsetWithinActualAncestor(element, host, vertical);
+        }
+
+        return ComputeOffsetWithinParent(element, vertical);
     }
 
     private double ComputeOffsetWithinParent(DomElement element, bool vertical)
