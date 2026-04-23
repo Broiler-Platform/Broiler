@@ -3269,11 +3269,13 @@ public sealed partial class DomBridge
         var position = props.GetValueOrDefault("position");
         var margin = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "margin-top" : "margin-left"), element);
         var positional = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault(vertical ? "top" : "left"), element);
+        var parentProps = GetComputedProps(element.Parent);
+        var parentPadding = ParseCssLengthToPixelsWithViewport(parentProps.GetValueOrDefault(vertical ? "padding-top" : "padding-left"), element.Parent);
 
         if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase))
             return margin + positional;
 
-        double offset = 0;
+        double offset = parentPadding;
         if (vertical)
         {
             foreach (var sibling in element.Parent.Children)

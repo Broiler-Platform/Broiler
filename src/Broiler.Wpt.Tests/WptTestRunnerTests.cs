@@ -1647,6 +1647,77 @@ input {
     }
 
     [Fact]
+    public void Wpt_CssomView_OffsetTopLeft_BorderBoxPaddingEdge_MatchReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""fixtures""></div>
+  <div id=""pass""></div>
+  <script>
+    function createCase(display, writingMode, tagName) {
+      var container = document.createElement('div');
+      container.style.position = 'relative';
+      container.style.font = '20px/1 monospace';
+      container.style.width = '150px';
+      container.style.height = '100px';
+      container.style.padding = '2px 10px';
+      container.style.borderStyle = 'solid';
+      container.style.borderWidth = '3px 6px';
+      container.style.boxSizing = 'border-box';
+      container.style.display = display;
+      container.style.writingMode = writingMode;
+
+      var target = document.createElement(tagName);
+      target.textContent = 'x';
+      container.appendChild(target);
+      document.getElementById('fixtures').appendChild(container);
+      return target.offsetLeft === 10 && target.offsetTop === 2;
+    }
+
+    var displays = ['block', 'inline-block', 'grid', 'inline-grid', 'flex', 'inline-flex', 'flow-root'];
+    var writingModes = ['horizontal-tb', 'vertical-lr'];
+    var tags = ['span', 'div'];
+    var passed = true;
+
+    for (var i = 0; i < displays.length; i++) {
+      for (var j = 0; j < writingModes.length; j++) {
+        for (var k = 0; k < tags.length; k++) {
+          passed = createCase(displays[i], writingModes[j], tags[k]) && passed;
+        }
+      }
+    }
+
+    document.getElementById('fixtures').style.display = 'none';
+    document.getElementById('pass').style.background = passed ? 'green' : 'red';
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "cssom-view-offset-top-left-border-box");
+        Assert.True(result.Passed,
+            $"offsetTop/offsetLeft should resolve against the offset parent padding edge. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_ViewportMediaQueryLengths_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>

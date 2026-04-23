@@ -2385,6 +2385,54 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
+    public void OffsetTopLeft_Are_Measured_From_OffsetParent_Padding_Edge()
+    {
+        var result = ExecJs(@"
+            try {
+                document.body.style.margin = '0';
+
+                function createCase(display, writingMode, tagName) {
+                    var container = document.createElement('div');
+                    container.style.position = 'relative';
+                    container.style.font = '20px/1 monospace';
+                    container.style.width = '150px';
+                    container.style.height = '100px';
+                    container.style.padding = '2px 10px';
+                    container.style.borderStyle = 'solid';
+                    container.style.borderWidth = '3px 6px';
+                    container.style.boxSizing = 'border-box';
+                    container.style.display = display;
+                    container.style.writingMode = writingMode;
+
+                    var target = document.createElement(tagName);
+                    target.textContent = 'x';
+                    container.appendChild(target);
+                    document.body.appendChild(container);
+                    return target.offsetLeft === 10 && target.offsetTop === 2;
+                }
+
+                var displays = ['block', 'inline-block', 'grid', 'inline-grid', 'flex', 'inline-flex', 'flow-root'];
+                var writingModes = ['horizontal-tb', 'vertical-lr'];
+                var tags = ['span', 'div'];
+                var passed = true;
+
+                for (var i = 0; i < displays.length; i++) {
+                    for (var j = 0; j < writingModes.length; j++) {
+                        for (var k = 0; k < tags.length; k++) {
+                            passed = createCase(displays[i], writingModes[j], tags[k]) && passed;
+                        }
+                    }
+                }
+
+                document.getElementById('result').textContent = String(passed);
+            } catch (e) {
+                document.getElementById('result').textContent = 'ERR:' + e;
+            }
+        ");
+        Assert.Contains("true", result);
+    }
+
+    [Fact]
     public void FontRelative_Lh_Units_Resolve_From_Parent_LineHeight_Under_Zoom()
     {
         var result = ExecJs(@"
