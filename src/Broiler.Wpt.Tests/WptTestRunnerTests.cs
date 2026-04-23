@@ -6257,6 +6257,86 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void Wpt_Selectors4_LangInvalidRangeList_DoesNotMatch()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { display: block; width: 40px; height: 40px; background: green; }
+    :lang(de, nl, 0, fr) { background: red; }
+  </style>
+</head>
+<body>
+  <span class="test" lang="fr"></span>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { display: block; width: 40px; height: 40px; background: green; }
+  </style>
+</head>
+<body>
+  <span class="test" lang="fr"></span>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors4-lang-invalid-range-list", 80, 80);
+        Assert.True(result.Passed,
+            $"Invalid :lang(...) ranges should invalidate the whole pseudo. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Selectors4_LangDigitOnlyRange_DoesNotMatch()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { display: block; width: 40px; height: 40px; background: green; }
+    :lang(0) { background: red; }
+  </style>
+</head>
+<body>
+  <span class="test" lang="0"></span>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { margin: 0; background: white; }
+    .test { display: block; width: 40px; height: 40px; background: green; }
+  </style>
+</head>
+<body>
+  <span class="test" lang="0"></span>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors4-lang-digit-only-range", 80, 80);
+        Assert.True(result.Passed,
+            $"Digit-only :lang(...) ranges should not match. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_Selectors4_DetailsOpenPseudo_And_ClosedContent_MatchReference()
     {
         var testHtml = """

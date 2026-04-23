@@ -241,6 +241,50 @@ document.getElementById('result').textContent = r.join(',');
     }
 
     [Fact]
+    public void Lang_Invalid_Range_Invalidates_Whole_Pseudo()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.test { position: absolute; z-index: 7; }
+:lang(de, nl, 0, fr) { z-index: 3; }
+</style>
+</head><body>
+<span id=""target"" class=""test"" lang=""fr"">text</span>
+<div id=""result""></div>
+<script>
+var cs = getComputedStyle(document.getElementById('target'));
+document.getElementById('result').textContent = cs.zIndex;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("7", result);
+    }
+
+    [Fact]
+    public void Lang_Digit_Only_Range_Does_Not_Match()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<style>
+.test { position: absolute; z-index: 7; }
+:lang(0) { z-index: 3; }
+</style>
+</head><body>
+<span id=""target"" class=""test"" lang=""0"">text</span>
+<div id=""result""></div>
+<script>
+var cs = getComputedStyle(document.getElementById('target'));
+document.getElementById('result').textContent = cs.zIndex;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("7", result);
+    }
+
+    [Fact]
     public void Lang_Matches_XmlLang_Ancestor()
     {
         var html = @"<!DOCTYPE html>

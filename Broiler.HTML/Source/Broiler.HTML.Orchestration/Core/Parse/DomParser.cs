@@ -742,7 +742,10 @@ internal sealed class DomParser
         if (!TryGetElementLanguage(box, out var elementLanguage))
             return false;
 
-        foreach (var range in SplitLangPseudoArguments(lang))
+        if (!TryGetValidLangPseudoArguments(lang, out var ranges))
+            return false;
+
+        foreach (var range in ranges)
             if (MatchesLanguageRange(elementLanguage, range))
                 return true;
 
@@ -783,14 +786,22 @@ internal sealed class DomParser
         return false;
     }
 
-    private static IEnumerable<string> SplitLangPseudoArguments(string lang)
+    private static bool TryGetValidLangPseudoArguments(string lang, out List<string> ranges)
     {
+        ranges = [];
         foreach (var part in lang.Split(','))
         {
             var normalized = NormalizeLangPseudoArgument(part);
-            if (!string.IsNullOrWhiteSpace(normalized))
-                yield return normalized;
+            if (string.IsNullOrWhiteSpace(normalized))
+                return false;
+
+            if (!IsValidLanguageRange(normalized))
+                return false;
+
+            ranges.Add(normalized);
         }
+
+        return ranges.Count > 0;
     }
 
     private static bool MatchesLanguageRange(string elementLanguage, string languageRange)
@@ -867,6 +878,37 @@ internal sealed class DomParser
 
         return true;
     }
+
+    private static bool IsValidLanguageRange(string languageRange)
+    {
+        var subtags = languageRange.Split(['-'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (subtags.Length == 0)
+            return false;
+
+        for (var i = 0; i < subtags.Length; i++)
+        {
+            var subtag = subtags[i];
+            if (subtag == "*")
+                continue;
+
+            if (subtag.Length is < 1 or > 8)
+                return false;
+
+            if (i == 0 && !subtag.All(IsAsciiLetter))
+                return false;
+
+            if (!subtag.All(IsAsciiLetterOrDigit))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static bool IsAsciiLetter(char c) =>
+        (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+
+    private static bool IsAsciiLetterOrDigit(char c) =>
+        IsAsciiLetter(c) || (c >= '0' && c <= '9');
 
     private static bool MatchesOpenPseudoClass(CssBox box)
     {
