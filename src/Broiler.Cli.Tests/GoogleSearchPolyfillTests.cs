@@ -1688,6 +1688,55 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
+    public void SmoothScroll_On_OverflowHidden_Element_Can_Be_Interrupted_By_Scroll_Handler()
+    {
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(ctx, "<!DOCTYPE html><html><body></body></html>", "file:///test.html");
+
+        var result = ctx.Eval("""
+            (() => {
+                var scroller = document.createElement('div');
+                scroller.style.overflowY = 'hidden';
+                scroller.style.width = '100px';
+                scroller.style.height = '100px';
+                scroller.style.scrollBehavior = 'smooth';
+
+                function block() {
+                    var d = document.createElement('div');
+                    d.style.width = '100px';
+                    d.style.height = '100px';
+                    return d;
+                }
+
+                scroller.appendChild(block());
+                scroller.appendChild(block());
+                scroller.appendChild(block());
+                document.body.appendChild(scroller);
+
+                var interrupted = 0;
+                var scrollEvents = 0;
+                var scrollEnds = 0;
+                scroller.onscroll = function () {
+                    scrollEvents++;
+                    if (scroller.scrollTop > 1 && scroller.scrollTop < 200) {
+                        scroller.scrollTop = 1;
+                        interrupted++;
+                    }
+                };
+                scroller.onscrollend = function () {
+                    scrollEnds++;
+                };
+
+                scroller.scrollTop = 200;
+                return [scroller.scrollTop, interrupted, scrollEvents, scrollEnds].join('|');
+            })()
+            """);
+
+        Assert.Equal("1|1|2|1", result.ToString());
+    }
+
+    [Fact]
     public void FontRelative_Ch_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
     {
         var result = ExecJs(@"

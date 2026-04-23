@@ -6303,6 +6303,58 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssomView_SmoothScroll_On_OverflowHidden_Element_Can_Be_Interrupted()
+    {
+        const string html = """
+<!DOCTYPE html>
+<div id="scroller" style="overflow-y:hidden;width:100px;height:100px;scroll-behavior:smooth;">
+  <div style="width:100px;height:100px;"></div>
+  <div style="width:100px;height:100px;"></div>
+  <div style="width:100px;height:100px;"></div>
+</div>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+
+        var beforeFlush = ctx.Eval("""
+            (() => {
+                var scroller = document.getElementById('scroller');
+                var interrupted = 0;
+                var scrollEvents = 0;
+                var scrollEnds = 0;
+
+                scroller.onscroll = function () {
+                    scrollEvents++;
+                    if (scroller.scrollTop > 1 && scroller.scrollTop < 200) {
+                        scroller.scrollTop = 1;
+                        interrupted++;
+                    }
+                };
+                scroller.onscrollend = function () {
+                    scrollEnds++;
+                };
+
+                scroller.scrollTop = 200;
+                return [scroller.scrollTop, interrupted, scrollEvents, scrollEnds].join('|');
+            })()
+            """);
+
+        Assert.Equal("1|1|2|1", beforeFlush.ToString());
+
+        bridge.FlushTimerStep();
+        var afterFlush = ctx.Eval("""
+            (() => {
+                var scroller = document.getElementById('scroller');
+                return [scroller.scrollTop].join('|');
+            })()
+            """);
+
+        Assert.Equal("1", afterFlush.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_SubframeWindowScrollTo_Honors_Smooth_And_Instant_Behavior()
     {
         const string html = """

@@ -11,6 +11,7 @@
 - Phase 6 has widened again: minimal `attachShadow()` / `shadowRoot` support now lets `scrollParent()` walk across open and closed shadow-root boundaries for focused cssom-view cases, with CLI and WPT guards for the shadow-tree follow-up slice.
 - Phase 6 has widened again: `scrollIntoView()` now treats an assigned default `<slot>` as a potential scroll container in focused shadow-DOM cases, and slot scroll metrics/offsets now account for projected light-DOM content with focused CLI and WPT guards for the slot-container follow-up slice.
 - Phase 6 has widened again: `scrollIntoView()` now maps logical block/inline alignment onto physical scroll axes for representative writing-mode and direction combinations, with focused CLI and WPT guards for the `scrollIntoView-*writing-mode*` follow-up slice.
+- Phase 6 has widened again: element scroll changes now dispatch minimal `scroll` / `scrollend` events, so overflow-hidden smooth scrolling can be interrupted by handler-driven `scrollTop` updates without the queued completion frame restoring the original target; focused CLI and WPT guards cover the `interrupt-hidden-smooth-scroll.html` follow-up slice.
 
 ### 2026-04-22
 

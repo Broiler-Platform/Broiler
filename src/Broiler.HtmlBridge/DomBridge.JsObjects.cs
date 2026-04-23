@@ -3642,40 +3642,50 @@ public sealed partial class DomBridge
         var trackVisualViewport = ReferenceEquals(element, DocumentElement);
         var previousVisualPageLeft = trackVisualViewport ? GetVisualViewportPageOffset(vertical: false) : 0;
         var previousVisualPageTop = trackVisualViewport ? GetVisualViewportPageOffset(vertical: true) : 0;
+        var previousLeft = GetElementScrollOffset(element, vertical: false);
+        var previousTop = GetElementScrollOffset(element, vertical: true);
         var (targetLeft, targetTop) = ResolveElementScrollOffsets(element, left, top, relative, clamp);
+        var hadActiveSmoothScroll = _smoothScrollTokens.ContainsKey(element);
         var effectiveBehavior = ResolveScrollBehavior(element, behavior);
+        if (hadActiveSmoothScroll && NormalizeScrollBehavior(behavior) != "smooth")
+            effectiveBehavior = "instant";
         CancelSmoothScroll(element);
 
         if (string.Equals(effectiveBehavior, "smooth", StringComparison.OrdinalIgnoreCase))
         {
-            var currentLeft = GetElementScrollOffset(element, vertical: false);
-            var currentTop = GetElementScrollOffset(element, vertical: true);
-            // Approximate smooth scrolling with a visible intermediate frame before
-            // finishing on the next queued frame.
-            element.DomProperties["_scrollLeft"] = currentLeft + ((targetLeft - currentLeft) / 2.0);
-            element.DomProperties["_scrollTop"] = currentTop + ((targetTop - currentTop) / 2.0);
-            NotifyVisualViewportScrollIfNeeded(previousVisualPageLeft, previousVisualPageTop, trackVisualViewport);
-
             var token = ++_frameActionIdCounter;
             _smoothScrollTokens[element] = token;
             QueueFrameAction(() =>
             {
                 if (_smoothScrollTokens.TryGetValue(element, out var activeToken) && activeToken == token)
                 {
+                    var queuedPreviousLeft = GetElementScrollOffset(element, vertical: false);
+                    var queuedPreviousTop = GetElementScrollOffset(element, vertical: true);
                     var queuedPreviousVisualPageLeft = trackVisualViewport ? GetVisualViewportPageOffset(vertical: false) : 0;
                     var queuedPreviousVisualPageTop = trackVisualViewport ? GetVisualViewportPageOffset(vertical: true) : 0;
                     element.DomProperties["_scrollLeft"] = targetLeft;
                     element.DomProperties["_scrollTop"] = targetTop;
                     NotifyVisualViewportScrollIfNeeded(queuedPreviousVisualPageLeft, queuedPreviousVisualPageTop, trackVisualViewport);
+                    DispatchScrollEventIfNeeded(element, queuedPreviousLeft, queuedPreviousTop);
+                    DispatchScrollEndEventIfNeeded(element, queuedPreviousLeft, queuedPreviousTop);
                     _smoothScrollTokens.Remove(element);
                 }
             });
+
+            // Approximate smooth scrolling with a visible intermediate frame before
+            // finishing on the next queued frame.
+            element.DomProperties["_scrollLeft"] = previousLeft + ((targetLeft - previousLeft) / 2.0);
+            element.DomProperties["_scrollTop"] = previousTop + ((targetTop - previousTop) / 2.0);
+            NotifyVisualViewportScrollIfNeeded(previousVisualPageLeft, previousVisualPageTop, trackVisualViewport);
+            DispatchScrollEventIfNeeded(element, previousLeft, previousTop);
             return;
         }
 
         element.DomProperties["_scrollLeft"] = targetLeft;
         element.DomProperties["_scrollTop"] = targetTop;
         NotifyVisualViewportScrollIfNeeded(previousVisualPageLeft, previousVisualPageTop, trackVisualViewport);
+        DispatchScrollEventIfNeeded(element, previousLeft, previousTop);
+        DispatchScrollEndEventIfNeeded(element, previousLeft, previousTop);
     }
 
     private void QueueFrameAction(Action callback)
@@ -3686,6 +3696,32 @@ public sealed partial class DomBridge
     private void CancelSmoothScroll(DomElement element)
     {
         _smoothScrollTokens.Remove(element);
+    }
+
+    private void DispatchScrollEventIfNeeded(DomElement element, double previousLeft, double previousTop)
+    {
+        if (AreClose(previousLeft, GetElementScrollOffset(element, vertical: false)) &&
+            AreClose(previousTop, GetElementScrollOffset(element, vertical: true)))
+            return;
+
+        DispatchElementEvent(element, "scroll");
+    }
+
+    private void DispatchScrollEndEventIfNeeded(DomElement element, double previousLeft, double previousTop)
+    {
+        if (AreClose(previousLeft, GetElementScrollOffset(element, vertical: false)) &&
+            AreClose(previousTop, GetElementScrollOffset(element, vertical: true)))
+            return;
+
+        DispatchElementEvent(element, "scrollend");
+    }
+
+    private void DispatchElementEvent(DomElement element, string eventType)
+    {
+        var evt = new JSObject();
+        evt.FastAddValue((KeyString)"type", new JSString(eventType), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        DispatchEventOnElement(element, evt);
     }
 
     private string ResolveScrollBehavior(DomElement element, string? requestedBehavior)
