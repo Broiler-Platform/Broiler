@@ -44,6 +44,13 @@ public class WptTestRunnerTests : IDisposable
         return runner.RunMatchTest(testFile, refFile, _tempDir);
     }
 
+    private void WriteTempSupportFile(string relativePath, string content)
+    {
+        var fullPath = Path.Combine(_tempDir, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        File.WriteAllText(fullPath, content);
+    }
+
     private static void CreateSolidReferencePng(string path, SkiaSharp.SKColor color)
     {
         using var bitmap = new SkiaSharp.SKBitmap(
@@ -3281,6 +3288,301 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
         var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-testdriver-pinch-zoom");
         Assert.True(result.Passed,
             $"test_driver.Actions pinch-zoom support should drive visual viewport harness checks. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Harness_RootRelative_ScrollSupport_Scripts_Enable_SubframeRoot_ScrollBehavior_Page()
+    {
+        WriteTempSupportFile("dom/events/scrolling/scroll_support.js", """
+function waitForScrollEnd() {
+  return new Promise((resolve) => {
+    setTimeout(() => setTimeout(resolve, 0), 0);
+  });
+}
+
+function waitForCompositorReady() {
+  return Promise.resolve();
+}
+""");
+        WriteTempSupportFile("support/scroll-behavior.js", """
+function resetScroll(scrollingElement) {
+  scrollingElement.scrollLeft = 0;
+  scrollingElement.scrollTop = 0;
+  scrollingElement.scroll({ left: 0, top: 0, behavior: "instant" });
+}
+
+function setScrollBehavior(styledElement, className) {
+  styledElement.classList.remove("autoBehavior", "smoothBehavior");
+  styledElement.classList.add(className);
+}
+
+function scrollNode(scrollingElement, scrollFunction, behavior, elementToRevealLeft, elementToRevealTop) {
+  var args = {};
+  if (behavior)
+    args.behavior = behavior;
+  if (scrollFunction === "scrollIntoView") {
+    args.inline = "start";
+    args.block = "start";
+    elementToReveal.scrollIntoView(args);
+    return;
+  }
+  args.left = elementToRevealLeft;
+  args.top = elementToRevealTop;
+  scrollingElement[scrollFunction](args);
+}
+""");
+
+        var testHtml = @"<!DOCTYPE html>
+<title>subframe root scroll-behavior harness</title>
+<script src=""/resources/testharness.js""></script>
+<script src=""/resources/testharnessreport.js""></script>
+<script src=""/dom/events/scrolling/scroll_support.js""></script>
+<script src=""support/scroll-behavior.js""></script>
+<style>
+  html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+  #pass { width: 100px; height: 100px; background: red; }
+</style>
+<div id=""pass""></div>
+<iframe id=""iframeNode"" width=""400px"" height=""200px"" srcdoc=""<!DOCTYPE html><html><style>body{margin:0}.autoBehavior{scroll-behavior:auto}.smoothBehavior{scroll-behavior:smooth}</style><body><div style='width:2000px;height:1000px'><span style='display:inline-block;width:500px;height:250px'></span><span id='elementToReveal' style='display:inline-block;vertical-align:-15px;width:10px;height:15px;background:black'></span></div></body></html>""></iframe>
+<script>
+  var iframeLoadTest = async_test('iframe loaded');
+  iframeNode.addEventListener('load', iframeLoadTest.step_func_done(() => {
+    promise_test(async () => {
+      await waitForCompositorReady();
+      var scrollingElement = iframeNode.contentDocument.scrollingElement;
+      var styledElement = iframeNode.contentDocument.documentElement;
+      resetScroll(scrollingElement);
+      setScrollBehavior(styledElement, 'smoothBehavior');
+      scrollNode(scrollingElement, 'scrollIntoView', 'auto', 500, 250);
+      if (!(scrollingElement.scrollLeft < 500 && scrollingElement.scrollTop < 250))
+        return;
+
+      return waitForScrollEnd(scrollingElement).then(() => {
+        if (scrollingElement.scrollLeft === 500 &&
+            scrollingElement.scrollTop === 250) {
+          document.getElementById('pass').style.background = 'green';
+        }
+      });
+    }, 'subframe root smooth scroll harness');
+  }));
+</script>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body><div id=""pass""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-subframe-root-scroll-behavior");
+        Assert.True(result.Passed,
+            $"Root-relative scrolling support scripts should let the subframe-root harness page complete. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_Harness_RootRelative_ScrollSupport_Scripts_Enable_SubframeWindow_ScrollBehavior_Page()
+    {
+        WriteTempSupportFile("dom/events/scrolling/scroll_support.js", """
+function waitForScrollEnd() {
+  return new Promise((resolve) => {
+    setTimeout(() => setTimeout(resolve, 0), 0);
+  });
+}
+
+function waitForCompositorReady() {
+  return Promise.resolve();
+}
+""");
+        WriteTempSupportFile("support/scroll-behavior.js", """
+function resetScrollForWindow(scrollingWindow) {
+  scrollingWindow.document.scrollingElement.scrollLeft = 0;
+  scrollingWindow.document.scrollingElement.scrollTop = 0;
+  scrollingWindow.scroll({ left: 0, top: 0, behavior: "instant" });
+}
+
+function setScrollBehavior(styledElement, className) {
+  styledElement.classList.remove("autoBehavior", "smoothBehavior");
+  styledElement.classList.add(className);
+}
+
+function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToRevealLeft, elementToRevealTop) {
+  var args = { left: elementToRevealLeft, top: elementToRevealTop };
+  if (behavior)
+    args.behavior = behavior;
+  scrollingWindow[scrollFunction](args);
+}
+""");
+
+        var testHtml = @"<!DOCTYPE html>
+<title>subframe window scroll-behavior harness</title>
+<script src=""/resources/testharness.js""></script>
+<script src=""/resources/testharnessreport.js""></script>
+<script src=""/dom/events/scrolling/scroll_support.js""></script>
+<script src=""support/scroll-behavior.js""></script>
+<style>
+  html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+  #pass { width: 100px; height: 100px; background: red; }
+</style>
+<div id=""pass""></div>
+<iframe id=""iframeNode"" width=""400px"" height=""200px"" srcdoc=""<!DOCTYPE html><html><style>body{margin:0}.autoBehavior{scroll-behavior:auto}.smoothBehavior{scroll-behavior:smooth}</style><body><div style='width:2000px;height:1000px;background:black'></div></body></html>""></iframe>
+<script>
+  var iframeLoadTest = async_test('iframe loaded');
+  iframeNode.addEventListener('load', iframeLoadTest.step_func_done(() => {
+    promise_test(async () => {
+      await waitForCompositorReady();
+      var scrollingWindow = iframeNode.contentWindow;
+      var styledElement = iframeNode.contentDocument.documentElement;
+      resetScrollForWindow(scrollingWindow);
+      setScrollBehavior(styledElement, 'smoothBehavior');
+      scrollWindow(scrollingWindow, 'scrollTo', 'auto', 500, 250);
+      if (!(scrollingWindow.scrollX < 500 && scrollingWindow.scrollY < 250))
+        return;
+
+      return waitForScrollEnd(scrollingWindow.document.scrollingElement).then(() => {
+        if (scrollingWindow.scrollX === 500 &&
+            scrollingWindow.scrollY === 250) {
+          document.getElementById('pass').style.background = 'green';
+        }
+      });
+    }, 'subframe window smooth scroll harness');
+  }));
+</script>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body><div id=""pass""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-subframe-window-scroll-behavior");
+        Assert.True(result.Passed,
+            $"Root-relative scrolling support scripts should let the subframe-window harness page complete. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssomView_ScrollIntoView_Fixed_FullHarness_Page_Matches_Reference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <script src=""/resources/testharness.js""></script>
+  <script src=""/resources/testharnessreport.js""></script>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    body {
+      width: 1000vw;
+      height: 1000vh;
+      background: repeating-linear-gradient(45deg, #A2CFD9, #A2CFD9 100px, #C3F3FF 100px, #C3F3FF 200px);
+    }
+    #pass { width: 100px; height: 100px; background: red; position: absolute; top: 0; left: 0; }
+    .fixedContainer {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      width: 150px;
+      height: 150px;
+      background-color: coral;
+    }
+    .fixedContainer.scrollable {
+      overflow: auto;
+      left: unset;
+      right: 10px;
+    }
+    .target {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: blue;
+      left: 50%;
+      top: 50%;
+    }
+    .scrollable .target {
+      left: 200%;
+      top: 200%;
+    }
+    iframe {
+      width: 96vw;
+      height: 300px;
+      position: absolute;
+      left: 2vw;
+      top: 100px;
+    }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <iframe></iframe>
+  <div class=""fixedContainer""><div class=""target""></div></div>
+  <div class=""fixedContainer scrollable""><div class=""target""></div></div>
+  <script>
+    function reset() {
+      [document, frames[0].document].forEach((doc) => {
+        doc.scrollingElement.scrollLeft = 0;
+        doc.scrollingElement.scrollTop = 0;
+        doc.querySelectorAll('.fixedContainer').forEach((e) => {
+          e.scrollLeft = 0;
+          e.scrollTop = 0;
+        });
+      });
+    }
+
+    const iframe = document.querySelector('iframe');
+    iframe.style.left = '100px';
+    iframe.style.top = '300px';
+    iframe.style.width = '400px';
+    iframe.style.height = '300px';
+    iframe.srcdoc = `<!DOCTYPE html><style>body{margin:0}.fixedContainer{position:fixed;bottom:10px;left:30px;width:150px;height:150px;background-color:coral}.fixedContainer.scrollable{overflow:auto}.target{position:absolute;width:10px;height:10px;background-color:blue;left:10px;top:20px}.scrollable .target{left:200%;top:200%}</style><div class=""fixedContainer""><div class=""target""></div></div><div class=""fixedContainer scrollable""><div style=""width:600px;height:600px""></div><div class=""target""></div></div>`;
+
+    window.addEventListener('load', function () {
+      reset();
+      var fixedTarget = frames[0].document.querySelector('.fixedContainer:not(.scrollable) .target');
+      fixedTarget.scrollIntoView({ block: 'start', inline: 'start' });
+      var fixedOk =
+        window.scrollX === 140 &&
+        window.scrollY === 460 &&
+        frames[0].scrollX === 0 &&
+        frames[0].scrollY === 0;
+
+      reset();
+      var scrollableContainer = frames[0].document.querySelector('.fixedContainer.scrollable');
+      var scrollableTarget = scrollableContainer.querySelector('.target');
+      scrollableTarget.scrollIntoView({ block: 'start', inline: 'start' });
+      var scrollableOk =
+        window.scrollX === 130 &&
+        window.scrollY === 440 &&
+        frames[0].scrollX === 0 &&
+        frames[0].scrollY === 0 &&
+        scrollableContainer.scrollLeft === 300 &&
+        scrollableContainer.scrollTop === 300;
+
+      if (fixedOk && scrollableOk) {
+        document.getElementById('pass').style.background = 'green';
+      }
+    });
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body><div id=""pass""></div></body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-full-harness");
+        Assert.True(result.Passed,
+            $"Full harness-style fixed-position iframe follow-up should match the reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]

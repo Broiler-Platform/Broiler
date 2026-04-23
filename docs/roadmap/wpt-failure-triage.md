@@ -25,6 +25,7 @@
 - Phase 6 has widened again: cssom-view auto-sized block metrics now derive basic width/height from rendered children and direct text when `width`/`height` stay `auto`, which keeps negative-margin hit-testing ancestors and no-overflow `scrollWidth` / `scrollHeight` checks from collapsing to zero in the next `elementFromPoint*` / `scroll*` follow-up slice.
 - Phase 6 has widened again: WPT harness stubs now queue `promise_test(...)` callbacks until window load and provide a minimal `HTMLElement` / `customElements.define()` upgrade path for already-parsed custom-element nodes, so the next cssom-view shadow-tree and visual/subframe harness pages can execute their scripted checks instead of stalling as empty harness output.
 - Phase 6 has widened again: WPT browser-api stubs now provide a minimal `Element.animate(...).finished` path plus a lightweight `test_driver.Actions()` touch-pinch model that raises `visualViewport.scale`, so the next `visual-scrollIntoView-002.html` harness-style page can exercise its compositor-ready/pinch-zoom flow instead of bailing out before the fixed-target visual scroll check runs.
+- Phase 6 has widened again: the WPT runner now resolves root-relative external support scripts (for example `/dom/events/scrolling/scroll_support.js`) against the checked-out WPT root, so the remaining `scrollIntoView-fixed.html` / `scroll-behavior-subframe-root.html` / `scroll-behavior-subframe-window.html` harness pages can execute their real helper scripts instead of silently skipping the scroll-behavior checks.
 
 ### 2026-04-22
 

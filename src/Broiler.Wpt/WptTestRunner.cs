@@ -758,6 +758,7 @@ internal sealed class WptTestRunner
             html = ExecuteScriptsWithDom(
                 html,
                 new Uri(Path.GetFullPath(testPath)).AbsoluteUri,
+                wptRoot,
                 batchStyleInvalidations: IsCrashTest(testPath));
         }
         catch (Exception ex)
@@ -987,7 +988,7 @@ internal sealed class WptTestRunner
         var testBaseUrl = new Uri(Path.GetFullPath(htmlPath)).AbsoluteUri;
 
         // Set local base path for sub-resource resolution.
-        html = ExecuteScriptsWithDom(html, testBaseUrl);
+        html = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot);
         html = HtmlPostProcessor.Process(html);
 
         EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetHandler = null;
@@ -1068,7 +1069,11 @@ internal sealed class WptTestRunner
     /// Extracts and executes inline/external scripts via the DomBridge,
     /// returning the post-execution HTML with DOM mutations applied.
     /// </summary>
-    private static string ExecuteScriptsWithDom(string html, string url, bool batchStyleInvalidations = false)
+    private static string ExecuteScriptsWithDom(
+        string html,
+        string url,
+        string? wptRoot = null,
+        bool batchStyleInvalidations = false)
     {
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
@@ -1121,20 +1126,14 @@ internal sealed class WptTestRunner
                     continue;
                 }
 
-                // Try to load relative-path scripts from the test directory.
-                if (testDir != null &&
-                    !src.StartsWith("/", StringComparison.Ordinal) &&
-                    !src.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                var localScript = ResolveExternalScriptPath(src, testDir, wptRoot);
+                if (localScript != null && File.Exists(localScript))
                 {
-                    var localScript = Path.Combine(testDir, src.Replace('/', Path.DirectorySeparatorChar));
-                    if (File.Exists(localScript))
-                    {
-                        var scriptContent = File.ReadAllText(localScript);
-                        if (isDefer)
-                            deferredScripts.Add(scriptContent);
-                        else
-                            scripts.Add(scriptContent);
-                    }
+                    var scriptContent = File.ReadAllText(localScript);
+                    if (isDefer)
+                        deferredScripts.Add(scriptContent);
+                    else
+                        scripts.Add(scriptContent);
                 }
 
                 continue;
@@ -1281,5 +1280,26 @@ internal sealed class WptTestRunner
         bridge.ResolveAnchorPositions();
 
         return bridge.SerializeToHtml();
+    }
+
+    private static string? ResolveExternalScriptPath(string src, string? testDir, string? wptRoot)
+    {
+        if (string.IsNullOrWhiteSpace(src) ||
+            src.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (src.StartsWith("/", StringComparison.Ordinal))
+        {
+            if (string.IsNullOrWhiteSpace(wptRoot))
+                return null;
+
+            var relativePath = src.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+            return Path.Combine(wptRoot, relativePath);
+        }
+
+        if (string.IsNullOrWhiteSpace(testDir))
+            return null;
+
+        return Path.Combine(testDir, src.Replace('/', Path.DirectorySeparatorChar));
     }
 }
