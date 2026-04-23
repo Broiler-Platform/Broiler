@@ -18,6 +18,7 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge
 {
+    private const int MaxCustomPropertyResolutionPasses = 4;
     private int _styleInvalidationBatchDepth;
     private HashSet<DomElement>? _pendingStyleInvalidationRoots;
 
@@ -1218,7 +1219,7 @@ public sealed partial class DomBridge
         Dictionary<string, string>? parentResolved,
         Dictionary<string, CustomPropertyRegistration> registrations)
     {
-        for (var pass = 0; pass < 4; pass++)
+        for (var pass = 0; pass < MaxCustomPropertyResolutionPasses; pass++)
         {
             var changed = false;
             foreach (var key in resolved.Keys.Where(k => k.StartsWith("--", StringComparison.Ordinal)).ToList())
