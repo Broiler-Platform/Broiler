@@ -684,7 +684,7 @@ public sealed partial class DomBridge
         }
     }
 
-    private static DomElement NextSibling(DomElement el)
+    private static DomElement? NextSibling(DomElement el)
     {
         if (el.Parent == null) return null;
         var siblings = el.Parent.Children;
