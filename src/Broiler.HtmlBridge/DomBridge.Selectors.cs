@@ -377,10 +377,6 @@ public sealed partial class DomBridge
         return compound;
     }
 
-    private static readonly Regex PseudoClassPattern = new(
-        @":(?<name>[a-zA-Z-]+)(?:\((?<arg>[^)]*)\))?",
-        RegexOptions.Compiled);
-
     /// <summary>
     /// Processes pseudo-class selectors (<c>:nth-child</c>, <c>:not</c>,
     /// <c>:first-of-type</c>, <c>:first-child</c>, <c>:last-child</c>)
@@ -390,13 +386,14 @@ public sealed partial class DomBridge
     /// </summary>
     private static bool ProcessPseudoClasses(DomElement el, ref string compound)
     {
-        var matches = PseudoClassPattern.Matches(compound);
-        if (matches.Count == 0) return true;
+        var pseudoClasses = ExtractPseudoClasses(compound);
+        if (pseudoClasses.Count == 0)
+            return true;
 
-        foreach (Match m in matches)
+        foreach (var pseudo in pseudoClasses)
         {
-            var pseudoName = m.Groups["name"].Value.ToLowerInvariant();
-            var arg = m.Groups["arg"].Success ? m.Groups["arg"].Value.Trim() : null;
+            var pseudoName = pseudo.Name.ToLowerInvariant();
+            var arg = pseudo.Argument?.Trim();
 
             switch (pseudoName)
             {
@@ -439,6 +436,9 @@ public sealed partial class DomBridge
                 case "not":
                     if (arg != null && MatchesCompound(el, arg)) return false;
                     break;
+                case "has":
+                    if (arg == null || !MatchesHas(el, arg)) return false;
+                    break;
                 case "lang":
                     if (arg == null || !MatchesLang(el, arg)) return false;
                     break;
@@ -477,8 +477,221 @@ public sealed partial class DomBridge
             }
         }
 
-        compound = PseudoClassPattern.Replace(compound, string.Empty);
+        compound = RemovePseudoClasses(compound, pseudoClasses);
         return true;
+    }
+
+    private static List<(string Name, string? Argument, int Start, int Length)> ExtractPseudoClasses(string compound)
+    {
+        var result = new List<(string Name, string? Argument, int Start, int Length)>();
+        int bracketDepth = 0;
+
+        for (int i = 0; i < compound.Length; i++)
+        {
+            var c = compound[i];
+            if (c == '[')
+            {
+                bracketDepth++;
+                continue;
+            }
+
+            if (c == ']')
+            {
+                bracketDepth = Math.Max(0, bracketDepth - 1);
+                continue;
+            }
+
+            if (bracketDepth > 0 || c != ':')
+                continue;
+
+            if (i + 1 < compound.Length && compound[i + 1] == ':')
+                continue;
+
+            int nameStart = i + 1;
+            int nameEnd = nameStart;
+            while (nameEnd < compound.Length &&
+                   (char.IsLetter(compound[nameEnd]) || compound[nameEnd] == '-'))
+            {
+                nameEnd++;
+            }
+
+            if (nameEnd == nameStart)
+                continue;
+
+            string? argument = null;
+            int tokenEnd = nameEnd;
+            if (nameEnd < compound.Length && compound[nameEnd] == '(')
+            {
+                int closeIndex = FindMatchingPseudoClassParen(compound, nameEnd);
+                if (closeIndex < 0)
+                    closeIndex = compound.Length - 1;
+
+                argument = compound.Substring(nameEnd + 1, Math.Max(0, closeIndex - nameEnd - 1));
+                tokenEnd = closeIndex + 1;
+            }
+
+            result.Add((compound[nameStart..nameEnd], argument, i, tokenEnd - i));
+            i = tokenEnd - 1;
+        }
+
+        return result;
+    }
+
+    private static int FindMatchingPseudoClassParen(string compound, int openParenIndex)
+    {
+        int parenDepth = 0;
+        int bracketDepth = 0;
+        for (int i = openParenIndex; i < compound.Length; i++)
+        {
+            var c = compound[i];
+            switch (c)
+            {
+                case '[':
+                    bracketDepth++;
+                    break;
+                case ']':
+                    bracketDepth = Math.Max(0, bracketDepth - 1);
+                    break;
+                case '(' when bracketDepth == 0:
+                    parenDepth++;
+                    break;
+                case ')' when bracketDepth == 0:
+                    parenDepth--;
+                    if (parenDepth == 0)
+                        return i;
+                    break;
+            }
+        }
+
+        return -1;
+    }
+
+    private static string RemovePseudoClasses(
+        string compound,
+        List<(string Name, string? Argument, int Start, int Length)> pseudoClasses)
+    {
+        var builder = new StringBuilder(compound.Length);
+        int currentIndex = 0;
+        foreach (var pseudo in pseudoClasses)
+        {
+            if (pseudo.Start > currentIndex)
+                builder.Append(compound, currentIndex, pseudo.Start - currentIndex);
+
+            currentIndex = pseudo.Start + pseudo.Length;
+        }
+
+        if (currentIndex < compound.Length)
+            builder.Append(compound, currentIndex, compound.Length - currentIndex);
+
+        return builder.ToString();
+    }
+
+    private static bool MatchesHas(DomElement el, string selectorList)
+    {
+        foreach (var selector in SplitSelectorList(selectorList))
+        {
+            if (MatchesRelativeSelector(el, selector))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool MatchesRelativeSelector(DomElement scope, string selector)
+    {
+        var parts = SplitSelectorParts(selector.Trim());
+        if (parts.Count == 0)
+            return false;
+
+        foreach (var candidate in EnumerateRelativeCandidates(scope, parts[0].Combinator, parts[0].Compound))
+        {
+            if (MatchesRelativeSelectorParts(parts, 1, candidate))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool MatchesRelativeSelectorParts(
+        List<(char Combinator, string Compound)> parts,
+        int index,
+        DomElement current)
+    {
+        if (index >= parts.Count)
+            return true;
+
+        foreach (var candidate in EnumerateRelativeCandidates(current, parts[index].Combinator, parts[index].Compound))
+        {
+            if (MatchesRelativeSelectorParts(parts, index + 1, candidate))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<DomElement> EnumerateRelativeCandidates(DomElement scope, char combinator, string compound)
+    {
+        combinator = combinator == '\0' ? ' ' : combinator;
+
+        switch (combinator)
+        {
+            case ' ':
+                foreach (var descendant in EnumerateDescendants(scope))
+                {
+                    if (MatchesCompound(descendant, compound))
+                        yield return descendant;
+                }
+                break;
+
+            case '>':
+                foreach (var child in scope.Children)
+                {
+                    if (!child.IsTextNode && MatchesCompound(child, compound))
+                        yield return child;
+                }
+                break;
+
+            case '+':
+                var nextSibling = NextSibling(scope);
+                if (nextSibling != null && MatchesCompound(nextSibling, compound))
+                    yield return nextSibling;
+                break;
+
+            case '~':
+                var sibling = NextSibling(scope);
+                while (sibling != null)
+                {
+                    if (MatchesCompound(sibling, compound))
+                        yield return sibling;
+
+                    sibling = NextSibling(sibling);
+                }
+                break;
+        }
+    }
+
+    private static IEnumerable<DomElement> EnumerateDescendants(DomElement root)
+    {
+        foreach (var child in root.Children)
+        {
+            if (child.IsTextNode || child.TagName.StartsWith("#", StringComparison.Ordinal))
+                continue;
+
+            yield return child;
+
+            foreach (var descendant in EnumerateDescendants(child))
+                yield return descendant;
+        }
+    }
+
+    private static DomElement NextSibling(DomElement el)
+    {
+        if (el.Parent == null) return null;
+        var siblings = el.Parent.Children;
+        var idx = siblings.IndexOf(el);
+        for (int i = idx + 1; i < siblings.Count; i++)
+            if (!siblings[i].IsTextNode) return siblings[i];
+        return null;
     }
 
     /// <summary>

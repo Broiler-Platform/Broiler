@@ -351,6 +351,111 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
+    [Fact]
+    public void Has_NthChild_Invalidation_Tracks_Removals()
+    {
+        var html = """
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  #target1:has(.item:nth-child(3)) { color: red; }
+  #target2:has(.item:nth-last-child(3)) { color: red; }
+  #target3:has(.item:nth-child(3) > .child) { color: red; }
+  #target4:has(.item:nth-last-child(3) > .child) { color: red; }
+</style>
+</head>
+<body>
+<div id="target1">
+  <div class="item" id="item1"></div>
+  <div class="item"></div>
+  <div class="item"></div>
+</div>
+<div id="target2">
+  <div class="item"></div>
+  <div class="item"></div>
+  <div class="item" id="item2"></div>
+</div>
+<div id="target3">
+  <div class="item" id="item3"></div>
+  <div class="item"></div>
+  <div class="item"><span class="child"></span></div>
+</div>
+<div id="target4">
+  <div class="item"><span class="child"></span></div>
+  <div class="item"></div>
+  <div class="item" id="item4"></div>
+</div>
+<script>
+function matches(selector) {
+  return document.querySelector(selector) !== null;
+}
+document.body.setAttribute('data-before', [
+  matches('#target1:has(.item:nth-child(3))'),
+  matches('#target2:has(.item:nth-last-child(3))'),
+  matches('#target3:has(.item:nth-child(3) > .child)'),
+  matches('#target4:has(.item:nth-last-child(3) > .child)')
+].join(';'));
+document.getElementById('item1').remove();
+document.getElementById('item2').remove();
+document.getElementById('item3').remove();
+document.getElementById('item4').remove();
+document.body.setAttribute('data-after', [
+  matches('#target1:has(.item:nth-child(3))'),
+  matches('#target2:has(.item:nth-last-child(3))'),
+  matches('#target3:has(.item:nth-child(3) > .child)'),
+  matches('#target4:has(.item:nth-last-child(3) > .child)')
+].join(';'));
+</script>
+</body>
+</html>
+""";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("data-before=\"true;true;true;true\"", result);
+        Assert.Contains("data-after=\"false;false;false;false\"", result);
+    }
+
+    [Fact]
+    public void Has_GeneralSibling_NestedNthChild_Invalidation_Tracks_Removals()
+    {
+        var html = """
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  .item:not(:has(~ .item > :nth-child(2))) { color: green; }
+</style>
+</head>
+<body>
+<div class="item square" id="first">
+  <div></div>
+  <div></div>
+</div>
+<div id="target" class="item">
+  <div></div>
+  <div></div>
+</div>
+<script>
+function matches(selector) {
+  return document.querySelector(selector) !== null;
+}
+document.body.setAttribute('data-before', [
+  matches('#first:not(:has(~ .item > :nth-child(2)))'),
+  matches('#target:not(:has(~ .item > :nth-child(2)))')
+].join(';'));
+document.getElementById('target').remove();
+document.body.setAttribute('data-after', matches('#first:not(:has(~ .item > :nth-child(2)))'));
+</script>
+</body>
+</html>
+""";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("data-before=\"false;true\"", result);
+        Assert.Contains("data-after=\"true\"", result);
+    }
+
     // ─────────── Pseudo-classes: :enabled, :disabled, :checked ────────────
 
     [Fact]

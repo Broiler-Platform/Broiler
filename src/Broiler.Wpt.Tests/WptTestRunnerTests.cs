@@ -6526,6 +6526,133 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void Wpt_SelectorsInvalidation_HasWithNthChild_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    #test-container > div { width: 100px; height: 25px; background: green; }
+    #target1:has(.item:nth-child(3)) { background: red; }
+    #target2:has(.item:nth-last-child(3)) { background: red; }
+    #target3:has(.item:nth-child(3) > .child) { background: red; }
+    #target4:has(.item:nth-last-child(3) > .child) { background: red; }
+  </style>
+</head>
+<body onload="item1.remove(); item2.remove(); item3.remove(); item4.remove();">
+  <div id="test-container">
+    <div id="target1">
+      <div class="item" id="item1"></div>
+      <div class="item"></div>
+      <div class="item"></div>
+    </div>
+    <div id="target2">
+      <div class="item"></div>
+      <div class="item"></div>
+      <div class="item" id="item2"></div>
+    </div>
+    <div id="target3">
+      <div class="item" id="item3"></div>
+      <div class="item"></div>
+      <div class="item"><span class="child"></span></div>
+    </div>
+    <div id="target4">
+      <div class="item"><span class="child"></span></div>
+      <div class="item"></div>
+      <div class="item" id="item4"></div>
+    </div>
+  </div>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    #test-container > div { width: 100px; height: 25px; background: green; }
+  </style>
+</head>
+<body>
+  <div id="test-container">
+    <div id="target1"></div>
+    <div id="target2"></div>
+    <div id="target3"></div>
+    <div id="target4"></div>
+  </div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors-invalidation-has-with-nth-child", 120, 120);
+        Assert.True(result.Passed,
+            $":has(.item:nth-child(...)) invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_SelectorsInvalidation_HasWithNthChildSiblingRemove_MatchesReference()
+    {
+        var testHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    .square {
+      width: 100px;
+      height: 100px;
+      background: red;
+    }
+
+    .item:not(:has(~ .item > :nth-child(2))) {
+      background: green;
+    }
+  </style>
+</head>
+<body onload="td.remove();">
+  <div id="container">
+    <div class="item square">
+      <div></div>
+      <div></div>
+    </div>
+    <div id="td" class="item">
+      <div></div>
+      <div></div>
+    </div>
+  </div>
+</body>
+</html>
+""";
+        var referenceHtml = """
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    .square {
+      width: 100px;
+      height: 100px;
+      background: green;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div class="square"></div>
+  </div>
+</body>
+</html>
+""";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "selectors-invalidation-has-with-nth-child-sibling-remove", 120, 120);
+        Assert.True(result.Passed,
+            $":has(~ .item > :nth-child(2)) invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_AbsposInBlockInInlineInRelposInline_MatchesReference()
     {
         // CSS2 §10.1: Absolute positioning in inline contexts.
