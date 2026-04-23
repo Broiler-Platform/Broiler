@@ -7157,6 +7157,45 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
     }
 
     [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Uses_Svg_Text_Tspan_And_TextPath_Content()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <svg id=""svgRoot"" xmlns=""http://www.w3.org/2000/svg"" xmlns:xlink=""http://www.w3.org/1999/xlink"" width=""300"" height=""300"" style=""margin:100px;display:block"">
+    <defs>
+      <path id=""path"" d=""M10,170h1000""></path>
+    </defs>
+    <text id=""text1"" x=""10"" y=""50"" font-size=""50"">Some text</text>
+    <text id=""text2"" x=""10"" y=""110"" font-size=""50""><tspan id=""tspan1"">Some text</tspan></text>
+    <text id=""text3"" font-size=""50""><textPath id=""textpath1"" xlink:href=""#path"">Some text</textPath></text>
+    <text id=""text4"" x=""10"" y=""230"" font-size=""50"">Text under<tspan id=""tspan2"" x=""10"">Text over</tspan></text>
+  </svg>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var firstHits = document.elementsFromPoint(125, 125);
+                var secondHits = document.elementsFromPoint(125, 185);
+                var thirdHits = document.elementsFromPoint(125, 245);
+                var fourthHits = document.elementsFromPoint(125, 305);
+                return [
+                    firstHits[0] && (firstHits[0].id || firstHits[0].tagName),
+                    firstHits[1] && (firstHits[1].id || firstHits[1].tagName),
+                    secondHits[0] && (secondHits[0].id || secondHits[0].tagName),
+                    thirdHits[0] && (thirdHits[0].id || thirdHits[0].tagName),
+                    fourthHits[0] && (fourthHits[0].id || fourthHits[0].tagName),
+                    fourthHits[1] && (fourthHits[1].id || fourthHits[1].tagName)
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("text1|svgRoot|tspan1|textpath1|tspan2|text4", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped()
     {
         const string html = @"<!DOCTYPE html>

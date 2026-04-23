@@ -72,6 +72,7 @@
 - Phase 6 has widened again: document hit-testing now gives inline SVG viewports and simple `<rect>` geometry usable client rects from SVG width/height/x/y attributes, so the focused `elementFromPoint*` / `elementsFromPoint*` SVG viewport slice can resolve `<svg>` roots and rect descendants instead of collapsing them to zero-sized boxes.
 - Phase 6 has widened again: inline SVG roots in HTML flow now keep normal block stacking while SVG-positioned descendants still honor their own geometry attributes, so document hit-testing can target later stacked SVG viewports without collapsing them back onto the first root.
 - Phase 6 has widened again: cssom-view hit-testing now treats SVG `<image>` / `<foreignObject>` geometry like other positioned SVG boxes, unions translated `<g>` descendants into a bounding box for `pointer-events: bounding-box` cases, and applies simple `translate(...)` transforms while deriving hit rects; focused CLI and WPT guards now cover the richer `elementsFromPoint-svg.html` follow-up slice locally.
+- Phase 6 has widened again: cssom-view hit-testing now gives SVG text content elements coarse boxes from their text anchors, direct text runs, font size, and simple `textPath` start points, so focused `elementsFromPoint-svg-text.html` cases can return `<text>`, `<tspan>`, and `<textPath>` targets instead of collapsing them back onto the outer SVG root; focused CLI and WPT guards cover that text-content follow-up slice locally.
 
 ### 2026-04-18
 

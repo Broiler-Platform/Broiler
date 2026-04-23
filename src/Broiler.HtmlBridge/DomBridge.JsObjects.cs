@@ -3597,6 +3597,17 @@ public sealed partial class DomBridge
                string.Equals(tag, "svg:g", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsSvgTextContentElement(DomElement element)
+    {
+        var tag = element.TagName;
+        return string.Equals(tag, "text", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "svg:text", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "tspan", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "svg:tspan", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "textpath", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "svg:textpath", StringComparison.OrdinalIgnoreCase);
+    }
+
     private bool TryGetSvgChildrenUnionRect(
         DomElement element,
         out (double Left, double Top, double Width, double Height) rect)
@@ -3636,6 +3647,145 @@ public sealed partial class DomBridge
             ? (minLeft, minTop, Math.Max(0, maxRight - minLeft), Math.Max(0, maxBottom - minTop))
             : (0, 0, 0, 0);
         return found;
+    }
+
+    private bool TryGetSvgTextHitTestRect(
+        DomElement element,
+        out (double Left, double Top, double Width, double Height) rect)
+    {
+        var text = GetDirectTextContent(element);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            rect = (0, 0, 0, 0);
+            return false;
+        }
+
+        var fontSize = ResolveFontSizeForElement(element);
+        if (fontSize <= 0)
+            fontSize = 16;
+
+        var width = text
+            .Replace("\r", string.Empty)
+            .Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => line.Length > 0)
+            .DefaultIfEmpty(string.Empty)
+            .Max(line => line.Length) * fontSize * 0.6;
+        if (width <= 0)
+        {
+            rect = (0, 0, 0, 0);
+            return false;
+        }
+
+        var baselineX = ResolveSvgTextCoordinate(element, "x");
+        var baselineY = ResolveSvgTextCoordinate(element, "y");
+        if (IsSvgTextPathElement(element) &&
+            TryResolveSvgTextPathStart(element, out var pathStart))
+        {
+            if (!HasOwnSvgCoordinate(element, "x"))
+                baselineX = pathStart.X;
+            if (!HasOwnSvgCoordinate(element, "y"))
+                baselineY = pathStart.Y;
+        }
+
+        rect = (baselineX, baselineY - fontSize, width, fontSize);
+        return true;
+    }
+
+    private static string GetDirectTextContent(DomElement element)
+    {
+        var sb = new StringBuilder();
+        if (!string.IsNullOrWhiteSpace(element.TextContent))
+            sb.Append(element.TextContent);
+
+        foreach (var child in element.Children)
+        {
+            if (child.IsTextNode && !string.IsNullOrWhiteSpace(child.TextContent))
+                sb.Append(child.TextContent);
+        }
+
+        return sb.ToString();
+    }
+
+    private double ResolveSvgTextCoordinate(DomElement element, string attributeName)
+    {
+        for (var current = element; current != null; current = current.Parent)
+        {
+            if (!IsSvgTextContentElement(current))
+                continue;
+
+            if (current.Attributes.TryGetValue(attributeName, out var rawValue))
+            {
+                var percentageBasis = ResolveContainingBlockReferenceLength(
+                    current,
+                    vertical: string.Equals(attributeName, "y", StringComparison.OrdinalIgnoreCase));
+                var resolved = ParseCssLengthToPixelsWithViewport(rawValue, current, percentageBasis: percentageBasis);
+                if (resolved > 0 || string.Equals(rawValue?.Trim(), "0", StringComparison.Ordinal))
+                    return resolved;
+            }
+
+            if (IsSvgTextPathElement(current) &&
+                TryResolveSvgTextPathStart(current, out var pathStart))
+            {
+                return string.Equals(attributeName, "y", StringComparison.OrdinalIgnoreCase)
+                    ? pathStart.Y
+                    : pathStart.X;
+            }
+        }
+
+        return 0;
+    }
+
+    private static bool HasOwnSvgCoordinate(DomElement element, string attributeName) =>
+        element.Attributes.TryGetValue(attributeName, out var rawValue) &&
+        !string.IsNullOrWhiteSpace(rawValue);
+
+    private bool TryResolveSvgTextPathStart(DomElement element, out (double X, double Y) point)
+    {
+        point = default;
+        if (!element.Attributes.TryGetValue("href", out var href) &&
+            !element.Attributes.TryGetValue("xlink:href", out href))
+        {
+            return false;
+        }
+
+        href = href?.Trim();
+        if (string.IsNullOrWhiteSpace(href) || !href.StartsWith('#'))
+            return false;
+
+        var documentElement = GetOwningDocumentElement(element);
+        var referencedPath = documentElement != null
+            ? FindInTree(documentElement, candidate => string.Equals(candidate.Id, href[1..], StringComparison.Ordinal))
+            : null;
+        if (referencedPath == null ||
+            !referencedPath.Attributes.TryGetValue("d", out var pathData) ||
+            string.IsNullOrWhiteSpace(pathData))
+        {
+            return false;
+        }
+
+        var moveMatch = Regex.Match(
+            pathData,
+            @"[Mm]\s*(?<x>[-+]?[0-9]*\.?[0-9]+)(?:[\s,]+(?<y>[-+]?[0-9]*\.?[0-9]+))",
+            RegexOptions.CultureInvariant);
+        if (!moveMatch.Success ||
+            !double.TryParse(moveMatch.Groups["x"].Value, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var x) ||
+            !double.TryParse(moveMatch.Groups["y"].Value, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var y))
+        {
+            return false;
+        }
+
+        point = (x, y);
+        return true;
+    }
+
+    private static bool IsSvgTextPathElement(DomElement element)
+    {
+        var tag = element.TagName;
+        return string.Equals(tag, "textpath", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "svg:textpath", StringComparison.OrdinalIgnoreCase);
     }
 
     private double GetBorderBoxWidth(Dictionary<string, string> props, DomElement? element = null)
@@ -6841,6 +6991,12 @@ public sealed partial class DomBridge
             TryGetSvgChildrenUnionRect(element, out var svgGroupRect))
         {
             return svgGroupRect;
+        }
+
+        if (IsSvgTextContentElement(element) &&
+            TryGetSvgTextHitTestRect(element, out var svgTextRect))
+        {
+            return svgTextRect;
         }
 
         var rect = GetBoundingClientRectForDomElement(element, isRoot: false);

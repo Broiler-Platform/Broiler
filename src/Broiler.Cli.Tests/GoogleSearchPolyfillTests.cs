@@ -534,6 +534,89 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Document_HitTesting_Uses_Svg_Text_Tspan_And_TextPath_Content()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var svgNs = 'http://www.w3.org/2000/svg';
+            var xlinkNs = 'http://www.w3.org/1999/xlink';
+            var svg = document.createElementNS(svgNs, 'svg');
+            svg.id = 'svgRoot';
+            svg.setAttribute('width', '300');
+            svg.setAttribute('height', '300');
+            svg.style.margin = '100px';
+            svg.style.display = 'block';
+
+            var defs = document.createElementNS(svgNs, 'defs');
+            var path = document.createElementNS(svgNs, 'path');
+            path.id = 'path';
+            path.setAttribute('d', 'M10,170h1000');
+            defs.appendChild(path);
+            svg.appendChild(defs);
+
+            var text1 = document.createElementNS(svgNs, 'text');
+            text1.id = 'text1';
+            text1.setAttribute('x', '10');
+            text1.setAttribute('y', '50');
+            text1.setAttribute('font-size', '50');
+            text1.textContent = 'Some text';
+            svg.appendChild(text1);
+
+            var text2 = document.createElementNS(svgNs, 'text');
+            text2.id = 'text2';
+            text2.setAttribute('x', '10');
+            text2.setAttribute('y', '110');
+            text2.setAttribute('font-size', '50');
+            var tspan1 = document.createElementNS(svgNs, 'tspan');
+            tspan1.id = 'tspan1';
+            tspan1.textContent = 'Some text';
+            text2.appendChild(tspan1);
+            svg.appendChild(text2);
+
+            var text3 = document.createElementNS(svgNs, 'text');
+            text3.id = 'text3';
+            text3.setAttribute('font-size', '50');
+            var textPath = document.createElementNS(svgNs, 'textPath');
+            textPath.id = 'textpath1';
+            textPath.setAttributeNS(xlinkNs, 'xlink:href', '#path');
+            textPath.textContent = 'Some text';
+            text3.appendChild(textPath);
+            svg.appendChild(text3);
+
+            var text4 = document.createElementNS(svgNs, 'text');
+            text4.id = 'text4';
+            text4.setAttribute('x', '10');
+            text4.setAttribute('y', '230');
+            text4.setAttribute('font-size', '50');
+            text4.appendChild(document.createTextNode('Text under'));
+            var tspan2 = document.createElementNS(svgNs, 'tspan');
+            tspan2.id = 'tspan2';
+            tspan2.setAttribute('x', '10');
+            tspan2.textContent = 'Text over';
+            text4.appendChild(tspan2);
+            svg.appendChild(text4);
+
+            document.body.insertBefore(svg, document.getElementById('result'));
+
+            var firstHits = document.elementsFromPoint(125, 125);
+            var secondHits = document.elementsFromPoint(125, 185);
+            var thirdHits = document.elementsFromPoint(125, 245);
+            var fourthHits = document.elementsFromPoint(125, 305);
+
+            document.getElementById('result').textContent = [
+                firstHits[0] && (firstHits[0].id || firstHits[0].tagName),
+                firstHits[1] && (firstHits[1].id || firstHits[1].tagName),
+                secondHits[0] && (secondHits[0].id || secondHits[0].tagName),
+                thirdHits[0] && (thirdHits[0].id || thirdHits[0].tagName),
+                fourthHits[0] && (fourthHits[0].id || fourthHits[0].tagName),
+                fourthHits[1] && (fourthHits[1].id || fourthHits[1].tagName)
+            ].join('|');
+        ");
+
+        Assert.Contains("text1|svgRoot|tspan1|textpath1|tspan2|text4", result);
+    }
+
+    [Fact]
     public void Element_ScrollTo_Updates_ScrollOffsets()
     {
         var result = ExecJs(@"
