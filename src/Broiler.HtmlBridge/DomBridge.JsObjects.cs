@@ -3455,8 +3455,12 @@ public sealed partial class DomBridge
                 continue;
             }
 
-            var scrollTop = ResolveScrollIntoViewOffset(element, scrollContainer, vertical: true, alignment: block);
-            var scrollLeft = ResolveScrollIntoViewOffset(element, scrollContainer, vertical: false, alignment: inline);
+            var (horizontalAlignment, verticalAlignment) = ResolvePhysicalScrollIntoViewAlignments(
+                scrollContainer,
+                block,
+                inline);
+            var scrollTop = ResolveScrollIntoViewOffset(element, scrollContainer, vertical: true, alignment: verticalAlignment);
+            var scrollLeft = ResolveScrollIntoViewOffset(element, scrollContainer, vertical: false, alignment: horizontalAlignment);
 
             SetElementScrollOffsetsWithBehavior(scrollContainer, scrollLeft, scrollTop, clamp: true, behavior: behavior);
 
@@ -3546,6 +3550,44 @@ public sealed partial class DomBridge
         return normalized is "start" or "center" or "end" or "nearest"
             ? normalized
             : fallback;
+    }
+
+    private (string Horizontal, string Vertical) ResolvePhysicalScrollIntoViewAlignments(
+        DomElement scrollContainer,
+        string? block,
+        string? inline)
+    {
+        var props = GetComputedProps(scrollContainer);
+        var writingMode = props.GetValueOrDefault("writing-mode")?.Trim().ToLowerInvariant();
+        var direction = props.GetValueOrDefault("direction");
+        bool isVerticalWritingMode = IsVerticalWritingMode(writingMode);
+        bool isRtl = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
+
+        var horizontal = ResolvePhysicalAxisAlignment(
+            alignment: isVerticalWritingMode ? block : inline,
+            startMapsToPhysicalStart: !isVerticalWritingMode
+                ? !isRtl
+                : writingMode?.EndsWith("-rl", StringComparison.Ordinal) != true);
+        var vertical = ResolvePhysicalAxisAlignment(
+            alignment: isVerticalWritingMode ? inline : block,
+            startMapsToPhysicalStart: !isVerticalWritingMode || !isRtl);
+        return (horizontal, vertical);
+    }
+
+    private static string ResolvePhysicalAxisAlignment(
+        string? alignment,
+        bool startMapsToPhysicalStart)
+    {
+        var normalized = NormalizeScrollIntoViewAlignment(alignment, "start");
+        if (normalized is "center" or "nearest" || startMapsToPhysicalStart)
+            return normalized;
+
+        return normalized switch
+        {
+            "start" => "end",
+            "end" => "start",
+            _ => normalized
+        };
     }
 
     private double GetElementScrollOffset(DomElement element, bool vertical)
@@ -3701,7 +3743,8 @@ public sealed partial class DomBridge
             viewportSizeOverride: GetVisualViewportHeight(),
             currentScrollOverride: GetVisualViewportPageOffset(vertical: true),
             offsetOverride: GetElementScrollOffset(scrollContainer, vertical: true) +
-                ComputeOffsetWithinAncestor(element, scrollContainer, vertical: true));
+                ComputeOffsetWithinAncestor(element, scrollContainer, vertical: true),
+            coordinateSpaceIsPhysical: true);
         var targetLeft = ResolveScrollIntoViewOffset(
             element,
             scrollContainer,
@@ -3710,7 +3753,8 @@ public sealed partial class DomBridge
             viewportSizeOverride: GetVisualViewportWidth(),
             currentScrollOverride: GetVisualViewportPageOffset(vertical: false),
             offsetOverride: GetElementScrollOffset(scrollContainer, vertical: false) +
-                ComputeOffsetWithinAncestor(element, scrollContainer, vertical: false));
+                ComputeOffsetWithinAncestor(element, scrollContainer, vertical: false),
+            coordinateSpaceIsPhysical: true);
         SetVisualViewportPageOffsets(left: targetLeft, top: targetTop);
     }
 
@@ -4154,7 +4198,8 @@ public sealed partial class DomBridge
         string? alignment,
         double? viewportSizeOverride = null,
         double? currentScrollOverride = null,
-        double? offsetOverride = null)
+        double? offsetOverride = null,
+        bool coordinateSpaceIsPhysical = false)
     {
         var normalizedAlignment = NormalizeScrollIntoViewAlignment(alignment, "start");
         var offset = offsetOverride ?? ComputeOffsetWithinAncestor(element, scrollContainer, vertical);
@@ -4169,23 +4214,30 @@ public sealed partial class DomBridge
             ? GetClientHeightForDomElement(scrollContainer, IsDocumentElement(scrollContainer))
             : GetClientWidthForDomElement(scrollContainer, IsDocumentElement(scrollContainer)));
         var currentScroll = currentScrollOverride ?? GetElementScrollOffset(scrollContainer, vertical);
+        var physicalCurrentScroll = coordinateSpaceIsPhysical
+            ? currentScroll
+            : ConvertScrollCoordinateToPhysicalPosition(scrollContainer, vertical, currentScroll);
 
         var startTarget = offset - marginStart - paddingStart;
         var endTarget = offset + targetSize + marginEnd + paddingEnd - viewportSize;
         if (normalizedAlignment == "start")
-            return startTarget;
+            return ConvertPhysicalScrollPosition(scrollContainer, vertical, startTarget, coordinateSpaceIsPhysical);
         if (normalizedAlignment == "end")
-            return endTarget;
+            return ConvertPhysicalScrollPosition(scrollContainer, vertical, endTarget, coordinateSpaceIsPhysical);
 
         var alignmentViewportSize = Math.Max(0, viewportSize - paddingStart - paddingEnd);
         if (normalizedAlignment == "center")
         {
             var targetCenter = offset + ((targetSize + marginEnd - marginStart) / 2.0);
-            return targetCenter - paddingStart - (alignmentViewportSize / 2.0);
+            return ConvertPhysicalScrollPosition(
+                scrollContainer,
+                vertical,
+                targetCenter - paddingStart - (alignmentViewportSize / 2.0),
+                coordinateSpaceIsPhysical);
         }
 
-        var visibleStart = currentScroll + paddingStart;
-        var visibleEnd = currentScroll + viewportSize - paddingEnd;
+        var visibleStart = physicalCurrentScroll + paddingStart;
+        var visibleEnd = physicalCurrentScroll + viewportSize - paddingEnd;
         var targetStart = offset - marginStart;
         var targetEnd = offset + targetSize + marginEnd;
 
@@ -4193,14 +4245,58 @@ public sealed partial class DomBridge
             return currentScroll;
 
         if (targetSize + marginStart + marginEnd > alignmentViewportSize)
-            return Math.Abs(startTarget - currentScroll) <= Math.Abs(endTarget - currentScroll) ? startTarget : endTarget;
+        {
+            var chosenTarget = Math.Abs(startTarget - physicalCurrentScroll) <= Math.Abs(endTarget - physicalCurrentScroll)
+                ? startTarget
+                : endTarget;
+            return ConvertPhysicalScrollPosition(scrollContainer, vertical, chosenTarget, coordinateSpaceIsPhysical);
+        }
 
         if (targetStart < visibleStart)
-            return startTarget;
+            return ConvertPhysicalScrollPosition(scrollContainer, vertical, startTarget, coordinateSpaceIsPhysical);
         if (targetEnd > visibleEnd)
-            return endTarget;
+            return ConvertPhysicalScrollPosition(scrollContainer, vertical, endTarget, coordinateSpaceIsPhysical);
 
         return currentScroll;
+    }
+
+    private double ConvertPhysicalScrollPosition(
+        DomElement scrollContainer,
+        bool vertical,
+        double physicalPosition,
+        bool coordinateSpaceIsPhysical)
+        => coordinateSpaceIsPhysical
+            ? physicalPosition
+            : ConvertPhysicalPositionToScrollCoordinate(scrollContainer, vertical, physicalPosition);
+
+    private double ConvertScrollCoordinateToPhysicalPosition(DomElement scrollContainer, bool vertical, double coordinate)
+    {
+        if (!UsesNegativeScrollCoordinates(scrollContainer, vertical))
+            return coordinate;
+
+        return coordinate + GetPositiveScrollExtent(scrollContainer, vertical);
+    }
+
+    private double ConvertPhysicalPositionToScrollCoordinate(DomElement scrollContainer, bool vertical, double physicalPosition)
+    {
+        if (!UsesNegativeScrollCoordinates(scrollContainer, vertical))
+            return physicalPosition;
+
+        return physicalPosition - GetPositiveScrollExtent(scrollContainer, vertical);
+    }
+
+    private bool UsesNegativeScrollCoordinates(DomElement scrollContainer, bool vertical)
+    {
+        var (minLeft, _, minTop, _) = GetScrollBounds(scrollContainer);
+        return vertical ? minTop < 0 : minLeft < 0;
+    }
+
+    private double GetPositiveScrollExtent(DomElement scrollContainer, bool vertical)
+    {
+        var (minLeft, maxLeft, minTop, maxTop) = GetScrollBounds(scrollContainer);
+        return vertical
+            ? (minTop < 0 ? maxTop - minTop : maxTop)
+            : (minLeft < 0 ? maxLeft - minLeft : maxLeft);
     }
 
     private (double Value, DomElement Owner) ResolveScrollIntoViewInset(DomElement element, string propertyName)

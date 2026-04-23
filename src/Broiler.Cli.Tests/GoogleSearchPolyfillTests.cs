@@ -1641,6 +1641,53 @@ document.getElementById('result').textContent =
     }
 
     [Fact]
+    public void ScrollIntoView_Maps_Block_And_Inline_Axes_For_WritingModes()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            function measure(writingMode, direction, options) {
+                var scroller = document.createElement('div');
+                scroller.style.overflow = 'scroll';
+                scroller.style.width = '300px';
+                scroller.style.height = '300px';
+                scroller.style.position = 'relative';
+                if (writingMode) {
+                    scroller.style.writingMode = writingMode;
+                }
+                if (direction) {
+                    scroller.style.direction = direction;
+                }
+
+                var content = document.createElement('div');
+                content.style.width = '600px';
+                content.style.height = '600px';
+
+                var target = document.createElement('div');
+                target.style.position = 'absolute';
+                target.style.left = '200px';
+                target.style.top = '200px';
+                target.style.width = '200px';
+                target.style.height = '200px';
+
+                scroller.appendChild(content);
+                scroller.appendChild(target);
+                document.body.appendChild(scroller);
+                target.scrollIntoView(options);
+                return scroller.scrollLeft + ',' + scroller.scrollTop;
+            }
+
+            document.getElementById('result').textContent = [
+                measure('horizontal-tb', 'rtl', { block: 'start', inline: 'start' }),
+                measure('vertical-rl', 'ltr', { block: 'center', inline: 'end' }),
+                measure('sideways-rl', 'rtl', { block: 'end', inline: 'center' })
+            ].join('|');
+        ");
+
+        Assert.Contains("-200,200|-150,100|-100,-150", result);
+    }
+
+    [Fact]
     public void FontRelative_Ch_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
     {
         var result = ExecJs(@"
