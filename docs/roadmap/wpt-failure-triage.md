@@ -24,6 +24,7 @@
 - Phase 6 has widened again: script-assigned `iframe.srcdoc` now updates the backing subdocument/load path instead of only creating a disconnected JS property, so `frames[0].document` sees the live same-origin `srcdoc` DOM during cssom-view fixed-target harness follow-ups driven from outer-window load listeners.
 - Phase 6 has widened again: cssom-view auto-sized block metrics now derive basic width/height from rendered children and direct text when `width`/`height` stay `auto`, which keeps negative-margin hit-testing ancestors and no-overflow `scrollWidth` / `scrollHeight` checks from collapsing to zero in the next `elementFromPoint*` / `scroll*` follow-up slice.
 - Phase 6 has widened again: WPT harness stubs now queue `promise_test(...)` callbacks until window load and provide a minimal `HTMLElement` / `customElements.define()` upgrade path for already-parsed custom-element nodes, so the next cssom-view shadow-tree and visual/subframe harness pages can execute their scripted checks instead of stalling as empty harness output.
+- Phase 6 has widened again: WPT browser-api stubs now provide a minimal `Element.animate(...).finished` path plus a lightweight `test_driver.Actions()` touch-pinch model that raises `visualViewport.scale`, so the next `visual-scrollIntoView-002.html` harness-style page can exercise its compositor-ready/pinch-zoom flow instead of bailing out before the fixed-target visual scroll check runs.
 
 ### 2026-04-22
 

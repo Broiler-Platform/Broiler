@@ -278,6 +278,22 @@ internal sealed class WptTestRunner
   var __broilerCustomElementRegistry = Object.create(null);
   var __broilerCurrentCustomElementName = null;
   var __broilerNativeCreateElement = document.createElement.bind(document);
+  function __broilerCreateAnimationResult() {
+    return {
+      finished: Promise.resolve(),
+      cancel: function() {},
+      play: function() {},
+      pause: function() {}
+    };
+  }
+  function __broilerEnsureAnimate(element) {
+    if (element && typeof element.animate === 'undefined') {
+      element.animate = function() {
+        return __broilerCreateAnimationResult();
+      };
+    }
+    return element;
+  }
 
   // Always override requestAnimationFrame with a synchronous stub.
   // DomBridge registers a native async rAF that queues callbacks into
@@ -301,9 +317,75 @@ internal sealed class WptTestRunner
       return Promise.resolve();
     };
   }
+  __broilerEnsureAnimate(document.documentElement);
+  __broilerEnsureAnimate(document.body);
+  if (typeof test_driver === 'undefined') {
+    window.test_driver = {};
+  }
+  if (typeof test_driver.Actions === 'undefined') {
+    function Actions() {
+      this._pointers = Object.create(null);
+    }
+
+    Actions.prototype.addPointer = function(name, type) {
+      this._pointers[String(name || 'pointer')] = {
+        type: String(type || 'mouse'),
+        moves: []
+      };
+      return this;
+    };
+
+    Actions.prototype.pointerMove = function(x, y, options) {
+      var sourceName = options && options.sourceName
+        ? String(options.sourceName)
+        : Object.keys(this._pointers)[0] || 'pointer';
+      if (!this._pointers[sourceName]) {
+        this.addPointer(sourceName, 'mouse');
+      }
+
+      this._pointers[sourceName].moves.push({
+        x: Number(x) || 0,
+        y: Number(y) || 0
+      });
+      return this;
+    };
+
+    Actions.prototype.pointerDown = function() { return this; };
+    Actions.prototype.pointerUp = function() { return this; };
+    Actions.prototype.pause = function() { return this; };
+    Actions.prototype.keyDown = function() { return this; };
+    Actions.prototype.keyUp = function() { return this; };
+    Actions.prototype.scroll = function() { return this; };
+    Actions.prototype.send = function() {
+      var touchPointers = Object.keys(this._pointers)
+        .map((name) => this._pointers[name])
+        .filter((pointer) => pointer.type === 'touch' && pointer.moves.length > 0);
+
+      if (touchPointers.length >= 2 &&
+          window.visualViewport &&
+          typeof visualViewport.scale !== 'undefined') {
+        var first = touchPointers[0];
+        var second = touchPointers[1];
+        var firstStart = first.moves[0];
+        var secondStart = second.moves[0];
+        var firstEnd = first.moves[first.moves.length - 1];
+        var secondEnd = second.moves[second.moves.length - 1];
+        var startDistance = Math.hypot(firstStart.x - secondStart.x, firstStart.y - secondStart.y);
+        var endDistance = Math.hypot(firstEnd.x - secondEnd.x, firstEnd.y - secondEnd.y);
+
+        if (endDistance > startDistance + 1) {
+          visualViewport.scale = Math.max(Number(visualViewport.scale) || 1, 2);
+        }
+      }
+
+      return Promise.resolve();
+    };
+
+    test_driver.Actions = Actions;
+  }
   if (typeof HTMLElement === 'undefined') {
     window.HTMLElement = function HTMLElement() {
-      return __broilerNativeCreateElement(__broilerCurrentCustomElementName || 'div');
+      return __broilerEnsureAnimate(__broilerNativeCreateElement(__broilerCurrentCustomElementName || 'div'));
     };
   }
   if (typeof customElements === 'undefined') {
@@ -320,6 +402,8 @@ internal sealed class WptTestRunner
       if (!upgraded) {
         return sourceElement;
       }
+
+      __broilerEnsureAnimate(upgraded);
 
       if (sourceElement && upgraded !== sourceElement) {
         if (sourceElement.attributes) {
@@ -354,7 +438,7 @@ internal sealed class WptTestRunner
 
       var ctor = __broilerCustomElementRegistry[tagName];
       if (!ctor) {
-        return __broilerNativeCreateElement(tagName);
+        return __broilerEnsureAnimate(__broilerNativeCreateElement(tagName));
       }
 
       return __broilerUpgradeElement(tagName, ctor, null);

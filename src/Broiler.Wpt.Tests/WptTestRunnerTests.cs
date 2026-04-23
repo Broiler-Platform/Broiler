@@ -3188,6 +3188,102 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_Harness_TestDriver_Actions_Can_Drive_VisualViewport_PinchZoom_Flow()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <meta name=""viewport"" content=""width=device-width,initial-scale=1"">
+  <script src=""/resources/testharness.js""></script>
+  <script src=""/resources/testharnessreport.js""></script>
+  <style>
+    html { height: 10000px; }
+    body { margin: 0; padding: 0; background: red; }
+    #pass { width: 100px; height: 100px; background: red; }
+    #fixed {
+      position: fixed;
+      bottom: 0;
+      height: 50vh;
+      width: 100vw;
+      overflow: scroll;
+      background-color: gray;
+    }
+    input { height: 20px; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <div id=""fixed"">
+    <div style=""height: calc(80vh - 40px)""></div>
+    <input type=""text"" id=""name"">
+  </div>
+  <script>
+    async function pinch_zoom_action(targetWindow = window) {
+      await new test_driver.Actions()
+        .addPointer('finger1', 'touch')
+        .addPointer('finger2', 'touch')
+        .pointerMove(parseInt(targetWindow.innerWidth / 2),
+                     parseInt(targetWindow.innerHeight / 2),
+                     {origin: 'viewport', sourceName: 'finger1'})
+        .pointerMove(parseInt(targetWindow.innerWidth / 2),
+                     parseInt(targetWindow.innerHeight / 2),
+                     {origin: 'viewport', sourceName: 'finger2'})
+        .pointerDown({sourceName: 'finger1'})
+        .pointerDown({sourceName: 'finger2'})
+        .pointerMove(parseInt(targetWindow.innerWidth / 3),
+                     parseInt(targetWindow.innerHeight / 3),
+                     {origin: 'viewport', sourceName: 'finger1'})
+        .pointerMove(parseInt(targetWindow.innerWidth / 3 * 2),
+                     parseInt(targetWindow.innerHeight / 3 * 2),
+                     {origin: 'viewport', sourceName: 'finger2'})
+        .pointerUp({sourceName: 'finger1'})
+        .pointerUp({sourceName: 'finger2'})
+        .send();
+    }
+
+    async function waitForCompositorReady() {
+      const animation = document.body.animate({ opacity: [0, 1] }, { duration: 1 });
+      await animation.finished;
+    }
+
+    promise_test(async () => {
+      await waitForCompositorReady();
+      await pinch_zoom_action();
+
+      window.scrollTo(0, 1000);
+      const expectedPageTop = visualViewport.pageTop;
+      let visualViewportScrolled = false;
+      visualViewport.addEventListener('scroll', () => { visualViewportScrolled = true; }, { once: true });
+
+      document.getElementById('name').scrollIntoView({ behavior: 'instant' });
+
+      assert_greater_than(visualViewport.scale, 1);
+      assert_true(visualViewportScrolled);
+      assert_greater_than(visualViewport.pageTop, expectedPageTop);
+      document.getElementById('pass').style.background = 'green';
+    }, 'test_driver.Actions pinch zoom should unblock visual viewport scrollIntoView harness pages');
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "wpt-harness-testdriver-pinch-zoom");
+        Assert.True(result.Passed,
+            $"test_driver.Actions pinch-zoom support should drive visual viewport harness checks. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_ChUnit_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
