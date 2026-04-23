@@ -20,6 +20,7 @@ public sealed partial class DomBridge
 
     private const int MaxSerializationDepth = 1024;
     private const double ZoomSerializationEpsilon = 0.0001;
+    private const double DefaultProgressLikeTrackLengthPx = 120;
 
     /// <summary>
     /// Serialises the current DOM tree back to an HTML string.
@@ -89,8 +90,8 @@ public sealed partial class DomBridge
         fill.Style["background-color"] = tag == "meter" ? "#4caf50" : "#0a84ff";
 
         var fillExtent = vertical
-            ? ReadPixelLength(height, 120) * ratio
-            : ReadPixelLength(width, 120) * ratio;
+            ? ReadPixelLength(height, DefaultProgressLikeTrackLengthPx) * ratio
+            : ReadPixelLength(width, DefaultProgressLikeTrackLengthPx) * ratio;
         var fillExtentPx = $"{fillExtent.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}px";
         if (vertical)
         {

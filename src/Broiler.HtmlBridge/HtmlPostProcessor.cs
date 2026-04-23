@@ -10,6 +10,8 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 internal static class HtmlPostProcessor
 {
+    private const double DefaultProgressLikeTrackLengthPx = 120;
+
     /// <summary>
     /// Matches all <c>&lt;script …&gt;…&lt;/script&gt;</c> blocks.
     /// </summary>
@@ -273,7 +275,7 @@ internal static class HtmlPostProcessor
             hostStyles.Add(vertical ? "width:16px" : "width:120px");
             hostStyles.Add(vertical ? "height:120px" : "height:16px");
 
-            var fillExtent = (120 * ratio).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "px";
+            var fillExtent = (DefaultProgressLikeTrackLengthPx * ratio).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "px";
             var fillStyles = new List<string>
             {
                 "position:absolute",
