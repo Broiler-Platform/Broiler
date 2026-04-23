@@ -211,6 +211,7 @@ public sealed partial class DomBridge
             return;
 
         var tag = element.TagName.ToLowerInvariant();
+        var serializedSrcDoc = TrySerializeCurrentSrcDoc(element, depth);
         sb.Append('<').Append(tag);
 
         // Emit id attribute
@@ -228,7 +229,12 @@ public sealed partial class DomBridge
                 string.Equals(kvp.Key, "class", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(kvp.Key, "style", StringComparison.OrdinalIgnoreCase))
                 continue;
-            sb.Append(' ').Append(kvp.Key).Append("=\"").Append(HtmlSerializer.HtmlEncode(kvp.Value)).Append('"');
+
+            var attributeValue =
+                string.Equals(kvp.Key, "srcdoc", StringComparison.OrdinalIgnoreCase) && serializedSrcDoc != null
+                    ? serializedSrcDoc
+                    : kvp.Value;
+            sb.Append(' ').Append(kvp.Key).Append("=\"").Append(HtmlSerializer.HtmlEncode(attributeValue)).Append('"');
         }
 
         // For <input> elements, if the IDL value property was set via
@@ -276,7 +282,15 @@ public sealed partial class DomBridge
         if (element.Children.Count > 0)
         {
             foreach (var child in element.Children)
+            {
+                if (serializedSrcDoc != null &&
+                    string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 SerializeElement(child, sb, depth + 1);
+            }
         }
         else if (!string.IsNullOrEmpty(element.TextContent))
         {
@@ -288,5 +302,25 @@ public sealed partial class DomBridge
         }
 
         sb.Append("</").Append(tag).Append('>');
+    }
+
+    private static string? TrySerializeCurrentSrcDoc(DomElement element, int depth)
+    {
+        if (!string.Equals(element.TagName, "iframe", StringComparison.OrdinalIgnoreCase) ||
+            !element.Attributes.ContainsKey("srcdoc"))
+        {
+            return null;
+        }
+
+        var subDocumentRoot = element.Children.FirstOrDefault(child =>
+            string.Equals(child.TagName, "#subdoc-root", StringComparison.OrdinalIgnoreCase));
+        if (subDocumentRoot == null || subDocumentRoot.Children.Count == 0)
+            return null;
+
+        var sb = new StringBuilder();
+        foreach (var child in subDocumentRoot.Children)
+            SerializeElement(child, sb, depth + 1);
+
+        return sb.ToString();
     }
 }

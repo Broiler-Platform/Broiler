@@ -13,6 +13,7 @@
 - Phase 6 has widened again: `scrollIntoView()` now maps logical block/inline alignment onto physical scroll axes for representative writing-mode and direction combinations, with focused CLI and WPT guards for the `scrollIntoView-*writing-mode*` follow-up slice.
 - Phase 6 has widened again: element scroll changes now dispatch minimal `scroll` / `scrollend` events, so overflow-hidden smooth scrolling can be interrupted by handler-driven `scrollTop` updates without the queued completion frame restoring the original target; focused CLI and WPT guards cover the `interrupt-hidden-smooth-scroll.html` follow-up slice.
 - Phase 6 has widened again: zoom serialization now scales the explicit-inherit `border-radius`, `outline-*`, and multi-column sizing properties that the renderer consumes after bridge execution, with focused CLI and WPT guards covering the `css/css-viewport/zoom/explicit-inherit/{border-radius,outline,column}.html` follow-up slice.
+- Phase 6 has widened again: iframe `srcdoc` serialization now rewrites same-origin subdocuments from their mutated DOM state instead of leaving stale original `srcdoc` markup and discarded fallback children, with focused CLI and WPT guards covering iframe-driven scroll/fixed follow-up cases.
 
 ### 2026-04-22
 

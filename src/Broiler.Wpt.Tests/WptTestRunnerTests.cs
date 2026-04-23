@@ -1101,6 +1101,33 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssomView_IframeSrcDocSerialization_Preserves_Subdocument_ScrollMutations()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body>
+  <iframe id="frame" srcdoc="<!DOCTYPE html><html><body><div id='scroller' style='width:100px;height:60px;overflow:hidden'><div style='height:200px'></div><div id='target' style='height:20px;background:black'></div></div></body></html>"></iframe>
+</body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+        ctx.Eval("""
+            var doc = document.getElementById('frame').contentDocument;
+            doc.getElementById('target').scrollIntoView();
+            """);
+        bridge.ResolveAnchorPositions();
+        var serialized = bridge.SerializeToHtml();
+
+        Assert.Contains("srcdoc=\"&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;div id=&quot;scroller&quot; style=&quot;width: 100px; height: 60px; overflow: hidden&quot;&gt;&lt;div style=&quot;position: relative; top: -160px&quot;&gt;", serialized);
+        Assert.DoesNotContain("&gt;&lt;html&gt;&lt;head&gt;", serialized);
+    }
+
+    [Fact]
     public void Wpt_CssomView_ClientAndScrollMetricsIncludePadding_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>

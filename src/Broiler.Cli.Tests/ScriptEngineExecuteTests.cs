@@ -600,6 +600,63 @@ document.write('<p id=""injected"">written</p>');
         Assert.Contains("id=\"columns\" class=\"zoomed-columns\" style=\"width: 600px; height: 400px; column-width: 80px; column-height: 300px; column-gap: 20px\"", result);
     }
 
+    [Fact]
+    public void DomBridge_SerializeToHtml_Updates_Iframe_SrcDoc_After_Subdocument_Mutation()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body>
+  <iframe id="frame" srcdoc="<!DOCTYPE html><html><body><div id='value'>old</div></body></html>"></iframe>
+</body>
+</html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        context.Eval("""
+            document.getElementById('frame').contentDocument.getElementById('value').textContent = 'new';
+            """);
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.Contains("srcdoc=\"&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;div id=&quot;value&quot;&gt;new&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;\"", result);
+        Assert.DoesNotContain("</html></iframe>", result);
+        Assert.DoesNotContain(">old<", result);
+    }
+
+    [Fact]
+    public void DomBridge_SerializeToHtml_Preserves_Mutated_Iframe_Scroll_State_In_SrcDoc()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body>
+  <iframe id="frame" srcdoc="<!DOCTYPE html><html><body><div id='scroller' style='width:100px;height:60px;overflow:hidden'><div style='height:200px'></div><div id='target' style='height:20px'></div></div></body></html>"></iframe>
+</body>
+</html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        context.Eval("""
+            var doc = document.getElementById('frame').contentDocument;
+            doc.getElementById('target').scrollIntoView();
+            """);
+        bridge.ResolveAnchorPositions();
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.Contains("srcdoc=\"&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;div id=&quot;scroller&quot; style=&quot;width: 100px; height: 60px; overflow: hidden&quot;&gt;&lt;div style=&quot;position: relative; top: -160px&quot;&gt;", result);
+        Assert.DoesNotContain("&gt;&lt;html&gt;&lt;head&gt;", result);
+    }
+
     // ---------------------------------------------------------------
     //  InteractiveSession
     // ---------------------------------------------------------------
