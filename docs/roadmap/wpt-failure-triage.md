@@ -5,6 +5,10 @@
 
 ## Implementation updates
 
+### 2026-04-23
+
+- Phase 6 has widened again: `HTMLElement.scrollParent()` now returns the nearest relevant scroll container for standard DOM cases, including `overflow:hidden`, `display:none`, `display:contents`, absolute/fixed positioning, and root/body/null edge cases, with focused CLI and WPT guards for the new scroll-parent foundation.
+
 ### 2026-04-22
 
 - The runner/Markdown/JSON triage output now surfaces timeout failures as a first-class section with the complete timeout path list plus focused `--subset` commands for each affected directory, and `Broiler.Wpt.Tests` now guards that richer timeout summary so future WPT workflow investigations do not require raw-log scraping.

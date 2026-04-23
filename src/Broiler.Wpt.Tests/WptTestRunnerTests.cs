@@ -5949,6 +5949,57 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssomView_ScrollParent_Finds_Nearest_Relevant_Scroll_Container()
+    {
+        const string html = @"<!DOCTYPE html>
+<div id=""childOfRoot""></div>
+<div id=""scroller3"" style=""overflow:scroll; height:100px;"">
+  <div id=""fixedToRoot"" style=""position:fixed;""></div>
+  <div style=""transform:scale(1);"">
+    <div id=""scroller2"" style=""overflow:scroll; height:100px;"">
+      <div style=""position:relative;"">
+        <div id=""scroller1"" style=""overflow:scroll; height:100px;"">
+          <div>
+            <div id=""normalChild""></div>
+            <div id=""noBox"" style=""display:none;""></div>
+            <div id=""absPosChild"" style=""position:absolute;""></div>
+            <div id=""fixedPosChild"" style=""position:fixed;""></div>
+          </div>
+          <div id=""hidden"" style=""overflow:hidden;"">
+            <div id=""childOfHidden""></div>
+          </div>
+          <div style=""display:contents"">
+            <div id=""childOfDisplayContents""></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => [
+                document.getElementById('normalChild').scrollParent().id,
+                document.getElementById('childOfHidden').scrollParent().id,
+                document.getElementById('noBox').scrollParent() === null,
+                document.getElementById('absPosChild').scrollParent().id,
+                document.getElementById('fixedPosChild').scrollParent().id,
+                document.getElementById('fixedToRoot').scrollParent() === null,
+                document.getElementById('childOfRoot').scrollParent() === document.scrollingElement,
+                document.getElementById('childOfDisplayContents').scrollParent().id,
+                document.body.scrollParent() === document.scrollingElement,
+                document.documentElement.scrollParent() === null,
+                document.scrollingElement.scrollParent() === null
+            ].join('|'))()
+            """);
+
+        Assert.Equal("scroller1|hidden|true|scroller2|scroller3|true|true|scroller1|true|true|true", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_IframeSubframeWindowScroll_Uses_SubdocumentRoot()
     {
         const string html = @"<!DOCTYPE html>

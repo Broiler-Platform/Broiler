@@ -2408,6 +2408,14 @@ public sealed partial class DomBridge
                     return JSUndefined.Value;
                 }, "scrollBy", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue(
+                (KeyString)"scrollParent",
+                new JSFunction((in Arguments _) =>
+                {
+                    var scrollParent = bridgeForOffset.GetScrollParentForDomElement(elForOffset);
+                    return scrollParent != null ? bridgeForOffset.ToJSObject(scrollParent) : JSNull.Value;
+                }, "scrollParent", 0),
+                JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         // -- Phase 6: SVG DOM interfaces --
@@ -2801,6 +2809,105 @@ public sealed partial class DomBridge
         }
 
         return fallbackBody ?? documentElement;
+    }
+
+    private DomElement? GetScrollParentForDomElement(DomElement element)
+    {
+        var documentElement = GetOwningDocumentElement(element);
+        if (!HasAssociatedLayoutBox(element))
+            return null;
+
+        if (ReferenceEquals(element, documentElement) || ReferenceEquals(element, GetDocumentScrollingElement(documentElement)))
+            return null;
+
+        if (IsViewportBodyElement(element, documentElement))
+            return GetDocumentScrollingElement(documentElement);
+
+        var props = GetComputedProps(element);
+        var position = props.GetValueOrDefault("position")?.Trim().ToLowerInvariant();
+        if (string.Equals(position, "fixed", StringComparison.OrdinalIgnoreCase))
+        {
+            var fixedContainingBlock = FindFixedPositionContainingBlock(element, documentElement);
+            if (fixedContainingBlock == null)
+                return null;
+
+            return FindNearestScrollParent(fixedContainingBlock, documentElement);
+        }
+
+        if (string.Equals(position, "absolute", StringComparison.OrdinalIgnoreCase))
+        {
+            var containingBlock = GetOffsetParentForDomElement(element);
+            if (containingBlock == null)
+                return GetDocumentScrollingElement(documentElement);
+
+            return FindNearestScrollParent(containingBlock, documentElement);
+        }
+
+        return FindNearestScrollParent(element.Parent, documentElement);
+    }
+
+    private DomElement GetDocumentScrollingElement(DomElement documentElement) => documentElement;
+
+    private DomElement FindNearestScrollParent(DomElement? start, DomElement documentElement)
+    {
+        for (var current = start; current != null; current = current.Parent)
+        {
+            if (ReferenceEquals(current, documentElement))
+                return GetDocumentScrollingElement(documentElement);
+
+            if (IsViewportBodyElement(current, documentElement) || !HasAssociatedLayoutBox(current))
+                continue;
+
+            if (HasOverflowClipping(GetComputedProps(current)))
+                return current;
+        }
+
+        return GetDocumentScrollingElement(documentElement);
+    }
+
+    private DomElement? FindFixedPositionContainingBlock(DomElement element, DomElement documentElement)
+    {
+        for (var current = element.Parent; current != null; current = current.Parent)
+        {
+            if (ReferenceEquals(current, documentElement))
+                break;
+
+            if (EstablishesFixedPositionContainingBlock(current))
+                return current;
+        }
+
+        return null;
+    }
+
+    private bool EstablishesFixedPositionContainingBlock(DomElement element)
+    {
+        var props = GetComputedProps(element);
+        var transform = props.GetValueOrDefault("transform");
+        if (!string.IsNullOrWhiteSpace(transform) &&
+            !string.Equals(transform.Trim(), "none", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var contain = props.GetValueOrDefault("contain");
+        if (string.IsNullOrWhiteSpace(contain))
+            return false;
+
+        var normalized = contain.Trim().ToLowerInvariant();
+        return normalized.Contains("paint") ||
+               normalized.Contains("layout") ||
+               normalized.Contains("strict") ||
+               normalized.Contains("content");
+    }
+
+    private bool HasAssociatedLayoutBox(DomElement element)
+    {
+        if (element.IsTextNode)
+            return false;
+
+        var display = GetComputedProps(element).GetValueOrDefault("display")?.Trim().ToLowerInvariant();
+        return !string.Equals(display, "none", StringComparison.OrdinalIgnoreCase) &&
+               !string.Equals(display, "contents", StringComparison.OrdinalIgnoreCase);
     }
 
     private double GetScrollWidthForDomElement(DomElement element, bool isRoot)

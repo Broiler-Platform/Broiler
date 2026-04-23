@@ -503,6 +503,53 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Element_ScrollParent_Finds_Nearest_Relevant_Scroll_Container()
+    {
+        var result = ExecJs(@"
+            function append(tag, parent, id, style) {
+                var el = document.createElement(tag);
+                if (id) el.id = id;
+                if (style) el.style.cssText = style;
+                parent.appendChild(el);
+                return el;
+            }
+
+            var childOfRoot = append('div', document.body, 'childOfRoot');
+            var scroller3 = append('div', document.body, 'scroller3', 'overflow:scroll; height:100px;');
+            var fixedToRoot = append('div', scroller3, 'fixedToRoot', 'position:fixed;');
+            var transformed = append('div', scroller3, null, 'transform:scale(1);');
+            var scroller2 = append('div', transformed, 'scroller2', 'overflow:scroll; height:100px;');
+            var relpos = append('div', scroller2, null, 'position:relative;');
+            var scroller1 = append('div', relpos, 'scroller1', 'overflow:scroll; height:100px;');
+            var wrapper = append('div', scroller1);
+            var normalChild = append('div', wrapper, 'normalChild');
+            var noBox = append('div', wrapper, 'noBox', 'display:none;');
+            var absPosChild = append('div', wrapper, 'absPosChild', 'position:absolute;');
+            var fixedPosChild = append('div', wrapper, 'fixedPosChild', 'position:fixed;');
+            var hidden = append('div', scroller1, 'hidden', 'overflow:hidden;');
+            var childOfHidden = append('div', hidden, 'childOfHidden');
+            var contents = append('div', scroller1, null, 'display:contents;');
+            var childOfDisplayContents = append('div', contents, 'childOfDisplayContents');
+
+            document.getElementById('result').textContent = [
+                normalChild.scrollParent().id,
+                childOfHidden.scrollParent().id,
+                noBox.scrollParent() === null,
+                absPosChild.scrollParent().id,
+                fixedPosChild.scrollParent().id,
+                fixedToRoot.scrollParent() === null,
+                childOfRoot.scrollParent() === document.scrollingElement,
+                childOfDisplayContents.scrollParent().id,
+                document.body.scrollParent() === document.scrollingElement,
+                document.documentElement.scrollParent() === null,
+                document.scrollingElement.scrollParent() === null
+            ].join('|');
+        ");
+
+        Assert.Contains("scroller1|hidden|true|scroller2|scroller3|true|true|scroller1|true|true|true", result);
+    }
+
+    [Fact]
     public void Element_ClientMetrics_Ignore_Effective_Zoom()
     {
         var result = ExecJs(@"
