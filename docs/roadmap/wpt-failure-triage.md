@@ -21,6 +21,7 @@
 - Phase 6 has widened again: renderer-side pseudo-element generation now treats `content: url(...)` as image content instead of literal text, so the focused `css/css-viewport/zoom/zoom-pseudo-image.html` pseudo-image slice can reuse the same image-loading path as normal replaced content with focused CLI and WPT guards.
 - Phase 6 has widened again: active `visualViewport` pinch-zoom state now serializes back into static rendering by folding the visual page offset into root scroll simulation and scaling the rendered DOM for fixed-target cases, with focused CLI and WPT guards for the `visual-scrollIntoView-002.html` follow-up slice.
 - Phase 6 has widened again: top-level `window.addEventListener('load', …)` / `removeEventListener()` / `dispatchEvent()` now expose a minimal window event target, and `FireWindowLoadEvent()` refreshes the same-origin `frames[0]` alias plus dispatches registered window `load` listeners so cssom-view harness-style pages can run their focused fixed-scroller checks through the normal WPT path.
+- Phase 6 has widened again: script-assigned `iframe.srcdoc` now updates the backing subdocument/load path instead of only creating a disconnected JS property, so `frames[0].document` sees the live same-origin `srcdoc` DOM during cssom-view fixed-target harness follow-ups driven from outer-window load listeners.
 
 ### 2026-04-22
 

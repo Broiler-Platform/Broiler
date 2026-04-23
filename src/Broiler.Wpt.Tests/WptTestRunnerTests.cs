@@ -6739,6 +6739,55 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssomView_ScriptAssignedIframeSrcdoc_Allows_FramesDocument_FixedTarget_Scroll_Match()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; }
+    body { width: 2000px; height: 2000px; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <iframe id=""fr"" style=""position:absolute; left:100px; top:300px; width:400px; height:300px;""></iframe>
+  <script>
+    var iframe = document.getElementById('fr');
+    iframe.srcdoc = '<!DOCTYPE html><html><body style=""margin:0""><div id=""container"" style=""position:fixed; bottom:10px; left:30px; width:150px; height:150px;""><div id=""target"" style=""position:absolute; left:10px; top:20px; width:10px; height:10px;""></div></div></body></html>';
+    window.addEventListener('load', function () {
+      var target = frames[0].document.getElementById('target');
+      target.scrollIntoView({ block: 'start', inline: 'start' });
+      if (document.documentElement.scrollLeft === 140 &&
+          document.documentElement.scrollTop === 460 &&
+          frames[0].scrollX === 0 &&
+          frames[0].scrollY === 0) {
+        document.getElementById('pass').style.background = 'green';
+      }
+    });
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-scripted-srcdoc");
+        Assert.True(result.Passed,
+            $"script-assigned iframe.srcdoc should populate frames[0].document for fixed-target scrollIntoView harness checks. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollIntoView_FixedIframeTarget_Scrolls_OuterWindow_Not_Subframe()
     {
         const string html = """

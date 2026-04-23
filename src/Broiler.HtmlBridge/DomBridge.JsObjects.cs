@@ -1478,15 +1478,21 @@ public sealed partial class DomBridge
         // contentWindow / contentDocument — for <iframe> elements with full sub-document DOM
         if (string.Equals(element.TagName, "iframe", StringComparison.OrdinalIgnoreCase))
         {
-            var iframeSrcValue = element.Attributes.TryGetValue("src", out var srcVal) ? srcVal : string.Empty;
-            var isCrossOrigin = IsCrossOrigin(iframeSrcValue, _pageUrl);
+            bool IsCurrentIframeCrossOrigin()
+            {
+                if (element.Attributes.ContainsKey("srcdoc"))
+                    return false;
+
+                var iframeSrcValue = element.Attributes.TryGetValue("src", out var srcVal) ? srcVal : string.Empty;
+                return IsCrossOrigin(iframeSrcValue, _pageUrl);
+            }
 
             obj.FastAddProperty(
                 (KeyString)"contentDocument",
                 new JSFunction((in Arguments _) =>
                 {
                     // Cross-origin iframes return null for contentDocument (same-origin policy)
-                    if (isCrossOrigin) return JSNull.Value;
+                    if (IsCurrentIframeCrossOrigin()) return JSNull.Value;
                     // Non-HTML resources get a minimal empty sub-document (no parsed fallback content)
                     return GetOrCreateSubDocument(element);
                 }, "get contentDocument"),
@@ -1497,7 +1503,7 @@ public sealed partial class DomBridge
                 (KeyString)"contentWindow",
                 new JSFunction((in Arguments _) =>
                 {
-                    if (isCrossOrigin) return JSNull.Value;
+                    if (IsCurrentIframeCrossOrigin()) return JSNull.Value;
                     return GetOrCreateSubWindow(element);
                 }, "get contentWindow"),
                 null,
@@ -1508,7 +1514,7 @@ public sealed partial class DomBridge
                 (KeyString)"getSVGDocument",
                 new JSFunction((in Arguments _) =>
                 {
-                    if (isCrossOrigin) return JSNull.Value;
+                    if (IsCurrentIframeCrossOrigin()) return JSNull.Value;
                     return GetOrCreateSubDocument(element);
                 }, "getSVGDocument", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1532,7 +1538,25 @@ public sealed partial class DomBridge
                     // Fire onload for the new resource
                     bridgeForSrc.FireSubDocumentOnload(element);
                     return JSUndefined.Value;
-                }, "set src"),
+                 }, "set src"),
+                 JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            obj.FastAddProperty(
+                (KeyString)"srcdoc",
+                new JSFunction((in Arguments _) =>
+                {
+                    return element.Attributes.TryGetValue("srcdoc", out var s)
+                        ? new JSString(s)
+                        : new JSString(string.Empty);
+                }, "get srcdoc"),
+                new JSFunction((in Arguments a) =>
+                {
+                    element.Attributes["srcdoc"] = a.Length > 0 ? a[0].ToString() : string.Empty;
+                    InvalidateCachedSubDocument(element);
+                    _onloadFired.Remove(element);
+                    bridgeForSrc.FireSubDocumentOnload(element);
+                    return JSUndefined.Value;
+                }, "set srcdoc"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
             // sandbox attribute access

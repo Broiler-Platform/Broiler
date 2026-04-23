@@ -89,6 +89,33 @@ fr.addEventListener('load', function () {
     }
 
     [Fact]
+    public void Iframe_ScriptAssigned_Srcdoc_Loads_ContentDocument_Through_Frames()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<iframe id=""fr""></iframe>
+<div id=""out""></div>
+<script>
+var fr = document.getElementById('fr');
+fr.addEventListener('load', function () {
+  var doc = frames[0].document;
+  document.getElementById('out').textContent = [
+    doc !== null,
+    doc.getElementById('target') !== null,
+    frames.length,
+    frames[0] === fr.contentWindow
+  ].join('|');
+});
+fr.srcdoc = '<!DOCTYPE html><html><body><div id=""target""></div></body></html>';
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("true|true|1|true", result);
+    }
+
+    [Fact]
     public void Iframe_Nested_Subdocument_Scripts_Resolve_Relative_Iframe_Sources()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"broiler-nested-iframe-{Guid.NewGuid():N}");
