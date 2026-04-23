@@ -2158,6 +2158,186 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssViewport_ZoomSvg_MatchesReference()
+    {
+        var testHtml = @"<!doctype html>
+<meta charset=""utf-8"">
+<style>
+  :root {
+    font-size: 10px;
+    zoom: 2;
+  }
+  body { margin: 0 }
+  .container {
+    font-size: 20px;
+  }
+  .child {
+    zoom: 2;
+  }
+  line {
+    stroke-width: 10px;
+    stroke: lime;
+  }
+  polygon, polyline, text {
+    fill: lime;
+  }
+  text {
+    font: 10px/1 Ahem;
+  }
+  svg {
+    background-color: red;
+  }
+</style>
+<div class=""container"">
+  <div class=""child"">
+    <svg width=""100"" height=""100"">
+    <defs>
+      <path id=""p"" d=""M80,60H25""></path>
+    </defs>
+      <rect width=""10rem"" height=""100"" fill=""blue""></rect>
+      <line y1=""0""  y2=""0""  x1=""0"" x2=""50""></line>
+      <line y1=""10"" y2=""10"" x1=""0"" x2=""2.5em""></line>
+      <line y1=""20"" y2=""20"" x1=""0"" x2=""5rem""></line>
+      <line y1=""30"" y2=""30"" x1=""0"" x2=""50%""></line>
+      <line y1=""40"" y2=""40"" x1=""0"" x2=""1vw""></line>
+      <polygon points=""0,50 50,50 50,60 0,60""></polygon>
+      <polyline points=""0,60 50,60 50,70 0,70""></polyline>
+      <text x=""80"" y=""60"">X</text>
+      <text><textPath href=""#p"">X</textPath></text>
+    </svg>
+  </div>
+</div>";
+
+        var referenceHtml = @"<!doctype html>
+<style>
+  body { margin: 0 }
+  :root {
+    font-size: 10px;
+  }
+  .container {
+    font-size: 20px;
+  }
+  line {
+    stroke-width: 40px;
+    stroke: lime;
+  }
+  polygon, polyline, text {
+    fill: lime;
+  }
+  text {
+    font: 40px/1 Ahem;
+  }
+  svg {
+    background-color: red;
+  }
+</style>
+<div class=""container"">
+  <svg width=""400"" height=""400"">
+    <defs>
+      <path id=""p"" d=""M320,240H100""></path>
+    </defs>
+    <rect width=""400"" height=""400"" fill=""blue""></rect>
+    <line y1=""0""   y2=""0""   x1=""0"" x2=""200""></line>
+    <line y1=""40""  y2=""40""  x1=""0"" x2=""10em""></line>
+    <line y1=""80""  y2=""80""  x1=""0"" x2=""20rem""></line>
+    <line y1=""120"" y2=""120"" x1=""0"" x2=""50%""></line>
+    <line y1=""160"" y2=""160"" x1=""0"" x2=""4vw""></line>
+    <polygon points=""0,200 200,200 200,240 0,240""></polygon>
+    <polyline points=""0,240 200,240 200,280 0,280""></polyline>
+    <text x=""320"" y=""240"">X</text>
+    <text><textPath href=""#p"">X</textPath></text>
+  </svg>
+</div>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-svg", 410, 410);
+        Assert.True(result.Passed,
+            $"zoom svg should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomSvg_FontRelativeUnits_MatchReference()
+    {
+        var testHtml = @"<!doctype html>
+<meta charset=""utf-8"">
+<style>
+  :root {
+    font: 10px/1 Ahem;
+    zoom: 2;
+  }
+  body { margin: 0 }
+  .container {
+    font-size: 20px;
+  }
+  .child {
+    zoom: 2;
+  }
+  line {
+    stroke-width: 2px;
+    stroke: lime;
+  }
+  svg {
+    background-color: black;
+  }
+</style>
+<div class=""container"">
+  <div class=""child"">
+    <svg width=""100"" height=""100"">
+      <line y1=""10"" y2=""10"" x1=""0"" x2=""1em""></line>
+      <line y1=""15"" y2=""15"" x1=""0"" x2=""1ex""></line>
+      <line y1=""20"" y2=""20"" x1=""0"" x2=""1cap""></line>
+      <line y1=""25"" y2=""25"" x1=""0"" x2=""1ch""></line>
+      <line y1=""30"" y2=""30"" x1=""0"" x2=""1ic""></line>
+      <line y1=""35"" y2=""35"" x1=""0"" x2=""1lh""></line>
+      <line y1=""60"" y2=""60"" x1=""0"" x2=""1rem""></line>
+      <line y1=""65"" y2=""65"" x1=""0"" x2=""1rex""></line>
+      <line y1=""70"" y2=""70"" x1=""0"" x2=""1rcap""></line>
+      <line y1=""75"" y2=""75"" x1=""0"" x2=""1rch""></line>
+      <line y1=""80"" y2=""80"" x1=""0"" x2=""1ric""></line>
+      <line y1=""85"" y2=""85"" x1=""0"" x2=""1rlh""></line>
+    </svg>
+  </div>
+</div>";
+
+        var referenceHtml = @"<!doctype html>
+<style>
+  :root {
+    font: 10px/1 Ahem;
+  }
+  body { margin: 0 }
+  .container {
+    font-size: 20px;
+  }
+  line {
+    stroke-width: 8px;
+    stroke: lime;
+  }
+  svg {
+    background-color: black;
+  }
+</style>
+<div class=""container"">
+  <svg width=""400"" height=""400"">
+    <line y1=""40""  y2=""40""  x1=""0"" x2=""80""></line>
+    <line y1=""60""  y2=""60""  x1=""0"" x2=""64""></line>
+    <line y1=""80""  y2=""80""  x1=""0"" x2=""64""></line>
+    <line y1=""100"" y2=""100"" x1=""0"" x2=""80""></line>
+    <line y1=""120"" y2=""120"" x1=""0"" x2=""80""></line>
+    <line y1=""140"" y2=""140"" x1=""0"" x2=""80""></line>
+    <line y1=""240"" y2=""240"" x1=""0"" x2=""40""></line>
+    <line y1=""260"" y2=""260"" x1=""0"" x2=""32""></line>
+    <line y1=""280"" y2=""280"" x1=""0"" x2=""32""></line>
+    <line y1=""300"" y2=""300"" x1=""0"" x2=""40""></line>
+    <line y1=""320"" y2=""320"" x1=""0"" x2=""40""></line>
+    <line y1=""340"" y2=""340"" x1=""0"" x2=""40""></line>
+  </svg>
+</div>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-svg-font-relative-units", 410, 410);
+        Assert.True(result.Passed,
+            $"zoom svg font-relative units should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssViewport_ZoomScrollIntoViewAbsolutePosition_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Text;
 using Broiler.HTML.Dom.Core.Utils;
 
@@ -61,6 +62,8 @@ public sealed partial class DomBridge
                 if (TryScaleSerializableCssValue(value, usedZoom, out var scaled))
                     element.Style[property] = scaled;
             }
+
+            ApplyZoomSerializationSvgAttributes(element, usedZoom);
         }
 
         element.Style.Remove("zoom");
@@ -105,11 +108,189 @@ public sealed partial class DomBridge
         "scroll-margin-top", "scroll-margin-right", "scroll-margin-bottom", "scroll-margin-left",
         "scroll-padding-top", "scroll-padding-right", "scroll-padding-bottom", "scroll-padding-left",
         "border-top-width", "border-right-width", "border-bottom-width", "border-left-width",
+        "stroke-width",
         "font-size", "line-height", "letter-spacing", "word-spacing", "text-indent",
         "border-radius", "border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius",
         "outline-width", "outline-offset",
         "column-width", "column-height", "column-gap"
     ];
+
+    private void ApplyZoomSerializationSvgAttributes(DomElement element, double usedZoom)
+    {
+        var tag = element.TagName.ToLowerInvariant();
+        switch (tag)
+        {
+            case "svg":
+                ScaleSvgLengthAttribute(element, "width", usedZoom);
+                ScaleSvgLengthAttribute(element, "height", usedZoom);
+                break;
+            case "rect":
+                ScaleSvgLengthAttribute(element, "x", usedZoom);
+                ScaleSvgLengthAttribute(element, "y", usedZoom);
+                ScaleSvgLengthAttribute(element, "width", usedZoom);
+                ScaleSvgLengthAttribute(element, "height", usedZoom);
+                break;
+            case "line":
+                ScaleSvgLengthAttribute(element, "x1", usedZoom);
+                ScaleSvgLengthAttribute(element, "x2", usedZoom);
+                ScaleSvgLengthAttribute(element, "y1", usedZoom);
+                ScaleSvgLengthAttribute(element, "y2", usedZoom);
+                break;
+            case "text":
+                ScaleSvgLengthAttribute(element, "x", usedZoom);
+                ScaleSvgLengthAttribute(element, "y", usedZoom);
+                break;
+            case "polygon":
+            case "polyline":
+                ScaleSvgPointListAttribute(element, "points", usedZoom);
+                break;
+            case "path":
+                ScaleSvgPathDataAttribute(element, "d", usedZoom);
+                break;
+        }
+    }
+
+    private void ScaleSvgLengthAttribute(DomElement element, string attributeName, double usedZoom)
+    {
+        if (!element.Attributes.TryGetValue(attributeName, out var value) ||
+            !TryScaleSvgLengthToken(element, value, usedZoom, out var scaled))
+        {
+            return;
+        }
+
+        element.Attributes[attributeName] = scaled;
+    }
+
+    private void ScaleSvgPointListAttribute(DomElement element, string attributeName, double usedZoom)
+    {
+        if (!element.Attributes.TryGetValue(attributeName, out var value) || string.IsNullOrWhiteSpace(value))
+            return;
+
+        element.Attributes[attributeName] = Regex.Replace(
+            value,
+            @"-?\d*\.?\d+(?:[eE][+-]?\d+)?",
+            match => ScaleSvgNumericMatch(match, usedZoom));
+    }
+
+    private void ScaleSvgPathDataAttribute(DomElement element, string attributeName, double usedZoom)
+    {
+        if (!element.Attributes.TryGetValue(attributeName, out var value) || string.IsNullOrWhiteSpace(value))
+            return;
+
+        element.Attributes[attributeName] = Regex.Replace(
+            value,
+            @"-?\d*\.?\d+(?:[eE][+-]?\d+)?",
+            match => ScaleSvgNumericMatch(match, usedZoom));
+    }
+
+    private static string ScaleSvgNumericMatch(Match match, double factor)
+    {
+        if (!double.TryParse(match.Value, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var number))
+        {
+            return match.Value;
+        }
+
+        return (number * factor).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private bool TryScaleSvgLengthToken(DomElement element, string value, double usedZoom, out string scaled)
+    {
+        scaled = string.Empty;
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0 || trimmed.EndsWith('%'))
+            return false;
+
+        if (double.TryParse(trimmed, System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out var unitlessNumber))
+        {
+            scaled = (unitlessNumber * usedZoom).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        foreach (var unit in SvgZoomScaledUnits)
+        {
+            if (!trimmed.EndsWith(unit, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var numericPart = trimmed[..^unit.Length];
+            if (!double.TryParse(numericPart, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var number))
+            {
+                return false;
+            }
+
+            var factor = ResolveSvgLengthZoomFactor(element, unit, usedZoom);
+            if (Math.Abs(factor - 1.0) < 0.0001)
+                return false;
+
+            scaled = $"{(number * factor).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}{unit}";
+            return true;
+        }
+
+        return false;
+    }
+
+    private double ResolveSvgLengthZoomFactor(DomElement element, string unit, double usedZoom)
+    {
+        if (SvgAbsoluteOrViewportUnits.Contains(unit))
+            return usedZoom;
+
+        if (SvgRootFontRelativeUnits.Contains(unit))
+            return usedZoom / GetRootFontSizeOwnerZoom();
+
+        if (SvgFontRelativeUnits.Contains(unit))
+            return usedZoom / GetNearestExplicitFontSizeOwnerZoom(element);
+
+        return usedZoom;
+    }
+
+    private double GetNearestExplicitFontSizeOwnerZoom(DomElement element)
+    {
+        for (DomElement? current = element; current != null; current = current.Parent)
+        {
+            var props = GetComputedProps(current);
+            if (props.TryGetValue("font-size", out var fontSize) && !string.IsNullOrWhiteSpace(fontSize))
+                return GetUsedZoomForElement(current);
+        }
+
+        return 1.0;
+    }
+
+    private double GetRootFontSizeOwnerZoom()
+    {
+        var props = GetComputedProps(DocumentElement);
+        if (props.TryGetValue("font-size", out var fontSize) && !string.IsNullOrWhiteSpace(fontSize))
+            return GetUsedZoomForElement(DocumentElement);
+
+        return 1.0;
+    }
+
+    private static readonly string[] SvgZoomScaledUnits =
+    [
+        "rcap", "rch", "ric", "rex", "rlh", "rem",
+        "vmin", "vmax",
+        "cap",
+        "em", "ex", "ch", "ic", "lh",
+        "vw", "vh",
+        "px", "pt", "pc", "cm", "mm", "in", "q"
+    ];
+
+    private static readonly HashSet<string> SvgAbsoluteOrViewportUnits = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "vw", "vh", "vmin", "vmax",
+        "px", "pt", "pc", "cm", "mm", "in", "q"
+    };
+
+    private static readonly HashSet<string> SvgFontRelativeUnits = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "em", "ex", "cap", "ch", "ic", "lh"
+    };
+
+    private static readonly HashSet<string> SvgRootFontRelativeUnits = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "rem", "rex", "rcap", "rch", "ric", "rlh"
+    };
 
     private static bool TryScaleSerializableCssValue(string value, double factor, out string scaled)
     {

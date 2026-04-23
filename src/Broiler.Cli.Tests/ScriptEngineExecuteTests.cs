@@ -654,6 +654,58 @@ document.write('<p id=""injected"">written</p>');
     }
 
     [Fact]
+    public void DomBridge_SerializeToHtml_Scales_Zoomed_Svg_Geometry_And_FontRelative_Lengths()
+    {
+        const string html = """
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  :root { font-size: 10px; zoom: 2; }
+  body { margin: 0 }
+  .container { font-size: 20px; }
+  .child { zoom: 2; }
+  line {
+    stroke-width: 2px;
+    stroke: lime;
+  }
+  svg {
+    background-color: black;
+  }
+</style>
+<div class="container">
+  <div class="child">
+    <svg id="icon" width="100" height="100">
+      <defs>
+        <path id="p" d="M80,60H25"></path>
+      </defs>
+      <rect id="box" width="10rem" height="100" fill="blue"></rect>
+      <line id="em-line" y1="10" y2="10" x1="0" x2="1em"></line>
+      <line id="rem-line" y1="20" y2="20" x1="0" x2="1rem"></line>
+      <line id="vw-line" y1="30" y2="30" x1="0" x2="1vw"></line>
+      <polygon id="poly" points="0,50 50,50 50,60 0,60"></polygon>
+      <text id="label" x="80" y="60" style="font-size:10px">X</text>
+    </svg>
+  </div>
+</div>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.Contains("id=\"icon\" width=\"400\" height=\"400\"", result);
+        Assert.Contains("id=\"box\" width=\"20rem\" height=\"400\"", result);
+        Assert.Contains("id=\"em-line\" y1=\"40\" y2=\"40\" x1=\"0\" x2=\"2em\" style=\"stroke-width: 8px\"", result);
+        Assert.Contains("id=\"rem-line\" y1=\"80\" y2=\"80\" x1=\"0\" x2=\"2rem\" style=\"stroke-width: 8px\"", result);
+        Assert.Contains("id=\"vw-line\" y1=\"120\" y2=\"120\" x1=\"0\" x2=\"4vw\" style=\"stroke-width: 8px\"", result);
+        Assert.Contains("id=\"poly\" points=\"0,200 200,200 200,240 0,240\"", result);
+        Assert.Contains("id=\"p\" d=\"M320,240H100\"", result);
+        Assert.Contains("id=\"label\" x=\"320\" y=\"240\" style=\"font-size: 40px\"", result);
+    }
+
+    [Fact]
     public void DomBridge_SerializeToHtml_Updates_Iframe_SrcDoc_After_Subdocument_Mutation()
     {
         const string html = """
