@@ -3002,6 +3002,69 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssomView_WindowLoadListener_Can_Run_HarnessStyle_FixedScroller_Checks()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; }
+    body { width: 2000px; height: 2000px; }
+    #pass { width: 100px; height: 100px; background: red; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+  <script>
+    window.addEventListener('load', function () {
+      var container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.right = '10px';
+      container.style.bottom = '10px';
+      container.style.width = '150px';
+      container.style.height = '150px';
+      container.style.overflow = 'auto';
+
+      var target = document.createElement('div');
+      target.style.position = 'absolute';
+      target.style.left = '200%';
+      target.style.top = '200%';
+      target.style.width = '10px';
+      target.style.height = '10px';
+
+      container.appendChild(target);
+      document.body.appendChild(container);
+      target.scrollIntoView();
+
+      if (document.documentElement.scrollLeft === 0 &&
+          document.documentElement.scrollTop === 0 &&
+          container.scrollLeft === 160 &&
+          container.scrollTop === 160) {
+        document.getElementById('pass').style.background = 'green';
+      }
+    });
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: red; overflow: hidden; }
+    #pass { width: 100px; height: 100px; background: green; }
+  </style>
+</head>
+<body>
+  <div id=""pass""></div>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-fixed-window-load-listener");
+        Assert.True(result.Passed,
+            $"window.addEventListener('load', …) should drive harness-style fixed-scroller checks. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssValues_ChUnit_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>

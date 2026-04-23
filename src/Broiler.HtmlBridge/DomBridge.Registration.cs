@@ -1593,6 +1593,60 @@ public sealed partial class DomBridge
                 return JSUndefined.Value;
             }, "scrollBy", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue(
+            (KeyString)"addEventListener",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2) return JSUndefined.Value;
+                var type = a[0].ToString();
+                var listener = a[1];
+                var capture = a.Length > 2 && a[2].BooleanValue;
+                if (!_windowEventListeners.TryGetValue(type, out var listeners))
+                {
+                    listeners = [];
+                    _windowEventListeners[type] = listeners;
+                }
+                listeners.Add((listener, capture));
+                return JSUndefined.Value;
+            }, "addEventListener", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue(
+            (KeyString)"removeEventListener",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length < 2) return JSUndefined.Value;
+                var type = a[0].ToString();
+                var listener = a[1];
+                var capture = a.Length > 2 && a[2].BooleanValue;
+                if (_windowEventListeners.TryGetValue(type, out var listeners))
+                {
+                    for (int i = listeners.Count - 1; i >= 0; i--)
+                    {
+                        if (listeners[i].Listener == listener && listeners[i].Capture == capture)
+                        {
+                            listeners.RemoveAt(i);
+                            break;
+                        }
+                    }
+                }
+                return JSUndefined.Value;
+            }, "removeEventListener", 3),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue(
+            (KeyString)"dispatchEvent",
+            new JSFunction((in Arguments a) =>
+            {
+                if (a.Length == 0 || a[0] is not JSObject evt)
+                    return JSBoolean.True;
+                return DispatchWindowEvent(evt);
+            }, "dispatchEvent", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddProperty(
+            (KeyString)"frames",
+            new JSFunction((in Arguments _) => BuildWindowFramesArray(), "get frames"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+        context["frames"] = BuildWindowFramesArray();
         // window.screen — basic stub for screen dimensions
         var screenObj = new JSObject();
         screenObj.FastAddValue((KeyString)"width", new JSNumber(vpWidth), JSPropertyAttributes.EnumerableConfigurableValue);

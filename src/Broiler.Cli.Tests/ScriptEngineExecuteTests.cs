@@ -54,6 +54,59 @@ function run() {
     }
 
     [Fact]
+    public void DomBridge_FireWindowLoadEvent_Triggers_Window_Load_Listeners_And_Honors_Removal()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body><div id="out"></div></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+
+        context.Eval("""
+            var calls = [];
+            function removed() { calls.push('removed'); }
+            window.addEventListener('load', function () {
+                calls.push('kept');
+                document.getElementById('out').textContent = calls.join('|');
+            });
+            window.addEventListener('load', removed);
+            window.removeEventListener('load', removed);
+            """);
+
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("document.getElementById('out').textContent");
+        Assert.Equal("kept", result.ToString());
+    }
+
+    [Fact]
+    public void DomBridge_WindowFrames_Expose_SameOrigin_Iframe_Windows()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body><iframe id="frame" srcdoc="<!DOCTYPE html><html><body>ok</body></html>"></iframe></body></html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+        bridge.FireWindowLoadEvent();
+
+        var result = context.Eval("""
+            [
+                frames.length,
+                frames[0] === document.getElementById('frame').contentWindow,
+                frames[0].document === document.getElementById('frame').contentDocument
+            ].join('|')
+            """);
+
+        Assert.Equal("1|true|true", result.ToString());
+    }
+
+    [Fact]
     public void DomBridge_FlushTimers_Executes_SetTimeout_Chains()
     {
         // Acid3 chains tests via setTimeout. ScriptEngine now calls

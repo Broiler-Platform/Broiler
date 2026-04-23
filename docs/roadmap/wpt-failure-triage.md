@@ -20,6 +20,7 @@
 - Phase 6 has widened again: zoom serialization now scales the focused SVG viewport/geometry follow-up slice, including numeric SVG coordinates, selected font-relative SVG lengths, path data, and stroke widths, with focused CLI and WPT guards for `css/css-viewport/zoom/{svg,svg-font-relative-units}.html`.
 - Phase 6 has widened again: renderer-side pseudo-element generation now treats `content: url(...)` as image content instead of literal text, so the focused `css/css-viewport/zoom/zoom-pseudo-image.html` pseudo-image slice can reuse the same image-loading path as normal replaced content with focused CLI and WPT guards.
 - Phase 6 has widened again: active `visualViewport` pinch-zoom state now serializes back into static rendering by folding the visual page offset into root scroll simulation and scaling the rendered DOM for fixed-target cases, with focused CLI and WPT guards for the `visual-scrollIntoView-002.html` follow-up slice.
+- Phase 6 has widened again: top-level `window.addEventListener('load', …)` / `removeEventListener()` / `dispatchEvent()` now expose a minimal window event target, and `FireWindowLoadEvent()` refreshes the same-origin `frames[0]` alias plus dispatches registered window `load` listeners so cssom-view harness-style pages can run their focused fixed-scroller checks through the normal WPT path.
 
 ### 2026-04-22
 
