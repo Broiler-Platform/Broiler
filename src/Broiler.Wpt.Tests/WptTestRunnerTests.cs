@@ -1865,7 +1865,7 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
   </div>
   <script>
     for (const match of document.querySelectorAll('.target')) {
-      match.scrollIntoView();
+      match.scrollIntoView({ block: 'start', inline: 'start' });
     }
   </script>
 </body>
@@ -1952,7 +1952,7 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
   </div>
   <script>
     for (const match of document.querySelectorAll('.target')) {
-      match.scrollIntoView();
+      match.scrollIntoView({ block: 'start', inline: 'start' });
     }
   </script>
 </body>
@@ -2052,7 +2052,7 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
   </div>
   <script>
     for (const match of document.querySelectorAll('.target')) {
-      match.scrollIntoView();
+      match.scrollIntoView({ block: 'start', inline: 'start' });
     }
   </script>
 </body>
@@ -2104,7 +2104,7 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
   </div>
   <script>
     for (const match of document.querySelectorAll('.target')) {
-      match.scrollIntoView();
+      match.scrollIntoView({ block: 'start', inline: 'start' });
     }
   </script>
 </body>
@@ -2416,6 +2416,116 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssomView_ScrollIntoView_DefaultInlineNearest_Leaves_Visible_InlineAxis_Unchanged()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 400px;
+      height: 400px;
+      position: relative;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      left: 60px;
+      top: 300px;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content"">
+      <div class=""target""></div>
+    </div>
+  </div>
+  <div class=""container"">
+    <div class=""content"">
+      <div class=""target""></div>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll('.container').forEach(container => {
+      container.scrollLeft = 40;
+      container.scrollTop = 0;
+    });
+    document.querySelectorAll('.target')[0].scrollIntoView();
+    document.querySelectorAll('.target')[1].scrollIntoView(true);
+  </script>
+</body>
+</html>";
+        var referenceHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; background: white; overflow: hidden; }
+    .container {
+      position: relative;
+      display: inline-block;
+      width: 120px;
+      height: 100px;
+      overflow: auto;
+      border: 1px solid black;
+      margin-right: 12px;
+      background: white;
+    }
+    .content {
+      width: 400px;
+      height: 400px;
+      position: relative;
+      background: white;
+    }
+    .target {
+      position: absolute;
+      left: 60px;
+      top: 300px;
+      width: 20px;
+      height: 20px;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+  <div class=""container"">
+    <div class=""content"">
+      <div class=""target""></div>
+    </div>
+  </div>
+  <div class=""container"">
+    <div class=""content"">
+      <div class=""target""></div>
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll('.container').forEach(container => {
+      container.scrollTo(40, 300);
+    });
+  </script>
+</body>
+</html>";
+
+        var result = RunTempMatchTest(testHtml, referenceHtml, "scroll-into-view-default-inline-nearest", 280, 130);
+        Assert.True(result.Passed,
+            $"Default scrollIntoView inline alignment should behave like nearest when the inline axis is already visible. Match={result.MatchPercent:F1}% Message={result.Message}");
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollIntoView_DoesNotScrollRootForUnscrollableFixedContainers_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2510,7 +2620,7 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     container.appendChild(filler);
     container.appendChild(target);
     document.body.appendChild(container);
-    target.scrollIntoView();
+    target.scrollIntoView({ block: 'start', inline: 'start' });
 
     if (document.documentElement.scrollLeft === 0 &&
         document.documentElement.scrollTop === 0 &&

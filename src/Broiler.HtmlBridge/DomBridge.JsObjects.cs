@@ -3475,7 +3475,7 @@ public sealed partial class DomBridge
     private (string Block, string Inline, string? Behavior) GetScrollIntoViewOptions(in Arguments args)
     {
         const string defaultBlock = "start";
-        const string defaultInline = "start";
+        const string defaultInline = "nearest";
 
         if (args.Length == 0)
             return (defaultBlock, defaultInline, null);

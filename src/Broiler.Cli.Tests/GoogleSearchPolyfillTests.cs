@@ -1240,7 +1240,7 @@ document.getElementById('result').textContent =
                 container.appendChild(content);
                 container.appendChild(target);
                 document.body.appendChild(container);
-                target.scrollIntoView();
+                target.scrollIntoView({ block: 'start', inline: 'start' });
                 return container.scrollLeft + ',' + container.scrollTop;
             }
 
@@ -1280,7 +1280,7 @@ document.getElementById('result').textContent =
                 container.appendChild(content);
                 container.appendChild(target);
                 document.body.appendChild(container);
-                target.scrollIntoView();
+                target.scrollIntoView({ block: 'start', inline: 'start' });
                 return container.scrollLeft + ',' + container.scrollTop;
             }
 
@@ -1366,6 +1366,55 @@ document.getElementById('result').textContent =
         ");
 
         Assert.Contains("0,140", result);
+    }
+
+    [Fact]
+    public void ScrollIntoView_Defaults_To_InlineNearest_For_Omitted_Options_And_Boolean_Overloads()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+
+            var container = document.createElement('div');
+            container.style.position = 'relative';
+            container.style.width = '120px';
+            container.style.height = '100px';
+            container.style.overflow = 'auto';
+
+            var content = document.createElement('div');
+            content.style.width = '400px';
+            content.style.height = '400px';
+            content.style.position = 'relative';
+
+            var target = document.createElement('div');
+            target.style.position = 'absolute';
+            target.style.left = '60px';
+            target.style.top = '300px';
+            target.style.width = '20px';
+            target.style.height = '20px';
+
+            container.appendChild(content);
+            container.appendChild(target);
+            document.body.appendChild(container);
+
+            function run(mode) {
+                container.scrollLeft = 40;
+                container.scrollTop = 0;
+                if (mode === 'default') {
+                    target.scrollIntoView();
+                } else if (mode === 'true') {
+                    target.scrollIntoView(true);
+                } else {
+                    target.scrollIntoView(false);
+                }
+
+                return container.scrollLeft + ',' + container.scrollTop;
+            }
+
+            document.getElementById('result').textContent =
+                run('default') + '|' + run('true') + '|' + run('false');
+        ");
+
+        Assert.Contains("40,300|40,300|40,220", result);
     }
 
     [Fact]
@@ -1507,7 +1556,7 @@ document.getElementById('result').textContent =
             container.appendChild(filler);
             container.appendChild(target);
             document.body.appendChild(container);
-            target.scrollIntoView();
+            target.scrollIntoView({ block: 'start', inline: 'start' });
 
             document.getElementById('result').textContent =
                 document.documentElement.scrollLeft + ',' + document.documentElement.scrollTop + '|' +

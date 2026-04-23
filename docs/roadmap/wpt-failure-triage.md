@@ -15,6 +15,7 @@
 - Phase 6 has widened again: zoom serialization now scales the explicit-inherit `border-radius`, `outline-*`, and multi-column sizing properties that the renderer consumes after bridge execution, with focused CLI and WPT guards covering the `css/css-viewport/zoom/explicit-inherit/{border-radius,outline,column}.html` follow-up slice.
 - Phase 6 has widened again: iframe `srcdoc` serialization now rewrites same-origin subdocuments from their mutated DOM state instead of leaving stale original `srcdoc` markup and discarded fallback children, with focused CLI and WPT guards covering iframe-driven scroll/fixed follow-up cases.
 - Phase 6 has widened again: zoom serialization now also scales scroll-padding and scroll-margin longhands for zoom-removed scrollers and targets, including explicit and inherited values, with focused CLI and WPT guards covering the remaining `css/css-viewport/zoom/{scroll-padding,scroll-margin}.html` follow-up slice.
+- Phase 6 has widened again: `scrollIntoView()` now defaults omitted and boolean-overload inline alignment to `nearest` instead of forcing `start`, so already-visible inline axes stay put while block scrolling still occurs; focused CLI and WPT guards cover the remaining default-alignment cssom-view slice.
 
 ### 2026-04-22
 
