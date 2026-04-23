@@ -113,7 +113,8 @@ public sealed partial class DomBridge
             (KeyString)"shadowRoot",
             new JSFunction((in Arguments _) =>
             {
-                if (!TryGetShadowRoot(element, out var shadowRoot))
+                var shadowRoot = GetShadowRoot(element);
+                if (shadowRoot == null)
                     return JSNull.Value;
 
                 var mode = element.DomProperties.TryGetValue("_shadowRootMode", out var rawMode)
@@ -891,7 +892,7 @@ public sealed partial class DomBridge
             (KeyString)"attachShadow",
             new JSFunction((in Arguments a) =>
             {
-                if (TryGetShadowRoot(element, out _))
+                if (GetShadowRoot(element) != null)
                     ThrowDOMException(_jsContext!, "Shadow root already attached.", "NotSupportedError");
 
                 var mode = "open";
@@ -2719,17 +2720,15 @@ public sealed partial class DomBridge
         return obj;
     }
 
-    private static bool TryGetShadowRoot(DomElement element, out DomElement shadowRoot)
+    private static DomElement? GetShadowRoot(DomElement element)
     {
         if (element.DomProperties.TryGetValue("_shadowRoot", out var rawShadowRoot) &&
             rawShadowRoot is DomElement root)
         {
-            shadowRoot = root;
-            return true;
+            return root;
         }
 
-        shadowRoot = null!;
-        return false;
+        return null;
     }
 
     private double GetClientWidthForDomElement(DomElement element, bool isRoot)
