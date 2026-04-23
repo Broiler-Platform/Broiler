@@ -19,6 +19,7 @@ public sealed partial class DomBridge
     // ------------------------------------------------------------------
 
     private const int MaxSerializationDepth = 1024;
+    private const double ZoomSerializationEpsilon = 0.0001;
 
     /// <summary>
     /// Serialises the current DOM tree back to an HTML string.
@@ -52,7 +53,7 @@ public sealed partial class DomBridge
         var specifiedZoom = props.GetValueOrDefault("zoom");
         var usedZoom = ResolveSpecifiedZoom(specifiedZoom, parentZoom);
 
-        if (Math.Abs(usedZoom - 1.0) > 0.0001)
+        if (Math.Abs(usedZoom - 1.0) > ZoomSerializationEpsilon)
         {
             foreach (var property in ZoomScaledSerializationProperties)
             {
@@ -221,7 +222,7 @@ public sealed partial class DomBridge
             }
 
             var factor = ResolveSvgLengthZoomFactor(element, unit, usedZoom);
-            if (Math.Abs(factor - 1.0) < 0.0001)
+            if (Math.Abs(factor - 1.0) < ZoomSerializationEpsilon)
                 return false;
 
             scaled = $"{(number * factor).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}{unit}";
