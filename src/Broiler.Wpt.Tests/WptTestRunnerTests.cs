@@ -5824,6 +5824,39 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssomView_ElementFromPoint_Keeps_Inline_Svg_Roots_In_Normal_Flow()
+    {
+        const string html = @"<!DOCTYPE html>
+<body style=""margin:0"">
+  <svg id=""firstSvg"" xmlns=""http://www.w3.org/2000/svg"" width=""180"" height=""98""></svg>
+  <svg id=""secondSvg"" xmlns=""http://www.w3.org/2000/svg"" width=""180"" height=""140"">
+    <rect id=""secondRect"" x=""50"" y=""50"" width=""60"" height=""60""></rect>
+  </svg>
+</body>";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        var result = ctx.Eval("""
+            (() => {
+                var firstRect = document.getElementById('firstSvg').getBoundingClientRect();
+                var secondRect = document.getElementById('secondSvg').getBoundingClientRect();
+                var hit = document.elementFromPoint(80, 160);
+                var hits = document.elementsFromPoint(80, 160);
+                return [
+                    firstRect.top,
+                    secondRect.top,
+                    hit && (hit.id || hit.tagName),
+                    hits[0] && (hits[0].id || hits[0].tagName),
+                    hits[1] && (hits[1].id || hits[1].tagName)
+                ].join('|');
+            })()
+            """);
+
+        Assert.Equal("0|98|secondRect|secondRect|secondSvg", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped()
     {
         const string html = @"<!DOCTYPE html>

@@ -344,6 +344,49 @@ public class GoogleSearchPolyfillTests
     }
 
     [Fact]
+    public void Document_HitTesting_Keeps_Inline_Svg_Roots_In_Normal_Flow()
+    {
+        var result = ExecJs(@"
+            document.body.style.margin = '0';
+            var svgNs = 'http://www.w3.org/2000/svg';
+
+            var first = document.createElementNS(svgNs, 'svg');
+            first.id = 'firstSvg';
+            first.setAttribute('width', '180');
+            first.setAttribute('height', '98');
+            document.body.insertBefore(first, document.getElementById('result'));
+
+            var second = document.createElementNS(svgNs, 'svg');
+            second.id = 'secondSvg';
+            second.setAttribute('width', '180');
+            second.setAttribute('height', '140');
+            var rect = document.createElementNS(svgNs, 'rect');
+            rect.id = 'secondRect';
+            rect.setAttribute('x', '50');
+            rect.setAttribute('y', '50');
+            rect.setAttribute('width', '60');
+            rect.setAttribute('height', '60');
+            second.appendChild(rect);
+            document.body.insertBefore(second, document.getElementById('result'));
+
+            var firstRect = first.getBoundingClientRect();
+            var secondRect = second.getBoundingClientRect();
+            var hit = document.elementFromPoint(80, 160);
+            var hits = document.elementsFromPoint(80, 160);
+
+            document.getElementById('result').textContent = [
+                firstRect.top,
+                secondRect.top,
+                hit && (hit.id || hit.tagName),
+                hits[0] && (hits[0].id || hits[0].tagName),
+                hits[1] && (hits[1].id || hits[1].tagName)
+            ].join('|');
+        ");
+
+        Assert.Contains("0|98|secondRect|secondRect|secondSvg", result);
+    }
+
+    [Fact]
     public void Element_ScrollTo_Updates_ScrollOffsets()
     {
         var result = ExecJs(@"

@@ -2969,13 +2969,13 @@ public sealed partial class DomBridge
         var top = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("top"), element, percentageBasis: containingBlockHeight);
         var left = ParseCssLengthToPixelsWithViewport(props.GetValueOrDefault("left"), element, percentageBasis: containingBlockWidth);
         var position = props.GetValueOrDefault("position");
-        var isSvgGeometryElement = IsSvgGeometryElement(element);
+        var isSvgPositionedGeometryElement = IsSvgPositionedGeometryElement(element);
 
         if (width <= 0)
             width = ResolveSvgGeometryLength(element, "width", vertical: false, containingBlockWidth);
         if (height <= 0)
             height = ResolveSvgGeometryLength(element, "height", vertical: true, containingBlockHeight);
-        if (isSvgGeometryElement)
+        if (isSvgPositionedGeometryElement)
         {
             top = ResolveSvgGeometryLength(element, "y", vertical: true, containingBlockHeight);
             left = ResolveSvgGeometryLength(element, "x", vertical: false, containingBlockWidth);
@@ -3045,24 +3045,35 @@ public sealed partial class DomBridge
     private static bool IsSvgGeometryContainer(DomElement? element) =>
         element != null && IsSvgElement(element);
 
-    private static bool IsSvgGeometryElement(DomElement element)
+    private static bool IsSvgPositionedGeometryElement(DomElement element)
     {
         if (!IsSvgElement(element))
             return false;
 
+        if (IsSvgShapeElement(element))
+            return true;
+
+        return IsSvgViewportElement(element) && IsSvgGeometryContainer(element.Parent);
+    }
+
+    private static bool IsSvgShapeElement(DomElement element)
+    {
+        var tag = element.TagName;
+        return string.Equals(tag, "rect", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(tag, "svg:rect", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsSvgViewportElement(DomElement element)
+    {
         var tag = element.TagName;
         return string.Equals(tag, "svg", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(tag, "svg:svg", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(tag, "rect", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(tag, "svg:rect", StringComparison.OrdinalIgnoreCase);
+               string.Equals(tag, "svg:svg", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsSvgElement(DomElement element) =>
         string.Equals(element.NamespaceURI, "http://www.w3.org/2000/svg", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(element.TagName, "svg", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(element.TagName, "svg:svg", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(element.TagName, "rect", StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(element.TagName, "svg:rect", StringComparison.OrdinalIgnoreCase);
+        IsSvgViewportElement(element) ||
+        IsSvgShapeElement(element);
 
     private double ResolveSvgGeometryLength(DomElement element, string attributeName, bool vertical, double percentageBasis)
     {

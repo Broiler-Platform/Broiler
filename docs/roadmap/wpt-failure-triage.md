@@ -48,6 +48,7 @@
 - Phase 6 has widened again: `document.elementFromPoint()` / `document.elementsFromPoint()` now expose a minimal same-document hit-testing path that honors viewport bounds, reverse tree-order stacking, pointer-events suppression, and iframe subdocument viewports; focused CLI and WPT guard rails now cover the opening `elementFromPoint*` / `elementsFromPoint*` slice locally.
 - Phase 6 has widened again: document hit-testing now treats iframe `<body>` boxes as content-sized instead of always viewport-sized, while synthetic `DOMImplementation.createHTMLDocument()` / `createDocument()` results report no hit-testing viewport; focused CLI and WPT guard rails now cover that iframe-root / viewport-less follow-up slice locally.
 - Phase 6 has widened again: document hit-testing now gives inline SVG viewports and simple `<rect>` geometry usable client rects from SVG width/height/x/y attributes, so the focused `elementFromPoint*` / `elementsFromPoint*` SVG viewport slice can resolve `<svg>` roots and rect descendants instead of collapsing them to zero-sized boxes.
+- Phase 6 has widened again: inline SVG roots in HTML flow now keep normal block stacking while SVG-positioned descendants still honor their own geometry attributes, so document hit-testing can target later stacked SVG viewports without collapsing them back onto the first root.
 
 ### 2026-04-18
 
