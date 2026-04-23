@@ -987,6 +987,120 @@ document.getElementById('result').style.background = passed ? 'green' : 'red';
     }
 
     [Fact]
+    public void Wpt_CssViewport_ZoomExplicitInheritedBorderRadius_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .zoomed {
+      background: green;
+      width: 100px;
+      height: 100px;
+      border: 5px solid black;
+      border-radius: inherit;
+      zoom: 2;
+    }
+  </style>
+</head>
+<body>
+  <div style=""border-radius:20px; display:contents"">
+    <div class=""zoomed""></div>
+  </div>
+</body>
+</html>";
+        using var radiusContext = new Broiler.JavaScript.Engine.JSContext();
+        var radiusBridge = new Broiler.HtmlBridge.DomBridge();
+        radiusBridge.Attach(radiusContext, testHtml, "file:///test.html");
+        var serialized = radiusBridge.SerializeToHtml();
+
+        Assert.Contains("class=\"zoomed\" style=\"width: 200px; height: 200px; border-top-width: 10px; border-right-width: 10px; border-bottom-width: 10px; border-left-width: 10px; border-radius: 40px\"", serialized);
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomExplicitInheritedOutline_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .zoomed {
+      background: green;
+      width: 50px;
+      height: 50px;
+      margin: 50px;
+      outline-width: inherit;
+      outline-offset: inherit;
+      outline-style: solid;
+      outline-color: black;
+      zoom: 2;
+    }
+  </style>
+</head>
+<body>
+  <div style=""outline-width:10px; outline-offset:5px; display:contents"">
+    <div class=""zoomed""></div>
+  </div>
+</body>
+</html>";
+        using var outlineContext = new Broiler.JavaScript.Engine.JSContext();
+        var outlineBridge = new Broiler.HtmlBridge.DomBridge();
+        outlineBridge.Attach(outlineContext, testHtml, "file:///test.html");
+        var serialized = outlineBridge.SerializeToHtml();
+
+        Assert.Contains("class=\"zoomed\" style=\"width: 100px; height: 100px; margin-top: 100px; margin-right: 100px; margin-bottom: 100px; margin-left: 100px; outline-width: 20px; outline-offset: 10px\"", serialized);
+    }
+
+    [Fact]
+    public void Wpt_CssViewport_ZoomExplicitInheritedColumns_MatchesReference()
+    {
+        var testHtml = @"<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    .zoomed {
+      background: skyblue;
+      width: 300px;
+      height: 200px;
+      column-width: inherit;
+      column-height: inherit;
+      column-gap: inherit;
+      zoom: 2;
+    }
+    .inner { background: coral; height: 40px; }
+  </style>
+</head>
+<body>
+  <div style=""column-width:40px; column-height:150px; column-gap:10px; display:contents"">
+    <div class=""zoomed"">
+      <div class=""inner"">1</div>
+      <div class=""inner"">2</div>
+      <div class=""inner"">3</div>
+      <div class=""inner"">4</div>
+      <div class=""inner"">5</div>
+      <div class=""inner"">6</div>
+      <div class=""inner"">7</div>
+      <div class=""inner"">8</div>
+      <div class=""inner"">9</div>
+      <div class=""inner"">10</div>
+      <div class=""inner"">11</div>
+      <div class=""inner"">12</div>
+    </div>
+  </div>
+</body>
+</html>";
+        using var columnContext = new Broiler.JavaScript.Engine.JSContext();
+        var columnBridge = new Broiler.HtmlBridge.DomBridge();
+        columnBridge.Attach(columnContext, testHtml, "file:///test.html");
+        var serialized = columnBridge.SerializeToHtml();
+
+        Assert.Contains("class=\"zoomed\" style=\"width: 600px; height: 400px; column-width: 80px; column-height: 300px; column-gap: 20px\"", serialized);
+    }
+
+    [Fact]
     public void Wpt_CssomView_ClientAndScrollMetricsIncludePadding_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>

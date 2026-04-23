@@ -55,7 +55,7 @@ public sealed partial class DomBridge
         {
             foreach (var property in ZoomScaledSerializationProperties)
             {
-                if (!props.TryGetValue(property, out var value))
+                if (!TryGetZoomSerializableValue(element, props, property, out var value))
                     continue;
 
                 if (TryScaleSerializableCssValue(value, usedZoom, out var scaled))
@@ -69,6 +69,33 @@ public sealed partial class DomBridge
             ApplyZoomSerializationStyles(child, usedZoom);
     }
 
+    private bool TryGetZoomSerializableValue(
+        DomElement element,
+        Dictionary<string, string> props,
+        string property,
+        out string value)
+    {
+        value = string.Empty;
+        if (props.TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
+            return true;
+
+        if (!element.Style.TryGetValue(property, out var specified) ||
+            !string.Equals(specified?.Trim(), "inherit", StringComparison.OrdinalIgnoreCase) ||
+            element.Parent == null)
+        {
+            return false;
+        }
+
+        var parentProps = GetComputedProps(element.Parent);
+        if (parentProps.TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
+            return true;
+
+        if (element.Parent.Style.TryGetValue(property, out value) && !string.IsNullOrWhiteSpace(value))
+            return true;
+
+        return false;
+    }
+
     private static readonly string[] ZoomScaledSerializationProperties =
     [
         "width", "height", "min-width", "min-height", "max-width", "max-height",
@@ -77,7 +104,9 @@ public sealed partial class DomBridge
         "padding-top", "padding-right", "padding-bottom", "padding-left",
         "border-top-width", "border-right-width", "border-bottom-width", "border-left-width",
         "font-size", "line-height", "letter-spacing", "word-spacing", "text-indent",
-        "border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius"
+        "border-radius", "border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius",
+        "outline-width", "outline-offset",
+        "column-width", "column-height", "column-gap"
     ];
 
     private static bool TryScaleSerializableCssValue(string value, double factor, out string scaled)

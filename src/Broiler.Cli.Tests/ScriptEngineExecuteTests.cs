@@ -540,6 +540,66 @@ document.write('<p id=""injected"">written</p>');
         Assert.False(bridge.FlushTimerStep());
     }
 
+    [Fact]
+    public void DomBridge_SerializeToHtml_Scales_ExplicitInherited_Zoom_Properties()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  .zoomed-radius {
+    width: 100px;
+    height: 100px;
+    border: 5px solid black;
+    border-radius: inherit;
+    zoom: 2;
+  }
+  .zoomed-outline {
+    width: 50px;
+    height: 50px;
+    margin: 50px;
+    outline-width: inherit;
+    outline-offset: inherit;
+    outline-style: solid;
+    outline-color: black;
+    zoom: 2;
+  }
+  .zoomed-columns {
+    width: 300px;
+    height: 200px;
+    column-width: inherit;
+    column-height: inherit;
+    column-gap: inherit;
+    zoom: 2;
+  }
+</style>
+</head>
+<body>
+  <div style="border-radius:20px; display:contents">
+    <div id="radius" class="zoomed-radius"></div>
+  </div>
+  <div style="outline-width:10px; outline-offset:5px; display:contents">
+    <div id="outline" class="zoomed-outline"></div>
+  </div>
+  <div style="column-width:40px; column-height:150px; column-gap:10px; display:contents">
+    <div id="columns" class="zoomed-columns"></div>
+  </div>
+</body>
+</html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.Contains("id=\"radius\" class=\"zoomed-radius\" style=\"width: 200px; height: 200px; border-top-width: 10px; border-right-width: 10px; border-bottom-width: 10px; border-left-width: 10px; border-radius: 40px\"", result);
+        Assert.Contains("id=\"outline\" class=\"zoomed-outline\" style=\"width: 100px; height: 100px; margin-top: 100px; margin-right: 100px; margin-bottom: 100px; margin-left: 100px; outline-width: 20px; outline-offset: 10px\"", result);
+        Assert.Contains("id=\"columns\" class=\"zoomed-columns\" style=\"width: 600px; height: 400px; column-width: 80px; column-height: 300px; column-gap: 20px\"", result);
+    }
+
     // ---------------------------------------------------------------
     //  InteractiveSession
     // ---------------------------------------------------------------
@@ -667,4 +727,3 @@ document.write('<p id=""injected"">written</p>');
         session.Dispose();
     }
 }
-
