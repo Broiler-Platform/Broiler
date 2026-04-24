@@ -204,7 +204,7 @@ internal sealed class GraphicsAdapter : RGraphics
             return;
         }
 
-        float shaderWidth = Math.Max(rect.Width, MeasureString(str, font).Width);
+        float shaderWidth = rect.Width > 0 ? rect.Width : MeasureString(str, font).Width;
         float shaderHeight = Math.Max(rect.Height > 0 ? rect.Height : size.Height, (float)font.Size);
         var shaderRect = new RectangleF(rect.X, rect.Y, shaderWidth, shaderHeight);
 
@@ -222,9 +222,7 @@ internal sealed class GraphicsAdapter : RGraphics
         {
             double offset = positions != null && i < positions.Length
                 ? Math.Clamp(positions[i], 0f, 1f)
-                : colors.Length == 1
-                    ? 0d
-                    : (double)i / (colors.Length - 1);
+                : (double)i / (colors.Length - 1);
             gradientStops.Add(new GradientStop(Utilities.Utils.Convert(colors[i]), offset));
         }
 
@@ -274,6 +272,8 @@ internal sealed class GraphicsAdapter : RGraphics
 
         if (!glyphRendered)
         {
+            // Always use LeftToRight flow direction — the layout engine has
+            // already positioned each word correctly for RTL contexts.
             var formattedText = new FormattedText(str, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ((FontAdapter)font).Font, 96d / 72d * font.Size, brush, 1.0);
             _g.DrawText(formattedText, Utilities.Utils.ConvertRound(point));
         }
