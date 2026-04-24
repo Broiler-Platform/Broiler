@@ -1454,11 +1454,13 @@ public sealed partial class DomBridge
             if (lower is not ("initial" or "inherit" or "unset" or "revert"))
                 continue;
 
+            // Preserve "inherit" as-is so getComputedStyle returns the keyword
+            // rather than eagerly resolving it to the parent's value.
+            if (lower == "inherit")
+                continue;
+
             string? replacement = lower switch
             {
-                "inherit" => parentProps != null && parentProps.TryGetValue(key, out var inheritedValue)
-                    ? inheritedValue
-                    : CssInitialValues.GetValueOrDefault(key),
                 "unset" or "revert" => IsInheritedCssProperty(key)
                     ? parentProps != null && parentProps.TryGetValue(key, out var inheritedUnsetValue)
                         ? inheritedUnsetValue
@@ -1654,12 +1656,12 @@ public sealed partial class DomBridge
 
         if (value.Trim().Equals("inherit", StringComparison.OrdinalIgnoreCase))
         {
-            computed["font-style"] = "inherit";
-            computed["font-variant"] = "inherit";
-            computed["font-weight"] = "inherit";
-            computed["font-size"] = "inherit";
-            computed["line-height"] = "inherit";
-            computed["font-family"] = "inherit";
+            if (!computed.ContainsKey("font-style")) computed["font-style"] = "inherit";
+            if (!computed.ContainsKey("font-variant")) computed["font-variant"] = "inherit";
+            if (!computed.ContainsKey("font-weight")) computed["font-weight"] = "inherit";
+            if (!computed.ContainsKey("font-size")) computed["font-size"] = "inherit";
+            if (!computed.ContainsKey("line-height")) computed["line-height"] = "inherit";
+            if (!computed.ContainsKey("font-family")) computed["font-family"] = "inherit";
             return;
         }
 
@@ -1708,12 +1710,12 @@ public sealed partial class DomBridge
         if (!hasNonEmptyFamily)
             return;
 
-        computed["font-style"] = fontStyle;
-        computed["font-variant"] = fontVariant;
-        computed["font-weight"] = fontWeight;
-        computed["font-size"] = fontSize;
-        computed["line-height"] = !string.IsNullOrWhiteSpace(lineHeight) ? lineHeight : "normal";
-        computed["font-family"] = fontFamily;
+        if (!computed.ContainsKey("font-style")) computed["font-style"] = fontStyle;
+        if (!computed.ContainsKey("font-variant")) computed["font-variant"] = fontVariant;
+        if (!computed.ContainsKey("font-weight")) computed["font-weight"] = fontWeight;
+        if (!computed.ContainsKey("font-size")) computed["font-size"] = fontSize;
+        if (!computed.ContainsKey("line-height")) computed["line-height"] = !string.IsNullOrWhiteSpace(lineHeight) ? lineHeight : "normal";
+        if (!computed.ContainsKey("font-family")) computed["font-family"] = fontFamily;
     }
 
     private static bool TryParseFontSizeAndLineHeight(string lowerToken, string originalToken, out string fontSize, out string lineHeight)
