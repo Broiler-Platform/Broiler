@@ -36,9 +36,9 @@ internal sealed class SkiaImageAdapter : RAdapter
         // CSS 2.1 §15.3 generic font family mappings.
         // SkiaSharp does not resolve CSS generic family names; map them to the
         // first available system font from a prioritised fallback list.
-        MapGenericFamily("sans-serif", systemFonts, "DejaVu Sans", "Arial", "Helvetica", "Liberation Sans");
-        MapGenericFamily("serif", systemFonts, "DejaVu Serif", "Times New Roman", "Liberation Serif");
-        MapGenericFamily("monospace", systemFonts, "DejaVu Sans Mono", "Courier New", "Liberation Mono");
+        MapGenericFamily("sans-serif", systemFonts, "Arial", "Helvetica", "Liberation Sans", "DejaVu Sans");
+        MapGenericFamily("serif", systemFonts, "Times New Roman", "Liberation Serif", "DejaVu Serif");
+        MapGenericFamily("monospace", systemFonts, "Courier New", "Liberation Mono", "DejaVu Sans Mono");
         MapGenericFamily("cursive", systemFonts, "Comic Sans MS", "URW Chancery L");
         MapGenericFamily("fantasy", systemFonts, "Impact");
 
@@ -48,15 +48,6 @@ internal sealed class SkiaImageAdapter : RAdapter
             var arialLike = FirstAvailable(systemFonts, "Arial", "Liberation Sans", "DejaVu Sans");
             if (arialLike != null)
                 AddFontFamilyMapping("Helvetica", arialLike);
-        }
-
-        // Match the current Linux browser environment more closely for common
-        // web font requests that are usually absent from the system image.
-        if (!systemFonts.Contains("Verdana"))
-        {
-            var verdanaLike = FirstAvailable(systemFonts, "DejaVu Sans", "Liberation Sans");
-            if (verdanaLike != null)
-                AddFontFamilyMapping("Verdana", verdanaLike);
         }
     }
 
