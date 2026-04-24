@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do
             exit 0
             ;;
         *)
-            echo "Unknown option: $1" >&2
+            echo "Unknown option: $1. Use --help for usage information." >&2
             exit 1
             ;;
     esac
