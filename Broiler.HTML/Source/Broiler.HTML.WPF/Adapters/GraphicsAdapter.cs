@@ -193,6 +193,92 @@ internal sealed class GraphicsAdapter : RGraphics
         }
     }
 
+    public override void DrawGradientString(string str, RFont font, RectangleF rect, PointF point, SizeF size, bool rtl, Color[] colors, float[] positions, float angle)
+    {
+        if (colors == null || colors.Length == 0)
+            return;
+
+        if (colors.Length == 1)
+        {
+            DrawString(str, font, colors[0], point, size, rtl);
+            return;
+        }
+
+        float shaderWidth = Math.Max(rect.Width, MeasureString(str, font).Width);
+        float shaderHeight = Math.Max(rect.Height > 0 ? rect.Height : size.Height, (float)font.Size);
+        var shaderRect = new RectangleF(rect.X, rect.Y, shaderWidth, shaderHeight);
+
+        var radians = angle * Math.PI / 180.0;
+        float cx = shaderRect.X + shaderRect.Width / 2f;
+        float cy = shaderRect.Y + shaderRect.Height / 2f;
+        float halfDiag = Math.Max(shaderRect.Width, shaderRect.Height) / 2f;
+        float sin = (float)Math.Sin(radians);
+        float cos = (float)Math.Cos(radians);
+        var startPoint = new Point(cx - sin * halfDiag, cy + cos * halfDiag);
+        var endPoint = new Point(cx + sin * halfDiag, cy - cos * halfDiag);
+
+        var gradientStops = new GradientStopCollection();
+        for (int i = 0; i < colors.Length; i++)
+        {
+            double offset = positions != null && i < positions.Length
+                ? Math.Clamp(positions[i], 0f, 1f)
+                : colors.Length == 1
+                    ? 0d
+                    : (double)i / (colors.Length - 1);
+            gradientStops.Add(new GradientStop(Utilities.Utils.Convert(colors[i]), offset));
+        }
+
+        var brush = new LinearGradientBrush(gradientStops, startPoint, endPoint)
+        {
+            MappingMode = BrushMappingMode.Absolute,
+            SpreadMethod = GradientSpreadMethod.Pad,
+        };
+        brush.Freeze();
+
+        bool glyphRendered = false;
+        GlyphTypeface glyphTypeface = ((FontAdapter)font).GlyphTypeface;
+
+        if (glyphTypeface != null)
+        {
+            ushort[] glyphs = new ushort[str.Length];
+            double[] widths = new double[str.Length];
+
+            int i = 0;
+            for (; i < str.Length; i++)
+            {
+                if (!glyphTypeface.CharacterToGlyphMap.TryGetValue(str[i], out ushort glyph))
+                    break;
+
+                glyphs[i] = glyph;
+                widths[i] = 96d / 72d * font.Size * glyphTypeface.AdvanceWidths[glyph];
+            }
+
+            if (i >= str.Length)
+            {
+                point.Y += (float)(glyphTypeface.Baseline * font.Size * 96d / 72d);
+
+                glyphRendered = true;
+                var wpfPoint = Utilities.Utils.ConvertRound(point);
+                var glyphRun = new GlyphRun(glyphTypeface, 0,
+                    false, 96d / 72d * font.Size, 1.0f, glyphs,
+                    wpfPoint, widths, null, null, null, null, null, null);
+
+                var guidelines = new GuidelineSet();
+                guidelines.GuidelinesX.Add(wpfPoint.X);
+                guidelines.GuidelinesY.Add(wpfPoint.Y);
+                _g.PushGuidelineSet(guidelines);
+                _g.DrawGlyphRun(brush, glyphRun);
+                _g.Pop();
+            }
+        }
+
+        if (!glyphRendered)
+        {
+            var formattedText = new FormattedText(str, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, ((FontAdapter)font).Font, 96d / 72d * font.Size, brush, 1.0);
+            _g.DrawText(formattedText, Utilities.Utils.ConvertRound(point));
+        }
+    }
+
     public override RBrush GetTextureBrush(RImage image, RectangleF dstRect, PointF translateTransformLocation)
     {
         var brush = new ImageBrush(((ImageAdapter)image).Image)
