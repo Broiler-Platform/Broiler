@@ -434,11 +434,11 @@ public sealed partial class DomBridge
                     if (el.Parent != null && !el.Parent.TagName.StartsWith("#", StringComparison.Ordinal)) return false;
                     break;
                 case "not":
-                    if (arg != null && MatchesSelectorList(el, arg)) return false;
+                    if (arg != null && MatchesAnySelectorInList(el, arg)) return false;
                     break;
                 case "is":
                 case "where":
-                    if (arg == null || !MatchesSelectorList(el, arg)) return false;
+                    if (arg == null || !MatchesAnySelectorInList(el, arg)) return false;
                     break;
                 case "has":
                     if (arg == null || !MatchesHas(el, arg)) return false;
@@ -501,6 +501,9 @@ public sealed partial class DomBridge
 
             if (c == ']')
             {
+                // Malformed selectors can close more brackets than they open.
+                // Clamp to zero so later pseudo-class scanning still makes a
+                // best-effort pass over the remaining selector text.
                 bracketDepth = Math.Max(0, bracketDepth - 1);
                 continue;
             }
@@ -966,6 +969,7 @@ public sealed partial class DomBridge
             if (subtag == "*")
                 continue;
 
+            // BCP 47 / RFC 5646 language subtags are 1-8 ASCII alphanumerics.
             if (subtag.Length is < 1 or > 8)
                 return false;
 
@@ -1044,7 +1048,7 @@ public sealed partial class DomBridge
 
         var siblings = el.Parent!.Children
             .Where(child => !child.IsTextNode)
-            .Where(child => selectorFilter == null || MatchesSelectorList(child, selectorFilter))
+            .Where(child => selectorFilter == null || MatchesAnySelectorInList(child, selectorFilter))
             .ToList();
 
         if (siblings.Count == 0)
@@ -1114,7 +1118,7 @@ public sealed partial class DomBridge
         selectorFilter = null;
     }
 
-    private static bool MatchesSelectorList(DomElement el, string selectorList)
+    private static bool MatchesAnySelectorInList(DomElement el, string selectorList)
     {
         foreach (var selector in SplitSelectorList(selectorList))
         {
