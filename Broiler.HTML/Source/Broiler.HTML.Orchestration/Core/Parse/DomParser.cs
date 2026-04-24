@@ -991,9 +991,26 @@ internal sealed class DomParser
     /// </summary>
     private static CssBlock FindPseudoElementBlock(CssBox box, CssData cssData, string pseudoElement)
     {
-        // Element-level: e.g. "p::before"
-        var found = MatchPseudoBlock(box, cssData, box.HtmlTag.Name + pseudoElement);
-        if (found != null) return found;
+        CssBlock? merged = null;
+
+        void MergeMatchingBlocks(string key)
+        {
+            foreach (var block in cssData.GetCssBlock(key))
+            {
+                if (block.Selectors != null && !IsBlockAssignableToBoxWithSelector(box, block))
+                    continue;
+
+                if (merged == null)
+                    merged = block.Clone();
+                else
+                    merged.Merge(block);
+            }
+        }
+
+        // General-to-specific merge order so later, more specific matching
+        // pseudo-element rules override earlier ones like the normal cascade.
+        MergeMatchingBlocks("*" + pseudoElement);
+        MergeMatchingBlocks(box.HtmlTag.Name + pseudoElement);
 
         // Class-level: e.g. ".nose::before", "p.nose::before"
         if (box.HtmlTag.HasAttribute("class"))
@@ -1011,13 +1028,8 @@ internal sealed class DomParser
                 if (endIdx < 0) endIdx = classes.Length;
 
                 var cls = classes.Substring(startIdx, endIdx - startIdx);
-
-                found = MatchPseudoBlock(box, cssData, "." + cls + pseudoElement);
-                if (found != null) return found;
-
-                found = MatchPseudoBlock(box, cssData, box.HtmlTag.Name + "." + cls + pseudoElement);
-                if (found != null) return found;
-
+                MergeMatchingBlocks("." + cls + pseudoElement);
+                MergeMatchingBlocks(box.HtmlTag.Name + "." + cls + pseudoElement);
                 startIdx = endIdx + 1;
             }
         }
@@ -1026,23 +1038,10 @@ internal sealed class DomParser
         if (box.HtmlTag.HasAttribute("id"))
         {
             var id = box.HtmlTag.TryGetAttribute("id");
-            found = MatchPseudoBlock(box, cssData, "#" + id + pseudoElement);
-            if (found != null) return found;
+            MergeMatchingBlocks("#" + id + pseudoElement);
         }
 
-        // Universal: "*::before"
-        found = MatchPseudoBlock(box, cssData, "*" + pseudoElement);
-        return found;
-    }
-
-    private static CssBlock MatchPseudoBlock(CssBox box, CssData cssData, string key)
-    {
-        foreach (var block in cssData.GetCssBlock(key))
-        {
-            if (block.Selectors == null || IsBlockAssignableToBoxWithSelector(box, block))
-                return block;
-        }
-        return null;
+        return merged;
     }
 
     /// <summary>
@@ -1084,6 +1083,13 @@ internal sealed class DomParser
 
         if (TryExtractPseudoElementImageUrl(contentValue, out var imageUrl))
         {
+            // The image is rendered by the nested CssBoxImage below. Reset the
+            // wrapper box's content value so the extracted URL is not retained as
+            // generic generated content on the wrapper, which would otherwise
+            // make later pseudo-box handling treat the wrapper as still owning
+            // the original url(...) payload instead of the nested image box.
+            pseudoBox.Content = CssConstants.Normal;
+
             var imageTag = new HtmlTag(
                 HtmlConstants.Img,
                 true,
@@ -1108,10 +1114,23 @@ internal sealed class DomParser
             return false;
 
         var trimmed = contentValue.Trim();
-        if (!trimmed.StartsWith("url(", StringComparison.OrdinalIgnoreCase) || !trimmed.EndsWith(")"))
+        if (trimmed.StartsWith("url(", StringComparison.OrdinalIgnoreCase) && trimmed.EndsWith(")"))
+        {
+            imageUrl = trimmed[4..^1].Trim();
+        }
+        else if (trimmed.StartsWith("/", StringComparison.Ordinal)
+            || trimmed.StartsWith("./", StringComparison.Ordinal)
+            || trimmed.StartsWith("../", StringComparison.Ordinal)
+            || trimmed.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            imageUrl = trimmed;
+        }
+        else
+        {
             return false;
-
-        imageUrl = trimmed[4..^1].Trim();
+        }
         if (imageUrl.Length >= 2 &&
             ((imageUrl[0] == '\'' && imageUrl[^1] == '\'') ||
              (imageUrl[0] == '"' && imageUrl[^1] == '"')))

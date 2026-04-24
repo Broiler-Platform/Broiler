@@ -678,6 +678,51 @@ document.write('<p id=""injected"">written</p>');
     }
 
     [Fact]
+    public void DomBridge_SerializeToHtml_Generates_Scaled_Zoomed_Pseudo_Element_Rules()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  .zoomed {
+    zoom: 2;
+  }
+  .zoomed::before {
+    content: "";
+    display: block;
+    width: 100px;
+    height: 50px;
+    margin-left: 10px;
+    border: 2px solid black;
+    background: green;
+  }
+</style>
+</head>
+<body>
+  <div id="target" class="zoomed"></div>
+</body>
+</html>
+""";
+
+        using var context = new JSContext();
+        var bridge = new DomBridge();
+        bridge.Attach(context, html, "file:///test.html");
+
+        var result = bridge.SerializeToHtml();
+
+        Assert.Contains("id=\"target\" class=\"zoomed\"", result);
+        Assert.Contains("#target::before", result);
+        Assert.Contains("width: 200px !important", result);
+        Assert.Contains("height: 100px !important", result);
+        Assert.Contains("margin-left: 20px !important", result);
+        Assert.Contains("border-top-width: 4px !important", result);
+        Assert.Contains("border-right-width: 4px !important", result);
+        Assert.Contains("border-bottom-width: 4px !important", result);
+        Assert.Contains("border-left-width: 4px !important", result);
+    }
+
+    [Fact]
     public void DomBridge_SerializeToHtml_Scales_Zoomed_ScrollPadding_And_ScrollMargin_Properties()
     {
         const string html = """

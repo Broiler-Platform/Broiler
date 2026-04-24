@@ -18,25 +18,23 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class Acid2ImageComparisonTests
 {
-    /// <summary>
-    /// Path to the Acid2 HTML source, resolved relative to the repository root.
-    /// </summary>
-    private static string Acid2HtmlPath
+    private static string RepoRoot
     {
         get
         {
-            // Walk up from the test binary directory to find the repository root.
             var dir = AppDomain.CurrentDomain.BaseDirectory;
             while (dir != null && !File.Exists(Path.Combine(dir, "Broiler.slnx")))
                 dir = Path.GetDirectoryName(dir);
 
-            if (dir == null)
-                throw new InvalidOperationException(
-                    "Could not locate repository root (Broiler.slnx)");
-
-            return Path.Combine(dir, "acid", "acid2", "acid2.html");
+            return dir ?? throw new InvalidOperationException(
+                "Could not locate repository root (Broiler.slnx)");
         }
     }
+
+    /// <summary>
+    /// Path to the Acid2 HTML source, resolved relative to the repository root.
+    /// </summary>
+    private static string Acid2HtmlPath => Path.Combine(RepoRoot, "acid", "acid2", "acid2.html");
 
     /// <summary>
     /// Read the Acid2 HTML source and return it as a string.
@@ -56,6 +54,16 @@ public class Acid2ImageComparisonTests
     {
         var html = LoadAcid2Html();
         return HtmlRender.RenderToImage(html, width, height);
+    }
+
+    private static string CreateSolidTempPng(SKColor color, int width = 300, int height = 300)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"broiler-acid2-{Guid.NewGuid():N}.png");
+        using var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        bitmap.Erase(color);
+        using var stream = File.OpenWrite(path);
+        bitmap.Encode(stream, SKEncodedImageFormat.Png, 100);
+        return path;
     }
 
     // ──────── Milestone 0: Red-pixel leak detection ────────
@@ -1021,7 +1029,10 @@ public class Acid2ImageComparisonTests
     [Fact]
     public void CssPseudoElement_ContentUrl_Renders_Image_Content()
     {
-        const string html = """
+        var greenImagePath = CreateSolidTempPng(SKColors.Lime);
+        try
+        {
+            const string html = """
 <!doctype html>
 <meta charset=utf-8>
 <style>
@@ -1042,7 +1053,15 @@ public class Acid2ImageComparisonTests
 <div class="icon"></div>
 """;
 
-        using var bitmap = HtmlRender.RenderToImage(html, 220, 220);
+        using var bitmap = HtmlRender.RenderToImage(
+            html,
+            220,
+            220,
+            imageLoad: (_, args) =>
+            {
+                if (args.Src == "/images/green.png")
+                    args.Callback(greenImagePath);
+            });
 
         var wrapperPixel = bitmap.GetPixel(10, 10);
         Assert.True(wrapperPixel.Blue > 120 && wrapperPixel.Red > 120,
@@ -1052,9 +1071,15 @@ public class Acid2ImageComparisonTests
         Assert.True(imagePixel.Green > 100 && imagePixel.Red < 120 && imagePixel.Blue < 120,
             $"Expected green pseudo-element image content, got ({imagePixel.Red},{imagePixel.Green},{imagePixel.Blue})");
 
-        var outsidePixel = bitmap.GetPixel(150, 150);
-        Assert.True(outsidePixel.Blue > 150 && outsidePixel.Red < 80,
-            $"Expected blue outer icon background outside pseudo-content, got ({outsidePixel.Red},{outsidePixel.Green},{outsidePixel.Blue})");
+        var overflowPixel = bitmap.GetPixel(150, 150);
+        Assert.True(overflowPixel.Green > 100 && overflowPixel.Red < 120 && overflowPixel.Blue < 120,
+            $"Expected overflowing image content to remain green, got ({overflowPixel.Red},{overflowPixel.Green},{overflowPixel.Blue})");
+        }
+        finally
+        {
+            if (File.Exists(greenImagePath))
+                File.Delete(greenImagePath);
+        }
     }
 
     // ──────── P1: §2.5 — Shrink-to-fit width for abs-pos ────────
