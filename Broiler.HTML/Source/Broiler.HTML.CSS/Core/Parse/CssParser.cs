@@ -437,7 +437,8 @@ internal sealed class CssParser
 
         // CSS2.1 §4.1.7 / §4.1.3: An escaped leading dot like "\.parser"
         // is not a class selector and must not be normalized into ".parser".
-        // Acid2 relies on this rule being ignored entirely.
+        // Returning null here drops the entire rule, which is the desired
+        // error-recovery behaviour for the Acid2 parser-strip fixture.
         if (className.StartsWith(@"\.", StringComparison.Ordinal))
             return null;
 
@@ -1170,7 +1171,9 @@ internal sealed class CssParser
     {
         // CSS2.1 §4.3.2: Non-zero lengths require a unit except where the
         // property grammar explicitly allows unitless numbers (e.g. line-height).
-        if (!string.Equals(propName, "lineheight", StringComparison.OrdinalIgnoreCase)
+        bool allowsUnitlessNonZero = propName.Equals("lineheight", StringComparison.OrdinalIgnoreCase)
+            || propName.Equals("line-height", StringComparison.OrdinalIgnoreCase);
+        if (!allowsUnitlessNonZero
             && double.TryParse(propValue, NumberStyles.Number, NumberFormatInfo.InvariantInfo, out var unitlessNumber)
             && Math.Abs(unitlessNumber) > double.Epsilon)
         {
