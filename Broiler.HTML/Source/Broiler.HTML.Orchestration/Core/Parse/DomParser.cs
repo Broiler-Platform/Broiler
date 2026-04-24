@@ -1084,6 +1084,11 @@ internal sealed class DomParser
 
         if (TryExtractPseudoElementImageUrl(contentValue, out var imageUrl))
         {
+            // The image is rendered by the nested CssBoxImage below.  Reset the
+            // wrapper box's content value so the extracted URL is not retained as
+            // generic generated content in the static box tree.
+            pseudoBox.Content = CssConstants.Normal;
+
             var imageTag = new HtmlTag(
                 HtmlConstants.Img,
                 true,
@@ -1108,10 +1113,23 @@ internal sealed class DomParser
             return false;
 
         var trimmed = contentValue.Trim();
-        if (!trimmed.StartsWith("url(", StringComparison.OrdinalIgnoreCase) || !trimmed.EndsWith(")"))
+        if (trimmed.StartsWith("url(", StringComparison.OrdinalIgnoreCase) && trimmed.EndsWith(")"))
+        {
+            imageUrl = trimmed[4..^1].Trim();
+        }
+        else if (trimmed.StartsWith("/", StringComparison.Ordinal)
+            || trimmed.StartsWith("./", StringComparison.Ordinal)
+            || trimmed.StartsWith("../", StringComparison.Ordinal)
+            || trimmed.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            imageUrl = trimmed;
+        }
+        else
+        {
             return false;
-
-        imageUrl = trimmed[4..^1].Trim();
+        }
         if (imageUrl.Length >= 2 &&
             ((imageUrl[0] == '\'' && imageUrl[^1] == '\'') ||
              (imageUrl[0] == '"' && imageUrl[^1] == '"')))

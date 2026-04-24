@@ -139,8 +139,13 @@ internal sealed class ImageLoadHandler : IImageLoadHandler
     {
         var uri = CommonUtils.TryGetUri(path);
 
-        if (uri.IsAbsoluteUri == false)
+        if (uri != null
+            && uri.IsAbsoluteUri == false
+            && !Path.IsPathRooted(path)
+            && baseUrl != null)
+        {
             uri = new Uri(baseUrl, uri);
+        }
 
         if (uri != null && uri.IsAbsoluteUri && uri.Scheme != "file")
         {

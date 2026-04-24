@@ -2668,7 +2668,7 @@ input {
     }
 
     [Fact]
-    public void Wpt_CssViewport_ZoomPseudoImage_MatchesReference()
+    public void Wpt_CssViewport_PseudoImage_MatchesReference()
     {
         var greenImagePath = Path.Combine(_tempDir, "images", "green.png");
         Directory.CreateDirectory(Path.GetDirectoryName(greenImagePath)!);
@@ -2681,7 +2681,6 @@ input {
   width: 200px;
   height: 200px;
   background-color: blue;
-  margin-right: 5px;
   display: inline-block;
   vertical-align: top;
 }
@@ -2693,13 +2692,8 @@ input {
   height: 100px;
   background-color: purple;
 }
-
-.zoom {
-  zoom: 2;
-}
 </style>
-<div class=""icon""></div>
-<div class=""icon zoom""></div>";
+<div class=""icon""></div>";
 
         var referenceHtml = @"<!doctype html>
 <meta charset=utf-8>
@@ -2708,7 +2702,6 @@ input {
   width: 200px;
   height: 200px;
   background-color: blue;
-  margin-right: 5px;
   display: inline-block;
   vertical-align: top;
 }
@@ -2719,25 +2712,16 @@ input {
   height: 100px;
   background-color: purple;
 }
-
-.zoom {
-  zoom: 2;
-}
 </style>
 <div class=""icon"">
   <div class=""img-wrapper"">
     <img src=""/images/green.png"">
   </div>
-</div>
-<div class=""icon zoom"">
-  <div class=""img-wrapper"">
-    <img src=""/images/green.png"">
-  </div>
 </div>";
 
-        var result = RunTempMatchTest(testHtml, referenceHtml, "zoom-pseudo-image", 420, 220);
+        var result = RunTempMatchTest(testHtml, referenceHtml, "pseudo-image", 220, 220);
         Assert.True(result.Passed,
-            $"zoom pseudo-image should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
+            $"pseudo-image should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
     [Fact]

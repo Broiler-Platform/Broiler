@@ -797,25 +797,15 @@ internal sealed class WptTestRunner
             var capturedWptRoot = wptRoot;
             stylesheetHandler = (_, args) =>
             {
-                var src = args.Src;
-                if (src != null && src.StartsWith("/", StringComparison.Ordinal))
-                {
-                    var rel = src.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
-                    var local = Path.Combine(capturedWptRoot, rel);
-                    if (File.Exists(local))
-                        args.SetSrc = local;
-                }
+                var local = TryResolveWptRootRelativePath(args.Src, capturedWptRoot);
+                if (local != null)
+                    args.SetSrc = local;
             };
             imageHandler = (_, args) =>
             {
-                var src = args.Src;
-                if (src != null && src.StartsWith("/", StringComparison.Ordinal))
-                {
-                    var rel = src.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
-                    var local = Path.Combine(capturedWptRoot, rel);
-                    if (File.Exists(local))
-                        args.Callback(local);
-                }
+                var local = TryResolveWptRootRelativePath(args.Src, capturedWptRoot);
+                if (local != null)
+                    args.Callback(local);
             };
         }
 
@@ -985,6 +975,16 @@ internal sealed class WptTestRunner
         }
     }
 
+    private static string? TryResolveWptRootRelativePath(string? src, string wptRoot)
+    {
+        if (src == null || !src.StartsWith("/", StringComparison.Ordinal))
+            return null;
+
+        var rel = src.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var local = Path.Combine(wptRoot, rel);
+        return File.Exists(local) ? local : null;
+    }
+
     /// <summary>
     /// Renders an HTML file through the full Broiler pipeline (script execution,
     /// anchor resolution, rendering) and returns the resulting bitmap.
@@ -1003,24 +1003,26 @@ internal sealed class WptTestRunner
         html = HtmlPostProcessor.Process(html);
 
         EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetHandler = null;
+        EventHandler<HtmlImageLoadEventArgs>? imageHandler = null;
         if (wptRoot != null)
         {
             var capturedWptRoot = wptRoot;
             stylesheetHandler = (_, args) =>
             {
-                var src = args.Src;
-                if (src != null && src.StartsWith("/", StringComparison.Ordinal))
-                {
-                    var rel = src.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
-                    var local = Path.Combine(capturedWptRoot, rel);
-                    if (File.Exists(local))
-                        args.SetSrc = local;
-                }
+                var local = TryResolveWptRootRelativePath(args.Src, capturedWptRoot);
+                if (local != null)
+                    args.SetSrc = local;
+            };
+            imageHandler = (_, args) =>
+            {
+                var local = TryResolveWptRootRelativePath(args.Src, capturedWptRoot);
+                if (local != null)
+                    args.Callback(local);
             };
         }
 
         return HtmlRender.RenderToImage(html, _width, _height, SKColors.White,
-            stylesheetLoad: stylesheetHandler, baseUrl: testBaseUrl);
+            stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl);
     }
 
     /// <summary>
