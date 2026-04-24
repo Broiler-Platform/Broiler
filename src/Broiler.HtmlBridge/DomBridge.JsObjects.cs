@@ -3431,7 +3431,7 @@ public sealed partial class DomBridge
                 {
                     continue;
                 }
-                baseTop += siblingRect.Height;
+                baseTop += GetNormalFlowHeightContribution(sibling, siblingRect);
                 baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-top"), sibling);
                 baseTop += ParseCssLengthToPixelsWithViewport(siblingProps.GetValueOrDefault("margin-bottom"), sibling);
             }
@@ -3452,6 +3452,61 @@ public sealed partial class DomBridge
         resolvedLeft += translateX;
 
         return (resolvedLeft, resolvedTop, width, height);
+    }
+
+    private double GetNormalFlowHeightContribution(
+        DomElement element,
+        (double Left, double Top, double Width, double Height) renderedRect)
+    {
+        var display = GetComputedProps(element).GetValueOrDefault("display");
+        if (!string.Equals(display, "contents", StringComparison.OrdinalIgnoreCase))
+            return renderedRect.Height;
+
+        var hasRect = false;
+        var minTop = 0.0;
+        var maxBottom = 0.0;
+        CollectDisplayContentsFlowExtents(element, ref hasRect, ref minTop, ref maxBottom);
+        return hasRect ? Math.Max(0, maxBottom - minTop) : 0;
+    }
+
+    private void CollectDisplayContentsFlowExtents(
+        DomElement element,
+        ref bool hasRect,
+        ref double minTop,
+        ref double maxBottom)
+    {
+        foreach (var child in element.Children)
+        {
+            if (child.IsTextNode || string.Equals(child.TagName, "#comment", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var childProps = GetComputedProps(child);
+            var childPosition = childProps.GetValueOrDefault("position");
+            if (string.Equals(childPosition, "absolute", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(childPosition, "fixed", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var childDisplay = childProps.GetValueOrDefault("display");
+            if (string.Equals(childDisplay, "contents", StringComparison.OrdinalIgnoreCase))
+            {
+                CollectDisplayContentsFlowExtents(child, ref hasRect, ref minTop, ref maxBottom);
+                continue;
+            }
+
+            var rect = ComputeRenderedRect(child);
+            if (!hasRect)
+            {
+                minTop = rect.Top;
+                maxBottom = rect.Top + rect.Height;
+                hasRect = true;
+                continue;
+            }
+
+            minTop = Math.Min(minTop, rect.Top);
+            maxBottom = Math.Max(maxBottom, rect.Top + rect.Height);
+        }
     }
 
     private static bool IsSvgGeometryContainer(DomElement? element) =>

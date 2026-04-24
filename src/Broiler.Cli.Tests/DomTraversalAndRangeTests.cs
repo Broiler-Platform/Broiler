@@ -1655,4 +1655,42 @@ document.body.appendChild(out);
         Assert.Contains("true|3", result);
         Assert.Contains("true|1|true|2", result);
     }
+
+    [Fact]
+    public void Range_GetBoundingClientRect_Includes_DisplayContents_Descendants()
+    {
+        var html = """
+<!DOCTYPE html>
+<html><body>
+<div id="container">
+  <div id="spacerBefore">spacer before</div>
+  <div style="display:contents">
+    <div style="height:30px; background:lightblue">HEIGHT: 30px</div>
+    <div style="display:contents">
+      <div style="display:contents">
+        <div style="height:30px; background:lightblue">HEIGHT: 30px</div>
+      </div>
+    </div>
+  </div>
+  <div id="spacerAfter">spacer after</div>
+</div>
+<div id="result"></div>
+<script>
+var spacerBefore = document.getElementById('spacerBefore');
+var spacerAfter = document.getElementById('spacerAfter');
+var expected = spacerAfter.getBoundingClientRect().top - spacerBefore.getBoundingClientRect().bottom;
+var rangeBetweenSpacers = document.createRange();
+rangeBetweenSpacers.setStartAfter(spacerBefore);
+rangeBetweenSpacers.setEndBefore(spacerAfter);
+var actualRect = rangeBetweenSpacers.getBoundingClientRect();
+document.getElementById('result').textContent =
+  'expected=' + expected + '|actual=' + actualRect.height + '|clientRects=' + rangeBetweenSpacers.getClientRects().length;
+</script>
+</body></html>
+""";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("expected=60|actual=60|clientRects=2", result);
+    }
 }
