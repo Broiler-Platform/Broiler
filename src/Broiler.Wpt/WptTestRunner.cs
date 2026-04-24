@@ -791,6 +791,7 @@ internal sealed class WptTestRunner
         // paths (e.g. "/fonts/ahem.css") against the WPT root directory so
         // that @import rules that use WPT-server-relative paths are honoured.
         EventHandler<HtmlStylesheetLoadEventArgs> stylesheetHandler = null;
+        EventHandler<HtmlImageLoadEventArgs> imageHandler = null;
         if (wptRoot != null)
         {
             var capturedWptRoot = wptRoot;
@@ -805,6 +806,17 @@ internal sealed class WptTestRunner
                         args.SetSrc = local;
                 }
             };
+            imageHandler = (_, args) =>
+            {
+                var src = args.Src;
+                if (src != null && src.StartsWith("/", StringComparison.Ordinal))
+                {
+                    var rel = src.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+                    var local = Path.Combine(capturedWptRoot, rel);
+                    if (File.Exists(local))
+                        args.Callback(local);
+                }
+            };
         }
 
         // Render via Broiler HTML stack.
@@ -812,7 +824,7 @@ internal sealed class WptTestRunner
         try
         {
             rendered = HtmlRender.RenderToImage(html, _width, _height, SKColors.White,
-                stylesheetLoad: stylesheetHandler, baseUrl: testBaseUrl);
+                stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl);
         }
         catch (Exception ex)
         {

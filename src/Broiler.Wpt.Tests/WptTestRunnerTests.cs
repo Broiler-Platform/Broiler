@@ -2670,6 +2670,10 @@ input {
     [Fact]
     public void Wpt_CssViewport_ZoomPseudoImage_MatchesReference()
     {
+        var greenImagePath = Path.Combine(_tempDir, "images", "green.png");
+        Directory.CreateDirectory(Path.GetDirectoryName(greenImagePath)!);
+        CreateSolidReferencePng(greenImagePath, SkiaSharp.SKColors.Lime);
+
         var testHtml = @"<!doctype html>
 <meta charset=utf-8>
 <style>

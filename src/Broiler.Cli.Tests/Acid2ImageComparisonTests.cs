@@ -18,25 +18,23 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class Acid2ImageComparisonTests
 {
-    /// <summary>
-    /// Path to the Acid2 HTML source, resolved relative to the repository root.
-    /// </summary>
-    private static string Acid2HtmlPath
+    private static string RepoRoot
     {
         get
         {
-            // Walk up from the test binary directory to find the repository root.
             var dir = AppDomain.CurrentDomain.BaseDirectory;
             while (dir != null && !File.Exists(Path.Combine(dir, "Broiler.slnx")))
                 dir = Path.GetDirectoryName(dir);
 
-            if (dir == null)
-                throw new InvalidOperationException(
-                    "Could not locate repository root (Broiler.slnx)");
-
-            return Path.Combine(dir, "acid", "acid2", "acid2.html");
+            return dir ?? throw new InvalidOperationException(
+                "Could not locate repository root (Broiler.slnx)");
         }
     }
+
+    /// <summary>
+    /// Path to the Acid2 HTML source, resolved relative to the repository root.
+    /// </summary>
+    private static string Acid2HtmlPath => Path.Combine(RepoRoot, "acid", "acid2", "acid2.html");
 
     /// <summary>
     /// Read the Acid2 HTML source and return it as a string.
@@ -1021,6 +1019,7 @@ public class Acid2ImageComparisonTests
     [Fact]
     public void CssPseudoElement_ContentUrl_Renders_Image_Content()
     {
+        var greenImagePath = Path.Combine(RepoRoot, "tests", "wpt", "references", "css", "reference", "ref-filled-green-300px-square.png");
         const string html = """
 <!doctype html>
 <meta charset=utf-8>
@@ -1042,7 +1041,15 @@ public class Acid2ImageComparisonTests
 <div class="icon"></div>
 """;
 
-        using var bitmap = HtmlRender.RenderToImage(html, 220, 220);
+        using var bitmap = HtmlRender.RenderToImage(
+            html,
+            220,
+            220,
+            imageLoad: (_, args) =>
+            {
+                if (args.Src == "/images/green.png")
+                    args.Callback(greenImagePath);
+            });
 
         var wrapperPixel = bitmap.GetPixel(10, 10);
         Assert.True(wrapperPixel.Blue > 120 && wrapperPixel.Red > 120,
