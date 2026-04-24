@@ -351,20 +351,19 @@ public sealed partial class DomBridge
         // Ensure the body's JS object is created so inline event attributes are compiled
         ToJSObject(body);
 
-        // Dispatch a 'load' event on the body element if it has a load handler
-        if (body.InlineEventHandlers.ContainsKey("load") || body.EventListeners.Count > 0)
+        // Dispatch a 'load' event on the body element. This covers inline
+        // attributes, property-assigned handlers (document.body.onload = fn),
+        // and addEventListener registrations using the same event path.
+        try
         {
-            try
-            {
-                var evt = _jsContext.Eval("(function() { var e = document.createEvent('Event'); e.initEvent('load', false, false); return e; })()") as JSObject;
-                if (evt != null)
-                    DispatchEventOnElement(body, evt);
-            }
-            catch (Exception ex)
-            {
-                RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireWindowLoadEvent",
-                    $"Error firing window load event: {ex.Message}", ex);
-            }
+            var evt = _jsContext.Eval("(function() { var e = document.createEvent('Event'); e.initEvent('load', false, false); return e; })()") as JSObject;
+            if (evt != null)
+                DispatchEventOnElement(body, evt);
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireWindowLoadEvent",
+                $"Error firing window load event: {ex.Message}", ex);
         }
     }
 

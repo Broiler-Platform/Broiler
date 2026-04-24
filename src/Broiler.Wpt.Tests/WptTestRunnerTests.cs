@@ -1454,6 +1454,32 @@ input {
     }
 
     [Fact]
+    public void Wpt_TimeoutTrack_TableHarness_BodyOnloadProperty_Fires_On_WindowLoad()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html>
+<body>
+  <div id="out"></div>
+</body>
+</html>
+""";
+
+        using var ctx = new Broiler.JavaScript.Engine.JSContext();
+        var bridge = new Broiler.HtmlBridge.DomBridge();
+        bridge.Attach(ctx, html, "file:///test.html");
+        ctx.Eval("""
+            document.body.onload = () => {
+              document.getElementById('out').textContent = 'ready';
+            };
+            """);
+        bridge.FireWindowLoadEvent();
+
+        var result = ctx.Eval("document.getElementById('out').textContent");
+        Assert.Equal("ready", result.ToString());
+    }
+
+    [Fact]
     public void Wpt_CssomView_ClientAndScrollMetricsIncludePadding_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>

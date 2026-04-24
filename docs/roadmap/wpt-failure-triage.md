@@ -7,6 +7,7 @@
 
 ### 2026-04-24
 
+- Phase 6 has widened again: `FireWindowLoadEvent()` now always dispatches the body `load` event path, so property-assigned `document.body.onload = fn` bootstrap handlers run through the same bridge event flow as inline/body listener cases; focused CLI and WPT guards cover that harness-side `css/css-tables/html5-table-formatting-3.html` timeout bootstrap slice locally.
 - Phase 6 has widened again: `scrollIntoView()` now converts inherited `scroll-padding-*` values from the padding owner’s zoom space into the active scroller’s coordinates before alignment, so focused CLI and WPT guards cover the remaining `css/css-viewport/zoom/scroll-padding.html` follow-up slice locally.
 
 ### 2026-04-23
