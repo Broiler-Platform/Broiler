@@ -1488,8 +1488,9 @@ public sealed partial class DomBridge
             if (lower is not ("initial" or "inherit" or "unset" or "revert"))
                 continue;
 
-            // Preserve "inherit" as-is so getComputedStyle returns the keyword
-            // rather than eagerly resolving it to the parent's value.
+            // Preserve "inherit" as-is in the computed-style map that backs
+            // getComputedStyle(), rather than eagerly resolving it to the
+            // parent's value during CSS-wide keyword normalization.
             if (lower == "inherit")
                 continue;
 
@@ -1690,6 +1691,9 @@ public sealed partial class DomBridge
 
         if (value.Trim().Equals("inherit", StringComparison.OrdinalIgnoreCase))
         {
+            // Keep any longhands that were already assigned by more specific
+            // declarations; only use the inherited font shorthand to backfill
+            // missing longhands in the computed map.
             if (!computed.ContainsKey("font-style")) computed["font-style"] = "inherit";
             if (!computed.ContainsKey("font-variant")) computed["font-variant"] = "inherit";
             if (!computed.ContainsKey("font-weight")) computed["font-weight"] = "inherit";
@@ -1744,6 +1748,8 @@ public sealed partial class DomBridge
         if (!hasNonEmptyFamily)
             return;
 
+        // Respect longhands that already won in the cascade; the shorthand only
+        // populates values that are still absent from the computed map.
         if (!computed.ContainsKey("font-style")) computed["font-style"] = fontStyle;
         if (!computed.ContainsKey("font-variant")) computed["font-variant"] = fontVariant;
         if (!computed.ContainsKey("font-weight")) computed["font-weight"] = fontWeight;

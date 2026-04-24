@@ -1083,9 +1083,11 @@ internal sealed class DomParser
 
         if (TryExtractPseudoElementImageUrl(contentValue, out var imageUrl))
         {
-            // The image is rendered by the nested CssBoxImage below.  Reset the
+            // The image is rendered by the nested CssBoxImage below. Reset the
             // wrapper box's content value so the extracted URL is not retained as
-            // generic generated content in the static box tree.
+            // generic generated content on the wrapper, which would otherwise
+            // make later pseudo-box handling treat the wrapper as still owning
+            // the original url(...) payload instead of the nested image box.
             pseudoBox.Content = CssConstants.Normal;
 
             var imageTag = new HtmlTag(
