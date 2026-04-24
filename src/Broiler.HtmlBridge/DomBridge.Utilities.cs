@@ -293,6 +293,9 @@ public sealed partial class DomBridge
         return null;
     }
 
+    private static bool IsSubDocRoot(DomElement element) =>
+        string.Equals(element.TagName, "#subdoc-root", StringComparison.Ordinal);
+
     /// <summary>
     /// Returns <c>true</c> if <paramref name="candidate"/> is a descendant of
     /// <paramref name="ancestor"/> in the DOM tree.
@@ -525,7 +528,7 @@ public sealed partial class DomBridge
         {
             // Skip sub-document roots — they are separate document trees
             // and must not be traversed as part of the parent document.
-            if (string.Equals(child.TagName, "#subdoc-root", StringComparison.Ordinal))
+            if (IsSubDocRoot(child))
                 continue;
             result.Add(child);
             CollectDescendants(child, result);

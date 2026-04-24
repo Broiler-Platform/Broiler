@@ -263,7 +263,7 @@ public sealed partial class DomBridge
                 var children = new List<JSValue>();
                 foreach (var child in element.Children)
                 {
-                    if (!string.Equals(child.TagName, "#subdoc-root", StringComparison.Ordinal))
+                    if (!IsSubDocRoot(child))
                         children.Add(ToJSObject(child));
                 }
                 return new JSArray(children);
@@ -277,7 +277,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var first = element.Children.FirstOrDefault(c =>
-                    !string.Equals(c.TagName, "#subdoc-root", StringComparison.Ordinal));
+                    !IsSubDocRoot(c));
                 return first != null ? ToJSObject(first) : JSNull.Value;
             }, "get firstChild"),
             null,
@@ -289,7 +289,7 @@ public sealed partial class DomBridge
             new JSFunction((in Arguments a) =>
             {
                 var last = element.Children.LastOrDefault(c =>
-                    !string.Equals(c.TagName, "#subdoc-root", StringComparison.Ordinal));
+                    !IsSubDocRoot(c));
                 return last != null ? ToJSObject(last) : JSNull.Value;
             }, "get lastChild"),
             null,
@@ -305,7 +305,7 @@ public sealed partial class DomBridge
                 var idx = siblings.IndexOf(element);
                 for (var i = idx + 1; i < siblings.Count; i++)
                 {
-                    if (!string.Equals(siblings[i].TagName, "#subdoc-root", StringComparison.Ordinal))
+                    if (!IsSubDocRoot(siblings[i]))
                         return ToJSObject(siblings[i]);
                 }
                 return JSNull.Value;
@@ -323,7 +323,7 @@ public sealed partial class DomBridge
                 var idx = siblings.IndexOf(element);
                 for (var i = idx - 1; i >= 0; i--)
                 {
-                    if (!string.Equals(siblings[i].TagName, "#subdoc-root", StringComparison.Ordinal))
+                    if (!IsSubDocRoot(siblings[i]))
                         return ToJSObject(siblings[i]);
                 }
                 return JSNull.Value;
@@ -828,7 +828,7 @@ public sealed partial class DomBridge
                 var result = new List<JSValue>();
                 foreach (var child in element.Children)
                 {
-                    if (!child.IsTextNode && !string.Equals(child.TagName, "#subdoc-root", StringComparison.Ordinal))
+                    if (!child.IsTextNode && !IsSubDocRoot(child))
                         result.Add(ToJSObject(child));
                 }
                 return new JSArray(result);
@@ -840,7 +840,7 @@ public sealed partial class DomBridge
         obj.FastAddProperty(
             (KeyString)"childElementCount",
             new JSFunction((in Arguments a) =>
-                new JSNumber(element.Children.Count(c => !c.IsTextNode && !string.Equals(c.TagName, "#subdoc-root", StringComparison.Ordinal))),
+                new JSNumber(element.Children.Count(c => !c.IsTextNode && !IsSubDocRoot(c))),
                 "get childElementCount"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -850,7 +850,7 @@ public sealed partial class DomBridge
             (KeyString)"firstElementChild",
             new JSFunction((in Arguments a) =>
             {
-                var first = element.Children.FirstOrDefault(c => !c.IsTextNode && !string.Equals(c.TagName, "#subdoc-root", StringComparison.Ordinal));
+                var first = element.Children.FirstOrDefault(c => !c.IsTextNode && !IsSubDocRoot(c));
                 return first != null ? ToJSObject(first) : JSNull.Value;
             }, "get firstElementChild"),
             null,
@@ -861,7 +861,7 @@ public sealed partial class DomBridge
             (KeyString)"lastElementChild",
             new JSFunction((in Arguments a) =>
             {
-                var last = element.Children.LastOrDefault(c => !c.IsTextNode && !string.Equals(c.TagName, "#subdoc-root", StringComparison.Ordinal));
+                var last = element.Children.LastOrDefault(c => !c.IsTextNode && !IsSubDocRoot(c));
                 return last != null ? ToJSObject(last) : JSNull.Value;
             }, "get lastElementChild"),
             null,
@@ -877,7 +877,7 @@ public sealed partial class DomBridge
                 var idx = siblings.IndexOf(element);
                 for (var i = idx + 1; i < siblings.Count; i++)
                 {
-                    if (!siblings[i].IsTextNode && !string.Equals(siblings[i].TagName, "#subdoc-root", StringComparison.Ordinal)) return ToJSObject(siblings[i]);
+                    if (!siblings[i].IsTextNode && !IsSubDocRoot(siblings[i])) return ToJSObject(siblings[i]);
                 }
                 return JSNull.Value;
             }, "get nextElementSibling"),
@@ -894,7 +894,7 @@ public sealed partial class DomBridge
                 var idx = siblings.IndexOf(element);
                 for (var i = idx - 1; i >= 0; i--)
                 {
-                    if (!siblings[i].IsTextNode && !string.Equals(siblings[i].TagName, "#subdoc-root", StringComparison.Ordinal)) return ToJSObject(siblings[i]);
+                    if (!siblings[i].IsTextNode && !IsSubDocRoot(siblings[i])) return ToJSObject(siblings[i]);
                 }
                 return JSNull.Value;
             }, "get previousElementSibling"),
